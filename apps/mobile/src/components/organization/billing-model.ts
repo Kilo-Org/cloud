@@ -37,9 +37,32 @@ export type OrgAutoTopUpConfig = Readonly<{
   thresholdCents: number;
 }>;
 
+/**
+ * The trial readout `organizations.list` carries for the active organization,
+ * as far as these screens read it. Both fields are optional in practice on a
+ * device that cached the list before they existed, so a missing value means
+ * "no running trial" rather than an error.
+ */
+export type OrgTrialState = Readonly<{
+  trialStatus: string | null | undefined;
+  trialEndsAt: string | null | undefined;
+}>;
+
 type BillingStateTone = 'good' | 'warn' | 'danger' | 'muted';
 
 export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
+
+/**
+ * The four stages in which the trial is still running, mirroring the server's
+ * `isRunningTrialStage`. The server publishes only these, so a device reads the
+ * same predicate over the payload rather than re-deriving dates.
+ */
+const RUNNING_TRIAL_STATUSES = {
+  trial_active: true,
+  trial_ending_soon: true,
+  trial_ending_very_soon: true,
+  trial_expires_today: true,
+} as const satisfies Record<string, true>;
 
 /**
  * Statuses Stripe reports after it stops billing: the subscription exists in
@@ -78,14 +101,51 @@ function formattedPeriodEnd(input: OrgSeatSubscription): string | null {
 }
 
 /**
+ * The trial readout as a state pill, or `null` when the organization is not on
+ * a running trial. Both surfaces that name the plan state read this one
+ * function, so the copy and the criteria cannot drift between them.
+ *
+ * The date is parsed with `parseTimestamp`: `new Date()` throws on the
+ * PostgreSQL timestamps Hermes cannot read, and the server sends the trial end
+ * as an ISO instant either way.
+ */
+export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null {
+  const status = trial.trialStatus;
+  if (status == null || !Object.hasOwn(RUNNING_TRIAL_STATUSES, status)) {
+    return null;
+  }
+  const endsAt = trial.trialEndsAt;
+  const date = endsAt == null ? null : parseTimestamp(endsAt);
+  if (date == null || Number.isNaN(date.getTime())) {
+    return { label: i18n.t('organization.billing.stateTrialing'), tone: 'good' };
+  }
+  return {
+    label: i18n.t('organization.billing.stateTrialEndsOn', {
+      date: formatDate(date, i18n.language, { year: 'numeric', month: 'short', day: 'numeric' }),
+    }),
+    tone: 'good',
+  };
+}
+
+/**
  * What the subscription is doing, in the words the reader needs: whether it
  * renews, when it stops, or that it is past due. Nothing here re-derives the
  * plan gate — `isTrialExpiredForEnforcement` owns that.
+ *
+ * `trial` is the boundary row's trial readout. An organization inside its
+ * Enterprise trial has bought no seats, so Stripe answers `null` and the row
+ * would claim there is no subscription while the trial is running; the trial
+ * branch speaks first in exactly that case. A subscription that does exist owns
+ * the row, including its own `trialing` status.
  */
-export function getOrgSubscriptionState(input: OrgSeatSubscription): BillingState {
+export function getOrgSubscriptionState(
+  input: OrgSeatSubscription,
+  trial?: OrgTrialState
+): BillingState {
   const subscription = input.subscription;
   if (subscription == null) {
-    return { label: i18n.t('organization.billing.stateNone'), tone: 'muted' };
+    const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
+    return trialState ?? { label: i18n.t('organization.billing.stateNone'), tone: 'muted' };
   }
   const { status } = subscription;
   const periodEnd = formattedPeriodEnd(input);

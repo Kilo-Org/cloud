@@ -140,7 +140,13 @@ export function OrganizationBillingScreen() {
   // no action.
   const changePlanOnBanner = planEnded && planChange.kind === 'link';
 
-  const subscriptionState = subscription.data ? getOrgSubscriptionState(subscription.data) : null;
+  // A running Enterprise trial has no seat subscription, so the row states the
+  // trial from the boundary row's own readout instead of reading as an
+  // organization that never subscribed.
+  const trial = { trialStatus: org.trialStatus, trialEndsAt: org.trialEndsAt };
+  const subscriptionState = subscription.data
+    ? getOrgSubscriptionState(subscription.data, trial)
+    : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.

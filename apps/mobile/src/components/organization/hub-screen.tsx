@@ -23,6 +23,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
+import { getOrgTrialStatusPill } from '@/components/organization/billing-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   getOrgKiloPassRowState,
@@ -183,6 +184,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
+  // The tier alone does not say the organization is on a running trial, and the
+  // row beside a block that names the trial would otherwise read as any other
+  // plan. The pill speaks the trial's own words — the same readout the billing
+  // screen's state row uses, from the boundary row the server already
+  // classified — and is absent whenever the trial is not what governs the
+  // organization.
+  const trialPill = getOrgTrialStatusPill({
+    trialStatus: org.trialStatus,
+    trialEndsAt: org.trialEndsAt,
+  });
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')
@@ -322,7 +333,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             valueStatus={
               planEnded
                 ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
-                : undefined
+                : (trialPill ?? undefined)
             }
             valueFace="text"
             last

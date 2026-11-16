@@ -5,6 +5,7 @@ import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
+  getOrgTrialStatusPill,
   getScheduledSeatChange,
   type OrgSeatSubscription,
 } from '@/components/organization/billing-model';
@@ -130,6 +131,75 @@ describe('getOrgSubscriptionState', () => {
     });
   });
 
+  it('states a running trial when there is no subscription', () => {
+    const state = getOrgSubscriptionState(subscription({ subscription: null }), {
+      trialStatus: 'trial_active',
+      trialEndsAt: '2026-11-24T00:00:00.000Z',
+    });
+    expect(state.tone).toBe('good');
+    expect(state.label.startsWith('Trial ends on ')).toBe(true);
+    expect(state.label).toContain('2026');
+  });
+
+  it('states the bare trial when the payload carries no end date', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_ending_soon',
+        trialEndsAt: null,
+      })
+    ).toEqual({ label: 'Trial', tone: 'good' });
+  });
+
+  it('states the bare trial when the end date cannot be read', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expires_today',
+        trialEndsAt: 'not-a-timestamp',
+      })
+    ).toEqual({ label: 'Trial', tone: 'good' });
+  });
+
+  it('keeps "No subscription" for an expired trial with no subscription', () => {
+    // The expired stages are the trial's past, so the row falls back to the
+    // state it always painted.
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expired_soft',
+        trialEndsAt: '2026-11-01T00:00:00.000Z',
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expired_hard',
+        trialEndsAt: '2026-10-01T00:00:00.000Z',
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+  });
+
+  it('keeps "No subscription" when the payload carries no trial at all', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: null,
+        trialEndsAt: null,
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: undefined,
+        trialEndsAt: undefined,
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+  });
+
+  it('lets a real subscription own the row even while a trial is running', () => {
+    const state = getOrgSubscriptionState(subscription(), {
+      trialStatus: 'trial_active',
+      trialEndsAt: '2026-11-24T00:00:00.000Z',
+    });
+    expect(state.tone).toBe('good');
+    expect(state.label.startsWith('Renews on ')).toBe(true);
+  });
+
   it('does not print an unknown provider status verbatim', () => {
     expect(getOrgSubscriptionState(withStatus('weird_future_status'))).toEqual({
       label: 'Unknown',
@@ -153,6 +223,25 @@ describe('getOrgSubscriptionState', () => {
       })
     );
     expect(state.label).toContain('2026');
+  });
+});
+
+describe('getOrgTrialStatusPill', () => {
+  it('states the end date of a running trial', () => {
+    const pill = getOrgTrialStatusPill({
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: '2026-11-19T00:00:00.000Z',
+    });
+    expect(pill?.tone).toBe('good');
+    expect(pill?.label.startsWith('Trial ends on ')).toBe(true);
+  });
+
+  it('has no pill when the trial is not what governs the organization', () => {
+    expect(getOrgTrialStatusPill({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
+    expect(
+      getOrgTrialStatusPill({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
+    ).toBeNull();
+    expect(getOrgTrialStatusPill({ trialStatus: null, trialEndsAt: null })).toBeNull();
   });
 });
 

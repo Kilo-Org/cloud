@@ -38,6 +38,9 @@ const boundary = vi.hoisted(() => ({
   balance: 5_000_000,
   plan: 'teams' as 'teams' | 'enterprise',
   isTrialExpiredForEnforcement: false,
+  /** The trial readout `organizations.list` carries; null for a subscribed org. */
+  trialStatus: null as string | null,
+  trialEndsAt: null as string | null,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
@@ -74,6 +77,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       seatCount: boundary.seatCount,
       plan: boundary.plan,
       isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+      trialStatus: boundary.trialStatus,
+      trialEndsAt: boundary.trialEndsAt,
     },
     isResolving: false,
   }),
@@ -129,10 +134,16 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }))
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
+  // The billing model's trial pill states the trial end; the date's own
+  // formatting is the real module's job and is pinned in its unit test.
+  formatDate: (date: Date) => date.toISOString().slice(0, 10),
 }));
 
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+  // The billing model parses the trial end with the shared helper, which exists
+  // to read timestamps Hermes' own `new Date` cannot.
+  parseTimestamp: (value: string) => new Date(value),
 }));
 
 // A suite that sets `current` pins the row state it needs; every other suite
@@ -296,6 +307,8 @@ beforeEach(() => {
   boundary.balance = 5_000_000;
   boundary.plan = 'teams';
   boundary.isTrialExpiredForEnforcement = false;
+  boundary.trialStatus = null;
+  boundary.trialEndsAt = null;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
@@ -406,6 +419,26 @@ describe('Organization hub plan', () => {
       tone: 'danger',
     });
     lapsed.unmount();
+  });
+
+  it('states the running trial beside the plan it governs', async () => {
+    boundary.plan = 'enterprise';
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = planRow(renderer);
+    // The tier keeps the row's ordinary ink; the trial is the state beside it,
+    // in the same words the billing screen's state row uses.
+    expect(row?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
+    expect(row?.props.valueTone).toBeUndefined();
+    expect(row?.props.valueStatus?.label).toBe('Trial ends on 2026-11-24');
+    expect(row?.props.valueStatus?.tone).toBe('good');
+    // A running trial is not the lapsed state, so nothing above the card
+    // explains an ending that has not happened.
+    expect(refusals(renderer)).toHaveLength(0);
+    unmount();
   });
 
   it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {

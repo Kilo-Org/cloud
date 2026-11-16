@@ -48,6 +48,9 @@ const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
   isTrialExpiredForEnforcement: false,
+  /** The trial readout `organizations.list` carries; null for a subscribed org. */
+  trialStatus: null as string | null,
+  trialEndsAt: null as string | null,
 }));
 
 /** The platform's answer for the billing destination: a link, or plain text. */
@@ -65,6 +68,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       seatCount: boundary.seatCount,
       requireSeats: boundary.requireSeats,
       isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+      trialStatus: boundary.trialStatus,
+      trialEndsAt: boundary.trialEndsAt,
       parentOrganizationId: null,
     },
     isResolving: false,
@@ -191,6 +196,12 @@ function seatsReadout(renderer: ReactTestRenderer): unknown {
   return row?.props.value;
 }
 
+/** The subscription state row's rendered value, as the screen hands it to `KvRow`. */
+function stateReadout(renderer: ReactTestRenderer): unknown {
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
+  return row?.props.value;
+}
+
 /** The manage-on-web destinations, as the screen builds them from `org-1`. */
 const SUBSCRIPTIONS_URL = 'http://localhost:3000/organizations/org-1/subscriptions';
 /** The auto top-up link's page: the billing page the destination mock returns. */
@@ -221,6 +232,8 @@ beforeEach(() => {
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
   boundary.isTrialExpiredForEnforcement = false;
+  boundary.trialStatus = null;
+  boundary.trialEndsAt = null;
   platform.billingActionKind = 'link';
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
@@ -263,6 +276,50 @@ describe('OrganizationBillingScreen failure states', () => {
     expect(queries.autoTopUp.refetch).toHaveBeenCalledTimes(1);
     expect(queries.subscription.refetch).not.toHaveBeenCalled();
     expect(queries.seats.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen state row', () => {
+  it('states the running trial when Stripe has no seat subscription', async () => {
+    // An organization inside its Enterprise trial has bought no seats, so the
+    // subscription read answers null and the row used to claim there was none.
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+    queries.subscription.data = {
+      subscription: null,
+      seatsUsed: 3,
+      totalSeats: 3,
+      nextSeatCount: null,
+      nextSeatCountEffectiveAt: null,
+      paidSeatItemId: null,
+      latestSeatPurchaseStatus: null,
+    };
+
+    const { renderer, unmount } = await mount();
+
+    const value = stateReadout(renderer);
+    expect(typeof value).toBe('string');
+    expect(String(value).startsWith('Trial ends on ')).toBe(true);
+    const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
+    expect(row?.props.valueTone).toBe('good');
+    unmount();
+  });
+
+  it('keeps "No subscription" for an organization with no trial and no subscription', async () => {
+    queries.subscription.data = {
+      subscription: null,
+      seatsUsed: 3,
+      totalSeats: 3,
+      nextSeatCount: null,
+      nextSeatCountEffectiveAt: null,
+      paidSeatItemId: null,
+      latestSeatPurchaseStatus: null,
+    };
+
+    const { renderer, unmount } = await mount();
+
+    expect(stateReadout(renderer)).toBe('No subscription');
     unmount();
   });
 });

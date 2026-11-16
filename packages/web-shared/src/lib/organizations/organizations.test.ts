@@ -212,6 +212,8 @@ describe('Organizations', () => {
           'requireSeats',
           'role',
           'seatCount',
+          'trialEndsAt',
+          'trialStatus',
         ].sort()
       );
       expect(Object.keys(result[0].seatCount).sort()).toEqual(['total', 'used'].sort());
@@ -240,6 +242,59 @@ describe('Organizations', () => {
       const [row] = await getUserOrganizationsWithSeats(user.id);
 
       expect(row?.isTrialExpiredForEnforcement).toBe(false);
+    });
+
+    test('publishes a running trial with the date it ends', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Trial Readout Org', user.id);
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      // A fresh organization is deep inside its 14-day window, so the row
+      // carries the stage a client renders "on trial" from.
+      expect(row?.trialStatus).toBe('trial_active');
+      // The date is the organization's own trial end, published as an ISO
+      // instant so a device never parses a Postgres timestamp.
+      expect(String(row?.trialEndsAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(Date.parse(String(row?.trialEndsAt))).toBe(
+        Date.parse(String(organization.free_trial_end_at))
+      );
+    });
+
+    test('publishes no trial once it has lapsed', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Lapsed Readout Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          require_seats: true,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.trialStatus).toBeNull();
+      expect(row?.trialEndsAt).toBeNull();
+    });
+
+    test('publishes no trial once a seat subscription pays for the plan', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Subscribed Readout Org', user.id);
+      await db.insert(organization_seats_purchases).values({
+        subscription_stripe_id: 'sub_readout_active',
+        organization_id: organization.id,
+        seat_count: 5,
+        amount_usd: 50.0,
+        starts_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        subscription_status: 'active',
+      });
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.trialStatus).toBeNull();
+      expect(row?.trialEndsAt).toBeNull();
     });
 
     test('keeps a lapsed trial entitled when trial messaging is suppressed', async () => {

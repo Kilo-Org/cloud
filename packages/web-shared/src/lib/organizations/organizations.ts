@@ -39,7 +39,11 @@ import {
 } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { classifyOrganizationEntitlement } from './trial-utils';
+import {
+  classifyOrganizationEntitlement,
+  getOrganizationTrialEndDate,
+  isRunningTrialStage,
+} from './trial-utils';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -131,18 +135,10 @@ export async function getUserOrganizationsWithSeats(
     );
 
   const now = new Date();
-  return results.map(result => ({
-    organizationName: result.organizationName,
-    organizationId: result.organizationId,
-    parentOrganizationId: result.parentOrganizationId,
-    role: result.role,
-    memberCount: result.total_member_count,
-    balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
-    requireSeats: result.requireSeats,
-    plan: result.plan,
-    created_at: result.createdAt,
-    isSalesDemo: result.isSalesDemo,
-    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+  return results.map(result => {
+    // One classification feeds both the gate verdict and the trial readout, so
+    // the two can never disagree about which state the organization is in.
+    const entitlement = classifyOrganizationEntitlement({
       organization: {
         created_at: result.createdAt,
         free_trial_end_at: result.freeTrialEndAt,
@@ -151,12 +147,38 @@ export async function getUserOrganizationsWithSeats(
       },
       latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
       now,
-    }).isTrialExpiredForEnforcement,
-    seatCount: {
-      used: result.total_member_count,
-      total: result.seatCountTotal,
-    },
-  }));
+    });
+    // A bypass (`displayStatus === 'subscribed'`) means the trial is not what
+    // governs the organization, and the expired stages are the trial's past, so
+    // only the four running stages are published. The date rides along with
+    // them: a client renders "trial ends on <date>" from the payload instead of
+    // re-deriving `free_trial_end_at ?? created_at + 14d` on the device.
+    const trialStatus = isRunningTrialStage(entitlement.displayStatus)
+      ? entitlement.trialStatus
+      : null;
+    return {
+      organizationName: result.organizationName,
+      organizationId: result.organizationId,
+      parentOrganizationId: result.parentOrganizationId,
+      role: result.role,
+      memberCount: result.total_member_count,
+      balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
+      requireSeats: result.requireSeats,
+      plan: result.plan,
+      created_at: result.createdAt,
+      isSalesDemo: result.isSalesDemo,
+      isTrialExpiredForEnforcement: entitlement.isTrialExpiredForEnforcement,
+      trialStatus,
+      trialEndsAt:
+        trialStatus == null
+          ? null
+          : getOrganizationTrialEndDate(result.freeTrialEndAt, result.createdAt).toISOString(),
+      seatCount: {
+        used: result.total_member_count,
+        total: result.seatCountTotal,
+      },
+    };
+  });
 }
 
 /**

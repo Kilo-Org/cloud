@@ -1665,12 +1665,14 @@ export function countAndStoreEmbeddingUsage(
   let json: z.infer<typeof embeddingResponseSchema> | undefined;
   const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
     if (!clonedResponse.body) return null;
-    const parsed = embeddingResponseSchema.parse(
-      parseUsageResponse(await clonedResponse.text(), statusCode)
+    const { text, timing } = await readResponseText(
+      clonedResponse.body,
+      usageContext.requestStartedAt
     );
+    const parsed = embeddingResponseSchema.parse(parseUsageResponse(text, statusCode));
     const stats = extractEmbeddingUsage(parsed, statusCode);
     json = parsed;
-    return stats;
+    return { ...stats, ...timing };
   });
 
   const usagePromise = usageStatsPromise.then(async usageStats => {

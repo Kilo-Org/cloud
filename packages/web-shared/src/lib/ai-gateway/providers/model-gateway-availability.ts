@@ -1,4 +1,7 @@
-import { OrganizationDataRegionSchema, type OrganizationDataRegion } from '@kilocode/db/schema-types';
+import {
+  OrganizationDataRegionSchema,
+  type OrganizationDataRegion,
+} from '@kilocode/db/schema-types';
 import {
   getOpenRouterModelsFromDatabase,
   getVercelModelsFromDatabase,

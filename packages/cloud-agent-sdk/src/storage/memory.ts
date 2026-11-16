@@ -1,14 +1,20 @@
 import type { Part } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
-import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
+import {
+  clearStorage,
+  deleteMessageFromStorage,
+  deletePartFromStorage,
+  type StorageContainers,
+} from './lifecycle';
+import type { PartsSnapshot } from './helpers';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
   createSubscriberRegistry,
-  forgetPartUpdateTime,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
@@ -21,12 +27,43 @@ function createMemoryStorage(): SessionStorage {
   let messageIds: string[] = [];
 
   const parts = new Map<string, Part[]>();
-  const partsSnapshot = new Map<string, Part[] | null>();
+  const partsSnapshot: PartsSnapshot = new Map<string, readonly ReadonlyPart[] | null>();
   // Ordering evidence of the last accepted update per part, owned next to the
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
 
   const subscribers = createSubscriberRegistry();
+
+  const containers: StorageContainers = {
+    messages: {
+      has: messageId => messages.has(messageId),
+      remove: messageId => {
+        messages.delete(messageId);
+      },
+      clear: () => messages.clear(),
+      ids: () => messageIds,
+      setIds: ids => {
+        messageIds = ids;
+      },
+    },
+    parts: {
+      get: messageId => parts.get(messageId),
+      set: (messageId, arr) => {
+        parts.set(messageId, arr);
+      },
+      has: messageId => parts.has(messageId),
+      remove: messageId => {
+        parts.delete(messageId);
+      },
+      messageIds: () => [...parts.keys()],
+      clear: () => parts.clear(),
+    },
+    snapshot: partsSnapshot,
+    evidence: partEvidence,
+    subscribers,
+    beforeStructuralChange: () => {},
+    publishPartsRevision: () => {},
+  };
 
   const storage: SessionStorage = {
     upsertMessage(info) {
@@ -72,15 +109,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deletePart(messageId, partId) {
-      forgetPartVersion(storage, messageId, partId);
-      const arr = parts.get(messageId);
-      if (!arr) return;
-      parts.set(
-        messageId,
-        arr.filter(p => p.id !== partId)
-      );
-      forgetPartUpdateTime(partEvidence, messageId, partId);
-      publishPartsChanged(partsSnapshot, subscribers, messageId);
+      deletePartFromStorage(storage, containers, messageId, partId);
     },
 
     getParts(messageId) {
@@ -98,47 +127,11 @@ function createMemoryStorage(): SessionStorage {
     subscribe: subscribers.subscribe,
 
     clear() {
-      storageVersions.delete(storage);
-      const existingMessageIds = [...messageIds];
-      const existingPartMessageIds = [...parts.keys()];
-
-      messages.clear();
-      messageIds = [];
-      parts.clear();
-      partsSnapshot.clear();
-      partEvidence.clear();
-
-      for (const messageId of existingMessageIds) {
-        subscribers.notifyMessage(messageId);
-      }
-      for (const messageId of existingPartMessageIds) {
-        subscribers.notifyParts(messageId);
-      }
-      subscribers.notifyMessageIds();
+      clearStorage(storage, containers);
     },
 
     deleteMessage(messageId) {
-      forgetMessageVersions(storage, messageId);
-      // A part delta can create parts before the message row (see
-      // `applyPartDelta`), so part state is dropped regardless of the row.
-      const hadMessage = messages.delete(messageId);
-      if (hadMessage) {
-        messageIds = messageIds.filter(id => id !== messageId);
-      }
-
-      const hadParts = parts.has(messageId);
-      for (const part of parts.get(messageId) ?? []) {
-        forgetPartUpdateTime(partEvidence, messageId, part.id);
-      }
-      parts.delete(messageId);
-      partsSnapshot.delete(messageId);
-      if (hadParts) {
-        subscribers.notifyParts(messageId);
-      }
-
-      if (!hadMessage) return;
-      subscribers.notifyMessage(messageId);
-      subscribers.notifyMessageIds();
+      deleteMessageFromStorage(storage, containers, messageId);
     },
   };
   return storage;

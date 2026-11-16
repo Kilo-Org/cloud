@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import {
   BookOpenCheck,
   Brain,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
@@ -98,7 +99,7 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
 }
 
 export function openModelPicker(
-  router: ImperativeRouter,
+  push: SinglePushRoute,
   params: {
     options: (ModelOption | SessionModelOption)[];
     value: string;
@@ -135,7 +136,7 @@ export function openModelPicker(
   // strip of the screen behind it below the sheet. Dismiss the keyboard first
   // so the sheet anchors at the window bottom (e1 spot check).
   Keyboard.dismiss();
-  router.push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
+  push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
 }
 
 export function ModelSelector({
@@ -148,7 +149,7 @@ export function ModelSelector({
   isLoading = false,
   lockLabel,
 }: Readonly<ModelSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
@@ -209,7 +210,7 @@ export function ModelSelector({
     if (effectivelyDisabled) {
       return;
     }
-    openModelPicker(router, {
+    openModelPicker(pushOnce, {
       options: pickerOptions,
       value,
       variant,

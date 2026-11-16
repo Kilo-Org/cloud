@@ -112,10 +112,7 @@ export function ProviderKeyNewScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('profile.providerKeys.newKeyTitle')}
-        backFallback={PROFILE_TAB_HREF}
-      />
+      <ScreenHeader title={t('profile.providerKeys.newKeyTitle')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

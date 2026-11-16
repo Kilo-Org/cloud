@@ -52,6 +52,9 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import { startBouncerDecide } from '@kilocode/web-shared/lib/bouncer/inference';
 import type * as BouncerInference from '@kilocode/web-shared/lib/bouncer/inference';
 import type { DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({
@@ -126,6 +129,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () =
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(),
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
@@ -221,6 +227,23 @@ const reconciledStats = {
   cacheWriteTokens: 0,
   cacheHitTokens: 0,
   is_byok: false,
+};
+
+const customPricingTier = {
+  start_context_length: 0,
+  pricing: {
+    prompt_per_million: 2,
+    completion_per_million: 10,
+    input_cache_read_per_million: null,
+    input_cache_write_per_million: null,
+  },
+};
+/** Both System One models billed at $2/M input and $10/M output tokens. */
+const systemOneCustomPricingConfig: CustomPricingConfig = {
+  models: [
+    { model: TYPESAFE_MODEL, pricing: [customPricingTier] },
+    { model: OTHER_SYSTEM_ONE_MODEL, pricing: [customPricingTier] },
+  ],
 };
 
 function makeRequest(
@@ -321,6 +344,7 @@ describe('handleSystemOneRequest', () => {
     mockedFetch.mockImplementation(async () => Response.json(upstreamBody));
     jest.mocked(fetchGeneration).mockResolvedValue(undefined);
     jest.mocked(mapToUsageStats).mockReturnValue(reconciledStats);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
   });
 
   afterEach(() => {
@@ -1274,6 +1298,76 @@ describe('handleSystemOneRequest', () => {
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
       expect.objectContaining({ is_free: true })
+    );
+  });
+
+  it('bills and reports custom pricing for an answered request', async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    // 23 input tokens at $2/M plus 7 output tokens at $10/M.
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...billedBody.usage, cost: 0.000116 },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 116, market_cost: 124, hasError: false }),
+      expect.objectContaining({ requested_model: TYPESAFE_MODEL, is_free: false })
+    );
+  });
+
+  it('bills custom pricing from the generation tokens when the body is unusable', async () => {
+    mockMeteredClock();
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage: undefined }));
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+    jest
+      .mocked(mapToUsageStats)
+      .mockReturnValue({ ...reconciledStats, inputTokens: 50, outputTokens: 10 });
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    // 50 input tokens at $2/M plus 10 output tokens at $10/M.
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: upstreamBody.id,
+        model: TYPESAFE_MODEL,
+        hasError: true,
+        status_code: 200,
+        latency: METERED_LATENCY_MS,
+        inputTokens: 50,
+        outputTokens: 10,
+        cost_mUsd: 200,
+        market_cost: 124,
+      }),
+      expect.objectContaining({ requested_model: TYPESAFE_MODEL, is_free: false })
+    );
+  });
+
+  it('charges a custom-priced free model nothing when the body is unusable', async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+    mockedFetch.mockResolvedValue(
+      Response.json({ ...upstreamBody, model: OTHER_SYSTEM_ONE_MODEL, usage: undefined })
+    );
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+
+    expect(
+      (await handleSystemOneRequest(makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })))
+        .status
+    ).toBe(502);
+
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
+      expect.objectContaining({ requested_model: OTHER_SYSTEM_ONE_MODEL, is_free: true })
     );
   });
 

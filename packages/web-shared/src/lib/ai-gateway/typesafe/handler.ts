@@ -344,24 +344,22 @@ export async function handleSystemOneRequest(request: NextRequest) {
         return;
       }
       const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
-      await logMicrodollarUsageAndReportToBouncer(
-        {
-          ...reconciled,
-          messageId: reconciled.messageId ?? stats.messageId,
-          model: reconciled.model ?? stats.model,
-          hasError: true,
-          status_code: stats.status_code,
-          cancelled: stats.cancelled,
-          // The generation lookup carries no latency, so the gateway's own
-          // measurement is the one this row reports, as it does for the other rows.
-          latency: stats.latency,
-          // Same split the answered path records: the provider cost stays on the
-          // row as `market_cost`, and a free model charges nothing.
-          cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
-          market_cost: reconciled.cost_mUsd,
-        },
-        context
-      );
+      const reconciledStats: MicrodollarUsageStats = {
+        ...reconciled,
+        messageId: reconciled.messageId ?? stats.messageId,
+        model: reconciled.model ?? stats.model,
+        hasError: true,
+        status_code: stats.status_code,
+        cancelled: stats.cancelled,
+        // The generation lookup carries no latency, so the gateway's own
+        // measurement is the one this row reports, as it does for the other rows.
+        latency: stats.latency,
+        market_cost: reconciled.cost_mUsd,
+      };
+      // Same pricing the answered path applies: the provider cost stays on the row as
+      // `market_cost`, custom pricing bills the generation's tokens, and a free model charges nothing.
+      applyUsagePricing(reconciledStats, context, customPricingConfig);
+      await logMicrodollarUsageAndReportToBouncer(reconciledStats, context);
     });
   };
 

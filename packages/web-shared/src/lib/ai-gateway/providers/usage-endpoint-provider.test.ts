@@ -278,6 +278,30 @@ describe('resolveUsageEndpointRoute', () => {
       expect(route.userByok).toEqual([credential('mistral')]);
     });
 
+    it('skip a key that does not decrypt while another still does', async () => {
+      mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral', 'codestral']);
+      const decrypt = storeKeys(key('mistral'), key('codestral'));
+      decrypt.mockImplementation(async providerId => {
+        if (providerId === 'mistral') throw new Error('undecryptable');
+        return credential(providerId);
+      });
+      vercelServes('embedding', vercelModelId);
+
+      const route = await resolveEmbedding();
+
+      expect(route.provider).toBe(VERCEL_AI_GATEWAY);
+      expect(route.userByok).toEqual([credential('codestral')]);
+    });
+
+    it('fail closed when no key decrypts', async () => {
+      mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral']);
+      const decrypt = storeKeys(key('mistral'));
+      decrypt.mockRejectedValue(new Error('undecryptable'));
+      vercelServes('embedding', vercelModelId);
+
+      await expect(resolveEmbedding()).rejects.toThrow('undecryptable');
+    });
+
     it('are ignored when disabled', async () => {
       mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral', 'codestral']);
       storeKeys(key('mistral', { isEnabled: false }), key('codestral'));

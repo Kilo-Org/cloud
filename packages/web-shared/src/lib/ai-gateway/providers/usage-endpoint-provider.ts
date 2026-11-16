@@ -122,10 +122,17 @@ export async function resolveUsageEndpointRoute(input: {
         const providerKeys = candidates.filter(
           candidate => !isGatewayUserByokProviderId(candidate.providerId)
         );
-        return {
-          provider: VERCEL_AI_GATEWAY,
-          userByok: await Promise.all(providerKeys.map(decrypt)),
-        };
+        // One undecryptable key does not fail the request while another still decrypts. When none
+        // does, fail closed so the request never falls back to a route Kilo pays for.
+        const results = await Promise.allSettled(providerKeys.map(decrypt));
+        const credentials = results.flatMap(result =>
+          result.status === 'fulfilled' ? [result.value] : []
+        );
+        if (credentials.length === 0) {
+          const [failure] = results;
+          throw failure?.status === 'rejected' ? failure.reason : new Error('No provider key');
+        }
+        return { provider: VERCEL_AI_GATEWAY, userByok: credentials };
       }
     }
   }

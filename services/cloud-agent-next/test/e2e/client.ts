@@ -325,6 +325,38 @@ export function deleteWorktree(
   });
 }
 
+/** Pages of root sessions the cleanup lookup reads before it gives up. */
+const HOSTED_SESSION_LOOKUP_PAGES = 5;
+
+/**
+ * The hosted workspace that owns a root session, or null when the newest root
+ * sessions do not include it. Cleanup uses it when the session is the last
+ * root of its workspace and only the workspace delete can remove it.
+ */
+export async function findHostedSessionWorkspaceId(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  signal?: AbortSignal
+): Promise<string | null> {
+  let cursor: string | undefined;
+  for (let page = 0; page < HOSTED_SESSION_LOOKUP_PAGES; page += 1) {
+    const result = await trpcCall<{
+      items: Array<{ cloudAgentSessionId: string; workspaceId: string | null }>;
+      nextCursor: string | null;
+    }>(
+      config,
+      'listHostedSessions',
+      { limit: 100, ...(cursor === undefined ? {} : { cursor }) },
+      { method: 'GET', signal }
+    );
+    const match = result.items.find(item => item.cloudAgentSessionId === cloudAgentSessionId);
+    if (match !== undefined) return match.workspaceId;
+    if (result.nextCursor === null) return null;
+    cursor = result.nextCursor;
+  }
+  return null;
+}
+
 export type StartSessionResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;

@@ -20,6 +20,8 @@ import { kilo2ConversationMessageSchema } from '../../src/shared/kilo2-conversat
 import {
   collectUntilTerminal,
   deleteSession,
+  deleteWorktree,
+  findHostedSessionWorkspaceId,
   fakeDirective,
   fetchFakeRequests,
   hasPreparationForMessage,
@@ -440,6 +442,26 @@ async function runHotTurn(
   }
 }
 
+const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+
+/** Delete the workspace of a last root session; a failure is returned, not thrown. */
+async function deleteOwningWorkspace(
+  config: DriverConfig,
+  sessionId: string
+): Promise<string | null> {
+  try {
+    const signal = AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS);
+    const worktreeId = await findHostedSessionWorkspaceId(config, sessionId, signal);
+    if (worktreeId === null) {
+      return 'deleteWorktree: the last root session has no workspace in the newest sessions';
+    }
+    await deleteWorktree(config, { worktreeId }, signal);
+    return null;
+  } catch (error) {
+    return `deleteWorktree: ${errorMessage(error)}`;
+  }
+}
+
 /**
  * Cleanup for one started session. Both requests are attempted independently
  * and each is bounded; a failure is reported but never thrown, so it never
@@ -463,7 +485,14 @@ export async function cleanupRemoteSession(
   try {
     await deleteSession(config, sessionId, AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS));
   } catch (error) {
-    failures.push(`deleteSession: ${errorMessage(error)}`);
+    const message = errorMessage(error);
+    if (message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      // The last root of a hosted workspace is removed only with its workspace.
+      const failure = await deleteOwningWorkspace(config, sessionId);
+      if (failure !== null) failures.push(failure);
+    } else {
+      failures.push(`deleteSession: ${message}`);
+    }
   }
   for (const failure of failures) {
     console.error(

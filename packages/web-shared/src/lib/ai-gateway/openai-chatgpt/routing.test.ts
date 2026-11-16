@@ -526,6 +526,107 @@ describe('checkOpenAiChatGptByok', () => {
     expect('top_p' in body).toBe(false);
   });
 
+  it.each([
+    { label: 'omitted', strictField: {} },
+    { label: 'undefined', strictField: { strict: undefined } },
+  ])('defaults $label function-tool strict without rewriting schemas', async ({ strictField }) => {
+    const provider = await buildProviderForTest();
+    const parameters = {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'integer', default: 10 },
+        labels: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+      required: ['query'],
+    };
+    const text: GatewayResponsesRequest['text'] = {
+      format: { type: 'json_schema', name: 'result', schema: { type: 'object' } },
+    };
+    const originalParameters = structuredClone(parameters);
+    const originalText = structuredClone(text);
+    const tool = { type: 'function' as const, name: 'search', parameters, strict: false };
+    // Incoming JSON can omit strict even though the SDK's function-tool type requires it.
+    Reflect.deleteProperty(tool, 'strict');
+    Object.assign(tool, strictField);
+    const body: GatewayResponsesRequest = {
+      model: REQUESTED_MODEL,
+      input: 'hello',
+      tools: [tool],
+      parallel_tool_calls: true,
+      text,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual([
+      { type: 'function', name: 'search', parameters: originalParameters, strict: false },
+    ]);
+    expect(body.parallel_tool_calls).toBe(true);
+    expect(body.text).toEqual(originalText);
+  });
+
+  it.each([true, false, null])('preserves explicit function-tool strict %p', async strict => {
+    const provider = await buildProviderForTest();
+    const tools: GatewayResponsesRequest['tools'] = [
+      { type: 'function', name: 'search', parameters: { type: 'object' }, strict },
+    ];
+    const originalTools = structuredClone(tools);
+    const body: GatewayResponsesRequest = { model: REQUESTED_MODEL, input: 'hello', tools };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual(originalTools);
+  });
+
+  it('leaves hosted and custom tools untouched', async () => {
+    const provider = await buildProviderForTest();
+    const tools: GatewayResponsesRequest['tools'] = [
+      { type: 'web_search' },
+      { type: 'custom', name: 'emit_text', format: { type: 'text' } },
+    ];
+    const originalTools = structuredClone(tools);
+    const body: GatewayResponsesRequest = { model: REQUESTED_MODEL, input: 'hello', tools };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual(originalTools);
+  });
+
+  it.each([null, {}, [null]])(
+    'leaves malformed tool definitions %p for upstream validation',
+    async tools => {
+      const provider = await buildProviderForTest();
+      const body = JSON.parse(
+        JSON.stringify({ model: REQUESTED_MODEL, input: 'hello', tools })
+      ) as GatewayResponsesRequest;
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.tools).toEqual(tools);
+    }
+  );
+
+  it.each([true, false, undefined])(
+    'leaves absent tools and parallel_tool_calls %p unchanged',
+    async parallelToolCalls => {
+      const provider = await buildProviderForTest();
+      const body: GatewayResponsesRequest = {
+        model: REQUESTED_MODEL,
+        input: 'hello',
+        ...(parallelToolCalls === undefined ? {} : { parallel_tool_calls: parallelToolCalls }),
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body).not.toHaveProperty('tools');
+      expect(body.parallel_tool_calls).toBe(parallelToolCalls);
+      if (parallelToolCalls === undefined) {
+        expect(body).not.toHaveProperty('parallel_tool_calls');
+      }
+    }
+  );
+
   it('keeps only the reasoning fields OpenAI accepts', async () => {
     const provider = await buildProviderForTest();
     const body: GatewayResponsesRequest = {
@@ -704,10 +805,18 @@ describe('checkOpenAiChatGptByok', () => {
 
   it('sends the partner key as Authorization and the delegated token upstream', async () => {
     const provider = await buildProviderForTest();
+    const tool = {
+      type: 'function' as const,
+      name: 'search',
+      parameters: { type: 'object' },
+      strict: false,
+    };
+    Reflect.deleteProperty(tool, 'strict');
     const body: GatewayResponsesRequest = {
       model: 'openai/gpt-5-nano',
       input: 'hello',
       provider: { only: ['openai'] },
+      tools: [tool],
     };
     const extraHeaders = await transformResponsesRequest(provider, body);
 
@@ -731,8 +840,12 @@ describe('checkOpenAiChatGptByok', () => {
     const headers = init.headers as Headers;
     expect(headers.get('Authorization')).toBe(`Bearer ${PARTNER_KEY}`);
     expect(headers.get(OPENAI_ON_BEHALF_OF_TOKEN_HEADER)).toBe(DELEGATED_TOKEN);
+    const outgoingBody = JSON.parse(init.body as string);
+    expect(outgoingBody.tools).toEqual([
+      { type: 'function', name: 'search', parameters: { type: 'object' }, strict: false },
+    ]);
     // api.openai.com rejects the gateway-only routing object.
-    expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
+    expect(outgoingBody).not.toHaveProperty('provider');
   });
 
   it('resolves the organization credential for an organization request', async () => {

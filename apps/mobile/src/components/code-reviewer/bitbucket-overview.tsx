@@ -1,5 +1,5 @@
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -50,7 +50,6 @@ export function BitbucketOverview({
   canEdit: boolean;
   permissionLoading: boolean;
 }>) {
-  const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
@@ -147,7 +146,7 @@ export function BitbucketOverview({
           models,
           modelsLoading,
           onOpenModelPicker: () => {
-            openModelPicker(router, {
+            openModelPicker(pushOnce, {
               options: models,
               value: data.modelSlug,
               variant: data.thinkingEffort ?? '',

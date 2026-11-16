@@ -8,13 +8,16 @@ import {
   thresholdError,
 } from '@/components/organization/low-balance-alert-validators';
 import { i18n } from '@/i18n';
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedUsd } from '@/lib/format';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 // `pnpm check:i18n` owns the copy; these assert which sentence a value earns,
 // echoing the spending-alert’s fixture instead of repeating the wording here.
 const CAP_SENTENCE = i18n.t('spendAlerts.thresholdMaxError', {
-  max: formatCurrency(1_000_000_000, i18n.language, 0),
+  max: formatPrefixedUsd(1_000_000_000, i18n.language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }),
 });
 const GREATER_THAN_ZERO_SENTENCE = i18n.t('organization.lowBalanceAlert.thresholdError');
 

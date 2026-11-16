@@ -23,7 +23,7 @@ import {
   remoteModelCatalogV1Schema,
   sessionsListDataSchema,
 } from './schemas';
-import type { SlashCommandInfo } from './schemas';
+import type { ActiveSessionData, SlashCommandInfo } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
 import type {
   CreateRemoteSessionInput,
@@ -630,6 +630,35 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       });
     }
 
+    /**
+     * Apply one `sessions.list` / `sessions.heartbeat` observation of this
+     * session. A payload that lists it names the owner connection to adopt,
+     * together with its status and capabilities; one that omits it stops the
+     * session. The events differ in where the owner id comes from — the matched
+     * `sessions.list` row versus the `sessions.heartbeat` envelope — and in what
+     * an omitted session means: `sessions.list` reports every session, so its
+     * silence clears the owner, while a heartbeat comes from any connected CLI,
+     * so only the owner's own heartbeat may clear it.
+     */
+    function applySessionObservation(
+      session: ActiveSessionData | undefined,
+      ownerId: string | undefined,
+      clearOwnerWhenAbsent: boolean
+    ): void {
+      if (session && ownerId !== undefined) {
+        setOwnerConnectionId(ownerId);
+        sessionStopped = false;
+        forwardHeartbeatStatus(session.status, session.scheduledAt);
+        publishCapabilities(session.capabilities);
+        return;
+      }
+
+      if (clearOwnerWhenAbsent || ownerId === ownerConnectionId) {
+        setOwnerConnectionId(null);
+        stopForDisconnectedSession();
+      }
+    }
+
     function handleSystemMessage(event: string, data: unknown): void {
       if (event === 'cli.disconnected') {
         const parsed = cliConnectionDataSchema.safeParse(data);
@@ -645,16 +674,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (!parsed.success) return;
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
-        if (session) {
-          setOwnerConnectionId(session.connectionId);
-          sessionStopped = false;
-          forwardHeartbeatStatus(session.status, session.scheduledAt);
-          publishCapabilities(session.capabilities);
-          return;
-        }
-
-        setOwnerConnectionId(null);
-        stopForDisconnectedSession();
+        applySessionObservation(session, session?.connectionId, true);
         return;
       }
 
@@ -663,18 +683,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (!parsed.success) return;
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
-        if (session) {
-          setOwnerConnectionId(parsed.data.connectionId);
-          sessionStopped = false;
-          forwardHeartbeatStatus(session.status, session.scheduledAt);
-          publishCapabilities(session.capabilities);
-          return;
-        }
-
-        if (ownerConnectionId === parsed.data.connectionId) {
-          setOwnerConnectionId(null);
-          stopForDisconnectedSession();
-        }
+        applySessionObservation(session, parsed.data.connectionId, false);
       }
     }
 

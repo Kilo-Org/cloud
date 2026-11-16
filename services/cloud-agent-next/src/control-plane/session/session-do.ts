@@ -2270,8 +2270,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Worker-facing live native read (spec §10). The route identity comes from
    * this DO's own registration, never from the caller, so a request cannot name
    * a sibling session or a stale runtime. A route that is not ready returns
-   * `not_ready` without preparing or waking the sandbox, and the Sandbox DO
-   * binds the request to the current wrapper socket as the generation fence.
+   * `runtime_offline`, which callers can tell apart from the Sandbox DO's
+   * transient `not_ready` wrapper failures, without preparing or waking the
+   * sandbox. The Sandbox DO binds the request to the current wrapper socket as
+   * the generation fence.
    */
   async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
     await this.initialized;
@@ -2285,14 +2287,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.route.state !== 'ready') {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+        error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
       };
     }
     const peer = this.sandboxPeer();
     if (peer === null) {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+        error: { code: 'runtime_offline', message: 'Sandbox is not available', retryable: true },
       };
     }
     const upstreamBranch = this.metadata?.repository?.upstreamBranch;

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LowBalanceAlertSheet } from '@/components/organization/low-balance-alert-sheet';
 import { i18n } from '@/i18n';
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedUsd } from '@/lib/format';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const boundary = vi.hoisted(() => ({
@@ -80,7 +80,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatNumber: String,
-  formatCurrency: String,
+  formatPrefixedUsd: String,
   normalizeLocalizedNumber: (value: string) => {
     const text = value.trim().replaceAll(',', '');
     return /^-?\d+(\.\d+)?$/.test(text) ? text : null;
@@ -250,7 +250,10 @@ describe('low balance alert sheet', () => {
     });
 
     const capSentence = i18n.t('spendAlerts.thresholdMaxError', {
-      max: formatCurrency(1_000_000_000, i18n.language, 0),
+      max: formatPrefixedUsd(1_000_000_000, i18n.language, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
     });
     expect(saveButtonOf(renderer).props.disabled).toBe(true);
     expect(

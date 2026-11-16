@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatCurrency, normalizeLocalizedNumber } from '@/lib/format';
+import { formatPrefixedUsd, normalizeLocalizedNumber } from '@/lib/format';
 
 /** Why a field's text is not yet a submittable amount. */
 type AmountProblem = 'empty' | 'unparsable' | 'aboveMaximum' | 'belowMinimum';
@@ -53,9 +53,12 @@ export function readAmountAtMost(value: string, maximum: number): AmountReading 
   return readAmount(value, { minimum: 0, maximum }, false);
 }
 
-/** The field's above-the-cap sentence, naming the cap as a plain USD amount. */
+/** The field's above-the-cap sentence, naming the cap as a whole USD amount. */
 export function aboveMaximumError(maximum: number): string {
   return i18n.t('spendAlerts.thresholdMaxError', {
-    max: formatCurrency(maximum, i18n.language, 0),
+    max: formatPrefixedUsd(maximum, i18n.language, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }),
   });
 }

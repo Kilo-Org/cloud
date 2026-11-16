@@ -26,20 +26,20 @@ All templates use a light-mode design system aligned with the Customer.io market
 
 ### Dark mode
 
-`renderTemplate()` injects a `<meta name="color-scheme">` pair and a `prefers-color-scheme: dark` stylesheet into every `emails/` template. Templates must not add their own `<style>` or `<meta>` tags. Every inline palette color needs the matching class on the same element (`email.test.ts` enforces this):
+`renderTemplate()` injects a `<meta name="color-scheme">` pair and a `prefers-color-scheme: dark` stylesheet into every `emails/` template. Templates must not add their own `<style>` tags or their own `color-scheme`/`supported-color-schemes` metas; the usual `<meta charset>` and `<meta name="viewport">` stay as they are. Every inline palette color needs the matching class on the same element (`email.test.ts` enforces this):
 
 | Inline style on the element | Class |
 |---|---|
-| Page/outer table (no `background-color`; never `#ffffff`) | `kc-page` |
-| `color: #1a1a1a` (not on `background-color: #1a1a1a`) | `kc-strong` |
+| Page/outer table (no `background`; never `#ffffff`/`#fff`) | `kc-page` |
+| `color: #1a1a1a` (not on `background: #1a1a1a`) | `kc-strong` |
 | `color: #333` | `kc-text` |
 | `color: #555` | `kc-muted` |
 | `color: #ccc` | `kc-faint` |
-| `background-color: #f6f6f4`, `border: 1px solid #ebebea` | `kc-box` |
+| `background-color: #f6f6f4` or `background: #f6f6f4`, `border: 1px solid #ebebea` | `kc-box` |
 | `border-top: 1px solid #ebebea` or `#eee` | `kc-divider` |
-| Primary CTA `background-color: #1a1a1a` | `kc-btn` |
+| Primary CTA `background-color: #1a1a1a` or `background: #1a1a1a` | `kc-btn` |
 
-One element can need several classes (e.g. `class="kc-divider kc-muted"`). Keep the inline styles unchanged — they are the light theme; the classes let dark clients override them. Never set `background-color: #ffffff`; leave the page background unset so the client's own (light or dark) background shows through, with `kc-page` only supplying the dark override. Any new inline palette value requires a corresponding class and dark rule.
+One element can need several classes (e.g. `class="kc-divider kc-muted"`). Keep the inline styles unchanged — they are the light theme; the classes let dark clients override them. Never set `background-color`/`background` to `#ffffff` or `#fff`; leave the page background unset so the client's own (light or dark) background shows through, with `kc-page` only supplying the dark override. Any new inline palette value requires a corresponding class and dark rule.
 
 ## Content Guidelines
 
@@ -56,21 +56,22 @@ Every template must include this branding footer below the content table:
 
 ```html
 <!-- Branding Footer -->
-<table width="520" cellpadding="0" cellspacing="0">
+<table width="520" cellpadding="0" cellspacing="0" role="presentation">
   <tr>
-    <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
-      <p
-        style="
-          margin: 0;
-          font-size: 11px;
-          color: #ccc;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-            Arial, sans-serif;
-        "
-      >
-        © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San Francisco, CA
-        94105, USA
-      </p>
+    <td
+      align="center"
+      class="kc-faint kc-divider"
+      style="
+        padding: 30px 20px;
+        border-top: 1px solid #eee;
+        color: #ccc;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+        font-size: 11px;
+      "
+    >
+      © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San Francisco, CA
+      94105, USA
     </td>
   </tr>
 </table>

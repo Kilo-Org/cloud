@@ -34,17 +34,17 @@
       "title": "Izdevumu brīdinājums",
       "body": "{{scopeName}} izdevumi pārsniedza ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Jauns drošības atradums ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} vietnē {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Jauns drošības atradums ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA brīdinājums",
-      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+      "title": "SLA brīdinājums"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pārkāpums",
-      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+      "title": "SLA pārkāpums"
     },
     "securityLifecycle": {
       "title": "Kilo",

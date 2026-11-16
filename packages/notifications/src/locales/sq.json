@@ -34,17 +34,17 @@
       "title": "Alarmi i shpenzimit",
       "body": "Shpenzimi i {{scopeName}} kaloi ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Gjetje e re sigurie ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} në {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Gjetje e re sigurie ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Paralajmërim SLA",
-      "body": "{{findingTitle}} në {{repoFullName}}"
+      "title": "Paralajmërim SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Shkelje SLA",
-      "body": "{{findingTitle}} në {{repoFullName}}"
+      "title": "Shkelje SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

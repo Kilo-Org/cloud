@@ -34,17 +34,17 @@
       "title": "වියදම් අනතුරු ඇඟවීම",
       "body": "{{scopeName}} වියදම ${{amountUsd}} ඉක්මවා ගියේය"
     },
-    "securityFindingNew": {
-      "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}} තුළ"
+    },
+    "securityFindingNew": {
+      "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA අනතුරු ඇඟවීම",
-      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+      "title": "SLA අනතුරු ඇඟවීම"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA උල්ලංඝනය",
-      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+      "title": "SLA උල්ලංඝනය"
     },
     "securityLifecycle": {
       "title": "Kilo",

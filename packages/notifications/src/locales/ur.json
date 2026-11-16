@@ -34,17 +34,17 @@
       "title": "خرچ الرٹ",
       "body": "{{scopeName}} کا خرچ ${{amountUsd}} سے تجاوز کر گیا"
     },
-    "securityFindingNew": {
-      "title": "نیا سیکیورٹی معاملہ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} میں {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "نیا سیکیورٹی معاملہ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA انتباہ",
-      "body": "{{findingTitle}} میں {{repoFullName}}"
+      "title": "SLA انتباہ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA خلاف ورزی",
-      "body": "{{findingTitle}} میں {{repoFullName}}"
+      "title": "SLA خلاف ورزی"
     },
     "securityLifecycle": {
       "title": "Kilo",

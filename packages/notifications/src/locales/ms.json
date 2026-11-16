@@ -34,17 +34,17 @@
       "title": "Amaran perbelanjaan",
       "body": "Perbelanjaan {{scopeName}} melebihi ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Penemuan keselamatan baharu ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} dalam {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Penemuan keselamatan baharu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Amaran SLA",
-      "body": "{{findingTitle}} dalam {{repoFullName}}"
+      "title": "Amaran SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Pelanggaran SLA",
-      "body": "{{findingTitle}} dalam {{repoFullName}}"
+      "title": "Pelanggaran SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

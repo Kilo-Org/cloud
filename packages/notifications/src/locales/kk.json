@@ -34,17 +34,17 @@
       "title": "Шығыс ескертуі",
       "body": "{{scopeName}} шығысы ${{amountUsd}} асты"
     },
-    "securityFindingNew": {
-      "title": "Жаңа қауіпсіздік табылғаны ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}} ішінде"
+    },
+    "securityFindingNew": {
+      "title": "Жаңа қауіпсіздік табылғаны ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA ескертуі",
-      "body": "{{findingTitle}} {{repoFullName}} ішінде"
+      "title": "SLA ескертуі"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA бұзылуы",
-      "body": "{{findingTitle}} {{repoFullName}} ішінде"
+      "title": "SLA бұзылуы"
     },
     "securityLifecycle": {
       "title": "Kilo",

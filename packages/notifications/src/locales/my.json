@@ -34,17 +34,17 @@
       "title": "အသုံးစရိတ် သတိပေးချက်",
       "body": "{{scopeName}} အသုံးစရိတ်သည် ${{amountUsd}} ကျော်လွန်သွားသည်"
     },
-    "securityFindingNew": {
-      "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA သတိပေးချက်",
-      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+      "title": "SLA သတိပေးချက်"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ချိုးဖောက်မှု",
-      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+      "title": "SLA ချိုးဖောက်မှု"
     },
     "securityLifecycle": {
       "title": "Kilo",

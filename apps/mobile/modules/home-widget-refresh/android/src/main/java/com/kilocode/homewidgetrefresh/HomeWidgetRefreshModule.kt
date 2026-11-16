@@ -10,32 +10,33 @@ class HomeWidgetRefreshModule : Module() {
   private var operationEpoch = 0L
   private var destroyed = false
   private val context get() = requireNotNull(appContext.reactContext)
+  /**
+   * The one fence against a stale JS operation: only a live module accepts an epoch above the one it already
+   * applied, and it applies the mutation inside the same lock.
+   */
+  private fun mutate(epoch: Long, action: () -> Unit) {
+    synchronized(operationLock) {
+      if (!destroyed && epoch > operationEpoch) {
+        operationEpoch = epoch
+        action()
+      }
+    }
+  }
+  /** JS numbers cross the bridge as Double; every native path keeps the epoch as a Long. */
+  private fun bridgeEpoch(epoch: Long): Double = epoch.toDouble()
   override fun definition() = ModuleDefinition {
     Name("HomeWidgetRefresh")
-    Function("getOperationEpoch") { synchronized(operationLock) { operationEpoch.toDouble() } }
+    Function("getOperationEpoch") { synchronized(operationLock) { bridgeEpoch(operationEpoch) } }
     AsyncFunction("configure") { payload: String ->
       val json = JSONObject(payload)
-      val epoch = json.getLong("operationEpoch")
-      synchronized(operationLock) {
-        if (!destroyed && epoch > operationEpoch) {
-          operationEpoch = epoch
-          HomeWidgetStore.configure(context, json)
-        }
-      }
+      mutate(json.getLong("operationEpoch")) { HomeWidgetStore.configure(context, json) }
     }
-    AsyncFunction("clear") { epoch: Long ->
-      synchronized(operationLock) {
-        if (!destroyed && epoch > operationEpoch) {
-          operationEpoch = epoch
-          HomeWidgetStore.clear(context)
-        }
-      }
-    }
+    AsyncFunction("clear") { epoch: Long -> mutate(epoch) { HomeWidgetStore.clear(context) } }
     AsyncFunction("setFixtureMode") { enabled: Boolean -> HomeWidgetStore.fixture(context, enabled) }
     AsyncFunction("getData") { HomeWidgetStore.data(context)?.let { jsonMap(it) } }
     AsyncFunction("getWidgetPushToken") { null as String? }
     AsyncFunction("widgetsChanged") { HomeWidgetStore.schedule(context, replace = true) }
-    AsyncFunction("isCurrent") { scope: String, epoch: Int, generation: String -> HomeWidgetStore.current(context, scope, epoch, generation) }
+    AsyncFunction("isCurrent") { scope: String, epoch: Long, generation: String -> HomeWidgetStore.current(context, scope, epoch, generation) }
     OnDestroy {
       synchronized(operationLock) {
         destroyed = true

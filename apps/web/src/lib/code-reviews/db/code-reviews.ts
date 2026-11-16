@@ -32,6 +32,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import type { ReviewGuidelineImport } from '@kilocode/db/schema-types';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import {
@@ -1578,6 +1579,7 @@ export async function updateRepositoryReviewInstructionsMetadata(
     used: boolean;
     ref: string | null;
     truncated: boolean;
+    imports?: ReviewGuidelineImport[];
   }
 ): Promise<void> {
   try {
@@ -1587,13 +1589,23 @@ export async function updateRepositoryReviewInstructionsMetadata(
         repository_review_instructions_used: metadata.used,
         repository_review_instructions_ref: metadata.ref,
         repository_review_instructions_truncated: metadata.truncated,
+        repository_review_instruction_imports:
+          metadata.imports?.map(entry => ({
+            ...entry,
+            source: sanitizePostgresString(entry.source),
+          })) ?? [],
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateRepositoryReviewInstructionsMetadata' },
-      extra: { reviewId, metadata },
+      extra: {
+        reviewId,
+        used: metadata.used,
+        truncated: metadata.truncated,
+        importCount: metadata.imports?.length ?? 0,
+      },
     });
     throw error;
   }

@@ -70,6 +70,7 @@ describe('fetchGitHubRootTextFileAtRef', () => {
       repo: 'widgets',
       path: 'REVIEW.md',
       ref: 'main',
+      request: { timeout: 10_000 },
     });
   });
 

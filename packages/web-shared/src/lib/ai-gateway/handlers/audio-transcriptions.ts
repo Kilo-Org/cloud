@@ -45,6 +45,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
+  freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -181,9 +182,20 @@ export async function handleAudioTranscriptionsRequest(
     return modelDoesNotExistResponse();
   }
 
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
+  const isFree = isFreeModel(requestedModelLowerCased);
+  if (isFree) {
+    const rateLimited = await freeModelRateLimitRejection({
+      request,
+      caller,
+      model: requestedModelLowerCased,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
+  }
+
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const { provider, userByok } = await getTranscriptionProvider();
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(ipAddress),
@@ -210,7 +222,7 @@ export async function handleAudioTranscriptionsRequest(
     api_kind: 'audio_transcriptions',
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: isFreeModel(requestedModelLowerCased),
+    is_free: isFree,
     promptInfo,
     isStreaming: false,
     user_byok: !!userByok,

@@ -10,6 +10,7 @@ import {
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -115,6 +116,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
       404
     );
   }
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
+  if (isFree) {
+    const rateLimited = await freeModelRateLimitRejection({
+      request,
+      caller,
+      model: requestedModel,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
+  }
   const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   // Unlike `readGatewayBalance`, System One funds free models from usage and
@@ -171,7 +182,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const providerPolicy =
     preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 
   // Resolve bouncer's identity once for this request. System One is always signed

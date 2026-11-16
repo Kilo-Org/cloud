@@ -17,6 +17,7 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -105,6 +106,12 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual<typeof LlmProxyHelpers>(
@@ -681,6 +688,33 @@ describe('handleSystemOneRequest', () => {
     expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'test-rate-limit-key');
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('limits a free System One model per account before reading the balance', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'rate_limit_exceeded' });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: user.id,
+    });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not count a paid System One model against the free-model limit', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
   });
 
   it.each([

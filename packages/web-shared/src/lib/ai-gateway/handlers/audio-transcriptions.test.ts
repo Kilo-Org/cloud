@@ -26,6 +26,7 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -56,6 +57,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
@@ -194,6 +201,51 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(request.bodyUsed).toBe(false);
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('limits signed-in callers of a free model per account before proxying', async () => {
+    setUserAuth();
+    mockedIsFreeModel.mockReturnValue(true);
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'vendor/transcribe:free',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message:
+        'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.',
+    });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: 'user-123',
+    });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not count paid transcription models against the free-model limit', async () => {
+    setUserAuth();
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello' }));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
   });
 
   it('never forwards a custom LLM id to a transcription upstream', async () => {

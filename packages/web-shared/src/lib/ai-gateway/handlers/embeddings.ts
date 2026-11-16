@@ -29,6 +29,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -139,6 +140,17 @@ export async function handleEmbeddingsRequest(
     return modelDoesNotExistResponse();
   }
 
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
+  if (isFreeModel(requestedModelLowerCased)) {
+    const rateLimited = await freeModelRateLimitRejection({
+      request,
+      caller,
+      model: requestedModelLowerCased,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
+  }
+
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
 
   const organizationDecision =
@@ -159,8 +171,6 @@ export async function handleEmbeddingsRequest(
     organizationId,
     organizationDecision?.eligibleProviderRoutes
   );
-
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
 
   const bouncerIp = bareIpLiteral(ipAddress);
   const ja4Digest = usageBase.context.fraudHeaders.http_x_vercel_ja4_digest;

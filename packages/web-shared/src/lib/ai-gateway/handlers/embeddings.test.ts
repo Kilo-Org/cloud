@@ -26,6 +26,7 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('@sentry/nextjs', () => ({
@@ -69,6 +70,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -332,6 +339,78 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(request.bodyUsed).toBe(false);
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  describe('free-model rate limit', () => {
+    const freeModel = 'acme/embedding-free:free';
+
+    function setAnonymousAuth() {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: new Response('unauthorized', { status: 401 }),
+        organizationId: undefined,
+      } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    }
+
+    it('limits anonymous callers of a free model per IP', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
+        error_type: ProxyErrorType.rate_limit_exceeded,
+      });
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'ip',
+        ipAddress: '127.0.0.1',
+      });
+      expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('limits signed-in callers of a free model per account', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      const body = await response.json();
+      expect(body).toMatchObject({ error_type: ProxyErrorType.rate_limit_exceeded });
+      expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'account',
+        kiloUserId: 'user-123',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves an anonymous free-model caller under the limit', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not count paid models', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+    });
   });
 
   it('never forwards a custom LLM id to an embeddings upstream', async () => {

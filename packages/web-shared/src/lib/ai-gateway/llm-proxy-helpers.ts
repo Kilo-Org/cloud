@@ -29,7 +29,6 @@ import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId'
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
-import { sentryRootSpan } from '../getRootSpan';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -1160,28 +1159,15 @@ async function parseMistralFimUsageFromStream(
     name: 'fim-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
   let reportedError = statusCode >= 400;
   let effectiveStatusCode = statusCode;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let usage: z.infer<typeof fimUsageSchema> | undefined;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
-    if (event.data === '[DONE]') return;
+    if (event.data === '[DONE]') return false;
 
     const json = fimResponseSchema.parse(JSON.parse(event.data));
 
@@ -1207,6 +1193,7 @@ async function parseMistralFimUsageFromStream(
     if (contentDelta) {
       responseContent += contentDelta;
     }
+    return !!contentDelta;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -1214,9 +1201,9 @@ async function parseMistralFimUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'fim.time_to_first_token_ms',
     () => ({ messageId, model })
   );
-  if (!firstTokenReceived) timeToFirstTokenSpan.end();
 
   if (!usage && !reportedError && !wasAborted && malformedEventCount === 0) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {

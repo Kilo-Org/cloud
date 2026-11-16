@@ -353,10 +353,18 @@ describe('runtime authorization', () => {
   it('refuses an unusable runtime environment input', async () => {
     const control = await admission();
     await expect(
-      createRuntimeAuthorization({ ...commonInput, environment: 'staging', token: control.token })
+      createRuntimeAuthorization({
+        ...commonInput,
+        environment: 'staging' as unknown as 'production',
+        token: control.token,
+      })
     ).rejects.toThrow();
     await expect(
-      createRuntimeAuthorization({ ...commonInput, environment: undefined, token: control.token })
+      createRuntimeAuthorization({
+        ...commonInput,
+        environment: undefined as unknown as 'production',
+        token: control.token,
+      })
     ).rejects.toThrow();
   });
 

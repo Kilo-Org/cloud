@@ -10,7 +10,7 @@
     "./classifier": "./src/classifier/index.ts"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/auto-routing-contracts/src",
     "test": "vitest run"
   },

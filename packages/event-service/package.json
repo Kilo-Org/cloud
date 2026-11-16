@@ -13,7 +13,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/event-service/src"
   },
   "devDependencies": {

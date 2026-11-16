@@ -11,7 +11,7 @@
     "./session-live-summary": "./src/session-live-summary.ts"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/session-ingest-contracts/src"
   },
   "dependencies": {

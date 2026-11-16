@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/container-usage/src",
     "test": "vitest run"
   },

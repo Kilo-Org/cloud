@@ -209,12 +209,13 @@ describe('POST /api/openrouter/models/validate', () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ valid: true });
-      expect(mockedGetAvailableModelsForOrganization).toHaveBeenCalledWith(
-        'org-1',
-        { type: 'member', kiloUserId: 'member-1' },
-        'member',
-        { fromDb: readDb, countryCode: null }
-      );
+      const [organizationId, subject, audience, options] =
+        mockedGetAvailableModelsForOrganization.mock.calls[0]!;
+      expect(organizationId).toBe('org-1');
+      expect(subject).toEqual({ type: 'member', kiloUserId: 'member-1' });
+      expect(audience).toBe('member');
+      expect(options.fromDb).toBe(readDb);
+      expect(options.countryCode).toBeNull();
       expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
       expect(mockedGetDirectByokModelsForUser).not.toHaveBeenCalled();
     });

@@ -16,7 +16,11 @@ import {
   startSecurityAnalysis,
 } from './launch.js';
 import { generateControlToken, generateTriageToken } from './token.js';
-import { SESSION_CLEANUP_TIMEOUT_MS, SESSION_INTERRUPT_TIMEOUT_MS } from './session-interrupt.js';
+import type * as SessionInterruptModule from './session-interrupt.js';
+import {
+  SESSION_CLEANUP_TIMEOUT_MS,
+  interruptAnalysisCloudAgentSession,
+} from './session-interrupt.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
@@ -30,6 +34,16 @@ vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecyc
 vi.mock('./token.js', () => ({ generateControlToken: vi.fn(), generateTriageToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 vi.mock('./credit-admission.js', () => ({ readAnalysisCreditAdmission: vi.fn() }));
+vi.mock('./session-interrupt.js', async importOriginal => {
+  const actual = await importOriginal<typeof SessionInterruptModule>();
+  return {
+    ...actual,
+    // The cleanup's bound is asserted through the `timeoutMs` the start passes,
+    // so the mock still runs the real interrupt and its request reaches the
+    // stubbed fetch instead of hanging the test until the deadline.
+    interruptAnalysisCloudAgentSession: vi.fn(actual.interruptAnalysisCloudAgentSession),
+  };
+});
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const workerConfig = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
@@ -800,45 +814,42 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(1);
   });
 
-  it('bounds the cleanup interrupt so the start outcome still settles', async () => {
+  it('bounds the cleanup interrupt to the cleanup constant', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
     vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
     const cloudAgentFetch = vi
       .fn()
-      .mockResolvedValueOnce(prepareSessionResponse('agent-session-hang'))
+      .mockResolvedValueOnce(prepareSessionResponse('agent-session-cleanup'))
       .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }))
-      .mockImplementationOnce((request: Request) => {
-        // The interrupt peer accepts the request and never answers; only the
-        // interrupt's own deadline settles it.
-        const { promise, reject } = Promise.withResolvers<Response>();
-        request.signal.addEventListener('abort', () => reject(request.signal.reason), {
-          once: true,
-        });
-        return promise;
-      });
+      .mockResolvedValue(new Response('', { status: 200 }));
 
-    const startedAt = Date.now();
-    await expect(
-      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
-    ).resolves.toEqual({
+    const params = createParams(false, cloudAgentFetch as never);
+    await expect(startSecurityAnalysis(params)).resolves.toEqual({
       started: false,
       error: 'initiate unavailable',
       failureNeedsLifecycleTransition: true,
     });
-    const elapsedMs = Date.now() - startedAt;
 
+    // The settlement stays observable: the start resolves and the cleanup
+    // interrupts exactly the session this attempt prepared.
     const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
     expect(interrupts).toHaveLength(1);
     const interrupt = interrupts[0];
     if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
-    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-hang' });
-    expect(interrupt.signal.aborted).toBe(true);
-    // The cleanup carries SESSION_CLEANUP_TIMEOUT_MS rather than the restart
-    // path's SESSION_INTERRUPT_TIMEOUT_MS, so the settlement is observable
-    // inside the shorter bound.
-    expect(elapsedMs).toBeGreaterThanOrEqual(SESSION_CLEANUP_TIMEOUT_MS - 50);
-    expect(elapsedMs).toBeLessThan(SESSION_INTERRUPT_TIMEOUT_MS);
-  }, 8_000);
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-cleanup' });
+
+    // The cleanup carries SESSION_CLEANUP_TIMEOUT_MS, not the interrupt
+    // default: the start outcome is already decided, so it must not hold the
+    // queue consumer message for the restart path's longer deadline.
+    expect(vi.mocked(interruptAnalysisCloudAgentSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(interruptAnalysisCloudAgentSession)).toHaveBeenCalledWith({
+      env: params.env,
+      authToken: 'control-token',
+      cloudAgentSessionId: 'agent-session-cleanup',
+      findingId: finding.id,
+      timeoutMs: SESSION_CLEANUP_TIMEOUT_MS,
+    });
+  });
 
   it('does not interrupt the prepared session when the start succeeds', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);

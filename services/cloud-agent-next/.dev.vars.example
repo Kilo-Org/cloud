@@ -39,9 +39,11 @@ CLOUD_AGENT_MCP_URL_OVERRIDE=http://host.docker.internal:8815/mcp
 # @url cloud-agent-next
 WORKER_URL=http://host.docker.internal:8794
 
-# Deployment environment bound into runtime admission checks; the web app's
-# tokens carry the same value from process.env.NODE_ENV (development locally).
-# @from NODE_ENV
+# Deployment environment bound into runtime admission checks. It stays
+# `development` here on purpose: a machine-local .env.local synced from a
+# deployed environment can carry NODE_ENV=production, while `next dev` and this
+# Worker both run as development.
+# @override
 ENVIRONMENT=development
 
 # Preview subdomain suffix; unset turns preview off (the web app reads it from the Worker).

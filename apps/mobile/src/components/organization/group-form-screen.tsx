@@ -7,7 +7,6 @@ import { Users } from '@/components/ui/icons';
 import { EmptyState } from '@/components/empty-state';
 import { GroupForm } from '@/components/organization/group-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
@@ -73,7 +72,7 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <PermissionDenied description={orgCopy(t, 'groupsPermissionDenied')} />
+        <PermissionDenied description={t('organization.groups.permissionDenied')} />
       </View>
     );
   }
@@ -100,7 +99,7 @@ function GroupNotFound() {
       <EmptyState
         icon={Users}
         placement="top"
-        title={orgCopy(t, 'groupsNotFound')}
+        title={t('organization.groups.notFound')}
         action={
           <Button
             variant="outline"

@@ -7,7 +7,6 @@ import { Plus, Users } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { OrgRecordRow } from '@/components/organization/org-record-row';
 import { QueryError } from '@/components/query-error';
@@ -74,7 +73,9 @@ export function OrganizationGroupsScreen() {
 
   let body: ReactNode = null;
   if (!enterprise) {
-    body = <EmptyState icon={Users} placement="top" title={orgCopy(t, 'groupsEnterpriseOnly')} />;
+    body = (
+      <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
+    );
   } else if (groupsQuery.isPending) {
     body = <GroupsSkeleton />;
   } else if (errorView) {
@@ -88,10 +89,10 @@ export function OrganizationGroupsScreen() {
   } else if (memberGroups !== null) {
     body = (
       <View className="mx-6 gap-2">
-        <Text variant="eyebrow">{orgCopy(t, 'groupsMemberViewTitle')}</Text>
+        <Text variant="eyebrow">{t('organization.groups.memberViewTitle')}</Text>
         {memberGroups.length === 0 ? (
           <Text variant="muted" className="text-sm">
-            {orgCopy(t, 'groupsMemberViewEmpty')}
+            {t('organization.groups.memberViewEmpty')}
           </Text>
         ) : (
           <View className="overflow-hidden rounded-lg bg-secondary">
@@ -112,8 +113,8 @@ export function OrganizationGroupsScreen() {
       <EmptyState
         icon={Users}
         placement="top"
-        title={orgCopy(t, 'groupsEmptyTitle')}
-        description={orgCopy(t, 'groupsEmptyDescription')}
+        title={t('organization.groups.emptyTitle')}
+        description={t('organization.groups.emptyDescription')}
         action={
           canManage ? (
             <Button
@@ -122,7 +123,7 @@ export function OrganizationGroupsScreen() {
                 openGroupForm();
               }}
             >
-              <Text className="text-primary-foreground">{orgCopy(t, 'groupsCreate')}</Text>
+              <Text className="text-primary-foreground">{t('organization.groups.create')}</Text>
             </Button>
           ) : undefined
         }
@@ -135,11 +136,10 @@ export function OrganizationGroupsScreen() {
           <OrgRecordRow
             key={group.id}
             title={group.name}
-            meta={orgCopy(
-              t,
-              group.memberIds.length === 1 ? 'groupsMemberCountOne' : 'groupsMemberCount',
-              { displayCount: formatNumber(group.memberIds.length, i18n.language) }
-            )}
+            meta={t('organization.groups.memberCount', {
+              count: group.memberIds.length,
+              displayCount: formatNumber(group.memberIds.length, i18n.language),
+            })}
             description={group.description ?? undefined}
             accessibilityLabel={group.name}
             onPress={
@@ -163,7 +163,7 @@ export function OrganizationGroupsScreen() {
         headerRight={
           enterprise && canManage ? (
             <IconButton
-              accessibilityLabel={orgCopy(t, 'groupsCreate')}
+              accessibilityLabel={t('organization.groups.create')}
               onPress={() => {
                 openGroupForm();
               }}

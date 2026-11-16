@@ -7,7 +7,6 @@ import { Plus, SlidersHorizontal } from '@/components/ui/icons';
 import { EmptyState } from '@/components/empty-state';
 import { type OrgMode } from '@/components/organization/org-mode-form-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { OrgRecordRow } from '@/components/organization/org-record-row';
 import { QueryError } from '@/components/query-error';
@@ -91,8 +90,8 @@ export function OrganizationModesScreen() {
       <EmptyState
         icon={SlidersHorizontal}
         placement="top"
-        title={orgCopy(t, 'modesEmptyTitle')}
-        description={orgCopy(t, 'modesEmptyDescription')}
+        title={t('organization.modes.emptyTitle')}
+        description={t('organization.modes.emptyDescription')}
         action={
           <Button
             className={STATE_ACTION_CLASS}
@@ -100,7 +99,7 @@ export function OrganizationModesScreen() {
               openModeForm();
             }}
           >
-            <Text className="text-primary-foreground">{orgCopy(t, 'modesCreate')}</Text>
+            <Text className="text-primary-foreground">{t('organization.modes.create')}</Text>
           </Button>
         }
       />
@@ -132,7 +131,7 @@ export function OrganizationModesScreen() {
         title={t('agentChat.modePicker.customModes')}
         headerRight={
           <IconButton
-            accessibilityLabel={orgCopy(t, 'modesCreate')}
+            accessibilityLabel={t('organization.modes.create')}
             onPress={() => {
               openModeForm();
             }}

@@ -5,10 +5,6 @@ import {
   MODE_TOOL_GROUPS,
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
-import {
-  orgCopy,
-  type OrgCustomizationCopyKey,
-} from '@/components/organization/org-customization-copy';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Switch } from '@/components/ui/switch';
@@ -16,12 +12,12 @@ import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 const TOOL_LABEL_KEYS = {
-  read: 'modesToolRead',
-  edit: 'modesToolEdit',
-  browser: 'modesToolBrowser',
-  command: 'modesToolCommand',
-  mcp: 'modesToolMcp',
-} as const satisfies Record<ModeToolGroup, OrgCustomizationCopyKey>;
+  read: 'organization.modes.tool.read',
+  edit: 'organization.modes.tool.edit',
+  browser: 'organization.modes.tool.browser',
+  command: 'organization.modes.tool.command',
+  mcp: 'organization.modes.tool.mcp',
+} as const satisfies Record<ModeToolGroup, string>;
 
 type ModeToolsFieldsProps = Readonly<{
   groups: readonly ModeToolGroup[];
@@ -55,7 +51,7 @@ export function ModeToolsFields({
   return (
     <>
       <View className="gap-2">
-        <FormFieldLabel label={orgCopy(t, 'modesToolsLabel')} />
+        <FormFieldLabel label={t('profiles.agents.tools')} />
         <View className="overflow-hidden rounded-lg bg-secondary">
           {MODE_TOOL_GROUPS.map((group, index) => (
             <View
@@ -65,16 +61,14 @@ export function ModeToolsFields({
                 index < MODE_TOOL_GROUPS.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
             >
-              <Text className="flex-1 text-sm text-foreground">
-                {orgCopy(t, TOOL_LABEL_KEYS[group])}
-              </Text>
+              <Text className="flex-1 text-sm text-foreground">{t(TOOL_LABEL_KEYS[group])}</Text>
               <Switch
                 value={groups.includes(group)}
                 disabled={disabled}
                 onValueChange={checked => {
                   onToggleGroup(group, checked);
                 }}
-                accessibilityLabel={orgCopy(t, TOOL_LABEL_KEYS[group])}
+                accessibilityLabel={t(TOOL_LABEL_KEYS[group])}
               />
             </View>
           ))}
@@ -84,7 +78,7 @@ export function ModeToolsFields({
       {groups.includes('edit') ? (
         <View className="gap-4 rounded-lg border border-border p-4">
           <FormField
-            label={orgCopy(t, 'modesRestrictionPattern')}
+            label={t('organization.modes.restrictionPattern')}
             defaultValue={editFileRegex}
             autoCapitalize="none"
             autoCorrect={false}
@@ -93,10 +87,10 @@ export function ModeToolsFields({
             onChangeText={onChangeFilePattern}
           />
           <Text variant="muted" className="text-xs">
-            {orgCopy(t, 'modesRestrictionHint')}
+            {t('organization.modes.restrictionHint')}
           </Text>
           <FormField
-            label={orgCopy(t, 'modesRestrictionLabel')}
+            label={t('organization.modes.restrictionLabel')}
             defaultValue={editRestrictionLabel}
             disabled={disabled}
             onChangeText={onChangeRestrictionLabel}

@@ -36,7 +36,7 @@ export function OrgFormActions({
       {deleteLabel === undefined || onDelete === undefined ? null : (
         <Button
           variant="outline-destructive"
-          disabled={disabled}
+          disabled={saving || removing}
           loading={removing}
           onPress={onDelete}
         >

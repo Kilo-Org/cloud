@@ -5,7 +5,6 @@ import { View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { ModeForm } from '@/components/organization/mode-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -85,7 +84,7 @@ function ModeNotFound() {
       <EmptyState
         icon={SlidersHorizontal}
         placement="top"
-        title={orgCopy(t, 'modesNotFound')}
+        title={t('organization.modes.notFound')}
         action={
           <Button
             variant="outline"

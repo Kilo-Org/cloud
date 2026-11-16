@@ -13,7 +13,6 @@ import {
   toggleOrgGroupMember,
   toggleOrgGroupMembers,
 } from '@/components/organization/org-group-form-model';
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
@@ -154,9 +153,9 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       return;
     }
     confirm({
-      title: orgCopy(t, 'groupsDeleteTitle'),
-      message: orgCopy(t, 'groupsDeleteMessage'),
-      confirmLabel: orgCopy(t, 'groupsDeleteAction'),
+      title: t('organization.groups.deleteTitle'),
+      message: t('organization.groups.deleteMessage'),
+      confirmLabel: t('organization.groups.deleteAction'),
       onConfirm: () => {
         mutations.remove.mutate({ groupId: group.id }, { onSuccess: leaveToList });
       },
@@ -169,7 +168,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={group === undefined ? orgCopy(t, 'groupsCreate') : group.name} />
+      <ScreenHeader title={group === undefined ? t('organization.groups.create') : group.name} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-5 px-6 pb-10 pt-4"
@@ -178,7 +177,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
         showsVerticalScrollIndicator={false}
       >
         <FormField
-          label={orgCopy(t, 'groupsNameLabel')}
+          label={t('organization.groups.nameLabel')}
           required
           defaultValue={nameRef.current}
           maxLength={ORG_GROUP_NAME_MAX_LENGTH}
@@ -186,7 +185,11 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
           error={
             nameError === null
               ? undefined
-              : orgCopy(t, nameError === 'required' ? 'groupsNameRequired' : 'groupsNameTooLong')
+              : t(
+                  nameError === 'required'
+                    ? 'organization.groups.nameRequired'
+                    : 'organization.groups.nameTooLong'
+                )
           }
           onChangeText={value => {
             nameRef.current = value;
@@ -197,7 +200,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
           }}
         />
         <FormField
-          label={orgCopy(t, 'groupsDescriptionLabel')}
+          label={t('organization.groups.descriptionLabel')}
           defaultValue={descriptionRef.current}
           multiline
           textAlignVertical="top"
@@ -212,13 +215,13 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
 
         {group === undefined ? null : (
           <View className="gap-2">
-            <FormFieldLabel label={orgCopy(t, 'groupsMembersLabel')} />
+            <FormFieldLabel label={t('organization.groups.membersLabel')} />
             <View className="flex-row items-center gap-2 rounded-lg bg-secondary px-3">
               <Search size={16} color={colors.mutedForeground} />
               <Input
                 className="min-h-10 flex-1 border-0 bg-transparent pl-0"
-                placeholder={orgCopy(t, 'groupsSearchMembers')}
-                accessibilityLabel={orgCopy(t, 'groupsMembersLabel')}
+                placeholder={t('organization.groups.searchMembers')}
+                accessibilityLabel={t('organization.groups.membersLabel')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={value => {
@@ -229,12 +232,12 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
             </View>
             {visibleMembers.length === 0 ? (
               <Text variant="muted" className="text-sm">
-                {orgCopy(t, 'groupsMembersEmpty')}
+                {t('organization.groups.membersEmpty')}
               </Text>
             ) : (
               <View className="overflow-hidden rounded-lg bg-secondary">
                 <ChoiceRow
-                  label={orgCopy(t, 'groupsSelectAllVisible')}
+                  label={t('organization.groups.selectAllVisible')}
                   selected={allVisibleSelected}
                   multi
                   disabled={busy}
@@ -281,7 +284,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
           saving={saving}
           removing={removing}
           disabled={busy || !dirty}
-          deleteLabel={group === undefined ? undefined : orgCopy(t, 'groupsDeleteAction')}
+          deleteLabel={group === undefined ? undefined : t('organization.groups.deleteAction')}
           onSave={save}
           onDelete={remove}
         />

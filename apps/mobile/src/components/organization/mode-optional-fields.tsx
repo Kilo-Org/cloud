@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 
-import { orgCopy } from '@/components/organization/org-customization-copy';
 import { FormField } from '@/components/ui/form-field';
 
 /** The three optional prose fields a mode carries. */
@@ -31,7 +30,7 @@ export function ModeOptionalFields({
   return (
     <>
       <FormField
-        label={orgCopy(t, 'modesDescriptionLabel')}
+        label={t('organization.modes.descriptionLabel')}
         defaultValue={description}
         disabled={disabled}
         onChangeText={value => {
@@ -39,7 +38,7 @@ export function ModeOptionalFields({
         }}
       />
       <FormField
-        label={orgCopy(t, 'modesWhenToUseLabel')}
+        label={t('organization.modes.whenToUseLabel')}
         defaultValue={whenToUse}
         multiline
         textAlignVertical="top"
@@ -50,7 +49,7 @@ export function ModeOptionalFields({
         }}
       />
       <FormField
-        label={orgCopy(t, 'modesInstructionsLabel')}
+        label={t('codeReviewer.instructions.title')}
         defaultValue={customInstructions}
         multiline
         textAlignVertical="top"

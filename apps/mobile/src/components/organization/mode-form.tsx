@@ -18,10 +18,6 @@ import {
   orgModeFormValues,
   validateOrgModeForm,
 } from '@/components/organization/org-mode-form-model';
-import {
-  orgCopy,
-  type OrgCustomizationCopyKey,
-} from '@/components/organization/org-customization-copy';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -37,13 +33,13 @@ import { usePopOnce } from '@/lib/navigation/pop-once';
 const MODES_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/modes' as const;
 
 const ERROR_COPY_KEYS = {
-  nameRequired: 'modesNameRequired',
-  identifierRequired: 'modesIdentifierRequired',
-  identifierInvalid: 'modesIdentifierInvalid',
-  identifierTaken: 'modesIdentifierTaken',
-  roleRequired: 'modesRoleRequired',
-  restrictionInvalid: 'modesRestrictionInvalid',
-} as const satisfies Record<OrgModeFormErrorCode, OrgCustomizationCopyKey>;
+  nameRequired: 'organization.modes.nameRequired',
+  identifierRequired: 'organization.modes.identifierRequired',
+  identifierInvalid: 'organization.modes.identifierInvalid',
+  identifierTaken: 'organization.modes.identifierTaken',
+  roleRequired: 'organization.modes.roleRequired',
+  restrictionInvalid: 'organization.modes.restrictionInvalid',
+} as const satisfies Record<OrgModeFormErrorCode, string>;
 
 type MutableModeValues = {
   -readonly [K in keyof OrgModeFormValues]: OrgModeFormValues[K];
@@ -115,7 +111,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
 
   const errorFor = (field: keyof OrgModeFormErrors): string | undefined => {
     const code = errors[field];
-    return code === undefined ? undefined : orgCopy(t, ERROR_COPY_KEYS[code]);
+    return code === undefined ? undefined : t(ERROR_COPY_KEYS[code]);
   };
 
   const leaveToList = () => {
@@ -150,9 +146,9 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       return;
     }
     confirm({
-      title: orgCopy(t, 'modesDeleteTitle'),
-      message: orgCopy(t, 'modesDeleteMessage'),
-      confirmLabel: orgCopy(t, 'modesDeleteAction'),
+      title: t('organization.modes.deleteTitle'),
+      message: t('organization.modes.deleteMessage'),
+      confirmLabel: t('organization.modes.deleteAction'),
       onConfirm: () => {
         mutations.remove.mutate({ modeId: mode.id }, { onSuccess: leaveToList });
       },
@@ -165,7 +161,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={mode === undefined ? orgCopy(t, 'modesCreate') : mode.name} />
+      <ScreenHeader title={mode === undefined ? t('organization.modes.create') : mode.name} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-5 px-6 pb-10 pt-4"
@@ -175,7 +171,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       >
         <View className="gap-1.5">
           <FormField
-            label={orgCopy(t, 'modesNameLabel')}
+            label={t('organization.modes.nameLabel')}
             required
             defaultValue={values.name}
             maxLength={ORG_MODE_NAME_MAX_LENGTH}
@@ -195,7 +191,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
         </View>
         <View className="gap-1.5">
           <FormField
-            label={orgCopy(t, 'modesIdentifierLabel')}
+            label={t('organization.modes.identifierLabel')}
             required
             defaultValue={values.slug}
             maxLength={ORG_MODE_SLUG_MAX_LENGTH}
@@ -213,12 +209,12 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
           />
           <Text variant="muted" className="text-xs">
             {values.slug.length > 0 || derivedSlug.length === 0
-              ? orgCopy(t, 'modesIdentifierHint')
-              : `${derivedSlug} · ${orgCopy(t, 'modesIdentifierHint')}`}
+              ? t('organization.modes.identifierHint')
+              : `${derivedSlug} · ${t('organization.modes.identifierHint')}`}
           </Text>
         </View>
         <FormField
-          label={orgCopy(t, 'modesRoleLabel')}
+          label={t('organization.modes.roleLabel')}
           required
           defaultValue={values.roleDefinition}
           multiline
@@ -278,7 +274,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
           saving={saving}
           removing={removing}
           disabled={busy || !dirty}
-          deleteLabel={mode === undefined ? undefined : orgCopy(t, 'modesDeleteAction')}
+          deleteLabel={mode === undefined ? undefined : t('organization.modes.deleteAction')}
           onSave={save}
           onDelete={remove}
         />

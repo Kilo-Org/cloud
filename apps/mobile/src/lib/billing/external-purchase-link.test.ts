@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
+import { canLinkExternalPurchase } from '@/lib/billing/external-purchase-rule';
 
 describe('canLinkExternalPurchase', () => {
   it('links only in the US App Store storefront on iOS', () => {

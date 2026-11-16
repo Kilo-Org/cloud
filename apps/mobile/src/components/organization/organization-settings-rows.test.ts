@@ -24,6 +24,10 @@ vi.mock('@/components/ui/icons', () => ({
   Wallet: 'Wallet',
 }));
 
+// Every row is an absolute web URL, so the suite needs the base the app bakes
+// in. The shared setup mocks this module with no value at all.
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
+
 function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
     role: 'owner',
@@ -115,7 +119,9 @@ describe('visibleOrgSettingsRows', () => {
           // A suffix-less row lands on the organization dashboard, which links
           // to the seats purchase; the hub lists no such row.
           expect(new URL(row.url).pathname).not.toBe('/organizations/org_1');
-          expect(new URL(row.url).pathname.startsWith('/organizations/org_1/')).toBe(true);
+          expect(
+            new URL(row.url, 'http://localhost').pathname.startsWith('/organizations/org_1/')
+          ).toBe(true);
         }
       }
     }

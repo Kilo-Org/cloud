@@ -1,31 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import {
-  cachedStorefrontCountry,
-  readStorefrontCountry,
-  US_STOREFRONT_COUNTRY,
-} from '@/lib/billing/storefront-country';
+import { canLinkExternalPurchase } from '@/lib/billing/external-purchase-rule';
+import { cachedStorefrontCountry, readStorefrontCountry } from '@/lib/billing/storefront-country';
 
 /**
- * Whether a surface may draw an in-app link to a web page that sells or manages
- * a purchase.
- *
- * One combination may: an iOS build whose App Store storefront is the United
- * States, where guideline 3.1.1(a) permits the link. Every other combination —
- * another storefront, a storefront the store did not answer for, and Android,
- * which is not enrolled in any external-content-links programme — shows the
- * destination as plain text with no control to press.
- */
-export function canLinkExternalPurchase(
-  platformOS: string,
-  storefrontCountry: string | null
-): boolean {
-  return platformOS === 'ios' && storefrontCountry === US_STOREFRONT_COUNTRY;
-}
-
-/**
- * The rule above for a rendered surface, with the storefront read it needs.
+ * The storefront rule for a rendered surface, with the read it needs.
  *
  * The read is asynchronous while a link decision is needed on the first frame,
  * so every unsettled case renders plain text: a pending read, a failed read and
@@ -42,14 +22,16 @@ export function useCanLinkExternalPurchase(): boolean {
 
   useEffect(() => {
     if (platformOS !== 'ios' || storefrontCountry != null) {
-      return;
+      return undefined;
     }
     let active = true;
-    void readStorefrontCountry().then(country => {
+    const read = async () => {
+      const country = await readStorefrontCountry();
       if (active && country != null) {
         setStorefrontCountry(country);
       }
-    });
+    };
+    void read();
     return () => {
       active = false;
     };

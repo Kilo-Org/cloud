@@ -1,5 +1,3 @@
-import { getStorefront } from 'expo-iap';
-
 import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
 
 /**
@@ -33,22 +31,26 @@ export function cachedStorefrontCountry(): string | null {
  * never settle its own layout. A deadline or a rejection is reported as an
  * unknown country, which every caller treats as "no link".
  */
-export async function readStorefrontCountry(): Promise<string | null> {
+export function readStorefrontCountry(): Promise<string | null> {
   if (answeredCountry != null) {
-    return answeredCountry;
+    return Promise.resolve(answeredCountry);
   }
-  pendingRead ??= readOnce().finally(() => {
-    pendingRead = null;
-  });
+  pendingRead ??= readOnce();
   return pendingRead;
 }
 
 async function readOnce(): Promise<string | null> {
   try {
+    // `expo-iap` builds its native module at import time, so the module is
+    // reached only on this path: the app's pure test project has no Expo
+    // runtime, and any surface that never asks the store loads none of it.
+    const { getStorefront } = await import('expo-iap');
     const country = await withStoreDeadline(getStorefront(), 'the App Store storefront');
     answeredCountry = country;
     return country;
   } catch {
     return null;
+  } finally {
+    pendingRead = null;
   }
 }

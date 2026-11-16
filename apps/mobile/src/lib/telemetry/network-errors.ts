@@ -9,8 +9,8 @@
  * transport sink (s2 wires the Sentry adapter); until then every report is a
  * no-op. Query strings are never emitted — tRPC input and tokens live there
  * (mirrors `sentry-scrub.ts`). A parsed error body never leaves the device
- * either: only its tRPC metadata (code, HTTP status, procedure path) reaches
- * the event.
+ * either: only its tRPC metadata (code, HTTP status, procedure path, and the
+ * input paths a validation failure names) reaches the event.
  *
  * Family 4 (KILO-APP-GX, `fetch failed: Fetch request has been canceled`) is
  * raised by this module's classifier (`abort-classification.ts`), so the fix
@@ -58,6 +58,15 @@ export type TrpcErrorContext = {
   code?: TrpcErrorCode;
   httpStatus?: number;
   path?: string;
+  /**
+   * The input paths a `BAD_REQUEST` validation failure names, comma-separated,
+   * never its messages: a Zod message can echo the input value back, while the
+   * path only names the field. Capped by {@link MAX_INVALID_FIELD_PATHS} and
+   * {@link MAX_INVALID_FIELD_PATH_LENGTH}.
+   */
+  invalidFields?: string;
+  /** How many whole-input failures the same validation answered. */
+  formErrorCount?: number;
 };
 
 export type NetworkErrorContext = {
@@ -140,6 +149,10 @@ const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
   httpStatus: z.number().optional(),
   path: z.string().optional(),
+  // Present only on a `BAD_REQUEST` the server's own schema produced
+  // (`trpcErrorFormatter` fills it from the `ZodError` cause), and `null` for
+  // every other failure. Read through {@link readValidationContext}.
+  zodError: z.unknown().optional(),
 });
 
 const DirectTrpcErrorSchema = z.looseObject({
@@ -151,6 +164,51 @@ const ShapedTrpcErrorSchema = z.looseObject({
 });
 
 const TopLevelCodeSchema = z.looseObject({ code: z.string() });
+
+/**
+ * The flattened form the server sends for a schema failure
+ * (`z.flattenError`): the failing input paths under `fieldErrors` and the
+ * whole-input failures under `formErrors`. Both hold the Zod messages beside
+ * them, so the values are dropped and only the paths are read.
+ */
+const ZodFlatErrorSchema = z.looseObject({
+  fieldErrors: z.record(z.string(), z.unknown()).optional(),
+  formErrors: z.array(z.unknown()).optional(),
+});
+
+/** The most input paths one report carries; a failed array can list hundreds. */
+const MAX_INVALID_FIELD_PATHS = 12;
+
+/** The longest input path one report carries. */
+const MAX_INVALID_FIELD_PATH_LENGTH = 64;
+
+/**
+ * What a validation failure names about its input: the paths that failed and
+ * how many whole-input failures the same answer carried. The messages and the
+ * values they may quote never leave this function. Total: an absent or
+ * unrecognized `zodError` yields no field, so the rest of the report stands.
+ */
+function readValidationContext(
+  zodError: unknown
+): Pick<TrpcErrorContext, 'invalidFields' | 'formErrorCount'> {
+  const parsed = ZodFlatErrorSchema.safeParse(zodError);
+  if (!parsed.success) {
+    return {};
+  }
+  const fieldErrors = parsed.data.fieldErrors;
+  const formErrorCount = parsed.data.formErrors?.length ?? 0;
+  const invalidFields =
+    fieldErrors === undefined
+      ? ''
+      : Object.keys(fieldErrors)
+          .slice(0, MAX_INVALID_FIELD_PATHS)
+          .map(field => field.slice(0, MAX_INVALID_FIELD_PATH_LENGTH))
+          .join(',');
+  return {
+    ...(invalidFields.length === 0 ? {} : { invalidFields }),
+    ...(formErrorCount === 0 ? {} : { formErrorCount }),
+  };
+}
 
 // The `error` of a tRPC failure body (batch item or direct body) is a plain
 // object; anything else yields no context.
@@ -253,6 +311,7 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
       code: code !== undefined && isTrpcErrorCode(code) ? code : undefined,
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
+      ...readValidationContext(directData?.zodError ?? shapedData?.zodError),
     };
   } catch {
     return {};
@@ -388,14 +447,18 @@ function buildSyntheticError(
 
 /**
  * The tRPC metadata a report carries from a parsed response body: the fields
- * the app already reads, and nothing else. `undefined` when the error names
- * none of them, so an unreadable body adds no payload context.
+ * the app already reads, and nothing else. A validation failure adds only the
+ * input paths and the whole-input failure count, never a message. `undefined`
+ * when the error names none of them, so an unreadable body adds no payload
+ * context.
  */
 function trpcPayload(trpc: TrpcErrorContext): TrpcErrorContext | undefined {
   const payload: TrpcErrorContext = {
     ...(trpc.code === undefined ? {} : { code: trpc.code }),
     ...(trpc.httpStatus === undefined ? {} : { httpStatus: trpc.httpStatus }),
     ...(trpc.path === undefined ? {} : { path: trpc.path }),
+    ...(trpc.invalidFields === undefined ? {} : { invalidFields: trpc.invalidFields }),
+    ...(trpc.formErrorCount === undefined ? {} : { formErrorCount: trpc.formErrorCount }),
   };
   return Object.keys(payload).length === 0 ? undefined : payload;
 }

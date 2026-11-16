@@ -293,21 +293,26 @@ function scrubNetworkContext(value: unknown): unknown {
 /**
  * The scrubbed form of one payload-context field, or `undefined` when the field
  * is not allow-listed. The payload is parsed tRPC metadata (see
- * `network-errors.ts`): `code` and `path` are strings, `httpStatus` a number,
- * and everything else a response body offers is untrusted text the event does
- * not need, so it is dropped rather than scrubbed.
+ * `network-errors.ts`): `code` and `path` are strings, `httpStatus` and
+ * `formErrorCount` numbers, `invalidFields` the input paths a validation
+ * failure named, and everything else a response body offers is untrusted text
+ * the event does not need, so it is dropped rather than scrubbed.
  *
- * `code` and `path` are identifier-shaped like the `trpc.code` and
- * `trpc.procedure` tags ({@link IDENTIFIER_PATHS}), so their word chains stay
- * readable; a token-shaped or `Bearer ` value is redacted either way.
+ * `code`, `path` and the comma-separated `invalidFields` are identifier-shaped
+ * like the `trpc.code` and `trpc.procedure` tags ({@link IDENTIFIER_PATHS}), so
+ * their word chains stay readable; a token-shaped or `Bearer ` value is redacted
+ * either way. The paths are capped where they are read, so no further bound is
+ * applied here.
  */
 function scrubPayloadField(field: string, value: unknown): unknown {
   switch (field) {
     case 'code':
+    case 'invalidFields':
     case 'path': {
       return typeof value === 'string' ? redactString(value, true) : undefined;
     }
-    case 'httpStatus': {
+    case 'httpStatus':
+    case 'formErrorCount': {
       return typeof value === 'number' ? value : undefined;
     }
     default: {

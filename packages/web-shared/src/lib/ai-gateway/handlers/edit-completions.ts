@@ -271,6 +271,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     toolsUsed: [],
     ttfbMs,
     statusCode: proxyRes.status,
+    mode: usageContext.mode || undefined,
   };
 
   if (!proxyRes.body) {

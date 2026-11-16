@@ -438,9 +438,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             </>
           )}
-          {/* The one destination this app reads itself. It closes the card, and
-              it is painted before any web row because its gate needs no
-              payload — see `visibleInAppSettingsRows`. */}
+          {/* The destinations this app reads and writes itself. They close the
+              card, and they are painted before any web row because their gates
+              need no payload — see `visibleInAppSettingsRows`. */}
           {inAppSettingsRows.map((row, index) => (
             <ConfigureRow
               key={row.area}

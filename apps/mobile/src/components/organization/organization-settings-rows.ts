@@ -27,8 +27,8 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 /**
  * The organization destinations the hub lists, in the two shapes it opens
- * them: the web pages this app does not reimplement, and the one area the app
- * reads itself.
+ * them: the web pages this app does not reimplement, and the areas the app
+ * reads and writes itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
  * role and plan gates, and its destinations follow
@@ -44,23 +44,23 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
- * - `providers-and-models`, `custom-modes`, `byok`, `integrations` and
- *   `usage-details` render for every member;
+ * - `providers-and-models`, `byok`, `integrations` and `usage-details` render
+ *   for every member;
  * - `data-collection` is the dashboard card a teams plan shows where an
  *   enterprise plan shows providers and models;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
  *
- * The audit log is the exception neither table shares with the other: the app
- * reads it natively, so it is an in-app destination, and its gate is the one
- * its procedure applies (billing role and the enterprise plan).
+ * The audit log, custom modes and groups are the exceptions the two tables do
+ * not share: the app reads and writes them natively, so they are in-app
+ * destinations. Each carries the gate its own procedure applies — the audit log
+ * a billing role on the enterprise plan, groups the enterprise plan it is sold
+ * with, and custom modes no gate at all, which is the gate its page has.
  */
 type OrgSettingsArea =
   | 'usageDetails'
   | 'providersAndModels'
-  | 'customModes'
-  | 'groups'
   | 'guardrails'
   | 'byok'
   | 'ssoAndDomain'
@@ -88,8 +88,8 @@ export type OrgSettingsRow = Readonly<{
   url: string;
 }>;
 
-/** The one area the app reads itself instead of opening its web page. */
-type OrgInAppSettingsArea = 'auditLogs';
+/** The areas the app reads and writes itself instead of opening their web pages. */
+type OrgInAppSettingsArea = 'customModes' | 'groups' | 'auditLogs';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -127,10 +127,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/providers-and-models',
     visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
   },
-  // "Custom Modes": no gate in the sidebar or on the page.
-  { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
-  // "Groups": enterprise only; the page redirects every other plan.
-  { area: 'groups', icon: Users, suffix: '/groups', visible: gate => gate.plan === 'enterprise' },
   // Guardrails page: owner/admin and Kilo Encrypt.
   {
     area: 'guardrails',
@@ -192,8 +188,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 const TITLE_KEYS = {
   usageDetails: 'organization.settingsOnWeb.usageDetails',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
-  customModes: 'agentChat.modePicker.customModes',
-  groups: 'organization.settingsOnWeb.groups',
   guardrails: 'organization.settingsOnWeb.guardrails',
   byok: 'organization.settingsOnWeb.byok',
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
@@ -227,6 +221,21 @@ type OrgInAppSettingsRowSpec = Readonly<{
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Custom modes": no gate in the sidebar or on the page, so every member
+  // reaches the native list and the server decides whether a write lands.
+  {
+    area: 'customModes',
+    icon: SlidersHorizontal,
+    href: '/(app)/(tabs)/(3_profile)/organization/modes',
+    visible: () => true,
+  },
+  // "Groups": enterprise only, which is the plan its page redirects away from.
+  {
+    area: 'groups',
+    icon: Users,
+    href: '/(app)/(tabs)/(3_profile)/organization/groups',
+    visible: gate => gate.plan === 'enterprise',
+  },
   // "Audit logs": the gate its procedure applies, which the screen repeats to
   // itself. The row opens the screen rather than the web page.
   {
@@ -238,6 +247,8 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
 ];
 
 const IN_APP_TITLE_KEYS = {
+  customModes: 'agentChat.modePicker.customModes',
+  groups: 'organization.settingsOnWeb.groups',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
 } satisfies Record<OrgInAppSettingsArea, string>;
 

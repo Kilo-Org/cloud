@@ -292,7 +292,10 @@ describe('runtime authorization', () => {
   it('rejects normal, multi-audience, expired, and mismatched control tokens', async () => {
     const valid = await admission();
     await expect(
-      createRuntimeAuthorization({ ...commonInput, token: valid.token.replace(/[^.]+$/, 'tampered') })
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: valid.token.replace(/[^.]+$/, 'tampered'),
+      })
     ).rejects.toThrow();
     await expect(
       createRuntimeAuthorization({

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isRetiredHistoryRow,
   NOTIFICATION_HISTORY_FILTERS,
   notificationHistoryCopy,
   notificationHistoryFilters,
   notificationHistoryTarget,
 } from '@/lib/notification-history';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 
 const LOW_BALANCE_PARAMS = { organizationName: 'Acme', minimumBalanceUsd: '5' };
 
@@ -185,24 +185,45 @@ describe('notificationHistoryTarget', () => {
     });
   });
 
-  it('reports no destination for a payload this app cannot parse or route', () => {
+  it('reports no destination for a payload this app cannot parse', () => {
     expect(notificationHistoryTarget({ type: 'retired_kind' })).toBeNull();
     expect(notificationHistoryTarget({})).toBeNull();
   });
+
+  it('reports no destination for a kind the schema declares but this app retired', () => {
+    expect(
+      notificationHistoryTarget({
+        type: 'chat.message',
+        sandboxId: 's1',
+        conversationId: 'c1',
+        messageId: 'm1',
+      })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({ type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({
+        type: 'scheduled-action',
+        event: 'scheduled_restart_notice',
+        sandboxId: 's1',
+      })
+    ).toBeNull();
+  });
 });
 
-describe('isRetiredHistoryRow', () => {
+describe('isRetiredPushType', () => {
   it.each(['chat.message', 'instance-lifecycle', 'scheduled-action'])(
     'retires a %s row',
     pushType => {
-      expect(isRetiredHistoryRow(pushType)).toBe(true);
+      expect(isRetiredPushType(pushType)).toBe(true);
     }
   );
 
   it('keeps a kind the app still routes, and anything it does not know', () => {
-    expect(isRetiredHistoryRow('cloud_agent_session')).toBe(false);
-    expect(isRetiredHistoryRow('low_balance')).toBe(false);
-    expect(isRetiredHistoryRow('retired_kind')).toBe(false);
+    expect(isRetiredPushType('cloud_agent_session')).toBe(false);
+    expect(isRetiredPushType('low_balance')).toBe(false);
+    expect(isRetiredPushType('retired_kind')).toBe(false);
   });
 });
 

@@ -71,6 +71,7 @@ import {
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
+import { isRetiredPushType } from './retired-push-types';
 import {
   isAppOwnedNeedsInputNotification,
   readNeedsInputPresentation,
@@ -140,8 +141,10 @@ const appBadgeSink: GlanceableSink = {
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
-// A payload this build's schema does not declare — a kind the server retired,
-// or one a newer server added — parses to null and its tap does nothing.
+// A payload this build's schema does not declare — a kind the server removed,
+// or one a newer server added — parses to null and its tap does nothing. A kind
+// this build retired but the schema still declares is suppressed by the
+// foreground handler instead (`isRetiredPushType`).
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
@@ -301,6 +304,13 @@ export function setupNotificationHandler() {
     handleNotification: async notification => {
       const parsed = pushDataSchema.safeParse(notification.request.content.data);
       const data = parsed.success ? parsed.data : null;
+
+      if (data && isRetiredPushType(data.type)) {
+        // A kind this app retired still parses and still has catalog copy, so
+        // this handler is the only thing between it and a foreground banner
+        // whose tap resolves no route. Suppress it until the senders stop.
+        return suppressed;
+      }
 
       if (data?.type === 'session_live_update') {
         // The session carrier is data-only: the app draws the ongoing

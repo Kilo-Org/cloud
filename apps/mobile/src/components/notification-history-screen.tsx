@@ -22,13 +22,13 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
 import {
-  isRetiredHistoryRow,
   NOTIFICATION_HISTORY_FILTERS,
   type NotificationHistoryFilter,
   notificationHistoryFilters,
   notificationHistoryTarget,
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -111,7 +111,7 @@ export function NotificationHistoryScreen() {
   // A stored page can still hold a row of a kind this build retired; the list
   // never draws one.
   const items = useMemo(
-    () => flatItems.filter(row => !isRetiredHistoryRow(row.pushType)),
+    () => flatItems.filter(row => !isRetiredPushType(row.pushType)),
     [flatItems]
   );
   // A page can be nothing but retired rows. Rather than report an account with

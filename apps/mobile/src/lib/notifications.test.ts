@@ -1314,6 +1314,33 @@ const needsInputPush = {
   category: 'attention',
 };
 
+// Kinds this app retired but the shared schema still declares: the catalog still
+// supplies their copy, so a foreground delivery would draw a banner whose tap
+// resolves no route.
+const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
+  [
+    'chat.message',
+    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+  ],
+  ['instance-lifecycle', { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }],
+  [
+    'scheduled-action',
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
+  ],
+];
+
+describe('a push kind this app retired', () => {
+  it.each(RETIRED_PUSHES)('suppresses the %s banner', async (_kind, data) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({
+        request: { content: { title: 'KiloClaw', body: 'Your instance is ready', data } },
+      })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+});
+
 describe('per-Focus agent-progress suppression', () => {
   it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
     mocks.platform.OS = 'ios';

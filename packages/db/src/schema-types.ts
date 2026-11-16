@@ -2299,6 +2299,31 @@ export const RepositoryModelOverrideSchema = z.object({
 });
 export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
 
+export const ReviewGuidelineSourceRepositoriesSchema = z
+  .array(
+    z
+      .string()
+      .max(140)
+      .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/)
+  )
+  .max(100);
+
+export type ReviewGuidelineImport = {
+  source: string;
+  sha: string | null;
+  status:
+    | 'imported'
+    | 'invalid'
+    | 'not_allowed'
+    | 'not_accessible'
+    | 'not_found'
+    | 'self_import'
+    | 'entry_limit'
+    | 'unsupported_platform'
+    | 'fetch_error'
+    | 'dropped_budget';
+};
+
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
   focus_areas: z.array(z.string()),
@@ -2334,6 +2359,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   // effect there yet.
   skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
+  review_guideline_source_repositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)

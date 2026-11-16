@@ -171,6 +171,7 @@ import type {
   CodeReviewType,
   CodeReviewTriggerSource,
   CodeReviewCouncilResult,
+  ReviewGuidelineImport,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -6138,6 +6139,7 @@ export const cloud_agent_code_reviews = pgTable(
     repository_review_instructions_used: boolean().notNull().default(false),
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
+    repository_review_instruction_imports: jsonb().$type<ReviewGuidelineImport[]>(),
 
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),

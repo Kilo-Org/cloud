@@ -29331,6 +29331,38 @@
     ],
     "searchBlob": "organizations.settings.getGatewaySettings Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured. organizations settings getgatewaysettings organizationid organizationId"
   },
+  "organizations.settings.getModelGatewayAvailability": {
+    "path": "organizations.settings.getModelGatewayAvailability",
+    "kind": "query",
+    "summary": "Check whether a given model is available through each AI gateway (Vercel and OpenRouter), including which data regions Vercel serves it in. Use this to see if a model is reachable and where it runs before configuring gateway or model routing settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "organizationId",
+        "modelId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "getmodelgatewayavailability",
+      "organizationid",
+      "modelid"
+    ],
+    "searchBlob": "organizations.settings.getModelGatewayAvailability Check whether a given model is available through each AI gateway (Vercel and OpenRouter), including which data regions Vercel serves it in. Use this to see if a model is reachable and where it runs before configuring gateway or model routing settings. organizations settings getmodelgatewayavailability organizationid modelid organizationId modelId"
+  },
   "organizations.settings.listAvailableModels": {
     "path": "organizations.settings.listAvailableModels",
     "kind": "query",

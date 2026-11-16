@@ -21,12 +21,15 @@ import {
   PolicyPill,
 } from '@/components/organizations/providers-and-models/PolicyPills';
 import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
+import { GatewayAvailabilityTable } from '@/components/organizations/providers-and-models/GatewayAvailabilityTable';
 import type {
   ModelRow,
   ProviderOffering,
 } from '@/components/organizations/providers-and-models/providersAndModels.types';
 
 export function ModelDetailsDialog({
+  organizationId,
+  showGatewayAvailability,
   open,
   canEdit,
   infoModel,
@@ -39,6 +42,8 @@ export function ModelDetailsDialog({
   onToggleProviderEnabled,
   onClose,
 }: {
+  organizationId: string;
+  showGatewayAvailability: boolean;
   open: boolean;
   canEdit: boolean;
   infoModel: ModelRow | null;
@@ -188,6 +193,10 @@ export function ModelDetailsDialog({
               })}
             </TableBody>
           </Table>
+
+          {infoModel && showGatewayAvailability ? (
+            <GatewayAvailabilityTable organizationId={organizationId} modelId={infoModel.modelId} />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

@@ -302,7 +302,6 @@ describe('verifyAppleAttestation certificate chain', () => {
 // ── Assertion verification ─────────────────────────────────────────────────
 
 describe('verifyAppleAssertion', () => {
-  const keyId = createHash('sha256').update('device-key').digest('base64');
   const challenge = 'c2VydmVyLWNoYWxsZW5nZQ';
   const clientDataHash = appAttestClientDataHash(challenge);
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
@@ -332,7 +331,6 @@ describe('verifyAppleAssertion', () => {
       .digest();
 
     const result = await verifyAppleAssertion(
-      keyId,
       clientDataHash,
       assertionWith(authenticatorData, nonce),
       publicKeySpkiBase64
@@ -347,7 +345,6 @@ describe('verifyAppleAssertion', () => {
     const authenticatorData = assertionAuthData(7);
 
     const result = await verifyAppleAssertion(
-      keyId,
       clientDataHash,
       assertionWith(authenticatorData, Buffer.concat([authenticatorData, clientDataHash])),
       publicKeySpkiBase64
@@ -363,7 +360,6 @@ describe('verifyAppleAssertion', () => {
       .digest();
 
     const result = await verifyAppleAssertion(
-      keyId,
       clientDataHash,
       assertionWith(authenticatorData, otherNonce),
       publicKeySpkiBase64

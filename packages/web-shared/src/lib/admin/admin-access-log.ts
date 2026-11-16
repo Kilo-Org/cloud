@@ -633,6 +633,26 @@ export async function elevateViaKiloAdmin<const TGrant>(
   return params.grant;
 }
 
+export type KiloAdminElevationRequestParams = {
+  user: AdminAccessUser;
+  tokenSource?: string | null;
+  reason: KiloAdminElevationReason;
+  target: string;
+  surface?: AdminAccessSurface;
+  /** The actual Request method when the caller has one. */
+  method?: string;
+  /** Use the caller's request headers instead of the ambient header store. */
+  headersList?: Headers;
+  internalApiUse?: boolean;
+  delegatedWorkload?: boolean;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
+  supportInheritedFromOrganizationId?: string | null;
+  issuanceId?: string | null;
+} & ElevationMembershipObservation;
+
 /**
  * {@link recordKiloAdminElevation} for route handlers and server components,
  * which have request headers instead of a tRPC context. Call it directly from
@@ -650,25 +670,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
  * rule that audit logging never denies a legitimate admin action.
  */
 export async function recordKiloAdminElevationForRequest(
-  params: {
-    user: AdminAccessUser;
-    tokenSource?: string | null;
-    reason: KiloAdminElevationReason;
-    target: string;
-    surface?: AdminAccessSurface;
-    /** The actual Request method when the caller has one. */
-    method?: string;
-    /** Use the caller's request headers instead of the ambient header store. */
-    headersList?: Headers;
-    internalApiUse?: boolean;
-    delegatedWorkload?: boolean;
-    supportDecision?: SupportDecision | null;
-    supportGrantId?: string | null;
-    supportActionId?: string | null;
-    inventoryId?: string | null;
-    supportInheritedFromOrganizationId?: string | null;
-    issuanceId?: string | null;
-  } & ElevationMembershipObservation
+  params: KiloAdminElevationRequestParams
 ): Promise<void> {
   let headersList = params.headersList;
   if (!headersList) {
@@ -682,23 +684,7 @@ export async function recordKiloAdminElevationForRequest(
 }
 
 function recordKiloAdminElevationFromHeaders(
-  params: {
-    user: AdminAccessUser;
-    headersList: Headers;
-    tokenSource?: string | null;
-    reason: KiloAdminElevationReason;
-    target: string;
-    surface?: AdminAccessSurface;
-    method?: string;
-    internalApiUse?: boolean;
-    delegatedWorkload?: boolean;
-    supportDecision?: SupportDecision | null;
-    supportGrantId?: string | null;
-    supportActionId?: string | null;
-    inventoryId?: string | null;
-    supportInheritedFromOrganizationId?: string | null;
-    issuanceId?: string | null;
-  } & ElevationMembershipObservation
+  params: KiloAdminElevationRequestParams & { headersList: Headers }
 ): void {
   emitElevation(attributionFromHeaders(params), params.user, params);
 }

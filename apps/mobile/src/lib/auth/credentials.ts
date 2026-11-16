@@ -277,6 +277,41 @@ async function hasStoredCredentialMember(): Promise<boolean> {
   );
 }
 
+/**
+ * The most of a 403 body the refresh route's own refusal can occupy. The route
+ * writes one short JSON object; a longer body is an intermediary's page, and no
+ * prefix of it can name the route's refusal.
+ */
+const REFUSAL_BODY_MAX_CHARS = 1_024;
+
+/**
+ * The parsed body of a 403, read inside the refresh's own deadline and capped.
+ * A body that stalls after its headers cannot hold the single-flight refresh
+ * open, and anything past the cap cannot be the route's short refusal, so it
+ * answers `undefined` and the 403 stays an intermediary's refusal.
+ */
+async function readCappedRefusalBody(response: Response): Promise<unknown> {
+  try {
+    const text = await response.text();
+    if (text.length === 0) {
+      return undefined;
+    }
+    const parsed: unknown = JSON.parse(text.slice(0, REFUSAL_BODY_MAX_CHARS));
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The refresh response bodies, read under the deadline that bounds the call. */
+type RefreshResponseBodies = {
+  response: Response;
+  /** The parsed 403 body; undefined for every other status. */
+  refusalBody: unknown;
+  /** The parsed 2xx body; undefined while the status is a failure. */
+  successBody: unknown;
+};
+
 async function doRefresh(): Promise<RefreshOutcome> {
   const sessionVersion = currentAuthEpoch();
   // A refresh is superseded when the session moved or sign-out teardown
@@ -325,28 +360,40 @@ async function doRefresh(): Promise<RefreshOutcome> {
 
     // Bound the refresh network I/O at the control-plane deadline so a hung
     // backend can never leave the refresh (or a sign-out queueing behind its
-    // credential write) waiting forever.
-    const response = await withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
-      const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: storedRefreshToken }),
-        signal,
-      });
-      return res;
-    });
+    // credential write) waiting forever. Both bodies are read inside that
+    // deadline: a body that stalls after its headers would otherwise leave the
+    // single-flight refresh pending and block every later refresh.
+    const { response, refusalBody, successBody } = await withDeadline(
+      CONTROL_PLANE_DEADLINE_MS,
+      async (signal): Promise<RefreshResponseBodies> => {
+        const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: storedRefreshToken }),
+          signal,
+        });
+        // A 403 needs its body read: the refresh route has no 403 branch, so
+        // the body is what tells its own refusal apart from an intermediary's
+        // (an edge firewall, a WAF, a proxy) refusal, which proves nothing
+        // about the stored pair. Every other failure status is classified on
+        // the status alone, and a 2xx body must be read whole to parse.
+        if (!res.ok) {
+          return {
+            response: res,
+            refusalBody: res.status === 403 ? await readCappedRefusalBody(res) : undefined,
+            successBody: undefined,
+          };
+        }
+        const body: unknown = await res.json();
+        return { response: res, refusalBody: undefined, successBody: body };
+      }
+    );
 
     if (superseded()) {
       return { kind: 'superseded' };
     }
 
     if (!response.ok) {
-      // A 403 needs its body read: the refresh route has no 403 branch, so the
-      // body is what tells its own refusal apart from an intermediary's (an
-      // edge firewall, a WAF, a proxy) refusal, which proves nothing about the
-      // stored pair. Every other status is classified on the status alone.
-      const refusalBody =
-        response.status === 403 ? await response.json().catch(() => undefined) : undefined;
       // Classify before deciding: a 401 is terminal (the stored pair is gone),
       // a 429/5xx is retryable and carries the server's own back-off, and any
       // other 4xx is terminal without a retry guidance to honour.
@@ -371,8 +418,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { kind: 'transient' };
     }
 
-    const body: unknown = await response.json();
-    const parsed = parseTokenPair(body);
+    const parsed = parseTokenPair(successBody);
 
     // A refresh response must include a full token pair with expiry.
     if (!parsed?.refreshToken || !parsed.expiresIn) {

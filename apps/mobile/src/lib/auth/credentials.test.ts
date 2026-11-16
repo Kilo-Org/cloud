@@ -217,6 +217,7 @@ vi.mock('@/lib/app-actions/session-catalog', () => ({
 }));
 
 import * as SecureStore from 'expo-secure-store';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
@@ -523,6 +524,78 @@ describe('refresh rotation', () => {
         'r2',
         expectedOptions
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('settles a stalled 403 body as retry inside the deadline and lets the next refresh run', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    // Headers arrive, the body never ends: the refusal can never be read from
+    // it. Waiting on it used to keep the single-flight refresh pending, so no
+    // later refresh could start.
+    const stalled = new Response(
+      new ReadableStream({
+        start() {
+          // Never enqueues and never closes.
+        },
+      }),
+      { status: 403 }
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(stalled)
+      .mockResolvedValueOnce(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    try {
+      const pending = performRefresh();
+      const stalledOutcome = expect(pending).resolves.toEqual({ kind: 'transient' });
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await stalledOutcome;
+      vi.useRealTimers();
+
+      // The rotation that follows the stalled one is not blocked behind it.
+      await expect(performRefresh()).resolves.toMatchObject({ kind: 'ok' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // The pair that could not be classified was never dropped.
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('r2');
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reads only the capped prefix of a 403 body before classifying it', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    // A body whose refusal sits past the cap is an intermediary's page: the
+    // route's own refusal is one short JSON object and is read in full.
+    const padded = `${' '.repeat(1_100)}{"error":"SESSION_REVOKED"}`;
+    const fetchMock = vi.fn().mockResolvedValue(new Response(padded, { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ kind: 'transient', retryAfterMs: undefined });
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+  });
+
+  it('stops on a 403 carrying the route refusal inside the cap', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ error: 'SESSION_REVOKED' }, { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({ kind: 'refused', sessionVersion: currentAuthEpoch() });
     } finally {
       vi.unstubAllGlobals();
     }

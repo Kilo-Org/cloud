@@ -14,6 +14,7 @@ import {
   INTERNAL_API_SECRET,
   NOTIFICATIONS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 
 type DispatchBody =
   | InternalDispatchAgentBriefingRequest
@@ -49,7 +50,7 @@ function sleep(ms: number): Promise<void> {
  * structured warning, never an alert.
  */
 async function dispatchInternal(body: DispatchBody): Promise<boolean> {
-  if (!NOTIFICATIONS_WORKER_URL) {
+  if (!NOTIFICATIONS_WORKER_URL || !parseInternalServiceUrl(NOTIFICATIONS_WORKER_URL)) {
     console.error(
       '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping push dispatch'
     );
@@ -245,7 +246,7 @@ export async function dispatchSecurityLifecyclePush(
  * card.
  */
 export async function refreshGlanceableScope(input: GlanceableScopeRefreshRequest): Promise<void> {
-  if (!NOTIFICATIONS_WORKER_URL) {
+  if (!NOTIFICATIONS_WORKER_URL || !parseInternalServiceUrl(NOTIFICATIONS_WORKER_URL)) {
     console.error(
       '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping glanceable refresh'
     );

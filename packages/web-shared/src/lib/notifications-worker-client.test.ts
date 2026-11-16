@@ -424,3 +424,33 @@ describe('notifications-worker-client glanceable refresh', () => {
     );
   });
 });
+
+describe('notifications-worker-client endpoint transport', () => {
+  it('requires an https or loopback notifications worker endpoint', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'internal-secret',
+      NOTIFICATIONS_WORKER_URL: 'http://notifications.example.test',
+    }));
+    const client = await import('./notifications-worker-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      client.dispatchAgentBriefingPush({
+        userId: 'user-1',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      })
+    ).resolves.toBe(false);
+    await expect(
+      client.refreshGlanceableScope({ userId: 'user-1', organizationId: null })
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+});

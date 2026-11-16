@@ -127,9 +127,33 @@ describe('deliverCreditEvent', () => {
     });
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it('requires an https or loopback bouncer endpoint', async () => {
+    mockConfigState.bouncerUrl = 'http://bouncer.example.com';
+    const result = await deliverCreditEvent({
+      type: 'charge.failed',
+      eventId: 'evt-5',
+      userId: 'user-1',
+    });
+    expect(result).toEqual({
+      delivered: false,
+      permanent: true,
+      status: null,
+      error: 'bouncer_not_configured',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 describe('decide', () => {
+  it('requires an https or loopback bouncer endpoint', async () => {
+    mockConfigState.bouncerUrl = 'http://bouncer.example.com';
+    await expect(
+      decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 50 })
+    ).resolves.toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('fails open at the timeout, without an error log', async () => {
     const errors = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockImplementation(

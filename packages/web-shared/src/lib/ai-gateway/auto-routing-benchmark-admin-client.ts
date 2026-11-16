@@ -28,6 +28,7 @@ import {
   AUTO_ROUTING_BENCHMARK_WORKER_URL,
   INTERNAL_API_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { createWorkerAdminFetch, ErrorBodySchema, type ErrorBody } from './worker-admin-fetch';
 
 const fetchBenchmarkAdmin = createWorkerAdminFetch({
@@ -160,7 +161,11 @@ export async function registerOwnerBenchmarkProfiles(
   },
   signal: AbortSignal = AbortSignal.timeout(5_000)
 ): Promise<RegisterOwnerBenchmarkProfilesResult> {
-  if (!AUTO_ROUTING_BENCHMARK_WORKER_URL || !INTERNAL_API_SECRET) {
+  if (
+    !AUTO_ROUTING_BENCHMARK_WORKER_URL ||
+    !parseInternalServiceUrl(AUTO_ROUTING_BENCHMARK_WORKER_URL) ||
+    !INTERNAL_API_SECRET
+  ) {
     return {
       ok: false,
       status: 500,

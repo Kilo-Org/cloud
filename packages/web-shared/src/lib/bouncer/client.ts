@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import * as z from 'zod';
 
 import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).
@@ -493,7 +494,7 @@ async function post(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<unknown> {
-  if (!BOUNCER_URL || !INTERNAL_API_SECRET) return null;
+  if (!BOUNCER_URL || !INTERNAL_API_SECRET || !parseInternalServiceUrl(BOUNCER_URL)) return null;
   const result = await postWithResult(path, body, timeoutMs, signal);
   if (result.ok) {
     try {
@@ -645,7 +646,7 @@ async function deliverWireBody(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<BouncerDeliveryResult> {
-  if (!BOUNCER_URL || !INTERNAL_API_SECRET) {
+  if (!BOUNCER_URL || !INTERNAL_API_SECRET || !parseInternalServiceUrl(BOUNCER_URL)) {
     return { delivered: false, permanent: true, status: null, error: 'bouncer_not_configured' };
   }
   const result = await postWithResult(path, body, timeoutMs, signal);

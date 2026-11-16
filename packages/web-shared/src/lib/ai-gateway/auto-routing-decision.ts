@@ -16,6 +16,7 @@ import {
   AUTO_ROUTING_WORKER_URL,
   INTERNAL_API_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
@@ -167,7 +168,7 @@ export async function fetchEfficientAutoDecision(
 ): Promise<{ decision: AutoRoutingDecision | null; costUsd: number } | null> {
   const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
-  if (!workerUrl || !authToken) return null;
+  if (!workerUrl || !authToken || !parseInternalServiceUrl(workerUrl)) return null;
 
   const payload = buildDecidePayload(params);
   if (!payload) return null;
@@ -199,7 +200,9 @@ export async function fetchCustomRouterDecision(
 ): Promise<CustomRouterDecisionOutcome> {
   const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
-  if (!workerUrl || !authToken) return { kind: 'unavailable' };
+  if (!workerUrl || !authToken || !parseInternalServiceUrl(workerUrl)) {
+    return { kind: 'unavailable' };
+  }
 
   const payload = buildDecidePayload(params);
   if (!payload) {

@@ -1791,12 +1791,7 @@ function checkCatalogLocales({
     // category suffix. The English `_one`/`_other` siblings of a family
     // English declares stay mandatory in the missing-key rule below, except
     // where the locale carries the flat base key instead.
-    const localeFamilies = new Set(
-      [...translated.keys()]
-        .map(pluralParts)
-        .filter(Boolean)
-        .map(parts => parts.base)
-    );
+    const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,

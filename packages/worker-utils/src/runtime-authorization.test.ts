@@ -350,6 +350,40 @@ describe('runtime authorization', () => {
     expect(decodeJwt(result.token).env).toBe('development');
   });
 
+  it('reports an environment mismatch as its own admission diagnostic', async () => {
+    const onAdmissionRejected = vi.fn();
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: (await admission({ env: 'staging' })).token,
+        onAdmissionRejected,
+      })
+    ).rejects.toThrow('Invalid runtime admission');
+    expect(onAdmissionRejected.mock.calls).toEqual([['environment_mismatch']]);
+  });
+
+  it('survives a diagnostic that throws', async () => {
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: (await admission({ env: 'staging' })).token,
+        onAdmissionRejected: () => {
+          throw new Error('private-logger-error');
+        },
+      })
+    ).rejects.toThrow('Invalid runtime admission');
+  });
+
+  it('reports no admission diagnostic for an admitted token', async () => {
+    const onAdmissionRejected = vi.fn();
+    await createRuntimeAuthorization({
+      ...commonInput,
+      token: (await admission()).token,
+      onAdmissionRejected,
+    });
+    expect(onAdmissionRejected).not.toHaveBeenCalled();
+  });
+
   it('refuses an unusable runtime environment input', async () => {
     const control = await admission();
     await expect(

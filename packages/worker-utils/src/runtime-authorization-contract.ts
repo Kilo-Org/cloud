@@ -25,6 +25,16 @@ export const RuntimeEnvironmentSchema = z.enum(['production', 'development']);
 export type RuntimeEnvironment = z.infer<typeof RuntimeEnvironmentSchema>;
 export type RuntimeAdmission = z.infer<typeof RuntimeAdmissionSchema>;
 
+/**
+ * The deployment environment every runtime-token minter writes into the `env`
+ * claim and the runtime compares it with. A missing or unrecognized value
+ * resolves to `production`, so a mistyped configuration refuses
+ * development-labelled tokens instead of admitting them.
+ */
+export function resolveRuntimeEnvironment(value: string | undefined): RuntimeEnvironment {
+  return value === 'development' ? 'development' : 'production';
+}
+
 const pepperDigest = z.string().regex(/^[a-f0-9]{64}$/);
 const nullablePepperDigest = z.union([pepperDigest, z.literal('null')]);
 

@@ -55,6 +55,17 @@ type BindingDiagnostics = {
   onBindingRejected?: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
 };
 
+/**
+ * Admission refusal reasons a runtime operator must be able to tell apart from
+ * a generic refusal, because they report a deployment configuration problem
+ * rather than a bad credential.
+ */
+export type RuntimeAuthorizationAdmissionRejectionReason = 'environment_mismatch';
+
+type AdmissionDiagnostics = {
+  onAdmissionRejected?: (reason: RuntimeAuthorizationAdmissionRejectionReason) => void;
+};
+
 type CommonInput = {
   secret: string;
   connectionString: string;
@@ -199,14 +210,15 @@ async function requireBindings(
 }
 
 export async function createRuntimeAuthorization(
-  input: CommonInput & {
-    token: string;
-    resourceKind: RuntimeAuthorization['resourceKind'];
-    resourceId: string;
-    environment: RuntimeEnvironment;
-    organizationId?: string;
-    now?: Date;
-  }
+  input: CommonInput &
+    AdmissionDiagnostics & {
+      token: string;
+      resourceKind: RuntimeAuthorization['resourceKind'];
+      resourceId: string;
+      environment: RuntimeEnvironment;
+      organizationId?: string;
+      now?: Date;
+    }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
@@ -235,10 +247,20 @@ export async function createRuntimeAuthorization(
     (admission.source === 'automation' && claims.tokenPurpose !== 'internal-service') ||
     claims.tokenPurpose === 'delegated-workload' ||
     claims.kiloUserId.length === 0 ||
-    claims.env !== environment ||
     input.organizationId !== claims.organizationId
   )
     throw new Error('Invalid runtime admission');
+  // The token names another deployment environment. That is a configuration
+  // mismatch rather than a bad credential, so it reports a distinct diagnostic
+  // while the public error stays generic.
+  if (claims.env !== environment) {
+    try {
+      input.onAdmissionRejected?.('environment_mismatch');
+    } catch {
+      // Diagnostics must not replace the authorization rejection.
+    }
+    throw new Error('Invalid runtime admission');
+  }
   const user = await getPrincipal(input, claims.kiloUserId);
   const authorizationUser = await getPrincipal(input, admission.authorizationUserId);
   if (

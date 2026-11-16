@@ -16,6 +16,7 @@ import {
   invalidRequestResponse,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  makeErrorReadable,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -45,7 +46,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
+  freeModelRateLimitRejection,
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -131,6 +135,11 @@ export async function handleAudioTranscriptionsRequest(
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
 
+  const ipAddress = rawClientIp(request);
+  // Like chat, cap the account before reading the body or authenticating.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
+  if (accountRateLimited) return accountRateLimited;
+
   const isMultipartRequest = (request.headers.get('content-type') ?? '')
     .toLowerCase()
     .startsWith('multipart/form-data');
@@ -150,7 +159,6 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -176,9 +184,20 @@ export async function handleAudioTranscriptionsRequest(
     return modelDoesNotExistResponse();
   }
 
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
+  const isFree = isFreeModel(requestedModelLowerCased);
+  if (isFree) {
+    const rateLimited = await freeModelRateLimitRejection({
+      request,
+      caller,
+      model: requestedModelLowerCased,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
+  }
+
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const { provider, userByok } = await getTranscriptionProvider();
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(ipAddress),
@@ -205,7 +224,7 @@ export async function handleAudioTranscriptionsRequest(
     api_kind: 'audio_transcriptions',
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: isFreeModel(requestedModelLowerCased),
+    is_free: isFree,
     promptInfo,
     isStreaming: false,
     user_byok: !!userByok,
@@ -229,6 +248,11 @@ export async function handleAudioTranscriptionsRequest(
   // The usage row reports the payer the balance check resolved: the root organization for an
   // organization member.
   usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
+
+  // Transcriptions only route to OpenRouter, which no data region pins, so only a
+  // disabled gateway applies here.
+  const gatewayPolicy = await organizationGatewayPolicy({ organizationId, settings, provider });
+  if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
@@ -362,6 +386,15 @@ export async function handleAudioTranscriptionsRequest(
     provider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
+  const readableError = await makeErrorReadable({
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    request: null,
+    response,
+    userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+  });
+  if (readableError) return readableError;
+
   return await rewriteModelResponse_UsageEndpoint({
     response,
     usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),

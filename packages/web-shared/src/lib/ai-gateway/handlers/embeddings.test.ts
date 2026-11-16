@@ -22,6 +22,13 @@ import {
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('@sentry/nextjs', () => ({
@@ -61,6 +68,22 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -151,6 +174,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
     jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
@@ -302,6 +326,165 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     await expect(response.json()).resolves.toEqual({
       error: { message: 'bad input' },
       model: 'upstream/model',
+    });
+  });
+
+  it('rate limits the account before reading the body or authenticating', async () => {
+    jest.mocked(gatewayRateLimitKey).mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    const request = makeRequest();
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(request);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    });
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+    expect(request.bodyUsed).toBe(false);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  describe('free-model rate limit', () => {
+    const freeModel = 'acme/embedding-free:free';
+
+    function setAnonymousAuth() {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: new Response('unauthorized', { status: 401 }),
+        organizationId: undefined,
+      } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    }
+
+    it('limits anonymous callers of a free model per IP', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
+        error_type: ProxyErrorType.rate_limit_exceeded,
+      });
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'ip',
+        ipAddress: '127.0.0.1',
+      });
+      expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('limits signed-in callers of a free model per account', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      const body = await response.json();
+      expect(body).toMatchObject({ error_type: ProxyErrorType.rate_limit_exceeded });
+      expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'account',
+        kiloUserId: 'user-123',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves an anonymous free-model caller under the limit', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not count paid models', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('readable upstream errors', () => {
+    it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+      mockedFetch.mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              message: 'No allowed providers are available for the selected model.',
+              code: 404,
+              metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+            },
+          },
+          { status: 404 }
+        )
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks an upstream context-length error', async () => {
+      const upstreamBody = {
+        error: {
+          message:
+            "This model's maximum context length is 8192 tokens, however you requested 9000 tokens.",
+        },
+      };
+      mockedFetch.mockResolvedValue(Response.json(upstreamBody, { status: 400 }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        ...upstreamBody,
+        error_type: ProxyErrorType.context_length_exceeded,
+      });
+    });
+
+    it('explains a rejected BYOK key', async () => {
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+        isFree: false,
+      });
+      mockedFetch.mockResolvedValue(
+        Response.json({ error: { message: 'Incorrect API key provided' } }, { status: 401 })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.byok_error,
+        message: expect.stringContaining('Provider message: Incorrect API key provided'),
+      });
     });
   });
 
@@ -553,6 +736,81 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: true,
+    });
+  });
+
+  describe('organization gateway settings', () => {
+    const vercelByok = {
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai' as const, decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
+    };
+
+    function enableGatewaySettings() {
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+    }
+
+    it('rejects an OpenRouter-routed request when the organization disabled OpenRouter', async () => {
+      setUserAuth({ disable_openrouter: true });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('ignores a disabled gateway while the organization feature is off', async () => {
+      setUserAuth({ disable_openrouter: true });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves Vercel BYOK requests when OpenRouter is disabled, pinned to the data region', async () => {
+      setUserAuth({ disable_openrouter: true, data_region: 'eu' });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: {
+          only: ['openai'],
+          byok: { openai: [{ apiKey: 'test-byok-key' }] },
+          inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+        },
+      });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region).toBe(
+        'eu'
+      );
+    });
+
+    it('keeps OpenRouter requests unpinned when a data region is set', async () => {
+      setUserAuth({ data_region: 'eu' });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toBeUndefined();
+      expect(
+        jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
+      ).toBeNull();
     });
   });
 

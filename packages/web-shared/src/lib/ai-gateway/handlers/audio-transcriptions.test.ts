@@ -22,6 +22,14 @@ import {
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('next/server', () => {
@@ -47,6 +55,22 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
@@ -152,6 +176,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = mockedFetch;
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
       statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
@@ -161,6 +186,103 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('rate limits the account before reading the body or authenticating', async () => {
+    jest.mocked(gatewayRateLimitKey).mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    const request = makeRequest({
+      model: 'openai/whisper-1',
+      input_audio: { data: 'UklGRiQA', format: 'wav' },
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(request as never);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    });
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
+    expect(jest.mocked(isGatewayAccountRateLimited).mock.calls).toEqual([[request, 'account-key']]);
+    expect(request.bodyUsed).toBe(false);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('limits signed-in callers of a free model per account before proxying', async () => {
+    setUserAuth();
+    mockedIsFreeModel.mockReturnValue(true);
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'vendor/transcribe:free',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message:
+        'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.',
+    });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: 'user-123',
+    });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not count paid transcription models against the free-model limit', async () => {
+    setUserAuth();
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello' }));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transcription when the organization disabled OpenRouter', async () => {
+    setOrganizationMemberAuth(new Set(['openai']));
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { disable_openrouter: true } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    jest
+      .mocked(getRuntimeOrganizationFeatures)
+      .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error:
+        'This request would be routed through OpenRouter, which your organization has disabled.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('never forwards a custom LLM id to a transcription upstream', async () => {
@@ -836,6 +958,36 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+    setOrganizationMemberAuth(new Set(['azure']));
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse(
+        {
+          error: {
+            message: 'No allowed providers are available for the selected model.',
+            code: 404,
+            metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+          },
+        },
+        404
+      )
+    );
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
   });
 
   it('passes an upstream 404 through for multipart requests', async () => {

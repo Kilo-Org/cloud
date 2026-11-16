@@ -55,9 +55,8 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
       <CardHeader>
         <CardTitle>Gateways</CardTitle>
         <CardDescription>
-          Kilo routes chat requests through the Vercel AI Gateway or OpenRouter. Chat requests that
-          end up on a disabled gateway fail with an error. These settings do not apply to embeddings
-          yet.
+          Kilo routes model requests through the Vercel AI Gateway or OpenRouter. Requests that end
+          up on a disabled gateway fail with an error.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -94,7 +93,7 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
               </SelectContent>
             </Select>
             <p id={`${id}-region-help`} className="text-muted-foreground text-sm">
-              Pins chat requests routed through the Vercel AI Gateway to this region. Requests for a
+              Pins requests routed through the Vercel AI Gateway to this region. Requests for a
               model that is not available in the region fail with an error.
             </p>
           </div>
@@ -115,8 +114,8 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Disabling OpenRouter also blocks BYOK keys that route chat requests through it. Chat
-          requests that would use those keys fail instead of falling back.
+          Disabling OpenRouter also blocks BYOK keys that route requests through it. Requests that
+          would use those keys fail instead of falling back.
         </p>
 
         {!canEdit && (

@@ -467,7 +467,8 @@ export async function makeErrorReadable({
 }: {
   provider: ProviderType;
   requestedModel: string;
-  request: GatewayRequest;
+  /** Null on the routes that do not send a chat request. */
+  request: GatewayRequest | null;
   response: Response;
   userByokProviderIds: UserByokProviderId[] | null;
 }) {
@@ -679,6 +680,17 @@ export function paidModelAuthRequiredResponse() {
 // only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
 // honor this header.
 const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
+
+export function gatewayAccountRateLimitResponse() {
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    },
+    { status: 429 }
+  );
+}
 
 export function anonymousFreeModelLimitResponse() {
   const message =

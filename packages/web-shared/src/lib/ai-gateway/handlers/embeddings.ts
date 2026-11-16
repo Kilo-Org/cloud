@@ -20,6 +20,7 @@ import {
   malformedJsonResponse,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  makeErrorReadable,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -29,7 +30,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  freeModelRateLimitRejection,
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -69,6 +73,7 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
@@ -83,6 +88,11 @@ export async function handleEmbeddingsRequest(
 ): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
+
+  const ipAddress = rawClientIp(request);
+  // Like chat, cap the account before reading the body or authenticating.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
+  if (accountRateLimited) return accountRateLimited;
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
@@ -108,7 +118,6 @@ export async function handleEmbeddingsRequest(
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -134,6 +143,17 @@ export async function handleEmbeddingsRequest(
     return modelDoesNotExistResponse();
   }
 
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
+  if (isFreeModel(requestedModelLowerCased)) {
+    const rateLimited = await freeModelRateLimitRejection({
+      request,
+      caller,
+      model: requestedModelLowerCased,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
+  }
+
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
 
   const organizationDecision =
@@ -154,8 +174,6 @@ export async function handleEmbeddingsRequest(
     organizationId,
     organizationDecision?.eligibleProviderRoutes
   );
-
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
 
   const bouncerIp = bareIpLiteral(ipAddress);
   const ja4Digest = usageBase.context.fraudHeaders.http_x_vercel_ja4_digest;
@@ -199,6 +217,7 @@ export async function handleEmbeddingsRequest(
   let accountBalance = 0;
   let accountPlan: OrganizationPlan | undefined;
   let accountPayer: BalancePayer | undefined;
+  let dataRegion: OrganizationDataRegion | null = null;
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
@@ -208,6 +227,10 @@ export async function handleEmbeddingsRequest(
     accountPlan = plan;
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
+
+    const gatewayPolicy = await organizationGatewayPolicy({ organizationId, settings, provider });
+    if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
+    dataRegion = gatewayPolicy.dataRegion;
 
     const creditsBlocked = paidUsageRejection({
       user,
@@ -303,8 +326,11 @@ export async function handleEmbeddingsRequest(
         byok: byokProviders,
         zeroDataRetention: effectivePrivacy.zdr,
         disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
+        // Vercel fails the request instead of leaving the region, as on chat.
+        ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
       },
     };
+    usageContext.inference_region = dataRegion;
   }
 
   const bouncerVerdict = await bouncerVerdictPromise;
@@ -369,6 +395,15 @@ export async function handleEmbeddingsRequest(
     effectiveProvider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
+
+  const readableError = await makeErrorReadable({
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    request: null,
+    response,
+    userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+  });
+  if (readableError) return readableError;
 
   return await rewriteModelResponse_UsageEndpoint({
     response,

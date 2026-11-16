@@ -6,6 +6,7 @@ import {
   buildVercelCredentialNetworkPolicy,
   buildVercelTransformNetworkPolicy,
   findMatchingCredentialInjectionRule,
+  openVercelEgress,
   type VercelCredentialPolicyInput,
 } from './vercel-network-policy.js';
 
@@ -45,7 +46,7 @@ function grant(scopeId: string): SessionCredentialGrant {
 function matchingTransform(policy: VercelSandboxNetworkPolicy, request: Request) {
   const url = new URL(request.url);
   return (policy.allow[url.hostname] ?? policy.allow['*'] ?? [])
-    .filter(rule => 'transform' in rule)
+    .filter(rule => 'match' in rule)
     .find(({ match }) => {
       if (match.method && !match.method.includes(request.method)) return false;
       if (match.path) {
@@ -125,7 +126,8 @@ describe('Vercel ordered transform conversion', () => {
       original.injectionRules
     );
     expect(Object.keys(policy)).toEqual(['allow']);
-    expect(policy.allow['*']).toEqual([]);
+    expect(original.allowedDomains).not.toContain('*');
+    expect(policy.allow['*']).toBeUndefined();
     for (const domain of original.allowedDomains) {
       expect(policy.allow[domain]).toEqual(
         original.injectionRules
@@ -163,6 +165,23 @@ describe('Vercel ordered transform conversion', () => {
         }
       }
     }
+  });
+});
+
+describe('Vercel egress default', () => {
+  it('adds the open wildcard last and keeps every other entry', () => {
+    const rule = {
+      match: { headers: [], method: ['GET'] },
+      transform: [{ headers: { authorization: 'Bearer handle' } }],
+    };
+    const policy: VercelSandboxNetworkPolicy = {
+      allow: { 'a.example.com': [rule], 'b.example.com': [] },
+    };
+    const open = openVercelEgress(policy);
+    expect(Object.keys(open.allow)).toEqual(['a.example.com', 'b.example.com', '*']);
+    expect(open.allow['a.example.com']).toEqual([rule]);
+    expect(open.allow['*']).toEqual([]);
+    expect(policy.allow['*']).toBeUndefined();
   });
 });
 

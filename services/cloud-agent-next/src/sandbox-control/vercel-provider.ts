@@ -11,10 +11,18 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
+import { configuredVercelForwardUrl } from '../scm-broker/targets.js';
+import { verifiedVercelSandboxIdentityContract } from '../scm-broker/vercel-identity.js';
+import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  buildControlCredentialPolicy,
+  buildControlNetworkPolicy,
+  type SessionCredentialGrant,
+} from './session-credentials.js';
+import { restrictVercelEgress } from './vercel-network-policy.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-import { ProviderCreationError } from './provider.js';
+import { ProviderCreationError, SandboxNetworkPolicyError } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
@@ -119,9 +127,37 @@ function isNotFound(error: unknown): boolean {
   return error instanceof VercelSandboxRestError && error.status === 404;
 }
 
+/** The egress allowlist of the provider pin, with the logical sandbox that owns the egress route. */
+export type VercelRestrictedEgress = { allowlist: readonly string[]; logicalSandboxId: string };
+
+/**
+ * The network policy of one sandbox, at create and at each credential refresh.
+ * Without an allowlist it is the open policy of today; with one it is the
+ * restricted policy, or `invalid_configuration` when it cannot be built.
+ */
+function buildSandboxNetworkPolicy(
+  grants: readonly SessionCredentialGrant[],
+  handles: ReadonlyMap<string, readonly string[]> | undefined,
+  env: { WORKER_URL?: string } | undefined,
+  restricted: VercelRestrictedEgress | undefined
+): VercelSandboxNetworkPolicy {
+  if (restricted === undefined) return buildControlNetworkPolicy(grants, handles, env);
+  const forwardURL = configuredVercelForwardUrl(env ?? {}, restricted.logicalSandboxId);
+  const policy =
+    forwardURL === null || !verifiedVercelSandboxIdentityContract
+      ? null
+      : restrictVercelEgress(buildControlCredentialPolicy(grants, handles), restricted.allowlist, {
+          forwardURL,
+          workerHost: new URL(forwardURL).hostname,
+        });
+  if (policy === null) throw new SandboxNetworkPolicyError();
+  return policy;
+}
+
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
   env?: { WORKER_URL?: string };
+  restrictedEgress?: VercelRestrictedEgress;
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
@@ -199,10 +235,11 @@ export function createVercelProviderAdapter(deps: {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
       // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(
+      const networkPolicy = buildSandboxNetworkPolicy(
         await deps.readContainedGrants(),
         await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
+        deps.env,
+        deps.restrictedEgress
       );
       const created = await restClient
         .createSandbox({
@@ -367,10 +404,11 @@ export function createVercelProviderAdapter(deps: {
     async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
-      const networkPolicy = buildControlNetworkPolicy(
+      const networkPolicy = buildSandboxNetworkPolicy(
         grants,
         await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
+        deps.env,
+        deps.restrictedEgress
       );
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,

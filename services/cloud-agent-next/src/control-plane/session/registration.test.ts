@@ -301,10 +301,6 @@ describe('egress policy registration', () => {
 
   it.each([
     { provider: 'cloudflare' },
-    {
-      provider: 'vercel',
-      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
-    },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
   ])('restricts allowlist and audit policies to isolated containers: %j', placement => {
@@ -325,6 +321,21 @@ describe('egress policy registration', () => {
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
         .success
     ).toBe(true);
+  });
+
+  it('accepts an allowlist on an isolated Vercel sandbox, but no audit without one', () => {
+    const vercel = {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    };
+    const parses = (policy: object) =>
+      controlPlaneSandboxSelectionSchema.safeParse({ ...vercel, ...policy }).success;
+    expect(parses({ egressMode: 'allowlist' })).toBe(true);
+    expect(parses({ egressMode: 'allowlist', egressAudit: true })).toBe(true);
+    expect(parses({ egressMode: 'unrestricted' })).toBe(true);
+    expect(parses({ egressAudit: true })).toBe(false);
+    expect(parses({ egressMode: 'unrestricted', egressAudit: true })).toBe(false);
+    expect(parses({ egressMode: 'allowlist', sandboxKind: 'shared' })).toBe(false);
   });
 });
 

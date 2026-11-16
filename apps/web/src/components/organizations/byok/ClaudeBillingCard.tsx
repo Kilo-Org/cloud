@@ -179,7 +179,7 @@ export function ClaudeBillingCardView({
         ) : status.state === 'connected' ? (
           <Badge variant="new">Linked</Badge>
         ) : status.state === 'reconnect_required' ? (
-          <Badge variant="destructive">Link again</Badge>
+          <Badge variant="destructive">New link required</Badge>
         ) : status.state === 'billing_unavailable' ? (
           <Badge variant="destructive">Billing unavailable</Badge>
         ) : null}

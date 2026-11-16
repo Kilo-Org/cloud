@@ -56,8 +56,13 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
             : t('cloudAgent.triggers.activationWebhook')
         }
       />
-      <KvRow label={t('cloudAgent.triggers.fieldAgent')} value={detail.mode ?? t('common.unknown')} />
-      <KvRow label={t('common.model')} value={detail.model ?? t('common.unknown')} last valueFace="text" />
+      <KvRow label={t('common.agent')} value={detail.mode ?? t('common.unknown')} />
+      <KvRow
+        label={t('common.model')}
+        value={detail.model ?? t('common.unknown')}
+        last
+        valueFace="text"
+      />
     </View>
   );
 }
@@ -81,7 +86,7 @@ export function TriggerDetailScreen({
     );
   }
 
-  let body: ReactNode;
+  let body: ReactNode = null;
   if (query.isPending) {
     body = <TriggerDetailSkeleton />;
   } else if (query.isError && query.data == null) {

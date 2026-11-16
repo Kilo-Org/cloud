@@ -13,12 +13,9 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import {
-  type TriggerDraft,
-  type TriggerDraftProblems,
-} from '@/lib/cloud-triggers/trigger-draft';
+import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 
-import { TriggerFormAgent, type TriggerAgentSheet } from './trigger-form-agent';
+import { type TriggerAgentSheet, TriggerFormAgent } from './trigger-form-agent';
 import { TriggerFormBasics } from './trigger-form-basics';
 import { TriggerFormBehaviour } from './trigger-form-behaviour';
 
@@ -95,7 +92,6 @@ export function TriggerForm({
   onDismissFailure,
   footer,
 }: TriggerFormProps) {
-  const { t } = useTranslation();
   const [repositoryPickerOpen, setRepositoryPickerOpen] = useState(false);
   const [agentSheet, setAgentSheet] = useState<TriggerAgentSheet>(null);
   return (

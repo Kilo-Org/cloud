@@ -14,6 +14,7 @@ import { View } from 'react-native';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 
 import { TriggerSwitchRow } from './trigger-form-rows';
@@ -67,7 +68,7 @@ export function TriggerFormBehaviour({
                 ? undefined
                 : triggerProblemMessage(problems.bodySchema)
             }
-            placeholder={'{\n  "type": "object"\n}'}
+            placeholder={TRIGGER_FIELD_EXAMPLES.bodySchema}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
@@ -110,7 +111,7 @@ export function TriggerFormBehaviour({
                   autoCapitalize="none"
                   autoCorrect={false}
                   spellCheck={false}
-                  placeholder="x-webhook-secret"
+                  placeholder={TRIGGER_FIELD_EXAMPLES.authHeader}
                 />
                 <FormField
                   label={t('cloudAgent.triggers.authSecretLabel')}
@@ -129,7 +130,9 @@ export function TriggerFormBehaviour({
                   autoCorrect={false}
                   spellCheck={false}
                   placeholder={
-                    authConfigured ? t('cloudAgent.triggers.authSecretKeep') : t('cloudAgent.triggers.authSecretLabel')
+                    authConfigured
+                      ? t('cloudAgent.triggers.authSecretKeep')
+                      : t('cloudAgent.triggers.authSecretLabel')
                   }
                 />
                 <Text variant="muted" className="text-xs">

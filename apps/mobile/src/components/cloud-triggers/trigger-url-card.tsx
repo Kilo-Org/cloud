@@ -21,9 +21,7 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
   const colors = useThemeColors();
   return (
     <View className="gap-1">
-      <Text className="text-sm text-muted-foreground">
-        {t('cloudAgent.triggers.webhookUrl')}
-      </Text>
+      <Text className="text-sm text-muted-foreground">{t('cloudAgent.triggers.webhookUrl')}</Text>
       <View className="flex-row items-center gap-2">
         <Text variant="mono" className="min-w-0 flex-1 text-xs">
           {url}

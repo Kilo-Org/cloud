@@ -42,7 +42,8 @@ export function TriggerSelectRow({
     <View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityValue={{ text: value }}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}
@@ -60,9 +61,7 @@ export function TriggerSelectRow({
         </Text>
         <ChevronDown size={16} color={colors.mutedForeground} />
       </Pressable>
-      {error === undefined ? null : (
-        <Text className="pb-1 text-xs text-destructive">{error}</Text>
-      )}
+      {error === undefined ? null : <Text className="pb-1 text-xs text-destructive">{error}</Text>}
     </View>
   );
 }
@@ -86,7 +85,12 @@ export function TriggerSwitchRow({
   return (
     <View className="flex-row items-start gap-3 py-2">
       <View className="min-w-0 flex-1 gap-1">
-        <Text className={cn('text-sm font-medium', disabled ? 'text-muted-foreground' : 'text-foreground')}>
+        <Text
+          className={cn(
+            'text-sm font-medium',
+            disabled ? 'text-muted-foreground' : 'text-foreground'
+          )}
+        >
           {title}
         </Text>
         {description === undefined ? null : (

@@ -20,11 +20,11 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   buildUpdateInput,
+  type CloudTriggerDetail,
   hasTriggerDraftProblems,
+  type TriggerDraft,
   triggerDraftFromDetail,
   triggerDraftProblems,
-  type CloudTriggerDetail,
-  type TriggerDraft,
 } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
@@ -80,7 +80,10 @@ export function TriggerEditPanel({
     }
     try {
       await save.mutateAsync(input);
-      const detailKey = trpc.webhookTriggers.get.queryKey({ triggerId: detail.triggerId, ...scope });
+      const detailKey = trpc.webhookTriggers.get.queryKey({
+        triggerId: detail.triggerId,
+        ...scope,
+      });
       void queryClient.invalidateQueries({ queryKey: detailKey });
       // The stored secret is the worker's now; the field stays empty.
       setDraft(current => ({ ...current, authSecret: '' }));

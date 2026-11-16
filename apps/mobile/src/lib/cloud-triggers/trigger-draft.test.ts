@@ -4,19 +4,19 @@ import { triggerNameProblem } from './trigger-id';
 import {
   buildCreateInput,
   buildUpdateInput,
-  newTriggerDraft,
+  type CloudTriggerDetail,
+  createTriggerDraft,
   readBodySchema,
+  type TriggerDraft,
   triggerDraftFromDetail,
   triggerDraftProblems,
-  type CloudTriggerDetail,
-  type TriggerDraft,
 } from './trigger-draft';
 
 const TIME_ZONE = 'Europe/Belgrade';
 
 function webhookDraft(overrides: Partial<TriggerDraft> = {}): TriggerDraft {
   return {
-    ...newTriggerDraft(TIME_ZONE),
+    ...createTriggerDraft(TIME_ZONE),
     name: 'nightly-deps',
     repository: 'kilo-org/cloud',
     model: 'anthropic/claude-sonnet-4',
@@ -97,10 +97,13 @@ describe('triggerDraftProblems', () => {
   });
 
   it('requires a secret only while none is stored', () => {
-    const required = triggerDraftProblems(webhookDraft({ authEnabled: true, authHeader: 'x-secret' }), {
-      mode: 'edit',
-      authConfigured: false,
-    });
+    const required = triggerDraftProblems(
+      webhookDraft({ authEnabled: true, authHeader: 'x-secret' }),
+      {
+        mode: 'edit',
+        authConfigured: false,
+      }
+    );
     const kept = triggerDraftProblems(webhookDraft({ authEnabled: true, authHeader: 'x-secret' }), {
       mode: 'edit',
       authConfigured: true,
@@ -117,10 +120,13 @@ describe('triggerDraftProblems', () => {
       }).bodySchema
     ).toBe('bodySchemaInvalid');
     expect(
-      triggerDraftProblems(webhookDraft({ activation: 'scheduled', cron: '0 9 * * *', bodySchemaJson: '{oops' }), {
-        mode: 'edit',
-        authConfigured: false,
-      }).bodySchema
+      triggerDraftProblems(
+        webhookDraft({ activation: 'scheduled', cron: '0 9 * * *', bodySchemaJson: '{oops' }),
+        {
+          mode: 'edit',
+          authConfigured: false,
+        }
+      ).bodySchema
     ).toBeUndefined();
   });
 });
@@ -197,7 +203,9 @@ describe('buildUpdateInput', () => {
   });
 
   it('keeps a stored secret when the field is left blank', () => {
-    const draft = triggerDraftFromDetail(detail({ webhookAuthConfigured: true, webhookAuthHeader: 'x-secret' }));
+    const draft = triggerDraftFromDetail(
+      detail({ webhookAuthConfigured: true, webhookAuthHeader: 'x-secret' })
+    );
     const input = buildUpdateInput(draft, {
       triggerId: 'nightly-deps',
       organizationId: 'org-1',

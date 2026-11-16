@@ -12,7 +12,7 @@
  */
 
 /** Reserved names the server refuses, because a route under the trigger's path uses them. */
-const RESERVED_TRIGGER_IDS: readonly string[] = [
+const RESERVED_TRIGGER_IDS = new Set([
   'new',
   'edit',
   'delete',
@@ -20,12 +20,12 @@ const RESERVED_TRIGGER_IDS: readonly string[] = [
   'settings',
   'api',
   'admin',
-];
+]);
 
 /** A new trigger's name is part of a public URL, so it may not be trivially guessable. */
-export const MIN_CREATE_TRIGGER_NAME_LENGTH = 8;
+const MIN_CREATE_TRIGGER_NAME_LENGTH = 8;
 
-export const MAX_TRIGGER_NAME_LENGTH = 64;
+const MAX_TRIGGER_NAME_LENGTH = 64;
 
 /**
  * Why a trigger name is refused, or `null` when it is accepted.
@@ -34,12 +34,7 @@ export const MAX_TRIGGER_NAME_LENGTH = 64;
  * accepts any stored name that matches its current pattern, even one shorter
  * than the creation minimum.
  */
-export type TriggerNameProblem =
-  | 'required'
-  | 'tooLong'
-  | 'characters'
-  | 'reserved'
-  | 'tooShort';
+export type TriggerNameProblem = 'required' | 'tooLong' | 'characters' | 'reserved' | 'tooShort';
 
 export function triggerNameProblem(
   name: string,
@@ -54,7 +49,7 @@ export function triggerNameProblem(
   if (!/^[a-z0-9-]+$/.test(name)) {
     return 'characters';
   }
-  if (RESERVED_TRIGGER_IDS.includes(name)) {
+  if (RESERVED_TRIGGER_IDS.has(name)) {
     return 'reserved';
   }
   if (mode === 'create' && name.length < MIN_CREATE_TRIGGER_NAME_LENGTH) {

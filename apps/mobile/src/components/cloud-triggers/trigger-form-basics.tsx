@@ -15,6 +15,7 @@ import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
   defaultPrompt,
   type TriggerActivation,
@@ -59,7 +60,8 @@ export function TriggerFormBasics({
     onDraftChange({
       ...draft,
       activation,
-      prompt: draft.prompt === defaultPrompt(draft.activation) ? defaultPrompt(activation) : draft.prompt,
+      prompt:
+        draft.prompt === defaultPrompt(draft.activation) ? defaultPrompt(activation) : draft.prompt,
     });
   };
   return (
@@ -80,7 +82,9 @@ export function TriggerFormBasics({
         />
       ) : (
         <View className="gap-1">
-          <Text className="text-sm text-muted-foreground">{t('cloudAgent.triggers.fieldName')}</Text>
+          <Text className="text-sm text-muted-foreground">
+            {t('cloudAgent.triggers.fieldName')}
+          </Text>
           <Text variant="mono">{draft.name}</Text>
           <Text variant="muted" className="text-xs">
             {t('cloudAgent.triggers.nameLocked')}
@@ -89,7 +93,9 @@ export function TriggerFormBasics({
       )}
 
       <View className="gap-2">
-        <Text className="text-sm text-muted-foreground">{t('cloudAgent.triggers.fieldActivation')}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('cloudAgent.triggers.fieldActivation')}
+        </Text>
         {mode === 'create' ? (
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
@@ -101,7 +107,9 @@ export function TriggerFormBasics({
             accessibilityLabel={t('cloudAgent.triggers.fieldActivation')}
           />
         ) : (
-          <Text>{isScheduled ? t('common.scheduled') : t('cloudAgent.triggers.activationWebhook')}</Text>
+          <Text>
+            {isScheduled ? t('common.scheduled') : t('cloudAgent.triggers.activationWebhook')}
+          </Text>
         )}
       </View>
 
@@ -118,7 +126,7 @@ export function TriggerFormBasics({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            placeholder="0 9 * * 1-5"
+            placeholder={TRIGGER_FIELD_EXAMPLES.cron}
           />
           <Text variant="muted" className="text-xs">
             {t('cloudAgent.triggers.fieldCronHelp')}
@@ -132,7 +140,7 @@ export function TriggerFormBasics({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            placeholder="UTC"
+            placeholder={TRIGGER_FIELD_EXAMPLES.timeZone}
           />
         </View>
       )}
@@ -142,7 +150,11 @@ export function TriggerFormBasics({
           <>
             <TriggerSelectRow
               label={t('common.repository')}
-              value={draft.repository.length === 0 ? t('cloudAgent.triggers.notSelected') : draft.repository}
+              value={
+                draft.repository.length === 0
+                  ? t('cloudAgent.triggers.notSelected')
+                  : draft.repository
+              }
               onPress={() => {
                 onRepositoryPickerOpenChange(true);
               }}
@@ -171,10 +183,10 @@ export function TriggerFormBasics({
         repositories={repositories.repositories}
         isLoading={repositories.isLoading}
         isError={repositories.isError}
-        onRetry={repositories.refetch}
-        selectedKey={
-          draft.repository.length === 0 ? null : `github:${draft.repository}`
-        }
+        onRetry={() => {
+          repositories.refetch();
+        }}
+        selectedKey={draft.repository.length === 0 ? null : `github:${draft.repository}`}
         onSelect={repository => {
           onRepositoryPickerOpenChange(false);
           onDraftChange({

@@ -18,14 +18,15 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   buildCreateInput,
+  createTriggerDraft,
   hasTriggerDraftProblems,
-  newTriggerDraft,
-  triggerDraftProblems,
   type TriggerDraft,
+  triggerDraftProblems,
 } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { deviceTimeZone } from '@/lib/intl-cache';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -40,9 +41,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<TriggerDraft>(() =>
-    newTriggerDraft(Intl.DateTimeFormat().resolvedOptions().timeZone)
-  );
+  const [draft, setDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const create = useMutation(trpc.webhookTriggers.create.mutationOptions());
   const problems = triggerDraftProblems(draft, { mode: 'create', authConfigured: false });

@@ -12,18 +12,20 @@
  * No React and no React Native imports: unit-tested directly.
  */
 
-import { type inferRouterInputs, type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import {
+  type inferRouterInputs,
+  type inferRouterOutputs,
+  type MobileRouter,
+} from '@kilocode/trpc/mobile';
 import { z } from 'zod';
 
-import {
-  type TriggerNameProblem,
-  triggerNameProblem,
-} from './trigger-id';
+import { type TriggerNameProblem, triggerNameProblem } from './trigger-id';
 
 export type CloudTriggerCreateInput = inferRouterInputs<MobileRouter>['webhookTriggers']['create'];
 export type CloudTriggerUpdateInput = inferRouterInputs<MobileRouter>['webhookTriggers']['update'];
 export type CloudTriggerDetail = inferRouterOutputs<MobileRouter>['webhookTriggers']['get'];
-export type CloudTriggerListRow = inferRouterOutputs<MobileRouter>['webhookTriggers']['list'][number];
+export type CloudTriggerListRow =
+  inferRouterOutputs<MobileRouter>['webhookTriggers']['list'][number];
 export type CloudTriggerDelivery =
   inferRouterOutputs<MobileRouter>['webhookTriggers']['listRequests'][number];
 
@@ -65,7 +67,7 @@ export type TriggerDraft = Readonly<{
 }>;
 
 /** The fields a problem can be attached to, so the form can place its copy. */
-export type TriggerDraftField =
+type TriggerDraftField =
   | 'name'
   | 'cron'
   | 'repository'
@@ -101,7 +103,7 @@ export function defaultPrompt(activation: TriggerActivation): string {
  * web form, and the agent starts on `code`, the mode a Cloud Agent run defaults
  * to when a profile names none.
  */
-export function newTriggerDraft(timezone: string): TriggerDraft {
+export function createTriggerDraft(timezone: string): TriggerDraft {
   return {
     name: '',
     activation: 'webhook',
@@ -165,14 +167,12 @@ export function readBodySchema(text: string): CloudTriggerBodySchema | null | un
   if (trimmed.length === 0) {
     return null;
   }
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    const object = jsonObjectSchema.safeParse(JSON.parse(trimmed));
+    return object.success ? object.data : undefined;
   } catch {
     return undefined;
   }
-  const object = jsonObjectSchema.safeParse(parsed);
-  return object.success ? object.data : undefined;
 }
 
 /**
@@ -183,7 +183,7 @@ export function readBodySchema(text: string): CloudTriggerBodySchema | null | un
 export function triggerDraftProblems(
   draft: TriggerDraft,
   context: Readonly<{ mode: 'create' | 'edit'; authConfigured: boolean }>
-): TriggerDraftProblems {
+) {
   const problems: TriggerDraftProblems = {};
   const nameProblem = triggerNameProblem(draft.name, context.mode);
   if (nameProblem !== null) {
@@ -217,7 +217,11 @@ export function triggerDraftProblems(
     const secret = draft.authSecret.trim();
     if (!context.authConfigured && secret.length === 0) {
       problems.authSecret = 'authSecretRequired';
-    } else if (draft.runAsCreator && secret.length > 0 && secret.length < MIN_CREATOR_SECRET_LENGTH) {
+    } else if (
+      draft.runAsCreator &&
+      secret.length > 0 &&
+      secret.length < MIN_CREATOR_SECRET_LENGTH
+    ) {
       problems.authSecret = 'authSecretTooShort';
     }
   }
@@ -251,9 +255,7 @@ export function buildCreateInput(
     ...(organizationId === undefined ? {} : { organizationId }),
     ...(organizationId !== undefined && draft.runAsCreator ? { runAsCreator: true } : {}),
     activationMode: draft.activation,
-    ...(isScheduled
-      ? { cronExpression: draft.cron.trim(), cronTimezone: draft.timezone }
-      : {}),
+    ...(isScheduled ? { cronExpression: draft.cron.trim(), cronTimezone: draft.timezone } : {}),
     githubRepo: draft.repository,
     mode: draft.agent,
     model: draft.model,
@@ -287,9 +289,9 @@ export function buildUpdateInput(
   }
   const authHeader = draft.authHeader.trim();
   const authSecret = draft.authSecret.trim();
-  const webhookAuth = isScheduled
-    ? {}
-    : draft.authEnabled
+  let webhookAuth: Pick<CloudTriggerUpdateInput, 'webhookAuth'> | undefined = undefined;
+  if (!isScheduled) {
+    webhookAuth = draft.authEnabled
       ? {
           webhookAuth: {
             header: authHeader,
@@ -297,6 +299,7 @@ export function buildUpdateInput(
           },
         }
       : { webhookAuth: { header: null, secret: null } };
+  }
   return {
     triggerId: context.triggerId,
     ...(context.organizationId === undefined ? {} : { organizationId: context.organizationId }),

@@ -53,7 +53,9 @@ function DeliveryRow({ delivery }: Readonly<{ delivery: CloudTriggerDelivery }>)
           {delivery.triggerSource === 'scheduled'
             ? t('common.scheduled')
             : t('cloudAgent.triggers.activationWebhook')}
-          {hasTime ? ` · ${formatDate(at, i18n.language, { dateStyle: 'medium', timeStyle: 'short' })}` : ''}
+          {hasTime
+            ? ` · ${formatDate(at, i18n.language, { dateStyle: 'medium', timeStyle: 'short' })}`
+            : ''}
         </Text>
       </View>
       {delivery.errorMessage === null ? null : (

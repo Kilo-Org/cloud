@@ -52,10 +52,7 @@ export function useTriggerRepositories(organizationId: string | undefined, enabl
  * list is the repository's own: an environment of another repository fails the
  * server's ownership-and-repository check.
  */
-export function useTriggerEnvironments(
-  organizationId: string | undefined,
-  repository: string
-) {
+export function useTriggerEnvironments(organizationId: string | undefined, repository: string) {
   const trpc = useTRPC();
   const enabled = repository.length > 0;
   const query = useQuery(
@@ -84,10 +81,9 @@ export type TriggerProfileOption = Readonly<{ id: string; name: string }>;
 export function useTriggerProfiles(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
   const query = useQuery(
-    trpc.agentProfiles.list.queryOptions(
-      organizationId === undefined ? {} : { organizationId },
-      { enabled }
-    )
+    trpc.agentProfiles.list.queryOptions(organizationId === undefined ? {} : { organizationId }, {
+      enabled,
+    })
   );
   const profiles = useMemo<TriggerProfileOption[]>(
     () => (query.data ?? []).map(profile => ({ id: profile.id, name: profile.name })),

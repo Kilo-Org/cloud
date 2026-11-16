@@ -17,7 +17,7 @@ import { useTRPC } from '@/lib/trpc';
 import { type CloudTriggerListRow } from './trigger-draft';
 
 /** The procedures' scope input: an organization, or the caller's own triggers. */
-export function triggerScope(organizationId: string | undefined): { organizationId?: string } {
+function triggerScope(organizationId: string | undefined): { organizationId?: string } {
   return organizationId === undefined ? {} : { organizationId };
 }
 
@@ -67,10 +67,7 @@ export function useTriggerDeliveries(
  * boolean the server echoes, so the switch answers the tap at once and rolls
  * back when the write fails. Every other edit reloads the row from the server.
  */
-export function useTriggerMutations(
-  triggerId: string | null,
-  organizationId: string | undefined
-) {
+export function useTriggerMutations(triggerId: string | null, organizationId: string | undefined) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const scope = triggerScope(organizationId);

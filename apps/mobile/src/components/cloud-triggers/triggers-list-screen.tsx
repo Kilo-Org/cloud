@@ -25,10 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
-import {
-  useCloudTriggers,
-  useTriggerMutations,
-} from '@/lib/cloud-triggers/use-cloud-triggers';
+import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -126,7 +123,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
     );
   }
 
-  let body: ReactNode;
+  let body: ReactNode = null;
   if (list.isPending) {
     body = (
       <View className="gap-3">

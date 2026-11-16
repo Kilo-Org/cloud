@@ -11,20 +11,24 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { getBuiltinModeDescriptionKey, getBuiltinModeLabelKey } from '@/components/agents/mode-options';
+import {
+  getBuiltinModeDescriptionKey,
+  getBuiltinModeLabelKey,
+} from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
+import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
   useTriggerEnvironments,
   useTriggerProfiles,
 } from '@/lib/cloud-triggers/use-trigger-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 
-import { TriggerChoiceSheet, type TriggerChoice } from './trigger-choice-sheet';
+import { type TriggerChoice, TriggerChoiceSheet } from './trigger-choice-sheet';
 import { TriggerSelectRow } from './trigger-form-rows';
 
 /** The one picker sheet this block opens, or `null` when none is presented. */
@@ -72,7 +76,7 @@ export function TriggerFormAgent({
   return (
     <View className="gap-4">
       <TriggerSelectRow
-        label={t('cloudAgent.triggers.fieldAgent')}
+        label={t('common.agent')}
         value={draft.agent.length === 0 ? t('cloudAgent.triggers.customAgent') : agentValue}
         onPress={() => {
           onOpenSheetChange('agent');
@@ -90,7 +94,7 @@ export function TriggerFormAgent({
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
-          placeholder="foreman"
+          placeholder={TRIGGER_FIELD_EXAMPLES.agent}
           maxLength={50}
         />
       )}
@@ -123,9 +127,7 @@ export function TriggerFormAgent({
 
       <TriggerSelectRow
         label={t('agentChat.newSession.environment')}
-        value={
-          selectedEnvironment?.name ?? t('cloudAgent.triggers.environmentAutomatic')
-        }
+        value={selectedEnvironment?.name ?? t('cloudAgent.triggers.environmentAutomatic')}
         disabled={draft.repository.length === 0}
         onPress={() => {
           onOpenSheetChange('environment');
@@ -144,7 +146,7 @@ export function TriggerFormAgent({
 
       <TriggerChoiceSheet
         visible={openSheet === 'agent'}
-        title={t('cloudAgent.triggers.fieldAgent')}
+        title={t('common.agent')}
         options={agentOptions}
         selected={isCustomAgent ? null : draft.agent}
         onSelect={value => {

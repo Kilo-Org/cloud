@@ -716,13 +716,19 @@ const TRANSIENT_HISTORY_READ: SessionHistoryRead = {
   outcome: 'retryable_failure',
 };
 
-/** A page the contract can validate has no `kind`; every failure variant has one. */
+/**
+ * A page the contract can validate has no `kind`; every failure variant has one.
+ * A page also carries its next-page cursor, so a body with only a `messages`
+ * array is not a page the worker failed to read — it is a body this worker
+ * cannot attribute to the stored page, and must stay retryable.
+ */
 function isPageShapedHistory(value: unknown): boolean {
   return (
     typeof value === 'object' &&
     value !== null &&
     'messages' in value &&
-    Array.isArray(value.messages)
+    Array.isArray(value.messages) &&
+    'nextCursor' in value
   );
 }
 

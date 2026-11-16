@@ -2376,6 +2376,31 @@ describe('api routes', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
   });
 
+  it('answers a messages-only body as retryable instead of claiming the history is gone', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // No `nextCursor`: this is not a page the contract rejected, so nothing
+    // here is evidence the stored page is unreadable.
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps invalid_data for a page the contract rejects on both reads', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);

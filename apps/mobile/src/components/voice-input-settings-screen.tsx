@@ -11,6 +11,7 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
@@ -80,7 +81,7 @@ export function VoiceInputSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.voiceInput')} />
+      <ScreenHeader title={t('preferences.voiceInput')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets

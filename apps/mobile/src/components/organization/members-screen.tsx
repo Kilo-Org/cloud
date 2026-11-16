@@ -96,7 +96,12 @@ export function OrganizationMembersScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.members.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.members.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   const isLoading = orgWithMembers.isLoading;

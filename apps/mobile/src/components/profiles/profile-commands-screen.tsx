@@ -1,5 +1,5 @@
 import { usePreventRemove, useRouter } from 'expo-router';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -30,6 +30,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -59,6 +60,15 @@ export function ProfileCommandsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const router = useRouter();
+  // A cold link can render this route with nothing beneath it: Back then lands
+  // on the Profiles list instead of unwinding the stack.
+  const leaveScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.dismissTo(getProfilesPath());
+  }, [router]);
   const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -331,9 +341,8 @@ export function ProfileCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.commandsTitle')}
-        onBack={() => {
-          router.back();
-        }}
+        backFallback={getProfilesPath()}
+        onBack={leaveScreen}
       />
       <TabScreenScrollView
         className="flex-1"

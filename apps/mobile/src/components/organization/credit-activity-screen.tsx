@@ -173,6 +173,7 @@ export function OrganizationCreditActivityScreen() {
     return (
       <OrganizationBoundary
         title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
         organizationIdOverride={orgParam}
       />
     );

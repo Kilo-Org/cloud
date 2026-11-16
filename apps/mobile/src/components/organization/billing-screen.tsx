@@ -116,7 +116,7 @@ export function OrganizationBillingScreen() {
   const screenTitle = t('organization.billing.title');
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={screenTitle} />;
+    return <OrganizationBoundary title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />;
   }
 
   if (!hasBillingRole) {

@@ -30,6 +30,7 @@ import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -317,6 +318,7 @@ export function ProfileSkillsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.skillsTitle')}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

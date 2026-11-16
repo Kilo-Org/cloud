@@ -13,7 +13,12 @@ export function OrganizationInvoicesScreen() {
   useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.invoices.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.invoices.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   return (

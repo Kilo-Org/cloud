@@ -13,6 +13,7 @@ import { Text } from '@/components/ui/text';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 
 /**
@@ -86,7 +87,10 @@ export function ToolSummaryTranslationSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.toolSummaryTranslation')} />
+      <ScreenHeader
+        title={t('preferences.toolSummaryTranslation')}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 gap-3 pt-4"

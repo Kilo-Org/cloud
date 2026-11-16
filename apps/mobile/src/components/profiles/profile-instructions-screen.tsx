@@ -32,6 +32,7 @@ import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-pro
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
@@ -315,6 +316,7 @@ export function ProfileInstructionsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.instructionsTitle')}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

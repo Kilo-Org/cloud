@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { Building2, type LucideIcon } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,13 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
+  /**
+   * Where the header's Back lands when the screen opens with no history to pop.
+   * Every caller that passes a `title` names its own area's parent: the Profile
+   * tab's root for that tab's children, the organization hub for the
+   * organization sub-Stack's screens.
+   */
+  backFallback?: Href;
   /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
   organizationIdOverride?: string;
   /** Overrides the default boundary icon (PR-review passes its own glyph). */
@@ -51,6 +58,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
+  backFallback,
   organizationIdOverride,
   icon = Building2,
 }: OrganizationBoundaryProps = {}) {
@@ -153,7 +161,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+      <ScreenHeader title={title} backFallback={backFallback} />
       {content}
     </View>
   );

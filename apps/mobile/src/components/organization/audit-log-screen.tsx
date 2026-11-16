@@ -105,7 +105,12 @@ export function OrganizationAuditLogScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.auditLog.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.auditLog.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   if (!allowed) {

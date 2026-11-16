@@ -126,6 +126,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     return (
       <OrganizationBoundary
         title={t('common.organization')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationIdOverride}
       />
     );

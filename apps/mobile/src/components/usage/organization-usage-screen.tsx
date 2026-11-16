@@ -45,6 +45,7 @@ export function OrganizationUsageScreen({
     return (
       <OrganizationBoundary
         title={t('usage.orgTitle')}
+        backFallback={ORGANIZATION_HUB_PATH}
         organizationIdOverride={organizationIdOverride}
       />
     );

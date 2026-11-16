@@ -22,6 +22,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -204,7 +205,7 @@ export function LoginMethodsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.signInMethods.title')} />
+      <ScreenHeader title={t('profile.signInMethods.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-4 pt-4"

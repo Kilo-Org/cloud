@@ -31,6 +31,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -251,6 +252,7 @@ export function ProfileKiloCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.slashCommands.title')}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

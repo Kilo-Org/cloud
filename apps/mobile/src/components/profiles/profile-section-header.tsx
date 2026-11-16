@@ -1,3 +1,5 @@
+import { type Href } from 'expo-router';
+
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
@@ -22,12 +24,15 @@ export function ProfileSectionHeader({
   profileId,
   organizationId,
   title,
+  backFallback,
   onBack,
 }: Readonly<{
   profileId: string;
   organizationId?: string;
   /** The section's own label: the screen's title and its accessible header name. */
   title: string;
+  /** Where the header's Back lands when the screen opens with no history to pop. */
+  backFallback: Href;
   onBack?: () => void;
 }>) {
   const overview = useAgentProfileOverview(profileId, organizationId);
@@ -39,6 +44,7 @@ export function ProfileSectionHeader({
         overview.isPending ? <Skeleton className="h-3.5 w-24 rounded-full" /> : undefined
       }
       reserveSubtitle
+      backFallback={backFallback}
       onBack={onBack}
     />
   );

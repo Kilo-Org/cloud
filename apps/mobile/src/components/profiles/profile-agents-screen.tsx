@@ -32,6 +32,7 @@ import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -294,6 +295,7 @@ export function ProfileAgentsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.agents.title')}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

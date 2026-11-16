@@ -25,6 +25,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
@@ -62,7 +63,7 @@ export function AccountSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.account')} />
+      <ScreenHeader title={t('preferences.account')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 gap-3 pt-4"

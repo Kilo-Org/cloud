@@ -30,6 +30,7 @@ import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -219,6 +220,7 @@ export function ProfileMcpScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.mcp.title')}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

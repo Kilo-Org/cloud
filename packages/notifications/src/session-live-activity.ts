@@ -15,11 +15,12 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-data';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionCardStatusKind,
+  type SessionLiveActivityContentState,
   type SessionLiveOutcomeKind,
 } from './session-live-content';
 

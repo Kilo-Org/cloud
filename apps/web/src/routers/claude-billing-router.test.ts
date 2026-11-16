@@ -4,6 +4,7 @@ jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
   getClaudeOperatorToken: jest.fn(async () => 'router-operator-token'),
   isClaudeOperatorConfigured: jest.fn(() => false),
+  unlinkClaudeUserProfile: jest.fn(async () => ({ kind: 'unlinked', revokedConnectionIds: [] })),
 }));
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
@@ -18,7 +19,11 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
-import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import {
+  isClaudeOperatorConfigured,
+  unlinkClaudeUserProfile,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { claudeBillingRouter } from './claude-billing-router';
@@ -74,6 +79,10 @@ async function seedConnectedOrganization(organizationId: string, createdBy: stri
 beforeEach(() => {
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(false);
+  jest
+    .mocked(unlinkClaudeUserProfile)
+    .mockReset()
+    .mockResolvedValue({ kind: 'unlinked', revokedConnectionIds: [] });
 });
 
 afterEach(() => {
@@ -220,12 +229,20 @@ describe('claudeBillingRouter.share and multi-account flows', () => {
     await caller.share({ source: {}, target: { organizationId: targetOrg.id } });
     await caller.remove({ organizationId: targetOrg.id });
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(unlinkClaudeUserProfile).not.toHaveBeenCalled();
 
     await caller.remove({});
+    expect(jest.mocked(unlinkClaudeUserProfile).mock.calls).toEqual([
+      [personalPayer.user_profile_id, 15_000],
+    ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(personalPayer.user_profile_id);
 
     await caller.remove({ organizationId: linkedOrg.id });
+    expect(jest.mocked(unlinkClaudeUserProfile).mock.calls.map(call => call[0])).toEqual([
+      personalPayer.user_profile_id,
+      organizationPayer.user_profile_id,
+    ]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain(organizationPayer.user_profile_id);
   });
@@ -245,6 +262,82 @@ describe('claudeBillingRouter.share and multi-account flows', () => {
     await expect(
       bobCaller.share({ source: { organizationId: org.id }, target: {} })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('claudeBillingRouter.remove', () => {
+  async function connectedPersonalCaller() {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    const user = await insertTestUser();
+    const payer = await seedConnectedPersonal(user.id);
+    return { user, payer, caller: await callerFor(user.id) };
+  }
+
+  it.each<[string[]]>([[['ocon_ended']], [[]]])(
+    'removes the row after Anthropic ends the link (%j)',
+    async revoked => {
+      const { user, payer, caller } = await connectedPersonalCaller();
+      jest
+        .mocked(unlinkClaudeUserProfile)
+        .mockResolvedValue({ kind: 'unlinked', revokedConnectionIds: revoked });
+      const fetchMock = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+        );
+
+      const status = await caller.remove({});
+
+      expect(status).toMatchObject({ state: 'not_connected' });
+      expect(unlinkClaudeUserProfile).toHaveBeenCalledWith(payer.user_profile_id, 15_000);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(
+        await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+      ).toBeNull();
+    }
+  );
+
+  it('removes the row when Anthropic has no profile left to unlink', async () => {
+    const { user, payer, caller } = await connectedPersonalCaller();
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'missing' });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    const status = await caller.remove({});
+
+    expect(status).toMatchObject({ state: 'not_connected' });
+    expect(unlinkClaudeUserProfile).toHaveBeenCalledWith(payer.user_profile_id, 15_000);
+    expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it('keeps the row and asks for a retry when Anthropic does not answer', async () => {
+    const { user, payer, caller } = await connectedPersonalCaller();
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'retry' });
+    const fetchMock = jest.spyOn(globalThis, 'fetch');
+
+    await expect(caller.remove({})).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected', user_profile_id: payer.user_profile_id });
+  });
+
+  it('keeps the row and points at Claude Console when Anthropic refuses the unlink', async () => {
+    const { user, payer, caller } = await connectedPersonalCaller();
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'needs_console' });
+    const fetchMock = jest.spyOn(globalThis, 'fetch');
+
+    await expect(caller.remove({})).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected', user_profile_id: payer.user_profile_id });
   });
 });
 

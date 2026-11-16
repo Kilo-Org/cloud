@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import {
+  EndpointInferenceRegionSchema,
   EndpointPricingSchema,
   EndpointSchema,
   EndpointsSchema,
@@ -110,11 +111,13 @@ export function gatewayModelEndpointsSource(
  * Keeps only `keys` of a jsonb object, so the query returns about as much data as the parsed models
  * hold rather than the raw upstream bodies. Absent keys stay absent, null values stay null, and
  * non-object values pass through unchanged, so the schemas see what they would in the raw body.
+ * `nested` picks keys of object members, and `nestedArrays` of each element of array members.
  */
 function pickJsonbKeys(
   value: SQL,
   keys: readonly string[],
-  nested: Partial<Record<string, readonly string[]>> = {}
+  nested: Partial<Record<string, readonly string[]>> = {},
+  nestedArrays: Partial<Record<string, readonly string[]>> = {}
 ): SQL {
   const object = sql`(${value})`;
   const otherKeys = sql`(
@@ -127,8 +130,19 @@ function pickJsonbKeys(
       THEN jsonb_build_object(${key}::text, ${pickJsonbKeys(member, nestedKeys)})
       ELSE '{}'::jsonb END`;
   });
+  const nestedArrayPicks = Object.entries(nestedArrays).map(([key, elementKeys = []]) => {
+    const member = sql`${object}->${key}::text`;
+    return sql` || CASE WHEN jsonb_typeof(${member}) = 'array'
+      THEN jsonb_build_object(${key}::text, (
+        SELECT coalesce(jsonb_agg(
+          ${pickJsonbKeys(sql`elements.element`, elementKeys)} ORDER BY elements.ordinality
+        ), '[]'::jsonb)
+        FROM jsonb_array_elements(${member}) WITH ORDINALITY AS elements(element, ordinality)
+      ))
+      ELSE '{}'::jsonb END`;
+  });
   return sql`CASE WHEN jsonb_typeof(${object}) = 'object'
-    THEN (${object} - ${otherKeys})${sql.join(nestedPicks, sql``)}
+    THEN (${object} - ${otherKeys})${sql.join([...nestedPicks, ...nestedArrayPicks], sql``)}
     ELSE ${object} END`;
 }
 
@@ -194,9 +208,12 @@ export async function readStoredGatewayModels(
           CASE WHEN jsonb_typeof(${endpointsList}) = 'array'
             THEN jsonb_build_object('data', jsonb_build_object('endpoints', (
               SELECT coalesce(jsonb_agg(
-                ${pickJsonbKeys(sql`endpoints.endpoint`, EndpointSchema.keyof().options, {
-                  pricing: EndpointPricingSchema.keyof().options,
-                })}
+                ${pickJsonbKeys(
+                  sql`endpoints.endpoint`,
+                  EndpointSchema.keyof().options,
+                  { pricing: EndpointPricingSchema.keyof().options },
+                  { inference_regions: EndpointInferenceRegionSchema.keyof().options }
+                )}
                 ORDER BY endpoints.ordinality
               ), '[]'::jsonb)
               FROM jsonb_array_elements(${endpointsList}) WITH ORDINALITY AS endpoints(endpoint, ordinality)

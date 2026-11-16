@@ -38,6 +38,7 @@ import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mo
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
   CodeReviewCouncilConfigSchema,
+  ReviewGuidelineSourceRepositoriesSchema,
   type CodeReviewCouncilConfig,
 } from '@kilocode/db/schema-types';
 import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
@@ -144,6 +145,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Feature-level guardrail: skip automated reviews of bot-authored PRs. Defaults to true.
   skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
@@ -184,6 +186,7 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
   // the stored value (field-merge); mobile exposes this toggle.
   skipBotPullRequests: z.boolean().optional(),
@@ -598,6 +601,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          reviewGuidelineSourceRepositories: [],
           skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -637,6 +641,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        reviewGuidelineSourceRepositories: cfg.review_guideline_source_repositories ?? [],
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
@@ -735,6 +740,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
+            review_guideline_source_repositories: input.reviewGuidelineSourceRepositories ?? [],
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
@@ -936,6 +942,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: isBitbucket ? true : (prevCfg.disable_review_md ?? true),
+          reviewGuidelineSourceRepositories: prevCfg.review_guideline_source_repositories ?? [],
           skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: isBitbucket ? [] : prevCfg.manually_added_repositories || [],
           // Council is org-only and Bitbucket never carries one; preserve as-is
@@ -1079,6 +1086,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: councilEnabledRepositoryIds,
             disable_review_md: disableReviewMd,
+            review_guideline_source_repositories: merged.reviewGuidelineSourceRepositories ?? [],
             // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
             // patch schema now accepts it; a patch that omits it keeps the
             // stored value (field-merge), never the bare default.

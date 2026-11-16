@@ -13,6 +13,7 @@ import {
 } from '@kilocode/notifications';
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
+import { truncatePushBody } from './push-body-truncate';
 
 export type {
   InstanceLifecycleEvent,
@@ -20,15 +21,9 @@ export type {
   SendInstanceLifecycleNotificationResult,
 } from '@kilocode/notifications';
 
-const BODY_MAX_LENGTH = 100;
 const EMPTY_TICKET_ERRORS = { total: 0, retryable: 0, terminal: 0 } as const;
 
 export type PushTokenWithLocale = { token: string; locale: string | null };
-
-function truncate(text: string, max = BODY_MAX_LENGTH): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 3)}...`;
-}
 
 function buildTitle(
   locale: string | null,
@@ -66,7 +61,7 @@ function buildBody(
       'Tap to start chatting.'
     );
   const trimmed = errorMessage?.trim();
-  if (trimmed && trimmed.length > 0) return truncate(trimmed);
+  if (trimmed && trimmed.length > 0) return truncatePushBody(trimmed);
   return translatePush(locale, 'instanceLifecycle.startFailed.body', undefined, 'Start failed.');
 }
 

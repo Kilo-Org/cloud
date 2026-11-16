@@ -10,6 +10,7 @@ import {
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokEndpointModelListedForOrganization } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
@@ -35,6 +36,7 @@ export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 /**
  * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
  * allowlisted that organization or group, which overrides organization policy.
+ * An endpoint model is exempt only for the organization whose enabled endpoint lists it.
  */
 export async function isModelRestrictionExempt(
   modelId: string,
@@ -55,8 +57,16 @@ export async function isModelRestrictionExempt(
       )
     );
   }
-  // An endpoint model id names the organization's own endpoint, which it configured itself.
-  if (isByokEndpointModelId(requestedModelId)) return true;
+  // An endpoint model the organization's own endpoint lists is one it configured itself.
+  if (isByokEndpointModelId(requestedModelId)) {
+    return (
+      customLlmGrantee !== undefined &&
+      (await isByokEndpointModelListedForOrganization(
+        customLlmGrantee.organizationId,
+        requestedModelId
+      ))
+    );
+  }
   const directByokModel = await getDirectByokModel(requestedModelId);
   return directByokModel.provider !== null && directByokModel.model !== null;
 }

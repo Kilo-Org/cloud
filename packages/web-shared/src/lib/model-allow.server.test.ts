@@ -8,8 +8,15 @@ import {
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
+  type CustomLlmGrantee,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
+import type { ByokEndpointDefinition } from '@kilocode/db/schema-types';
+import { byok_api_keys } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 
 const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
@@ -130,18 +137,88 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test('exempts endpoint model ids, like bespoke direct BYOK ids', async () => {
-    const isAllowed = createAllowPredicateFromRestrictions(
-      {
-        requireModelInCurrentSnapshot: true,
-        providerAllowList: [],
-        modelDenyList: ['endpoint-a1b2c3d4e5/acme/coder'],
-      },
-      lookup({})
-    );
+  describe('endpoint models', () => {
+    const ENDPOINT_ID = 'endpoint-a1b2c3d4e5';
+    const CATALOG_ENDPOINT_ID = 'endpoint-b1c2d3e4f5';
+    const DISABLED_ENDPOINT_ID = 'endpoint-c1d2e3f4g5';
+    let organizationId: string;
+    let otherOrganizationId: string;
 
-    await expect(isAllowed('endpoint-a1b2c3d4e5/acme/coder')).resolves.toBe(true);
-    await expect(isAllowed('endpoint-short/acme/coder')).resolves.toBe(false);
+    function endpointDefinition(): ByokEndpointDefinition {
+      return {
+        name: 'Acme',
+        base_url: 'https://llm.acme.example/v1',
+        api_kinds: ['chat_completions'],
+        client_provider: 'openrouter',
+        reasoning_format: 'reasoning-details',
+        models: [
+          {
+            id: 'acme/coder',
+            internal_id: 'coder-v2',
+            context_length: 1000,
+            max_completion_tokens: 10,
+          },
+        ],
+      };
+    }
+
+    beforeAll(async () => {
+      const user = await insertTestUser();
+      organizationId = (await createTestOrganization(`Endpoint ${crypto.randomUUID()}`, user.id, 0))
+        .id;
+      otherOrganizationId = (
+        await createTestOrganization(`Endpoint ${crypto.randomUUID()}`, user.id, 0)
+      ).id;
+      await db.insert(byok_api_keys).values(
+        [
+          { providerId: ENDPOINT_ID, catalogMode: false, isEnabled: true },
+          { providerId: CATALOG_ENDPOINT_ID, catalogMode: true, isEnabled: true },
+          { providerId: DISABLED_ENDPOINT_ID, catalogMode: false, isEnabled: false },
+        ].map(key => ({
+          organization_id: organizationId,
+          provider_id: key.providerId,
+          encrypted_api_key_envelope: testByokEnvelope('{"type":"api_key","api_key":"secret"}'),
+          created_by: user.id,
+          is_enabled: key.isEnabled,
+          settings: { serve_catalog_models: key.catalogMode, endpoint: endpointDefinition() },
+        }))
+      );
+    });
+
+    function isAllowed(modelId: string, grantee: CustomLlmGrantee | undefined) {
+      return createAllowPredicateFromRestrictions(
+        {
+          requireModelInCurrentSnapshot: true,
+          providerAllowList: [],
+          modelDenyList: [modelId],
+          customLlmGrantee: grantee,
+        },
+        lookup({})
+      )(modelId);
+    }
+
+    test('exempts a model the grantee organization endpoint lists', async () => {
+      await expect(
+        isAllowed(`${ENDPOINT_ID}/acme/coder`, { organizationId, groupIds: [] })
+      ).resolves.toBe(true);
+    });
+
+    test.each([
+      ['an unlisted model', `${ENDPOINT_ID}/acme/other`, () => organizationId],
+      ['a catalog-mode endpoint', `${CATALOG_ENDPOINT_ID}/acme/coder`, () => organizationId],
+      ['a disabled endpoint', `${DISABLED_ENDPOINT_ID}/acme/coder`, () => organizationId],
+      ['an unknown endpoint', 'endpoint-zzzzzzzzzz/acme/coder', () => organizationId],
+      ['another organization', `${ENDPOINT_ID}/acme/coder`, () => otherOrganizationId],
+    ])('does not exempt %s', async (_case, modelId, grantee) => {
+      await expect(isAllowed(modelId, { organizationId: grantee(), groupIds: [] })).resolves.toBe(
+        false
+      );
+    });
+
+    test('does not exempt an endpoint model without a grantee', async () => {
+      await expect(isAllowed(`${ENDPOINT_ID}/acme/coder`, undefined)).resolves.toBe(false);
+      await expect(isAllowed('endpoint-short/acme/coder', undefined)).resolves.toBe(false);
+    });
   });
 
   describe('custom LLMs', () => {

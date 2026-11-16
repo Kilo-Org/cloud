@@ -35,8 +35,8 @@ type MobileToolbarPopoverProps = {
   variantPickerTooltip?: string;
   className?: string;
   customModeOptions?: ModeOption[];
-  /** Enables favorite stars in the model picker, scoped to the organization. */
-  favorites?: { organizationId?: string };
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function MobileToolbarPopover({

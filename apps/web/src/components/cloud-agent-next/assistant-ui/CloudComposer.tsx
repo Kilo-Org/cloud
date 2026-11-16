@@ -154,8 +154,8 @@ type CloudComposerProps = {
    * selected chat, so completion is scoped to this key.
    */
   conversationKey?: string;
-  /** Enables favorite stars in the model picker, scoped to the session's organization. */
-  favorites?: { organizationId?: string };
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function CloudComposer({

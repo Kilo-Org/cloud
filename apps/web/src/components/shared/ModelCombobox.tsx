@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import {
   buildModelOptionGroups,
   getModelOptionKeywords,
+  NO_FAVORITES,
   type ModelOption,
   type ModelOptionGroup,
 } from './model-combobox-options';
@@ -75,9 +76,9 @@ export type ModelComboboxProps = {
   id?: string;
   /**
    * Show favorite stars and a Favorites group, persisted to the user's cloud
-   * model preferences. The organization scopes which favorites are shown.
+   * model preferences. Favorites are per-user and shared with the mobile app.
    */
-  favorites?: { organizationId?: string };
+  favorites?: boolean;
 };
 
 export function ModelCombobox({
@@ -121,8 +122,13 @@ export function ModelCombobox({
     favorites: favoriteModels,
     addFavorite,
     removeFavorite,
-  } = useModelFavorites(favorites?.organizationId, { enabled: favorites !== undefined });
-  const favoriteIds = useMemo(() => new Set(favoriteModels), [favoriteModels]);
+  } = useModelFavorites({ enabled: favorites === true });
+  // The disabled query still observes cached favorites; only an opted-in
+  // picker may group or star them.
+  const favoriteIds = useMemo(
+    () => (favorites ? new Set(favoriteModels) : NO_FAVORITES),
+    [favorites, favoriteModels]
+  );
   const modelGroups = useMemo(
     () => buildModelOptionGroups(models, preferredModels, favoriteIds),
     [models, preferredModels, favoriteIds]
@@ -494,7 +500,7 @@ function FavoriteStar({
         if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
       }}
       className={cn(
-        'focus-visible:ring-ring inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none focus-visible:ring-2',
+        'focus-visible:ring-ring relative inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none before:absolute before:-inset-2 focus-visible:ring-2 [@media(any-pointer:coarse)]:before:-inset-3',
         isFavorite ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
       )}
     >

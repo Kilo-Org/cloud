@@ -1,10 +1,14 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { toast } from 'sonner';
 
 import type { RootRouter } from '@/routers/root-router';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { useTRPC } from '@/lib/trpc/utils';
 
 type ModelPreferences = inferRouterOutputs<RootRouter>['modelPreferences']['get'];
@@ -40,38 +44,48 @@ export function useModelPreferences(organizationId: string | undefined) {
 // serializes add/remove so a slower earlier request cannot stomp a later one.
 const FAVORITES_MUTATION_SCOPE = { id: 'model-preferences-favorites' };
 
-export function useModelFavorites(
-  organizationId: string | undefined,
-  options: { enabled?: boolean } = {}
-) {
+const EMPTY_FAVORITES: string[] = [];
+
+type FavoritesMutationContext = {
+  previous: ModelPreferences | undefined;
+  generation: number;
+};
+
+// Favorites are per-user, not per-organization: the read stays org-less so
+// CLI-catalog (`remote:`) keys survive and stars match the mobile picker,
+// which reads the same store without an organization.
+export function useModelFavorites(options: { enabled?: boolean } = {}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const input = organizationId ? { organizationId } : undefined;
 
   const query = useQuery({
-    ...trpc.modelPreferences.get.queryOptions(input),
+    ...trpc.modelPreferences.get.queryOptions(undefined),
     enabled: options.enabled ?? true,
   });
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: trpc.modelPreferences.get.queryKey() });
 
-  const applyOptimisticFavorites = async (update: (favorites: string[]) => string[]) => {
-    const queryKey = trpc.modelPreferences.get.queryKey(input);
+  const applyOptimisticFavorites = async (
+    update: (favorites: string[]) => string[]
+  ): Promise<FavoritesMutationContext> => {
+    const queryKey = trpc.modelPreferences.get.queryKey(undefined);
     await queryClient.cancelQueries({ queryKey });
+    const generation = nextMutationGeneration(hashKey(queryKey));
     const previous = queryClient.getQueryData<ModelPreferences>(queryKey);
     if (previous) {
       queryClient.setQueryData(queryKey, { ...previous, favorites: update(previous.favorites) });
     }
-    return previous;
+    return { previous, generation };
   };
 
   const rollbackFavorites = (
     error: { message: string },
-    previous: ModelPreferences | undefined
+    context: FavoritesMutationContext | undefined
   ) => {
-    if (previous) {
-      queryClient.setQueryData(trpc.modelPreferences.get.queryKey(input), previous);
+    const queryKey = trpc.modelPreferences.get.queryKey(undefined);
+    if (context?.previous && isLatestMutationGeneration(hashKey(queryKey), context.generation)) {
+      queryClient.setQueryData(queryKey, context.previous);
     }
     onError(error);
   };
@@ -79,11 +93,11 @@ export function useModelFavorites(
   const addFavorite = useMutation(
     trpc.modelPreferences.addFavorite.mutationOptions({
       scope: FAVORITES_MUTATION_SCOPE,
-      onMutate: async ({ model }): Promise<ModelPreferences | undefined> =>
+      onMutate: ({ model }) =>
         applyOptimisticFavorites(favorites =>
           favorites.includes(model) ? favorites : [...favorites, model]
         ),
-      onError: (error, _input, previous) => rollbackFavorites(error, previous),
+      onError: (error, _input, context) => rollbackFavorites(error, context),
       onSettled: invalidate,
     })
   );
@@ -91,15 +105,15 @@ export function useModelFavorites(
   const removeFavorite = useMutation(
     trpc.modelPreferences.removeFavorite.mutationOptions({
       scope: FAVORITES_MUTATION_SCOPE,
-      onMutate: async ({ model }): Promise<ModelPreferences | undefined> =>
+      onMutate: ({ model }) =>
         applyOptimisticFavorites(favorites => favorites.filter(id => id !== model)),
-      onError: (error, _input, previous) => rollbackFavorites(error, previous),
+      onError: (error, _input, context) => rollbackFavorites(error, context),
       onSettled: invalidate,
     })
   );
 
   return {
-    favorites: query.data?.favorites ?? [],
+    favorites: query.data?.favorites ?? EMPTY_FAVORITES,
     addFavorite: addFavorite.mutate,
     removeFavorite: removeFavorite.mutate,
   };

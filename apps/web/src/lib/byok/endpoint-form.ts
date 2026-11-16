@@ -62,8 +62,6 @@ export type EndpointForm = {
   api_kinds: CustomLlmApiKind[];
   client_provider: CustomLlmProvider;
   reasoning_format: ByokEndpointReasoningFormat;
-  forward_provider_routing: boolean;
-  forward_tracking_ids: boolean;
   models: EndpointModelRow[];
 };
 
@@ -113,8 +111,6 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
       api_kinds: ['chat_completions'],
       client_provider: 'openrouter',
       reasoning_format: 'reasoning-details',
-      forward_provider_routing: false,
-      forward_tracking_ids: false,
       models: [toEndpointModelRow()],
     };
   }
@@ -124,8 +120,6 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
     api_kinds: definition.api_kinds,
     client_provider: definition.client_provider,
     reasoning_format: definition.reasoning_format,
-    forward_provider_routing: definition.forward_provider_routing ?? false,
-    forward_tracking_ids: definition.forward_tracking_ids ?? false,
     models: definition.models.map(toEndpointModelRow),
   };
 }
@@ -184,8 +178,6 @@ export function buildEndpointDefinition(form: EndpointForm): BuildResult<ByokEnd
     api_kinds: form.api_kinds,
     client_provider: form.client_provider,
     reasoning_format: form.reasoning_format,
-    ...(form.forward_provider_routing && { forward_provider_routing: true }),
-    ...(form.forward_tracking_ids && { forward_tracking_ids: true }),
     models: form.models.map(toEndpointModel),
   });
   if (result.success) return result;

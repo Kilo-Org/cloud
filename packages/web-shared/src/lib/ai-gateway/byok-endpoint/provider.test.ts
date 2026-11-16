@@ -100,7 +100,7 @@ describe('buildByokEndpointProvider', () => {
     expect(body).not.toHaveProperty('model');
   });
 
-  it('removes OpenRouter provider routing and the tracking ids Kilo adds by default', async () => {
+  it('removes OpenRouter provider routing and the tracking ids Kilo adds', async () => {
     const { body } = await transform(definition(), chatRequest());
 
     expect(body).not.toHaveProperty('provider');
@@ -127,18 +127,6 @@ describe('buildByokEndpointProvider', () => {
 
     const { extraHeaders: chatHeaders } = await transform(definition(), chatRequest());
     expect(chatHeaders).not.toHaveProperty('anthropic-version');
-  });
-
-  it('forwards provider routing and tracking ids when the endpoint asks for them', async () => {
-    const endpoint = definition({ forward_provider_routing: true, forward_tracking_ids: true });
-
-    const { body } = await transform(endpoint, chatRequest());
-    expect(body.provider).toEqual({ order: ['openai'] });
-    expect(body.user).toEqual(expect.any(String));
-    expect(body.safety_identifier).toEqual(expect.any(String));
-
-    const { body: messagesBody } = await transform(endpoint, messagesRequest());
-    expect(messagesBody.metadata).toEqual({ user_id: expect.any(String) });
   });
 
   it('uses the model overrides of the endpoint defaults', () => {

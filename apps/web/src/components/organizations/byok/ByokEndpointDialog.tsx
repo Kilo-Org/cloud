@@ -35,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   EMPTY_ENDPOINT_CREDENTIALS_FORM,
@@ -771,39 +770,6 @@ function ByokEndpointForm({
               />
               <p className="text-muted-foreground text-xs">
                 How the endpoint returns reasoning in Chat Completions responses.
-              </p>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset className="space-y-3">
-          <legend className="type-label mb-2">Advanced</legend>
-          <div className="flex items-start gap-3">
-            <Switch
-              id="endpoint-forward-provider-routing"
-              checked={form.forward_provider_routing}
-              onCheckedChange={forward_provider_routing => updateForm({ forward_provider_routing })}
-            />
-            <div className="space-y-1">
-              <Label htmlFor="endpoint-forward-provider-routing">Forward provider routing</Label>
-              <p className="text-muted-foreground text-xs">
-                Keep OpenRouter&apos;s <code>provider</code> routing object in requests. Turn this
-                on only for OpenRouter-compatible endpoints; others may reject it.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Switch
-              id="endpoint-forward-tracking-ids"
-              checked={form.forward_tracking_ids}
-              onCheckedChange={forward_tracking_ids => updateForm({ forward_tracking_ids })}
-            />
-            <div className="space-y-1">
-              <Label htmlFor="endpoint-forward-tracking-ids">Forward tracking IDs</Label>
-              <p className="text-muted-foreground text-xs">
-                Keep the hashed user and session IDs Kilo adds (<code>user</code>,{' '}
-                <code>safety_identifier</code>, <code>session_id</code>, and{' '}
-                <code>metadata.user_id</code>), for example for abuse monitoring on your endpoint.
               </p>
             </div>
           </div>

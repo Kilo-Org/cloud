@@ -57,8 +57,10 @@ export function buildByokEndpointProvider(
     async transformRequest(context) {
       await provider.transformRequest(context);
       const body = context.request.body as Record<string, unknown>;
-      if (!definition.forward_provider_routing) delete body.provider;
-      if (!definition.forward_tracking_ids) removeTrackingIds(body);
+      // Only OpenRouter-compatible upstreams accept OpenRouter's routing object, and an
+      // organization's upstream has no use for the user and session ids Kilo adds.
+      delete body.provider;
+      removeTrackingIds(body);
       // Anthropic's own API rejects Messages requests without it; compatible upstreams ignore it.
       if (context.request.kind === 'messages') {
         context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;

@@ -16,7 +16,7 @@ const MODEL = {
 };
 
 describe('buildEndpointDefinition', () => {
-  test('builds a definition and leaves unset overrides and advanced flags out', () => {
+  test('builds a definition and leaves unset overrides out', () => {
     const form = {
       ...toEndpointForm(null),
       name: ' Gateway ',
@@ -44,7 +44,6 @@ describe('buildEndpointDefinition', () => {
       api_kinds: ['chat_completions' as const, 'messages' as const],
       client_provider: 'anthropic' as const,
       reasoning_format: 'reasoning-content' as const,
-      forward_tracking_ids: true,
       models: [
         {
           ...MODEL,

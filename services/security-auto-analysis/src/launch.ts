@@ -243,9 +243,14 @@ export async function startSecurityAnalysis(
       };
     }
     if (admission.outcome === 'unavailable') {
-      // The admission read could not decide, so no paid work runs and the
-      // caller applies its usual retry classification and attempt bound.
-      return { started: false, error: admission.message, failureNeedsLifecycleTransition: true };
+      // The read could not decide and no paid work ran, so both the scheduled
+      // and the manual entrypoint requeue it under the consumer's attempt bound.
+      return {
+        started: false,
+        error: admission.message,
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+      };
     }
 
     // The pending write follows admission, and the caller's start-failed

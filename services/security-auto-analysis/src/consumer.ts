@@ -13,6 +13,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
+import { nextRetryAt } from './retry-policy.js';
 import {
   InsufficientCreditsError,
   startSecurityAnalysis,
@@ -183,13 +184,6 @@ function isEligibleForAutoLaunch(params: {
     autoAnalysisMinSeverity: params.config.auto_analysis_min_severity,
     autoAnalysisIncludeExisting: params.config.auto_analysis_include_existing,
   }).eligible;
-}
-
-function nextRetryAt(attemptCount: number): Date {
-  const baseDelayMs = 15_000 * 2 ** Math.max(0, attemptCount);
-  const cappedDelayMs = Math.min(15 * 60 * 1000, baseDelayMs);
-  const jitterMs = Math.round(cappedDelayMs * Math.random() * 0.2);
-  return new Date(Date.now() + cappedDelayMs + jitterMs);
 }
 
 async function markQueuePendingState(params: TransitionParams): Promise<void> {

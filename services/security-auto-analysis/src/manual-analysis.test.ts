@@ -744,6 +744,70 @@ describe('processManualAnalysisStart', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('requeues a manual start whose admission read could not decide', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const db = {
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row-retry',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      }),
+      execute,
+    };
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'admission unavailable',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'failed', resultCode: 'REQUEUE_TEMPORARY_PRECONDITION' });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'admission unavailable',
+          queueStatus: 'queued',
+          failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+          incrementAttempt: true,
+          nextRetryAt: expect.any(String),
+        },
+      })
+    );
+
+    const transition = vi.mocked(transitionAnalysisStartLifecycle).mock.calls[0]?.[1];
+    const outcome = transition?.outcome;
+    if (outcome?.type !== 'start-failed') throw new Error('Expected a start-failed outcome');
+    const retryAt = Date.parse(outcome.nextRetryAt ?? '');
+    expect(retryAt).toBeGreaterThan(Date.now());
+    expect(retryAt).toBeLessThan(Date.now() + 5 * 60 * 1000);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
     const db = fakeAdmissionDb({
       admissionAnalysisStatus: null,

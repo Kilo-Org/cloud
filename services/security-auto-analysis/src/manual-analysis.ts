@@ -29,6 +29,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import { nextRetryAt } from './retry-policy.js';
 import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { generateControlToken } from './token.js';
 import {
@@ -352,6 +353,27 @@ export async function processManualAnalysisStart(params: {
   }
   if (!result.started) {
     if (result.failureNeedsLifecycleTransition) {
+      if (result.failureCode === 'REQUEUE_TEMPORARY_PRECONDITION') {
+        // A start that could not decide is retried, not failed: the queue row is
+        // what the scheduled consumer picks up again, and its attempt bound is
+        // the one that gives up eventually.
+        await transitionAnalysisStartLifecycle(params.db, {
+          claim: {
+            source: 'manual',
+            findingId: finding.id,
+            claimToken,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: result.error ?? 'Security analysis start failed',
+            queueStatus: 'queued',
+            failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+            incrementAttempt: true,
+            nextRetryAt: nextRetryAt(1).toISOString(),
+          },
+        });
+        return { status: 'failed', resultCode: 'REQUEUE_TEMPORARY_PRECONDITION' };
+      }
       await transitionAnalysisStartLifecycle(params.db, {
         claim: {
           source: 'manual',

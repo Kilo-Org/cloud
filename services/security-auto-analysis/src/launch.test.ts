@@ -719,6 +719,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       started: false,
       error: 'Cloud Agent credit admission returned HTTP 503',
       failureNeedsLifecycleTransition: true,
+      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
     });
 
     expect(triageSecurityFinding).not.toHaveBeenCalled();

@@ -83,7 +83,7 @@ export function ProvidersTab({
       <div className="text-muted-foreground space-y-1 text-sm">
         <p>
           {scope === 'organization'
-            ? 'Enable which providers organization members can use. A group policy in "Specific models and providers" mode can add providers beyond this list.'
+            ? 'Enable which providers organization members can use. A group policy in "Specific models and providers" mode gives its own members the providers it selects.'
             : 'Grant models offered by enabled providers through this policy.'}
         </p>
         <p>

@@ -29,6 +29,7 @@ import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 const MODES_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/modes' as const;
 
@@ -82,6 +83,7 @@ export type ModeFormProps = Readonly<{
 export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps) {
   const router = useRouter();
   const popOnce = usePopOnce();
+  const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
   const mutations = useOrgModeMutations(organizationId);
   const initial = mode === undefined ? null : orgModeFormValues(mode);
@@ -115,12 +117,13 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   };
 
   const leaveToList = () => {
-    guard.markClean();
-    if (router.canGoBack()) {
-      popOnce();
-      return;
-    }
-    router.replace(MODES_LIST_PATH as Href);
+    guard.leaveWithoutAsking(() => {
+      if (router.canGoBack()) {
+        popOnce();
+        return;
+      }
+      stackSafeReplace.replace(MODES_LIST_PATH as Href);
+    });
   };
 
   const save = () => {

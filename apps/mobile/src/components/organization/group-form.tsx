@@ -30,10 +30,12 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups' as const;
+const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
 
 type GroupFormProps = Readonly<{
   organizationId: string;
@@ -56,6 +58,7 @@ type GroupFormProps = Readonly<{
 export function GroupForm({ organizationId, group }: GroupFormProps) {
   const router = useRouter();
   const popOnce = usePopOnce();
+  const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const mutations = useOrgGroupMutations(organizationId);
@@ -96,12 +99,13 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   };
 
   const leaveToList = () => {
-    guard.markClean();
-    if (router.canGoBack()) {
-      popOnce();
-      return;
-    }
-    router.replace(GROUPS_LIST_PATH as Href);
+    guard.leaveWithoutAsking(() => {
+      if (router.canGoBack()) {
+        popOnce();
+        return;
+      }
+      stackSafeReplace.replace(GROUPS_LIST_PATH as Href);
+    });
   };
 
   const activeMembers: readonly ActiveOrgMember[] = (orgWithMembers.data?.members ?? []).filter(
@@ -131,12 +135,16 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     if (group === undefined) {
       mutations.create.mutate(payload, {
         onSuccess: created => {
-          guard.markClean();
           // Members belong to a group that exists, so the created group opens
-          // its own form for that step instead of dropping the selection.
-          router.replace({
-            pathname: '/(app)/(tabs)/(3_profile)/organization/group-form',
-            params: { groupId: created.result.id },
+          // its own form for that step instead of dropping the selection. The
+          // form it replaces is retired once that push has landed: swapping two
+          // screens of one native stack in a single commit is the other Android
+          // Fabric crash `stack-safe-replace` exists for (KILO-APP-25).
+          guard.leaveWithoutAsking(() => {
+            stackSafeReplace.replace({
+              pathname: GROUP_FORM_PATH,
+              params: { groupId: created.result.id },
+            });
           });
         },
       });

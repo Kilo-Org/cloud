@@ -31,6 +31,7 @@ const withMembersQuery = vi.hoisted(() => ({
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
+const memberRowProps = vi.hoisted(() => [] as Record<string, unknown>[]);
 
 /** The smallest box the control-size audit accepts on a control's own node. */
 const MIN_BOX_DP = 28;
@@ -128,7 +129,10 @@ vi.mock('@/components/organization/invited-member-row', () => ({
 }));
 
 vi.mock('@/components/organization/member-row', () => ({
-  MemberRow: () => null,
+  MemberRow: (props: Record<string, unknown>) => {
+    memberRowProps.push(props);
+    return null;
+  },
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
@@ -210,6 +214,7 @@ beforeEach(() => {
   withMembersQuery.error = null;
   withMembersQuery.refetch.mockClear();
   routerPush.mockClear();
+  memberRowProps.length = 0;
 });
 
 describe('OrganizationMembersScreen empty-state precedence', () => {
@@ -394,5 +399,89 @@ describe('OrganizationMembersScreen invite header control', () => {
 
     expect(loadedControl.props.className).toBe(loadingClassName);
     loaded.unmount();
+  });
+});
+
+describe('OrganizationMembersScreen removal refusals', () => {
+  // The optimistic removal unmounts the row while its request runs, so the
+  // screen owns the failure and hands it back on the row's remount. The
+  // MemberRow mock records its props, so the channel under test is the last
+  // render's props.
+  const activeMember = { status: 'active', id: 'member-9', name: 'Ada', email: 'ada@example.com' };
+
+  function lastRowProps(): Record<string, unknown> {
+    const props = memberRowProps.at(-1);
+    if (!props) {
+      throw new Error('member row never rendered');
+    }
+    return props;
+  }
+
+  function removalStart(): (memberId: string) => {
+    fail: (failure: { kind: string; message: string }) => boolean;
+  } | null {
+    const start = lastRowProps().onRemovalStarted;
+    if (typeof start !== 'function') {
+      throw new TypeError('removal channel missing');
+    }
+    return start as never;
+  }
+
+  it('hands the channel to every row and reports no failure while healthy', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+
+    const props = lastRowProps();
+    expect(typeof props.onRemovalStarted).toBe('function');
+    expect(props.removalFailure).toBeNull();
+    unmount();
+  });
+
+  it('publishes a refused removal to the row that owns the member', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+    const attempt = start('member-9');
+    if (!attempt) {
+      throw new Error('attempt not admitted');
+    }
+    act(() => {
+      attempt.fail({ kind: 'removal-refused', message: 'Organization trial has expired.' });
+    });
+
+    expect(lastRowProps().removalFailure).toEqual({
+      kind: 'removal-refused',
+      message: 'Organization trial has expired.',
+    });
+    unmount();
+  });
+
+  it('admits one attempt per member until it settles', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+
+    expect(start('member-9')).not.toBeNull();
+    expect(start('member-9')).toBeNull();
+    unmount();
+  });
+
+  it('retires the refusal when the next attempt for the member begins', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+    const first = start('member-9');
+    if (!first) {
+      throw new Error('first attempt not admitted');
+    }
+    act(() => {
+      first.fail({ kind: 'removal-refused', message: 'Organization trial has expired.' });
+    });
+    act(() => {
+      start('member-9');
+    });
+
+    expect(lastRowProps().removalFailure).toBeNull();
+    unmount();
   });
 });

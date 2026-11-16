@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  repositoryAccessModeSchema,
+  type RepositoryAccessFailure,
+} from './workspace-repository-access';
 
 export function isGitHubTaskRef(value: string): boolean {
   return (
@@ -36,14 +40,15 @@ export const githubTaskGrantSchema = z
         name: repositoryPart,
       })
       .strict(),
-    taskRef: z.string().refine(isGitHubTaskRef),
+    taskRef: z.string().refine(isGitHubTaskRef).optional(),
+    mode: repositoryAccessModeSchema.optional(),
   })
   .strict();
 
 export type GitHubTaskGrant = z.infer<typeof githubTaskGrantSchema>;
 
 export const githubTaskScopeSchema = githubTaskGrantSchema
-  .pick({ scopeId: true, taskRef: true })
+  .pick({ scopeId: true, taskRef: true, mode: true })
   .extend({
     repositoryId: z.number().int().positive().safe().optional(),
   })
@@ -51,6 +56,7 @@ export const githubTaskScopeSchema = githubTaskGrantSchema
 export type GitHubTaskScope = z.infer<typeof githubTaskScopeSchema>;
 
 export type GitHubTaskPolicyFailure =
+  | RepositoryAccessFailure
   | 'invalid_upstream_url'
   | 'upstream_host_not_allowed'
   | 'repository_mismatch'

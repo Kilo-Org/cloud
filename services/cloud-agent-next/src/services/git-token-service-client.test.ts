@@ -791,10 +791,16 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     });
   });
 
-  it('explains unsupported provided credentials without an installation fallback', async () => {
+  it.each([
+    [
+      'provided_token_not_supported',
+      'Provided GitHub tokens cannot authorize this task. Connect your GitHub account through the GitHub App.',
+    ],
+    ['user_authorization_revoked', 'Reconnect your GitHub account to continue this task.'],
+  ])('explains %s without an installation fallback', async (reason, message) => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: false,
-      reason: 'provided_token_not_supported',
+      reason,
     });
     const getTokenForRepo = vi.fn();
     await expect(
@@ -806,9 +812,8 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     ).resolves.toEqual({
       success: false,
       error: {
-        reason: 'provided_token_not_supported',
-        message:
-          'Provided GitHub tokens cannot authorize this task. Connect your GitHub account through the GitHub App.',
+        reason,
+        message,
       },
     });
     expect(getTokenForRepo).not.toHaveBeenCalled();

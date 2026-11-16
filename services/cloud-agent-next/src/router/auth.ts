@@ -1,3 +1,5 @@
+import { resolveSecret } from '../auth.js';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { timingSafeEqual } from '@kilocode/encryption';
 import type { TRPCContext } from '../types.js';
@@ -132,3 +134,34 @@ export const internalApiProtectedProcedure = t.procedure.use(
     return next({ ctx });
   }
 );
+
+/** A normal runtime token must never acquire trusted repository management authority. */
+export const repositoryAccessProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  try {
+    const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Control authorization unavailable');
+    const auth = await verifyKiloTokenForPolicy(ctx.authToken, secret, {
+      audience: 'cloud-agent-next',
+      mode: 'required',
+    });
+    const claims = auth.claims;
+    if (
+      claims.kiloUserId !== ctx.userId ||
+      claims.cloudAgentControlScope !== 'repository-access' ||
+      claims.runtimeAdmission?.source !== 'user' ||
+      claims.runtimeAdmission.authorizationUserId !== ctx.userId ||
+      claims.runtimeAuthorization ||
+      claims.cloudAgentAuthority ||
+      !['human-api', 'device-access'].includes(claims.tokenPurpose ?? '') ||
+      claims.credentialExchange !== false ||
+      claims.aud !== 'cloud-agent-next'
+    )
+      throw new Error('Invalid control authority');
+  } catch {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Trusted repository access control required',
+    });
+  }
+  return next({ ctx });
+});

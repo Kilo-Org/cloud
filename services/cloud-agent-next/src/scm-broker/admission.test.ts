@@ -62,6 +62,25 @@ function fixture(
 describe.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
   '%s shared SCM admission',
   provider => {
+    it.each(['kgh2.', 'kgh4.'])(
+      'keeps the %s workspace policy when a request omits its credential',
+      async prefix => {
+        const f = fixture(provider);
+        if (!f.scope.scm?.capability) throw new Error('Missing fixture capability');
+        f.scope.scm.capability.credential = `${prefix}synthetic`;
+        expect(f.scope.githubTaskRef).toBeUndefined();
+        expect(f.scope.scm.githubTaskGrant).toBeUndefined();
+        expect(await admitScmRequest({ ...f.request, authorization: {} }, f.deps)).toEqual({
+          ok: true,
+          authority: {
+            type: 'unmanaged',
+            ...(prefix === 'kgh4.' ? { githubAuthorization: 'task' } : {}),
+          },
+        });
+        expect(f.resolve).not.toHaveBeenCalled();
+      }
+    );
+
     it.each(['github', 'gitlab', 'bitbucket'] as const)(
       'admits %s and persists renewed backing credentials behind the same alias',
       async purpose => {

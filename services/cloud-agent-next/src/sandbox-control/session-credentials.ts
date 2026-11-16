@@ -1,3 +1,5 @@
+import { githubUserAuthorizationAllowed } from '../session/environment-launch.js';
+import { REPOSITORY_ACCESS_PROTOCOL_VERSION } from '@kilocode/worker-utils/workspace-repository-access';
 import { githubTaskGrantSchema, isGitHubTaskRef } from '@kilocode/worker-utils/github-task-grant';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
@@ -61,9 +63,23 @@ import {
   CAPABILITY_FAMILY_PATTERN_SOURCE,
   CURRENT_CAPABILITY_PREFIX,
   GITHUB_TASK_CAPABILITY_PREFIX,
+  GITHUB_WORKSPACE_CAPABILITY_PREFIX,
   hasCurrentCapabilityPrefix,
   LEGACY_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
+
+/** Existing scopes retain the authorization policy recorded when they were created. */
+export function hasTaskGitHubAuthorization(grant: SessionCredentialGrant): boolean {
+  const entries = [grant.scm, ...(grant.additionalRepositories ?? []).map(entry => entry.scm)];
+  return (
+    grant.githubTaskRef !== undefined ||
+    entries.some(
+      scm =>
+        scm?.githubTaskGrant !== undefined ||
+        scm?.capability?.credential.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX) === true
+    )
+  );
+}
 
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
@@ -356,7 +372,7 @@ function refinePersistedSessionCredentialGrant(
   if (grant.additionalRepositories) {
     // Only a contained grant that the outbound proxy serves can hold several
     // repositories. Vercel forwards the launch capability only.
-    if (!contained || grant.provider === 'vercel') reject();
+    if (!contained) reject();
     const aliasByPurpose = new Map([[grant.scm.purpose, grant.scm.alias]]);
     for (const { repository, scm } of grant.additionalRepositories) {
       if (scm.purpose !== repository.type) reject();
@@ -407,9 +423,13 @@ function assertScmGrantValid(
   ) {
     reject();
   }
-  const capabilityPrefix = taskGrant
-    ? GITHUB_TASK_CAPABILITY_PREFIX
-    : CURRENT_CAPABILITY_PREFIX[scm.purpose];
+  const capabilityPrefix =
+    scm.purpose === 'github' &&
+    scm.capability?.credential.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX)
+      ? GITHUB_WORKSPACE_CAPABILITY_PREFIX
+      : taskGrant
+        ? GITHUB_TASK_CAPABILITY_PREFIX
+        : CURRENT_CAPABILITY_PREFIX[scm.purpose];
   if (!context.contained) {
     if (
       scm.alias !== undefined ||
@@ -703,11 +723,10 @@ function repositoryFromSource(
         ? { expectedIntegrationId: repository.githubIntegrationId }
         : {}),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
-      allowUserAuthorization:
-        repository.allowUserAuthorization ??
-        (context.createdOnPlatform === 'cloud-agent-web' ||
-          context.createdOnPlatform === 'agent-manager' ||
-          context.createdOnPlatform === 'slack'),
+      allowUserAuthorization: githubUserAuthorizationAllowed({
+        allowUserAuthorization: repository.allowUserAuthorization,
+        createdOnPlatform: context.createdOnPlatform,
+      }),
     };
   }
   const url = canonicalRepositoryUrl(repository.url, repository.type !== 'git', diagnostic);
@@ -821,6 +840,60 @@ async function refreshScmCapability(
 ): Promise<ScmGrant> {
   if (repository.type === 'git') {
     throw new Error('A git repository carries no contained capability');
+  }
+  const taskAuthorization =
+    repository.type === 'github' &&
+    (githubTaskRef !== undefined || hasTaskGitHubAuthorization(grant));
+  const repositoryAccessProtocol = taskAuthorization
+    ? await env.GIT_TOKEN_SERVICE?.repositoryAccessProtocolVersion?.()
+    : undefined;
+  if (
+    existingScm?.capability?.credential.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX) &&
+    repositoryAccessProtocol !== REPOSITORY_ACCESS_PROTOCOL_VERSION
+  )
+    throw new Error('GitHub authorization is unavailable. Retry in this workspace.');
+  if (
+    repository.type === 'github' &&
+    taskAuthorization &&
+    env.GIT_TOKEN_SERVICE?.issueWorkspaceGitHubSessionCapability &&
+    repositoryAccessProtocol === REPOSITORY_ACCESS_PROTOCOL_VERSION
+  ) {
+    if (
+      !refresh &&
+      existingScm?.capability?.credential.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX) &&
+      isCapabilityCurrent(existingScm.capability, outboundContainerId, now)
+    )
+      return existingScm;
+    const issued = await env.GIT_TOKEN_SERVICE.issueWorkspaceGitHubSessionCapability({
+      sandboxId: grant.sandboxId,
+      scopeId: grant.scopeId,
+      userId: grant.userId,
+      repository: repository.repo,
+      ...(grant.orgId ? { orgId: grant.orgId } : {}),
+      outboundContainerId,
+    });
+    if (!issued.success)
+      throw new Error('GitHub authorization is unavailable. Retry in this workspace.');
+    return {
+      ...existingScm,
+      ...(issued.attribution
+        ? {
+            author: issued.attribution.author,
+            githubAppType: issued.attribution.appType,
+            githubAuthSource: issued.attribution.source,
+          }
+        : {}),
+      purpose: 'github',
+      alias: existingScm?.alias ?? createControlPlaneCredential(grant.sandboxId, 'github'),
+      gitUrl: `https://github.com/${repository.repo}.git`,
+      capability: cachedCapability(
+        issued.capability,
+        GITHUB_WORKSPACE_CAPABILITY_PREFIX,
+        outboundContainerId,
+        now,
+        diagnostic
+      ),
+    };
   }
   if (repository.type === 'github' && repository.expectedIntegrationId) {
     // Cached capabilities still require current association authorization; older brokers fail closed.
@@ -1276,17 +1349,18 @@ export async function prepareCredentialGrant(
     diagnostic
   );
   const additionalMembers = additionalEnvironmentMembers(input.environment, source.repository);
-  if (additionalMembers.length > 0 && !providerUsesOutboundCredentialProxy(provider)) {
+  if (
+    additionalMembers.length > 0 &&
+    provider !== 'vercel' &&
+    !providerUsesOutboundCredentialProxy(provider)
+  ) {
     // Several repositories need the proxy to select each one's capability.
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
     invalidCredentials();
   }
   // An existing scope keeps its policy when another session joins or its grant renews.
   const taskAuthorization = existing
-    ? existing.githubTaskRef !== undefined ||
-      existing.scm?.githubTaskGrant !== undefined ||
-      existing.additionalRepositories?.some(entry => entry.scm.githubTaskGrant !== undefined) ===
-        true
+    ? hasTaskGitHubAuthorization(existing)
     : source.githubAuthorization === 'task';
   const additionalEntries = additionalMembers.map(member => ({
     repoFullName: member.repoFullName,

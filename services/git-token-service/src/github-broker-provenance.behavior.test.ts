@@ -16,6 +16,7 @@ vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('@octokit/auth-app', () => ({ createAppAuth: vi.fn() }));
 
 const installation = {
+  id: '00000000-0000-4000-8000-000000000001',
   platform_installation_id: '123',
   platform_account_login: 'example',
   github_app_type: 'standard',

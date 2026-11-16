@@ -1,3 +1,7 @@
+import {
+  githubRepositoryPermissions,
+  type WorkspaceGitHubRepositoryAccess,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import { GitHubTaskResources } from './github-task-resources.js';
@@ -10,6 +14,18 @@ const grant: GitHubTaskGrant = {
   taskRef: 'refs/heads/main',
   repository: { id: 101, nodeId: 'R_fixture', name: 'repo', owner: 'acme' },
 };
+const approved = (id: number, name: string): WorkspaceGitHubRepositoryAccess => ({
+  repositoryId: id,
+  nodeId: id === 101 ? 'R_fixture' : 'R_other',
+  owner: 'acme',
+  name,
+  mode: 'read',
+  source: 'user',
+  approvedBy: 'user',
+  approvedAt: 1,
+  integrationId: '00000000-0000-4000-8000-000000000001',
+  identity: { source: 'user', providerSubjectId: '1', appType: 'standard' },
+});
 const env = {
   GITHUB_APP_CLIENT_ID: 'synthetic-client',
   GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
@@ -17,17 +33,52 @@ const env = {
 const resources = () => new GitHubTaskResources('synthetic-user-token', env);
 const fetchMock = vi.fn();
 let responses: Map<string, unknown>;
+let ids: number[];
 beforeEach(() => {
+  ids = [];
   responses = new Map<string, unknown>([
     ['/repos/acme/repo', repository],
+    [
+      '/user/installations/123/repositories',
+      { total_count: 2, repositories: [{ id: 101 }, { id: 202 }] },
+    ],
     ['/repos/acme/other', { ...repository, id: 202, node_id: 'R_other', name: 'other' }],
     [
       '/applications/synthetic-client/token/scoped',
-      { token: 'synthetic-scoped-token', installation: { repository_selection: 'selected' } },
+      {
+        token: 'synthetic-scoped-token',
+        installation: {
+          id: 123,
+          repository_selection: 'selected',
+          permissions: githubRepositoryPermissions('contribute'),
+        },
+      },
     ],
   ]);
-  fetchMock.mockReset().mockImplementation(async (input: string) => {
-    const value = responses.get(new URL(input).pathname);
+  fetchMock.mockReset().mockImplementation(async (input: string, init?: RequestInit) => {
+    const path = new URL(input).pathname;
+    let value = responses.get(path);
+    if (path.endsWith('/token/scoped')) {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+      ids = body.repository_ids;
+      if (
+        value &&
+        typeof value === 'object' &&
+        'token' in value &&
+        value.token === 'synthetic-scoped-token'
+      )
+        value = {
+          ...value,
+          token: value.token,
+          installation: {
+            id: 123,
+            repository_selection: 'selected',
+            permissions: body.permissions,
+          },
+        };
+    }
+    if (path === '/user/installations/123/repositories')
+      value = { total_count: ids.length, repositories: ids.map(id => ({ id })) };
     return value instanceof Response
       ? value
       : value === undefined
@@ -59,7 +110,11 @@ describe('trusted GitHub repository authority', () => {
   );
   it('adds only the requested same-owner repository to the credential scope', async () => {
     expect(
-      await resources().verify(grant, [{ kind: 'repository-read', owner: 'acme', name: 'other' }])
+      await resources().verify(
+        grant,
+        [{ kind: 'repository-read', owner: 'acme', name: 'other' }],
+        [approved(202, 'other')]
+      )
     ).toEqual({ owner: 'acme', repositoryIds: [101, 202] });
   });
   it.each([
@@ -88,7 +143,13 @@ describe('trusted GitHub repository authority', () => {
     );
     if (!decision.allowed) throw new Error('Expected supported GraphQL aliases');
     expect(decision.checks).toHaveLength(64);
-    expect(await resources().verify(grant, decision.checks)).toEqual({
+    expect(
+      await resources().verify(
+        grant,
+        decision.checks,
+        owner === 'acme' ? [{ ...approved(id, name), nodeId: `R_${name}` }] : []
+      )
+    ).toEqual({
       owner: 'acme',
       repositoryIds: owner === 'acme' ? [101, id] : [101],
     });
@@ -123,7 +184,11 @@ describe('trusted GitHub repository authority', () => {
         name: check.name,
       });
     }
-    const scope = await resources().verify(grant, checks);
+    const scope = await resources().verify(
+      grant,
+      checks,
+      checks.map((check, index) => ({ ...approved(202 + index, check.name), nodeId: `R_${index}` }))
+    );
     expect(scope.repositoryIds).toHaveLength(16);
     expect(fetchMock).toHaveBeenCalledTimes(16);
   });
@@ -140,7 +205,7 @@ describe('trusted GitHub repository authority', () => {
     ).rejects.toMatchObject({ reason: 'operation_not_allowed' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it('measures one verification and one user-token exchange per request', async () => {
+  it('measures repository verification, exchange and selected-repository validation per request', async () => {
     for (let index = 0; index < 2; index++) {
       const authority = resources();
       const scope = await authority.verify(grant, []);
@@ -149,8 +214,10 @@ describe('trusted GitHub repository authority', () => {
     expect(fetchMock.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
       '/repos/acme/repo',
       '/applications/synthetic-client/token/scoped',
+      '/user/installations/123/repositories',
       '/repos/acme/repo',
       '/applications/synthetic-client/token/scoped',
+      '/user/installations/123/repositories',
     ]);
   });
   it('observes a changed provider repository identity on the next request', async () => {
@@ -162,13 +229,21 @@ describe('trusted GitHub repository authority', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it('keeps repository discovery credentials limited to the task repository', async () => {
-    const scope = await resources().verify(grant, [{ kind: 'owner-read' }]);
-    expect(scope).toEqual({ owner: 'acme', repositoryIds: [101] });
-    await resources().scopeUserToken(scope);
-    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+    expect(await resources().verify(grant, [{ kind: 'owner-read' }])).toEqual({
+      owner: 'acme',
+      repositoryIds: [101],
+    });
+    await resources().scopeUserToken({ owner: 'acme', repositoryIds: [101] });
+    expect(
+      JSON.parse(
+        fetchMock.mock.calls.find(([url]) => new URL(url).pathname.endsWith('/token/scoped'))?.[1]
+          .body
+      )
+    ).toEqual({
       access_token: 'synthetic-user-token',
       target: 'acme',
       repository_ids: [101],
+      permissions: githubRepositoryPermissions('contribute'),
     });
   });
   it('probes foreign public repositories without personal authorization', async () => {
@@ -201,7 +276,7 @@ describe('trusted GitHub repository authority', () => {
         resources().verify(grant, [
           { kind: 'repository-read', owner: 'personal-user', name: 'private' },
         ])
-      ).rejects.toMatchObject({ reason: 'repository_mismatch' });
+      ).rejects.toMatchObject({ reason: 'repository_access_required' });
       expect(new Headers(fetchMock.mock.calls.at(-1)?.[1].headers).has('authorization')).toBe(
         false
       );
@@ -258,8 +333,52 @@ describe('trusted GitHub repository authority', () => {
       access_token: 'synthetic-user-token',
       target: 'acme',
       repository_ids: [101, 202],
+      permissions: githubRepositoryPermissions('contribute'),
     });
   });
+  it('caches only validated credentials by identity, exact repository set, permissions and expiry', async () => {
+    const values = new Map<string, unknown>();
+    const cache = {
+      get: vi.fn(async (key: string) => values.get(key) ?? null),
+      put: vi.fn(async (key: string, value: string) => {
+        values.set(key, JSON.parse(value));
+      }),
+    };
+    responses.set('/applications/synthetic-client/token/scoped', {
+      token: 'synthetic-scoped-token',
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+      installation: {
+        id: 123,
+        repository_selection: 'selected',
+        permissions: githubRepositoryPermissions('read'),
+      },
+    });
+    const cached = new GitHubTaskResources('synthetic-user-token', {
+      ...env,
+      TOKEN_CACHE: cache as unknown as KVNamespace,
+    });
+    await cached.scopeUserToken({ owner: 'acme', repositoryIds: [101] }, 'read');
+    const first = fetchMock.mock.calls.length;
+    await cached.scopeUserToken({ owner: 'acme', repositoryIds: [101] }, 'read');
+    expect(fetchMock.mock.calls.length).toBe(first);
+    await cached.scopeUserToken({ owner: 'acme', repositoryIds: [202] }, 'read');
+    await cached.scopeUserToken({ owner: 'acme', repositoryIds: [101] }, 'contribute');
+    await new GitHubTaskResources('different-user-token', {
+      ...env,
+      TOKEN_CACHE: cache as unknown as KVNamespace,
+    }).scopeUserToken({ owner: 'acme', repositoryIds: [101] }, 'read');
+    expect(
+      fetchMock.mock.calls.filter(([url]) => new URL(url).pathname.endsWith('/token/scoped'))
+    ).toHaveLength(4);
+    for (const value of values.values())
+      if (value && typeof value === 'object' && 'expiresAt' in value)
+        value.expiresAt = Date.now() - 1;
+    await cached.scopeUserToken({ owner: 'acme', repositoryIds: [101] }, 'read');
+    expect(
+      fetchMock.mock.calls.filter(([url]) => new URL(url).pathname.endsWith('/token/scoped'))
+    ).toHaveLength(5);
+  });
+
   it.each([
     { token: 'broad', installation: { repository_selection: 'all' } },
     {},
@@ -268,6 +387,8 @@ describe('trusted GitHub repository authority', () => {
     responses.set('/applications/synthetic-client/token/scoped', value);
     await expect(
       resources().scopeUserToken({ owner: 'acme', repositoryIds: [101] })
-    ).rejects.toMatchObject({ reason: 'source_unavailable' });
+    ).rejects.toMatchObject({
+      reason: value instanceof Response ? 'source_unavailable' : 'authorization_unavailable',
+    });
   });
 });

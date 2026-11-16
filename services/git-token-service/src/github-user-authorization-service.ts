@@ -68,6 +68,7 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
     userId: string;
     githubRepo: string;
     strictRepositoryLookup?: boolean;
+    repositoryMode?: 'read' | 'contribute';
   }): Promise<UserAuthorizationSelection> {
     if (!this.env.HYPERDRIVE) {
       return { selected: false, reason: 'refresh_failed' };
@@ -168,7 +169,10 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
           ? response.body && (await readBoundedJsonBody(response.body, 64 * 1024))
           : await response.json()
       );
-      if (!repositoryAccess.success || !repositoryAccess.data.permissions.push) {
+      if (
+        !repositoryAccess.success ||
+        (params.repositoryMode !== 'read' && !repositoryAccess.data.permissions.push)
+      ) {
         return { selected: false, reason: 'insufficient_user_access' };
       }
 

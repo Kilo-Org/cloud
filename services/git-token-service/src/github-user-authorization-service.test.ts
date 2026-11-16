@@ -275,6 +275,21 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     ).rejects.toThrow();
   });
 
+  it('selects the existing user identity for Read access without requiring push permission', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ permissions: { push: false } }))
+    );
+    expect(
+      await makeService().selectUserAuthorization({
+        userId: 'user_1',
+        githubRepo: 'acme/repo',
+        strictRepositoryLookup: true,
+        repositoryMode: 'read',
+      })
+    ).toMatchObject({ selected: true, token: 'access-token' });
+  });
+
   it('rejects attachment authorization without repository push access', async () => {
     vi.stubGlobal(
       'fetch',

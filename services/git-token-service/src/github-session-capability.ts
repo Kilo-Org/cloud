@@ -1,9 +1,11 @@
+import type { WorkspaceRepositoryScope } from '@kilocode/worker-utils/workspace-repository-access';
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import {
   CURRENT_CAPABILITY_PREFIX,
   GITHUB_TASK_CAPABILITY_PREFIX,
+  GITHUB_WORKSPACE_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
 import {
   githubTaskGrantSchema,
@@ -61,10 +63,24 @@ const GitHubTaskSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBas
   outboundContainerId: z.string().min(1),
   taskGrant: githubTaskGrantSchema,
 }).strict();
+const GitHubWorkspaceSessionCapabilityClaimsSchema = z
+  .object({
+    purpose: z.literal(CAPABILITY_PURPOSE),
+    version: z.literal(4),
+    userId: z.string().min(1),
+    orgId: z.string().uuid().optional(),
+    sandboxId: z.string().min(1).max(256),
+    scopeId: z.string().min(1).max(256),
+    outboundContainerId: z.string().min(1),
+    issuedAt: z.number().int().nonnegative(),
+    expiresAt: z.number().int().positive(),
+  })
+  .strict();
 const GitHubSessionCapabilityClaimsSchema = z
   .discriminatedUnion('version', [
     GitHubBoundSessionCapabilityClaimsSchema,
     GitHubTaskSessionCapabilityClaimsSchema,
+    GitHubWorkspaceSessionCapabilityClaimsSchema,
   ])
   .refine(
     claims =>
@@ -145,6 +161,18 @@ export function normalizeGitHubRepository(
 export class GitHubSessionCapabilityCodec {
   constructor(private readonly encryptionKey: string) {}
 
+  issueWorkspace(subject: WorkspaceRepositoryScope): string {
+    const issuedAt = Date.now();
+    const claims = GitHubWorkspaceSessionCapabilityClaimsSchema.parse({
+      purpose: CAPABILITY_PURPOSE,
+      version: 4,
+      ...subject,
+      issuedAt,
+      expiresAt: issuedAt + MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
+    });
+    return `${GITHUB_WORKSPACE_CAPABILITY_PREFIX}${encryptWithSymmetricKey(JSON.stringify(claims), this.encryptionKey)}`;
+  }
+
   issue(subject: GitHubSessionCapabilitySubject): string {
     if (subject.outboundContainerId.length === 0) {
       throw new GitHubSessionCapabilityError('capability_configuration_error');
@@ -170,12 +198,14 @@ export class GitHubSessionCapabilityCodec {
     }
   }
 
-  decode(capability: string): GitHubSessionCapabilityClaims {
-    const format = capability.startsWith(TASK_CAPABILITY_PREFIX)
-      ? { prefix: TASK_CAPABILITY_PREFIX, version: 3 as const }
-      : capability.startsWith(BOUND_CAPABILITY_PREFIX)
-        ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
-        : null;
+  decodePersistedIdentity(capability: string): GitHubSessionCapabilityClaims {
+    const format = capability.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX)
+      ? { prefix: GITHUB_WORKSPACE_CAPABILITY_PREFIX, version: 4 as const }
+      : capability.startsWith(TASK_CAPABILITY_PREFIX)
+        ? { prefix: TASK_CAPABILITY_PREFIX, version: 3 as const }
+        : capability.startsWith(BOUND_CAPABILITY_PREFIX)
+          ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
+          : null;
     if (!format) throw new GitHubSessionCapabilityError('invalid_capability');
 
     const encrypted = capability.slice(format.prefix.length);
@@ -199,9 +229,12 @@ export class GitHubSessionCapabilityCodec {
     if (!parsed.success || parsed.data.version !== format.version) {
       throw new GitHubSessionCapabilityError('invalid_capability');
     }
-    if (parsed.data.expiresAt <= Date.now()) {
-      throw new GitHubSessionCapabilityError('expired_capability');
-    }
     return parsed.data;
+  }
+  decode(capability: string): GitHubSessionCapabilityClaims {
+    const claims = this.decodePersistedIdentity(capability);
+    if (claims.expiresAt <= Date.now())
+      throw new GitHubSessionCapabilityError('expired_capability');
+    return claims;
   }
 }

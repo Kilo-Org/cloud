@@ -102,7 +102,8 @@ async function handleControlPlaneOutbound(
       request,
       env.GIT_TOKEN_SERVICE,
       { provider: capability.provider, capability: credential },
-      ctx.containerId
+      ctx.containerId,
+      parsed.sandboxId
     );
   } catch {
     return new Response('SCM authorization unavailable', { status: 502 });

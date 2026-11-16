@@ -1,11 +1,11 @@
 /* eslint-disable max-lines -- one harness holds the screen's state cases and the real-query retention cases that share its page fixtures. */
 import { createElement, type ElementType, Fragment, type ReactNode } from 'react';
-import { infiniteQueryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { ReportReceiptsScreen } from './report-receipts-screen';
 import type * as ReactQuery from '@tanstack/react-query';
@@ -585,7 +585,13 @@ describe('ReportReceiptsScreen', () => {
     // entry retains, one request per page.
     await useRealInfiniteQuery();
     state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
-    const queryClient = createTestQueryClient();
+    // `staleTime` unset, the library's 0: the reopen meets a stale entry, the
+    // state a reopen starts from in the app, whose default expires after 30 s.
+    // (`createTestQueryClient` is never stale, so its reopen only ever measured
+    // the reconcile's own read.)
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
 
     await loadThreePages(queryClient);
     state.pageRequests = [];
@@ -620,7 +626,11 @@ describe('ReportReceiptsScreen', () => {
   it('keeps the retained rows when the reopen cannot read page one', async () => {
     await useRealInfiniteQuery();
     state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
-    const queryClient = createTestQueryClient();
+    // The same stale reopen state: a mount-started fetch must also keep the
+    // rows when its only read fails.
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
 
     await loadThreePages(queryClient);
     state.pageRequests = [];

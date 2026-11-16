@@ -407,7 +407,7 @@
       "codeRequired": "Insira o código do e-mail.",
       "download": "Baixar arquivo",
       "downloadFailed": "Não foi possível baixar a exportação. Verifique sua conexão e tente novamente.",
-      "unavailableTitle": "Seus dados ainda não estão disponíveis",
+      "unavailableTitle": "A exportação de dados ainda não está disponível",
       "unavailableDescription": "A exportação de dados está sendo liberada aos poucos. Volte em breve."
     },
     "blockedPeople": {
@@ -2439,7 +2439,7 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "Nenhuma sessão ativa",
     "noSessionsDescription": "Entre na sua conta pelo app Kilo em outro dispositivo para que ele apareça aqui.",
-    "signInScopeNote": "Apenas os acessos pelo app Kilo e pela Kilo CLI aparecem aqui. Os acessos pelo editor não são listados.",
+    "signInScopeNote": "Apenas os acessos pelo app Kilo, pela Kilo CLI e por um navegador aparecem aqui. Os acessos pelo editor não são listados.",
     "signedIn": "Entrada: {{signedIn}} · Último acesso: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",

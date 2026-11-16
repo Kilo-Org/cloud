@@ -407,7 +407,7 @@
       "codeRequired": "Shigar da lambar daga imel ɗin.",
       "download": "Sauke fayil",
       "downloadFailed": "An kasa sauke fitarwar. Duba haɗin intanet ɗinka ka sake gwadawa.",
-      "unavailableTitle": "Bayananka ba su samu ba tukuna",
+      "unavailableTitle": "Fitar da bayanai ba ya samuwa tukuna",
       "unavailableDescription": "Ana fitar da fasalin fitar da bayanai a hankali. Sake dubawa nan ba da jimawa ba."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Babu zamannin da ke aiki",
     "noSessionsDescription": "Shiga ta manhajar Kilo a wata na'ura, kuma za ta bayyana a nan.",
     "signedIn": "An shiga {{signedIn}} · An gani na ƙarshe {{lastSeen}}",
-    "signInScopeNote": "Shiga ta manhajar Kilo da ta Kilo CLI ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ba.",
+    "signInScopeNote": "Shiga ta manhajar Kilo, ta Kilo CLI da ta burauzar yanar gizo ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ba.",
     "thisDevice": "Wannan na'ura",
     "viewProfile": "Duba bayanan martaba",
     "signOutThisDevice": "Fita daga wannan na'urar",

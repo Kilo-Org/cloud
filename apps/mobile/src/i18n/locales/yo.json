@@ -407,7 +407,7 @@
       "codeRequired": "Tẹ kóòdù láti inú ímeèlì sí i.",
       "download": "Ṣe ìgbàsílẹ̀ fáìlì",
       "downloadFailed": "A kò lè ṣe ìgbàsílẹ̀ ìkójáde náà. Ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
-      "unavailableTitle": "Dátà rẹ kò tíì wà lárọ̀ọ́wọ́tó",
+      "unavailableTitle": "Ìkójáde dátà kò tíì wà lárọ̀ọ́wọ́tó",
       "unavailableDescription": "À ń ṣe ìfilọ́lẹ̀ ìkójáde dátà díẹ̀díẹ̀. Padà wá láìpẹ́."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Kò sí ìgbà ìwọlé tó ń ṣiṣẹ́",
     "noSessionsDescription": "Wọlé pẹ̀lú ohun èlò Kilo lórí ẹ̀rọ mìíràn, ẹ̀rọ náà yóò sì hàn níbí.",
     "signedIn": "Wọlé {{signedIn}} · A rí i gbẹ̀yìn {{lastSeen}}",
-    "signInScopeNote": "Àwọn ìwọlé láti ohun èlò Kilo àti Kilo CLI ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù kò sí nínú àkójọ yìí.",
+    "signInScopeNote": "Àwọn ìwọlé láti ohun èlò Kilo, Kilo CLI àti aṣàwákiri ayélujára ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù kò sí nínú àkójọ yìí.",
     "thisDevice": "Ẹ̀rọ yìí",
     "webBrowser": "Aṣàwákiri ayélujára",
     "viewProfile": "Wo prófáìlì",

@@ -407,7 +407,7 @@
       "codeRequired": "Introdueix el codi del correu electrònic.",
       "download": "Baixa el fitxer",
       "downloadFailed": "No s'ha pogut baixar l'exportació. Comprova la connexió i torna-ho a provar.",
-      "unavailableTitle": "Les teves dades encara no estan disponibles",
+      "unavailableTitle": "L'exportació de dades encara no està disponible",
       "unavailableDescription": "L'exportació de dades s'està desplegant gradualment. Torna-ho a comprovar aviat."
     },
     "blockedPeople": {
@@ -3000,7 +3000,7 @@
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
     "signedIn": "Inici de sessió: {{signedIn}} · Última activitat: {{lastSeen}}",
-    "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo i del Kilo CLI. No es mostren els de l'editor.",
+    "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo, del Kilo CLI i d'un navegador web. No es mostren els de l'editor.",
     "thisDevice": "Aquest dispositiu",
     "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",

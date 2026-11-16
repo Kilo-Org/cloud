@@ -407,7 +407,7 @@
       "codeRequired": "Skriv inn koden fra e-posten.",
       "download": "Last ned fil",
       "downloadFailed": "Kunne ikke laste ned eksporten. Sjekk tilkoblingen og prøv igjen.",
-      "unavailableTitle": "Dataene dine er ikke tilgjengelige ennå",
+      "unavailableTitle": "Dataeksport er ikke tilgjengelig ennå",
       "unavailableDescription": "Dataeksport rulles ut gradvis. Sjekk igjen snart."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Ingen aktive økter",
     "noSessionsDescription": "Logg inn med Kilo-appen på en annen enhet, så vises den her.",
     "signedIn": "Logget inn {{signedIn}} · Sist sett {{lastSeen}}",
-    "signInScopeNote": "Her vises innlogginger i Kilo-appen og i Kilo CLI. Innlogginger i kodeeditoren vises ikke.",
+    "signInScopeNote": "Her vises innlogginger i Kilo-appen, i Kilo CLI og i en nettleser. Innlogginger i kodeeditoren vises ikke.",
     "thisDevice": "Denne enheten",
     "viewProfile": "Vis profil",
     "signOutThisDevice": "Logg ut denne enheten",

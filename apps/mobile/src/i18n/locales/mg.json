@@ -407,7 +407,7 @@
       "codeRequired": "Ampidiro ny kaody avy amin'ny mailaka.",
       "download": "Ampidino ny rakitra",
       "downloadFailed": "Tsy voadidina ny fanondranana. Hamarino ny fifandraisanao ary andramo indray.",
-      "unavailableTitle": "Mbola tsy misy ny angonao",
+      "unavailableTitle": "Mbola tsy misy ny fanondranana angona",
       "unavailableDescription": "Miandalana ny fametrahana ny fanondranana angona. Miverena tsy ho ela."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Tsy misy fotoam-piasana mandeha",
     "noSessionsDescription": "Midira amin'ny rindranasa Kilo amin'ny fitaovana hafa, dia hiseho eto izany.",
     "signedIn": "Niditra {{signedIn}} · Hita farany {{lastSeen}}",
-    "signInScopeNote": "Ny fidirana amin'ny rindranasa Kilo sy ny Kilo CLI no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody.",
+    "signInScopeNote": "Ny fidirana amin'ny rindranasa Kilo, amin'ny Kilo CLI sy amin'ny mpitety tranonkala no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody.",
     "thisDevice": "Ity fitaovana ity",
     "viewProfile": "Jereo ny mombamomba anao",
     "webBrowser": "Mpitety tranonkala",

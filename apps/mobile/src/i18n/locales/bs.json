@@ -407,7 +407,7 @@
       "codeRequired": "Unesi kod iz e-pošte.",
       "download": "Preuzmi datoteku",
       "downloadFailed": "Preuzimanje izvoza nije uspjelo. Provjeri vezu i pokušaj ponovo.",
-      "unavailableTitle": "Tvoji podaci još nisu dostupni",
+      "unavailableTitle": "Izvoz podataka još nije dostupan",
       "unavailableDescription": "Izvoz podataka uvodi se postepeno. Provjeri ponovo uskoro."
     },
     "blockedPeople": {
@@ -3000,7 +3000,7 @@
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju da se prikaže ovdje.",
     "signedIn": "Prijava: {{signedIn}} · Posljednja aktivnost: {{lastSeen}}",
-    "signInScopeNote": "Ovdje se prikazuju prijave u aplikaciju Kilo i Kilo CLI. Prijave iz uređivača koda nisu navedene.",
+    "signInScopeNote": "Ovdje se prikazuju prijave u aplikaciju Kilo, Kilo CLI i web preglednik. Prijave iz uređivača koda nisu navedene.",
     "thisDevice": "Ovaj uređaj",
     "webBrowser": "Web preglednik",
     "viewProfile": "Pogledaj profil",

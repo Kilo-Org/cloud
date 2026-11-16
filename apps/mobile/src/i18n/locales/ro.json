@@ -407,7 +407,7 @@
       "codeRequired": "Introdu codul din e-mail.",
       "download": "Descarcă fișierul",
       "downloadFailed": "Exportul nu a putut fi descărcat. Verifică-ți conexiunea și încearcă din nou.",
-      "unavailableTitle": "Datele tale nu sunt încă disponibile",
+      "unavailableTitle": "Exportul datelor nu este încă disponibil",
       "unavailableDescription": "Exportul datelor este lansat treptat. Revino în curând."
     },
     "blockedPeople": {
@@ -2999,7 +2999,7 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "Nicio sesiune activă",
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
-    "signInScopeNote": "Aici apar autentificările din aplicația Kilo și din Kilo CLI. Autentificările din editor nu sunt listate.",
+    "signInScopeNote": "Aici apar autentificările din aplicația Kilo, din Kilo CLI și din browserul web. Autentificările din editor nu sunt listate.",
     "signedIn": "Autentificare: {{signedIn}} · Ultima activitate: {{lastSeen}}",
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",

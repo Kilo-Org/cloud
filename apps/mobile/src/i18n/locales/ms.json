@@ -407,7 +407,7 @@
       "codeRequired": "Masukkan kod daripada e-mel.",
       "download": "Muat turun fail",
       "downloadFailed": "Tidak dapat memuat turun eksport. Semak sambungan anda dan cuba lagi.",
-      "unavailableTitle": "Data anda belum tersedia",
+      "unavailableTitle": "Eksport data belum tersedia",
       "unavailableDescription": "Eksport data sedang dilancarkan secara berperingkat. Sila semak semula tidak lama lagi."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
     "signedIn": "Log masuk {{signedIn}} · Terakhir dilihat {{lastSeen}}",
-    "signInScopeNote": "Sesi log masuk daripada apl Kilo dan Kilo CLI dipaparkan di sini. Sesi log masuk penyunting tidak disenaraikan.",
+    "signInScopeNote": "Sesi log masuk daripada apl Kilo, Kilo CLI dan pelayar web dipaparkan di sini. Sesi log masuk penyunting tidak disenaraikan.",
     "thisDevice": "Peranti ini",
     "viewProfile": "Lihat profil",
     "webBrowser": "Pelayar web",

@@ -11,7 +11,7 @@ import { useLegalDocument } from '@/lib/hooks/use-legal-document';
 import { type LegalDocument } from '@/lib/legal-document';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
-import { legalDocumentForLink } from './legal-document-link';
+import { planLegalInContentLink } from './legal-document-link';
 
 const TITLE_KEY = {
   terms: 'login.termsInSentence',
@@ -40,18 +40,28 @@ export function LegalDocumentScreen({
 
   // The documents cross-reference each other. Both stay in the app: opening the
   // web page would hand the reader the marketing site's chrome, pricing links
-  // included.
+  // included. An in-page anchor is consumed here instead of reaching the
+  // external-link flow, which would report it as a broken link.
   const openInContentLink = useCallback(
     (href: string) => {
-      const target = legalDocumentForLink(href);
-      if (!target || target === document) {
-        return target !== null;
+      const plan = planLegalInContentLink(href, document);
+      if (plan.kind === 'handled') {
+        return true;
+      }
+      if (plan.kind === 'external') {
+        return false;
       }
 
       if (group === '(auth)') {
-        router.push({ pathname: '/(auth)/legal/[document]', params: { document: target } });
+        router.push({
+          pathname: '/(auth)/legal/[document]',
+          params: { document: plan.document },
+        });
       } else {
-        router.push({ pathname: '/(app)/legal/[document]', params: { document: target } });
+        router.push({
+          pathname: '/(app)/legal/[document]',
+          params: { document: plan.document },
+        });
       }
       return true;
     },

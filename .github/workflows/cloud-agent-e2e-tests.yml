@@ -31,6 +31,21 @@ on:
   # The nightly workflow calls this after it deploys the e2e stack.
   workflow_call:
     inputs:
+      worker_url:
+        description: 'HTTPS URL of the deployed cloud-agent-next Worker'
+        required: false
+        type: string
+        default: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev'
+      fake_llm_url:
+        description: 'HTTPS URL of the deployed fake-LLM Worker'
+        required: false
+        type: string
+        default: 'https://fake-llm.engineering-e11.workers.dev'
+      backend_url:
+        description: 'HTTPS URL of the Kilo backend that issues stream tickets'
+        required: false
+        type: string
+        default: 'https://api.kilo.ai'
       only:
         description: 'Comma-separated scenario names to run; empty runs every scenario'
         required: false

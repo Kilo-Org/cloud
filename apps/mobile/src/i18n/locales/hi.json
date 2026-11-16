@@ -1613,9 +1613,9 @@
       "refreshRepositories": "रिपॉज़िटरी रीफ़्रेश करें",
       "githubConnected": "GitHub कनेक्ट है",
       "gitlabConnected": "GitLab कनेक्ट है",
-      "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। जाँचें कि Kilo GitHub ऐप को रिपॉज़िटरी का ऐक्सेस मिला है, फिर रीफ़्रेश करें।",
-      "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। GitLab के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
-      "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। Bitbucket के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
+      "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। जाँचें कि Kilo GitHub ऐप को रिपॉज़िटरी की पहुँच मिली है, फिर रीफ़्रेश करें।",
+      "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। GitLab के लिए रिपॉज़िटरी की पहुँच जाँचें, फिर रीफ़्रेश करें।",
+      "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। Bitbucket के लिए रिपॉज़िटरी की पहुँच जाँचें, फिर रीफ़्रेश करें।",
       "bitbucketOrganizationsOnly": "Bitbucket केवल संगठनों के लिए उपलब्ध है।",
       "githubNeedsAttention": "GitHub को फिर से कनेक्ट करना होगा",
       "githubNeedsAttentionDescription": "Kilo GitHub ऐप को फिर से कनेक्ट करें, फिर उसकी रिपॉज़िटरी लोड करने के लिए रीफ़्रेश करें।",
@@ -2411,7 +2411,7 @@
     "sessionSignedOut": "इस सत्र से साइन आउट हो गया।",
     "signOutThisDeviceTitle": "इस डिवाइस से साइन आउट करें?",
     "signOutThisSessionTitle": "इस सत्र से साइन आउट करें?",
-    "signOutThisSessionMessage": "{{device}} से साइन आउट हो जाएगा। आखिरी बार सक्रिय: {{lastSeen}}। वह एक घंटे तक API का ऐक्सेस बनाए रख सकता है।",
+    "signOutThisSessionMessage": "{{device}} से साइन आउट हो जाएगा। आखिरी बार सक्रिय: {{lastSeen}}। वह एक घंटे तक API की पहुँच बनाए रख सकता है।",
     "webBrowser": "वेब ब्राउज़र",
     "unknownDevice": "अज्ञात डिवाइस"
   },
@@ -2964,7 +2964,7 @@
     },
     "inbox": {
       "couldNotLoad": "इनबॉक्स लोड नहीं हो सका।",
-      "accessLostTitle": "इस संगठन का ऐक्सेस नहीं है",
+      "accessLostTitle": "इस संगठन की पहुँच नहीं है",
       "accessLostDescription": "आप अब इस संगठन के मेंबर नहीं हैं, इसलिए इसके समीक्षा अनुरोध लोड नहीं हो सकते। समीक्षा जारी रखने के लिए अपने व्यक्तिगत खाते में जारी रखें।",
       "organizationUnavailableTitle": "यह संगठन अब मौजूद नहीं है",
       "organizationUnavailableDescription": "यह संगठन हटा दिया गया है, इसलिए इसके समीक्षा अनुरोध लोड नहीं हो सकते। समीक्षा जारी रखने के लिए अपने व्यक्तिगत खाते में जारी रखें।",
@@ -3304,7 +3304,7 @@
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
       "chooseAccount": "एक खाता चुनें",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
-      "membershipLostNotice": "आपको इस संगठन का ऐक्सेस अब नहीं है। {{target}} पर स्विच किया गया।",
+      "membershipLostNotice": "आपको इस संगठन की पहुँच अब नहीं है। {{target}} पर स्विच किया गया।",
       "noOrganization": "कोई संगठन नहीं",
       "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्यों को आमंत्रित करने और कम बैलेंस की सूचनाओं जैसी संगठन सुविधाओं का इस्तेमाल करने के लिए एक संगठन बनाएँ, या जिस संगठन में आपको आमंत्रित किया गया है उसमें शामिल होने के लिए वेब खोलें।",
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
@@ -3312,7 +3312,7 @@
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
       "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
-      "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
+      "accessDeniedDescription": "आपको इस संगठन की पहुँच नहीं है।"
     },
     "create": {
       "title": "संगठन बनाएँ",

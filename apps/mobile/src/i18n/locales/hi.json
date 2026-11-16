@@ -1647,7 +1647,6 @@
       "attachmentUploadingToStart": "एक अटैचमेंट अभी भी अपलोड हो रहा है। उसके बिना शुरू करने के लिए उसे हटाएँ।",
       "modelMissingToStart": "शुरू करने के लिए एक मॉडल चुनें।",
       "staleRepositoryToStart": "चुनी गई रिपॉज़िटरी अब उपलब्ध नहीं है। शुरू करने के लिए फिर से रिपॉज़िटरी चुनें।",
-      "connectProviderToStart": "रिपॉज़िटरी किसी कनेक्ट किए गए GitHub, GitLab या Bitbucket खाते से आती है।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे दूसरी रिपॉज़िटरी और मॉडल चुनें।",

@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "ඇමුණුමක් තවමත් උඩුගත වෙමින් පවතී. එය නොමැතිව ආරම්භ කිරීමට එය ඉවත් කරන්න.",
       "modelMissingToStart": "ආරම්භ කිරීමට මාදිලියක් තෝරන්න.",
       "staleRepositoryToStart": "තෝරාගත් ගබඩාව තවදුරටත් නොමැත. ආරම්භ කිරීමට නැවත ගබඩාවක් තෝරන්න.",
-      "connectProviderToStart": "ගබඩා ලැබෙන්නේ සම්බන්ධ වූ GitHub, GitLab හෝ Bitbucket ගිණුමකින් වේ.",
       "promptPlaceholder": "ඔබට කිරීමට අවශ්‍ය කාර්යය කුමක්ද?",
       "couldNotLoadModels": "මාදිලි පූරණය කළ නොහැකි විය.",
       "prefillRepoAndModelUnavailable": "මුල් සැසියේ ගබඩාව සහ මාදිලිය තවදුරටත් ලබා ගත නොහැක. පහතින් ගබඩාවක් සහ මාදිලියක් තෝරන්න.",

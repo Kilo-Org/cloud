@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "একটি সংযুক্তি এখনও আপলোড হচ্ছে। এটি ছাড়া শুরু করতে এটি সরান।",
       "modelMissingToStart": "শুরু করতে একটি মডেল বেছে নিন।",
       "staleRepositoryToStart": "নির্বাচিত রিপোজিটরিটি আর উপলব্ধ নেই। শুরু করতে আবার একটি রিপোজিটরি বেছে নিন।",
-      "connectProviderToStart": "রিপোজিটরি আসে একটি সংযুক্ত GitHub, GitLab বা Bitbucket অ্যাকাউন্ট থেকে।",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
       "prefillRepoAndModelUnavailable": "মূল সেশনের রিপোজিটরি ও মডেল আর ব্যবহার করা যাচ্ছে না। নিচে অন্য রিপোজিটরি ও মডেল বেছে নিন।",

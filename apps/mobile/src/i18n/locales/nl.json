@@ -1647,7 +1647,6 @@
       "attachmentUploadingToStart": "Er wordt nog een bijlage geüpload. Verwijder deze om zonder bijlage te starten.",
       "modelMissingToStart": "Kies een model om te starten.",
       "staleRepositoryToStart": "De geselecteerde repository is niet meer beschikbaar. Selecteer opnieuw een repository om te starten.",
-      "connectProviderToStart": "Repositories komen van een gekoppeld GitHub-, GitLab- of Bitbucket-account.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",

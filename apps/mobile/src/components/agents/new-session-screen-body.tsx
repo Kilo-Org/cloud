@@ -1214,11 +1214,9 @@ export function NewSessionScreenBody() {
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
   const hasRepositories = repositories.length > 0;
-  // One source of truth for "a provider can still be connected" and which one
-  // the footer's connect action opens: the first group in the `connect` state,
-  // in the section's fixed github/gitlab/bitbucket order.
-  const connectProviderPlatform = resolveNewSessionConnectProvider(groups);
-  const hasConnectableProvider = connectProviderPlatform !== null;
+  // True while at least one provider can still be connected: the repository
+  // section's connect card carries that step.
+  const hasConnectableProvider = resolveNewSessionConnectProvider(groups) !== null;
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
@@ -1268,6 +1266,9 @@ export function NewSessionScreenBody() {
 
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
+  // `connect-provider` is not mapped here: the repository section's connect card
+  // already names that step and carries its own button, so the footer leaves
+  // the reason empty instead of repeating the prompt.
   if (environmentBlocked) {
     // The environment picker is part of the form, so an unchosen repository
     // environment blocks the start the same way the web's picker does. Its own
@@ -1277,23 +1278,6 @@ export function NewSessionScreenBody() {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
-  } else if (startBlockedReasonKey === 'connect-provider') {
-    startBlockedReason = t('agentChat.newSession.connectProviderToStart');
-    // `connect-provider` requires at least one connectable group, so a target
-    // exists exactly when this branch runs; fall back to no action if it ever
-    // does not, rather than opening a broken connect flow.
-    if (connectProviderPlatform !== null) {
-      startBlockedAction = {
-        label: t('common.connectProvider'),
-        onPress: () => {
-          openIntegration(connectProviderPlatform);
-        },
-        // The flow's first step is a network round trip (GitHub mints an install
-        // state), so the action keeps a spinner and stays disabled until the
-        // flow ends instead of looking inert for the whole mint.
-        isBusy: connectingProvider !== null,
-      };
-    }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {

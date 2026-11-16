@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Üks manus laaditakse veel üles. Eemalda see, et alustada ilma selleta.",
       "modelMissingToStart": "Alustamiseks vali mudel.",
       "staleRepositoryToStart": "Valitud hoidla pole enam saadaval. Alustamiseks vali hoidla uuesti.",
-      "connectProviderToStart": "Hoidlad pärinevad ühendatud GitHubi, GitLabi või Bitbucketi kontost.",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
       "prefillRepoAndModelUnavailable": "Algse seansi hoidla ja mudel pole enam saadaval. Vali allpool uus hoidla ja mudel.",

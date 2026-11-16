@@ -1647,7 +1647,6 @@
       "attachmentUploadingToStart": "添付ファイルをアップロード中です。これを使わずに開始するには削除してください。",
       "modelMissingToStart": "開始するにはモデルを選択してください。",
       "staleRepositoryToStart": "選択したリポジトリは利用できなくなりました。開始するにはリポジトリをもう一度選択してください。",
-      "connectProviderToStart": "リポジトリは、連携済みのGitHub、GitLab、またはBitbucketアカウントから取得されます。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",

@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "ਇੱਕ ਅਟੈਚਮੈਂਟ ਅਜੇ ਵੀ ਅੱਪਲੋਡ ਹੋ ਰਹੀ ਹੈ। ਇਸ ਤੋਂ ਬਿਨਾਂ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇਸਨੂੰ ਹਟਾਓ।",
       "modelMissingToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਮਾਡਲ ਚੁਣੋ।",
       "staleRepositoryToStart": "ਚੁਣੀ ਗਈ ਰਿਪੋਜ਼ਟਰੀ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
-      "connectProviderToStart": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਇੱਕ ਕਨੈਕਟ ਹੋਏ GitHub, GitLab ਜਾਂ Bitbucket ਖਾਤੇ ਤੋਂ ਆਉਂਦੀਆਂ ਹਨ।",
       "promptPlaceholder": "ਤੁਸੀਂ ਕਿਸ 'ਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
       "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "prefillRepoAndModelUnavailable": "ਮੂਲ ਸੈਸ਼ਨ ਦੀ ਰਿਪੋਜ਼ਟਰੀ ਅਤੇ ਮਾਡਲ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਹੇਠਾਂ ਨਵੀਂ ਰਿਪੋਜ਼ਟਰੀ ਅਤੇ ਨਵਾਂ ਮਾਡਲ ਚੁਣੋ।",

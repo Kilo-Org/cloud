@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Ilova hali yuklanmoqda. Usiz boshlash uchun uni olib tashlang.",
       "modelMissingToStart": "Boshlash uchun model tanlang.",
       "staleRepositoryToStart": "Tanlangan repozitoriya endi mavjud emas. Boshlash uchun repozitoriyani qaytadan tanlang.",
-      "connectProviderToStart": "Repozitoriyalar ulangan GitHub, GitLab yoki Bitbucket hisobidan keladi.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",

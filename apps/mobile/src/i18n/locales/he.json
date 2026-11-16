@@ -1666,7 +1666,6 @@
       "attachmentUploadingToStart": "קובץ מצורף עדיין בהעלאה. הסר אותו כדי להתחיל בלעדיו.",
       "modelMissingToStart": "בחר מודל כדי להתחיל.",
       "staleRepositoryToStart": "המאגר שנבחר אינו זמין עוד. בחר מאגר שוב כדי להתחיל.",
-      "connectProviderToStart": "מאגרים מגיעים מחשבון מחובר של GitHub, GitLab או Bitbucket.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",

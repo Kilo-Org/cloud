@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Kei te tuku ake tonu tētahi whakapirihanga. Tangohia kia tīmata ai me te kore whakapirihanga.",
       "modelMissingToStart": "Kōwhiria he tauira hei tīmata.",
       "staleRepositoryToStart": "Kāore te putunga waehere i kōwhiria e wātea ana ināianei. Kōwhiria anō he putunga waehere hei tīmata.",
-      "connectProviderToStart": "Ka puta mai ngā putunga waehere i tētahi pūkete kua hono GitHub, GitLab, rānei Bitbucket.",
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira.",
       "prefillRepoAndModelUnavailable": "Kāore te putunga waehere me te tauira o te wātū taketake e wātea ana ināianei. Kōwhiria he mea kē ki raro nei.",

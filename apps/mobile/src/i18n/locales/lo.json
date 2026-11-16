@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "ໄຟລ໌ແນບຍັງກຳລັງອັບໂຫຼດຢູ່. ຖ້າຈະເລີ່ມໂດຍບໍ່ໃຊ້ມັນ ໃຫ້ລຶບມັນອອກ.",
       "modelMissingToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກໂມເດວ.",
       "staleRepositoryToStart": "ຄັງໂຄດທີ່ເລືອກໄວ້ໃຊ້ບໍ່ໄດ້ແລ້ວ. ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດໃໝ່ອີກຄັ້ງ.",
-      "connectProviderToStart": "ຄັງໂຄດມາຈາກບັນຊີ GitHub, GitLab ຫຼື Bitbucket ທີ່ເຊື່ອມຕໍ່ແລ້ວ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
       "prefillRepoAndModelUnavailable": "ຄັງໂຄດແລະໂມເດວຂອງເຊດຊັນເດີມໃຊ້ບໍ່ໄດ້ແລ້ວ. ເລືອກໃໝ່ຂ້າງລຸ່ມ.",

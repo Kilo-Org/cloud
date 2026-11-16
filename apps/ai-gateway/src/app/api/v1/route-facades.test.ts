@@ -12,12 +12,16 @@ import * as modelValidation from './models/validate/route';
 import * as organizationModels from './organizations/[id]/models/route';
 import * as organizationModelValidation from './organizations/[id]/models/validate/route';
 import * as providers from './providers/route';
+import * as systemOne from './systemone/route';
 import * as transcriptionModels from './transcription-models/route';
 import * as autoRoutingDeniedModels from './internal/auto-routing/denied-models/route';
 import { handleAutoRoutingDeniedModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models';
 import { handleEditCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions';
 import { handleEmbeddingModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models';
-import { handleEmbeddingsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
+import {
+  EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS,
+  handleEmbeddingsRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
 import { handleFimCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions';
 import { handleModelEndpointsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-endpoints';
 import { handleModelValidationRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-validation';
@@ -29,6 +33,10 @@ import { handleProvidersRequest } from '@kilocode/web-shared/lib/ai-gateway/hand
 import { handleTranscriptionModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/transcription-models';
 import { handleAudioTranscriptionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/audio-transcriptions';
 import { handleLlmProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  UPSTREAM_POST_RESPONSE_HEADROOM_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 describe('ai-gateway route facades', () => {
   test.each([
@@ -75,4 +83,18 @@ describe('ai-gateway route facades', () => {
   ])('%s keeps its route duration limit', (_route, maxDuration, expected) => {
     expect(maxDuration).toBe(expected);
   });
+
+  test.each([
+    ['[...path]', llmProxy.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['audio/transcriptions', audioTranscriptions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['embeddings', embeddings.maxDuration, EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS],
+    ['systemone', systemOne.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+  ])(
+    '%s leaves the post-response headroom after its upstream budget',
+    (_route, maxDuration, upstreamBudgetMs) => {
+      expect(upstreamBudgetMs + UPSTREAM_POST_RESPONSE_HEADROOM_MS).toBeLessThanOrEqual(
+        maxDuration * 1000
+      );
+    }
+  );
 });

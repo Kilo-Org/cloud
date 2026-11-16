@@ -21,7 +21,6 @@ import {
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
@@ -62,43 +61,22 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  fetchUpstream,
+  UPSTREAM_POST_RESPONSE_HEADROOM_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
-async function embeddingProxyRequest(params: {
-  body: Record<string, unknown>;
-  provider: Provider;
-  signal?: AbortSignal;
-}) {
-  const { body, provider, signal } = params;
-  const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
-  headers.set('Authorization', `Bearer ${provider.apiKey}`);
-
-  // OpenRouter needs these identification headers (same as upstreamRequest)
-  if (provider.type === 'openrouter' || provider.type === 'vercel') {
-    for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
-      headers.set(key, value);
-    }
-  }
-
-  const targetUrl = `${provider.apiUrl}/embeddings`;
-
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-
-  return await fetch(targetUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal: combinedSignal,
-  });
-}
+/**
+ * The embeddings route's `maxDuration` is 300s. The upstream call gets what is
+ * left after the post-response headroom chat reserves for its usage work.
+ */
+export const EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS =
+  300 * 1000 - UPSTREAM_POST_RESPONSE_HEADROOM_MS;
 
 export async function handleEmbeddingsRequest(
   request: NextRequest
@@ -333,10 +311,15 @@ export async function handleEmbeddingsRequest(
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
 
-  const response = await embeddingProxyRequest({
-    body: upstreamBody,
+  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
+  const upstream = await fetchUpstream({
     provider: effectiveProvider,
+    path: '/embeddings',
+    method: 'POST',
+    body: upstreamBody,
     signal: request.signal,
+    vercelRequestId,
+    durationBudgetMs: EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS,
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
@@ -354,9 +337,14 @@ export async function handleEmbeddingsRequest(
     toolsAvailable: [],
     toolsUsed: [],
     ttfbMs,
-    statusCode: response.status,
+    statusCode: upstream.response.status,
   };
 
+  if (upstream.type === 'error') {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstream.response;
+  }
+  const { response } = upstream;
   usageContext.status_code = response.status;
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
@@ -385,6 +373,6 @@ export async function handleEmbeddingsRequest(
   return await rewriteModelResponse_UsageEndpoint({
     response,
     usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),
-    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    vercelRequestId,
   });
 }

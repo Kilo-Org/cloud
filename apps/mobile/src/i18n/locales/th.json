@@ -1170,8 +1170,6 @@
       "clearMessage": "การบันทึกช่องที่ว่างเปล่าจะลบคำแนะนำที่กำหนดเองที่จัดเก็บไว้สำหรับตัวตรวจสอบนี้ออก"
     },
     "repos": {
-      "unavailable": "คลังโค้ดยังไม่พร้อมใช้งาน ตั้งค่า Bitbucket ให้เสร็จบน kilo.ai",
-      "finishSetup": "ตั้งค่าให้เสร็จ",
       "manageAccess": "จัดการสิทธิ์เข้าถึง",
       "bitbucketNoRepositoriesDescription": "ไม่มีคลังโค้ดที่ใช้งานได้ในพื้นที่ทำงาน Bitbucket นี้",
       "gitlabNoRepositoriesDescription": "คุณอาจต้องให้สิทธิ์เข้าถึงกลุ่มหรือโปรเจกต์เพิ่มเติมบน GitLab",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
-      "setupIncomplete": "ยังตั้งค่าไม่เสร็จ ตั้งค่าต่อให้เสร็จบน kilo.ai",
-      "setup": "การตั้งค่า Bitbucket"
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
     },
     "bitbucketConnect": {
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานที่มีขอบเขตสิทธิ์ตามที่กำหนด แล้ววางโทเค็นด้านล่าง",
@@ -1358,8 +1354,7 @@
       "githubError": "ไม่สามารถเปิดหน้าตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง",
       "gitlabAccount": "บัญชี GitLab",
       "gitlabError": "ไม่สามารถเปิดหน้าตั้งค่า GitLab ได้ กรุณาลองอีกครั้ง",
-      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ",
-      "bitbucketError": "ไม่สามารถเปิดหน้าตั้งค่า Bitbucket ได้ กรุณาลองอีกครั้ง"
+      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ"
     },
     "overview": {
       "allAreas": "ทุกด้าน",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดคลังโค้ดจาก Bitbucket ได้",
       "connectGithubDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด GitHub ที่นี่",
       "connectGitlabDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด GitLab ที่นี่",
-      "connectBitbucketDescription": "ลงชื่อเข้าใช้จากเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ด Bitbucket ที่นี่",
       "openGithub": "เปิด GitHub",
       "openGitlab": "เปิด GitLab",
-      "openBitbucket": "เปิด Bitbucket",
       "refreshRepositories": "รีเฟรชรายการคลังโค้ด",
       "githubConnected": "เชื่อมต่อ GitHub แล้ว",
       "gitlabConnected": "เชื่อมต่อ GitLab แล้ว",

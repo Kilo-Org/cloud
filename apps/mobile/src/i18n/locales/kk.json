@@ -1170,8 +1170,6 @@
       "clearMessage": "Бос өрісті сақтау осы шолушы үшін сақталған арнайы нұсқауларды жойып тастайды."
     },
     "repos": {
-      "unavailable": "Репозиторийлер қолжетімсіз. Bitbucket қызметін баптауды kilo.ai сайтында аяқтаңыз.",
-      "finishSetup": "Баптауды аяқтау",
       "manageAccess": "Кіру рұқсаттарын басқару",
       "bitbucketNoRepositoriesDescription": "Бұл Bitbucket жұмыс кеңістігінде қолжетімді репозиторийлер жоқ.",
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md нұсқауларын орындау",
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
-      "setupIncomplete": "Баптау аяқталмаған. Оны kilo.ai сайтында аяқтаңыз.",
-      "setup": "Bitbucket қызметін баптау"
+      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады."
     },
     "bitbucketConnect": {
       "description": "Жұмыс кеңістігіне кіру үшін қажетті рұқсаттары бар токен жасап, төмендегі өріске қойыңыз.",
@@ -1358,8 +1354,7 @@
       "githubError": "GitHub баптау бетін ашу мүмкін болмады. Қайталап көріңіз.",
       "gitlabAccount": "GitLab тіркелгісі",
       "gitlabError": "GitLab баптау бетін ашу мүмкін болмады. Қайталап көріңіз.",
-      "description": "Біріктіру сұрауларын автоматты түрде тексеру үшін Kilo {{label}} арқылы қосылыңыз.",
-      "bitbucketError": "Bitbucket баптау бетін ашу мүмкін болмады. Қайталап көріңіз."
+      "description": "Біріктіру сұрауларын автоматты түрде тексеру үшін Kilo {{label}} арқылы қосылыңыз."
     },
     "overview": {
       "allAreas": "Барлық бағыттар",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады.",
       "connectGithubDescription": "Браузерден тіркелгіге кіріп, GitHub репозиторийін таңдау үшін осында оралыңыз.",
       "connectGitlabDescription": "Браузерден тіркелгіге кіріп, GitLab репозиторийін таңдау үшін осында оралыңыз.",
-      "connectBitbucketDescription": "Браузерден тіркелгіге кіріп, Bitbucket репозиторийін таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",
       "openGitlab": "GitLab-ты ашу",
-      "openBitbucket": "Bitbucket-ті ашу",
       "refreshRepositories": "Репозиторийлерді жаңарту",
       "githubConnected": "GitHub қосылды",
       "gitlabConnected": "GitLab қосылды",

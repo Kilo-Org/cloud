@@ -1170,8 +1170,6 @@
       "clearMessage": "Ki te tiakia he āpure tuatau, ka mukua ngā tohutohu ake kua penapenatia mō tēnei kaiarotake."
     },
     "repos": {
-      "unavailable": "Kāore e wātea ana ngā pūranga — whakaotia te whakarite i Bitbucket i kilo.ai.",
-      "finishSetup": "Whakaotia te whakarite",
       "manageAccess": "Whakahaeretia te uru",
       "bitbucketNoRepositoriesDescription": "Kāore he pūranga e wātea ana i tēnei mokowāmahi Bitbucket.",
       "gitlabNoRepositoriesDescription": "Me tuku pea koe i te whakaaetanga uru ki ētahi atu rōpū, kaupapa rānei i GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Whaia a REVIEW.md",
     "followReviewMdSubtitle": "Whaia ngā kōnae tohutohu REVIEW.md o ia pūranga",
     "bitbucket": {
-      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
-      "setupIncomplete": "Kāore anō kia oti te whakarite — whakaotia te whirihora i kilo.ai.",
-      "setup": "Te whakatū Bitbucket"
+      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono."
     },
     "bitbucketConnect": {
       "description": "Hangaia he tohu uru mokowāmahi me ngā whakaaetanga e hiahiatia ana, kātahi ka whakapiri ki raro nei.",
@@ -1358,8 +1354,7 @@
       "githubError": "Kāore i taea te whakatuwhera i te whakarite GitHub. Whakamātau anō.",
       "gitlabAccount": "Pūkete GitLab",
       "gitlabError": "Kāore i taea te whakatuwhera i te whakarite GitLab. Whakamātau anō.",
-      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume.",
-      "bitbucketError": "Kāore i taea te whakatuwhera i te whakarite Bitbucket. Whakamātau anō."
+      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume."
     },
     "overview": {
       "allAreas": "Ngā wāhanga katoa",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā putunga waehere Bitbucket.",
       "connectGithubDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere GitHub.",
       "connectGitlabDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere GitLab.",
-      "connectBitbucketDescription": "Takiuru mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere Bitbucket.",
       "openGithub": "Whakatuwheratia a GitHub",
       "openGitlab": "Whakatuwheratia a GitLab",
-      "openBitbucket": "Whakatuwheratia a Bitbucket",
       "refreshRepositories": "Whakahoutia ngā putunga waehere",
       "githubConnected": "Kua hono a GitHub",
       "gitlabConnected": "Kua hono a GitLab",

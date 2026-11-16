@@ -1170,8 +1170,6 @@
       "clearMessage": "Хоосон талбарыг хадгалснаар энэ хянагчид хадгалагдсан тусгай зааврыг устгана."
     },
     "repos": {
-      "unavailable": "Репозиториудад хандах боломжгүй байна. kilo.ai дээр Bitbucket-ийг тохируулж дуусгана уу.",
-      "finishSetup": "Тохиргоог дуусгах",
       "manageAccess": "Хандах эрхийг удирдах",
       "bitbucketNoRepositoriesDescription": "Энэ Bitbucket ажлын талбарт репозитори байхгүй байна.",
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
-      "setupIncomplete": "Тохиргоо дутуу байна. kilo.ai дээр тохиргоог дуусгана уу.",
-      "setup": "Bitbucket-ийн тохиргоо"
+      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй."
     },
     "bitbucketConnect": {
       "description": "Шаардлагатай эрхүүдтэй ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
@@ -1358,8 +1354,7 @@
       "githubError": "GitHub тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
       "gitlabAccount": "GitLab бүртгэл",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу.",
-      "bitbucketError": "Bitbucket тохиргоог нээж чадсангүй. Дахин оролдоно уу."
+      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу."
     },
     "overview": {
       "allAreas": "Бүх чиглэл",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket-ийн кодын сангуудыг ачаалж чадсангүй.",
       "connectGithubDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж GitHub-ын кодын сангаа сонгоно уу.",
       "connectGitlabDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж GitLab-ын кодын сангаа сонгоно уу.",
-      "connectBitbucketDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж Bitbucket-ын кодын сангаа сонгоно уу.",
       "openGithub": "GitHub-ыг нээх",
       "openGitlab": "GitLab-ыг нээх",
-      "openBitbucket": "Bitbucket-ыг нээх",
       "refreshRepositories": "Кодын сангийн жагсаалтыг шинэчлэх",
       "githubConnected": "GitHub холбогдсон",
       "gitlabConnected": "GitLab холбогдсон",

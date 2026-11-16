@@ -1170,8 +1170,6 @@
       "clearMessage": "Η αποθήκευση κενού πεδίου διαγράφει τις προσαρμοσμένες οδηγίες που είναι αποθηκευμένες για αυτόν τον αναθεωρητή."
     },
     "repos": {
-      "unavailable": "Τα αποθετήρια δεν είναι διαθέσιμα. Ολοκλήρωσε τη ρύθμιση του Bitbucket στο kilo.ai.",
-      "finishSetup": "Ολοκλήρωση ρύθμισης",
       "manageAccess": "Διαχείριση πρόσβασης",
       "bitbucketNoRepositoriesDescription": "Δεν υπάρχουν διαθέσιμα αποθετήρια σε αυτόν τον χώρο εργασίας του Bitbucket.",
       "gitlabNoRepositoriesDescription": "Ίσως χρειαστεί να δώσεις πρόσβαση σε περισσότερες ομάδες ή έργα στο GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
-      "setupIncomplete": "Η ρύθμιση δεν έχει ολοκληρωθεί. Ολοκλήρωσέ την στο kilo.ai.",
-      "setup": "Ρύθμιση Bitbucket"
+      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν."
     },
     "bitbucketConnect": {
       "description": "Δημιούργησε ένα διακριτικό πρόσβασης στον χώρο εργασίας με τα απαιτούμενα δικαιώματα και επικόλλησέ το παρακάτω.",
@@ -1358,8 +1354,7 @@
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitHub. Δοκίμασε ξανά.",
       "gitlabAccount": "Λογαριασμός GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitLab. Δοκίμασε ξανά.",
-      "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR.",
-      "bitbucketError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του Bitbucket. Δοκίμασε ξανά."
+      "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR."
     },
     "overview": {
       "allAreas": "Όλοι οι τομείς",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του Bitbucket.",
       "connectGithubDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο GitHub.",
       "connectGitlabDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο GitLab.",
-      "connectBitbucketDescription": "Συνδέσου από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο Bitbucket.",
       "openGithub": "Άνοιγμα GitHub",
       "openGitlab": "Άνοιγμα GitLab",
-      "openBitbucket": "Άνοιγμα Bitbucket",
       "refreshRepositories": "Ανανέωση αποθετηρίων",
       "githubConnected": "Συνδεδεμένο GitHub",
       "gitlabConnected": "Συνδεδεμένο GitLab",

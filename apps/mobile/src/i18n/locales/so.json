@@ -1170,8 +1170,6 @@
       "clearMessage": "Kaydinta beer madhan waxay tirtiraysaa tilmaamaha gaarka ah ee lagu kaydiyay fiiriyahan."
     },
     "repos": {
-      "unavailable": "Kaydadka lama heli karo. Ku dhammaystir dejinta Bitbucket bogga kilo.ai.",
-      "finishSetup": "Dhammaystir dejinta",
       "manageAccess": "Maamul oggolaanshaha gelitaanka",
       "bitbucketNoRepositoriesDescription": "Ma jiraan kaydad laga heli karo goobtan shaqada ee Bitbucket.",
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
-      "setupIncomplete": "Dejintu ma dhammaystirna. Ku dhammaystir bogga kilo.ai.",
-      "setup": "Diyaarinta Bitbucket"
+      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
     },
     "bitbucketConnect": {
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
@@ -1358,8 +1354,7 @@
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
       "gitlabAccount": "Akoonka GitLab",
       "gitlabError": "Dejinta GitLab lama furi karin. Fadlan mar kale isku day.",
-      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah.",
-      "bitbucketError": "Lama furi karin dejinta Bitbucket. Fadlan mar kale isku day."
+      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah."
     },
     "overview": {
       "allAreas": "Dhammaan meelaha",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Kaydadka Bitbucket lama soo shubi karin.",
       "connectGithubDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd GitHub u doorato.",
       "connectGitlabDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd GitLab u doorato.",
-      "connectBitbucketDescription": "Biraawsarkaaga ku gal, ka dibna halkan ku soo noqo si aad kayd Bitbucket u doorato.",
       "openGithub": "Fur GitHub",
       "openGitlab": "Fur GitLab",
-      "openBitbucket": "Fur Bitbucket",
       "refreshRepositories": "Cusboonaysii kaydadka",
       "githubConnected": "GitHub waa la xiriiriyay",
       "gitlabConnected": "GitLab waa la xiriiriyay",

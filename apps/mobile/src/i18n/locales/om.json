@@ -1170,8 +1170,6 @@
       "clearMessage": "Bakka duwwaa olkaa'uun qajeelfamoota dhuunfaa qorataa kanaaf kuufaman ni balleessa."
     },
     "repos": {
-      "unavailable": "Kuusaawwan koodii hin argaman — qophii Bitbucket kilo.ai irratti xumuri.",
-      "finishSetup": "Qophii xumuri",
       "manageAccess": "Hayyama bulchi",
       "bitbucketNoRepositoriesDescription": "Iddoo hojii Bitbucket kana keessatti kuusaawwan koodii hin argaman.",
       "gitlabNoRepositoriesDescription": "GitLab irratti gareewwan ykn pirojektoota dabalataa argachuuf hayyama kennuun si barbaachisuu danda'a.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md hordofi",
     "followReviewMdSubtitle": "Faayiloota qajeelfamaa REVIEW.md kuusaa koodii tokkoon tokkoo keessa jiran kabaji",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
-      "setupIncomplete": "Qophiin hin xumuramne — qindaa'ina kilo.ai irratti xumuri.",
-      "setup": "Qophii Bitbucket"
+      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u."
     },
     "bitbucketConnect": {
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
@@ -1358,8 +1354,7 @@
       "githubError": "Qophii GitHub banuun hin danda'amne. Irra deebi'ii yaali.",
       "gitlabAccount": "Herrega GitLab",
       "gitlabError": "Qophii GitLab banuun hin danda'amne. Irra deebi'ii yaali.",
-      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi.",
-      "bitbucketError": "Qophii Bitbucket banuun hin danda'amne. Irra deebi'ii yaali."
+      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi."
     },
     "overview": {
       "allAreas": "Kutaa hunda",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Kuusaawwan koodii Bitbucket fe'uu hin danda'amne.",
       "connectGithubDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii GitHub filachuuf asitti deebi'i.",
       "connectGitlabDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii GitLab filachuuf asitti deebi'i.",
-      "connectBitbucketDescription": "Biraawzarii kee keessatti seeni, sana booda kuusaa koodii Bitbucket filachuuf asitti deebi'i.",
       "openGithub": "GitHub bani",
       "openGitlab": "GitLab bani",
-      "openBitbucket": "Bitbucket bani",
       "refreshRepositories": "Kuusaawwan koodii haaromsi",
       "githubConnected": "GitHub walqabateera",
       "gitlabConnected": "GitLab walqabateera",

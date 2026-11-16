@@ -1170,8 +1170,6 @@
       "clearMessage": "As jy 'n leë veld stoor, word die pasgemaakte instruksies wat vir hierdie resensent gestoor is, verwyder."
     },
     "repos": {
-      "unavailable": "Die bewaarplekke is nie beskikbaar nie. Voltooi die Bitbucket-opstelling op kilo.ai.",
-      "finishSetup": "Voltooi opstelling",
       "manageAccess": "Bestuur toegang",
       "bitbucketNoRepositoriesDescription": "Geen bewaarplekke is in hierdie Bitbucket-werkruimte beskikbaar nie.",
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
-      "setupIncomplete": "Die opstelling is onvolledig. Voltooi dit op kilo.ai.",
-      "setup": "Bitbucket-opstelling"
+      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
     },
     "bitbucketConnect": {
       "description": "Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
@@ -1358,8 +1354,7 @@
       "githubError": "Die GitHub-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
       "gitlabAccount": "GitLab-rekening",
       "gitlabError": "Die GitLab-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien.",
-      "bitbucketError": "Kon nie Bitbucket-opstelling oopmaak nie. Probeer asseblief weer."
+      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien."
     },
     "overview": {
       "allAreas": "Alle fokusareas",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Die Bitbucket-bewaarplekke kon nie gelaai word nie.",
       "connectGithubDescription": "Teken in jou blaaier aan en kom dan hierheen terug om 'n GitHub-bewaarplek te kies.",
       "connectGitlabDescription": "Teken in jou blaaier aan en kom dan hierheen terug om 'n GitLab-bewaarplek te kies.",
-      "connectBitbucketDescription": "Teken in jou blaaier aan en kom dan hierheen terug om 'n Bitbucket-bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
       "openGitlab": "Maak GitLab oop",
-      "openBitbucket": "Maak Bitbucket oop",
       "refreshRepositories": "Verfris bewaarplekke",
       "githubConnected": "GitHub gekoppel",
       "gitlabConnected": "GitLab gekoppel",

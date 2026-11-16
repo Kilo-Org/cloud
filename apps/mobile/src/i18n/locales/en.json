@@ -1237,8 +1237,6 @@
       "clearMessage": "Saving an empty field deletes the custom instructions stored for this reviewer."
     },
     "repos": {
-      "unavailable": "Repositories unavailable — finish Bitbucket setup on kilo.ai.",
-      "finishSetup": "Finish setup",
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
@@ -1393,9 +1391,7 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
-      "setupIncomplete": "Setup incomplete — finish configuration on kilo.ai",
-      "setup": "Bitbucket setup"
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
     },
     "bitbucketConnect": {
       "description": "Create a Workspace Access Token with the required scopes and paste it below.",
@@ -1425,7 +1421,6 @@
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
       "gitlabError": "Could not open GitLab setup. Please try again.",
-      "bitbucketError": "Could not open Bitbucket setup. Please try again.",
       "description": "Connect the Kilo {{label}} to review pull requests automatically."
     },
     "overview": {
@@ -2216,10 +2211,8 @@
       "couldNotLoadBitbucketRepositories": "Couldn't load Bitbucket repositories",
       "connectGithubDescription": "Sign in from your browser, then return here to pick a GitHub repository.",
       "connectGitlabDescription": "Sign in from your browser, then return here to pick a GitLab repository.",
-      "connectBitbucketDescription": "Sign in from your browser, then return here to pick a Bitbucket repository.",
       "openGithub": "Open GitHub",
       "openGitlab": "Open GitLab",
-      "openBitbucket": "Open Bitbucket",
       "refreshRepositories": "Refresh repositories",
       "githubConnected": "GitHub connected",
       "gitlabConnected": "GitLab connected",

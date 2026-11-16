@@ -627,8 +627,6 @@
       "clearMessage": "Збереження порожнього поля видалить власні інструкції, збережені для цього рецензента."
     },
     "repos": {
-      "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
-      "finishSetup": "Завершити налаштування",
       "manageAccess": "Керувати доступом",
       "bitbucketNoRepositoriesDescription": "У цьому робочому просторі Bitbucket немає доступних репозиторіїв.",
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
@@ -648,9 +646,7 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
-      "setupIncomplete": "Налаштування не завершено — завершіть його на kilo.ai.",
-      "setup": "Налаштування Bitbucket"
+      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
     },
     "bitbucketConnect": {
       "description": "Створіть токен доступу до робочого простору з потрібними дозволами та вставте його нижче.",
@@ -696,8 +692,7 @@
       "githubApp": "Застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
       "gitlabAccount": "Обліковий запис GitLab",
-      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз.",
-      "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
+      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
     },
     "reviewDetail": {
       "byline": "#{{number}} від {{author}}",
@@ -1644,10 +1639,8 @@
       "couldNotLoadBitbucketRepositories": "Не вдалося завантажити репозиторії Bitbucket.",
       "connectGithubDescription": "Увійдіть через браузер, а потім поверніться сюди, щоб вибрати репозиторій GitHub.",
       "connectGitlabDescription": "Увійдіть через браузер, а потім поверніться сюди, щоб вибрати репозиторій GitLab.",
-      "connectBitbucketDescription": "Увійдіть через браузер, а потім поверніться сюди, щоб вибрати репозиторій Bitbucket.",
       "openGithub": "Відкрити GitHub",
       "openGitlab": "Відкрити GitLab",
-      "openBitbucket": "Відкрити Bitbucket",
       "refreshRepositories": "Оновити список репозиторіїв",
       "githubConnected": "GitHub підключено",
       "gitlabConnected": "GitLab підключено",

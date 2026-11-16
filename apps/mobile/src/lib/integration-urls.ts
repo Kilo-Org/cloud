@@ -4,7 +4,7 @@ function trimTrailingSlash(webBaseUrl: string): string {
 
 /** The platforms whose connect flow starts on the web (OAuth callbacks land
  *  there, never in the app), so the app hands the browser the page that owns it. */
-type IntegrationPagePlatform = 'github' | 'slack' | 'gitlab' | 'discord' | 'linear' | 'bitbucket';
+type IntegrationPagePlatform = 'github' | 'slack' | 'gitlab' | 'discord' | 'linear';
 
 /**
  * The web path that owns a platform's connect flow: `apps/web`'s
@@ -44,11 +44,5 @@ export function getByokUrl(webBaseUrl: string, organizationId?: string): string 
   return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/byok`;
 }
 
-// Bitbucket is org-only (see PLATFORM_CAPABILITIES), so unlike the GitHub/
-// GitLab helpers above there is no personal variant — it links straight to
-// the org's Code Reviewer settings page (apps/web's
-// organizations/[id]/code-reviews), pre-selecting the Bitbucket tab.
-export function getBitbucketIntegrationUrl(webBaseUrl: string, organizationId: string): string {
-  const baseUrl = trimTrailingSlash(webBaseUrl);
-  return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/code-reviews?platform=bitbucket`;
-}
+// Bitbucket has no page here: its workspace access token is pasted in the
+// app's own connect sheet (`app/(app)/bitbucket-connect.tsx`).

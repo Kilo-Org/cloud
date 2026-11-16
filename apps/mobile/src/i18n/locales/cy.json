@@ -1262,8 +1262,6 @@
       "clearMessage": "Bydd cadw maes gwag yn dileu'r cyfarwyddiadau personol sydd wedi'u cadw ar gyfer yr adolygydd hwn."
     },
     "repos": {
-      "unavailable": "Nid yw'r ystorfeydd ar gael. Gorffennwch sefydlu Bitbucket ar kilo.ai.",
-      "finishSetup": "Gorffen sefydlu",
       "manageAccess": "Rheoli mynediad",
       "bitbucketNoRepositoriesDescription": "Nid oes unrhyw ystorfeydd ar gael yn y gweithle Bitbucket hwn.",
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
@@ -1418,9 +1416,7 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
-      "setupIncomplete": "Nid yw'r broses sefydlu wedi'i chwblhau. Gorffennwch ffurfweddu ar kilo.ai.",
-      "setup": "Gosod Bitbucket"
+      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
     },
     "bitbucketConnect": {
       "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
@@ -1450,8 +1446,7 @@
       "githubError": "Ni ellid agor y broses sefydlu GitHub. Ceisiwch eto.",
       "gitlabAccount": "y cyfrif GitLab",
       "gitlabError": "Ni ellid agor y broses sefydlu GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig.",
-      "bitbucketError": "Ni ellid agor y broses sefydlu Bitbucket. Ceisiwch eto."
+      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig."
     },
     "overview": {
       "allAreas": "Pob maes",
@@ -2317,10 +2312,8 @@
       "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket.",
       "connectGithubDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa GitHub.",
       "connectGitlabDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa GitLab.",
-      "connectBitbucketDescription": "Mewngofnodwch o'ch porwr, yna dewch yn ôl yma i ddewis ystorfa Bitbucket.",
       "openGithub": "Agor GitHub",
       "openGitlab": "Agor GitLab",
-      "openBitbucket": "Agor Bitbucket",
       "refreshRepositories": "Adnewyddu ystorfeydd",
       "githubConnected": "GitHub wedi'i gysylltu",
       "gitlabConnected": "GitLab wedi'i gysylltu",

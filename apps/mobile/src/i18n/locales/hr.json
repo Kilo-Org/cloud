@@ -1193,8 +1193,6 @@
       "clearMessage": "Ako spremiš prazno polje, izbrisat će se prilagođene upute spremljene za ovog recenzenta."
     },
     "repos": {
-      "unavailable": "Repozitoriji nisu dostupni. Dovrši postavljanje za Bitbucket na kilo.ai.",
-      "finishSetup": "Dovrši postavljanje",
       "manageAccess": "Upravljaj pristupom",
       "bitbucketNoRepositoriesDescription": "U ovom radnom prostoru na Bitbucketu nema dostupnih repozitorija.",
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
@@ -1349,9 +1347,7 @@
     "followReviewMd": "Slijedi REVIEW.md",
     "followReviewMdSubtitle": "Slijedi upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
-      "setupIncomplete": "Postavljanje nije dovršeno. Dovrši ga na kilo.ai.",
-      "setup": "Postavljanje Bitbucketa"
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati."
     },
     "bitbucketConnect": {
       "description": "Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
@@ -1381,8 +1377,7 @@
       "githubError": "Nije moguće otvoriti postavljanje za GitHub. Pokušaj ponovno.",
       "gitlabAccount": "Račun na GitLabu",
       "gitlabError": "Nije moguće otvoriti postavljanje za GitLab. Pokušaj ponovno.",
-      "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje.",
-      "bitbucketError": "Nije moguće otvoriti postavljanje za Bitbucket. Pokušaj ponovno."
+      "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje."
     },
     "overview": {
       "allAreas": "Sva područja",
@@ -2191,10 +2186,8 @@
       "couldNotLoadBitbucketRepositories": "Učitavanje Bitbucket repozitorija nije uspjelo.",
       "connectGithubDescription": "Prijavi se u pregledniku, a zatim se vrati ovdje da odabereš GitHub repozitorij.",
       "connectGitlabDescription": "Prijavi se u pregledniku, a zatim se vrati ovdje da odabereš GitLab repozitorij.",
-      "connectBitbucketDescription": "Prijavi se u pregledniku, a zatim se vrati ovdje da odabereš Bitbucket repozitorij.",
       "openGithub": "Otvori GitHub",
       "openGitlab": "Otvori GitLab",
-      "openBitbucket": "Otvori Bitbucket",
       "refreshRepositories": "Osvježi repozitorije",
       "githubConnected": "GitHub povezan",
       "gitlabConnected": "GitLab povezan",

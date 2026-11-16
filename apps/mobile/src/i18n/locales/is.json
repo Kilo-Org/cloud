@@ -1170,8 +1170,6 @@
       "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
     },
     "repos": {
-      "unavailable": "Geymslur eru ekki tiltækar. Ljúktu uppsetningu Bitbucket á kilo.ai.",
-      "finishSetup": "Ljúka uppsetningu",
       "manageAccess": "Stjórna aðgangi",
       "bitbucketNoRepositoriesDescription": "Engar geymslur eru tiltækar á þessu Bitbucket-vinnusvæði.",
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
-      "setupIncomplete": "Uppsetningu er ekki lokið. Ljúktu stillingunum á kilo.ai.",
-      "setup": "Uppsetning Bitbucket"
+      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
     },
     "bitbucketConnect": {
       "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
@@ -1358,8 +1354,7 @@
       "githubError": "Ekki tókst að opna uppsetningu GitHub. Reyndu aftur.",
       "gitlabAccount": "GitLab-reikninginn",
       "gitlabError": "Ekki tókst að opna uppsetningu GitLab. Reyndu aftur.",
-      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa.",
-      "bitbucketError": "Ekki tókst að opna uppsetningu Bitbucket. Reyndu aftur."
+      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa."
     },
     "overview": {
       "allAreas": "Allir þættir",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Ekki tókst að hlaða kóðasöfnum frá Bitbucket.",
       "connectGithubDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á GitHub.",
       "connectGitlabDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á GitLab.",
-      "connectBitbucketDescription": "Skráðu þig inn í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn á Bitbucket.",
       "openGithub": "Opna GitHub",
       "openGitlab": "Opna GitLab",
-      "openBitbucket": "Opna Bitbucket",
       "refreshRepositories": "Endurnýja kóðasöfn",
       "githubConnected": "GitHub tengt",
       "gitlabConnected": "GitLab tengt",

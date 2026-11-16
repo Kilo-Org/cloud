@@ -1170,8 +1170,6 @@
       "clearMessage": "Anrejistre yon chan vid ap efase enstriksyon pèsonalize yo ki estoke pou revizè kòd sa a."
     },
     "repos": {
-      "unavailable": "Depo yo pa disponib. Fini konfigirasyon Bitbucket la sou kilo.ai.",
-      "finishSetup": "Fini konfigirasyon an",
       "manageAccess": "Jere aksè",
       "bitbucketNoRepositoriesDescription": "Pa gen depo ki disponib nan espas travay Bitbucket sa a.",
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Swiv REVIEW.md",
     "followReviewMdSubtitle": "Respekte fichye enstriksyon REVIEW.md nan chak depo",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
-      "setupIncomplete": "Konfigirasyon an pa fini. Fini li sou kilo.ai.",
-      "setup": "Konfigirasyon Bitbucket"
+      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li."
     },
     "bitbucketConnect": {
       "description": "Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
@@ -1358,8 +1354,7 @@
       "githubError": "Nou pa t ka louvri konfigirasyon GitHub la. Tanpri eseye ankò.",
       "gitlabAccount": "Kont GitLab",
       "gitlabError": "Nou pa t ka louvri konfigirasyon GitLab la. Tanpri eseye ankò.",
-      "description": "Konekte {{label}} Kilo a pou revize demann fizyon yo otomatikman.",
-      "bitbucketError": "Nou pa t ka louvri konfigirasyon Bitbucket la. Tanpri eseye ankò."
+      "description": "Konekte {{label}} Kilo a pou revize demann fizyon yo otomatikman."
     },
     "overview": {
       "allAreas": "Tout domèn",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Nou pa t ka chaje depo Bitbucket yo.",
       "connectGithubDescription": "Ouvri sesyon nan navigatè ou a, epi tounen isit la pou chwazi yon depo GitHub.",
       "connectGitlabDescription": "Ouvri sesyon nan navigatè ou a, epi tounen isit la pou chwazi yon depo GitLab.",
-      "connectBitbucketDescription": "Ouvri sesyon nan navigatè ou a, epi tounen isit la pou chwazi yon depo Bitbucket.",
       "openGithub": "Louvri GitHub",
       "openGitlab": "Louvri GitLab",
-      "openBitbucket": "Louvri Bitbucket",
       "refreshRepositories": "Rafrechi depo yo",
       "githubConnected": "GitHub konekte",
       "gitlabConnected": "GitLab konekte",

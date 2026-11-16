@@ -1170,8 +1170,6 @@
       "clearMessage": "Ukugcina indawo engenalutho kususa imiyalo oyibekayo egcinelwe lo mhloli wekhodi."
     },
     "repos": {
-      "unavailable": "Izinqolobane zekhodi azitholakali. Qedela ukusetha i-Bitbucket ku-kilo.ai.",
-      "finishSetup": "Qeda ukusetha",
       "manageAccess": "Phatha ukufinyelela",
       "bitbucketNoRepositoriesDescription": "Azikho izinqolobane zekhodi ezitholakalayo kule ndawo yokusebenza ye-Bitbucket.",
       "gitlabNoRepositoriesDescription": "Kungenzeka udinge ukunikeza ukufinyelela kumaqembu noma amaphrojekthi engeziwe ku-GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Landela i-REVIEW.md",
     "followReviewMdSubtitle": "Landela imiyalo yamafayela e-REVIEW.md enqolobaneni ngayinye yekhodi",
     "bitbucket": {
-      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
-      "setupIncomplete": "Ukusetha akukaqedwa. Kuqedele ku-kilo.ai.",
-      "setup": "Ukusetha kwe-Bitbucket"
+      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma."
     },
     "bitbucketConnect": {
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
@@ -1358,8 +1354,7 @@
       "githubError": "Asikwazanga ukuvula ukusetha i-GitHub. Sicela uzame futhi.",
       "gitlabAccount": "I-akhawunti ye-GitLab",
       "gitlabError": "Asikwazanga ukuvula ukusetha i-GitLab. Sicela uzame futhi.",
-      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo.",
-      "bitbucketError": "Asikwazanga ukuvula ukusetha i-Bitbucket. Sicela uzame futhi."
+      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo."
     },
     "overview": {
       "allAreas": "Zonke izindawo",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-Bitbucket.",
       "connectGithubDescription": "Ngena esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi ye-GitHub.",
       "connectGitlabDescription": "Ngena esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi ye-GitLab.",
-      "connectBitbucketDescription": "Ngena esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi ye-Bitbucket.",
       "openGithub": "Vula i-GitHub",
       "openGitlab": "Vula i-GitLab",
-      "openBitbucket": "Vula i-Bitbucket",
       "refreshRepositories": "Vuselela izinqolobane zekhodi",
       "githubConnected": "I-GitHub ixhunyiwe",
       "gitlabConnected": "I-GitLab ixhunyiwe",

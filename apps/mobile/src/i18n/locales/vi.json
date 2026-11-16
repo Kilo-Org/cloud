@@ -627,8 +627,6 @@
       "clearMessage": "Lưu trường trống sẽ xóa hướng dẫn tùy chỉnh đã lưu cho người duyệt mã này."
     },
     "repos": {
-      "unavailable": "Không thể truy cập các kho lưu trữ. Hãy hoàn tất thiết lập Bitbucket trên kilo.ai.",
-      "finishSetup": "Hoàn tất thiết lập",
       "manageAccess": "Quản lý quyền truy cập",
       "bitbucketNoRepositoriesDescription": "Không có kho lưu trữ nào có thể truy cập trong không gian làm việc Bitbucket này.",
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
@@ -648,9 +646,7 @@
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
-      "setupIncomplete": "Chưa hoàn tất thiết lập. Hãy hoàn tất cấu hình trên kilo.ai.",
-      "setup": "Thiết lập Bitbucket"
+      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối."
     },
     "bitbucketConnect": {
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
@@ -696,8 +692,7 @@
       "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "Tài khoản GitLab",
-      "gitlabError": "Không thể mở trang thiết lập GitLab. Vui lòng thử lại.",
-      "bitbucketError": "Không thể mở trang thiết lập Bitbucket. Vui lòng thử lại."
+      "gitlabError": "Không thể mở trang thiết lập GitLab. Vui lòng thử lại."
     },
     "reviewDetail": {
       "byline": "#{{number}} do {{author}} tạo",
@@ -1606,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
       "connectGithubDescription": "Đăng nhập từ trình duyệt, rồi quay lại đây để chọn kho mã GitHub.",
       "connectGitlabDescription": "Đăng nhập từ trình duyệt, rồi quay lại đây để chọn kho mã GitLab.",
-      "connectBitbucketDescription": "Đăng nhập từ trình duyệt, rồi quay lại đây để chọn kho mã Bitbucket.",
       "openGithub": "Mở GitHub",
       "openGitlab": "Mở GitLab",
-      "openBitbucket": "Mở Bitbucket",
       "refreshRepositories": "Làm mới danh sách kho mã",
       "githubConnected": "Đã kết nối GitHub",
       "gitlabConnected": "Đã kết nối GitLab",

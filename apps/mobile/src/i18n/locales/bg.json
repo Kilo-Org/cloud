@@ -1170,8 +1170,6 @@
       "clearMessage": "Ако запазиш празно поле, ще изтриеш персонализираните инструкции, съхранени за този рецензент."
     },
     "repos": {
-      "unavailable": "Хранилищата са недостъпни — завърши настройката на Bitbucket в kilo.ai.",
-      "finishSetup": "Завърши настройката",
       "manageAccess": "Управлявай достъпа",
       "bitbucketNoRepositoriesDescription": "Няма налични хранилища в това работно пространство на Bitbucket.",
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Следвай REVIEW.md",
     "followReviewMdSubtitle": "Спазвай инструкциите във файла REVIEW.md на всяко хранилище",
     "bitbucket": {
-      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
-      "setupIncomplete": "Настройката не е завършена. Завърши я в kilo.ai.",
-      "setup": "Настройка на Bitbucket"
+      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят."
     },
     "bitbucketConnect": {
       "description": "Създай токен за достъп до работното пространство с необходимите права и го постави по-долу.",
@@ -1358,8 +1354,7 @@
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
       "gitlabAccount": "Акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
-      "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане.",
-      "bitbucketError": "Не успяхме да отворим настройката на Bitbucket. Опитай отново."
+      "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане."
     },
     "overview": {
       "allAreas": "Всички области",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
       "connectGithubDescription": "Влез от браузъра си, след което се върни тук, за да избереш хранилище в GitHub.",
       "connectGitlabDescription": "Влез от браузъра си, след което се върни тук, за да избереш хранилище в GitLab.",
-      "connectBitbucketDescription": "Влез от браузъра си, след което се върни тук, за да избереш хранилище в Bitbucket.",
       "openGithub": "Отвори GitHub",
       "openGitlab": "Отвори GitLab",
-      "openBitbucket": "Отвори Bitbucket",
       "refreshRepositories": "Опресни хранилищата",
       "githubConnected": "Връзка с GitHub",
       "gitlabConnected": "Връзка с GitLab",

@@ -1193,8 +1193,6 @@
       "clearMessage": "Ao guardares um campo vazio, eliminas as instruções personalizadas armazenadas para este revisor."
     },
     "repos": {
-      "unavailable": "Os repositórios não estão disponíveis. Conclui a configuração do Bitbucket em kilo.ai.",
-      "finishSetup": "Concluir configuração",
       "manageAccess": "Gerir acesso",
       "bitbucketNoRepositoriesDescription": "Não há repositórios disponíveis neste espaço de trabalho do Bitbucket.",
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
@@ -1349,9 +1347,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
-      "setupIncomplete": "A configuração está incompleta. Conclui-a em kilo.ai.",
-      "setup": "Configuração do Bitbucket"
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
     },
     "bitbucketConnect": {
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
@@ -1381,8 +1377,7 @@
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
       "gitlabAccount": "Conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
-      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente.",
-      "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tenta novamente."
+      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },
     "overview": {
       "allAreas": "Todas as áreas",
@@ -2197,10 +2192,8 @@
       "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
       "connectGithubDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitHub.",
       "connectGitlabDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitLab.",
-      "connectBitbucketDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do Bitbucket.",
       "openGithub": "Abrir o GitHub",
       "openGitlab": "Abrir o GitLab",
-      "openBitbucket": "Abrir o Bitbucket",
       "refreshRepositories": "Atualizar repositórios",
       "githubConnected": "GitHub ligado",
       "gitlabConnected": "GitLab ligado",

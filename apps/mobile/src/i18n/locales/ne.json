@@ -1170,8 +1170,6 @@
       "clearMessage": "खाली फिल्ड सुरक्षित गर्दा यस समीक्षकका लागि भण्डारण गरिएका आफ्नै निर्देशनहरू मेटिइन्छन्।"
     },
     "repos": {
-      "unavailable": "रिपोजिटरीहरू उपलब्ध छैनन् — kilo.ai मा Bitbucket को सेटअप पूरा गर्नुहोस्।",
-      "finishSetup": "सेटअप पूरा गर्नुहोस्",
       "manageAccess": "पहुँच व्यवस्थापन गर्नुहोस्",
       "bitbucketNoRepositoriesDescription": "यो Bitbucket वर्कस्पेसमा कुनै रिपोजिटरी उपलब्ध छैन।",
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md का निर्देशन पालना गर्नुहोस्",
     "followReviewMdSubtitle": "हरेक रिपोजिटरीको REVIEW.md फाइलमा भएका निर्देशन पालना गर्नुहोस्",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
-      "setupIncomplete": "सेटअप पूरा भएको छैन — kilo.ai मा सेटिङहरू मिलाएर पूरा गर्नुहोस्।",
-      "setup": "Bitbucket सेटअप"
+      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।"
     },
     "bitbucketConnect": {
       "description": "आवश्यक अनुमतिसहित वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
@@ -1358,8 +1354,7 @@
       "githubError": "GitHub सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
       "gitlabAccount": "GitLab खाता",
       "gitlabError": "GitLab सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
-      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।",
-      "bitbucketError": "Bitbucket सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।"
+      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।"
     },
     "overview": {
       "allAreas": "सबै क्षेत्रहरू",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपोजिटरीहरू लोड गर्न सकिएन।",
       "connectGithubDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitHub रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "connectGitlabDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitLab रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectBitbucketDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि Bitbucket रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "openGitlab": "GitLab खोल्नुहोस्",
-      "openBitbucket": "Bitbucket खोल्नुहोस्",
       "refreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्नुहोस्",
       "githubConnected": "GitHub जडान भएको",
       "gitlabConnected": "GitLab जडान भएको",

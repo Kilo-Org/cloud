@@ -1170,8 +1170,6 @@
       "clearMessage": "پاشەکەوتی خانەیەکی بەتاڵ ڕێنماییە تایبەتەکان دەسڕێتەوە کە بۆ ئەم پێداچوونەوەکارە هەڵگیراون."
     },
     "repos": {
-      "unavailable": "کۆگاکان بەردەست نین — ڕێکخستنی Bitbucket لەسەر kilo.ai تەواو بکە.",
-      "finishSetup": "ڕێکخستن تەواو بکە",
       "manageAccess": "دەستگەیشتن بەڕێوە ببە",
       "bitbucketNoRepositoriesDescription": "هیچ کۆگایەک لەم بۆشاییەی کار لە Bitbucket بەردەست نییە.",
       "gitlabNoRepositoriesDescription": "ڕەنگە پێویست بکات مۆڵەتی دەستگەیشتن بە گرووپ یان پڕۆژەی زیاتر لە GitLab بدەیت.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "پابەندی REVIEW.md بە",
     "followReviewMdSubtitle": "لە هەر کۆگایەکدا ڕێنماییەکانی پەڕگەی REVIEW.md جێبەجێ بکە",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
-      "setupIncomplete": "ڕێکخستن ناتەواوە — لە kilo.ai تەواوی بکە.",
-      "setup": "ڕێکخستنی Bitbucket"
+      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن."
     },
     "bitbucketConnect": {
       "description": "بۆ بۆشایی کار توکنێکی دەستگەیشتن بە مۆڵەتە پێویستەکان دروست بکە و لە خوارەوە بیلکێنە.",
@@ -1358,8 +1354,7 @@
       "githubError": "نەتوانرا ڕێکخستنی GitHub بکرێتەوە. تکایە دووبارە هەوڵ بدە.",
       "gitlabAccount": "هەژماری GitLab",
       "gitlabError": "نەتوانرا ڕێکخستنی GitLab بکرێتەوە. تکایە دووبارە هەوڵ بدە.",
-      "description": "بۆ پێداچوونەوەی خۆکاری داواکارییەکانی تێکەڵکردن، {{label}}ی Kilo ببەستە.",
-      "bitbucketError": "نەتوانرا ڕێکخستنی Bitbucket بکرێتەوە. تکایە دووبارە هەوڵ بدە."
+      "description": "بۆ پێداچوونەوەی خۆکاری داواکارییەکانی تێکەڵکردن، {{label}}ی Kilo ببەستە."
     },
     "overview": {
       "allAreas": "هەموو بوارەکان",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "نەتوانرا کۆگاکانی Bitbucket بار بکرێن.",
       "connectGithubDescription": "لە وێبگەڕەکەتدا بچۆ ژوورەوە، پاشان بگەڕێوە ئێرە و کۆگایەکی GitHub هەڵبژێرە.",
       "connectGitlabDescription": "لە وێبگەڕەکەتدا بچۆ ژوورەوە، پاشان بگەڕێوە ئێرە و کۆگایەکی GitLab هەڵبژێرە.",
-      "connectBitbucketDescription": "لە وێبگەڕەکەتدا بچۆ ژوورەوە، پاشان بگەڕێوە ئێرە و کۆگایەکی Bitbucket هەڵبژێرە.",
       "openGithub": "کردنەوەی GitHub",
       "openGitlab": "کردنەوەی GitLab",
-      "openBitbucket": "کردنەوەی Bitbucket",
       "refreshRepositories": "نوێکردنەوەی کۆگاکان",
       "githubConnected": "GitHub بەستراوەتەوە",
       "gitlabConnected": "GitLab بەستراوەتەوە",

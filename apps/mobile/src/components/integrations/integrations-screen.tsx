@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -19,6 +20,8 @@ import {
   useIntegrationConnect,
   useIntegrationStatuses,
 } from '@/lib/hooks/use-integrations';
+import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -45,6 +48,7 @@ type IntegrationsScreenProps = Readonly<{
  */
 export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const scope = integrationScope(organizationId);
   const boundary = useOrgBoundary(organizationId);
   // The link's organization becomes the selection once it resolves to a
@@ -66,6 +70,9 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
 
   const statuses = useIntegrationStatuses(organizationId, scopeResolved);
   const githubConnections = useGitHubConnections(organizationId, scopeResolved);
+  // The setup-status read reports whether a Bitbucket workspace is installed but
+  // never the integration row, which is the only id a native disconnect names.
+  const bitbucket = useBitbucketIntegrationStatus(organizationId, scopeResolved);
   const disconnect = useDisconnectIntegration(organizationId);
   const { confirm, dialog } = useConfirmDialog();
   const { pendingProvider, connect } = useIntegrationConnect({
@@ -113,6 +120,8 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     statuses: statuses.data,
     githubConnections: githubConnections.data ?? [],
     githubConnectionsPending: githubConnections.isPending,
+    bitbucketIntegrationId: bitbucket.data?.integrationId ?? null,
+    bitbucketIntegrationPending: bitbucket.isPending,
   });
   const role = boundary.role ?? undefined;
   // One row that offers the viewer no action is enough to need the sentence,
@@ -131,10 +140,25 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         })
     );
 
-  const openProviderPage = (provider: IntegrationProvider) => {
+  // Only a GitHub row whose installations the hub cannot name reaches the web
+  // page; every other provider's action runs in the app.
+  const manageRowOnWeb = (provider: IntegrationProvider) => {
+    if (provider === 'bitbucket') {
+      return;
+    }
     void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
       label: t(providerLabelKey(provider)),
     });
+  };
+
+  const connectProvider = (provider: IntegrationProvider) => {
+    if (provider === 'bitbucket') {
+      if (organizationId) {
+        router.push(bitbucketConnectHref(organizationId));
+      }
+      return;
+    }
+    void connect(provider);
   };
 
   const requestDisconnect = (row: IntegrationRow) => {
@@ -146,7 +170,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       onConfirm: () => {
         disconnect.mutate({
           provider: row.provider,
-          githubIntegrationId: row.githubIntegrationId,
+          integrationId: row.disconnectIntegrationId,
         });
       },
     });
@@ -180,13 +204,13 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                     disconnect.isPending && disconnect.variables.provider === row.provider
                   }
                   onConnect={() => {
-                    void connect(row.provider);
+                    connectProvider(row.provider);
                   }}
                   onDisconnect={() => {
                     requestDisconnect(row);
                   }}
                   onManageOnWeb={() => {
-                    openProviderPage(row.provider);
+                    manageRowOnWeb(row.provider);
                   }}
                   last={index === rows.length - 1}
                 />

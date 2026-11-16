@@ -24,6 +24,7 @@ const config = vi.hoisted(() => ({
 const readiness = vi.hoisted(() => ({
   connected: true,
   ready: true as boolean | undefined,
+  integrationId: 'bitbucket-1' as string | null,
   workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
 }));
@@ -62,8 +63,8 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
-vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
-  BitbucketConnectForm: () => null,
+vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({
+  BitbucketSetupRecovery: () => null,
 }));
 vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
@@ -107,7 +108,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     data: {
       connected: readiness.connected,
       ready: readiness.ready,
+      integrationId: readiness.integrationId,
       workspace: { slug: readiness.workspaceSlug },
+      missingRequiredScopes: [],
+      repositoryCache: {
+        status: readiness.ready ? 'available' : 'uninitialized',
+        repositories: [],
+        syncedAt: null,
+      },
+      canManage: true,
+      canTriggerManualReview: false,
     },
     refetch: vi.fn(),
   }),

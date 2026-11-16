@@ -1170,8 +1170,6 @@
       "clearMessage": "Դատարկ դաշտի պահպանումը ջնջում է այս ստուգողի համար պահված անհատական հրահանգները։"
     },
     "repos": {
-      "unavailable": "Պահոցներն անհասանելի են։ Ավարտիր Bitbucket-ի կարգավորումը kilo.ai-ում։",
-      "finishSetup": "Ավարտել կարգավորումը",
       "manageAccess": "Կառավարել հասանելիությունը",
       "bitbucketNoRepositoriesDescription": "Bitbucket-ի այս աշխատանքային տարածքում հասանելի պահոցներ չկան։",
       "gitlabNoRepositoriesDescription": "Հնարավոր է՝ պետք է GitLab-ում ավելի շատ խմբերի կամ նախագծերի հասանելիություն տրամադրես։",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
-      "setupIncomplete": "Կարգավորումն անավարտ է։ Ավարտիր այն kilo.ai-ում։",
-      "setup": "Bitbucket-ի կարգավորում"
+      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։"
     },
     "bitbucketConnect": {
       "description": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն՝ անհրաժեշտ թույլտվություններով, և տեղադրիր այն ստորև։",
@@ -1358,8 +1354,7 @@
       "githubError": "Չհաջողվեց բացել GitHub-ի կարգավորումը։ Կրկին փորձիր։",
       "gitlabAccount": "GitLab հաշիվ",
       "gitlabError": "Չհաջողվեց բացել GitLab-ի կարգավորումը։ Կրկին փորձիր։",
-      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։",
-      "bitbucketError": "Չհաջողվեց բացել Bitbucket-ի կարգավորումը։ Կրկին փորձիր։"
+      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։"
     },
     "overview": {
       "allAreas": "Բոլոր ոլորտները",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
       "connectGithubDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ GitHub պահոց ընտրելու համար։",
       "connectGitlabDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ GitLab պահոց ընտրելու համար։",
-      "connectBitbucketDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ Bitbucket պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
       "openGitlab": "Բացել GitLab-ը",
-      "openBitbucket": "Բացել Bitbucket-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
       "githubConnected": "GitHub-ը միացված է",
       "gitlabConnected": "GitLab-ը միացված է",

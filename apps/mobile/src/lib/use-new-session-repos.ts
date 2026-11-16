@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import {
@@ -21,7 +22,8 @@ import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -86,6 +88,7 @@ export function useNewSessionRepos({
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const githubQuery = useQuery(
     organizationId
@@ -348,10 +351,12 @@ export function useNewSessionRepos({
 
   // ── Per-provider connect ──────────────────────────────────────────
   /**
-   * The provider whose connect flow is running, or null. The flow's first step
-   * (GitHub mints an install state over the network; all three then open the
-   * browser and refetch on return) takes long enough that a control without this
-   * flag reads as inert: nothing happens until the network settles.
+   * The provider whose browser connect flow is running, or null. Its first step
+   * (GitHub mints an install state over the network, then both open the browser
+   * and refetch on return) takes long enough that a control without this flag
+   * reads as inert: nothing happens until the network settles. Bitbucket never
+   * sets it: its workspace access token is pasted in the app's own connect
+   * sheet, which opens synchronously.
    */
   const [connectingProvider, setConnectingProvider] = useState<RepositoryPlatform | null>(null);
   // Mirrors the state so a second tap inside the same frame — before the
@@ -374,27 +379,21 @@ export function useNewSessionRepos({
     }
   }, [organizationId, forceFreshGitLab]);
 
-  const openBitbucketIntegration = useCallback(async () => {
+  const openBitbucketIntegration = useCallback(() => {
     if (!organizationId) {
       return;
     }
-    try {
-      const wait = await openAuthorizationAndWaitForReturn(
-        getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
-      );
-      reportLateLaunchFailure(wait, {
-        onFailure: () => {
-          toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-        },
-      });
-      await forceFreshBitbucket();
-    } catch {
-      toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-    }
-  }, [organizationId, forceFreshBitbucket]);
+    // The sheet owns the token form and invalidates this hook's repository read
+    // when the connection lands, so there is nothing to wait for here.
+    router.push(bitbucketConnectHref(organizationId));
+  }, [organizationId, router]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
+      if (platform === 'bitbucket') {
+        openBitbucketIntegration();
+        return;
+      }
       if (connectingProviderRef.current !== null) {
         return;
       }
@@ -402,13 +401,7 @@ export function useNewSessionRepos({
       setConnectingProvider(platform);
       void (async () => {
         try {
-          if (platform === 'github') {
-            await openGitHubIntegration();
-          } else if (platform === 'gitlab') {
-            await openGitLabIntegration();
-          } else {
-            await openBitbucketIntegration();
-          }
+          await (platform === 'github' ? openGitHubIntegration() : openGitLabIntegration());
         } finally {
           connectingProviderRef.current = null;
           setConnectingProvider(null);

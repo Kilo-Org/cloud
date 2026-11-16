@@ -1170,8 +1170,6 @@
       "clearMessage": "ცარიელი ველის შენახვა წაშლის ამ რეცენზენტისთვის შენახულ მორგებულ ინსტრუქციებს."
     },
     "repos": {
-      "unavailable": "რეპოზიტორები მიუწვდომელია — დაასრულე Bitbucket-ის გამართვა kilo.ai-ზე.",
-      "finishSetup": "გამართვის დასრულება",
       "manageAccess": "წვდომის მართვა",
       "bitbucketNoRepositoriesDescription": "Bitbucket-ის ამ სამუშაო სივრცეში ხელმისაწვდომი რეპოზიტორები არ არის.",
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md-ის მითითებების დაცვა",
     "followReviewMdSubtitle": "თითოეული რეპოზიტორის REVIEW.md ფაილში მოცემული ინსტრუქციების დაცვა",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ.",
-      "setupIncomplete": "გამართვა არ დასრულებულა — დაასრულე გამართვა kilo.ai-ზე.",
-      "setup": "Bitbucket-ის გამართვა"
+      "notConnectedReadOnly": "Bitbucket არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ."
     },
     "bitbucketConnect": {
       "description": "შექმენი სამუშაო სივრცის წვდომის ტოკენი საჭირო ნებართვებით და ჩასვი ქვემოთ.",
@@ -1358,8 +1354,7 @@
       "githubError": "GitHub-ის გამართვის გვერდის გახსნა ვერ მოხერხდა. სცადე ხელახლა.",
       "gitlabAccount": "GitLab-ის ანგარიში",
       "gitlabError": "GitLab-ის გამართვის გვერდის გახსნა ვერ მოხერხდა. სცადე ხელახლა.",
-      "description": "დააკავშირე Kilo-ს {{label}}, რათა PR-ები ავტომატურად შემოწმდეს.",
-      "bitbucketError": "Bitbucket-ის გამართვის გვერდის გახსნა ვერ მოხერხდა. სცადე ხელახლა."
+      "description": "დააკავშირე Kilo-ს {{label}}, რათა PR-ები ავტომატურად შემოწმდეს."
     },
     "overview": {
       "allAreas": "ყველა მიმართულება",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "connectGithubDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitHub-ის რეპოზიტორიის ასარჩევად.",
       "connectGitlabDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით GitLab-ის რეპოზიტორიის ასარჩევად.",
-      "connectBitbucketDescription": "შედით ბრაუზერში, შემდეგ აქ დაბრუნდით Bitbucket-ის რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
       "openGitlab": "GitLab-ის გახსნა",
-      "openBitbucket": "Bitbucket-ის გახსნა",
       "refreshRepositories": "რეპოზიტორიების განახლება",
       "githubConnected": "GitHub დაკავშირებულია",
       "gitlabConnected": "GitLab დაკავშირებულია",

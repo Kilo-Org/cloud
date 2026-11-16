@@ -117,7 +117,7 @@ export function IntegrationProviderRow({
         <Text>{t('common.manageOnWeb')}</Text>
       </Button>
     ) : null;
-  } else if (row.installed) {
+  } else if (row.installed && row.canDisconnectNatively) {
     action = canDisconnect ? (
       <Button
         size="sm"
@@ -129,7 +129,7 @@ export function IntegrationProviderRow({
         <Text>{t('integrations.disconnect')}</Text>
       </Button>
     ) : null;
-  } else {
+  } else if (!row.installed) {
     action = canConnect ? (
       <Button
         size="sm"

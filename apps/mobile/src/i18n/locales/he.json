@@ -627,8 +627,6 @@
       "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
     },
     "repos": {
-      "unavailable": "המאגרים אינם זמינים — השלם את הגדרת Bitbucket ב-kilo.ai.",
-      "finishSetup": "השלמת ההגדרה",
       "manageAccess": "ניהול גישה",
       "bitbucketNoRepositoriesDescription": "אין מאגרים זמינים בסביבת העבודה הזו של Bitbucket.",
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
@@ -648,9 +646,7 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
-      "setupIncomplete": "ההגדרה לא הושלמה. השלם אותה ב-kilo.ai.",
-      "setup": "הגדרת Bitbucket"
+      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו."
     },
     "bitbucketConnect": {
       "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
@@ -696,8 +692,7 @@
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן לפתוח את הגדרות GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
-      "gitlabError": "לא ניתן לפתוח את הגדרות GitLab. נסה שוב.",
-      "bitbucketError": "לא ניתן לפתוח את הגדרות Bitbucket. נסה שוב."
+      "gitlabError": "לא ניתן לפתוח את הגדרות GitLab. נסה שוב."
     },
     "reviewDetail": {
       "byline": "#{{number}} מאת {{author}}",
@@ -1625,10 +1620,8 @@
       "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים מ-Bitbucket.",
       "connectGithubDescription": "התחבר דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר GitHub.",
       "connectGitlabDescription": "התחבר דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר GitLab.",
-      "connectBitbucketDescription": "התחבר דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר Bitbucket.",
       "openGithub": "פתיחת GitHub",
       "openGitlab": "פתיחת GitLab",
-      "openBitbucket": "פתיחת Bitbucket",
       "refreshRepositories": "רענון המאגרים",
       "githubConnected": "GitHub מחובר",
       "gitlabConnected": "GitLab מחובר",

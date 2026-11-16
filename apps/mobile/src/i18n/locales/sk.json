@@ -1216,8 +1216,6 @@
       "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
     },
     "repos": {
-      "unavailable": "Repozitáre nie sú dostupné. Dokončite nastavenie pripojenia k platforme Bitbucket na kilo.ai.",
-      "finishSetup": "Dokončiť nastavenie",
       "manageAccess": "Spravovať prístup",
       "bitbucketNoRepositoriesDescription": "V tomto pracovnom priestore na platforme Bitbucket nie sú dostupné žiadne repozitáre.",
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
@@ -1372,9 +1370,7 @@
     "followReviewMd": "Riadiť sa pokynmi v REVIEW.md",
     "followReviewMdSubtitle": "Dodržiavať pokyny v súbore REVIEW.md každého repozitára",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
-      "setupIncomplete": "Nastavenie nie je dokončené. Dokončite ho na kilo.ai.",
-      "setup": "Nastavenie služby Bitbucket"
+      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
     },
     "bitbucketConnect": {
       "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
@@ -1404,8 +1400,7 @@
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
       "gitlabAccount": "Účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
-      "bitbucketError": "Nastavenie pripojenia k platforme Bitbucket sa nepodarilo otvoriť. Skúste to znova."
+      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
     },
     "overview": {
       "allAreas": "Všetky oblasti",
@@ -2233,10 +2228,8 @@
       "couldNotLoadBitbucketRepositories": "Repozitáre zo služby Bitbucket sa nepodarilo načítať.",
       "connectGithubDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitHub repozitár.",
       "connectGitlabDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber GitLab repozitár.",
-      "connectBitbucketDescription": "Prihlás sa v prehliadači, potom sa sem vráť a vyber Bitbucket repozitár.",
       "openGithub": "Otvoriť GitHub",
       "openGitlab": "Otvoriť GitLab",
-      "openBitbucket": "Otvoriť Bitbucket",
       "refreshRepositories": "Obnoviť repozitáre",
       "githubConnected": "GitHub pripojený",
       "gitlabConnected": "GitLab pripojený",

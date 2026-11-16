@@ -46,7 +46,8 @@ function integrationRow(overrides: Partial<IntegrationRow> = {}): IntegrationRow
     provider: 'github',
     installed: false,
     accountLabel: null,
-    githubIntegrationId: null,
+    disconnectIntegrationId: null,
+    canDisconnectNatively: false,
     webManaged: false,
     actionPending: false,
     ...overrides,
@@ -178,7 +179,8 @@ describe('IntegrationProviderRow body press', () => {
       row: integrationRow({
         installed: true,
         accountLabel: 'octocat',
-        githubIntegrationId: 'gh-1',
+        disconnectIntegrationId: 'gh-1',
+        canDisconnectNatively: true,
       }),
       scope: 'personal',
     });

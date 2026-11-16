@@ -1170,8 +1170,6 @@
       "clearMessage": "ពេលអ្នករក្សាទុកវាលទទេ ការណែនាំផ្ទាល់ខ្លួនដែលបានរក្សាទុកសម្រាប់អ្នកពិនិត្យកូដនេះនឹងត្រូវបានលុបចេញ។"
     },
     "repos": {
-      "unavailable": "មិនអាចចូលប្រើឃ្លាំងកូដបានទេ។ សូមបញ្ចប់ការរៀបចំ Bitbucket នៅលើ kilo.ai។",
-      "finishSetup": "បញ្ចប់ការរៀបចំ",
       "manageAccess": "គ្រប់គ្រងសិទ្ធិចូលប្រើ",
       "bitbucketNoRepositoriesDescription": "គ្មានឃ្លាំងកូដដែលអាចប្រើបានក្នុងកន្លែងធ្វើការ Bitbucket នេះទេ។",
       "gitlabNoRepositoriesDescription": "អ្នកប្រហែលជាត្រូវផ្តល់សិទ្ធិចូលប្រើក្រុម ឬគម្រោងបន្ថែមនៅលើ GitLab។",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "អនុវត្តតាម REVIEW.md",
     "followReviewMdSubtitle": "អនុវត្តតាមការណែនាំក្នុងឯកសារ REVIEW.md របស់ឃ្លាំងកូដនីមួយៗ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។",
-      "setupIncomplete": "ការរៀបចំមិនទាន់បានបញ្ចប់ទេ។ សូមបញ្ចប់ការកំណត់រចនាសម្ព័ន្ធនៅលើ kilo.ai។",
-      "setup": "ការរៀបចំ Bitbucket"
+      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។"
     },
     "bitbucketConnect": {
       "description": "បង្កើតថូខឹនចូលប្រើកន្លែងធ្វើការដែលមានសិទ្ធិចាំបាច់ រួចបិទភ្ជាប់វាខាងក្រោម។",
@@ -1358,8 +1354,7 @@
       "githubError": "មិនអាចបើកការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។",
       "gitlabAccount": "គណនី GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។",
-      "bitbucketError": "មិនអាចបើកការរៀបចំ Bitbucket បានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។"
     },
     "overview": {
       "allAreas": "គ្រប់ផ្នែក",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី Bitbucket បានទេ។",
       "connectGithubDescription": "ចូលតាមកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ GitHub។",
       "connectGitlabDescription": "ចូលតាមកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ GitLab។",
-      "connectBitbucketDescription": "ចូលតាមកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ Bitbucket។",
       "openGithub": "បើក GitHub",
       "openGitlab": "បើក GitLab",
-      "openBitbucket": "បើក Bitbucket",
       "refreshRepositories": "ផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញ",
       "githubConnected": "បានភ្ជាប់ GitHub",
       "gitlabConnected": "បានភ្ជាប់ GitLab",

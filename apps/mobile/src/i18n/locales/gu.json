@@ -1170,8 +1170,6 @@
       "clearMessage": "ખાલી ફીલ્ડ સાચવવાથી આ રિવ્યુઅર માટે સંગ્રહિત પોતાની સૂચનાઓ કાઢી નાખાય છે."
     },
     "repos": {
-      "unavailable": "રિપોઝિટરીઓ ઉપલબ્ધ નથી — kilo.ai પર Bitbucket નું સેટઅપ પૂરું કરો.",
-      "finishSetup": "સેટઅપ પૂરું કરો",
       "manageAccess": "ઍક્સેસનું સંચાલન કરો",
       "bitbucketNoRepositoriesDescription": "આ Bitbucket વર્કસ્પેસમાં કોઈ રિપોઝિટરી ઉપલબ્ધ નથી.",
       "gitlabNoRepositoriesDescription": "તમારે GitLab પર વધુ જૂથો અથવા પ્રોજેક્ટની ઍક્સેસ આપવાની જરૂર પડી શકે છે.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md અનુસરો",
     "followReviewMdSubtitle": "દરેક રિપોઝિટરીની REVIEW.md ફાઇલમાં આપેલી સૂચનાઓનું પાલન કરો",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
-      "setupIncomplete": "સેટઅપ અધૂરું છે — kilo.ai પર ગોઠવણી પૂરી કરો.",
-      "setup": "Bitbucket સેટઅપ"
+      "notConnectedReadOnly": "Bitbucket જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે."
     },
     "bitbucketConnect": {
       "description": "જરૂરી પરવાનગીઓ સાથે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
@@ -1358,8 +1354,7 @@
       "githubError": "GitHub સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "gitlabAccount": "GitLab એકાઉન્ટ",
       "gitlabError": "GitLab સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "description": "પુલ રિક્વેસ્ટની આપમેળે સમીક્ષા કરવા Kilo {{label}} જોડો.",
-      "bitbucketError": "Bitbucket સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "description": "પુલ રિક્વેસ્ટની આપમેળે સમીક્ષા કરવા Kilo {{label}} જોડો."
     },
     "overview": {
       "allAreas": "બધા ક્ષેત્રો",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
       "connectGithubDescription": "તમારા બ્રાઉઝરમાંથી સાઇન ઇન કરો, પછી અહીં પાછા આવો અને GitHub રિપોઝિટરી પસંદ કરો.",
       "connectGitlabDescription": "તમારા બ્રાઉઝરમાંથી સાઇન ઇન કરો, પછી અહીં પાછા આવો અને GitLab રિપોઝિટરી પસંદ કરો.",
-      "connectBitbucketDescription": "તમારા બ્રાઉઝરમાંથી સાઇન ઇન કરો, પછી અહીં પાછા આવો અને Bitbucket રિપોઝિટરી પસંદ કરો.",
       "openGithub": "GitHub ખોલો",
       "openGitlab": "GitLab ખોલો",
-      "openBitbucket": "Bitbucket ખોલો",
       "refreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરો",
       "githubConnected": "GitHub કનેક્ટ થયું",
       "gitlabConnected": "GitLab કનેક્ટ થયું",

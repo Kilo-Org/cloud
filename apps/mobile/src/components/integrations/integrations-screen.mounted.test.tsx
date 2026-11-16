@@ -34,6 +34,7 @@ const state = vi.hoisted(() => ({
     error: undefined as unknown,
   },
   githubConnections: { data: [] as unknown[] | undefined, isPending: false },
+  bitbucket: { data: undefined as { integrationId: string | null } | undefined, isPending: false },
   role: undefined as string | undefined,
   orgResolved: true,
   orgs: [] as { organizationId: string; organizationName?: string; role?: string }[],
@@ -41,11 +42,11 @@ const state = vi.hoisted(() => ({
 }));
 const calls = vi.hoisted(() => ({
   connect: vi.fn<(provider: string) => void>(),
-  disconnect:
-    vi.fn<(variables: { provider: string; githubIntegrationId: string | null }) => void>(),
+  disconnect: vi.fn<(variables: { provider: string; integrationId: string | null }) => void>(),
   confirm: vi.fn<(request: { title: string; onConfirm: () => void }) => void>(),
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
+  push: vi.fn<(href: unknown) => void>(),
 }));
 
 function statusState(overrides: Partial<typeof state.statuses> = {}): typeof state.statuses {
@@ -68,6 +69,10 @@ vi.mock('@/lib/hooks/use-integrations', () => ({
     variables: undefined,
   }),
   useIntegrationConnect: () => ({ pendingProvider: null, connect: calls.connect }),
+}));
+
+vi.mock('@/lib/hooks/use-bitbucket', () => ({
+  useBitbucketIntegrationStatus: () => state.bitbucket,
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
@@ -247,6 +252,7 @@ beforeEach(() => {
   routeParams.org = undefined;
   state.statuses = statusState();
   state.githubConnections = { data: [], isPending: false };
+  state.bitbucket = { data: undefined, isPending: false };
   state.role = undefined;
   state.orgResolved = true;
   state.permissionDenied = false;
@@ -298,18 +304,53 @@ describe('IntegrationsScreen', () => {
       { id: 'a', integration_status: 'active', suspended_at: null },
       { id: 'b', integration_status: 'active', suspended_at: null },
     ];
+    state.bitbucket = { data: { integrationId: 'bitbucket-1' }, isPending: false };
     const renderer = mount('org-1');
     const root = renderer.root;
 
     expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe(
       'Manage on the web. GitHub'
     );
+    // Bitbucket's connection is changed in the app, so an owner's installed row
+    // disconnects instead of opening the web page.
     const bitbucket = actionOf(rowTitled(root, 'Bitbucket'));
-    expect(bitbucket?.props.accessibilityLabel).toBe('Manage on the web. Bitbucket');
-    press(bitbucket);
-    expect(calls.openExternal).toHaveBeenCalledWith(
-      expect.stringContaining('/organizations/org-1/integrations/bitbucket')
-    );
+    expect(bitbucket?.props.accessibilityLabel).toBe('Disconnect. Bitbucket');
+  });
+
+  it('opens the Bitbucket connect sheet for an organization without a workspace', () => {
+    state.role = 'owner';
+    state.statuses.data = [{ platform: 'bitbucket', installed: false, installation: null }];
+    const renderer = mount('org-1');
+
+    const connect = actionOf(rowTitled(renderer.root, 'Bitbucket'));
+    expect(connect?.props.accessibilityLabel).toBe('Connect. Bitbucket');
+    press(connect);
+
+    expect(calls.connect).not.toHaveBeenCalled();
+    expect(calls.push).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+  });
+
+  it('disconnects the Bitbucket integration the status read names', () => {
+    state.role = 'owner';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    state.bitbucket = { data: { integrationId: 'bitbucket-1' }, isPending: false };
+    const renderer = mount('org-1');
+
+    press(actionOf(rowTitled(renderer.root, 'Bitbucket')));
+    const request = calls.confirm.mock.calls[0]?.[0];
+    act(() => {
+      request?.onConfirm();
+    });
+
+    expect(calls.disconnect).toHaveBeenCalledWith({
+      provider: 'bitbucket',
+      integrationId: 'bitbucket-1',
+    });
   });
 
   it('disconnects an organization connection after the destructive confirmation', () => {
@@ -329,7 +370,7 @@ describe('IntegrationsScreen', () => {
     act(() => {
       request?.onConfirm();
     });
-    expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
+    expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', integrationId: null });
   });
 
   it('shows one shared note to a member whose organization rows offer nothing', () => {
@@ -360,6 +401,7 @@ describe('IntegrationsScreen', () => {
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
+    state.bitbucket = { data: { integrationId: 'bitbucket-1' }, isPending: false };
     const root = mount('org-1').root;
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
@@ -450,6 +492,7 @@ describe('IntegrationsScreen', () => {
 const routeParams = vi.hoisted(() => ({ org: undefined as string | string[] | undefined }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: routeParams.org }),
+  useRouter: () => ({ push: calls.push }),
 }));
 
 let mountedRoute: TestRenderer.ReactTestRenderer | undefined = undefined;

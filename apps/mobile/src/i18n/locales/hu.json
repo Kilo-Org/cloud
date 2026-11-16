@@ -1170,8 +1170,6 @@
       "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
     },
     "repos": {
-      "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
-      "finishSetup": "Beállítás befejezése",
       "manageAccess": "Hozzáférés kezelése",
       "bitbucketNoRepositoriesDescription": "Ebben a Bitbucket-munkaterületben nem érhetők el kódtárak.",
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
@@ -1326,9 +1324,7 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
-      "setupIncomplete": "A beállítás hiányos. Fejezd be a beállítást a kilo.ai oldalon.",
-      "setup": "Bitbucket beállítása"
+      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
     },
     "bitbucketConnect": {
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
@@ -1358,8 +1354,7 @@
       "githubError": "Nem sikerült megnyitni a GitHub beállítását. Próbáld újra.",
       "gitlabAccount": "GitLab-fiók",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Próbáld újra.",
-      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}.",
-      "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Próbáld újra."
+      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}."
     },
     "overview": {
       "allAreas": "Minden terület",
@@ -2149,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-adattárakat.",
       "connectGithubDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitHub-adattárat.",
       "connectGitlabDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy GitLab-adattárat.",
-      "connectBitbucketDescription": "Jelentkezz be a böngészőből, majd térj vissza ide, és válassz egy Bitbucket-adattárat.",
       "openGithub": "GitHub megnyitása",
       "openGitlab": "GitLab megnyitása",
-      "openBitbucket": "Bitbucket megnyitása",
       "refreshRepositories": "Adattárak frissítése",
       "githubConnected": "GitHub csatlakoztatva",
       "gitlabConnected": "GitLab csatlakoztatva",

@@ -594,8 +594,6 @@
       "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
     },
     "repos": {
-      "unavailable": "Les dépôts sont indisponibles. Terminez la configuration de Bitbucket sur kilo.ai.",
-      "finishSetup": "Terminer la configuration",
       "manageAccess": "Gérer l'accès",
       "bitbucketNoRepositoriesDescription": "Aucun dépôt n'est disponible dans cet espace de travail Bitbucket.",
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
@@ -615,9 +613,7 @@
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
-      "setupIncomplete": "La configuration est incomplète. Terminez-la sur kilo.ai",
-      "setup": "Configuration de Bitbucket"
+      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion."
     },
     "bitbucketConnect": {
       "description": "Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
@@ -663,8 +659,7 @@
       "githubApp": "Application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
       "gitlabAccount": "Compte GitLab",
-      "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez.",
-      "bitbucketError": "Impossible d'ouvrir la configuration de Bitbucket. Réessayez."
+      "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez."
     },
     "reviewDetail": {
       "byline": "#{{number}} par {{author}}",
@@ -1525,10 +1520,8 @@
       "couldNotLoadBitbucketRepositories": "Impossible de charger les dépôts Bitbucket",
       "connectGithubDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt GitHub.",
       "connectGitlabDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt GitLab.",
-      "connectBitbucketDescription": "Connectez-vous depuis votre navigateur, puis revenez ici pour choisir un dépôt Bitbucket.",
       "openGithub": "Ouvrir GitHub",
       "openGitlab": "Ouvrir GitLab",
-      "openBitbucket": "Ouvrir Bitbucket",
       "refreshRepositories": "Actualiser les dépôts",
       "githubConnected": "GitHub connecté",
       "gitlabConnected": "GitLab connecté",

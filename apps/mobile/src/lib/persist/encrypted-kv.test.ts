@@ -33,6 +33,11 @@ let failNextMigration = false;
 // The message the migration seam throws. A corruption message routes the open
 // into the reset recovery; anything else keeps the file.
 let nextMigrationMessage = 'migration failed: disk I/O error';
+// An optional `cause` for the migration seam's error, the way the driver
+// wraps a failed statement.
+let failNextMigrationCause: Error | undefined = undefined;
+// An optional non-Error throw from the migration seam.
+let failNextMigrationNonError: unknown = undefined;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
@@ -122,7 +127,13 @@ function nativeStatement(source: string): FakeStatement {
       // which wraps nothing, so this throw is the error the open reports.
       if (failNextMigration && source.includes('__drizzle_migrations')) {
         failNextMigration = false;
-        throw new Error(nextMigrationMessage);
+        if (failNextMigrationNonError !== undefined) {
+          // oxlint-disable-next-line no-throw-literal -- the seam models a caller that throws a non-Error
+          throw failNextMigrationNonError;
+        }
+        throw failNextMigrationCause === undefined
+          ? new Error(nextMigrationMessage)
+          : new Error(nextMigrationMessage, { cause: failNextMigrationCause });
       }
       return {
         getAllSync: () =>
@@ -286,6 +297,8 @@ beforeEach(() => {
   failNextProbe = false;
   failNextMigration = false;
   nextMigrationMessage = 'migration failed: disk I/O error';
+  failNextMigrationCause = undefined;
+  failNextMigrationNonError = undefined;
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
@@ -800,6 +813,38 @@ describe('migration failure keeps the database', () => {
     });
 
     await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_corruption_signal_wrapped_by_the_driver_resets_too', async () => {
+    // The driver wraps a failed statement and keeps the engine error in
+    // `cause`. The corruption check follows that chain.
+    failNextMigration = true;
+    nextMigrationMessage = "Failed to run the query 'CREATE TABLE ...'";
+    failNextMigrationCause = new Error('file is not a database');
+    await setItem('s', 'a', 'x');
+
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_non_error_migration_rejection_keeps_the_file', async () => {
+    // A throw that is not an Error must never reach the destructive reset.
+    failNextMigration = true;
+    nextMigrationMessage = 'threw a string';
+    failNextMigrationNonError = 'migration exploded';
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('migration exploded');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith('migration exploded', {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
   });
 });
 

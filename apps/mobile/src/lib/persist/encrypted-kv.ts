@@ -43,7 +43,9 @@ import { kv } from './schema';
  * chats table and the harness SDK's conversation tables, which are lost with
  * it. A failed migration is different. The file opened and keyed correctly,
  * so the failure is reported under the migration operation and rethrown
- * without deleting anything.
+ * without deleting anything — unless the rejection carries a corruption
+ * signal, which means the file is unreadable after all, and the same
+ * delete-and-recreate recovery runs.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -262,8 +264,16 @@ const CORRUPTION_SIGNALS = [
 ];
 
 function isCorruptionSignal(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : '';
-  return CORRUPTION_SIGNALS.some(signal => message.includes(signal));
+  // Drizzle wraps a failed statement in its own error and keeps the engine
+  // error in `cause`, so the signal can sit one level down.
+  let current = error;
+  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    if (CORRUPTION_SIGNALS.some(signal => current.message.includes(signal))) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
 }
 
 function probeSchema(db: KVDatabase): void {
@@ -279,12 +289,9 @@ async function migrateSchema(db: KVDatabase): Promise<void> {
   try {
     await migrate(db, migrations);
   } catch (error) {
-    // Tag the failure so the open can tell it apart from a corrupt file.
-    if (error instanceof Error && error.message !== MIGRATION_FAILURE_MESSAGE) {
-      const tagged = new Error(MIGRATION_FAILURE_MESSAGE, { cause: error });
-      throw tagged;
-    }
-    throw error;
+    // Tag every rejection, including a non-Error throw: the open must route
+    // each one through the migration branch, never into the destructive reset.
+    throw new Error(MIGRATION_FAILURE_MESSAGE, { cause: error });
   }
 }
 
@@ -336,10 +343,10 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     // conversation tables the failure never touched.
     let resetCause = openError;
     if (openError instanceof Error && openError.message === MIGRATION_FAILURE_MESSAGE) {
-      if (db) {
-        await closeQuietly(db.$client);
-      }
       if (!isCorruptionSignal(openError.cause)) {
+        if (db) {
+          await closeQuietly(db.$client);
+        }
         Sentry.captureException(openError.cause, {
           level: 'error',
           tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
@@ -347,7 +354,8 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
         throw openError.cause;
       }
       // The corruption report rides on the reset report below; a separate
-      // capture would file the same unreadable file twice.
+      // capture would file the same unreadable file twice. The close stays
+      // with the shared reset block, which closes the handle exactly once.
       resetCause = openError.cause;
     }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are

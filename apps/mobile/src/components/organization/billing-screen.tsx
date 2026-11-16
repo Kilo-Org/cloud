@@ -282,7 +282,7 @@ export function OrganizationBillingScreen() {
           <SectionLabel>{t('organization.billing.seats')}</SectionLabel>
           <BillingCard>
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              label={t('organization.billing.seatsInUse')}
               value={seatCountValue}
               valueFace="numeric"
               last

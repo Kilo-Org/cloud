@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber, formatUsd } from '@/lib/format';
+import { formatDate, formatNumber, formatPrefixedUsd } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -68,7 +68,7 @@ function paidSeatsLabel(count: number): string {
 }
 
 function activeSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
-  const tierPrice = formatUsd(TIER_PRICES[agreement.tier], i18n.language, {
+  const tierPrice = formatPrefixedUsd(TIER_PRICES[agreement.tier], i18n.language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });

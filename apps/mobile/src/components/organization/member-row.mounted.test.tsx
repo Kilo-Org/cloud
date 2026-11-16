@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { formatMoney } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { MemberRow } from './member-row';
 
 type Mounted = RenderWithProvidersResult;
@@ -356,11 +356,11 @@ describe('MemberRow daily spend', () => {
   const texts = (renderer: Awaited<ReturnType<typeof renderRow>>) =>
     renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
 
-  const pair = `${isolateLtrBidiText(formatMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
-    formatMoney(10, i18n.language)
+  const pair = `${isolateLtrBidiText(formatPrefixedMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
+    formatPrefixedMoney(10, i18n.language)
   )}`;
   const limitOnly = i18n.t('organization.members.limitPerDay', {
-    amount: isolateLtrBidiText(formatMoney(10, i18n.language)),
+    amount: isolateLtrBidiText(formatPrefixedMoney(10, i18n.language)),
   });
 
   it('pairs spend with the limit for a sales-demo organization', async () => {
@@ -392,7 +392,7 @@ describe('MemberRow daily spend', () => {
     expect(texts(renderer)).not.toContain(pair);
     expect(
       texts(renderer).some(
-        value => typeof value === 'string' && value.includes(formatMoney(10, i18n.language))
+        value => typeof value === 'string' && value.includes(formatPrefixedMoney(10, i18n.language))
       )
     ).toBe(false);
   });

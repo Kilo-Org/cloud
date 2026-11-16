@@ -2,7 +2,6 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -22,6 +21,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -103,7 +103,7 @@ function AnalysisSettingsSkeleton() {
 }
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
@@ -201,7 +201,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       ? () => {
           // The Security Agent config stores a model slug and nothing else, so
           // the picker must not offer a thinking effort it would have to drop.
-          openModelPicker(router, {
+          openModelPicker(pushOnce, {
             options: models,
             value,
             variant: '',

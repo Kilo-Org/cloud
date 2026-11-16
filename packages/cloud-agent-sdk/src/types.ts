@@ -34,6 +34,14 @@ export type {
 } from '@kilocode/session-ingest-contracts';
 
 /**
+ * A part as a storage reader sees it. `createReadonlyPartView` re-routes
+ * writes to nowhere at runtime, so the view's top-level fields are declared
+ * `readonly` — writing to a returned part is a compile error, passing one
+ * where `Part` is expected still typechecks.
+ */
+export type ReadonlyPart = Readonly<Part>;
+
+/**
  * Payload sent to a cloud agent session transport — either a chat prompt or a
  * slash command. Pairs with the SDK transport send types.
  */

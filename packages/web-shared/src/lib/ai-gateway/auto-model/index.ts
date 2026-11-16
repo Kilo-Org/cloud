@@ -139,6 +139,13 @@ export const AUTO_MODELS = [
   KILO_AUTO_SMALL_MODEL,
 ];
 
+// Every auto model this gateway serves, in catalog order: the router-backed models plus the
+// organization model, which routes by organization settings and is not a row in AUTO_MODELS.
+export const SERVED_AUTO_MODEL_IDS: readonly string[] = [
+  ...AUTO_MODELS.map(model => model.id),
+  ORG_AUTO_MODEL.id,
+];
+
 export function customRouterAutoModel(router: {
   scope: OwnerType;
   slug: string;
@@ -155,10 +162,16 @@ export function customRouterAutoModel(router: {
   };
 }
 
+/**
+ * True when this gateway serves `model` as an auto model: a member of SERVED_AUTO_MODEL_IDS
+ * (an exact match on the canonical id) or a custom router id (`kilo-auto/custom/...`).
+ *
+ * `isVirtualAutoModelId` from @kilocode/auto-routing-contracts answers a different question: it
+ * tests the reserved `kilo-auto/` namespace after trimming and lowercasing, so it is true for
+ * every auto id, whether or not this gateway serves it. Use it where an auto id must be refused
+ * as a concrete model (pool entries, `measuredAs`, denied candidates); use this predicate to
+ * decide whether a request names an auto model this gateway can resolve.
+ */
 export function isKiloAutoModel(model: string) {
-  return (
-    AUTO_MODELS.some(m => m.id === model) ||
-    model === ORG_AUTO_MODEL.id ||
-    isCustomRouterModelId(model)
-  );
+  return SERVED_AUTO_MODEL_IDS.includes(model) || isCustomRouterModelId(model);
 }

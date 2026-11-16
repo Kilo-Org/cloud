@@ -47,9 +47,7 @@ export const RoutingConstraintsSchema = z.object({
 });
 export type RoutingConstraints = z.infer<typeof RoutingConstraintsSchema>;
 
-export function isVirtualAutoModelId(model: string): boolean {
-  return model.trim().toLowerCase().startsWith('kilo-auto/');
-}
+export { isVirtualAutoModelId } from './virtual-auto-model';
 
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway

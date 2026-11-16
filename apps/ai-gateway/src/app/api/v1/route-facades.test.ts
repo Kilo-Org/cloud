@@ -18,10 +18,7 @@ import * as autoRoutingDeniedModels from './internal/auto-routing/denied-models/
 import { handleAutoRoutingDeniedModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models';
 import { handleEditCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions';
 import { handleEmbeddingModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models';
-import {
-  EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS,
-  handleEmbeddingsRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
+import { handleEmbeddingsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
 import { handleFimCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions';
 import { handleModelEndpointsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-endpoints';
 import { handleModelValidationRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-validation';
@@ -79,7 +76,10 @@ describe('ai-gateway route facades', () => {
   test.each([
     ['[...path]', llmProxy.maxDuration, 800],
     ['audio/transcriptions', audioTranscriptions.maxDuration, 800],
-    ['embeddings', embeddings.maxDuration, 300],
+    ['embeddings', embeddings.maxDuration, 800],
+    ['edit/completions', editCompletions.maxDuration, 800],
+    ['fim/completions', fimCompletions.maxDuration, 800],
+    ['systemone', systemOne.maxDuration, 800],
   ])('%s keeps its route duration limit', (_route, maxDuration, expected) => {
     expect(maxDuration).toBe(expected);
   });
@@ -87,7 +87,9 @@ describe('ai-gateway route facades', () => {
   test.each([
     ['[...path]', llmProxy.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['audio/transcriptions', audioTranscriptions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
-    ['embeddings', embeddings.maxDuration, EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS],
+    ['embeddings', embeddings.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['edit/completions', editCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['fim/completions', fimCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['systemone', systemOne.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
   ])(
     '%s leaves the post-response headroom after its upstream budget',

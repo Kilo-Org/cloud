@@ -134,6 +134,18 @@ import {
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import { sessionReadTrpcError } from '@/lib/session-trpc-errors';
+
+/**
+ * Retryable copy for a cloud-agent read that did not settle inside the mobile
+ * procedure budget. Fixed text: never the worker's own message.
+ */
+const SESSION_STATE_UNAVAILABLE_MESSAGE = 'Session state is temporarily unavailable. Try again.';
+const SESSION_MESSAGES_UNAVAILABLE_MESSAGE =
+  'Session messages are temporarily unavailable. Try again.';
+const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
+const BRANCH_LISTING_UNAVAILABLE_MESSAGE = 'Repository branches took too long to load. Try again.';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -1334,13 +1346,29 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      return createCloudAgentNextClient(authToken).getSessionMessagesPage({
-        sessionId: input.sessionId,
-        kiloSessionId: input.kiloSessionId,
-        cursor: input.cursor,
-        limit: input.limit,
-        toolDisplay: input.toolDisplay,
-      });
+      const client = createCloudAgentNextClient(authToken);
+
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          read: () =>
+            client.getSessionMessagesPage({
+              sessionId: input.sessionId,
+              kiloSessionId: input.kiloSessionId,
+              cursor: input.cursor,
+              limit: input.limit,
+              toolDisplay: input.toolDisplay,
+            }),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
     }),
 
   getBackgroundActivity: organizationMemberProcedure
@@ -1409,7 +1437,20 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const workerOrganizationId =
         ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
 
-      return await client.getSession(input.cloudAgentSessionId, workerOrganizationId);
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          read: () => client.getSession(input.cloudAgentSessionId, workerOrganizationId),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
     }),
 
   getEgressAudit: organizationMemberProcedure
@@ -1593,11 +1634,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     )
     .output(ProviderBranchListingSchema)
     .query(async ({ ctx, input }) =>
-      listProviderRepositoryBranches({
-        platform: input.platform,
-        userId: ctx.user.id,
-        organizationId: input.organizationId,
-        repositoryFullName: input.repository.fullName,
+      withControlPlaneReadBudget({
+        clock: ctx,
+        message: BRANCH_LISTING_UNAVAILABLE_MESSAGE,
+        read: () =>
+          listProviderRepositoryBranches({
+            platform: input.platform,
+            userId: ctx.user.id,
+            organizationId: input.organizationId,
+            repositoryFullName: input.repository.fullName,
+          }),
       })
     ),
 });

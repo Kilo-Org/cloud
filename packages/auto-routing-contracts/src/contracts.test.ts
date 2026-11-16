@@ -277,9 +277,9 @@ describe('BenchmarkConfigSchema defaults', () => {
     );
     expect(BenchmarkSchedulerOverridesSchema.parse(limits)).toEqual(limits);
 
-    expect(
-      BenchmarkSchedulerOverridesSchema.safeParse({ slots: 1, notASetting: 1 }).success
-    ).toBe(false);
+    expect(BenchmarkSchedulerOverridesSchema.safeParse({ slots: 1, notASetting: 1 }).success).toBe(
+      false
+    );
   });
 
   it.each(['efficient', 'frontier'])(

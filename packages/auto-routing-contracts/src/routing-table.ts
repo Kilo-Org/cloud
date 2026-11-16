@@ -9,7 +9,10 @@ import {
   type ProductionTokenProfile,
 } from './production-token-profile';
 
-export { ProductionTokenProfileSchema, type ProductionTokenProfile } from './production-token-profile';
+export {
+  ProductionTokenProfileSchema,
+  type ProductionTokenProfile,
+} from './production-token-profile';
 
 /** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;

@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { ProductionTokenProfileSchema, type ProductionTokenProfile } from './production-token-profile';
+import {
+  ProductionTokenProfileSchema,
+  type ProductionTokenProfile,
+} from './production-token-profile';
 
 /**
  * Every policy setting an admin can see on the router Policy tab.

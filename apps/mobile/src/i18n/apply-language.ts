@@ -22,6 +22,46 @@ export type ApplyLanguageOutcome =
   | { kind: 'persist-failed' }
   | { kind: 'catalog-failed' };
 
+/** Switch the i18n instance in place; false when the catalog failed to load. */
+async function changeLanguageInPlace(language: string): Promise<boolean> {
+  try {
+    // The plural-rules polyfill must be in place before the first render in the new language.
+    prewarmIntl(language);
+    await i18n.changeLanguage(language);
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/** Re-localize the notification surfaces for the language now applied. */
+function refreshLocalizedNotifications(): void {
+  void renameAndroidNotificationChannels();
+  // The launch-time category registration ran under the previous language, so
+  // re-register the needs-input action buttons in the applied one (same
+  // localization pass as the channel rename above; idempotent).
+  void registerNeedsInputCategories();
+}
+
+/** Force the native direction for `language` and reload the app. */
+async function restartForDirection(language: SupportedLanguage): Promise<ApplyLanguageOutcome> {
+  // Record the relaunch so a cold start that comes back with the previous
+  // direction does not relaunch again for it; the cold start then shows the
+  // retry screen instead of reloading forever. Without the record a relaunch
+  // that does not take the direction repeats on every launch, so a failed
+  // write skips the relaunch instead of risking that loop.
+  if (!(await writeDirectionAttemptAsync(language))) {
+    return { kind: 'restart-skipped' };
+  }
+  syncRtl(language);
+  try {
+    await reloadAppAsync();
+  } catch {
+    return { kind: 'reload-failed' };
+  }
+  return { kind: 'restarting-rtl' };
+}
+
 /**
  * Persist a language preference and apply it. When the native direction must
  * change, write the preference first, force the direction, and reload. When
@@ -38,9 +78,7 @@ export async function applyLanguagePreference(
   returnTarget?: LanguageReturnTarget,
   beforeReload?: () => Promise<void>
 ): Promise<ApplyLanguageOutcome> {
-  const needsDirectionChange = I18nManager.isRTL !== isRtlLanguage(resolved);
-
-  if (needsDirectionChange) {
+  if (I18nManager.isRTL !== isRtlLanguage(resolved)) {
     const persisted = await setLanguagePreferenceAsync(preference);
     if (!persisted) {
       return { kind: 'persist-failed' };
@@ -62,48 +100,43 @@ export async function applyLanguagePreference(
     } catch {
       // Ignore: continue to the reload.
     }
-    // Record the relaunch so a cold start that comes back with the previous
-    // direction does not relaunch again for it; the cold start then shows the
-    // retry screen instead of reloading forever. Without the record a relaunch
-    // that does not take the direction repeats on every launch, so a failed
-    // write skips the relaunch instead of risking that loop.
-    if (!(await writeDirectionAttemptAsync(resolved))) {
-      return { kind: 'restart-skipped' };
-    }
-    syncRtl(resolved);
-    try {
-      await reloadAppAsync();
-    } catch {
-      return { kind: 'reload-failed' };
-    }
-    return { kind: 'restarting-rtl' };
+    return restartForDirection(resolved);
   }
 
   const previousLanguage = i18n.language;
-  try {
-    // The plural-rules polyfill must be in place before the first render in the new language.
-    prewarmIntl(resolved);
-    await i18n.changeLanguage(resolved);
-  } catch {
+  if (!(await changeLanguageInPlace(resolved))) {
     return { kind: 'catalog-failed' };
   }
 
   const persisted = await setLanguagePreferenceAsync(preference, previousLanguage);
   if (!persisted) {
-    try {
-      // The plural-rules polyfill must be in place before the first render in the new language.
-      prewarmIntl(previousLanguage);
-      await i18n.changeLanguage(previousLanguage);
-    } catch {
-      // Ignore: the rollback is best-effort; the persist failure already surfaced.
-    }
+    // The rollback is best-effort; the persist failure already surfaced.
+    await changeLanguageInPlace(previousLanguage);
     return { kind: 'persist-failed' };
   }
 
-  void renameAndroidNotificationChannels();
-  // The launch-time category registration ran under the previous language, so
-  // re-register the needs-input action buttons in the applied one (same
-  // localization pass as the channel rename above; idempotent).
-  void registerNeedsInputCategories();
+  refreshLocalizedNotifications();
+  return { kind: 'applied-ltr' };
+}
+
+/**
+ * Apply the device language after the device locale changed, while the stored
+ * preference is `device`. Same steps as {@link applyLanguagePreference} except
+ * the persist: the stored preference is already `device`, and the person may
+ * pick a language while this runs, so writing here would clobber that pick.
+ * Never throws: every failure maps to an outcome the caller reports.
+ */
+export async function applyDeviceLanguage(
+  language: SupportedLanguage
+): Promise<ApplyLanguageOutcome> {
+  if (I18nManager.isRTL !== isRtlLanguage(language)) {
+    return restartForDirection(language);
+  }
+
+  if (!(await changeLanguageInPlace(language))) {
+    return { kind: 'catalog-failed' };
+  }
+
+  refreshLocalizedNotifications();
   return { kind: 'applied-ltr' };
 }

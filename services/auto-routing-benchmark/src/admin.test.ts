@@ -479,6 +479,37 @@ describe('GET /admin/config', () => {
     });
   });
 
+  it('keeps the previous release’s admin config fields on the resolved policy values', async () => {
+    // The stored legacy columns are stale; the previous web release still
+    // requires the fields, so they must carry the canonical policy value.
+    vi.mocked(getConfigRows).mockResolvedValueOnce({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        frontier_min_accuracy_delta: 0.4,
+        switch_cost_factor: 50,
+        best_accuracy_switch_threshold: 9,
+        low_confidence_threshold: 0.8,
+        classifier_repetitions: 3,
+        decider_repetitions: 5,
+        classifier_max_p95_latency_ms: 1000,
+      },
+    });
+
+    const res = await authedGet('/admin/config');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    });
+  });
+
   it('returns overrides and computed values per policy setting', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce({
       ...TEST_CONFIG_ROWS,
@@ -596,7 +627,45 @@ describe('PUT /admin/config', () => {
     expect(router).toBe('efficient');
   });
 
-  it('accepts the seven legacy policy keys and strips them from the saved config', async () => {
+  it('keeps the previous release’s admin config fields on the resolved policy values', async () => {
+    // The stored legacy columns are stale; the previous web release still
+    // requires the fields, so they must carry the canonical policy value.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        frontier_min_accuracy_delta: 0.4,
+        switch_cost_factor: 50,
+        best_accuracy_switch_threshold: 9,
+        low_confidence_threshold: 0.8,
+        classifier_repetitions: 3,
+        decider_repetitions: 5,
+        classifier_max_p95_latency_ms: 1000,
+      },
+    });
+
+    const res = await authedPut('/admin/config', {
+      ...TEST_CONFIG,
+      minAccuracy: 0.85,
+      frontierMinAccuracyDelta: 0.4,
+      switchCostFactor: 50,
+      deciderRepetitions: 2,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      minAccuracy: 0.85,
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    });
+  });
+
+  it('accepts the seven legacy policy keys and strips them before saving', async () => {
     const legacyBody = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
@@ -616,17 +685,17 @@ describe('PUT /admin/config', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { config: Record<string, unknown> };
-    for (const key of [
-      'frontierMinAccuracyDelta',
-      'switchCostFactor',
-      'bestAccuracySwitchThreshold',
-      'lowConfidenceThreshold',
-      'classifierRepetitions',
-      'deciderRepetitions',
-      'classifierMaxP95LatencyMs',
-    ]) {
-      expect(body.config).not.toHaveProperty(key);
-    }
+    // The previous web release still parses these fields, so the response
+    // carries the canonical policy value rather than the payload's value.
+    expect(body.config).toMatchObject({
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    });
     expect(body.config.minAccuracy).toBe(0.85);
 
     // The legacy columns are not part of the payload: replaceConfig writes the
@@ -2196,7 +2265,9 @@ describe('router selection', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { config: Record<string, unknown> };
     expect(body.config).toMatchObject({ router: 'frontier', accuracyNoiseBand: 0.03 });
-    expect(body.config).not.toHaveProperty('frontierMinAccuracyDelta');
+    // The payload's delta is not saved; the response carries the canonical
+    // fixed policy value the previous web release still parses.
+    expect(body.config).toMatchObject({ frontierMinAccuracyDelta: 0 });
     expect(replaceConfig).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ accuracy_noise_band: 0.03 }),

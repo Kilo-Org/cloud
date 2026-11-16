@@ -132,10 +132,36 @@ describe('router contracts and database isolation', () => {
       const configInsert = queries.find(
         query => query.sql.startsWith('insert') && query.sql.includes('"benchmark_config"')
       );
-      expect(configInsert?.params).toEqual(expect.arrayContaining([80, 40]));
-      // The legacy fixed policy columns are written with the canonical value so
-      // the still-deployed worker reads valid settings.
-      expect(configInsert?.params).toEqual(expect.arrayContaining([3, 0.05, 0, 1, null]));
+      if (!configInsert) throw new Error('replaceConfig did not insert a benchmark_config row');
+      const [columnsSource = '', , valuesSource = ''] =
+        /insert into "benchmark_config" \(([^)]*)\) values \(([^)]*)\)/.exec(configInsert.sql) ??
+        [];
+      const columns = columnsSource.split(', ').map(column => column.replaceAll('"', ''));
+      // The values clause mixes bound parameters with inline literals, so bind
+      // each placeholder to its own column instead of matching values by type.
+      let bound = 0;
+      const row = Object.fromEntries(
+        columns.map((column, index) => {
+          const value = valuesSource.split(', ')[index];
+          if (value === '?') return [column, configInsert.params[bound++]];
+          return [column, value === 'null' ? null : Number(value)];
+        })
+      );
+      // The legacy fixed policy columns carry the canonical policy value so the
+      // still-deployed worker reads valid settings.
+      expect(row).toMatchObject({
+        min_accuracy: config.minAccuracy,
+        accuracy_noise_band: config.accuracyNoiseBand,
+        frontier_min_accuracy_delta: 0,
+        switch_cost_factor: 3,
+        best_accuracy_switch_threshold: 0.05,
+        low_confidence_threshold: null,
+        classifier_repetitions: 1,
+        decider_repetitions: 1,
+        classifier_max_p95_latency_ms: null,
+        max_concurrency: 80,
+        user_max_concurrency: 40,
+      });
     }
   );
 

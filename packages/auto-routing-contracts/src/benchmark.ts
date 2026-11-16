@@ -196,6 +196,29 @@ export const BenchmarkConfigSchema = z
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
+/**
+ * Fixed policy fields the previous web release still requires in the admin
+ * config response. Production deploys this worker before the web promotion
+ * (ADR 0003 invariant 7), so the response keeps them, projected from the
+ * resolved policy, until that release is promoted. Remove this schema with the
+ * projection in the worker's admin routes.
+ */
+export const BenchmarkConfigAdminLegacyFieldsSchema = z.object({
+  frontierMinAccuracyDelta: POLICY_SETTING_VALUE_SCHEMAS.frontierMinAccuracyDelta,
+  switchCostFactor: POLICY_SETTING_VALUE_SCHEMAS.switchCostFactor,
+  bestAccuracySwitchThreshold: POLICY_SETTING_VALUE_SCHEMAS.bestAccuracySwitchThreshold,
+  lowConfidenceThreshold: POLICY_SETTING_VALUE_SCHEMAS.lowConfidenceThreshold.nullable(),
+  classifierRepetitions: POLICY_SETTING_VALUE_SCHEMAS.classifierRepetitions,
+  deciderRepetitions: POLICY_SETTING_VALUE_SCHEMAS.deciderRepetitions,
+  classifierMaxP95LatencyMs: POLICY_SETTING_VALUE_SCHEMAS.classifierMaxP95LatencyMs.nullable(),
+});
+export type BenchmarkConfigAdminLegacyFields = z.infer<
+  typeof BenchmarkConfigAdminLegacyFieldsSchema
+>;
+
+/** Admin config response body: the editable config plus the transitional fields. */
+export type BenchmarkConfigAdminResponseConfig = BenchmarkConfig & BenchmarkConfigAdminLegacyFields;
+
 export type BenchmarkIdentity = { benchmarkUserId: string; benchmarkOrgId: string };
 export type BenchmarkIdentityOverrides = Pick<
   BenchmarkConfig,

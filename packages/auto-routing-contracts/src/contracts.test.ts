@@ -17,6 +17,7 @@ import type { RoutingConstraints } from './index';
 import {
   BENCHMARK_SCHEDULER_SETTING_KEYS,
   BenchmarkConfigSchema,
+  BenchmarkConfigAdminLegacyFieldsSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -265,6 +266,23 @@ describe('BenchmarkConfigSchema defaults', () => {
     ]) {
       expect(result).not.toHaveProperty(key);
     }
+  });
+
+  it('accepts the transitional admin config fields on the canonical policy values', () => {
+    const canonical = {
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    };
+    expect(BenchmarkConfigAdminLegacyFieldsSchema.parse(canonical)).toEqual(canonical);
+    expect(
+      BenchmarkConfigAdminLegacyFieldsSchema.safeParse({ ...canonical, classifierRepetitions: 7 })
+        .success
+    ).toBe(false);
   });
 
   it('builds scheduler overrides from the shared scheduler key list', () => {

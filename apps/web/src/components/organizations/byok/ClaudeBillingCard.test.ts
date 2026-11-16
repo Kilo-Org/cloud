@@ -68,7 +68,7 @@ describe('ClaudeBillingCardView', () => {
             },
           ],
         },
-        scope: 'member',
+        scope: 'organization',
         onShare: () => undefined,
       })
     ).toHaveLength(1);
@@ -102,15 +102,23 @@ describe('ClaudeBillingCardView', () => {
 
   it.each([
     ['personal', 'your Claude usage in Kilo'],
-    ['member', 'the Claude requests you make in this organization'],
-    ['shared_services', 'Link a Claude API organization for this organization'],
+    ['organization', "both members' requests and Kilo services such as code review"],
   ] as const)('says what the %s connection bills', (scope, description) => {
-    const html = render({ status: status('not_connected'), scope });
-    expect(html).toContain('Claude (linked billing)');
-    expect(html).toContain(description);
+    const text = parseHTML(render({ status: status('not_connected'), scope })).document
+      .documentElement.textContent;
+    expect(text).toContain('Claude (linked billing)');
+    expect(text).toContain(description);
   });
 
-  it.each(['personal', 'member', 'shared_services'] as const)(
+  it('states what the organization connection covers', () => {
+    const text = parseHTML(render({ status: status('not_connected'), scope: 'organization' }))
+      .document.documentElement.textContent;
+    expect(text).toContain(
+      "Covers every member's Claude requests in this organization and Kilo services such as code review."
+    );
+  });
+
+  it.each(['personal', 'organization'] as const)(
     'keeps the %s billing terms behind one disclosure',
     scope => {
       const { document } = parseHTML(render({ status: status('not_connected'), scope }));
@@ -155,7 +163,7 @@ describe('ClaudeBillingCardView', () => {
   it('reports a link that needs linking again and offers the owner the action', () => {
     const html = render({
       status: { ...status('reconnect_required'), connectedAt: '2026-09-16T12:00:00.000Z' },
-      scope: 'shared_services',
+      scope: 'organization',
       onConnect: () => undefined,
       onRemove: () => undefined,
     });
@@ -167,7 +175,7 @@ describe('ClaudeBillingCardView', () => {
     expect(
       buttons({
         status: status('reconnect_required'),
-        scope: 'shared_services',
+        scope: 'organization',
         onConnect: () => undefined,
       }).map(button => button.textContent)
     ).toEqual(['Link Claude billing again', 'Remove from Kilo']);
@@ -177,13 +185,11 @@ describe('ClaudeBillingCardView', () => {
   it('shows the link-again state to a member without the action', () => {
     const html = render({
       status: { ...status('reconnect_required'), canManage: false },
-      scope: 'shared_services',
+      scope: 'organization',
     });
     expect(html).toContain('New link required');
     expect(html).toContain('is no longer available');
-    expect(html).toContain(
-      'Ask a Kilo organization owner or admin to manage Claude shared services.'
-    );
+    expect(html).toContain('Ask a Kilo organization owner or admin to link a Claude organization.');
   });
 
   it.each(['not_connected', 'connected'] as const)(
@@ -212,11 +218,8 @@ describe('ClaudeBillingCardView', () => {
         shareableLinks: [
           {
             payerId: '00000000-0000-4000-8000-000000000001',
-            source: {
-              organizationId: '00000000-0000-4000-8000-000000000010',
-              scope: 'shared_services',
-            },
-            label: 'Acme (shared services)',
+            source: { organizationId: '00000000-0000-4000-8000-000000000010' },
+            label: 'Acme',
             connectedAt: '2026-09-16T12:00:00.000Z',
           },
         ],
@@ -224,9 +227,7 @@ describe('ClaudeBillingCardView', () => {
       scope: 'personal',
       onShare: () => undefined,
     });
-    expect(rendered.map(button => button.textContent)).toEqual([
-      'Use Claude link from Acme (shared services)',
-    ]);
+    expect(rendered.map(button => button.textContent)).toEqual(['Use Claude link from Acme']);
   });
 
   it('renders a link selector when multiple Claude accounts are available', () => {
@@ -238,7 +239,7 @@ describe('ClaudeBillingCardView', () => {
             {
               payerId: '00000000-0000-4000-8000-000000000001',
               source: { organizationId: '00000000-0000-4000-8000-000000000010' },
-              label: 'Acme (member)',
+              label: 'Acme',
               connectedAt: '2026-09-16T12:00:00.000Z',
             },
             {
@@ -249,14 +250,14 @@ describe('ClaudeBillingCardView', () => {
             },
           ],
         },
-        scope: 'shared_services',
+        scope: 'organization',
         onConnect: () => undefined,
         onShare: () => undefined,
       })
     );
     const doc = parseHTML(html).document;
     const selectTrigger = doc.querySelector('[aria-label="Existing Claude link"]');
-    expect(selectTrigger?.textContent).toContain('Acme (member)');
+    expect(selectTrigger?.textContent).toContain('Acme');
     expect(html).toContain('Use selected Claude link');
   });
 
@@ -265,11 +266,11 @@ describe('ClaudeBillingCardView', () => {
       React.createElement(ClaudeBillingCardView, {
         status: {
           ...status('connected'),
-          sharedWith: ['Personal account', 'Acme (shared services)'],
+          sharedWith: ['Personal account', 'Acme'],
         },
-        scope: 'member',
+        scope: 'organization',
       })
     );
-    expect(html).toContain('Shared with Personal account, Acme (shared services).');
+    expect(html).toContain('Shared with Personal account, Acme.');
   });
 });

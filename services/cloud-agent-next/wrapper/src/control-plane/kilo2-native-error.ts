@@ -5,7 +5,10 @@ export const nativeErrorSchema = z.object({
   type: z.string(),
   message: z.string(),
   status: z.number().int().optional(),
-  name: z.string().optional(),
+  name: z
+    .string()
+    .optional()
+    .catch(() => undefined),
 });
 
 // Kilo v2-104: Kilo-Org/kilocode@1649d3bf, packages/core/src/session/{to-session-error,runner/{llm,step}}.ts.
@@ -40,18 +43,19 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
       ? (NATIVE_ERROR_NAMES.get(error.type) ?? error.name ?? 'UnknownError')
       : 'APIError';
   const data = status === undefined ? {} : { statusCode: status };
+  const message = classifyAssistantFailure(error.message);
   // Generic request rejections omit the native context-overflow classification.
   const structured = classifyAssistantFailure({
     name,
     data: {
       ...data,
       ...(error.type === 'provider.invalid-request' &&
-      (error.status === undefined || error.status === 400 || error.status === 413)
+      (error.status === undefined || error.status === 400 || error.status === 413) &&
+      (message.reason === 'context_limit' || message.reason === 'output_limit')
         ? { message: error.message }
         : {}),
     },
   });
-  const message = classifyAssistantFailure(error.message);
   // V1 lets specific message text override structured errors. Canonicalize only
   // the v2 adapter's stronger signal, keeping BYOK ownership and honest fallback.
   return {

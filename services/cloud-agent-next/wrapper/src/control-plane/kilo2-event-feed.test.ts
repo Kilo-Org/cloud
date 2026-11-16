@@ -217,11 +217,16 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
 });
 
 it.each([
-  undefined,
-  { type: 'provider.internal', message: 'internal' },
-  { type: 'tool.execution', message: 'failed' },
-  { type: 'unknown', message: 'failed', name: 'ContextOverflowError' },
-])('closes the turn and preserves native error %j when a read fails', async error => {
+  [undefined, undefined],
+  [{ type: 'provider.internal', message: 'internal' }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: null }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: 42 }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: false }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: {} }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: [] }, 'provider_unavailable'],
+  [{ type: 'tool.execution', message: 'failed' }, 'unknown'],
+  [{ type: 'unknown', message: 'failed', name: 'ContextOverflowError' }, 'context_limit'],
+] as const)('preserves native error %j when a read fails', async (error, reason) => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
   const events: KiloFeedEvent[] = [];
@@ -281,11 +286,13 @@ it.each([
       type: terminalType,
       data: error === undefined ? {} : { error },
     });
-    expect(events.find(event => event.type === 'session.turn.close')?.properties).toEqual({
+    const turnClose = events.find(event => event.type === 'session.turn.close')?.properties;
+    expect(turnClose).toMatchObject({
       sessionID,
       reason: error === undefined ? 'completed' : 'error',
-      ...(error === undefined ? {} : { error: nativeTurnError(error) }),
     });
+    if (reason === undefined) expect(turnClose).not.toHaveProperty('error');
+    else expect(classifyAssistantFailure(turnClose?.error).reason).toBe(reason);
     expect(
       events
         .filter(event =>
@@ -614,6 +621,39 @@ it.each([
   expect(translated).toMatchObject({ name: 'APIError', data: { statusCode: status } });
   expect(classifyAssistantFailure(translated).reason).toBe(reason);
 });
+
+it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(
+  'does not replace a native invalid-request identity with %s',
+  message => {
+    for (const status of [undefined, 400, 413]) {
+      for (const prefix of ['', '[BYOK] ']) {
+        const failure = classifyAssistantFailure(
+          nativeTurnError({
+            type: 'provider.invalid-request',
+            message: `${prefix}${message}`,
+            status,
+          }),
+          'managed'
+        );
+        expect(failure.reason).toBe('invalid_request');
+        expect(failure.terminalCode).toBeUndefined();
+        expect(failure.providerOwnership).toBe(prefix ? 'byok' : 'managed');
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          })
+        ).toEqual({
+          responsibility: prefix ? 'user' : 'platform',
+          reason: 'assistant_invalid_request',
+        });
+      }
+    }
+  }
+);
 
 // Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
 const catalogFailure = (detail: string) =>

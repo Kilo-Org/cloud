@@ -107,6 +107,24 @@ describe('native v2 failure attribution', () => {
       'provider',
       'assistant_output_limit',
     ],
+    [
+      { type: 'provider.invalid-request', message: 'Tool calls cutoff by max_tokens', status: 400 },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Tool calls cutoff by max_tokens', status: 413 },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Prompt is too long', status: 429 },
+      'rate_limited',
+      'provider',
+      'rate_limited',
+    ],
     [{ type: 'tool.execution', message: 'failed' }, 'unknown', 'unknown', 'assistant_unknown'],
     [
       { type: 'provider.rate-limit', message: 'timeout', status: 503 },

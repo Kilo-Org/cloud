@@ -1413,10 +1413,12 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
     'base'
   );
 
-  // `narrow` stands for the workspace rule: what scripts/affected-workspaces.mjs
-  // selected. The broad rule runs when that detection is unavailable.
-  const detected = (head, narrow) =>
-    execFileSync(
+  // Detection on `branch` against `base`. `narrow` stands for the workspace
+  // rule: what scripts/affected-workspaces.mjs selected. Without it the broad
+  // rule runs, as when that detection is unavailable.
+  const detected = (branch, narrow) => {
+    git('checkout', '-q', branch);
+    return execFileSync(
       'bash',
       [
         '--noprofile',
@@ -1441,14 +1443,24 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
       .trim()
       .split('\n')
       .filter(Boolean);
+  };
 
   git('checkout', '-q', '-b', 'pin', base);
-  const pin = commit({ 'services/pages/source.json': '{"tag":"pages-111111111111"}' }, 'pin');
+  commit({ 'services/pages/source.json': '{"tag":"pages-111111111111"}' }, 'pin');
   const both = ['services/pages', 'services/pages-output'];
-  assert.deepEqual(detected(pin), both, 'the broad rule deploys the shell on a pin move');
-  assert.deepEqual(detected(pin, ['services/pages']), both, 'so does the workspace rule');
+  // The source.json rule selects the shell whatever the workspace rule says.
+  assert.deepEqual(detected('pin'), both, 'the broad rule deploys the shell on a pin move');
+  assert.deepEqual(detected('pin', ['services/pages']), both, 'so does the workspace rule');
+
+  // A change to the shared archive code reaches the shell through the
+  // workspace rule alone: the shell's build imports ../pages/scripts/, so
+  // affected-workspaces.mjs selects it as a reader of services/pages.
+  git('checkout', '-q', '-b', 'loader', base);
+  commit({ 'services/pages/scripts/pinned.mjs': 'export {};' }, 'loader');
+  assert.deepEqual(detected('loader', both), both, 'the workspace rule selects the reader');
+  assert.deepEqual(detected('loader', ['services/pages']), ['services/pages']);
 
   git('checkout', '-q', '-b', 'docs', base);
-  const docs = commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
-  assert.deepEqual(detected(docs), ['services/pages'], 'another Pages change leaves the shell');
+  commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
+  assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
 });

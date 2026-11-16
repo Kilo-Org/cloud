@@ -42,6 +42,8 @@ import {
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import { waitFor } from './wait-for.js';
 
 const SANDBOX_ID = 'sbx__control_v2_routes';
@@ -2776,6 +2778,55 @@ describe('SandboxControlV2 routes and forwarding', () => {
       workspaceStopEpoch: 0,
       workspaceStopAt: 0,
     });
+  });
+
+  it('interrupts native preparation before its probe completes and waits only for destroy', async () => {
+    const native = await pendingNativeStart();
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      });
+      return { startSource: 'image' };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopCalls.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const { stub } = await setup(provider);
+    try {
+      await stub.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await readState(stub)).kind).toBe('creating');
+
+      await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+      await stub.prepare({ ...prepareInput(SESSION), stopEpoch: 1 });
+
+      // The readiness read is still blocked. Destroy must already have started.
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      expect((await readState(stub)).kind).toBe('stopping');
+      expect(native.container.starts).toBe(1);
+      expect(provider.createCalls).toBe(1);
+
+      native.releaseDestroy();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(native.container.starts).toBe(2);
+      const replacement = await readState(stub);
+      expect(replacement.providerRef).toBe(provider.refs[1]);
+
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
+      expect(native.container.starts).toBe(2);
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+    }
   });
 
   it('returns at once and stores a new route when prepare runs during stopping', async () => {

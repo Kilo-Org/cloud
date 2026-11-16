@@ -137,6 +137,13 @@ export class ContainersAllocationConflictError extends Error {
   }
 }
 
+class ContainersLaunchInterruptedError extends Error {
+  constructor() {
+    super('Container startup interrupted by stop');
+    this.name = 'ContainersLaunchInterruptedError';
+  }
+}
+
 type WrapperAttempt = 'not_started' | 'exec_pending';
 type WrapperAttemptRead = WrapperAttempt | 'missing' | 'unknown';
 
@@ -272,6 +279,7 @@ function stopPath(
 
 export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
+  private pendingStart: { allocationRef: string; controller: AbortController } | undefined;
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
   /** Snapshot calls still awaited in this isolate, by capture id. */
@@ -556,23 +564,44 @@ export class SandboxContainers extends DurableObject<Env> {
         ...(policy.egressAudit === true ? { egressAudit: true } : {}),
       };
     }
-    await this.writeRecord(launching);
-    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
-      throw new WrapperExecTimeoutError();
+    const controller = new AbortController();
+    this.pendingStart = { allocationRef: ref, controller };
+    try {
+      await this.writeRecord(launching);
+      controller.signal.throwIfAborted();
+      if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+        throw new WrapperExecTimeoutError();
+      }
+      const failure = await this.runStart(
+        start,
+        async () => {
+          const issuedAt = Date.now();
+          await this.startContainerAndActivateBilling(container, record, start.options);
+          // Only the read-only readiness probe is cancellable. Physical start,
+          // billing and destroy keep their order in the provider queue.
+          const cancelled = Promise.withResolvers<never>();
+          const interrupt = () => cancelled.reject(controller.signal.reason);
+          controller.signal.addEventListener('abort', interrupt, { once: true });
+          try {
+            controller.signal.throwIfAborted();
+            await Promise.race([
+              this.awaitMainProcess(container, start, issuedAt, deadlineAt, controller.signal),
+              cancelled.promise,
+            ]);
+          } finally {
+            controller.signal.removeEventListener('abort', interrupt);
+          }
+          await this.activateBillingIfRunning(container, record);
+        },
+        policy?.snapshotDiagnostic
+      );
+      controller.signal.throwIfAborted();
+      if (failure !== null) return { started: false, startSource: start.source, ...failure };
+      await this.writeRunning(ref, 'clear');
+      return { started: true, startSource: start.source };
+    } finally {
+      this.pendingStart = undefined;
     }
-    const failure = await this.runStart(
-      start,
-      async () => {
-        const issuedAt = Date.now();
-        await this.startContainerAndActivateBilling(container, record, start.options);
-        await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
-        await this.activateBillingIfRunning(container, record);
-      },
-      policy?.snapshotDiagnostic
-    );
-    if (failure !== null) return { started: false, startSource: start.source, ...failure };
-    await this.writeRunning(ref, 'clear');
-    return { started: true, startSource: start.source };
   }
 
   /**
@@ -647,6 +676,7 @@ export class SandboxContainers extends DurableObject<Env> {
       await attempt();
       return null;
     } catch (error) {
+      if (error instanceof ContainersLaunchInterruptedError) throw error;
       if (start.source === 'repository' && start.snapshotId !== null) {
         const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
@@ -821,6 +851,9 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   async stop(allocationRef: string): Promise<'terminal' | 'retryable'> {
+    if (this.pendingStart?.allocationRef === allocationRef) {
+      this.pendingStart.controller.abort(new ContainersLaunchInterruptedError());
+    }
     return this.runExclusive(async () => {
       const ref = allocationRef;
       const record = await this.readRecord();
@@ -1263,7 +1296,8 @@ export class SandboxContainers extends DurableObject<Env> {
     container: Container,
     start: ResolvedStart,
     issuedAt: number,
-    launchDeadlineAt?: number
+    launchDeadlineAt: number | undefined,
+    signal: AbortSignal
   ): Promise<void> {
     const readinessDeadline =
       start.source === 'repository'
@@ -1283,6 +1317,7 @@ export class SandboxContainers extends DurableObject<Env> {
       })
     );
     for (;;) {
+      signal.throwIfAborted();
       const result = await Promise.race([
         this.observeMainProcess(container, start.command, deadlineAt).then(observation => ({
           type: 'observed' as const,
@@ -1290,6 +1325,7 @@ export class SandboxContainers extends DurableObject<Env> {
         })),
         stopped,
       ]);
+      signal.throwIfAborted();
       const observation = result.observation;
       checks += 1;
       if (result.type === 'stopped') {

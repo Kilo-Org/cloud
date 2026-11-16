@@ -34,17 +34,17 @@
       "title": "ചെലവ് അലേർട്ട്",
       "body": "{{scopeName}} ചെലവ് ${{amountUsd}} കവിഞ്ഞു"
     },
-    "securityFindingNew": {
-      "title": "പുതിയ സുരക്ഷാ കണ്ടെത്തൽ ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "പുതിയ സുരക്ഷാ കണ്ടെത്തൽ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA മുന്നറിയിപ്പ്",
-      "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+      "title": "SLA മുന്നറിയിപ്പ്"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ലംഘനം",
-      "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+      "title": "SLA ലംഘനം"
     },
     "securityLifecycle": {
       "title": "Kilo",

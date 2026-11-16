@@ -34,17 +34,17 @@
       "title": "Ọkwa mmefu",
       "body": "Mmefu {{scopeName}} gafere ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} na {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Ịdọ aka na ntị SLA",
-      "body": "{{findingTitle}} na {{repoFullName}}"
+      "title": "Ịdọ aka na ntị SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Mmebi SLA",
-      "body": "{{findingTitle}} na {{repoFullName}}"
+      "title": "Mmebi SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

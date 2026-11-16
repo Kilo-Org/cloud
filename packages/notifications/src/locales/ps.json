@@ -34,17 +34,17 @@
       "title": "د لګښت خبرتیا",
       "body": "د {{scopeName}} لګښت ${{amountUsd}} واوښت"
     },
-    "securityFindingNew": {
-      "title": "نوې امنیتي موندنه ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} په {{repoFullName}} کې"
+    },
+    "securityFindingNew": {
+      "title": "نوې امنیتي موندنه ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "د SLA خبرداری",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
+      "title": "د SLA خبرداری"
     },
     "securityFindingSlaBreach": {
-      "title": "د SLA سرغړونه",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
+      "title": "د SLA سرغړونه"
     },
     "securityLifecycle": {
       "title": "Kilo",

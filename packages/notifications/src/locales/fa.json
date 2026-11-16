@@ -34,17 +34,17 @@
       "title": "هشدار هزینه",
       "body": "هزینه {{scopeName}} از ${{amountUsd}} عبور کرد"
     },
-    "securityFindingNew": {
-      "title": "یافته امنیتی جدید ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} در {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "یافته امنیتی جدید ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "هشدار SLA",
-      "body": "{{findingTitle}} در {{repoFullName}}"
+      "title": "هشدار SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "نقض SLA",
-      "body": "{{findingTitle}} در {{repoFullName}}"
+      "title": "نقض SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

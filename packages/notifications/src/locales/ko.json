@@ -34,17 +34,17 @@
       "title": "지출 알림",
       "body": "{{scopeName}} 지출이 ${{amountUsd}}를 초과했습니다"
     },
-    "securityFindingNew": {
-      "title": "새 보안 발견 사항 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}}의 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "새 보안 발견 사항 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 경고",
-      "body": "{{repoFullName}}의 {{findingTitle}}"
+      "title": "SLA 경고"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 위반",
-      "body": "{{repoFullName}}의 {{findingTitle}}"
+      "title": "SLA 위반"
     },
     "securityLifecycle": {
       "title": "Kilo",

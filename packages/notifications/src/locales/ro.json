@@ -34,17 +34,17 @@
       "title": "Alertă de cheltuială",
       "body": "Cheltuiala pentru {{scopeName}} a depășit ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Constatare de securitate nouă ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} în {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Constatare de securitate nouă ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avertisment SLA",
-      "body": "{{findingTitle}} în {{repoFullName}}"
+      "title": "Avertisment SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Încălcare SLA",
-      "body": "{{findingTitle}} în {{repoFullName}}"
+      "title": "Încălcare SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

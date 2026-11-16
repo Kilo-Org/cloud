@@ -34,17 +34,17 @@
       "title": "Fampandrenesana fandaniana",
       "body": "Nihoatra ny ${{amountUsd}} ny fandaniana tao amin'ny {{scopeName}}"
     },
-    "securityFindingNew": {
-      "title": "Hitan'ny fiarovana vaovao ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Hitan'ny fiarovana vaovao ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Fampitandremana SLA",
-      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+      "title": "Fampitandremana SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Fanitsakitsahana SLA",
-      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+      "title": "Fanitsakitsahana SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

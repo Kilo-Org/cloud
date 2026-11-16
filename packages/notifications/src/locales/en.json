@@ -34,17 +34,17 @@
       "title": "Spend alert",
       "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "New security finding ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA warning"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA breach"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -34,17 +34,17 @@
       "title": "Upozornenie na útratu",
       "body": "Útrata {{scopeName}} prekročila ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nový bezpečnostný problém ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový bezpečnostný problém ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Upozornenie na SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Upozornenie na SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Porušenie SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Porušenie SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -1,5 +1,6 @@
 import {
   genericPushContentForPushData,
+  SECURITY_FINDING_PUSH_TITLE_KEYS,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type InternalDispatchRequest,
@@ -36,19 +37,6 @@ function securityFindingTitle(
       return 'SLA warning';
     case 'sla_breach':
       return 'SLA breach';
-  }
-}
-
-function securityFindingI18nKey(
-  notificationKind: 'new_finding' | 'sla_warning' | 'sla_breach'
-): string {
-  switch (notificationKind) {
-    case 'new_finding':
-      return 'internal.securityFindingNew';
-    case 'sla_warning':
-      return 'internal.securityFindingSlaWarning';
-    case 'sla_breach':
-      return 'internal.securityFindingSlaBreach';
   }
 }
 
@@ -142,7 +130,7 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title,
           body: `${input.title} in ${input.repoFullName}`,
-          i18nKey: securityFindingI18nKey(input.notificationKind),
+          i18nKey: SECURITY_FINDING_PUSH_TITLE_KEYS[input.notificationKind],
           i18nParams: {
             severity: input.severity,
             findingTitle: input.title,

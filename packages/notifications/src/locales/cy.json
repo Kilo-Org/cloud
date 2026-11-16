@@ -34,17 +34,17 @@
       "title": "Rhybudd gwariant",
       "body": "Aeth gwariant {{scopeName}} dros ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Canfyddiad diogelwch newydd ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} yn {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Canfyddiad diogelwch newydd ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Rhybudd SLA",
-      "body": "{{findingTitle}} yn {{repoFullName}}"
+      "title": "Rhybudd SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Torri SLA",
-      "body": "{{findingTitle}} yn {{repoFullName}}"
+      "title": "Torri SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

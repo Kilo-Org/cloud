@@ -34,17 +34,17 @@
       "title": "Ausgaben-Warnung",
       "body": "Die Ausgaben von {{scopeName}} haben ${{amountUsd}} überschritten"
     },
-    "securityFindingNew": {
-      "title": "Neuer Sicherheitsbefund ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Neuer Sicherheitsbefund ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-Warnung",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-Warnung"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-Verletzung",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-Verletzung"
     },
     "securityLifecycle": {
       "title": "Kilo",

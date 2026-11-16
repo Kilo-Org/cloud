@@ -1,6 +1,7 @@
 import {
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
+  pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
   translatePush,
@@ -47,9 +48,11 @@ function translatedPart(
   part: 'title' | 'body'
 ): string {
   const stored = row[part];
-  return row.i18nKey === null
-    ? stored
-    : translatePush(locale, `${row.i18nKey}.${part}`, row.i18nParams ?? undefined, stored);
+  if (row.i18nKey === null) {
+    return stored;
+  }
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
 /**

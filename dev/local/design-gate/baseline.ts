@@ -93,7 +93,7 @@ export type Preparation = z.infer<typeof PreparationSchema>;
 export type Revision = 'base' | 'head';
 const INTENT = 'apps/mobile/src/app/+native-intent.tsx';
 const MARKER = '__kiloDesignProofSource';
-const LIMIT = 1024 * 1024;
+const LIMIT = 4 * 1024 * 1024;
 
 const digest = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
 function git(repo: string, args: string[]): string {
@@ -105,7 +105,7 @@ function git(repo: string, args: string[]): string {
   });
 }
 function readJson(file: string): unknown {
-  if (fs.statSync(file).size > LIMIT) throw new Error('Proof JSON exceeds 1 MiB');
+  if (fs.statSync(file).size > LIMIT) throw new Error('Proof JSON exceeds 4 MiB');
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 export function readProofManifest(file: string): ProofManifest {

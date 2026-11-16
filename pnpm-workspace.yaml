@@ -389,7 +389,12 @@ patchedDependencies:
   # past the rows that arrived. The patch bounds the engaged-index passes and
   # answers an out-of-range key and type without calling the list's callbacks,
   # so those are never handed an undefined row that keyExtractor would
-  # dereference. Remove once an upstream release carries both guards.
+  # dereference. It also reads a row layout through the bounds-safe accessor, so
+  # a stale onLayout or render-stack entry past a shrink draws nothing instead of
+  # throwing, and it drops the forced child re-render whose rows the collection
+  # already drew, so the parent's layout effect and the collection's commit no
+  # longer re-enter each other until React's nested update limit. Remove once an
+  # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
 publicHoistPattern:
   - '@types/*'

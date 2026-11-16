@@ -107,7 +107,7 @@ export function BitbucketConnectForm({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={BITBUCKET_TOKEN_MAX_LENGTH}
-        editable={!submitting}
+        disabled={submitting}
         onChangeText={value => {
           tokenRef.current = value;
           setHasToken(readBitbucketToken(value).kind === 'ready');

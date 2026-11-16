@@ -126,4 +126,30 @@ describe('BitbucketConnectForm', () => {
     expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
     expect(submitButton(root).props.disabled).toBe(false);
   });
+
+  it('holds the token field still while the submitted token is in flight', async () => {
+    const landing = Promise.withResolvers<unknown>();
+    mutations.connect.mockImplementation(() => landing.promise);
+    const { root } = await mount(null);
+    const [field] = root.findAll(node => Object.is(node.type, FIELD));
+    if (!field) {
+      throw new Error('missing token field');
+    }
+    await act(async () => {
+      (field.props.onChangeText as (value: string) => void)('workspace-token');
+      await Promise.resolve();
+    });
+    await act(async () => {
+      (submitButton(root).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    const [pending] = root.findAll(node => Object.is(node.type, FIELD));
+    expect(pending?.props.disabled).toBe(true);
+
+    await act(async () => {
+      landing.resolve({ integrationId: 'bitbucket-1' });
+      await Promise.resolve();
+    });
+  });
 });

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { ReportReceiptsScreen } from './report-receipts-screen';
 import type * as ReactQuery from '@tanstack/react-query';
@@ -18,8 +18,11 @@ type ScreenState = {
   pages: Page[];
   /** Page params the stubbed page fetch was asked for, oldest first. */
   pageRequests: (string | undefined)[];
-  /** The page the stubbed page fetch answers for a page param. */
-  answerPage: (pageParam: string | undefined) => Page;
+  /**
+   * The page the stubbed page fetch answers for a page param, or a promise for
+   * one when a case needs to observe the screen while that answer is in flight.
+   */
+  answerPage: (pageParam: string | undefined) => Page | Promise<Page>;
   now: number;
   isPending: boolean;
   isError: boolean;
@@ -92,13 +95,21 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return { ...actual, useInfiniteQuery: useInfiniteQueryMock };
 });
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    moderation: {
-      listReportReceipts: { infiniteQueryOptions: buildReceiptsQueryOptions },
+/**
+ * The tRPC proxy the screen reads, as one object: the real `useTRPC` memoizes
+ * its proxy, so a mount effect keyed on it runs once per mount rather than on
+ * every render. `pathFilter` is the path-only key, as tRPC builds it: the
+ * screen's infinite entries sit under it.
+ */
+const trpcProxy = {
+  moderation: {
+    listReportReceipts: {
+      infiniteQueryOptions: buildReceiptsQueryOptions,
+      pathFilter: () => ({ queryKey: ['moderation.listReportReceipts'] }),
     },
-  }),
-}));
+  },
+};
+vi.mock('@/lib/trpc', () => ({ useTRPC: () => trpcProxy }));
 vi.mock('@/lib/hooks/use-now-ticker', () => ({ useRelativeTimeNow: () => state.now }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -156,7 +167,7 @@ const pageByCursor = new Map<string, number>();
  * always present.
  */
 type InfiniteOptionsOverride = {
-  staleTime?: number;
+  refetchOnMount?: boolean;
   getNextPageParam: ReactQuery.GetNextPageParamFunction<string | undefined, Page>;
 };
 
@@ -247,6 +258,32 @@ async function mount() {
   const view = await renderWithProviders(createElement(ReportReceiptsScreen));
   renderer = view.renderer;
   return view.renderer.root;
+}
+
+/**
+ * Mount the screen over a client the case keeps, so a remount meets the cache
+ * the previous mount left: `afterEach` unmounts whatever this last returned.
+ */
+async function mountWith(queryClient: ReactQuery.QueryClient) {
+  const view = await renderWithProviders(createElement(ReportReceiptsScreen), { queryClient });
+  renderer = view.renderer;
+  return view.renderer.root;
+}
+
+/** Drop the tree without dropping the client's cache, as a tab switch does. */
+function unload() {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+}
+
+/** A cold open, and the three pages the list loads when the reader scrolls. */
+async function loadThreePages(queryClient: ReactQuery.QueryClient) {
+  const root = await mountWith(queryClient);
+  await waitFor(() => rows(root).length === PAGE_ROWS);
+  await loadPage(root, 2);
+  await loadPage(root, 3);
+  expect(rows(root)).toHaveLength(3 * PAGE_ROWS);
+  unload();
 }
 
 function rows(root: ReactTestRenderer['root']) {
@@ -540,5 +577,61 @@ describe('ReportReceiptsScreen', () => {
 
     await scrollToEnd(root);
     expect(state.pageRequests).toHaveLength(2);
+  });
+
+  it('reads page one only when the screen reopens over cached pages', async () => {
+    // The real hook and a real client, because the cost of a reopen is React
+    // Query's own page bookkeeping: a plain refetch re-requests every page the
+    // entry retains, one request per page.
+    await useRealInfiniteQuery();
+    state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
+    const queryClient = createTestQueryClient();
+
+    await loadThreePages(queryClient);
+    state.pageRequests = [];
+
+    // Hold the reopen's page-one answer: the rows it keeps are observable only
+    // while the refresh is still in flight.
+    const refresh = Promise.withResolvers<Page>();
+    state.answerPage = () => refresh.promise;
+
+    const reopened = await mountWith(queryClient);
+    await waitFor(() => state.pageRequests.length === 1);
+
+    // The rows the last mount measured are still on screen, and the reopen has
+    // asked the server for page one only.
+    expect(rows(reopened)).toHaveLength(3 * PAGE_ROWS);
+    expect(state.pageRequests).toEqual([FIRST_PAGE_PARAM]);
+
+    await act(async () => {
+      refresh.resolve(pageOf(1));
+      await Promise.resolve();
+    });
+    await waitFor(() => queryClient.isFetching() === 0);
+
+    // The whole reopen cost one request, with page one's input and no cursor:
+    // the retained pages were never re-requested.
+    expect(state.pageRequests).toEqual([FIRST_PAGE_PARAM]);
+    // Page one replaces the retained pages, so the list restarts from the
+    // newest row the way the newest-first window requires.
+    await waitFor(() => rows(reopened).length === PAGE_ROWS);
+  });
+
+  it('keeps the retained rows when the reopen cannot read page one', async () => {
+    await useRealInfiniteQuery();
+    state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
+    const queryClient = createTestQueryClient();
+
+    await loadThreePages(queryClient);
+    state.pageRequests = [];
+    state.answerPage = () => Promise.reject(new Error('offline'));
+
+    const reopened = await mountWith(queryClient);
+    await waitFor(() => state.pageRequests.length === 1 && queryClient.isFetching() === 0);
+
+    // A failed refresh is neither an empty list nor a lost list: the rows the
+    // reader was reading stay, and no full-screen error replaces them.
+    expect(rows(reopened)).toHaveLength(3 * PAGE_ROWS);
+    expect(reopened.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(0);
   });
 });

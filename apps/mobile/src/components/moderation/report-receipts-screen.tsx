@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
@@ -14,7 +14,11 @@ import { Flag } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
-import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  hasRetentionBudget,
+  reconcileFirstPage,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import { statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
@@ -43,6 +47,7 @@ const listContentContainerStyle = {
  */
 export function ReportReceiptsScreen() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { t } = useTranslation();
   const now = useRelativeTimeNow();
@@ -54,8 +59,11 @@ export function ReportReceiptsScreen() {
         { limit: PAGE_SIZE },
         {
           // A report filed a moment ago is the one the reader opens this screen
-          // for, so an open reads the server instead of a cached page.
-          staleTime: 0,
+          // for, so an open reads the server instead of a cached page. That
+          // read is the page-one reconcile below, not React Query's mount
+          // refetch: on an entry that holds pages, the mount refetch re-requests
+          // every retained page (up to the bound), one after another.
+          refetchOnMount: false,
           // A newest-first list reaches its retention bound by refusing the
           // next page: `maxPages` alone would drop index 0, which is the newest
           // page.
@@ -68,6 +76,14 @@ export function ReportReceiptsScreen() {
       MAX_PAGES
     )
   );
+
+  // Opening the screen reads the server, and reads one page of it. The helper
+  // keeps the retained rows until that page arrives, so a paused or failed
+  // refresh never blanks the list into its empty or full-screen error state; a
+  // cold open has nothing cached, so its own page-one fetch is left alone.
+  useEffect(() => {
+    void reconcileFirstPage(queryClient, trpc.moderation.listReportReceipts.pathFilter().queryKey);
+  }, [queryClient, trpc]);
 
   const items = useMemo(
     () => query.data?.pages.flatMap(page => page.items) ?? [],

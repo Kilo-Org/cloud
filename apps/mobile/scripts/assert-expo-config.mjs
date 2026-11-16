@@ -253,11 +253,13 @@ check(
 );
 // Exact tags, not a count: swapping one tag for another keeps the length equal
 // while dropping one language's prompts and checking another's. The two filters
-// only name the offending tags in the failure message.
+// only name the offending tags in the failure message. The comparison itself
+// runs on the distinct tags, because a repeat names no extra language: the
+// assertion asks which languages are named, not how often.
 const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
 const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
 check(
-  sameMembers(localizations, localeTags),
+  sameMembers([...new Set(localizations)], localeTags),
   `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
 );
 for (const tag of localizations) {

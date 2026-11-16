@@ -51,6 +51,7 @@ describe('egressRequestSupported', () => {
     'cloudflare-containers': [true, true, true, true, true, true],
     vercel: [true, true, false, false, false, false],
     cloudflare: [true, true, false, false, false, false],
+    aws: [true, true, false, false, false, false],
   };
 
   it.each(

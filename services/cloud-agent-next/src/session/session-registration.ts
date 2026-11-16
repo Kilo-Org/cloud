@@ -20,6 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
+import { fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -1215,6 +1216,21 @@ async function allocateNewSession(
           kind: 'byoc',
           ...byocVercelOwnerFields(enrollment),
           credentialId: enrollment.credentialId,
+        },
+      };
+    } else if (sandboxProvider === 'aws') {
+      const connection = await fetchAwsByocConnection(
+        ctx.env,
+        orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
+      );
+      if (connection.setupStatus !== 'ready')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
+      sandboxProviderBinding = {
+        kind: 'aws',
+        source: {
+          kind: 'byoc',
+          ...byocVercelOwnerFields(connection),
+          credentialId: connection.credentialId,
         },
       };
     } else {

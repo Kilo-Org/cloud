@@ -323,7 +323,7 @@ import {
 } from './allocation.js';
 import {
   deleteRoute,
-  dropReadyRoutes,
+  stopAllocationRoutes,
   earliestRouteDeadlineAt,
   ensureRoute,
   failRoute,
@@ -463,6 +463,14 @@ import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.
 import { nativeEgressAllowlistSchema } from '../../sandbox-control/egress-policy.js';
 import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
 import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
+import {
+  providerLifetimeAt,
+  validateProviderHello,
+  reconcileProviderLaunch,
+  type ProviderHelloAdmission,
+  type ProviderHelloDecision,
+} from './provider-lifecycle.js';
+import { providerFailureReason } from '../../sandbox-control/provider-failure.js';
 import {
   egressRequestSupported,
   providerSupports,
@@ -1008,6 +1016,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
   workspaceSnapshotIdleMs = WORKSPACE_SNAPSHOT_IDLE_MS;
   private workspaceSnapshotCapturePending = false;
+  private readonly pendingProviderHellos = new WeakSet<WebSocket>();
   /** Earliest retry per grant scope after a failed renewal; in memory, so eviction retries once. */
   private readonly credentialRenewalRetryAt: CredentialRenewalRetries = new Map();
   private readonly workspaceHistoryReaders = new WeakMap<
@@ -1074,6 +1083,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+    ctx.waitUntil(this.initialized.then(() => this.reconcileProviderLaunch()));
   }
 
   async [readSentryIdentity]() {
@@ -2985,7 +2995,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // Resolve an outstanding control request before the serial queue so the
     // queued request that awaits it cannot block its own reply.
     this.resolvePendingControlResult(ws, message);
-    await this.enqueue(() => this.handleFrame(ws, message));
+    const admission = await this.enqueue(() => this.handleFrame(ws, message));
+    if (!admission) return;
+    try {
+      const decision = await validateProviderHello(
+        admission,
+        this.sandboxTimers().providerStopAttemptMs
+      );
+      await this.enqueue(() => this.finishHello(ws, admission, decision));
+    } finally {
+      this.pendingProviderHellos.delete(ws);
+    }
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -3022,10 +3042,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.initialized;
+    await this.reconcileProviderLaunch();
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
       this.redispatchPendingWorkspaceStops();
       let state = await this.readAllocation();
+      const lifetimeAt = await providerLifetimeAt(this.provider, state);
+      if (lifetimeAt !== undefined && Date.now() >= lifetimeAt) {
+        await this.applyEvent({
+          type: 'stop-requested',
+          at: Date.now(),
+          reason: 'provider_lifetime_exhausted',
+        });
+        state = await this.readAllocation();
+      }
       const admissionDeadline =
         state.kind === 'creating' && providerSupports(this.currentProvider(), 'meteredBilling')
           ? await storedNativeBillingAdmissionDeadlineAt(
@@ -3243,7 +3273,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       throw new ProviderCreationError('invalid_configuration');
     }
     const { requiresCustomerCredential } = PROVIDER_DESCRIPTORS[provider];
-    if (input.byoc && !requiresCustomerCredential) throw new Error('BYOC requires Vercel');
+    if (input.byoc && !requiresCustomerCredential)
+      throw new Error('This provider does not accept customer credentials');
     if (requiresCustomerCredential && !input.byoc)
       throw new ByocVercelProviderError('byoc_credential_missing');
     return {
@@ -3392,7 +3423,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // Fail the routes before the stopped sweep: a failed route has no attempt
     // time left, so nothing else retries a create that just spent its budget.
     if (routeFailure !== undefined) {
-      await this.failPreparingRoutesNow(routeFailure);
+      await this.failPreparingRoutesNow(
+        routeFailure,
+        event.type === 'provider-failed' ? 'provider_failed' : 'create_exhausted'
+      );
     }
     await this.applyRouteEffects(previous, state, event, stopReason);
     for (const effect of effects) {
@@ -3407,7 +3441,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * that now, not at the routes' attempt deadline. Same mechanism as
    * `failCreationRoutes` for a permanent create failure.
    */
-  private async failPreparingRoutesNow(reason: ControlPlaneFailureReason): Promise<void> {
+  private async failPreparingRoutesNow(
+    reason: ControlPlaneFailureReason,
+    stage: string
+  ): Promise<void> {
     const state = await this.readAllocation();
     for (const route of await listRoutes(this.db)) {
       if (route.state === 'preparing') {
@@ -3416,7 +3453,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           route.sessionId,
           route.attemptId,
           reason,
-          'create_exhausted'
+          stage
         );
       }
     }
@@ -4440,7 +4477,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const provider = this.currentProvider();
     const { retired, credentialTransport } = PROVIDER_DESCRIPTORS[provider];
     if (retired) return null;
-    if (credentialTransport === 'network-policy') return this.sandboxId;
+    if (credentialTransport !== 'outbound-proxy') return this.sandboxId;
     return (
       getManagedOutboundContainerId(provider, this.env, {
         logicalSandboxId: this.sandboxId,
@@ -4643,7 +4680,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (previous.kind !== 'stopping' && next.kind === 'stopping') {
       // The reducer owns the cause; ready routes must not re-derive it.
       if (stopReason !== undefined) {
-        await dropReadyRoutes(
+        await stopAllocationRoutes(
           this.routeContext(next),
           stopReason,
           event.type === 'stop-requested' ? event.billingFailure : undefined
@@ -4676,7 +4713,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await failExpiredRoutes(ctx);
     if (previous.kind !== 'stopping') {
       // A direct `provider-gone` keeps ready routes; they lose the sandbox.
-      await dropReadyRoutes(ctx, 'sandbox_lost');
+      await stopAllocationRoutes(ctx, 'sandbox_lost');
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
@@ -5850,9 +5887,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
-          ...(pin.provider === 'cloudflare-containers'
-            ? { deadlineAt: launchDeadline, nativeImage: selection.image }
-            : {}),
+          deadlineAt: launchDeadline,
+          ...(pin.provider === 'cloudflare-containers' ? { nativeImage: selection.image } : {}),
         };
         this.launchInFlightAllocationId = allocationId;
         let launched: { result: ProviderLaunchResult; owned: boolean };
@@ -6004,13 +6040,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.failCreationRoutes(allocationId, false, 'billing_unavailable');
           return;
         }
-        if (error instanceof ProviderCreationError && error.permanentReason !== null) {
+        const providerFailure = providerFailureReason(error);
+        if (providerFailure) {
           await this.failCreationRoutes(
             allocationId,
             false,
-            error.permanentReason,
+            providerFailure,
             undefined,
-            error.billingFailure
+            error instanceof ProviderCreationError ? error.billingFailure : undefined
           );
           return;
         }
@@ -7081,7 +7118,146 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
   }
 
-  private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+  private async finishHello(
+    ws: WebSocket,
+    admission: ProviderHelloAdmission,
+    decision: ProviderHelloDecision
+  ): Promise<void> {
+    const { frame, credential } = admission;
+    const attachment = this.readAttachment(ws);
+    if (ws.readyState !== WebSocket.OPEN || attachment?.connectionId !== undefined) return;
+    if (admission.deadlineAt !== undefined && admission.deadlineAt <= Date.now()) {
+      this.expireUnboundSockets(Date.now());
+      await this.armAlarm(await this.readAllocation());
+      return;
+    }
+    const admittedAllocation = await this.readAllocation();
+    if (
+      this.provider !== admission.provider ||
+      admittedAllocation.providerRef !== admission.providerRef ||
+      admittedAllocation.connectionId !== admission.connectionId ||
+      attachment?.credential !== credential ||
+      attachment?.helloDeadlineAt !== admission.deadlineAt ||
+      !(await this.validateAllocationCredential(
+        frame.allocationId,
+        credential,
+        attachment?.runtimeHarness
+      ))
+    ) {
+      ws.close(1008, 'Provider admission changed');
+      return;
+    }
+    if (decision.kind === 'stop') {
+      ws.close(1008, 'Provider launch validation failed');
+      await this.applyEvent({ type: 'provider-failed', at: Date.now(), reason: decision.reason });
+      return;
+    }
+    if (decision.kind === 'retry') {
+      ws.close(1013, 'Provider validation is temporarily unavailable');
+      return;
+    }
+    const disk = readWorkspaceSnapshotAllocation(this.db);
+    if (
+      disk?.allocationId === frame.allocationId &&
+      disk.restore !== undefined &&
+      frame.workspaceSnapshots !== true
+    ) {
+      logControlDiagnostic('workspace_snapshot_capability', {
+        sandboxId: this.sandboxId,
+        workspaceId: disk.owner.workspaceId,
+        allocationId: frame.allocationId,
+        wrapperId: frame.wrapperId,
+        advertised: frame.workspaceSnapshots === true,
+        accepted: false,
+        reason: 'restore_requires_capability',
+      });
+      this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+      ws.close(1008, 'Workspace snapshot capability required');
+      this.ctx.waitUntil(
+        this.failWorkspaceSnapshotStart(
+          frame.allocationId,
+          'unsupported',
+          workspaceSnapshotFailureDetail('unsupported')
+        )
+      );
+      return;
+    }
+    if (
+      !acceptRuntimeContract(this.ctx.storage.kv, frame.allocationId, attachment?.runtimeCapability)
+    ) {
+      this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+      ws.close(1008, 'Runtime contract mismatch');
+      return;
+    }
+    const connectionId = crypto.randomUUID();
+    this.releaseBoundSockets(ws, frame.allocationId);
+    ws.serializeAttachment({
+      credential,
+      allocationId: frame.allocationId,
+      connectionId,
+      wrapperId: frame.wrapperId,
+      ...(attachment?.runtimeCapability ? { runtimeCapability: attachment.runtimeCapability } : {}),
+      ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+      ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+      ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+      ...(frame.startCommands ? { startCommands: true } : {}),
+      ...(frame.worktreeGit ? { worktreeGit: true } : {}),
+      ...(frame.transferGrants ? { transferGrants: true } : {}),
+      ...(frame.previewTunnel ? { previewTunnel: true } : {}),
+      ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
+      ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+      ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
+      ...runtimeHarnessField(attachment?.runtimeHarness),
+    });
+    logControlDiagnostic('workspace_snapshot_capability', {
+      sandboxId: this.sandboxId,
+      workspaceId: disk?.owner.workspaceId,
+      allocationId: frame.allocationId,
+      wrapperId: frame.wrapperId,
+      connectionId,
+      advertised: frame.workspaceSnapshots === true,
+      accepted: frame.workspaceSnapshots === true,
+      reason: frame.workspaceSnapshots === true ? 'accepted' : 'not_advertised',
+    });
+    // Welcome first, then route effects: a re-prepared route resends
+    // `session.prepare`, which must not arrive before the welcome.
+    this.sendFrame(ws, {
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+      ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+    });
+    writeRuntimeIdentity(this.ctx.storage.kv, frame.allocationId, {
+      kiloCliVersion: attachment?.kiloCliVersion ?? null,
+      wrapperVersion: attachment?.wrapperVersion ?? null,
+    });
+    await this.applyEvent({
+      type: 'hello-accepted',
+      at: Date.now(),
+      allocationId: frame.allocationId,
+      connectionId,
+      wrapperId: frame.wrapperId,
+    });
+    await confirmRepositoryLaunch(this.ctx.storage, frame.allocationId);
+    if (admittedAllocation.providerRef !== null && this.provider.confirmAdmission) {
+      this.ctx.waitUntil(
+        this.provider.confirmAdmission(admittedAllocation.providerRef).catch(() => {
+          logControlDiagnostic(
+            'provider_admission_cleanup_failed',
+            { sandboxId: this.sandboxId, allocationId: frame.allocationId },
+            'warn'
+          );
+        })
+      );
+    }
+    return;
+  }
+
+  private async handleFrame(
+    ws: WebSocket,
+    message: string | ArrayBuffer
+  ): Promise<ProviderHelloAdmission | void> {
     if (ws.readyState !== WebSocket.OPEN) return;
     const deadline = this.readAttachment(ws)?.helloDeadlineAt;
     if (deadline !== undefined && deadline <= Date.now()) {
@@ -7115,7 +7291,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const attachment = this.readAttachment(ws);
 
     if (frame.type === 'hello') {
-      if (attachment?.connectionId !== undefined) return;
+      if (attachment?.connectionId !== undefined || this.pendingProviderHellos.has(ws)) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
       const accepted = await this.validateAllocationCredential(
         frame.allocationId,
@@ -7127,97 +7303,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ws.close(1008, 'shutdown');
         return;
       }
-      const disk = readWorkspaceSnapshotAllocation(this.db);
-      if (
-        disk?.allocationId === frame.allocationId &&
-        disk.restore !== undefined &&
-        frame.workspaceSnapshots !== true
-      ) {
-        logControlDiagnostic('workspace_snapshot_capability', {
-          sandboxId: this.sandboxId,
-          workspaceId: disk.owner.workspaceId,
-          allocationId: frame.allocationId,
-          wrapperId: frame.wrapperId,
-          advertised: frame.workspaceSnapshots === true,
-          accepted: false,
-          reason: 'restore_requires_capability',
-        });
-        this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
-        ws.close(1008, 'Workspace snapshot capability required');
-        this.ctx.waitUntil(
-          this.failWorkspaceSnapshotStart(
-            frame.allocationId,
-            'unsupported',
-            workspaceSnapshotFailureDetail('unsupported')
-          )
-        );
-        return;
-      }
-      if (
-        !acceptRuntimeContract(
-          this.ctx.storage.kv,
-          frame.allocationId,
-          attachment?.runtimeCapability
-        )
-      ) {
-        this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
-        ws.close(1008, 'Runtime contract mismatch');
-        return;
-      }
-      const connectionId = crypto.randomUUID();
-      this.releaseBoundSockets(ws, frame.allocationId);
-      ws.serializeAttachment({
+      const admittedAllocation = await this.readAllocation();
+      this.pendingProviderHellos.add(ws);
+      return {
+        frame,
+        provider: this.provider,
+        providerRef: admittedAllocation.providerRef,
+        connectionId: admittedAllocation.connectionId,
         credential,
-        allocationId: frame.allocationId,
-        connectionId,
-        wrapperId: frame.wrapperId,
-        ...(attachment?.runtimeCapability
-          ? { runtimeCapability: attachment.runtimeCapability }
-          : {}),
-        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
-        ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
-        ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
-        ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
-        ...(frame.startCommands ? { startCommands: true } : {}),
-        ...(frame.worktreeGit ? { worktreeGit: true } : {}),
-        ...(frame.transferGrants ? { transferGrants: true } : {}),
-        ...(frame.previewTunnel ? { previewTunnel: true } : {}),
-        ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
-        ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
-        ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
-        ...runtimeHarnessField(attachment?.runtimeHarness),
-      });
-      logControlDiagnostic('workspace_snapshot_capability', {
-        sandboxId: this.sandboxId,
-        workspaceId: disk?.owner.workspaceId,
-        allocationId: frame.allocationId,
-        wrapperId: frame.wrapperId,
-        connectionId,
-        advertised: frame.workspaceSnapshots === true,
-        accepted: frame.workspaceSnapshots === true,
-        reason: frame.workspaceSnapshots === true ? 'accepted' : 'not_advertised',
-      });
-      // Welcome first, then route effects: a re-prepared route resends
-      // `session.prepare`, which must not arrive before the welcome.
-      this.sendFrame(ws, {
-        type: 'welcome',
-        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
-        ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
-      });
-      writeRuntimeIdentity(this.ctx.storage.kv, frame.allocationId, {
-        kiloCliVersion: attachment?.kiloCliVersion ?? null,
-        wrapperVersion: attachment?.wrapperVersion ?? null,
-      });
-      await this.applyEvent({
-        type: 'hello-accepted',
-        at: Date.now(),
-        allocationId: frame.allocationId,
-        connectionId,
-        wrapperId: frame.wrapperId,
-      });
-      await confirmRepositoryLaunch(this.ctx.storage, frame.allocationId);
-      return;
+        deadlineAt: attachment?.helloDeadlineAt,
+      };
     }
 
     // Frames from an unbound or superseded socket are ignored: a heartbeat
@@ -7659,6 +7754,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return createProviderAdapter(pin, {
       env: this.env,
       sandboxId: this.sandboxId,
+      operationStorage: this.ctx.storage,
       persistRuntimeLocator: (allocationName, locator) =>
         this.enqueue(async () => {
           if (
@@ -7682,6 +7778,70 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async retryAllowed(): Promise<boolean> {
     return routeRetryAllowed(this.routeContext(await this.readAllocation()));
+  }
+
+  /** Resume an issued launch without regenerating its credential or startup environment. */
+  private async reconcileProviderLaunch(): Promise<void> {
+    const reconcile = this.provider.reconcileLaunch?.bind(this.provider);
+    if (this.createInFlight || !reconcile) return;
+    const state = await this.readAllocation();
+    if (
+      state.providerRef === null ||
+      state.allocationId === null ||
+      state.kind === 'stopped' ||
+      state.kind === 'stopping'
+    )
+      return;
+    const providerRef = state.providerRef;
+    this.createInFlight = true;
+    try {
+      const decision = await reconcileProviderLaunch(
+        () => reconcile(providerRef),
+        this.sandboxTimers().providerStopAttemptMs
+      );
+      if (decision.kind === 'stop') {
+        await this.enqueue(async () => {
+          const current = await this.readAllocation();
+          if (
+            current.allocationId === state.allocationId &&
+            current.providerRef === state.providerRef &&
+            current.kind !== 'stopped' &&
+            current.kind !== 'stopping'
+          )
+            await this.applyEvent({
+              type: 'provider-failed',
+              at: Date.now(),
+              reason: decision.reason,
+            });
+        });
+        return;
+      }
+      if (decision.kind === 'retry') {
+        logControlDiagnostic(
+          'provider_launch_reconciliation_failed',
+          { sandboxId: this.sandboxId, allocationId: state.allocationId },
+          'warn'
+        );
+      }
+      if (state.kind !== 'creating') return;
+      if (decision.kind === 'launched') {
+        await this.recordLaunch(state.allocationId, decision.result.startSource);
+        await this.dispatchResult({
+          type: 'created',
+          at: Date.now(),
+          allocationId: state.allocationId,
+          providerRef: state.providerRef,
+        });
+      } else if (
+        decision.kind === 'absent' ||
+        (state.createDeadlineAt !== null && Date.now() >= state.createDeadlineAt)
+      ) {
+        await this.stopRef(state.providerRef, state.allocationId);
+        await this.dispatchCreateFailed(state.allocationId);
+      }
+    } finally {
+      this.createInFlight = false;
+    }
   }
 
   private async readAllocation(): Promise<AllocationState> {
@@ -7889,6 +8049,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // preparation deadlines, so a hung wrapper's route cannot outlive its
     // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
+    const lifetimeAt = await providerLifetimeAt(this.provider, state);
     const routeAt = await earliestRouteDeadlineAt(this.db);
     const renewalAt = nextCredentialRenewalAt(
       await listRoutes(this.db),
@@ -7955,6 +8116,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           )
         : undefined;
     const candidates = [
+      lifetimeAt ?? null,
       admissionAt ?? null,
       allocationAt,
       routeAt,

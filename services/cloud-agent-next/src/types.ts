@@ -562,6 +562,11 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** User or organization IDs enrolled in customer-paid Vercel compute. */
   BYOC_VERCEL_IDS?: string;
+  /** User or organization IDs enrolled in the AWS BYOC MVP. */
+  BYOC_AWS_IDS?: string;
+  /** Bootstrap principal credentials. Its only permission is assuming the fixed Kilo role. */
+  AWS_BYOC_CREDENTIALS?: string;
+  AWS_BYOC_KILO_ROLE_ARN?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   /**

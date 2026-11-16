@@ -148,7 +148,7 @@ export const GRANT_FAILURE_REASONS = [
 ] as const;
 export type GrantFailureReason = (typeof GRANT_FAILURE_REASONS)[number];
 
-export const GRANT_PROVIDERS = ['cloudflare', 'vercel', 'cloudflare-containers'] as const;
+export const GRANT_PROVIDERS = ['cloudflare', 'vercel', 'cloudflare-containers', 'aws'] as const;
 export type GrantProvider = (typeof GRANT_PROVIDERS)[number];
 export const GRANT_CONTAINMENT = ['enabled', 'disabled'] as const;
 export type GrantContainment = (typeof GRANT_CONTAINMENT)[number];

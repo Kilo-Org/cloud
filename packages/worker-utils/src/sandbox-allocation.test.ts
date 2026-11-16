@@ -235,16 +235,19 @@ describe('sandbox allocation contract', () => {
     }
   );
 
-  it('keeps every selectable allocation in the containers and BYOC Vercel providers', () => {
+  it('keeps every selectable allocation in containers and customer providers', () => {
     expect(SELECTABLE_SANDBOX_ALLOCATIONS).toEqual([
       'cloudflare-containers-standard-3',
       'cloudflare-containers-standard-4',
       'vercel-small',
       'vercel-large',
+      'aws-microvm-8g',
     ]);
     for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
       expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
-      expect(getSandboxAllocationProvider(allocation)).toMatch(/^(cloudflare-containers|vercel)$/);
+      expect(getSandboxAllocationProvider(allocation)).toMatch(
+        /^(cloudflare-containers|vercel|aws)$/
+      );
     }
   });
 

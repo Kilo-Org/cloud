@@ -215,6 +215,10 @@ describe('sandbox selection policy', () => {
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'Configure Vercel BYOC'
         );
+      else if (preset === 'aws-microvm-8g')
+        await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
+          'Configure AWS BYOC'
+        );
       else if (preset === 'cloudflare-shared' || preset === 'isolated-standard')
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'has been retired'

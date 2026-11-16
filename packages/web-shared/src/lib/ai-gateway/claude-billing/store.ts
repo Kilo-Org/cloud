@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNull, ne, not, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, not, notExists, or, sql, type SQL } from 'drizzle-orm';
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
@@ -17,6 +17,7 @@ import {
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
 import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
+import { specificRefusalCodesFor } from './refusal';
 
 export type { ClaudeBillingOwner } from './owner';
 
@@ -486,6 +487,39 @@ async function reassignPayerOwnerColumns(
     .where(eq(claude_billing_connections.id, payerConnectionId));
 }
 
+/**
+ * Runs `work` while holding the payer lock that sharing and removal take, so no
+ * grant on the payer changes between a read and the write that follows it. A
+ * scope without a row has nothing to serialize.
+ */
+export async function withClaudeBillingPayerLock<T>(
+  owner: ClaudeBillingOwner,
+  work: (tx: DrizzleTransaction) => Promise<T>,
+  onDb: DrizzleConnection = db
+): Promise<T> {
+  return await onDb.transaction(async tx => {
+    const connection = await getGrantedClaudeBillingConnection(owner, tx);
+    if (connection) await lockClaudeBillingPayer(tx, connection.id);
+    return await work(tx);
+  });
+}
+
+/**
+ * The payer `removeClaudeBillingGrant` would retire for this scope, or null when
+ * the scope has no link or another live grant keeps its payer. Removal asks this
+ * before it retires anything, so it can end Kilo's link at Anthropic first and
+ * leave the row in place when that fails.
+ */
+export async function findRetiringClaudeBillingPayer(
+  owner: ClaudeBillingOwner,
+  fromDb: DrizzleConnection = db
+): Promise<UnreferencedClaudeBillingPayer | null> {
+  const connection = await getGrantedClaudeBillingConnection(owner, fromDb);
+  if (!connection) return null;
+  const remaining = await selectNextActiveGrant(fromDb, connection.id, owner);
+  return remaining ? null : { id: connection.id, userProfileId: connection.user_profile_id };
+}
+
 export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   onDb: DrizzleConnection = db
@@ -825,8 +859,8 @@ export async function removeUserClaudeBillingGrants(
  * Columns that refusal bookkeeping may change on a connected row.
  */
 type ConnectedClaudeBillingConnectionChange = Partial<
-  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_code' | 'last_refusal_at'>
->;
+  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_at'>
+> & { last_refusal_code?: string | null | SQL };
 
 /**
  * Updates only the connected row that refused the request: the same profile with
@@ -877,8 +911,16 @@ export async function recordClaudeBillingRefusal(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
+  const keptCodes = specificRefusalCodesFor(refusalCode);
   await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
-    last_refusal_code: refusalCode,
+    // A status-only code says only what the stored specific code already said,
+    // so the specific one stays; a specific code always replaces what it finds.
+    last_refusal_code: keptCodes.length
+      ? sql`case when ${claude_billing_connections.last_refusal_code} in (${sql.join(
+          keptCodes.map(code => sql`${code}`),
+          sql`, `
+        )}) then ${claude_billing_connections.last_refusal_code} else ${refusalCode} end`
+      : refusalCode,
     last_refusal_at: new Date().toISOString(),
   });
 }

@@ -4242,7 +4242,7 @@
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
-      "receiptA11y": "{{description}} の領収書を開く",
+      "receiptA11y": "{{description}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。"
     },
     "title": "クレジットを購入",
@@ -4340,7 +4340,7 @@
       "sessionPullRequestNumber": "セッション PR #{{number}}",
       "openSessionHint": "セッションを開きます。",
       "unlinkSessionAction": "セッションのリンクを解除",
-      "unlinkConfirmTitle": "{{title}} のリンクを解除しますか?",
+      "unlinkConfirmTitle": "{{title}}のリンクを解除しますか?",
       "unlinkConfirmMessage": "セッション自体は削除されません。この ToDo へのリンクだけが解除されます。",
       "startNewSession": "新しいセッションを開始",
       "startNewSessionHint": "長押しして新しいセッションを開始します。",

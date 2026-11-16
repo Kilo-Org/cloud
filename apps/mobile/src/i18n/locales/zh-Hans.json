@@ -4517,6 +4517,7 @@
     "existingTitle": "现有链接",
     "existingDescription": "此会话已有分享链接。创建新链接将替换现有链接，旧链接将随即失效。",
     "rotate": "创建新链接",
+    "replacementSettings": "这些设置将应用于新链接。",
     "revoke": "撤销链接",
     "revokeTitle": "撤销链接？",
     "revokeMessage": "当前链接将立即失效。",

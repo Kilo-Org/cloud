@@ -4651,6 +4651,7 @@
     "existingTitle": "Istniejący link",
     "existingDescription": "Ta sesja ma już link do udostępniania. Utworzenie nowego zastąpi go, a stary link przestanie działać.",
     "rotate": "Utwórz nowy link",
+    "replacementSettings": "Te ustawienia dotyczą nowego linku.",
     "revoke": "Unieważnij link",
     "revokeTitle": "Unieważnić link?",
     "revokeMessage": "Obecny link natychmiast przestanie działać.",

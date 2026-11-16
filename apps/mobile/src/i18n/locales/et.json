@@ -4517,6 +4517,7 @@
     "existingTitle": "Olemasolev link",
     "existingDescription": "Sellel seansil on juba jagamislink. Uue lingi loomine asendab selle ja vana link lakkab töötamast.",
     "rotate": "Loo uus link",
+    "replacementSettings": "Need seaded rakenduvad uuele lingile.",
     "revoke": "Eemalda link",
     "revokeTitle": "Kas tühistada link?",
     "revokeMessage": "Praegune link lakkab kohe töötamast.",

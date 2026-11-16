@@ -4584,6 +4584,7 @@
     "existingTitle": "Link existent",
     "existingDescription": "Această sesiune are deja un link de partajare. Crearea unui link nou îl înlocuiește pe cel vechi, care nu va mai funcționa.",
     "rotate": "Creează un link nou",
+    "replacementSettings": "Aceste setări se aplică noului link.",
     "revoke": "Revocă linkul",
     "revokeTitle": "Revoci linkul?",
     "revokeMessage": "Linkul actual nu va mai funcționa imediat.",

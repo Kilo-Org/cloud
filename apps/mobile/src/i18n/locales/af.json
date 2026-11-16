@@ -4517,6 +4517,7 @@
     "existingTitle": "Bestaande skakel",
     "existingDescription": "Hierdie sessie het reeds 'n deelskakel. As jy 'n nuwe een skep, word dit vervang en werk die ou skakel nie meer nie.",
     "rotate": "Skep 'n nuwe skakel",
+    "replacementSettings": "Hierdie instellings geld vir die nuwe skakel.",
     "revoke": "Herroep skakel",
     "revokeTitle": "Herroep skakel?",
     "revokeMessage": "Die huidige skakel hou onmiddellik op werk.",

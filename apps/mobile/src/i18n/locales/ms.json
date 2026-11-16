@@ -4517,6 +4517,7 @@
     "existingTitle": "Pautan sedia ada",
     "existingDescription": "Sesi ini sudah mempunyai pautan kongsi. Mencipta pautan baharu akan menggantikannya dan pautan lama tidak akan berfungsi lagi.",
     "rotate": "Cipta pautan baharu",
+    "replacementSettings": "Tetapan ini terpakai untuk pautan baharu.",
     "revoke": "Buang pautan",
     "revokeTitle": "Batalkan pautan?",
     "revokeMessage": "Pautan semasa akan berhenti berfungsi serta-merta.",

@@ -4718,6 +4718,7 @@
     "existingTitle": "Link eżistenti",
     "existingDescription": "Din is-sessjoni diġà għandha link għall-qsim. Jekk toħloq wieħed ġdid, dan jissostitwixxih u l-link il-qadim jieqaf jaħdem.",
     "rotate": "Oħloq link ġdid",
+    "replacementSettings": "Dawn l-issettjar japplikaw għall-link il-ġdid.",
     "revoke": "Irrevoka l-link",
     "revokeTitle": "Tirrevoka l-link?",
     "revokeMessage": "Il-link attwali jieqaf jaħdem minnufih.",

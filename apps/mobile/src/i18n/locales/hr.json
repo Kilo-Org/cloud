@@ -4584,6 +4584,7 @@
     "existingTitle": "Postojeća poveznica",
     "existingDescription": "Ova sesija već ima poveznicu za dijeljenje. Izradom nove poveznice zamjenjuje se postojeća, a stara poveznica prestaje raditi.",
     "rotate": "Izradi novu poveznicu",
+    "replacementSettings": "Ove se postavke primjenjuju na novu poveznicu.",
     "revoke": "Opozovi poveznicu",
     "revokeTitle": "Opozvati poveznicu?",
     "revokeMessage": "Trenutačna poveznica odmah prestaje raditi.",

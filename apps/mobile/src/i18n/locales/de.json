@@ -4517,6 +4517,7 @@
     "existingTitle": "Bestehender Link",
     "existingDescription": "Für diese Sitzung gibt es bereits einen Freigabelink. Wenn du einen neuen erstellst, ersetzt er den alten, und der alte Link funktioniert nicht mehr.",
     "rotate": "Neuen Link erstellen",
+    "replacementSettings": "Diese Einstellungen gelten für den neuen Link.",
     "revoke": "Link widerrufen",
     "revokeTitle": "Link widerrufen?",
     "revokeMessage": "Der aktuelle Link funktioniert sofort nicht mehr.",

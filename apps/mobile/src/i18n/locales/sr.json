@@ -4584,6 +4584,7 @@
     "existingTitle": "Postojeći link",
     "existingDescription": "Ova sesija već ima link za deljenje. Pravljenjem novog linka zamenjuje se postojeći, a stari link prestaje da radi.",
     "rotate": "Napravi novi link",
+    "replacementSettings": "Ova podešavanja važe za novi link.",
     "revoke": "Opozovi link",
     "revokeTitle": "Opozvati link?",
     "revokeMessage": "Trenutni link odmah prestaje da radi.",

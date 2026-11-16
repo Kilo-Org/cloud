@@ -4517,6 +4517,7 @@
     "existingTitle": "Mövcud link",
     "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
     "rotate": "Yeni link yarat",
+    "replacementSettings": "Bu parametrlər yeni linkə aiddir.",
     "revoke": "Linki sil",
     "revokeTitle": "Link ləğv edilsin?",
     "revokeMessage": "Cari link dərhal işləməyi dayandırır.",

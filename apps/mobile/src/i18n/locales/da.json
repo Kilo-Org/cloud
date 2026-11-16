@@ -4517,6 +4517,7 @@
     "existingTitle": "Eksisterende link",
     "existingDescription": "Denne session har allerede et delingslink. Hvis du opretter et nyt, erstatter det det gamle link, som så holder op med at virke.",
     "rotate": "Opret et nyt link",
+    "replacementSettings": "Disse indstillinger gælder for det nye link.",
     "revoke": "Tilbagekald link",
     "revokeTitle": "Tilbagekald link?",
     "revokeMessage": "Det nuværende link holder op med at virke med det samme.",

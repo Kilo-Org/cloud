@@ -4584,6 +4584,7 @@
     "existingTitle": "Esošā saite",
     "existingDescription": "Šai sesijai jau ir kopīgošanas saite. Izveidojot jaunu, tā tiks aizstāta un vecā saite vairs nedarbosies.",
     "rotate": "Izveidot jaunu saiti",
+    "replacementSettings": "Šie iestatījumi attiecas uz jauno saiti.",
     "revoke": "Atsaukt saiti",
     "revokeTitle": "Atsaukt saiti?",
     "revokeMessage": "Pašreizējā saite nekavējoties pārstās darboties.",

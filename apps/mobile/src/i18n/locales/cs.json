@@ -4651,6 +4651,7 @@
     "existingTitle": "Existující odkaz",
     "existingDescription": "Tato relace už má odkaz pro sdílení. Vytvořením nového ho nahradíte a starý odkaz přestane fungovat.",
     "rotate": "Vytvořit nový odkaz",
+    "replacementSettings": "Tato nastavení platí pro nový odkaz.",
     "revoke": "Odebrat odkaz",
     "revokeTitle": "Zrušit odkaz?",
     "revokeMessage": "Aktuální odkaz okamžitě přestane fungovat.",

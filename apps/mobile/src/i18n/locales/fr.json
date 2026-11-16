@@ -4584,6 +4584,7 @@
     "existingTitle": "Lien existant",
     "existingDescription": "Cette session a déjà un lien de partage. En créer un nouveau le remplace et désactive l’ancien lien.",
     "rotate": "Créer un nouveau lien",
+    "replacementSettings": "Ces paramètres s'appliquent au nouveau lien.",
     "revoke": "Révoquer le lien",
     "revokeTitle": "Révoquer le lien ?",
     "revokeMessage": "Le lien actuel cesse immédiatement de fonctionner.",

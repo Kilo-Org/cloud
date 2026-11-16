@@ -4517,6 +4517,7 @@
     "existingTitle": "Ligazón existente",
     "existingDescription": "Esta sesión xa ten unha ligazón para compartir. Se creas unha nova, substituirá a actual e a ligazón antiga deixará de funcionar.",
     "rotate": "Crear unha ligazón nova",
+    "replacementSettings": "Estes axustes aplícanse á nova ligazón.",
     "revoke": "Revogar ligazón",
     "revokeTitle": "Revogar a ligazón?",
     "revokeMessage": "A ligazón actual deixa de funcionar inmediatamente.",

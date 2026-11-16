@@ -4517,6 +4517,7 @@
     "existingTitle": "Bestaande link",
     "existingDescription": "Deze sessie heeft al een deellink. Als je een nieuwe maakt, wordt die vervangen en werkt de oude link niet meer.",
     "rotate": "Nieuwe link maken",
+    "replacementSettings": "Deze instellingen gelden voor de nieuwe link.",
     "revoke": "Link intrekken",
     "revokeTitle": "Link intrekken?",
     "revokeMessage": "De huidige link werkt direct niet meer.",

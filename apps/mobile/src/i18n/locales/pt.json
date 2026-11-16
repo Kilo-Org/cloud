@@ -4590,6 +4590,7 @@
     "existingTitle": "Link existente",
     "existingDescription": "Esta sessão já tem um link de partilha. Criar um novo substitui-o e faz com que o link antigo deixe de funcionar.",
     "rotate": "Criar um novo link",
+    "replacementSettings": "Estas definições aplicam-se ao novo link.",
     "revoke": "Revogar link",
     "revokeTitle": "Revogar link?",
     "revokeMessage": "O link atual deixa de funcionar imediatamente.",

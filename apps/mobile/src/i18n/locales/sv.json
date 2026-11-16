@@ -4517,6 +4517,7 @@
     "existingTitle": "Befintlig länk",
     "existingDescription": "Den här sessionen har redan en delningslänk. Om du skapar en ny ersätts den och den gamla länken slutar fungera.",
     "rotate": "Skapa en ny länk",
+    "replacementSettings": "De här inställningarna gäller för den nya länken.",
     "revoke": "Återkalla länk",
     "revokeTitle": "Återkalla länk?",
     "revokeMessage": "Den nuvarande länken slutar fungera omedelbart.",

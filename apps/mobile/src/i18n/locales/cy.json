@@ -4785,6 +4785,7 @@
     "existingTitle": "Dolen bresennol",
     "existingDescription": "Mae gan y sesiwn hon ddolen rannu eisoes. Bydd creu un newydd yn ei disodli ac yn atal yr hen ddolen rhag gweithio.",
     "rotate": "Creu dolen newydd",
+    "replacementSettings": "Mae'r gosodiadau hyn yn gymwys i'r ddolen newydd.",
     "revoke": "Dirymu dolen",
     "revokeTitle": "Dirymu'r ddolen?",
     "revokeMessage": "Bydd y ddolen gyfredol yn peidio â gweithio ar unwaith.",

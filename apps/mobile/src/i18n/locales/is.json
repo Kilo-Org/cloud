@@ -4517,6 +4517,7 @@
     "existingTitle": "Fyrirliggjandi tengill",
     "existingDescription": "Þessi lota er þegar með deilitengil. Ef þú býrð til nýjan kemur hann í stað þess gamla og gamli tengillinn hættir að virka.",
     "rotate": "Búa til nýjan tengil",
+    "replacementSettings": "Þessar stillingar gilda um nýja tengilinn.",
     "revoke": "Afturkalla tengil",
     "revokeTitle": "Afturkalla tengil?",
     "revokeMessage": "Núverandi tengill hættir strax að virka.",

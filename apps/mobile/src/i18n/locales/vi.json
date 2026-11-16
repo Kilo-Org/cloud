@@ -4517,6 +4517,7 @@
     "existingTitle": "Liên kết hiện có",
     "existingDescription": "Phiên này đã có liên kết chia sẻ. Tạo liên kết mới sẽ thay thế liên kết đó và khiến liên kết cũ ngừng hoạt động.",
     "rotate": "Tạo liên kết mới",
+    "replacementSettings": "Cài đặt này áp dụng cho liên kết mới.",
     "revoke": "Thu hồi liên kết",
     "revokeTitle": "Thu hồi liên kết?",
     "revokeMessage": "Liên kết hiện tại sẽ ngừng hoạt động ngay lập tức.",

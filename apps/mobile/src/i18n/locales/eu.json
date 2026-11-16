@@ -4517,6 +4517,7 @@
     "existingTitle": "Lehendik dagoen esteka",
     "existingDescription": "Saio honek partekatze-esteka bat du dagoeneko. Berri bat sortzen baduzu, hura ordeztuko du eta esteka zaharrak funtzionatzeari utziko dio.",
     "rotate": "Sortu esteka berri bat",
+    "replacementSettings": "Ezarpen hauek esteka berriari aplikatzen zaizkio.",
     "revoke": "Baliogabetu esteka",
     "revokeTitle": "Esteka baliogabetu?",
     "revokeMessage": "Uneko estekak berehala utziko dio funtzionatzeari.",

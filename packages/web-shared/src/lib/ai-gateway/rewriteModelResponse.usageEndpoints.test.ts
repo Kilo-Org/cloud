@@ -125,6 +125,29 @@ describe('rewriteUsageEndpointBody', () => {
     expect(body.usage).toEqual({ input_tokens: 10, cost: 0.00002 });
   });
 
+  test('applies custom pricing to a transcription cost without a BYOK flag and drops internal fields', () => {
+    const body = {
+      usage: { input_tokens: 1_000_000, output_tokens: 0, cost: 0.5, market_cost: 0.5 },
+    };
+    rewriteUsageEndpointBody(body, {
+      ...context,
+      api_kind: 'audio_transcriptions',
+      custom_llm_pricing: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 2,
+            completion_per_million: 3,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
+        },
+      ],
+    });
+    expect(body.usage).toMatchObject({ cost: 2, is_byok: false });
+    expect(body.usage).not.toHaveProperty('market_cost');
+  });
+
   test('zeroes a free transcription even without a BYOK flag', () => {
     const body = { usage: { input_tokens: 10, cost: 0.00002 } };
     rewriteUsageEndpointBody(body, { ...context, api_kind: 'audio_transcriptions', is_free: true });

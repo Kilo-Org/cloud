@@ -49,10 +49,12 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
   const usage = body.usage;
   // OpenRouter transcriptions report no `is_byok`, and the ledger prices them from the generation
   // lookup, because a BYOK-served one reports only the fee. A paid cost the response cannot verify
-  // stays as the upstream reported it instead of claiming a billed amount that may be too low.
+  // stays as the upstream reported it instead of claiming a billed amount that may be too low,
+  // unless custom pricing replaces it, which derives from the token counts.
   const costIsUnverified =
     context.api_kind === 'audio_transcriptions' && usage?.is_byok == null && !context.is_free;
-  if (typeof usage === 'object' && usage !== null && !Array.isArray(usage) && !costIsUnverified) {
+  if (typeof usage === 'object' && usage !== null && !Array.isArray(usage)) {
+    const reported = { cost: usage.cost, is_byok: usage.is_byok, cost_details: usage.cost_details };
     // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
     const gateway = (body.provider_metadata ?? body.providerMetadata)?.gateway;
     const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
@@ -67,6 +69,12 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
       is_byok: usage.is_byok ?? null,
     };
     rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+    if (costIsUnverified && costs.cost_mUsd === costs.market_cost) {
+      for (const [key, value] of Object.entries(reported)) {
+        if (value === undefined) delete usage[key as keyof typeof reported];
+        else Object.assign(usage, { [key]: value });
+      }
+    }
   }
   rewriteResponseMetadata(body, context);
 }

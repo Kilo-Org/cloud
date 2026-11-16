@@ -4735,5 +4735,162 @@
     "unavailableDescription": "Chuaigh an nasc comhroinnte seo in éag nó cúlghaireadh é.",
     "transcriptUnavailableTitle": "Níorbh fhéidir an tras-scríbhinn seo a lódáil",
     "transcriptUnavailableDescription": "Tá an nasc fós ag obair. Bain triail eile as ar ball beag."
+  },
+  "organizationGuardrails": {
+    "title": "Ráillí Cosanta AI",
+    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú.",
+    "unavailable": "Níl Ráillí Cosanta AI ar fáil don eagraíocht seo.",
+    "loadError": "Níorbh fhéidir Ráillí Cosanta AI a lódáil",
+    "statusSaving": "Ag sábháil…",
+    "statusSaved": "Sábháilte",
+    "statusFailed": "Theip ar an sábháil.",
+    "inputTitle": "Ráillí cosanta ionchuir",
+    "inputDescription": "Scanann sé gach ionchur le Enkrypt AI, lena n-áirítear torthaí uirlisí. Diúltaíonn brathadóir blocála d’iarratas nuair nach bhfuil Enkrypt ar fáil.",
+    "outputTitle": "Ráillí cosanta aschuir",
+    "outputDescription": "Scanann sé freagraí le Enkrypt AI sula bhfaigheann comhaltaí iad. Tá sé as mura gcuireann tú ar siúl é.",
+    "detectorsHint": "Diúltaíonn Bloc d’iarratas atá marcáilte. Ní dhéanann Logáil amháin ach é a thaifeadadh gan moill a chur ar an iarratas.",
+    "detectorsHintOutput": "Diúltaíonn Bloc d’fhreagra atá marcáilte. Ní dhéanann Logáil amháin ach é a thaifeadadh gan moill a chur ar an bhfreagra.",
+    "choiceLog": "Logáil amháin",
+    "applyTo": "Cuir i bhfeidhm ar",
+    "applyToAllMembers": "Gach comhalta",
+    "applyKiloDefault": "Cuir Réamhshocrú Kilo i bhfeidhm",
+    "invalidSavedTitle": "Ní féidir socruithe brathadóra ionchuir atá sábháilte a léamh",
+    "invalidSavedBody": "Cuirtear bac ar iarratais go dtí go sábháiltear na brathadóirí ionchuir arís. Tosaíonn na brathadóirí thíos ó Réamhshocrú Kilo.",
+    "invalidSavedOutputTitle": "Ní féidir socruithe brathadóra aschuir atá sábháilte a léamh",
+    "invalidSavedOutputBody": "Coinnítear freagraí siar go dtí go sábháiltear na brathadóirí aschuir arís. Roghnaigh brathadóirí aschuir thíos.",
+    "blockingOutputNote": "Coinníonn brathadóir aschuir blocála freagra siar go dtí go mbeidh Enkrypt tar éis é ar fad a sheiceáil. Úsáid Logáil amháin chun an mhoill a sheachaint.",
+    "inputDetectorRequired": "Cuir ar siúl brathadóir ionchuir amháin ar a laghad.",
+    "outputDetectorRequired": "Cuir ar siúl brathadóir aschuir amháin ar a laghad.",
+    "rulesTooMany": "Is féidir suas le {{max}} riail a chur leis.",
+    "ruleIdRequired": "Iontráil ID rialach.",
+    "ruleIdInvalid": "Ní féidir le ID rialach ach litreacha, uimhreacha, pointí, fleiscíní agus fostríocanna a úsáid.",
+    "ruleTextRequired": "Déan cur síos ar an rud a chuireann an riail cosc air nó a éilíonn sí.",
+    "keywordTooLong": "Féadfaidh gach eochairfhocal suas le {{max}} carachtar a bheith ann.",
+    "topicTooLong": "Féadfaidh gach topaic suas le {{max}} carachtar a bheith ann.",
+    "piiEntities": "Sonraí le brath",
+    "keywordsLabel": "Eochairfhocail",
+    "keywordsHint": "Eochairfhocal amháin in aghaidh na líne.",
+    "topicsHint": "Topaic amháin in aghaidh na líne.",
+    "policyFormat": "Formáid an pholasaí",
+    "policyFormatRules": "Rialacha struchtúrtha",
+    "policyFormatRulesDescription": "Riail amháin in aghaidh an cheanglais, le catagóir agus déine. Molta.",
+    "policyFormatText": "Téacs an pholasaí",
+    "policyFormatTextDescription": "Greamaigh polasaí atá ann cheana mar ghnáth-théacs.",
+    "rulesEmpty": "Níl aon rialacha ann fós. Déanann gach riail cur síos ar rud amháin nár cheart d’ionchuir a áireamh ná a iarraidh.",
+    "addRule": "Cuir riail leis",
+    "ruleNumber": "Riail {{number}}",
+    "ruleRemove": "Bain riail {{number}}",
+    "ruleIdLabel": "ID rialach",
+    "ruleNameLabel": "Ainm (roghnach)",
+    "ruleTextLabel": "Riail",
+    "ruleRiskCategory": "Catagóir riosca",
+    "ruleApplicability": "Raon feidhme",
+    "ruleFrameworks": "Creatanna",
+    "detector": {
+      "promptInjection": {
+        "label": "Instealladh prompta",
+        "description": "Brathann sé iarrachtaí treoracha a shárú nó an tsamhail a scaoileadh saor óna teorainneacha."
+      },
+      "policyViolation": {
+        "label": "Sárú polasaí",
+        "description": "Marcálann sé ionchuir a sháraíonn polasaí do eagraíochta, atá scríofa mar théacs nó mar rialacha.",
+        "descriptionOutput": "Marcálann sé freagraí a sháraíonn polasaí do eagraíochta, atá scríofa mar théacs nó mar rialacha."
+      },
+      "pii": {
+        "label": "PII agus rúin",
+        "description": "Brathann sé sonraí pearsanta, dintiúirí, seoltaí IP agus URL."
+      },
+      "keywords": {
+        "label": "Eochairfhocail toirmiscthe",
+        "descriptionOutput": "Brathann sé freagraí ina bhfuil aon eochairfhocal a liostaíonn tú."
+      },
+      "topics": {
+        "label": "Topaicí",
+        "descriptionOutput": "Marcálann sé freagraí faoi aon topaic a liostaíonn tú."
+      },
+      "toxicity": {
+        "label": "Tocsaineacht",
+        "description": "Brathann sé teanga thocsaineach, mhaslach, bhagrach nó fhuathmhar."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Brathann sé ábhar gnéasach nó ábhar nach bhfuil sábháilte don obair ar bhealach eile."
+      },
+      "bias": {
+        "label": "Claontacht",
+        "description": "Brathann sé teanga chlaonta nó idirdhealaitheach."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Sonraí pearsanta",
+        "description": "Ainmneacha, seoltaí ríomhphoist, uimhreacha guthán."
+      },
+      "secrets": {
+        "label": "Rúin",
+        "description": "Eochracha API, comharthaí, pasfhocail."
+      },
+      "ipAddress": {
+        "label": "Seoltaí IP",
+        "description": "Seoltaí IPv4 agus IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Seoltaí gréasáin."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Slándáil agus calaois",
+      "safetyHarm": "Sábháilteacht agus díobháil",
+      "privacyDataProtection": "Príobháideachas agus cosaint sonraí",
+      "brandReputationTrust": "Branda agus clú",
+      "biasFairnessEthical": "Claontacht, cothroime agus eitice",
+      "legalIpLiability": "Dliteanas dlíthiúil agus dliteanas maoine intleachtúla",
+      "productMisuse": "Mí-úsáid táirge",
+      "performanceQuality": "Feidhmíocht agus cáilíocht"
+    },
+    "applicability": {
+      "user": "Ionchur úsáideora",
+      "userAssistant": "Ionchur úsáideora agus freagraí"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RGPD",
+      "ccpa": "CCPA",
+      "owasp": "Barr 10 OWASP LLM (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Acht AI an AE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Gné fiontraíochta",
+    "enterpriseOnly": "Níl an ghné seo ar fáil ach d’fhiontair.",
+    "readOnly": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta na socruithe seo a athrú.",
+    "loadError": "Níorbh fhéidir soláthraithe agus samhlacha a lódáil",
+    "tabModels": "Samhlacha",
+    "tabProviders": "Soláthraithe",
+    "tabGateways": "Geataí",
+    "modelsDescription": "Múch samhail chun í a bhac do gach comhalta. Tosaíonn samhlacha ó sholáthraithe ceadaithe ar siúl.",
+    "modelsDeniedOnly": "Diúltaithe amháin",
+    "modelsEmpty": "Níl aon samhail ag teacht leis an gcuardach seo.",
+    "providersDescription": "Múch soláthraí chun Kilo a stopadh ó ródú chuige don eagraíocht seo.",
+    "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",
+    "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
+    "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
+    "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Níl iarratais OpenRouter ceangailte le réigiún.",
+    "inferenceRegion": "Réigiún tátail",
+    "inferenceRegionDescription": "Ceanglaíonn sé iarratais Vercel AI Gateway leis an réigiún seo. Teipeann samhail nach bhfuil ar fáil ansin.",
+    "disableOpenrouterNote": "Má mhúchann tú OpenRouter, cuirtear bac freisin ar eochracha BYOK a ródálann iarratais tríd.",
+    "region": {
+      "global": "Domhanda",
+      "us": "Stáit Aontaithe Mheiriceá",
+      "eu": "An tAontas Eorpach",
+      "au": "An Astráil",
+      "jp": "An tSeapáin"
+    }
   }
 }

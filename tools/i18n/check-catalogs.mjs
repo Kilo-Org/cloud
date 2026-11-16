@@ -261,6 +261,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // The CLI's product name, a title for a device-sessions row. A product name
   // has nothing to translate, so every catalog keeps the published spelling.
   'deviceSessions.kiloCli',
+  // The gateway's product name, the label of the switch that routes through it.
+  // A product name has nothing to translate, so every catalog keeps the spelling
+  // the gateway and its documentation publish.
+  'organizationModelAccess.openrouter',
 ]);
 
 /**

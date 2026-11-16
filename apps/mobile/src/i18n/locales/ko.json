@@ -4534,5 +4534,162 @@
     "unavailableDescription": "이 공유 링크는 만료되었거나 취소되었습니다.",
     "transcriptUnavailableTitle": "대화 기록을 불러올 수 없음",
     "transcriptUnavailableDescription": "링크는 아직 유효합니다. 잠시 후 다시 시도하세요."
+  },
+  "organizationGuardrails": {
+    "title": "인공지능 가드레일",
+    "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다.",
+    "unavailable": "이 조직에서는 인공지능 가드레일을 사용할 수 없습니다.",
+    "loadError": "인공지능 가드레일을 불러오지 못했습니다",
+    "statusSaving": "저장 중…",
+    "statusSaved": "저장됨",
+    "statusFailed": "저장하지 못했습니다.",
+    "inputTitle": "입력 가드레일",
+    "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. 차단 탐지기는 Enkrypt AI를 사용할 수 없을 때 요청을 거부합니다.",
+    "outputTitle": "출력 가드레일",
+    "outputDescription": "구성원이 응답을 받기 전에 Enkrypt AI로 응답을 검사합니다. 직접 켜지 않는 한 꺼져 있습니다.",
+    "detectorsHint": "차단은 표시된 요청을 거부합니다. 기록만은 요청을 지연시키지 않고 기록합니다.",
+    "detectorsHintOutput": "차단은 표시된 응답을 실패 처리합니다. 기록만은 응답을 지연시키지 않고 기록합니다.",
+    "choiceLog": "기록만",
+    "applyTo": "적용 대상",
+    "applyToAllMembers": "모든 구성원",
+    "applyKiloDefault": "Kilo 기본값 적용",
+    "invalidSavedTitle": "저장된 입력 탐지기 설정을 읽을 수 없습니다",
+    "invalidSavedBody": "입력 탐지기를 다시 저장할 때까지 요청이 차단됩니다. 아래 탐지기는 Kilo 기본값에서 시작합니다.",
+    "invalidSavedOutputTitle": "저장된 출력 탐지기 설정을 읽을 수 없습니다",
+    "invalidSavedOutputBody": "출력 탐지기를 다시 저장할 때까지 응답이 보류됩니다. 아래에서 출력 탐지기를 선택하세요.",
+    "blockingOutputNote": "차단 출력 탐지기는 Enkrypt AI가 응답 전체를 검사할 때까지 응답을 보류합니다. 지연을 피하려면 기록만을 사용하세요.",
+    "inputDetectorRequired": "입력 탐지기를 하나 이상 켜세요.",
+    "outputDetectorRequired": "출력 탐지기를 하나 이상 켜세요.",
+    "rulesTooMany": "규칙을 최대 {{max}}개까지 추가하세요.",
+    "ruleIdRequired": "규칙 ID를 입력하세요.",
+    "ruleIdInvalid": "규칙 ID에는 영문자, 숫자, 마침표, 대시, 밑줄만 사용할 수 있습니다.",
+    "ruleTextRequired": "규칙이 금지하거나 요구하는 내용을 설명하세요.",
+    "keywordTooLong": "각 키워드는 최대 {{max}}자까지 가능합니다.",
+    "topicTooLong": "각 주제는 최대 {{max}}자까지 가능합니다.",
+    "piiEntities": "탐지할 데이터",
+    "keywordsLabel": "키워드",
+    "keywordsHint": "한 줄에 키워드 하나씩 입력하세요.",
+    "topicsHint": "한 줄에 주제 하나씩 입력하세요.",
+    "policyFormat": "정책 형식",
+    "policyFormatRules": "구조화된 규칙",
+    "policyFormatRulesDescription": "요구 사항마다 범주와 심각도를 포함한 규칙을 하나씩 작성합니다. 권장됩니다.",
+    "policyFormatText": "정책 텍스트",
+    "policyFormatTextDescription": "기존 정책을 일반 텍스트로 붙여넣으세요.",
+    "rulesEmpty": "아직 규칙이 없습니다. 각 규칙은 입력에 포함되거나 요청되어서는 안 되는 한 가지 항목을 설명합니다.",
+    "addRule": "규칙 추가",
+    "ruleNumber": "규칙 {{number}}",
+    "ruleRemove": "규칙 {{number}} 삭제",
+    "ruleIdLabel": "규칙 ID",
+    "ruleNameLabel": "이름(선택 사항)",
+    "ruleTextLabel": "규칙",
+    "ruleRiskCategory": "위험 범주",
+    "ruleApplicability": "적용 범위",
+    "ruleFrameworks": "프레임워크",
+    "detector": {
+      "promptInjection": {
+        "label": "프롬프트 인젝션",
+        "description": "지시를 덮어쓰거나 모델을 탈옥하려는 시도를 탐지합니다."
+      },
+      "policyViolation": {
+        "label": "정책 위반",
+        "description": "텍스트 또는 규칙으로 작성된 조직 정책을 위반하는 입력을 표시합니다.",
+        "descriptionOutput": "텍스트 또는 규칙으로 작성된 조직 정책을 위반하는 응답을 표시합니다."
+      },
+      "pii": {
+        "label": "PII 및 비밀 정보",
+        "description": "개인 데이터, 자격 증명, IP 주소, URL을 탐지합니다."
+      },
+      "keywords": {
+        "label": "금지 키워드",
+        "descriptionOutput": "목록에 추가한 키워드가 포함된 응답을 탐지합니다."
+      },
+      "topics": {
+        "label": "주제",
+        "descriptionOutput": "목록에 추가한 주제에 관한 응답을 표시합니다."
+      },
+      "toxicity": {
+        "label": "독성",
+        "description": "독성이 있거나 모욕적이거나 위협적이거나 혐오스러운 언어를 탐지합니다."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "성적이거나 그 밖에 업무 환경에 부적절한 콘텐츠를 탐지합니다."
+      },
+      "bias": {
+        "label": "편향",
+        "description": "편향적이거나 차별적인 언어를 탐지합니다."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "개인 데이터",
+        "description": "이름, 이메일 주소, 전화번호."
+      },
+      "secrets": {
+        "label": "비밀 정보",
+        "description": "API 키, 토큰, 비밀번호."
+      },
+      "ipAddress": {
+        "label": "IP 주소",
+        "description": "IPv4 및 IPv6 주소."
+      },
+      "url": {
+        "label": "URL",
+        "description": "웹 주소."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "보안 및 사기",
+      "safetyHarm": "안전 및 피해",
+      "privacyDataProtection": "개인정보 및 데이터 보호",
+      "brandReputationTrust": "브랜드 및 평판",
+      "biasFairnessEthical": "편향 및 공정성",
+      "legalIpLiability": "법률 및 지식재산 책임",
+      "productMisuse": "제품 오용",
+      "performanceQuality": "성능 및 품질"
+    },
+    "applicability": {
+      "user": "사용자 입력",
+      "userAssistant": "사용자 입력 및 응답"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 상위 10(2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI법",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "엔터프라이즈 기능",
+    "enterpriseOnly": "이 기능은 엔터프라이즈 전용 기능입니다.",
+    "readOnly": "조직 소유자와 관리자만 이 설정을 변경할 수 있습니다.",
+    "loadError": "공급자와 모델을 불러오지 못했습니다",
+    "tabModels": "모델",
+    "tabProviders": "공급자",
+    "tabGateways": "게이트웨이",
+    "modelsDescription": "모델을 끄면 모든 구성원에 대해 해당 모델이 차단됩니다. 허용된 공급자의 모델은 켜진 상태로 시작합니다.",
+    "modelsDeniedOnly": "거부된 항목만",
+    "modelsEmpty": "이 검색과 일치하는 모델이 없습니다.",
+    "providersDescription": "공급자를 끄면 이 조직에서 Kilo가 해당 공급자로 라우팅하지 않습니다.",
+    "providersEmpty": "이 검색과 일치하는 공급자가 없습니다.",
+    "allowAllShown": "표시된 항목 모두 허용",
+    "denyAllShown": "표시된 항목 모두 거부",
+    "gatewaysDescription": "Kilo는 모델 요청을 Vercel AI Gateway 또는 OpenRouter를 통해 라우팅합니다. 비활성화된 게이트웨이는 해당 요청을 실패 처리합니다.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter 요청은 특정 리전에 고정되지 않습니다.",
+    "inferenceRegion": "추론 리전",
+    "inferenceRegionDescription": "Vercel AI Gateway 요청을 이 리전에 고정합니다. 해당 리전에서 사용할 수 없는 모델은 실패합니다.",
+    "disableOpenrouterNote": "OpenRouter를 비활성화하면 이를 통해 요청을 라우팅하는 BYOK 키도 차단됩니다.",
+    "region": {
+      "global": "글로벌",
+      "us": "미국",
+      "eu": "유럽 연합",
+      "au": "호주",
+      "jp": "일본"
+    }
   }
 }

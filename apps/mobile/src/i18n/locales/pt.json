@@ -4607,5 +4607,162 @@
     "unavailableDescription": "Este link de partilha expirou ou foi revogado.",
     "transcriptUnavailableTitle": "Não foi possível carregar esta transcrição",
     "transcriptUnavailableDescription": "O link continua a funcionar. Tente novamente dentro de momentos."
+  },
+  "organizationGuardrails": {
+    "title": "Proteções de IA",
+    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA.",
+    "unavailable": "As Proteções de IA não estão disponíveis para esta organização.",
+    "loadError": "Não foi possível carregar as Proteções de IA",
+    "statusSaving": "A guardar…",
+    "statusSaved": "Guardado",
+    "statusFailed": "Não foi possível guardar.",
+    "inputTitle": "Proteções de entrada",
+    "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Um detetor bloqueante rejeita um pedido quando a Enkrypt AI não está disponível.",
+    "outputTitle": "Proteções de saída",
+    "outputDescription": "Analisa as respostas com a Enkrypt AI antes de os membros as receberem. Desativadas, a menos que as ative.",
+    "detectorsHint": "Bloquear rejeita um pedido sinalizado. A opção Registar apenas regista-o sem atrasar o pedido.",
+    "detectorsHintOutput": "Bloquear faz falhar uma resposta sinalizada. A opção Registar apenas regista-a sem atrasar a resposta.",
+    "choiceLog": "Registar apenas",
+    "applyTo": "Aplicar a",
+    "applyToAllMembers": "Todos os membros",
+    "applyKiloDefault": "Aplicar predefinição do Kilo",
+    "invalidSavedTitle": "Não é possível ler as definições guardadas dos detetores de entrada",
+    "invalidSavedBody": "Os pedidos são bloqueados até que os detetores de entrada sejam guardados novamente. Os detetores abaixo partem da predefinição do Kilo.",
+    "invalidSavedOutputTitle": "Não é possível ler as definições guardadas dos detetores de saída",
+    "invalidSavedOutputBody": "As respostas são retidas até que os detetores de saída sejam guardados novamente. Escolha os detetores de saída abaixo.",
+    "blockingOutputNote": "Um detetor de saída bloqueante retém uma resposta até que a Enkrypt AI a tenha verificado por completo. Utilize a opção Registar apenas para evitar o atraso.",
+    "inputDetectorRequired": "Ative pelo menos um detetor de entrada.",
+    "outputDetectorRequired": "Ative pelo menos um detetor de saída.",
+    "rulesTooMany": "Adicione até {{max}} regras.",
+    "ruleIdRequired": "Introduza um ID de regra.",
+    "ruleIdInvalid": "Um ID de regra só pode usar letras, números, pontos, hífenes e sublinhados.",
+    "ruleTextRequired": "Descreva o que a regra proíbe ou exige.",
+    "keywordTooLong": "Cada palavra-chave pode ter até {{max}} caracteres.",
+    "topicTooLong": "Cada tópico pode ter até {{max}} caracteres.",
+    "piiEntities": "Dados a detetar",
+    "keywordsLabel": "Palavras-chave",
+    "keywordsHint": "Uma palavra-chave por linha.",
+    "topicsHint": "Um tópico por linha.",
+    "policyFormat": "Formato da política",
+    "policyFormatRules": "Regras estruturadas",
+    "policyFormatRulesDescription": "Uma regra por requisito, com uma categoria e uma gravidade. Recomendado.",
+    "policyFormatText": "Texto da política",
+    "policyFormatTextDescription": "Cole uma política existente como texto simples.",
+    "rulesEmpty": "Ainda não existem regras. Cada regra descreve uma coisa que as entradas não podem conter nem solicitar.",
+    "addRule": "Adicionar regra",
+    "ruleNumber": "Regra {{number}}",
+    "ruleRemove": "Remover regra {{number}}",
+    "ruleIdLabel": "ID da regra",
+    "ruleNameLabel": "Nome (opcional)",
+    "ruleTextLabel": "Regra",
+    "ruleRiskCategory": "Categoria de risco",
+    "ruleApplicability": "Âmbito",
+    "ruleFrameworks": "Referenciais",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeção de prompt",
+        "description": "Deteta tentativas de substituir instruções ou de contornar as restrições do modelo."
+      },
+      "policyViolation": {
+        "label": "Violação da política",
+        "description": "Sinaliza entradas que violam a política da sua organização, escrita como texto ou regras.",
+        "descriptionOutput": "Sinaliza respostas que violam a política da sua organização, escrita como texto ou regras."
+      },
+      "pii": {
+        "label": "PII e segredos",
+        "description": "Deteta dados pessoais, credenciais, endereços IP e URLs."
+      },
+      "keywords": {
+        "label": "Palavras-chave proibidas",
+        "descriptionOutput": "Deteta respostas que contenham qualquer uma das palavras-chave que listar."
+      },
+      "topics": {
+        "label": "Tópicos",
+        "descriptionOutput": "Sinaliza respostas sobre qualquer tópico que liste."
+      },
+      "toxicity": {
+        "label": "Toxicidade",
+        "description": "Deteta linguagem tóxica, insultuosa, ameaçadora ou de ódio."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Deteta conteúdo sexual ou outro conteúdo impróprio para o trabalho."
+      },
+      "bias": {
+        "label": "Enviesamento",
+        "description": "Deteta linguagem enviesada ou discriminatória."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dados pessoais",
+        "description": "Nomes, endereços de email e números de telefone."
+      },
+      "secrets": {
+        "label": "Segredos",
+        "description": "Chaves de API, tokens e palavras-passe."
+      },
+      "ipAddress": {
+        "label": "Endereços IP",
+        "description": "Endereços IPv4 e IPv6."
+      },
+      "url": {
+        "label": "URLs",
+        "description": "Endereços Web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Segurança e fraude",
+      "safetyHarm": "Segurança e danos",
+      "privacyDataProtection": "Privacidade e proteção de dados",
+      "brandReputationTrust": "Marca e reputação",
+      "biasFairnessEthical": "Enviesamento e equidade",
+      "legalIpLiability": "Responsabilidade legal e de propriedade intelectual",
+      "productMisuse": "Utilização indevida do produto",
+      "performanceQuality": "Desempenho e qualidade"
+    },
+    "applicability": {
+      "user": "Entrada do utilizador",
+      "userAssistant": "Entrada do utilizador e respostas"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RGPD",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Regulamento Europeu de Inteligência Artificial",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funcionalidade empresarial",
+    "enterpriseOnly": "Esta é uma funcionalidade exclusiva para empresas.",
+    "readOnly": "Apenas os proprietários e administradores da organização podem alterar estas definições.",
+    "loadError": "Não foi possível carregar os fornecedores e os modelos",
+    "tabModels": "Modelos",
+    "tabProviders": "Fornecedores",
+    "tabGateways": "Passarelas",
+    "modelsDescription": "Desative um modelo para o bloquear para todos os membros. Os modelos de fornecedores permitidos começam ativados.",
+    "modelsDeniedOnly": "Apenas negados",
+    "modelsEmpty": "Nenhum modelo corresponde a esta pesquisa.",
+    "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
+    "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "allowAllShown": "Permitir todos os apresentados",
+    "denyAllShown": "Negar todos os apresentados",
+    "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Os pedidos ao OpenRouter não estão fixados a uma região.",
+    "inferenceRegion": "Região de inferência",
+    "inferenceRegionDescription": "Fixa os pedidos do Vercel AI Gateway a esta região. Um modelo que não esteja disponível nessa região falha.",
+    "disableOpenrouterNote": "Desativar o OpenRouter também bloqueia as chaves BYOK que encaminham pedidos através dele.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "União Europeia",
+      "au": "Austrália",
+      "jp": "Japão"
+    }
   }
 }

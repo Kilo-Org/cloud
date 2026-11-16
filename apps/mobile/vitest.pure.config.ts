@@ -68,6 +68,7 @@ export default defineProject({
       'src/lib/credits/**/!(*.mounted).test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
+      'src/lib/organization/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
       'src/lib/passkeys/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',

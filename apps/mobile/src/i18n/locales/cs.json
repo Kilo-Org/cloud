@@ -4668,5 +4668,162 @@
     "unavailableDescription": "Platnost tohoto odkazu pro sdílení vypršela nebo byl odkaz zrušen.",
     "transcriptUnavailableTitle": "Tento přepis se nepodařilo načíst",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Zkuste to znovu za chvíli."
+  },
+  "organizationGuardrails": {
+    "title": "Ochranná pravidla AI",
+    "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace.",
+    "unavailable": "Ochranná pravidla AI nejsou pro tuto organizaci k dispozici.",
+    "loadError": "Ochranná pravidla AI se nepodařilo načíst",
+    "statusSaving": "Ukládání…",
+    "statusSaved": "Uloženo",
+    "statusFailed": "Uložení se nezdařilo.",
+    "inputTitle": "Ochranná pravidla pro vstup",
+    "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Blokující detektor odmítne požadavek, když je Enkrypt nedostupný.",
+    "outputTitle": "Ochranná pravidla pro výstup",
+    "outputDescription": "Kontroluje odpovědi pomocí Enkrypt AI dříve, než je členové obdrží. Je vypnuto, dokud ho nezapnete.",
+    "detectorsHint": "Možnost Blokovat označený požadavek odmítne. Možnost Jen zaznamenat ho pouze zaznamená, aniž by požadavek zdržela.",
+    "detectorsHintOutput": "Možnost Blokovat způsobí selhání označené odpovědi. Možnost Jen zaznamenat ji pouze zaznamená, aniž by odpověď zdržela.",
+    "choiceLog": "Jen zaznamenat",
+    "applyTo": "Použít pro",
+    "applyToAllMembers": "Všichni členové",
+    "applyKiloDefault": "Použít výchozí nastavení Kilo",
+    "invalidSavedTitle": "Uložené nastavení vstupních detektorů nelze načíst",
+    "invalidSavedBody": "Požadavky jsou blokovány, dokud vstupní detektory znovu neuložíte. Detektory níže vycházejí z výchozího nastavení Kilo.",
+    "invalidSavedOutputTitle": "Uložené nastavení výstupních detektorů nelze načíst",
+    "invalidSavedOutputBody": "Odpovědi jsou zadržovány, dokud výstupní detektory znovu neuložíte. Výstupní detektory vyberte níže.",
+    "blockingOutputNote": "Blokující výstupní detektor zadrží odpověď, dokud ji Enkrypt celou nezkontroluje. Zdržení se vyhnete volbou Jen zaznamenat.",
+    "inputDetectorRequired": "Zapněte alespoň jeden vstupní detektor.",
+    "outputDetectorRequired": "Zapněte alespoň jeden výstupní detektor.",
+    "rulesTooMany": "Maximální počet pravidel je {{max}}.",
+    "ruleIdRequired": "Zadejte ID pravidla.",
+    "ruleIdInvalid": "ID pravidla může obsahovat jen písmena, číslice, tečky, pomlčky a podtržítka.",
+    "ruleTextRequired": "Popište, co pravidlo zakazuje nebo vyžaduje.",
+    "keywordTooLong": "Každé klíčové slovo může mít nejvýše {{max}} znaků.",
+    "topicTooLong": "Každé téma může mít nejvýše {{max}} znaků.",
+    "piiEntities": "Data k detekci",
+    "keywordsLabel": "Klíčová slova",
+    "keywordsHint": "Jedno klíčové slovo na řádek.",
+    "topicsHint": "Jedno téma na řádek.",
+    "policyFormat": "Formát zásad",
+    "policyFormatRules": "Strukturovaná pravidla",
+    "policyFormatRulesDescription": "Jedno pravidlo pro každou podmínku, s kategorií a závažností. Doporučeno.",
+    "policyFormatText": "Text zásad",
+    "policyFormatTextDescription": "Vložte existující zásady jako prostý text.",
+    "rulesEmpty": "Zatím žádná pravidla. Každé pravidlo popisuje jednu věc, kterou vstupy nesmí obsahovat ani o ni žádat.",
+    "addRule": "Přidat pravidlo",
+    "ruleNumber": "Pravidlo {{number}}",
+    "ruleRemove": "Odebrat pravidlo {{number}}",
+    "ruleIdLabel": "ID pravidla",
+    "ruleNameLabel": "Název (nepovinné)",
+    "ruleTextLabel": "Pravidlo",
+    "ruleRiskCategory": "Kategorie rizika",
+    "ruleApplicability": "Rozsah",
+    "ruleFrameworks": "Rámce",
+    "detector": {
+      "promptInjection": {
+        "label": "Injektáž promptu",
+        "description": "Detekuje pokusy přepsat instrukce nebo obejít omezení modelu (jailbreak)."
+      },
+      "policyViolation": {
+        "label": "Porušení zásad",
+        "description": "Označuje vstupy, které porušují zásady vaší organizace zadané jako text nebo pravidla.",
+        "descriptionOutput": "Označuje odpovědi, které porušují zásady vaší organizace zadané jako text nebo pravidla."
+      },
+      "pii": {
+        "label": "Osobní a tajné údaje",
+        "description": "Detekuje osobní údaje, přihlašovací údaje, IP adresy a URL adresy."
+      },
+      "keywords": {
+        "label": "Zakázaná klíčová slova",
+        "descriptionOutput": "Detekuje odpovědi, které obsahují kterékoli z uvedených klíčových slov."
+      },
+      "topics": {
+        "label": "Témata",
+        "descriptionOutput": "Označuje odpovědi týkající se kteréhokoli z uvedených témat."
+      },
+      "toxicity": {
+        "label": "Toxicita",
+        "description": "Detekuje toxický, urážlivý, výhružný nebo nenávistný jazyk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detekuje sexuální nebo jinak nevhodný obsah (NSFW)."
+      },
+      "bias": {
+        "label": "Předpojatost",
+        "description": "Detekuje předpojatý nebo diskriminační jazyk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osobní údaje",
+        "description": "Jména, e-mailové adresy, telefonní čísla."
+      },
+      "secrets": {
+        "label": "Tajné údaje",
+        "description": "Klíče API, tokeny, hesla."
+      },
+      "ipAddress": {
+        "label": "IP adresy",
+        "description": "Adresy IPv4 a IPv6."
+      },
+      "url": {
+        "label": "URL adresy",
+        "description": "Webové adresy."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Zabezpečení a podvody",
+      "safetyHarm": "Bezpečnost a újma",
+      "privacyDataProtection": "Soukromí a ochrana dat",
+      "brandReputationTrust": "Značka a pověst",
+      "biasFairnessEthical": "Předpojatost a férovost",
+      "legalIpLiability": "Právní odpovědnost a duševní vlastnictví",
+      "productMisuse": "Zneužití produktu",
+      "performanceQuality": "Výkon a kvalita"
+    },
+    "applicability": {
+      "user": "Vstup uživatele",
+      "userAssistant": "Vstup uživatele a odpovědi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o umělé inteligenci",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkce pro Enterprise",
+    "enterpriseOnly": "Tato funkce je dostupná pouze v tarifu Enterprise.",
+    "readOnly": "Tato nastavení mohou měnit jen vlastníci a správci organizace.",
+    "loadError": "Poskytovatele a modely se nepodařilo načíst",
+    "tabModels": "Modely",
+    "tabProviders": "Poskytovatelé",
+    "tabGateways": "Brány",
+    "modelsDescription": "Vypnutím modelu ho zablokujete pro všechny členy. Modely od povolených poskytovatelů jsou ve výchozím stavu zapnuté.",
+    "modelsDeniedOnly": "Jen zakázané",
+    "modelsEmpty": "Hledání neodpovídají žádné modely.",
+    "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
+    "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
+    "allowAllShown": "Povolit vše zobrazené",
+    "denyAllShown": "Zakázat vše zobrazené",
+    "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Požadavky přes OpenRouter nejsou vázány na region.",
+    "inferenceRegion": "Region inference",
+    "inferenceRegionDescription": "Váže požadavky přes Vercel AI Gateway na tento region. Model, který v něm není k dispozici, selže.",
+    "disableOpenrouterNote": "Vypnutím OpenRouter zablokujete i klíče BYOK, které přes něj směrují požadavky.",
+    "region": {
+      "global": "Globální",
+      "us": "Spojené státy",
+      "eu": "Evropská unie",
+      "au": "Austrálie",
+      "jp": "Japonsko"
+    }
   }
 }

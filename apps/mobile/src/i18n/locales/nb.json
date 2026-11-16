@@ -4534,5 +4534,162 @@
     "unavailableDescription": "Denne delingslenken har utløpt eller blitt tilbakekalt.",
     "transcriptUnavailableTitle": "Kunne ikke laste inn denne transkripsjonen",
     "transcriptUnavailableDescription": "Lenken fungerer fortsatt. Prøv igjen om litt."
+  },
+  "organizationGuardrails": {
+    "title": "KI-vernetiltak",
+    "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak.",
+    "unavailable": "KI-vernetiltak er ikke tilgjengelig for denne organisasjonen.",
+    "loadError": "KI-vernetiltak kunne ikke lastes inn",
+    "statusSaving": "Lagrer…",
+    "statusSaved": "Lagret",
+    "statusFailed": "Kunne ikke lagre.",
+    "inputTitle": "Vernetiltak for inndata",
+    "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. En blokkerende detektor avviser en forespørsel når Enkrypt ikke er tilgjengelig.",
+    "outputTitle": "Vernetiltak for utdata",
+    "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
+    "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",
+    "detectorsHintOutput": "Blokker får et flagget svar til å feile. Bare logg registrerer det uten å forsinke svaret.",
+    "choiceLog": "Bare logg",
+    "applyTo": "Bruk på",
+    "applyToAllMembers": "Alle medlemmer",
+    "applyKiloDefault": "Bruk Kilo-standard",
+    "invalidSavedTitle": "Lagrede innstillinger for inndatadetektorer kan ikke leses",
+    "invalidSavedBody": "Forespørsler blokkeres til inndatadetektorene er lagret på nytt. Detektorene nedenfor starter fra Kilo-standard.",
+    "invalidSavedOutputTitle": "Lagrede innstillinger for utdatadetektorer kan ikke leses",
+    "invalidSavedOutputBody": "Svar holdes tilbake til utdatadetektorene er lagret på nytt. Velg utdatadetektorer nedenfor.",
+    "blockingOutputNote": "En blokkerende utdatadetektor holder et svar tilbake til Enkrypt har kontrollert alt av det. Bruk Bare logg for å unngå forsinkelsen.",
+    "inputDetectorRequired": "Slå på minst én inndatadetektor.",
+    "outputDetectorRequired": "Slå på minst én utdatadetektor.",
+    "rulesTooMany": "Legg til opptil {{max}} regler.",
+    "ruleIdRequired": "Skriv inn en regel-ID.",
+    "ruleIdInvalid": "En regel-ID kan bare bruke bokstaver, tall, punktum, bindestreker og understreker.",
+    "ruleTextRequired": "Beskriv hva regelen forbyr eller krever.",
+    "keywordTooLong": "Hvert nøkkelord kan være opptil {{max}} tegn.",
+    "topicTooLong": "Hvert emne kan være opptil {{max}} tegn.",
+    "piiEntities": "Data som skal oppdages",
+    "keywordsLabel": "Nøkkelord",
+    "keywordsHint": "Ett nøkkelord per linje.",
+    "topicsHint": "Ett emne per linje.",
+    "policyFormat": "Format for retningslinjer",
+    "policyFormatRules": "Strukturerte regler",
+    "policyFormatRulesDescription": "Én regel per krav, med kategori og alvorlighetsgrad. Anbefalt.",
+    "policyFormatText": "Retningslinjetekst",
+    "policyFormatTextDescription": "Lim inn en eksisterende retningslinje som ren tekst.",
+    "rulesEmpty": "Ingen regler ennå. Hver regel beskriver én ting inndata ikke må inneholde eller be om.",
+    "addRule": "Legg til regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Fjern regel {{number}}",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Navn (valgfritt)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risikokategori",
+    "ruleApplicability": "Omfang",
+    "ruleFrameworks": "Rammeverk",
+    "detector": {
+      "promptInjection": {
+        "label": "Ledetekstinjeksjon",
+        "description": "Oppdager forsøk på å overstyre instruksjoner eller omgå modellens sikkerhet."
+      },
+      "policyViolation": {
+        "label": "Brudd på retningslinjer",
+        "description": "Markerer inndata som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler.",
+        "descriptionOutput": "Markerer svar som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler."
+      },
+      "pii": {
+        "label": "PII og hemmeligheter",
+        "description": "Oppdager personopplysninger, påloggingsinformasjon, IP-adresser og URL-er."
+      },
+      "keywords": {
+        "label": "Forbudte nøkkelord",
+        "descriptionOutput": "Oppdager svar som inneholder noen av nøkkelordene du lister opp."
+      },
+      "topics": {
+        "label": "Emner",
+        "descriptionOutput": "Markerer svar om noen av emnene du lister opp."
+      },
+      "toxicity": {
+        "label": "Toksicitet",
+        "description": "Oppdager giftig, fornærmende, truende eller hatefull språkbruk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Oppdager seksuelt innhold eller annet innhold som ikke er trygt for arbeid."
+      },
+      "bias": {
+        "label": "Skjevhet",
+        "description": "Oppdager partisk eller diskriminerende språkbruk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personopplysninger",
+        "description": "Navn, e-postadresser, telefonnumre."
+      },
+      "secrets": {
+        "label": "Hemmeligheter",
+        "description": "API-nøkler, tokener, passord."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- og IPv6-adresser."
+      },
+      "url": {
+        "label": "URL-er",
+        "description": "Nettadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sikkerhet og svindel",
+      "safetyHarm": "Trygghet og skade",
+      "privacyDataProtection": "Personvern og databeskyttelse",
+      "brandReputationTrust": "Merkevare og omdømme",
+      "biasFairnessEthical": "Skjevhet og rettferdighet",
+      "legalIpLiability": "Juridisk og IP-ansvar",
+      "productMisuse": "Misbruk av produkt",
+      "performanceQuality": "Ytelse og kvalitet"
+    },
+    "applicability": {
+      "user": "Brukerinndata",
+      "userAssistant": "Brukerinndata og svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EUs KI-forordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Bedriftsfunksjon",
+    "enterpriseOnly": "Dette er en funksjon kun for bedrifter.",
+    "readOnly": "Bare organisasjonseiere og administratorer kan endre disse innstillingene.",
+    "loadError": "Leverandører og modeller kunne ikke lastes inn",
+    "tabModels": "Modeller",
+    "tabProviders": "Leverandører",
+    "tabGateways": "Inngangsportaler",
+    "modelsDescription": "Slå av en modell for å blokkere den for alle medlemmer. Modeller fra tillatte leverandører er slått på som standard.",
+    "modelsDeniedOnly": "Kun nektet",
+    "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
+    "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
+    "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
+    "allowAllShown": "Tillat alle viste",
+    "denyAllShown": "Nekt alle viste",
+    "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-forespørsler er ikke låst til en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-forespørsler til denne regionen. En modell som ikke er tilgjengelig der, feiler.",
+    "disableOpenrouterNote": "Deaktivering av OpenRouter blokkerer også BYOK-nøkler som ruter forespørsler gjennom den.",
+    "region": {
+      "global": "Global",
+      "us": "USA",
+      "eu": "Den europeiske union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

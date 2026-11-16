@@ -4534,5 +4534,162 @@
     "unavailableDescription": "此分享連結已過期或已被撤銷。",
     "transcriptUnavailableTitle": "無法載入此對話記錄",
     "transcriptUnavailableDescription": "連結仍然有效，請稍後再試一次。"
+  },
+  "organizationGuardrails": {
+    "title": "AI 護欄",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "unavailable": "此組織無法使用 AI 護欄。",
+    "loadError": "無法載入 AI 護欄",
+    "statusSaving": "儲存中…",
+    "statusSaved": "已儲存",
+    "statusFailed": "無法儲存。",
+    "inputTitle": "輸入護欄",
+    "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，封鎖型偵測器會拒絕請求。",
+    "outputTitle": "輸出護欄",
+    "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
+    "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",
+    "detectorsHintOutput": "封鎖會讓被標記的回應失敗。僅記錄只會記錄該回應，不會延遲回應。",
+    "choiceLog": "僅記錄",
+    "applyTo": "套用至",
+    "applyToAllMembers": "所有成員",
+    "applyKiloDefault": "套用 Kilo 預設值",
+    "invalidSavedTitle": "無法讀取已儲存的輸入偵測器設定",
+    "invalidSavedBody": "在重新儲存輸入偵測器之前，請求會遭到封鎖。下方偵測器會從 Kilo 預設值開始。",
+    "invalidSavedOutputTitle": "無法讀取已儲存的輸出偵測器設定",
+    "invalidSavedOutputBody": "在重新儲存輸出偵測器之前，回應會暫不傳送。請在下方選擇輸出偵測器。",
+    "blockingOutputNote": "封鎖型輸出偵測器會保留回應，直到 Enkrypt 檢查完所有內容。使用「僅記錄」可避免延遲。",
+    "inputDetectorRequired": "請至少開啟一個輸入偵測器。",
+    "outputDetectorRequired": "請至少開啟一個輸出偵測器。",
+    "rulesTooMany": "最多可新增 {{max}} 條規則。",
+    "ruleIdRequired": "請輸入規則 ID。",
+    "ruleIdInvalid": "規則 ID 只能使用字母、數字、點、連字號與底線。",
+    "ruleTextRequired": "描述此規則禁止或要求的事項。",
+    "keywordTooLong": "每個關鍵字最多可有 {{max}} 個字元。",
+    "topicTooLong": "每個主題最多可有 {{max}} 個字元。",
+    "piiEntities": "要偵測的資料",
+    "keywordsLabel": "關鍵字",
+    "keywordsHint": "每行一個關鍵字。",
+    "topicsHint": "每行一個主題。",
+    "policyFormat": "政策格式",
+    "policyFormatRules": "結構化規則",
+    "policyFormatRulesDescription": "每個要求一條規則，並包含類別與嚴重性。建議使用。",
+    "policyFormatText": "政策文字",
+    "policyFormatTextDescription": "將現有政策貼上為純文字。",
+    "rulesEmpty": "尚無規則。每條規則描述輸入不得包含或要求的一件事項。",
+    "addRule": "新增規則",
+    "ruleNumber": "規則 {{number}}",
+    "ruleRemove": "移除規則 {{number}}",
+    "ruleIdLabel": "規則 ID",
+    "ruleNameLabel": "名稱（選填）",
+    "ruleTextLabel": "規則",
+    "ruleRiskCategory": "風險類別",
+    "ruleApplicability": "範圍",
+    "ruleFrameworks": "框架",
+    "detector": {
+      "promptInjection": {
+        "label": "提示注入",
+        "description": "偵測嘗試覆寫指示或越獄模型的行為。"
+      },
+      "policyViolation": {
+        "label": "政策違規",
+        "description": "標記違反您組織政策的輸入，政策以文字或規則撰寫。",
+        "descriptionOutput": "標記違反您組織政策的回應，政策以文字或規則撰寫。"
+      },
+      "pii": {
+        "label": "PII 與機密",
+        "description": "偵測個人資料、憑證、IP 位址與 URL。"
+      },
+      "keywords": {
+        "label": "禁用關鍵字",
+        "descriptionOutput": "偵測包含您所列任何關鍵字的回應。"
+      },
+      "topics": {
+        "label": "主題",
+        "descriptionOutput": "標記涉及您所列任何主題的回應。"
+      },
+      "toxicity": {
+        "label": "毒性",
+        "description": "偵測有毒、侮辱、威脅或仇恨性語言。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "偵測色情或其他不宜在工作場所觀看的內容。"
+      },
+      "bias": {
+        "label": "偏見",
+        "description": "偵測帶有偏見或歧視性的語言。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "個人資料",
+        "description": "姓名、電子郵件地址、電話號碼。"
+      },
+      "secrets": {
+        "label": "機密",
+        "description": "API 金鑰、權杖、密碼。"
+      },
+      "ipAddress": {
+        "label": "IP 位址",
+        "description": "IPv4 與 IPv6 位址。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "網址。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "安全與詐欺",
+      "safetyHarm": "安全與危害",
+      "privacyDataProtection": "隱私與資料保護",
+      "brandReputationTrust": "品牌與聲譽",
+      "biasFairnessEthical": "偏見與公平性",
+      "legalIpLiability": "法律與 IP 責任",
+      "productMisuse": "產品濫用",
+      "performanceQuality": "效能與品質"
+    },
+    "applicability": {
+      "user": "使用者輸入",
+      "userAssistant": "使用者輸入與回應"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 十大風險（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "歐盟 AI 法案",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "企業版功能",
+    "enterpriseOnly": "這是僅限企業版的功能。",
+    "readOnly": "只有組織擁有者與管理員可以變更這些設定。",
+    "loadError": "無法載入供應商與模型",
+    "tabModels": "模型",
+    "tabProviders": "供應商",
+    "tabGateways": "閘道",
+    "modelsDescription": "關閉模型即可對所有成員封鎖該模型。來自允許供應商的模型預設為開啟。",
+    "modelsDeniedOnly": "僅顯示已拒絕",
+    "modelsEmpty": "沒有符合此搜尋的模型。",
+    "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
+    "providersEmpty": "沒有符合此搜尋的供應商。",
+    "allowAllShown": "允許所有顯示項目",
+    "denyAllShown": "拒絕所有顯示項目",
+    "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter 請求不會固定到特定區域。",
+    "inferenceRegion": "推論區域",
+    "inferenceRegionDescription": "將 Vercel AI Gateway 請求固定到此區域。在該區域無法使用的模型會失敗。",
+    "disableOpenrouterNote": "停用 OpenRouter 也會封鎖透過其路由請求的 BYOK 金鑰。",
+    "region": {
+      "global": "全球",
+      "us": "美國",
+      "eu": "歐盟",
+      "au": "澳洲",
+      "jp": "日本"
+    }
   }
 }

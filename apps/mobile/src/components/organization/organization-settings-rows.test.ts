@@ -32,7 +32,6 @@ function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
     role: 'owner',
     plan: 'enterprise',
     isTopLevel: true,
-    guardrailsEnabled: true,
     ...overrides,
   };
 }
@@ -42,19 +41,20 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
 }
 
 function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
-  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }).map(
-    row => row.area
-  );
+  return visibleInAppSettingsRows({
+    role: 'owner',
+    plan: 'enterprise',
+    guardrailsEnabled: true,
+    ...overrides,
+  }).map(row => row.area);
 }
 
 describe('visibleOrgSettingsRows', () => {
   it('lists every area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
       'usageDetails',
-      'providersAndModels',
       'customModes',
       'groups',
-      'guardrails',
       'byok',
       'ssoAndDomain',
       'emailPreferences',
@@ -88,7 +88,6 @@ describe('visibleOrgSettingsRows', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
       'usageDetails',
       'customModes',
-      'guardrails',
       'byok',
       'emailPreferences',
       'dataCollection',
@@ -103,18 +102,13 @@ describe('visibleOrgSettingsRows', () => {
     const rows = areas({ role: 'billing_manager', isTopLevel: false });
     expect(rows).not.toContain('subOrganizations');
     expect(rows).not.toContain('distributeFunds');
-    expect(rows).toContain('providersAndModels');
-  });
-
-  it('hides guardrails when the organization has not enabled Kilo Encrypt', () => {
-    expect(areas({ guardrailsEnabled: false })).not.toContain('guardrails');
+    expect(rows).toContain('byok');
   });
 
   it('drops the owner-only rows for a billing manager', () => {
     const rows = areas({ role: 'billing_manager' });
-    expect(rows).not.toContain('guardrails');
     expect(rows).not.toContain('emailPreferences');
-    expect(rows).toContain('providersAndModels');
+    expect(rows).toContain('byok');
   });
 
   it('opens the web page that owns each setting', () => {
@@ -144,23 +138,57 @@ describe('visibleOrgSettingsRows', () => {
   it('keeps every in-app area out of the web group', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        expect(areas({ role, plan })).not.toContain('auditLogs');
+        const rows = areas({ role, plan });
+        expect(rows).not.toContain('auditLogs');
+        expect(rows).not.toContain('providersAndModels');
+        expect(rows).not.toContain('guardrails');
       }
     }
   });
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns the audit log to every billing role on the enterprise plan', () => {
+  it('returns the audit log and Model Access to every billing role on the enterprise plan', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['auditLogs']);
+      expect(inAppAreas({ role, guardrailsEnabled: false })).toEqual([
+        'auditLogs',
+        'providersAndModels',
+      ]);
     }
   });
 
-  it('returns nothing to a member, an unknown role or a teams plan', () => {
+  it('adds guardrails for the roles that manage the organization', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      expect(inAppAreas({ role })).toEqual(['auditLogs', 'providersAndModels', 'guardrails']);
+    }
+  });
+
+  it('hides guardrails until the organization enables Kilo Encrypt', () => {
+    expect(inAppAreas({ guardrailsEnabled: false })).not.toContain('guardrails');
+    expect(inAppAreas({ guardrailsEnabled: undefined })).not.toContain('guardrails');
+  });
+
+  it('returns the member-readable area less to a member, an unknown role or a teams plan', () => {
     expect(inAppAreas({ role: 'member' })).toEqual([]);
     expect(inAppAreas({ role: undefined })).toEqual([]);
-    expect(inAppAreas({ plan: 'teams' })).toEqual([]);
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['guardrails']);
+  });
+
+  it('opens each in-app screen at its own route', () => {
+    const byArea = new Map(
+      visibleInAppSettingsRows({
+        role: 'owner',
+        plan: 'enterprise',
+        guardrailsEnabled: true,
+      }).map(row => [row.area, row])
+    );
+    expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('providersAndModels')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/providers-and-models'
+    );
+    expect(byArea.get('guardrails')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/guardrails'
+    );
   });
 });
 

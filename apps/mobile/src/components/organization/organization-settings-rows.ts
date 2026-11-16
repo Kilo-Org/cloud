@@ -27,8 +27,8 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 /**
  * The organization destinations the hub lists, in the two shapes it opens
- * them: the web pages this app does not reimplement, and the one area the app
- * reads itself.
+ * them: the screens this app reads itself, and the web pages it does not
+ * reimplement.
  *
  * Every web row opens the page that already owns the setting. The list, its
  * role and plan gates, and its destinations follow
@@ -36,32 +36,27 @@ import { WEB_BASE_URL } from '@/lib/config';
  * each web page applies to itself, so a member never sees a row that would
  * bounce them off the page it opened:
  *
- * - the sidebar hides Model Access, Request logs, Invoices, Sub-organizations
- *   and BYOK from a role without billing authority
- *   (`canManageOrganizationBilling`);
- * - the sidebar hides Model Access and Groups below the enterprise plan;
+ * - the sidebar hides Request logs, Invoices, Sub-organizations and BYOK from a
+ *   role without billing authority (`canManageOrganizationBilling`);
+ * - the sidebar hides Groups below the enterprise plan;
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
- * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
- *   setting;
- * - `providers-and-models`, `custom-modes`, `byok`, `integrations` and
- *   `usage-details` render for every member;
- * - `data-collection` is the dashboard card a teams plan shows where an
- *   enterprise plan shows providers and models;
+ * - `custom-modes`, `byok`, `integrations` and `usage-details` render for every
+ *   member;
+ * - `data-collection` is the dashboard card a teams plan shows;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
  *
- * The audit log is the exception neither table shares with the other: the app
- * reads it natively, so it is an in-app destination, and its gate is the one
- * its procedure applies (billing role and the enterprise plan).
+ * Three areas are in-app destinations instead, and each carries the gate its
+ * own procedure applies: the audit log (billing role, enterprise plan), Model
+ * Access (billing role, enterprise plan) and guardrails (`owner`/`admin` and
+ * the organization's Kilo Encrypt setting).
  */
 type OrgSettingsArea =
   | 'usageDetails'
-  | 'providersAndModels'
   | 'customModes'
   | 'groups'
-  | 'guardrails'
   | 'byok'
   | 'ssoAndDomain'
   | 'emailPreferences'
@@ -76,8 +71,6 @@ export type OrgSettingsGate = Readonly<{
   plan: 'teams' | 'enterprise';
   /** The organization has no parent: `parent_organization_id === null`. */
   isTopLevel: boolean;
-  /** The organization's Kilo Encrypt setting, which decides whether guardrails exist. */
-  guardrailsEnabled: boolean;
 }>;
 
 export type OrgSettingsRow = Readonly<{
@@ -88,8 +81,12 @@ export type OrgSettingsRow = Readonly<{
   url: string;
 }>;
 
-/** The one area the app reads itself instead of opening its web page. */
-type OrgInAppSettingsArea = 'auditLogs';
+/**
+ * The areas the app reads itself instead of opening their web pages. The
+ * providers-and-models page and the guardrails page are the two settings the
+ * organization hub opens natively; the audit log was the first.
+ */
+type OrgInAppSettingsArea = 'auditLogs' | 'providersAndModels' | 'guardrails';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -102,6 +99,13 @@ export type OrgInAppSettingsRow = Readonly<{
 export type OrgInAppSettingsGate = Readonly<{
   role: OrganizationRole | undefined;
   plan: 'teams' | 'enterprise';
+  /**
+   * The organization's Kilo Encrypt setting, which decides whether guardrails
+   * exist. `undefined` while the membership payload is still on its way, so the
+   * guardrails row waits for the same payload the web group below it waits for
+   * instead of appearing a frame later and moving that group.
+   */
+  guardrailsEnabled: boolean | undefined;
 }>;
 
 type OrgSettingsRowSpec = Readonly<{
@@ -120,24 +124,10 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/usage-details?view=ai-usage',
     visible: () => true,
   },
-  // "Model Access": billing role and the enterprise plan.
-  {
-    area: 'providersAndModels',
-    icon: Cpu,
-    suffix: '/providers-and-models',
-    visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
-  },
   // "Custom Modes": no gate in the sidebar or on the page.
   { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
   // "Groups": enterprise only; the page redirects every other plan.
   { area: 'groups', icon: Users, suffix: '/groups', visible: gate => gate.plan === 'enterprise' },
-  // Guardrails page: owner/admin and Kilo Encrypt.
-  {
-    area: 'guardrails',
-    icon: Shield,
-    suffix: '/guardrails',
-    visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled,
-  },
   // "Bring Your Own Key (BYOK)": billing role. The ChatGPT connection the
   // sidebar also counts is personal, so it does not make this row apply.
   {
@@ -191,10 +181,8 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 
 const TITLE_KEYS = {
   usageDetails: 'organization.settingsOnWeb.usageDetails',
-  providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   customModes: 'agentChat.modePicker.customModes',
   groups: 'organization.settingsOnWeb.groups',
-  guardrails: 'organization.settingsOnWeb.guardrails',
   byok: 'organization.settingsOnWeb.byok',
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
   emailPreferences: 'organization.settingsOnWeb.emailPreferences',
@@ -235,10 +223,28 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
     href: '/(app)/(tabs)/(3_profile)/organization/audit-log',
     visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
   },
+  // "Model Access": the sidebar's own gate (billing role, enterprise plan),
+  // which is also the plan the page itself refuses below.
+  {
+    area: 'providersAndModels',
+    icon: Cpu,
+    href: '/(app)/(tabs)/(3_profile)/organization/providers-and-models',
+    visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
+  },
+  // Guardrails: owner/admin and the organization's Kilo Encrypt setting, which
+  // the guardrails procedure itself enforces.
+  {
+    area: 'guardrails',
+    icon: Shield,
+    href: '/(app)/(tabs)/(3_profile)/organization/guardrails',
+    visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled === true,
+  },
 ];
 
 const IN_APP_TITLE_KEYS = {
   auditLogs: 'organization.settingsOnWeb.auditLogs',
+  providersAndModels: 'organization.settingsOnWeb.providersAndModels',
+  guardrails: 'organization.settingsOnWeb.guardrails',
 } satisfies Record<OrgInAppSettingsArea, string>;
 
 /**

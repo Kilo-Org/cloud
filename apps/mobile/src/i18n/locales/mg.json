@@ -4534,5 +4534,162 @@
     "unavailableDescription": "Efa lany daty na nofoanana ity rohy fizarana ity.",
     "transcriptUnavailableTitle": "Tsy nety nampidirina ity firaketana ity",
     "transcriptUnavailableDescription": "Mbola miasa ihany ny rohy. Andramo indray afaka kelikely."
+  },
+  "organizationGuardrails": {
+    "title": "Fefin-tandro faharanitan-tsaina artifisialy",
+    "permissionDenied": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mitantana ny Fefin-tandro faharanitan-tsaina artifisialy.",
+    "unavailable": "Tsy misy ny Fefin-tandro faharanitan-tsaina artifisialy ho an'ity fikambanana ity.",
+    "loadError": "Tsy afaka nampiditra ny Fefin-tandro faharanitan-tsaina artifisialy",
+    "statusSaving": "Mitehirizana…",
+    "statusSaved": "Voatahiry",
+    "statusFailed": "Tsy afaka nitahiry.",
+    "inputTitle": "Fefin-tandro fampidirana",
+    "inputDescription": "Mikaroka ny fampidirana rehetra miaraka amin'ny Enkrypt AI, anisan'izany ny valin'ny fitaovana. Mandà fangatahana ny mpikaroka manakana rehefa tsy misy Enkrypt.",
+    "outputTitle": "Fefin-tandro fivoahana",
+    "outputDescription": "Mikaroka ny valiny miaraka amin'ny Enkrypt AI alohan'ny hahazoan'ny mpikambana azy. Tsy miasa raha tsy velesinao.",
+    "detectorsHint": "Ny Sakano dia mandà fangatahana voamarika. Ny Rakitra fotsiny dia manoratra izany fotsiny nefa tsy manemotra ny fangatahana.",
+    "detectorsHintOutput": "Ny Sakano dia mahatonga ny valiny voamarika tsy hahomby. Ny Rakitra fotsiny dia manoratra izany fotsiny nefa tsy manemotra ny valiny.",
+    "choiceLog": "Rakitra fotsiny",
+    "applyTo": "Ampiharo amin'ny",
+    "applyToAllMembers": "Mpikambana rehetra",
+    "applyKiloDefault": "Ampiharo ny Kilo mahazatra",
+    "invalidSavedTitle": "Tsy afaka vakiana ny safidin'ny mpikaroka fampidirana voatahiry",
+    "invalidSavedBody": "Sakanana ny fangatahana mandra-pitahiry indray ny mpikaroka fampidirana. Ny mpikaroka etsy ambany dia manomboka amin'ny Kilo mahazatra.",
+    "invalidSavedOutputTitle": "Tsy afaka vakiana ny safidin'ny mpikaroka fivoahana voatahiry",
+    "invalidSavedOutputBody": "Tazonina ny valiny mandra-pitahiry indray ny mpikaroka fivoahana. Safidio ny mpikaroka fivoahana etsy ambany.",
+    "blockingOutputNote": "Ny mpikaroka fivoahana manakana dia mitazona valiny mandra-panamarina ny Enkrypt ny zavatra rehetra. Ampiasao ny Rakitra fotsiny mba hialana amin'ny fahatarana.",
+    "inputDetectorRequired": "Veleso farafahakeliny mpikaroka fampidirana iray.",
+    "outputDetectorRequired": "Veleso farafahakeliny mpikaroka fivoahana iray.",
+    "rulesTooMany": "Ampio lalàna hatramin'ny {{max}}.",
+    "ruleIdRequired": "Ampidiro ny famantarana ny lalàna.",
+    "ruleIdInvalid": "Ny famantarana ny lalàna dia tsy afaka mampiasa afa-tsy litera, isa, teboka, tsipika, ary tsipika ambany.",
+    "ruleTextRequired": "Farano izay voararan'ny lalàna na takiny.",
+    "keywordTooLong": "Ny teny fanalahidy tsirairay dia afaka hatramin'ny {{max}} litera.",
+    "topicTooLong": "Ny lohahevitra tsirairay dia afaka hatramin'ny {{max}} litera.",
+    "piiEntities": "Angona hodinihina",
+    "keywordsLabel": "Teny fanalahidy",
+    "keywordsHint": "Teny fanalahidy iray isaky ny andalana.",
+    "topicsHint": "Lohahevitra iray isaky ny andalana.",
+    "policyFormat": "Endriky ny politika",
+    "policyFormatRules": "Lalàna voarindra",
+    "policyFormatRulesDescription": "Lalàna iray isaky ny fepetra, miaraka amin'ny sokajy sy ny hamafiny. Amporisina.",
+    "policyFormatText": "Lahatsoratry ny politika",
+    "policyFormatTextDescription": "Apetraho amin'ny endriny lahatsoratra tsotra ny politika efa misy.",
+    "rulesEmpty": "Mbola tsy misy lalàna. Ny lalàna tsirairay dia mamaritra zavatra iray tsy tokony ho ao amin'ny fampidirana na angatahina.",
+    "addRule": "Ampio lalàna",
+    "ruleNumber": "Lalàna {{number}}",
+    "ruleRemove": "Esory ny lalàna {{number}}",
+    "ruleIdLabel": "Famantarana ny lalàna",
+    "ruleNameLabel": "Anarana (tsy voatery)",
+    "ruleTextLabel": "Lalàna",
+    "ruleRiskCategory": "Sokajy risika",
+    "ruleApplicability": "Faritra ampiharana",
+    "ruleFrameworks": "Rafitra",
+    "detector": {
+      "promptInjection": {
+        "label": "Tsindrona amin'ny baiko",
+        "description": "Mamantatra fikasana hamafa na hanova toromarika na handositra ny modely."
+      },
+      "policyViolation": {
+        "label": "Fandikana politika",
+        "description": "Mamarika fampidirana mandika ny politikan'ny fikambananao, voasoratra ho lahatsoratra na lalàna.",
+        "descriptionOutput": "Mamarika valiny mandika ny politikan'ny fikambananao, voasoratra ho lahatsoratra na lalàna."
+      },
+      "pii": {
+        "label": "PII sy tsiambaratelo",
+        "description": "Mamantatra angona manokana, porofo fidirana, adiresy tambajotra, ary URL."
+      },
+      "keywords": {
+        "label": "Teny fanalahidy voarara",
+        "descriptionOutput": "Mamantatra valiny misy na inona na inona amin'ny teny fanalahidy lisitrao."
+      },
+      "topics": {
+        "label": "Lohahevitra",
+        "descriptionOutput": "Mamarika valiny momba ny lohahevitra rehetra lisitrao."
+      },
+      "toxicity": {
+        "label": "Fiteny misy poizina",
+        "description": "Mamantatra fiteny misy poizina, manevateva, mandrahona, na fankahalana."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Mamantatra votoaty ara-pananahana na tsy azo jerena any am-piasana."
+      },
+      "bias": {
+        "label": "Fitongilanana",
+        "description": "Mamantatra fiteny mitongilana na manavakavaka."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Angona manokana",
+        "description": "Anarana, adiresy mailaka, nomeraon-telefaona."
+      },
+      "secrets": {
+        "label": "Tsiambaratelo",
+        "description": "Fanalahidin'ny API, famantarana, tenimiafina."
+      },
+      "ipAddress": {
+        "label": "Adiresy tambajotra",
+        "description": "Adiresy IPv4 sy IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adiresy tranonkala."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Fiarovana sy hosoka",
+      "safetyHarm": "Fiarovana sy fahavoazana",
+      "privacyDataProtection": "Fiainana manokana sy fiarovana angona",
+      "brandReputationTrust": "Marika sy laza",
+      "biasFairnessEthical": "Fitongilanana, hitsiny ary etika",
+      "legalIpLiability": "Lalàna sy andraikitra amin'ny fananana ara-tsaina",
+      "productMisuse": "Fampiasana diso ny vokatra",
+      "performanceQuality": "Fahombiazana sy kalitao"
+    },
+    "applicability": {
+      "user": "Fampidirana avy amin'ny mpampiasa",
+      "userAssistant": "Fampidirana avy amin'ny mpampiasa sy valiny"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 ambony (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Lalàna Eoropeana momba ny faharanitan-tsaina artifisialy",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Endri-javatra ho an'ny orinasa lehibe",
+    "enterpriseOnly": "Endri-javatra natokana ho an'ny orinasa lehibe ihany ity.",
+    "readOnly": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka manova ireo safidy ireo.",
+    "loadError": "Tsy afaka nampiditra ny mpamatsy sy ny modely",
+    "tabModels": "Modely",
+    "tabProviders": "Mpamatsy",
+    "tabGateways": "Vavahady",
+    "modelsDescription": "Vonoy ny modely iray mba hanakanana azy ho an'ny mpikambana rehetra. Ny modely avy amin'ny mpamatsy avela dia mandeha avy hatrany.",
+    "modelsDeniedOnly": "Nolavina fotsiny",
+    "modelsEmpty": "Tsy misy modely mifanaraka amin'ity fikarohana ity.",
+    "providersDescription": "Vonoy ny mpamatsy iray mba hampitsahatra ny fandefasan'ny Kilo ny fangatahana ho azy ho an'ity fikambanana ity.",
+    "providersEmpty": "Tsy misy mpamatsy mifanaraka amin'ity fikarohana ity.",
+    "allowAllShown": "Avelao daholo izay aseho",
+    "denyAllShown": "Lavina daholo izay aseho",
+    "gatewaysDescription": "Ny Kilo dia mandefa fangatahana modely amin'ny alalan'ny Vercel AI Gateway na OpenRouter. Ny vavahady voavono dia mahatonga ireo fangatahana ireo tsy hahomby.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Ny fangatahana OpenRouter dia tsy mifatotra amin'ny faritra iray.",
+    "inferenceRegion": "Faritra fanodinana",
+    "inferenceRegionDescription": "Mametraka ny fangatahana Vercel AI Gateway amin'ity faritra ity. Ny modely tsy misy eto dia tsy hahomby.",
+    "disableOpenrouterNote": "Ny fanakanana OpenRouter dia manakana koa ny fanalahidy BYOK izay mandefa fangatahana amin'ny alalany.",
+    "region": {
+      "global": "Maneran-tany",
+      "us": "Etazonia",
+      "eu": "Vondrona Eoropeana",
+      "au": "Aostralia",
+      "jp": "Japana"
+    }
   }
 }

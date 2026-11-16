@@ -4534,5 +4534,162 @@
     "unavailableDescription": "Tautan berbagi ini sudah kedaluwarsa atau telah dicabut.",
     "transcriptUnavailableTitle": "Tidak dapat memuat transkrip ini",
     "transcriptUnavailableDescription": "Tautan masih berfungsi. Coba lagi sebentar lagi."
+  },
+  "organizationGuardrails": {
+    "title": "Pagar Pengaman Kecerdasan Artifisial",
+    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial.",
+    "unavailable": "Pagar Pengaman Kecerdasan Artifisial tidak tersedia untuk organisasi ini.",
+    "loadError": "Pagar Pengaman Kecerdasan Artifisial tidak dapat dimuat",
+    "statusSaving": "Menyimpan…",
+    "statusSaved": "Tersimpan",
+    "statusFailed": "Tidak dapat menyimpan.",
+    "inputTitle": "Pagar pengaman masukan",
+    "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Detektor pemblokir menolak permintaan saat Enkrypt tidak tersedia.",
+    "outputTitle": "Pagar pengaman keluaran",
+    "outputDescription": "Memindai respons dengan Enkrypt AI sebelum anggota menerimanya. Nonaktif kecuali Anda mengaktifkannya.",
+    "detectorsHint": "Blokir menolak permintaan yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda permintaan.",
+    "detectorsHintOutput": "Blokir menggagalkan respons yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda respons.",
+    "choiceLog": "Catat saja",
+    "applyTo": "Terapkan ke",
+    "applyToAllMembers": "Semua anggota",
+    "applyKiloDefault": "Terapkan Bawaan Kilo",
+    "invalidSavedTitle": "Pengaturan detektor masukan tersimpan tidak dapat dibaca",
+    "invalidSavedBody": "Permintaan diblokir hingga detektor masukan disimpan kembali. Detektor di bawah dimulai dari Bawaan Kilo.",
+    "invalidSavedOutputTitle": "Pengaturan detektor keluaran tersimpan tidak dapat dibaca",
+    "invalidSavedOutputBody": "Respons ditahan hingga detektor keluaran disimpan kembali. Pilih detektor keluaran di bawah.",
+    "blockingOutputNote": "Detektor keluaran pemblokir menahan respons hingga Enkrypt selesai memeriksa seluruhnya. Gunakan Catat saja untuk menghindari penundaan.",
+    "inputDetectorRequired": "Aktifkan setidaknya satu detektor masukan.",
+    "outputDetectorRequired": "Aktifkan setidaknya satu detektor keluaran.",
+    "rulesTooMany": "Tambahkan hingga {{max}} aturan.",
+    "ruleIdRequired": "Masukkan ID aturan.",
+    "ruleIdInvalid": "ID aturan hanya dapat menggunakan huruf, angka, titik, tanda hubung, dan garis bawah.",
+    "ruleTextRequired": "Jelaskan apa yang dilarang atau diwajibkan oleh aturan.",
+    "keywordTooLong": "Setiap kata kunci dapat berisi hingga {{max}} karakter.",
+    "topicTooLong": "Setiap topik dapat berisi hingga {{max}} karakter.",
+    "piiEntities": "Data yang dideteksi",
+    "keywordsLabel": "Kata kunci",
+    "keywordsHint": "Satu kata kunci per baris.",
+    "topicsHint": "Satu topik per baris.",
+    "policyFormat": "Format kebijakan",
+    "policyFormatRules": "Aturan terstruktur",
+    "policyFormatRulesDescription": "Satu aturan per persyaratan, dengan kategori dan tingkat keparahan. Direkomendasikan.",
+    "policyFormatText": "Teks kebijakan",
+    "policyFormatTextDescription": "Tempel kebijakan yang sudah ada sebagai teks biasa.",
+    "rulesEmpty": "Belum ada aturan. Setiap aturan menjelaskan satu hal yang tidak boleh ada dalam masukan atau diminta oleh masukan.",
+    "addRule": "Tambahkan aturan",
+    "ruleNumber": "Aturan {{number}}",
+    "ruleRemove": "Hapus aturan {{number}}",
+    "ruleIdLabel": "ID aturan",
+    "ruleNameLabel": "Nama (opsional)",
+    "ruleTextLabel": "Aturan",
+    "ruleRiskCategory": "Kategori risiko",
+    "ruleApplicability": "Cakupan",
+    "ruleFrameworks": "Kerangka kerja",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeksi perintah",
+        "description": "Mendeteksi upaya untuk mengesampingkan instruksi atau membobol model."
+      },
+      "policyViolation": {
+        "label": "Pelanggaran kebijakan",
+        "description": "Menandai masukan yang melanggar kebijakan organisasi Anda, yang ditulis sebagai teks atau aturan.",
+        "descriptionOutput": "Menandai respons yang melanggar kebijakan organisasi Anda, yang ditulis sebagai teks atau aturan."
+      },
+      "pii": {
+        "label": "PII dan rahasia",
+        "description": "Mendeteksi data pribadi, kredensial, alamat IP, dan URL."
+      },
+      "keywords": {
+        "label": "Kata kunci terlarang",
+        "descriptionOutput": "Mendeteksi respons yang berisi kata kunci apa pun yang Anda cantumkan."
+      },
+      "topics": {
+        "label": "Topik",
+        "descriptionOutput": "Menandai respons tentang topik apa pun yang Anda cantumkan."
+      },
+      "toxicity": {
+        "label": "Toksisitas",
+        "description": "Mendeteksi bahasa yang toksik, menghina, mengancam, atau penuh kebencian."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Mendeteksi konten seksual atau konten yang tidak layak untuk tempat kerja."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Mendeteksi bahasa yang bias atau diskriminatif."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Data pribadi",
+        "description": "Nama, alamat email, nomor telepon."
+      },
+      "secrets": {
+        "label": "Rahasia",
+        "description": "Kunci API, token, kata sandi."
+      },
+      "ipAddress": {
+        "label": "Alamat IP",
+        "description": "Alamat IPv4 dan IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Alamat web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Keamanan dan penipuan",
+      "safetyHarm": "Keselamatan dan bahaya",
+      "privacyDataProtection": "Privasi dan perlindungan data",
+      "brandReputationTrust": "Merek dan reputasi",
+      "biasFairnessEthical": "Bias dan keadilan",
+      "legalIpLiability": "Hukum dan tanggung jawab kekayaan intelektual",
+      "productMisuse": "Penyalahgunaan produk",
+      "performanceQuality": "Kinerja dan kualitas"
+    },
+    "applicability": {
+      "user": "Masukan pengguna",
+      "userAssistant": "Masukan pengguna dan respons"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 Teratas (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Undang-Undang Kecerdasan Artifisial Uni Eropa",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Fitur perusahaan",
+    "enterpriseOnly": "Ini adalah fitur khusus perusahaan.",
+    "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
+    "loadError": "Penyedia dan model tidak dapat dimuat",
+    "tabModels": "Model",
+    "tabProviders": "Penyedia",
+    "tabGateways": "Gerbang",
+    "modelsDescription": "Nonaktifkan model untuk memblokirnya bagi setiap anggota. Model dari penyedia yang diizinkan aktif secara bawaan.",
+    "modelsDeniedOnly": "Hanya yang ditolak",
+    "modelsEmpty": "Tidak ada model yang cocok dengan pencarian ini.",
+    "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
+    "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "allowAllShown": "Izinkan semua yang ditampilkan",
+    "denyAllShown": "Tolak semua yang ditampilkan",
+    "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Permintaan OpenRouter tidak dipatok ke suatu wilayah.",
+    "inferenceRegion": "Wilayah inferensi",
+    "inferenceRegionDescription": "Mematok permintaan Vercel AI Gateway ke wilayah ini. Model yang tidak tersedia di sana akan gagal.",
+    "disableOpenrouterNote": "Menonaktifkan OpenRouter juga memblokir kunci BYOK yang merutekan permintaan melaluinya.",
+    "region": {
+      "global": "Global",
+      "us": "Amerika Serikat",
+      "eu": "Uni Eropa",
+      "au": "Australia",
+      "jp": "Jepang"
+    }
   }
 }

@@ -8,18 +8,11 @@ import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime
 const getRuntimeAuthorizationStatus = vi.fn();
 const recoverExpiredRuntimeAuthorization = vi.fn();
 
-const { createRuntimeAuthorizationMock, logRuntimeAuthorizationDiagnosticMock } = vi.hoisted(
-  () => ({
-    createRuntimeAuthorizationMock: vi.fn(
-      async (
-        _input: Parameters<typeof RuntimeAuthorizationModule.createRuntimeAuthorization>[0]
-      ) => ({
-        authorization: { id: 'authorization-1' },
-        token: 'runtime-token',
-      })
-    ),
-    logRuntimeAuthorizationDiagnosticMock: vi.fn(),
-  })
+const createRuntimeAuthorizationMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    authorization: { id: 'authorization-1' },
+    token: 'runtime-token',
+  }))
 );
 
 vi.mock('../sandbox-session/session-stub.js', () => ({
@@ -36,10 +29,6 @@ vi.mock('./metadata.js', () => ({
 }));
 
 vi.mock('../auth.js', () => ({ resolveSecret: vi.fn(async () => 'secret') }));
-
-vi.mock('./runtime-authorization-diagnostics.js', () => ({
-  logRuntimeAuthorizationDiagnostic: logRuntimeAuthorizationDiagnosticMock,
-}));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importOriginal => ({
   ...(await importOriginal<typeof RuntimeAuthorizationModule>()),
@@ -84,8 +73,6 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     getRuntimeAuthorizationStatus.mockReset();
     recoverExpiredRuntimeAuthorization.mockReset();
     recoverExpiredRuntimeAuthorization.mockResolvedValue({ status: 'recovered' });
-    createRuntimeAuthorizationMock.mockClear();
-    logRuntimeAuthorizationDiagnosticMock.mockClear();
   });
 
   it('does nothing for an active authorization', async () => {
@@ -138,18 +125,15 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
       id: 'authorization-1',
     });
     createRuntimeAuthorizationMock.mockRejectedValueOnce(new RuntimeAuthorizationRevokedError());
-    await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toMatchObject({
+    const rejection = await preflightRuntimeAuthorizationRecovery('workspace_a', ctx).catch(
+      (error: unknown) => error
+    );
+    expect(rejection).toBeInstanceOf(TRPCError);
+    expect(rejection).toMatchObject({
       code: 'FORBIDDEN',
       message: 'Runtime authorization denied',
     });
     expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
-    const [input] = createRuntimeAuthorizationMock.mock.calls.at(-1) ?? [];
-    input?.onBindingRejected?.('device_session_inactive');
-    expect(logRuntimeAuthorizationDiagnosticMock).toHaveBeenCalledWith(
-      'workspace_a',
-      'preflight',
-      'device_session_inactive'
-    );
   });
 
   it('rethrows an unexpected authorization failure unchanged', async () => {

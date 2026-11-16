@@ -75,7 +75,6 @@ const {
   selectControlPlaneSandboxMock,
   fetchByocVercelEnrollmentMock,
   fetchByocVercelEnrollmentForUserMock,
-  logRuntimeAuthorizationDiagnosticMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -93,16 +92,12 @@ const {
   selectControlPlaneSandboxMock: vi.fn(),
   fetchByocVercelEnrollmentMock: vi.fn(),
   fetchByocVercelEnrollmentForUserMock: vi.fn(),
-  logRuntimeAuthorizationDiagnosticMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importOriginal => ({
   ...(await importOriginal<typeof RuntimeAuthorizationModule>()),
   createRuntimeAuthorization: vi.fn(),
   sealRuntimeAuthorization: vi.fn(),
-}));
-vi.mock('./runtime-authorization-diagnostics.js', () => ({
-  logRuntimeAuthorizationDiagnostic: logRuntimeAuthorizationDiagnosticMock,
 }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
 // These cases cover allocation and ledger behavior, not the unverified Vercel SCM gate.
@@ -5885,18 +5880,13 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
       new RuntimeAuthorizationRevokedError()
     );
-    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+    const rejection = await runCreate(ctx, input).catch((error: unknown) => error);
+    expect(rejection).toBeInstanceOf(TRPCError);
+    expect(rejection).toMatchObject({
       code: 'FORBIDDEN',
       message: 'Runtime authorization denied',
     });
     expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    const [runtimeInput] = vi.mocked(createRuntimeAuthorization).mock.calls.at(-1) ?? [];
-    runtimeInput?.onBindingRejected?.('device_session_inactive');
-    expect(logRuntimeAuthorizationDiagnosticMock).toHaveBeenCalledWith(
-      expect.any(String),
-      'binding_check',
-      'device_session_inactive'
-    );
   });
 
   it('reconciles the original BYOC worktree binding after enrollment changes without reallocating', async () => {

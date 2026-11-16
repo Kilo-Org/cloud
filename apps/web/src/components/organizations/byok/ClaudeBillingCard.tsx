@@ -58,7 +58,7 @@ const SCOPE_COPY: Record<
       'Pay Anthropic directly for your Claude usage in Kilo through your Claude API organization. No API key needed.',
     coverageNote: null,
     removeNote:
-      'Removing the link from Kilo also unlinks Kilo at Anthropic, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, then restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
   organization: {
     description:
@@ -66,7 +66,7 @@ const SCOPE_COPY: Record<
     coverageNote:
       "Covers every member's Claude requests in this organization and Kilo services such as code review.",
     removeNote:
-      'Removing the link from Kilo also unlinks Kilo at Anthropic, stops every Claude request in this organization from billing it, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, stops every Claude request in this organization from billing it, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
 };
 

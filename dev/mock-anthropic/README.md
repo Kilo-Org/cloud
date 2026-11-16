@@ -41,7 +41,8 @@ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256
   survive them. Like Anthropic, a link outlives its profile: deleting a profile
   leaves the organization linked to the app, so linking that organization again
   fails with `user_profile_already_linked` until `POST
-  /v1/user_profiles/{id}/unlink` ends the link. The unlink endpoint requires the
+  /v1/user_profiles/{id}/unlink` ends the link — which it does even for a deleted
+  profile, so the recovery path can be exercised. The unlink endpoint requires the
   `user-profiles-search-2026-08-30` beta header, a body of only `oauth_app_id`,
   and no query parameters, then answers `{"revoked_connection_ids": [...]}`.
 - `POST /test/config` sets the refusal code and the number of leading `503`

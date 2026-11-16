@@ -13,6 +13,8 @@ import {
 import {
   findRetiringClaudeBillingPayer,
   liveClaudeBillingGrantWhere,
+  removeClaudeBillingGrant,
+  withClaudeBillingPayerLock,
   type ClaudeBillingOwner,
   type UnreferencedClaudeBillingPayer,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
@@ -82,19 +84,35 @@ export async function retireUnreferencedClaudeBillingPayer(
   );
 }
 
+export type ClaudeBillingRemoval = {
+  unlink: ClaudeUserProfileUnlinkResult;
+  /** The payer to delete at Anthropic and locally, when no grant keeps it. */
+  unreferencedPayer: UnreferencedClaudeBillingPayer | null;
+};
+
+const NO_UNLINK: ClaudeUserProfileUnlinkResult = { kind: 'unlinked', revokedConnectionIds: [] };
+
 /**
- * Ends Kilo's link at Anthropic for the payer this scope would retire, before
- * any local row is retired. A scope whose payer another live grant keeps has
- * nothing to end: that link still bills the other scope.
+ * Ends Kilo's link at Anthropic for the payer this scope would retire, then
+ * removes the scope's grant. Both run under the payer lock that sharing takes,
+ * so a grant cannot appear or vanish around the unlink: the scope that keeps the
+ * payer keeps its link, and a scope that retires it never leaves the link behind.
  */
-export async function unlinkRetiringClaudeBillingPayer(
+export async function unlinkAndRemoveClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   timeoutMs = 15_000
-): Promise<ClaudeUserProfileUnlinkResult> {
-  if (!operatorConfigured()) return { kind: 'unlinked', revokedConnectionIds: [] };
-  const retiring = await findRetiringClaudeBillingPayer(owner);
-  if (!retiring) return { kind: 'unlinked', revokedConnectionIds: [] };
-  return await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs);
+): Promise<ClaudeBillingRemoval> {
+  if (!operatorConfigured()) {
+    return { unlink: NO_UNLINK, unreferencedPayer: await removeClaudeBillingGrant(owner) };
+  }
+  return await withClaudeBillingPayerLock(owner, async tx => {
+    const retiring = await findRetiringClaudeBillingPayer(owner, tx);
+    const unlink = retiring
+      ? await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs)
+      : NO_UNLINK;
+    if (unlink.kind !== 'unlinked') return { unlink, unreferencedPayer: null };
+    return { unlink, unreferencedPayer: await removeClaudeBillingGrant(owner, tx) };
+  });
 }
 
 export async function cleanupRemovedClaudeProfilesForUser(

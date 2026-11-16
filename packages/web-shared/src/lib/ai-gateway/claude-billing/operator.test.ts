@@ -98,7 +98,7 @@ describe('unlinkClaudeUserProfile', () => {
     });
   });
 
-  it.each([500, 503, 429, 408])('asks for a retry on %s', async status => {
+  it.each([500, 503, 429, 408, 401])('asks for a retry on %s', async status => {
     stubAnthropic(new Response(JSON.stringify({ error: 'unavailable' }), { status }));
 
     await expect(unlinkClaudeUserProfile('uprof_3')).resolves.toEqual({ kind: 'retry' });
@@ -116,7 +116,7 @@ describe('unlinkClaudeUserProfile', () => {
     await expect(unlinkClaudeUserProfile('uprof_5')).resolves.toEqual({ kind: 'retry' });
   });
 
-  it.each([400, 401, 403, 404])('sends the customer to Claude Console on %s', async status => {
+  it.each([400, 403, 404])('sends the customer to Claude Console on %s', async status => {
     stubAnthropic(new Response(JSON.stringify({ error: 'refused' }), { status }));
 
     await expect(unlinkClaudeUserProfile('uprof_6')).resolves.toEqual({ kind: 'needs_console' });

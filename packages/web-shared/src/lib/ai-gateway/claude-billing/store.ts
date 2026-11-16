@@ -488,6 +488,23 @@ async function reassignPayerOwnerColumns(
 }
 
 /**
+ * Runs `work` while holding the payer lock that sharing and removal take, so no
+ * grant on the payer changes between a read and the write that follows it. A
+ * scope without a row has nothing to serialize.
+ */
+export async function withClaudeBillingPayerLock<T>(
+  owner: ClaudeBillingOwner,
+  work: (tx: DrizzleTransaction) => Promise<T>,
+  onDb: DrizzleConnection = db
+): Promise<T> {
+  return await onDb.transaction(async tx => {
+    const connection = await getGrantedClaudeBillingConnection(owner, tx);
+    if (connection) await lockClaudeBillingPayer(tx, connection.id);
+    return await work(tx);
+  });
+}
+
+/**
  * The payer `removeClaudeBillingGrant` would retire for this scope, or null when
  * the scope has no link or another live grant keeps its payer. Removal asks this
  * before it retires anything, so it can end Kilo's link at Anthropic first and

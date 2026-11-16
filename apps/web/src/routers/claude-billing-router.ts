@@ -11,7 +11,6 @@ import {
   claudeBillingOwnerKey,
   describeClaudeBillingSharing,
   getGrantedClaudeBillingConnection,
-  removeClaudeBillingGrant,
   shareClaudeBillingConnection,
   type ClaudeBillingOwner,
   type ClaudeBillingScopeSharing,
@@ -30,7 +29,7 @@ import {
 } from '@/lib/claude-billing/profile';
 import {
   retireUnreferencedClaudeBillingPayer,
-  unlinkRetiringClaudeBillingPayer,
+  unlinkAndRemoveClaudeBillingGrant,
 } from '@/lib/claude-billing/delete';
 /**
  * The caller's Claude billing connections: their personal one, and the
@@ -246,20 +245,20 @@ export const claudeBillingRouter = createTRPCRouter({
           message: 'Only an organization owner or admin can remove the organization link.',
         });
       }
-      const unlink = await unlinkRetiringClaudeBillingPayer(owner);
-      if (unlink.kind === 'retry') {
+      const removal = await unlinkAndRemoveClaudeBillingGrant(owner);
+      if (removal.unlink.kind === 'retry') {
         throw new TRPCError({
           code: 'SERVICE_UNAVAILABLE',
           message: 'Anthropic did not confirm the unlink. Try again.',
         });
       }
-      if (unlink.kind === 'needs_console') {
+      if (removal.unlink.kind === 'needs_console') {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'Unlink Kilo under Linked platforms in Claude Console, then remove it here.',
         });
       }
-      const unreferencedPayer = await removeClaudeBillingGrant(owner);
+      const unreferencedPayer = removal.unreferencedPayer;
       if (unreferencedPayer) {
         await retireUnreferencedClaudeBillingPayer(unreferencedPayer).catch(error => {
           console.error('[claude-billing] remote profile retirement deferred', {

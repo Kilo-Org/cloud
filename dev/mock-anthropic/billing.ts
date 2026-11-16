@@ -267,7 +267,8 @@ export function createBillingStub(
         send(response, 403, { error: 'forbidden' });
         return true;
       }
-      if (!profiles.has(profileId)) {
+      // The link outlives its profile, so recovery works after a profile delete.
+      if (!profiles.has(profileId) && !links.has(profileId)) {
         send(response, 404, { error: 'not_found' });
         return true;
       }

@@ -92,7 +92,9 @@ export type ClaudeUserProfileUnlinkResult =
   | { kind: 'needs_console' };
 
 function unlinkStatusResult(status: number): ClaudeUserProfileUnlinkResult {
-  if (status === 408 || status === 425 || status === 429 || status >= 500) return { kind: 'retry' };
+  if (status === 401 || status === 408 || status === 425 || status === 429 || status >= 500) {
+    return { kind: 'retry' };
+  }
   return { kind: 'needs_console' };
 }
 
@@ -127,7 +129,13 @@ export async function unlinkClaudeUserProfile(
   } catch {
     return { kind: 'retry' };
   }
-  if (!response.ok) return unlinkStatusResult(response.status);
+  if (!response.ok) {
+    // A cached operator token can be stale or revoked; a fresh one is minted on
+    // the next attempt, so 401 is worth retrying rather than sending the
+    // customer to Claude Console.
+    if (response.status === 401) invalidateClaudeOperatorToken();
+    return unlinkStatusResult(response.status);
+  }
   const parsed = unlinkResponseSchema.safeParse(await response.json().catch(() => null));
   if (!parsed.success) return { kind: 'retry' };
   return { kind: 'unlinked', revokedConnectionIds: parsed.data.revoked_connection_ids };

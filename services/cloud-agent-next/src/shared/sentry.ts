@@ -1,5 +1,14 @@
 import type { ErrorEvent, StackFrame } from '@sentry/core';
 
+type SentryConfigKey = 'CLOUD_AGENT_SENTRY_DSN' | 'CLOUD_AGENT_SENTRY_ENVIRONMENT';
+const warnedConfigKeys = new Set<SentryConfigKey>();
+
+function warnInvalidSentryConfig(key: SentryConfigKey): void {
+  if (warnedConfigKeys.has(key)) return;
+  warnedConfigKeys.add(key);
+  console.warn(`Cloud Agent Sentry reporting disabled: invalid ${key}`);
+}
+
 export function getSentryConfig(env: {
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
@@ -17,15 +26,20 @@ export function getSentryConfig(env: {
       !/^\/\d+$/.test(url.pathname) ||
       !/^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/.test(url.hostname)
     ) {
+      warnInvalidSentryConfig('CLOUD_AGENT_SENTRY_DSN');
       return undefined;
     }
     const environment = env.CLOUD_AGENT_SENTRY_ENVIRONMENT;
+    if (environment && !/^[a-zA-Z0-9_-]{1,32}$/.test(environment)) {
+      warnInvalidSentryConfig('CLOUD_AGENT_SENTRY_ENVIRONMENT');
+      return undefined;
+    }
     return {
       dsn: url.toString(),
-      environment:
-        environment && /^[a-zA-Z0-9_-]{1,32}$/.test(environment) ? environment : 'production',
+      environment: environment || 'production',
     };
   } catch {
+    warnInvalidSentryConfig('CLOUD_AGENT_SENTRY_DSN');
     return undefined;
   }
 }

@@ -201,7 +201,9 @@ console.log(JSON.stringify({ ...disabled, enabledLoadsSdk: sdkModules().length >
       const stderr = new Response(child.stderr).text();
       try {
         expect(await child.exited).toBe(0);
-        expect(await stderr).toBe('');
+        expect(await stderr).toBe(
+          dsn ? 'Cloud Agent Sentry reporting disabled: invalid CLOUD_AGENT_SENTRY_DSN\n' : ''
+        );
         expect(JSON.parse(await stdout)).toEqual({
           sdkModules: [],
           logs: [],

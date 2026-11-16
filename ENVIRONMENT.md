@@ -623,7 +623,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
 - `WRAPPER_LOG_PATH` - File path for the Cloud Agent Next wrapper's log output. [SERVER]
 - `CLOUD_AGENT_SENTRY_DSN` - Optional Worker-owned Sentry DSN for the `kilo-code/kilo-cloud-agent` project, used for Cloud Agent exceptions and wrapper crashes. Forwarded only at wrapper launch, never taken from agent profiles. Missing or invalid disables reporting. [SERVER]
-- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Sentry environment label; defaults to `production`. Use a separate label for nonproduction deployments. [SERVER]
+- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Sentry environment label; defaults to `production` when absent. Invalid nonempty labels disable reporting. Configuration warnings name the variable once per process or Worker isolate, without its value. Use a separate label for nonproduction deployments. [SERVER]
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]

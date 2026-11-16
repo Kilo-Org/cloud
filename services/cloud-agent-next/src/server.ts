@@ -1013,7 +1013,7 @@ const worker = {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env, _ctx?: ExecutionContext): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
@@ -1027,7 +1027,7 @@ const worker = {
   async scheduled(
     controller: ScheduledController,
     env: Env,
-    _ctx?: ExecutionContext
+    _ctx: ExecutionContext
   ): Promise<void> {
     if (controller.cron === REPORT_RETENTION_CRON) {
       await removeExpiredCloudAgentReportData(env);

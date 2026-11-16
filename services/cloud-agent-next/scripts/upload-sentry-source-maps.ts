@@ -8,7 +8,7 @@ import {
 if (sentryUploadConfigured({ SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN })) {
   for (const [source, shipped] of [
     ['wrapper/dist/sentry', 'wrapper/dist/runtime'],
-    ...(process.argv.includes('--wrapper') ? [] : [['dist/worker', 'dist/worker']]),
+    ['dist/worker', 'dist/worker'],
   ]) {
     const directory = resolve(source);
     const artifacts = await validateSentryArtifacts(directory, resolve(shipped));

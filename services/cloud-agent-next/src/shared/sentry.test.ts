@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ErrorEvent } from '@sentry/core';
 import { getSentryConfig, sanitizeSentryEvent } from './sentry.js';
 
@@ -28,11 +28,41 @@ describe('Cloud Agent Sentry configuration', () => {
       })
     ).toEqual({ dsn: 'https://public@o1.ingest.sentry.io/42', environment: 'staging' });
     expect(
-      getSentryConfig({
-        CLOUD_AGENT_SENTRY_DSN: 'https://public@o1.ingest.sentry.io/42',
-        CLOUD_AGENT_SENTRY_ENVIRONMENT: 'untrusted text with spaces',
-      })?.environment
-    ).toBe('production');
+      getSentryConfig({ CLOUD_AGENT_SENTRY_DSN: 'https://public@o1.ingest.sentry.io/42' })
+    ).toEqual({ dsn: 'https://public@o1.ingest.sentry.io/42', environment: 'production' });
+  });
+
+  it('disables invalid environments and warns once per variable without logging values', async () => {
+    vi.resetModules();
+    const { getSentryConfig } = await import('./sentry.js');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(getSentryConfig({})).toBeUndefined();
+      expect(warning).not.toHaveBeenCalled();
+      for (const environment of ['private staging', 'private.staging', 'x'.repeat(33)]) {
+        expect(
+          getSentryConfig({
+            CLOUD_AGENT_SENTRY_DSN: 'https://public@o1.ingest.sentry.io/42',
+            CLOUD_AGENT_SENTRY_ENVIRONMENT: environment,
+          })
+        ).toBeUndefined();
+      }
+      for (const dsn of ['private-invalid-dsn', 'https://public:private@o1.ingest.sentry.io/42']) {
+        expect(getSentryConfig({ CLOUD_AGENT_SENTRY_DSN: dsn })).toBeUndefined();
+      }
+      expect(warning.mock.calls).toEqual([
+        ['Cloud Agent Sentry reporting disabled: invalid CLOUD_AGENT_SENTRY_ENVIRONMENT'],
+        ['Cloud Agent Sentry reporting disabled: invalid CLOUD_AGENT_SENTRY_DSN'],
+      ]);
+      expect(
+        getSentryConfig({
+          CLOUD_AGENT_SENTRY_DSN: 'https://public@o1.ingest.sentry.io/42',
+          CLOUD_AGENT_SENTRY_ENVIRONMENT: 'staging',
+        })?.environment
+      ).toBe('staging');
+    } finally {
+      warning.mockRestore();
+    }
   });
 });
 

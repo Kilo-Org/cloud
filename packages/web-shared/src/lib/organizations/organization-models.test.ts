@@ -599,22 +599,17 @@ describe('organization model producer publication', () => {
     );
   });
 
-  it('tags from the Claude billing link of the audience it lists for', async () => {
+  it('tags every list from the organization Claude billing link', async () => {
+    const owner = { kind: 'organization', organizationId: 'fixture-org' };
+
     await resultFor(subject, 'member');
-    expect(mockTagClaude).toHaveBeenLastCalledWith(
-      { kind: 'member', kiloUserId: 'fixture-user', organizationId: 'fixture-org' },
-      expect.any(Array)
-    );
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
 
     await resultFor(subject, 'shared_services');
-    expect(mockTagClaude).toHaveBeenLastCalledWith(
-      { kind: 'shared_services', organizationId: 'fixture-org' },
-      expect.any(Array)
-    );
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
 
-    mockTagClaude.mockClear();
     await resultFor({ type: 'defaultAccess' });
-    expect(mockTagClaude).not.toHaveBeenCalled();
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {

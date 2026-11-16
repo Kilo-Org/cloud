@@ -2953,6 +2953,7 @@
     "signOutThisDevice": "Одјави го овој уред",
     "signOutSessionLabel": "Одјави го {{device}}, најава: {{signedIn}}, последна активност: {{lastSeen}}",
     "sessionSignedOut": "Сесијата е одјавена.",
+    "sessionSignOutFailed": "Не можеше да се одјави оваа сесија. Обидете се повторно.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",
     "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Последна активност: {{lastSeen}}. Може да го задржи пристапот до API уште најмногу еден час.",

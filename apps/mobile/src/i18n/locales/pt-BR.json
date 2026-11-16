@@ -2446,6 +2446,7 @@
     "signOutThisDevice": "Sair deste dispositivo",
     "signOutSessionLabel": "Sair de {{device}}, entrada: {{signedIn}}, último acesso: {{lastSeen}}",
     "sessionSignedOut": "Sessão encerrada.",
+    "sessionSignOutFailed": "Não foi possível encerrar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
     "signOutThisSessionMessage": "{{device}} será desconectado. Último acesso: {{lastSeen}}. Ele pode manter o acesso à API por até uma hora.",

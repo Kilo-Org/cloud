@@ -2410,6 +2410,7 @@
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
     "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat, giriş: {{signedIn}}, son görülme: {{lastSeen}}",
     "sessionSignedOut": "Oturum kapatıldı.",
+    "sessionSignOutFailed": "Bu oturum kapatılamadı. Tekrar deneyin.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
     "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Son görülme: {{lastSeen}}. Cihazın API erişimi bir saat daha devam edebilir.",

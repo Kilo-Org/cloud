@@ -3007,6 +3007,7 @@
     "signOutThisDevice": "Tanca la sessió d'aquest dispositiu",
     "signOutSessionLabel": "Tanca la sessió de {{device}}, inici de sessió: {{signedIn}}, última activitat: {{lastSeen}}",
     "sessionSignedOut": "Sessió tancada.",
+    "sessionSignOutFailed": "No s'ha pogut tancar aquesta sessió. Torna-ho a provar.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
     "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Última activitat: {{lastSeen}}. Pot mantenir l'accés a l'API fins a una hora.",

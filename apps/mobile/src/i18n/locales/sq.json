@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Dil nga kjo pajisje",
     "signOutSessionLabel": "Dil nga {{device}}, hyrja: {{signedIn}}, aktiviteti i fundit: {{lastSeen}}",
     "sessionSignedOut": "Seanca u mbyll.",
+    "sessionSignOutFailed": "Nuk mund të mbyllej kjo seancë. Provo përsëri.",
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",
     "signOutThisSessionMessage": "Seanca në {{device}} do të mbyllet. Aktiviteti i fundit: {{lastSeen}}. Pajisja mund të ruajë qasjen në API deri në një orë.",

@@ -2953,6 +2953,7 @@
     "signOutThisDevice": "دەرچوون لەم ئامێرە",
     "signOutSessionLabel": "دەرچوون لە {{device}}، چوونەژوورەوە: {{signedIn}}، دوایین بینین: {{lastSeen}}",
     "sessionSignedOut": "دەرچوون لە سێشنەکە تەواو بوو.",
+    "sessionSignOutFailed": "نەتوانرا لەم سێشنە دەربچێت. دووبارە هەوڵ بدە.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم سێشنە؟",
     "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دوایین بینین: {{lastSeen}}. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",

@@ -2471,6 +2471,7 @@
     "signOutThisDevice": "Wyloguj to urządzenie",
     "signOutSessionLabel": "Wyloguj {{device}}, logowanie: {{signedIn}}, ostatnia aktywność: {{lastSeen}}",
     "sessionSignedOut": "Zakończono sesję logowania.",
+    "sessionSignOutFailed": "Nie udało się zakończyć tej sesji logowania. Spróbuj ponownie.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
     "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Ostatnia aktywność: {{lastSeen}}. Może nadal mieć dostęp do API przez maksymalnie godzinę.",

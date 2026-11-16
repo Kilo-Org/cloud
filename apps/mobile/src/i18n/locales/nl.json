@@ -2409,6 +2409,7 @@
     "signOutThisDevice": "Dit apparaat afmelden",
     "signOutSessionLabel": "{{device}} afmelden, aangemeld {{signedIn}}, laatst gezien {{lastSeen}}",
     "sessionSignedOut": "Sessie afgemeld.",
+    "sessionSignOutFailed": "Kon deze sessie niet afmelden. Probeer het opnieuw.",
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
     "signOutThisSessionMessage": "{{device}} wordt afgemeld. Laatst gezien {{lastSeen}}. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",

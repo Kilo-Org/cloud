@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Dekonekte aparèy sa a",
     "signOutSessionLabel": "Dekonekte {{device}}, konekte {{signedIn}}, dènye aktivite {{lastSeen}}",
     "sessionSignedOut": "Sesyon an dekonekte.",
+    "sessionSignOutFailed": "Pa t ka dekonekte sesyon sa a. Eseye ankò.",
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",
     "signOutThisSessionMessage": "{{device}} ap dekonekte. Dènye aktivite {{lastSeen}}. Li ka kenbe aksè nan API a pou jiska inèdtan.",

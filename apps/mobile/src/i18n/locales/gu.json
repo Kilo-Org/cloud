@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "આ ઉપકરણમાંથી સાઇન આઉટ કરો",
     "signOutSessionLabel": "{{device}}માંથી સાઇન આઉટ કરો, સાઇન ઇન: {{signedIn}}, છેલ્લે સક્રિય: {{lastSeen}}",
     "sessionSignedOut": "સત્રમાંથી સાઇન આઉટ થયું.",
+    "sessionSignOutFailed": "આ સત્રમાંથી સાઇન આઉટ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
     "signOutThisDeviceTitle": "આ ઉપકરણમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionTitle": "આ સત્રમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. છેલ્લે સક્રિય: {{lastSeen}}. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",

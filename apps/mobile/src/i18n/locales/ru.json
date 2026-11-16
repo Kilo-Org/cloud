@@ -2471,6 +2471,7 @@
     "signOutThisDevice": "Выйти на этом устройстве",
     "signOutSessionLabel": "Выйти на {{device}}, вход выполнен {{signedIn}}, последняя активность {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершён.",
+    "sessionSignOutFailed": "Не удалось завершить этот сеанс. Попробуйте ещё раз.",
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Завершить этот сеанс?",
     "signOutThisSessionMessage": "На устройстве {{device}} будет выполнен выход из аккаунта. Последняя активность {{lastSeen}}. Доступ к API на нём может сохраняться ещё до часа.",

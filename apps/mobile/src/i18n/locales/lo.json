@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້",
     "signOutSessionLabel": "ອອກຈາກລະບົບໃນ {{device}}, ເຂົ້າສູ່ລະບົບ {{signedIn}}, ໃຊ້ງານຫຼ້າສຸດ {{lastSeen}}",
     "sessionSignedOut": "ອອກຈາກລະບົບໃນເຊສຊັນແລ້ວ.",
+    "sessionSignOutFailed": "ບໍ່ສາມາດອອກຈາກລະບົບໃນເຊສຊັນນີ້ໄດ້. ລອງອີກຄັ້ງ.",
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",
     "signOutThisSessionMessage": "ລະບົບຈະອອກຈາກບັນຊີໃນ {{device}}. ໃຊ້ງານຫຼ້າສຸດເມື່ອ {{lastSeen}}. ອຸປະກອນນີ້ອາດຍັງເຂົ້າເຖິງ API ໄດ້ອີກສູງສຸດໜຶ່ງຊົ່ວໂມງ.",

@@ -2409,6 +2409,7 @@
     "signOutThisDevice": "このデバイスからサインアウト",
     "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}、最終アクセス：{{lastSeen}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
+    "sessionSignOutFailed": "このセッションからサインアウトできませんでした。もう一度お試しください。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}からサインアウトします。最終アクセス：{{lastSeen}}。ただし、最大1時間はAPIにアクセスできる状態が続くことがあります。",

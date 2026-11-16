@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
     "signOutSessionLabel": "Pụọ na {{device}}, a banyere na {{signedIn}}, a hụrụ ikpeazụ na {{lastSeen}}",
     "sessionSignedOut": "Apụrụ na nnọkọ ahụ.",
+    "sessionSignOutFailed": "Enweghị ike ịpụ na nnọkọ a. Nwaa ọzọ.",
     "signOutThisDeviceTitle": "Pụọ na ngwaọrụ a?",
     "signOutThisSessionTitle": "Pụọ na nnọkọ a?",
     "signOutThisSessionMessage": "A ga-eme ka {{device}} pụọ. A hụrụ ikpeazụ na {{lastSeen}}. Ọ ka nwere ike ịnweta API ruo otu awa.",

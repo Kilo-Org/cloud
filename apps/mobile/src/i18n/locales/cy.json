@@ -3168,6 +3168,7 @@
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
     "signOutSessionLabel": "Allgofnodi {{device}}, wedi mewngofnodi {{signedIn}}, gwelwyd ddiwethaf {{lastSeen}}",
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
+    "sessionSignOutFailed": "Methu ag allgofnodi'r sesiwn hon. Rhowch gynnig arall.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
     "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gwelwyd ddiwethaf {{lastSeen}}. Gall gadw mynediad at yr API am hyd at awr.",

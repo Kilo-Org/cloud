@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Αποσύνδεση από αυτή τη συσκευή",
     "signOutSessionLabel": "Αποσύνδεση από το {{device}}, σύνδεση: {{signedIn}}, τελευταία δραστηριότητα: {{lastSeen}}",
     "sessionSignedOut": "Η συνεδρία αποσυνδέθηκε.",
+    "sessionSignOutFailed": "Δεν ήταν δυνατή η αποσύνδεση από αυτή τη συνεδρία. Δοκιμάστε ξανά.",
     "signOutThisDeviceTitle": "Αποσύνδεση από αυτή τη συσκευή;",
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",
     "signOutThisSessionMessage": "Η συσκευή {{device}} θα αποσυνδεθεί. Τελευταία δραστηριότητα: {{lastSeen}}. Μπορεί να διατηρήσει την πρόσβαση στο API για έως και μία ώρα.",

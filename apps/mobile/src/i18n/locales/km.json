@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "ចេញពីគណនីលើឧបករណ៍នេះ",
     "signOutSessionLabel": "{{device}} ចេញពីគណនី, ចូលគណនីនៅ {{signedIn}}, សកម្មចុងក្រោយនៅ {{lastSeen}}",
     "sessionSignedOut": "បានចេញពីគណនីក្នុងវគ្គនេះហើយ។",
+    "sessionSignOutFailed": "មិនអាចចេញពីគណនីក្នុងវគ្គនេះបានទេ សូមព្យាយាមម្តងទៀត។",
     "signOutThisDeviceTitle": "ចេញពីគណនីលើឧបករណ៍នេះ?",
     "signOutThisSessionTitle": "ចេញពីគណនីក្នុងវគ្គនេះ?",
     "signOutThisSessionMessage": "{{device}} នឹងត្រូវបានចេញពីគណនី។ សកម្មចុងក្រោយនៅ {{lastSeen}}។ ឧបករណ៍នោះនៅតែអាចចូលប្រើ API បានរហូតដល់មួយម៉ោងទៀត។",

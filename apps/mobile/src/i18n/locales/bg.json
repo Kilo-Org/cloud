@@ -2953,6 +2953,7 @@
     "signOutThisDevice": "Излез от акаунта на това устройство",
     "signOutSessionLabel": "Излез от акаунта на {{device}}, Влизане: {{signedIn}}, Последна активност: {{lastSeen}}",
     "sessionSignedOut": "Сесията е прекратена.",
+    "sessionSignOutFailed": "Сесията не можа да бъде прекратена. Опитайте отново.",
     "signOutThisDeviceTitle": "Да се излезе ли от акаунта на това устройство?",
     "signOutThisSessionTitle": "Да се прекрати ли тази сесия?",
     "signOutThisSessionMessage": "Сесията на {{device}} ще бъде прекратена. Последна активност: {{lastSeen}}. Устройството може да запази достъп до API до един час.",

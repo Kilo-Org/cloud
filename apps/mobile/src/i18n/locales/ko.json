@@ -2409,6 +2409,7 @@
     "signOutThisDevice": "이 기기 로그아웃",
     "signOutSessionLabel": "{{device}} 기기 로그아웃, {{signedIn}}에 로그인함, 마지막 활동 {{lastSeen}}",
     "sessionSignedOut": "세션이 로그아웃되었습니다.",
+    "sessionSignOutFailed": "이 세션에서 로그아웃하지 못했습니다. 다시 시도해 주세요.",
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
     "signOutThisSessionMessage": "{{device}} 기기에서 로그아웃됩니다. 마지막 활동 {{lastSeen}}. 로그아웃 후에도 최대 1시간 동안 API에 접근할 수 있습니다.",

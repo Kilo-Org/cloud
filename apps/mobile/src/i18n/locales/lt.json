@@ -3060,6 +3060,7 @@
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
     "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, paskutinė veikla {{lastSeen}}",
     "sessionSignedOut": "Sesija baigta.",
+    "sessionSignOutFailed": "Nepavyko baigti šios sesijos. Bandykite dar kartą.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Nuo paskyros bus atsijungta: {{device}}. Paskutinė veikla {{lastSeen}}. Prieiga prie API gali galioti dar iki valandos.",

@@ -2953,6 +2953,7 @@
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
     "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}, oxirgi faollik: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan chiqildi.",
+    "sessionSignOutFailed": "Bu sessiyadan chiqib bo'lmadi. Yana urinib ko'ring.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
     "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Oxirgi faollik: {{lastSeen}}. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",

@@ -2410,6 +2410,7 @@
     "signOutThisDevice": "Đăng xuất khỏi thiết bị này",
     "signOutSessionLabel": "Đăng xuất khỏi {{device}}, đăng nhập lúc {{signedIn}}, hoạt động gần nhất {{lastSeen}}",
     "sessionSignedOut": "Đã đăng xuất phiên.",
+    "sessionSignOutFailed": "Không thể đăng xuất phiên này. Hãy thử lại.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
     "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Hoạt động gần nhất {{lastSeen}}. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",

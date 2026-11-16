@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Logga ut från den här enheten",
     "signOutSessionLabel": "Logga ut från {{device}}, inloggad {{signedIn}}, senast aktiv {{lastSeen}}",
     "sessionSignedOut": "Sessionen är utloggad.",
+    "sessionSignOutFailed": "Det gick inte att logga ut den här sessionen. Försök igen.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
     "signOutThisSessionMessage": "{{device}} loggas ut. Senast aktiv {{lastSeen}}. Den kan behålla API-åtkomst i upp till en timme.",

@@ -2953,6 +2953,7 @@
     "signOutThisDevice": "Mivoaha amin'ity fitaovana ity",
     "signOutSessionLabel": "Mivoaha amin'ny {{device}}, niditra {{signedIn}}, hita farany {{lastSeen}}",
     "sessionSignedOut": "Nifarana ny fidirana tamin'ity fotoam-piasana ity.",
+    "sessionSignOutFailed": "Tsy afaka nivoaka tamin'ity fotoam-piasana ity. Andramo indray.",
     "signOutThisDeviceTitle": "Hivoaka amin'ity fitaovana ity ve?",
     "signOutThisSessionTitle": "Hivoaka amin'ity fotoam-piasana ity ve?",
     "signOutThisSessionMessage": "Havoaka amin'ny kaonty ny {{device}}. Hita farany {{lastSeen}}. Mbola afaka mampiasa ny API hatramin'ny adiny iray izany.",

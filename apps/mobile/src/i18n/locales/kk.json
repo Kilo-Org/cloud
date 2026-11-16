@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Бұл құрылғыдан шығу",
     "signOutSessionLabel": "{{device}} құрылғысынан шығу, кірген уақыты: {{signedIn}}, соңғы белсенділігі: {{lastSeen}}",
     "sessionSignedOut": "Сессия аяқталды.",
+    "sessionSignOutFailed": "Бұл сессиядан шығу мүмкін болмады. Қайталап көріңіз.",
     "signOutThisDeviceTitle": "Бұл құрылғыдан шығасыз ба?",
     "signOutThisSessionTitle": "Бұл сессиядан шығасыз ба?",
     "signOutThisSessionMessage": "{{device}} сессиясы аяқталады. Соңғы белсенділігі: {{lastSeen}}. Құрылғы API қызметіне тағы бір сағатқа дейін қол жеткізе алады.",

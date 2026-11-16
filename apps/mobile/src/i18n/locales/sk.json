@@ -3060,6 +3060,7 @@
     "signOutThisDevice": "Odhlásiť toto zariadenie",
     "signOutSessionLabel": "Odhlásiť zariadenie {{device}}, prihlásenie: {{signedIn}}, posledná aktivita: {{lastSeen}}",
     "sessionSignedOut": "Relácia bola odhlásená.",
+    "sessionSignOutFailed": "Reláciu nebolo možné odhlásiť. Skúste to znova.",
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "Zariadenie {{device}} sa odhlási. Posledná aktivita: {{lastSeen}}. Prístup k API mu môže zostať ešte hodinu.",

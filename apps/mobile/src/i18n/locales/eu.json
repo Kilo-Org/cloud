@@ -2952,6 +2952,7 @@
     "signOutThisDevice": "Itxi saioa gailu honetan",
     "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}, azken jarduera: {{lastSeen}}",
     "sessionSignedOut": "Saioa itxi da.",
+    "sessionSignOutFailed": "Ezin izan da saio hau itxi. Saiatu berriro.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "{{device}} gailuaren saioa itxiko da. Azken jarduera: {{lastSeen}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",

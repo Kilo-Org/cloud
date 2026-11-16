@@ -1439,8 +1439,11 @@ api.post('/user/web-ticket', async c => {
     }
     // The mint may not have run, so a retry can still succeed. It may also have
     // committed: the retry scope re-checks its deadline after the operation
-    // resolves, and each attempt mints under a fresh id whose secret is never
-    // returned, so an orphaned ticket simply expires with its own TTL.
+    // resolves, so an attempt that committed can still be reported here as a
+    // timeout. That is safe because `createConnectionTicket` picks one object id
+    // and one secret before the retry, so every attempt re-mints the same
+    // ticket slot, and this response never returns that secret: an orphaned
+    // ticket is unreachable and expires with its own TTL.
     console.warn({
       event: 'web_ticket_mint_unavailable',
       error: error instanceof Error ? error.message : String(error),

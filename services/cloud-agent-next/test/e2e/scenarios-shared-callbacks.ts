@@ -29,6 +29,7 @@ import {
   type ApiVersion,
   type DriverConfig,
   type StreamConnection,
+  type StreamEvent,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SharedScenario } from './scenarios-shared.js';
@@ -403,6 +404,29 @@ async function runCallbackCompletion(
 }
 
 /**
+ * The assistant messages on a stream with the user message each answers. A
+ * callback finds its text by this parent, so a batch answered under another
+ * user message shows here.
+ */
+function assistantParents(events: StreamEvent[]): Array<{ id: string; parentID: string }> {
+  const parents = new Map<string, string>();
+  for (const event of events) {
+    if (event.streamEventType !== 'kilocode') continue;
+    const properties = event.data.properties;
+    const info =
+      properties !== null && typeof properties === 'object' && 'info' in properties
+        ? properties.info
+        : undefined;
+    if (info === null || typeof info !== 'object') continue;
+    const { id, parentID, role } = info as { id?: unknown; parentID?: unknown; role?: unknown };
+    if (role === 'assistant' && typeof id === 'string' && typeof parentID === 'string') {
+      parents.set(id, parentID);
+    }
+  }
+  return [...parents].map(([id, parentID]) => ({ id, parentID }));
+}
+
+/**
  * callback-batch-followup: boot on a fast warm-up turn, hold the next turn on a
  * bounded `slow:90:1000:16`, queue two follow-ups, let the hold complete, and
  * expect one message-correlated callback for the last queued message only; then
@@ -511,7 +535,9 @@ async function runCallbackBatchFollowup(
       !queuedBatchCallbackIds.includes(second.messageId);
     if (!batchCallbackOk) {
       return fail(
-        `queued callback batch mismatch: ids=${queuedBatchCallbackIds.join(',') || 'none'} status=${firstCallback?.status ?? 'missing'} text=${JSON.stringify(firstCallback?.lastAssistantMessageText)}`
+        `queued callback batch mismatch: ids=${queuedBatchCallbackIds.join(',') || 'none'} status=${firstCallback?.status ?? 'missing'} text=${JSON.stringify(firstCallback?.lastAssistantMessageText)} ` +
+          `held=${hold.held.messageId} second=${second.messageId} third=${third.messageId} ` +
+          `assistantParents=${JSON.stringify(assistantParents(stream.events))}`
       );
     }
 

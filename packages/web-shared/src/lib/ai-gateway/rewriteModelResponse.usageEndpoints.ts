@@ -1,11 +1,18 @@
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
-import type { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import {
   getOutputHeaders,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { ReadResponseBody } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import type {
+  JustTheCostsUsageStats,
+  MicrodollarUsageContext,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
+  responseReadErrorResponse,
+  rewriteBilledUsage,
+  rewriteJsonBody,
   rewriteJsonResponse,
   rewriteResponseMetadata,
   rewriteUsageFromTokens,
@@ -68,6 +75,64 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
     }
   }
   rewriteResponseMetadata(body, context);
+}
+
+/**
+ * Applies the rewrites of `rewriteUsageEndpointBody`, but reports the cost the ledger already
+ * billed instead of pricing the body again. Mutates `body`.
+ */
+export function rewriteBilledUsageEndpointBody(
+  body: UsageEndpointBody,
+  billed: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
+  context: ResponseUsageContext
+) {
+  const usage = body.usage;
+  if (typeof usage === 'object' && usage !== null && !Array.isArray(usage)) {
+    rewriteBilledUsage(usage, billed, context, body.provider_metadata ?? body.providerMetadata);
+  }
+  rewriteResponseMetadata(body, context);
+}
+
+/**
+ * Builds the response of an endpoint that is not streamed from the body its accounting already
+ * read, so the body is read and parsed once. A successful JSON body reports the requested model
+ * and the cost the ledger bills, or, when the accounting could not price it, the cost
+ * `rewriteUsageEndpointBody` computes. An error response, a body that is not JSON, and a JSON body
+ * that is not an object pass through.
+ */
+export async function rewriteBilledResponse_UsageEndpoint({
+  response,
+  body,
+  billed,
+  usageContext,
+  vercelRequestId,
+}: {
+  response: Response;
+  body: Promise<ReadResponseBody | null>;
+  billed: Promise<Pick<JustTheCostsUsageStats, 'cost_mUsd'> | null>;
+  usageContext: ResponseUsageContext;
+  vercelRequestId: string | null;
+}): Promise<NextResponse> {
+  const headers = getOutputHeaders(response);
+  const init = { status: response.status, statusText: response.statusText, headers };
+  let read: ReadResponseBody | null;
+  try {
+    read = await body;
+  } catch (error) {
+    const errorResponse = responseReadErrorResponse(error, headers, vercelRequestId, null);
+    if (!errorResponse) throw error;
+    return errorResponse;
+  }
+  if (!read) return new NextResponse(null, init);
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    return new NextResponse(read.text, init);
+  }
+  // A pricing failure fails the ledger write, not the response.
+  const billedCosts = await billed.catch(() => null);
+  return rewriteJsonBody<UsageEndpointBody>(read, init, responseBody => {
+    if (billedCosts) rewriteBilledUsageEndpointBody(responseBody, billedCosts, usageContext);
+    else rewriteUsageEndpointBody(responseBody, usageContext);
+  });
 }
 
 /**

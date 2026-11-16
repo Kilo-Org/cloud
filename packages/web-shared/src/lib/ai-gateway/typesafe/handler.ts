@@ -57,7 +57,7 @@ import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/r
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import {
   responseUsageContext,
-  rewriteUsageEndpointBody,
+  rewriteBilledUsageEndpointBody,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
@@ -439,13 +439,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   let responseBody: unknown;
   let bodyRead = false;
-  let providerCost = 0;
+  let answer: z.infer<typeof systemOneResponseSchema> | undefined;
   const context = usageContextOf(response.status, ttfbMs);
   const stats = await parseUsageWithRecovery(response, context, async () => {
     responseBody = await response.json();
     bodyRead = true;
-    const { id, model, provider, usage } = systemOneResponseSchema.parse(responseBody);
-    providerCost = usage.cost;
+    answer = systemOneResponseSchema.parse(responseBody);
+    const { id, model, provider, usage } = answer;
     return {
       ...zeroCostUsageStats({
         messageId: id,
@@ -461,7 +461,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     };
   });
   emitMetrics(response.status, ttfbMs, stats.inference_provider);
-  if (stats.hasError) {
+  if (stats.hasError || !answer) {
     const reportedModel = providerModelSchema.safeParse(responseBody);
     const generationId = generationIdSchema.safeParse(responseBody);
     deferReconciledUsage(
@@ -481,7 +481,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 
-  const cost = toMicrodollars(providerCost);
+  const cost = toMicrodollars(answer.usage.cost);
   stats.cost_mUsd = cost;
   stats.market_cost = cost;
   // Keeps the provider cost as `market_cost`, then applies custom pricing and zeroes a free model.
@@ -490,7 +490,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
     await logMicrodollarUsageAndReportToBouncer(stats, context);
   });
   // The caller gets the model id it asked for and the cost the ledger row bills, as on chat.
-  const answer = systemOneResponseSchema.parse(responseBody);
-  rewriteUsageEndpointBody(answer, responseUsageContext(context, customPricingConfig));
+  rewriteBilledUsageEndpointBody(answer, stats, responseUsageContext(context, customPricingConfig));
   return NextResponse.json(answer);
 }

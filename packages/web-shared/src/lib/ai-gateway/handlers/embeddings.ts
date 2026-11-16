@@ -6,6 +6,7 @@ import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
   invalidRequestResponse,
+  makeErrorReadable,
   malformedJsonResponse,
   modelDoesNotExistResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -13,6 +14,12 @@ import {
   getEffectiveProviderPrivacy,
   providerPreferencesSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import {
+  responseUsageContext,
+  rewriteBilledResponse_UsageEndpoint,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
@@ -22,7 +29,6 @@ import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { UPSTREAM_POST_RESPONSE_HEADROOM_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
-  accountAndRewriteUsageResponse,
   handleUsageEndpointRequest,
   type UsageEndpoint,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/usage-endpoint-pipeline';
@@ -146,8 +152,42 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
     return { body: upstreamBody, inferenceRegion: dataRegion };
   },
 
-  accountAndRespond: upstream =>
-    accountAndRewriteUsageResponse(upstream, countAndStoreEmbeddingUsage),
+  accountAndRespond: async upstream => {
+    const { response, usageContext, provider, userByok } = upstream;
+    // makeErrorReadable reads a clone, which must be taken before the accounting reads the body.
+    const errorResponse = response.status >= 400 ? response.clone() : null;
+    const accounting = countAndStoreEmbeddingUsage(
+      response,
+      usageContext,
+      upstream.requestSpan,
+      provider
+    );
+    emitApiMetricsForResponse(
+      upstream.metricsParams,
+      accounting.statsPromise,
+      upstream.requestStartedAt
+    );
+
+    if (errorResponse) {
+      const readableError = await makeErrorReadable({
+        provider: provider.type,
+        requestedModel: upstream.requestedModelLowerCased,
+        request: null,
+        response: errorResponse,
+        userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+      });
+      if (readableError) return readableError;
+    }
+
+    // The accounting reads the body once; the response reports the cost the ledger row bills.
+    return await rewriteBilledResponse_UsageEndpoint({
+      response,
+      body: accounting.bodyPromise,
+      billed: accounting.pricedStatsPromise,
+      usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),
+      vercelRequestId: upstream.vercelRequestId,
+    });
+  },
 };
 
 export async function handleEmbeddingsRequest(

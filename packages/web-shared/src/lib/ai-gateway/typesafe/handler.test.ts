@@ -589,6 +589,62 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
+  it('reports the custom-priced cost the ledger row bills', async () => {
+    const customPricing: CustomPricingConfig = {
+      models: [
+        {
+          model: TYPESAFE_MODEL,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 2,
+                completion_per_million: 10,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(customPricing);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    // 23 input tokens at $2/M plus 7 output tokens at $10/M.
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...billedBody.usage, cost: 0.000116 },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 116, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
+  it('reports the provider cost the ledger row bills even when the body claims BYOK', async () => {
+    const usage = {
+      ...upstreamBody.usage,
+      is_byok: true,
+      cost_details: { upstream_inference_cost: 0.002 },
+    };
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...usage, cost: 0.000124, is_byok: false },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 124, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
   it('forwards privacy without exposing client routing, credentials, or identity', async () => {
     const response = await handleSystemOneRequest(
       makeRequest({

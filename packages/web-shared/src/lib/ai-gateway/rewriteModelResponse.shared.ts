@@ -7,6 +7,8 @@ import {
   computeVercelCostFields,
   extractVercelIsByok,
   getUpstreamBodyTermination,
+  parseJson,
+  type ReadResponseBody,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   JustTheCostsUsageStats,
@@ -196,26 +198,61 @@ export async function readResponseText(
   try {
     return { text: await response.text() };
   } catch (error) {
-    const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
-    if (!responseReadError) {
+    const errorResponse = responseReadErrorResponse(
+      error,
+      headers,
+      vercelRequestId,
+      reasoningEffort
+    );
+    if (!errorResponse) {
       // Settle the capture so the after() callback awaiting it does not hang
       // and the request is still logged (without a response body).
       capture?.setReadError(error);
       throw error;
     }
-
-    return {
-      error,
-      errorResponse: NextResponse.json(
-        {
-          error: responseReadError.message,
-          error_type: responseReadError.errorType,
-          message: responseReadError.message,
-        },
-        { status: 503, headers }
-      ),
-    };
+    return { error, errorResponse };
   }
+}
+
+/**
+ * The response for a body read that failed because the upstream disconnected or timed out, or
+ * null for any other read error.
+ */
+export function responseReadErrorResponse(
+  error: unknown,
+  headers: Headers,
+  vercelRequestId: string | null | undefined,
+  reasoningEffort: string | null
+): NextResponse | null {
+  const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
+  if (!responseReadError) return null;
+  return NextResponse.json(
+    {
+      error: responseReadError.message,
+      error_type: responseReadError.errorType,
+      message: responseReadError.message,
+    },
+    { status: 503, headers }
+  );
+}
+
+/**
+ * Rewrites a non-streamed JSON body that was already read and parsed, in place with `mutate`. A
+ * body that is not valid JSON, or whose JSON is not an object, passes through unchanged.
+ */
+export function rewriteJsonBody<Body extends object>(
+  { text, json }: ReadResponseBody,
+  init: ResponseInit,
+  mutate: (body: Body) => void
+): NextResponse {
+  // Upstream returned invalid/empty JSON body — pass through as-is
+  if (!('value' in json)) return new NextResponse(text, init);
+  const body = json.value;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return new NextResponse(text, init);
+  }
+  mutate(body as Body);
+  return NextResponse.json(body, init);
 }
 
 /**
@@ -253,19 +290,11 @@ export async function rewriteJsonResponse<Body extends object>({
   }
   const { text } = textResult;
   capture?.setBody(text);
-  const init = { status: response.status, statusText: response.statusText, headers };
-  let body: Body | null;
-  try {
-    body = JSON.parse(text) as Body | null;
-  } catch {
-    // Upstream returned invalid/empty JSON body — pass through as-is
-    return new NextResponse(text, init);
-  }
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return new NextResponse(text, init);
-  }
-  mutate(body);
-  return NextResponse.json(body, init);
+  return rewriteJsonBody(
+    { text, json: parseJson(text) },
+    { status: response.status, statusText: response.statusText, headers },
+    mutate
+  );
 }
 
 export function partialCapturedBody(capturedChunks: string[] | null): string | undefined {
@@ -350,18 +379,17 @@ export async function rewriteSseStream(
 }
 
 /**
- * Replaces the upstream's cost fields with what Kilo bills: custom pricing applied, and free,
- * BYOK and subscription-funded requests at zero. Shared by every endpoint whose response carries
- * an OpenRouter-style `usage` object.
+ * Replaces the upstream's cost fields with what Kilo bills, `costs` after `applyUsagePricing`:
+ * custom pricing applied, and free, BYOK and subscription-funded requests at zero. Shared by every
+ * endpoint whose response carries an OpenRouter-style `usage` object.
  */
 function rewriteUsageCost(
   usage: ResponseUsage,
-  costs: JustTheCostsUsageStats,
+  costs: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
   context: ResponseUsageContext,
   gateway: NonNullable<VercelProviderMetaData['gateway']> | undefined,
   vercelCosts: ReturnType<typeof computeVercelCostFields> | undefined
 ) {
-  applyUsagePricing(costs, context, context.custom_pricing_config);
   usage.cost = costs.cost_mUsd / 1_000_000;
   usage.is_byok =
     context.user_byok ||
@@ -412,8 +440,24 @@ export function rewriteUsageFromTokens({
     ...tokens,
     is_byok: usage.is_byok ?? null,
   };
+  applyUsagePricing(costs, context, context.custom_pricing_config);
   rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
   return costs;
+}
+
+/**
+ * Replaces the cost fields of `usage` with the cost the ledger already billed for it, so the
+ * response and the ledger row cannot disagree.
+ */
+export function rewriteBilledUsage(
+  usage: ResponseUsage,
+  billed: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
+  context: ResponseUsageContext,
+  providerMetadata: VercelProviderMetaData | undefined
+) {
+  const gateway = providerMetadata?.gateway;
+  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
+  rewriteUsageCost(usage, billed, context, gateway, vercelCosts);
 }
 
 export function rewriteUsage(

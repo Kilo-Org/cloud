@@ -1,10 +1,3 @@
-/**
- * Message Content Renderer
- *
- * Handles different message subtypes from the cloud agent stream.
- * Based on CLI's message routing patterns from cli-message-use.md
- */
-
 'use client';
 
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -34,10 +27,6 @@ export interface MessageContentProps {
   isStreaming?: boolean;
 }
 
-/**
- * Main message content renderer
- * Routes to appropriate subcomponent based on message `say`/`ask` type
- */
 export function MessageContent({
   content,
   say,
@@ -62,14 +51,9 @@ export function MessageContent({
     return <CommandOutputMessage content={content} />;
   }
 
-  // Default: regular text message
   return <TextMessage content={content} isStreaming={isStreaming} />;
 }
 
-/**
- * API Request Message
- * Shows progress/completion of API requests
- */
 function ApiRequestMessage({
   metadata,
   partial,
@@ -77,14 +61,12 @@ function ApiRequestMessage({
   metadata?: Record<string, unknown>;
   partial?: boolean;
 }) {
-  // Check if we have completion metadata (cost, error, or cancel reason)
   const hasCompletionMetadata =
     metadata &&
     (metadata.cost !== undefined ||
       metadata.streamingFailedMessage !== undefined ||
       metadata.cancelReason !== undefined);
 
-  // Still in progress (partial, no metadata, or metadata without completion info)
   if (partial || !hasCompletionMetadata) {
     return (
       <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -141,10 +123,6 @@ function ApiRequestMessage({
   );
 }
 
-/**
- * Completion Result Message
- * Shows the final result from the agent
- */
 function CompletionResultMessage({
   content,
   isStreaming,
@@ -170,10 +148,6 @@ function CompletionResultMessage({
   );
 }
 
-/**
- * Regular Text Message
- * Default message renderer
- */
 function TextMessage({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
   return (
     <div
@@ -193,10 +167,6 @@ function TextMessage({ content, isStreaming }: { content: string; isStreaming?: 
   );
 }
 
-/**
- * Tool Message
- * Shows tool execution inline with Running/Complete status
- */
 export function ToolMessage({
   metadata,
   partial,
@@ -219,10 +189,8 @@ export function ToolMessage({
     }
   };
 
-  // Handle command messages (with or without content)
   // Should mimic CLI behavior: atm always show command header, show box only if content exists
   if (ask === 'command') {
-    // If there's no command content, show header only
     if (!content) {
       return (
         <div className="bg-muted/30 border-muted flex items-center gap-2 rounded-md border px-3 py-2">
@@ -241,7 +209,6 @@ export function ToolMessage({
     return <ToolExecutionCard execution={execution} />;
   }
 
-  // Handle regular tool messages with metadata
   if (!metadata) {
     const formattedContent = formatToolContent(content);
     if (formattedContent) {
@@ -263,11 +230,9 @@ export function ToolMessage({
 
   const toolName = (metadata.tool as string) || ask || 'tool';
 
-  // All fields except 'tool' are input parameters
   const input = { ...metadata };
   delete input.tool;
 
-  // Convert to ToolExecution format
   const execution: ToolExecution = {
     toolName,
     input,
@@ -279,10 +244,6 @@ export function ToolMessage({
   return <ToolExecutionCard execution={execution} />;
 }
 
-/**
- * Command Output Message
- * Shows command execution output
- */
 function CommandOutputMessage({ content }: { content: string }) {
   return (
     <div className="my-2">

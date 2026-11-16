@@ -571,6 +571,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         </Tabs>
 
         <ModelDetailsDialog
+          organizationId={organizationId}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

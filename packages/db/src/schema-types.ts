@@ -3347,6 +3347,8 @@ export const VercelModelSchema = ModelSchema.extend({
     .optional()
     .catch(undefined),
   supported_parameters: z.array(z.string()).optional().catch(undefined),
+  /** The inference regions the model can be pinned to; absent when it has no regional inference. */
+  regions: z.array(z.string()).optional().catch(undefined),
   pricing: z
     .object({
       input: z.string(),

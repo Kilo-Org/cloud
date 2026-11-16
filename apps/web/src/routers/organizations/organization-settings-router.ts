@@ -29,6 +29,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getModelGatewayAvailability } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
@@ -341,6 +342,11 @@ const GatewaySettingsResponseSchema = z.object({
   data_region: OrganizationDataRegionSchema.nullable(),
 });
 
+const ModelGatewayAvailabilityResponseSchema = z.object({
+  vercel: z.object({ available: z.boolean(), regions: z.array(OrganizationDataRegionSchema) }),
+  openrouter: z.object({ available: z.boolean() }),
+});
+
 async function isGatewaySettingsAvailable(organizationId: string) {
   return isOrganizationFeatureEnabled(
     await readOrganizationFeatures(db),
@@ -383,6 +389,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
         data_region: organization.settings.data_region ?? null,
       };
     }),
+
+  getModelGatewayAvailability: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
+    .output(ModelGatewayAvailabilityResponseSchema)
+    .query(({ input }) => getModelGatewayAvailability(input.modelId)),
 
   updateGatewaySettings: organizationAdminMutationProcedure
     .input(UpdateGatewaySettingsInputSchema)

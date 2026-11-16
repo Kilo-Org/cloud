@@ -102,15 +102,19 @@ export async function handleModelsRequest(
 
     const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
     if (!Array.isArray(data.data)) {
-      return NextResponse.json(data);
+      // The passed-through body belongs to the catalog for this request
+      // country, so it carries the same directive as the catalog response.
+      return NextResponse.json(data, { headers: CATALOG_CACHE_HEADERS.sharedByCountry });
     }
     const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
+      // This body is the same for every caller, and it is built from the
+      // request country, so the stored entry is keyed on that country.
       return await modelResponse(
         {
           data: appendLocalFakeDeterministicCatalogModels(models),
         },
-        'shared'
+        'sharedByCountry'
       );
     }
 

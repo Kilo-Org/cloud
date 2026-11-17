@@ -7,7 +7,6 @@ import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { openExternalUrl } from '@/lib/external-link';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -19,7 +18,6 @@ const mutations = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
@@ -33,6 +31,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 const FIELD = 'FormField' as ElementType;
 const BUTTON = 'Button' as ElementType;
 const STATUS = 'AccessibleStatus' as ElementType;
+/** The sentence that names where a connection the app cannot change is managed. */
+const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb');
 
 function submitButton(root: ReactTestRenderer['root']) {
   const found = root.findAll(node => Object.is(node.type, BUTTON));
@@ -43,23 +43,11 @@ function submitButton(root: ReactTestRenderer['root']) {
   return button;
 }
 
-/** The action a non-repairable connection failure renders beside its message. */
-function manageButtons(root: ReactTestRenderer['root']) {
-  return root.findAll(
-    node =>
-      Object.is(node.type, BUTTON) &&
-      node
-        .findAll(child => Object.is(child.type, 'Text'))
-        .some(child => Object.values(child.props).includes(i18n.t('common.manageOnWeb')))
-  );
-}
-
-function manageButton(root: ReactTestRenderer['root']) {
-  const [button] = manageButtons(root);
-  if (!button) {
-    throw new Error('missing manage button');
-  }
-  return button;
+/** Whether the form renders this exact copy. */
+function rendersText(root: ReactTestRenderer['root'], value: string): boolean {
+  return root
+    .findAll(node => Object.is(node.type, 'Text'))
+    .some(node => node.children.includes(value));
 }
 
 function statusMessage(root: ReactTestRenderer['root']): string | null {
@@ -96,7 +84,6 @@ async function submit(root: ReactTestRenderer['root'], token: string): Promise<v
 beforeEach(() => {
   mutations.connect.mockReset();
   mutations.replace.mockReset();
-  vi.mocked(openExternalUrl).mockReset();
 });
 
 describe('BitbucketConnectForm', () => {
@@ -148,29 +135,28 @@ describe('BitbucketConnectForm', () => {
     expect(submitButton(root).props.disabled).toBe(true);
   });
 
-  it('keeps a connection that changed underneath on screen and names the page that manages it', async () => {
+  it('keeps a connection that changed underneath on screen and names where it is managed', async () => {
     mutations.connect.mockRejectedValue({
       data: { code: 'CONFLICT', message: 'The Bitbucket credential changed during this operation' },
     });
     const { root } = await mount(null);
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
+    // The sheet's own controls: the token-minting link above the field and the
+    // submit. The note below must not add a third one.
+    const controls = root.findAll(node => Object.is(node.type, BUTTON)).length;
 
     await submit(root, 'workspace-token');
 
     expect(statusMessage(root)).toBe(i18n.t('prReview.connect.checkFailedTitleBitbucket'));
     expect(submitButton(root).props.disabled).toBe(true);
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(true);
 
     await edit(root, 'another-token');
 
     expect(statusMessage(root)).toBe(i18n.t('prReview.connect.checkFailedTitleBitbucket'));
     expect(submitButton(root).props.disabled).toBe(true);
-
-    const action = manageButton(root);
-    (action.props.onPress as () => void)();
-
-    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(
-      'https://app.example.test/organizations/org-1/integrations/bitbucket',
-      { label: i18n.t('common.manageOnWeb') }
-    );
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(true);
+    expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(controls);
   });
 
   it('keeps submit available for a refused token, which a different one can fix', async () => {
@@ -188,7 +174,7 @@ describe('BitbucketConnectForm', () => {
     await edit(root, 'another-token');
 
     expect(statusMessage(root)).toBeNull();
-    expect(manageButtons(root)).toHaveLength(0);
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
   });
 
   it('holds the token field still while the submitted token is in flight', async () => {

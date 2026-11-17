@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"

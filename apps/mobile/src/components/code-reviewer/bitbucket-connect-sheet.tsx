@@ -9,17 +9,13 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { SheetScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { WEB_BASE_URL } from '@/lib/config';
 import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
-import { openExternalUrl } from '@/lib/external-link';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
-import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -119,26 +115,16 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
 
   // The connect mutation refuses a second Bitbucket integration for the same
   // organization, and a Bitbucket OAuth connection can only be changed on the
-  // page that runs its callback, so the sheet names that page rather than a
-  // form whose submit the server would refuse.
+  // web page that runs its callback — which the app may not link to, so the
+  // sheet states where the connection is managed and offers no action.
   if (managesExisting) {
     return (
       <>
         <SheetTitle title={title} />
-        <View className="gap-4 px-6 pt-2 pb-8">
+        <View className="px-6 pt-2 pb-8">
           <Text variant="muted" className="text-sm">
-            {t('organization.settingsOnWeb.integrations')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
           </Text>
-          <Button
-            variant="outline"
-            onPress={() => {
-              void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, 'bitbucket', scope), {
-                label: t('common.manageOnWeb'),
-              });
-            }}
-          >
-            <Text>{t('common.manageOnWeb')}</Text>
-          </Button>
         </View>
       </>
     );

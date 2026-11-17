@@ -6,7 +6,6 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
   bitbucketConnectionFailure,
@@ -16,7 +15,6 @@ import {
 import { openExternalUrl } from '@/lib/external-link';
 import { useConnectBitbucket, useReplaceBitbucketToken } from '@/lib/hooks/use-bitbucket';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
-import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 /** Where Bitbucket sends a workspace admin to mint the token Kilo asks for. */
@@ -123,17 +121,9 @@ export function BitbucketConnectForm({
       <AccessibleStatus message={failure?.message ?? null} className="text-sm" />
 
       {failure?.kind === 'connection-changed' ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onPress={() => {
-            void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, 'bitbucket', scope), {
-              label: t('common.manageOnWeb'),
-            });
-          }}
-        >
-          <Text>{t('common.manageOnWeb')}</Text>
-        </Button>
+        <Text variant="muted" className="text-sm">
+          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+        </Text>
       ) : null}
 
       <Button

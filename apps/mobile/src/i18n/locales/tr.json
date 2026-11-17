@@ -649,6 +649,7 @@
       "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
       "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci"

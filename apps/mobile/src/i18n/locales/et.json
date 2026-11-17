@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus"

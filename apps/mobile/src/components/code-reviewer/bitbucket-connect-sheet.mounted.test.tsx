@@ -1,14 +1,13 @@
 // The sheet's two entry answers: a workspace the token form can connect, and an
 // organization already connected through Bitbucket OAuth. `connect` refuses a
-// second integration, so the second case names the page that owns the OAuth
-// flow instead of a form whose submit the server would reject.
+// second integration, so the second case names that connection and says where
+// it is managed, without offering a form the server would reject.
 
 import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { openExternalUrl } from '@/lib/external-link';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BitbucketConnectSheet } from './bitbucket-connect-sheet';
@@ -37,10 +36,8 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/haptics', () => ({ notificationHaptic: vi.fn() }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
     role: state.role,
@@ -83,29 +80,19 @@ vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
 const BUTTON = 'Button' as ElementType;
 const FORM = 'BitbucketConnectForm' as ElementType;
 const PERMISSION_DENIED = 'PermissionDenied' as ElementType;
+/** The sentence that names where a connection the app cannot change is managed. */
+const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb');
 
 async function mount(): Promise<ReactTestRenderer['root']> {
   const view = await renderWithProviders(createElement(BitbucketConnectSheet, { scope: 'org-1' }));
   return view.renderer.root;
 }
 
-/** The one control the sheet offers for a connection it cannot touch here. */
-function manageButtons(root: ReactTestRenderer['root']) {
-  return root.findAll(
-    node =>
-      Object.is(node.type, BUTTON) &&
-      node
-        .findAll(child => Object.is(child.type, 'Text'))
-        .some(child => Object.values(child.props).includes(i18n.t('common.manageOnWeb')))
-  );
-}
-
-function manageButton(root: ReactTestRenderer['root']) {
-  const [button] = manageButtons(root);
-  if (!button) {
-    throw new Error('missing manage button');
-  }
-  return button;
+/** Whether the sheet renders this exact copy. */
+function rendersText(root: ReactTestRenderer['root'], value: string): boolean {
+  return root
+    .findAll(node => Object.is(node.type, 'Text'))
+    .some(node => node.children.includes(value));
 }
 
 beforeEach(() => {
@@ -113,32 +100,25 @@ beforeEach(() => {
   state.readiness.integrationId = null;
   state.status.data = undefined;
   state.status.isPending = false;
-  vi.mocked(openExternalUrl).mockReset();
 });
 
 describe('BitbucketConnectSheet', () => {
-  it('sends a workspace connected through Bitbucket OAuth to the page that owns it', async () => {
+  it('names an existing Bitbucket OAuth connection and says where it is managed', async () => {
     state.status.data = { method: 'oauth', integrationId: 'bitbucket-4' };
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
-
-    await act(async () => {
-      (manageButton(root).props.onPress as () => void)();
-      await Promise.resolve();
-    });
-
-    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(
-      'https://app.example.test/organizations/org-1/integrations/bitbucket',
-      { label: i18n.t('common.manageOnWeb') }
-    );
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(true);
+    // The connection page is not a place this sheet sends the reader: the note
+    // is text, and the sheet offers nothing to press.
+    expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 
   it('keeps the token form for a workspace with no integration', async () => {
     state.status.data = { method: 'workspace_access_token', integrationId: null };
     const root = await mount();
 
-    expect(manageButtons(root)).toHaveLength(0);
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
     const [form] = root.findAll(node => Object.is(node.type, FORM));
     expect(form?.props.integrationId).toBeNull();
   });
@@ -148,7 +128,7 @@ describe('BitbucketConnectSheet', () => {
     state.status.data = { method: 'workspace_access_token', integrationId: 'bitbucket-2' };
     const root = await mount();
 
-    expect(manageButtons(root)).toHaveLength(0);
+    expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
     expect(root.findAll(node => Object.is(node.type, FORM))[0]?.props.integrationId).toBe(
       'bitbucket-2'
     );

@@ -616,6 +616,7 @@
       "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "La connexion Bitbucket de cette organisation se gère sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail"

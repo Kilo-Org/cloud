@@ -1373,6 +1373,7 @@
       "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas"

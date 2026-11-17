@@ -1396,6 +1396,7 @@
       "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol"

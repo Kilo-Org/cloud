@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan"

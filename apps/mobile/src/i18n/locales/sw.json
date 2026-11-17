@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"

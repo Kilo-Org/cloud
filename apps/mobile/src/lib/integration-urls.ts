@@ -4,7 +4,7 @@ function trimTrailingSlash(webBaseUrl: string): string {
 
 /** The platforms whose connect flow starts on the web (OAuth callbacks land
  *  there, never in the app), so the app hands the browser the page that owns it. */
-type IntegrationPagePlatform = 'github' | 'slack' | 'gitlab' | 'discord' | 'linear' | 'bitbucket';
+type IntegrationPagePlatform = 'github' | 'slack' | 'gitlab' | 'discord' | 'linear';
 
 /**
  * The web path that owns a platform's connect flow: `apps/web`'s
@@ -44,7 +44,6 @@ export function getByokUrl(webBaseUrl: string, organizationId?: string): string 
   return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/byok`;
 }
 
-// Bitbucket's workspace access token is pasted in the app's own connect sheet
-// (`app/(app)/bitbucket-connect.tsx`). Only a connection the app cannot
-// describe — a Bitbucket OAuth authorization, whose flow lives on the web —
-// sends the reader to the integration page that owns it.
+// Bitbucket has no page here: its workspace access token is pasted in the
+// app's own connect sheet (`app/(app)/bitbucket-connect.tsx`), and a connection
+// the app cannot describe is named there in plain text rather than linked.

@@ -1396,6 +1396,7 @@
       "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bainistítear nasc Bitbucket na heagraíochta seo ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre"

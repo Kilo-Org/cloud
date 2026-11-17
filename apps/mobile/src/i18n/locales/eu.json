@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Erakunde honen Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena"

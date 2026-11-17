@@ -1350,6 +1350,7 @@
       "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball"

@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
       "tokenPlaceholder": "Tokanii hayyama iddoo hojii"

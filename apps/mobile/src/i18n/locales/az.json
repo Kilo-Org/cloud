@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni"

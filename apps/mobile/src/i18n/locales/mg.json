@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
       "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"

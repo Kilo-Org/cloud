@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Ennek a szervezetnek a Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token"

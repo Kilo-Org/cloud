@@ -1350,6 +1350,7 @@
       "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru"

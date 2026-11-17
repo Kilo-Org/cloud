@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
       "tokenPlaceholder": "Token para sa access sa workspace"

@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja"

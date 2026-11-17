@@ -649,6 +649,7 @@
       "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "De Bitbucket-verbinding van deze organisatie wordt via het web op een computer beheerd.",
       "description": "Maak een toegangstoken voor de werkruimte met de vereiste rechten en plak het hieronder.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
       "tokenPlaceholder": "Toegangstoken voor de werkruimte"

@@ -1327,6 +1327,7 @@
       "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni"

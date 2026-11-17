@@ -1419,6 +1419,7 @@
       "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle"

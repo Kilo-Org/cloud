@@ -61,9 +61,9 @@ export type BitbucketExistingIntegration = Pick<BitbucketIntegrationStatus, 'met
  * A workspace authorized through Bitbucket OAuth reads as one with no
  * integration, because the readiness read only describes workspace access
  * tokens, but `organizations.bitbucket.connect` refuses a second integration
- * (`credential_conflict`). That connection can only be changed where the OAuth
- * flow lives, so its repair names that page instead of a form that cannot
- * succeed.
+ * (`credential_conflict`). The app cannot change that connection — its OAuth
+ * flow lives on the web — so the repair names the connection itself instead of
+ * offering a form that cannot succeed.
  */
 type BitbucketRepair =
   | { readonly kind: 'connect' }

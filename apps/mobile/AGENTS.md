@@ -255,18 +255,31 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Section | Label plus content blocks, 10.5pt apart. | `Section` from `@/components/ui/section` |
 | Section header | 10pt mono uppercase eyebrow, muted; optional 11pt mono primary action and notice. Gutter-free inside a padded body; `inset` for a full-bleed list. | `SectionHeader` from `@/components/ui/section-header` |
 | Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
-| Row anatomy | `min-h-[48px] flex-row items-center gap-3 px-4 py-3`; 30pt `IconTile`; title `text-sm font-medium text-foreground` on one line; subtitle `text-xs text-muted-foreground` with `mt-0.5`; trailing `RowChevron`, `Switch`, `RowCheck` or a value. | `ConfigureRow` (`variant="action"` for an in-place command), `PreferenceRow`, `KvRow`, `ChoiceRow` from `@/components/ui/*` |
-| Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`; rows own no card and no grouped divider |
+| Row anatomy | `min-h-[48px] flex-row items-center gap-3 px-4 py-3`; 30pt `IconTile`; title `text-sm font-medium text-foreground` on one line; subtitle `text-xs text-muted-foreground` with `mt-0.5`; trailing `RowChevron`, `Switch`, `RowCheck` or a value. | `ConfigureRow` (`variant="action"` for an in-place command), `PreferenceRow`, `KvRow`, `ChoiceRow` from `@/components/ui/*`; `RowCheck` is the selection mark |
+| Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
 | Card | Non-row block (balance, metric, form, info): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. | `Card` from `@/components/ui/card` |
 | Radii | Controls `rounded-md`; tiles and thumbnails `rounded-lg`; cards, row groups and dialogs `rounded-xl`; pills, avatars and the FAB `rounded-full`. Nothing else. | the primitives above |
 | Dividers | 0.5pt `border-hair-soft`. Never `border-border` for a row divider. | `RowGroup`, flat list rows |
-| Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
+| Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; a metric figure `variant="figure"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
 | Screen header | First child of the screen root; `size="large"` on tab roots; never override its gutter, title typography or bottom padding. A badge on the title line goes through `titleAccessory`. | `ScreenHeader` |
 | Sheet header | Every formSheet route and imperative `Sheet`. The body uses the same body class. | `SheetHeader` |
-| States | Loading, empty, error and happy states for every data screen. A skeleton mirrors the primitive's geometry. | `Skeleton`, `EmptyState`, `QueryError`, `CenteredState` |
-| Primary action | One per screen. A pinned footer uses one shared primitive; an inline action ends its section. | the footer in `@/components/ui/` |
+| States | Loading, empty, error and happy states for every data screen. A skeleton mirrors the primitive's geometry. | `RowSkeleton` (a row group, a flat list) and `Skeleton`, `EmptyState`, `QueryError`, `CenteredState` |
+| Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]` outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the eight bans L1–L8 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+
+`pnpm check:classes` reads every class string (and the `style` objects) against `LAYOUT_RULES` in
+`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
+type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body, or any padding on a
+`ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a section label; **L4** a card surface
+built by hand (a card fill plus a card radius); **L5** `text-xl` or larger; **L6** a layout number in a `style`
+object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
+`RowChevron`; **L8** an arbitrary height, width or size that pins one box. A violation the migration has not
+reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and lower
+its line, never regenerate the baseline over a new violation.
+
+After you change anything in `components/ui`, run the design gate on
+`kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.
 
 ## Translations
 

@@ -105,6 +105,17 @@ const blankEyebrow = '\u00A0';
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
+  /**
+   * Replaces the title's text in the title's own slot, for a heading the header
+   * cannot spell as a string: the Home mark, a pressable chat name that renames
+   * in place, a name-shaped bar while the name loads. `title` stays the
+   * accessible name of the slot.
+   *
+   * It must not restyle the heading: the title's size, weight and colour are
+   * this header's (`titleClass`), so a node that paints its own copy repeats
+   * them rather than inventing a second title style, and anything that sits
+   * beside the title belongs in `titleAccessory`.
+   */
   titleContent?: React.ReactNode;
   /**
    * A badge or control on the title's own line, after the title and centred

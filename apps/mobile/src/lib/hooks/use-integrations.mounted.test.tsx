@@ -2,14 +2,10 @@
 // provider's connect flow, reached through a one-time hand-off token. The mint
 // is the only step that can fail, and its failure is the tap's failure: the row
 // reports it instead of opening a page that would refuse the reader again.
-// Bitbucket has no shell page, so its row keeps the full web page it opened
-// before.
 
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { type IntegrationProvider } from '@/lib/integrations/provider-catalog';
 
 import { type IntegrationConnect, useIntegrationConnect } from './use-integrations';
 
@@ -22,8 +18,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
-
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: mocks.toastError, success: vi.fn(), warning: vi.fn() },
@@ -90,7 +84,10 @@ function requireHook(resultRef: { current: HookResult }): IntegrationConnect {
   return result;
 }
 
-async function connect(resultRef: { current: HookResult }, provider: IntegrationProvider) {
+async function connect(
+  resultRef: { current: HookResult },
+  provider: Parameters<IntegrationConnect['connect']>[0]
+) {
   await act(async () => {
     await requireHook(resultRef).connect(provider);
   });
@@ -143,18 +140,6 @@ describe('useIntegrationConnect', () => {
       organizationId: 'org_1',
     });
     expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
-  });
-
-  // Bitbucket has no shell page, so its row keeps the full web page.
-  it('keeps the full web page for Bitbucket', async () => {
-    const resultRef = mountHook('org_1');
-
-    await connect(resultRef, 'bitbucket');
-
-    expect(mocks.handoffUrl).not.toHaveBeenCalled();
-    expect(mocks.launch).toHaveBeenCalledWith(
-      'https://app.example.com/organizations/org_1/integrations/bitbucket'
-    );
   });
 
   it('reports a failed mint and opens nothing', async () => {

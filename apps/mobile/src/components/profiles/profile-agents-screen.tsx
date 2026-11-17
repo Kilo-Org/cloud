@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -138,7 +139,12 @@ function AgentsSkeleton() {
 export function ProfileAgentsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileAgents(profileId, organizationId);
@@ -294,6 +300,7 @@ export function ProfileAgentsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.agents.title')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

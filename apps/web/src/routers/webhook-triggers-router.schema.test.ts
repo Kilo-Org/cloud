@@ -1808,3 +1808,126 @@ describe('optional profiles and body validation', () => {
     }
   );
 });
+
+describe('webhook trigger list editability', () => {
+  const organizationId = '00000000-0000-4000-8000-000000000003';
+  const listRow = {
+    id: '00000000-0000-4000-8000-000000000002',
+    triggerId: 'trigger-id',
+    targetType: 'cloud_agent',
+    githubRepo: 'owner/repo',
+    kiloclawInstanceId: null,
+    isActive: true,
+    activationMode: 'webhook',
+    cronExpression: null,
+    cronTimezone: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSelectWhere.mockResolvedValue([listRow]);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetWorkerTrigger.mockResolvedValue({ found: true, config: triggerConfig });
+  });
+
+  it('marks a personal row writable without reading the worker', async () => {
+    const rows = await createCaller({ user }).list({});
+
+    expect(rows).toEqual([expect.objectContaining({ canEdit: true, canEditReason: null })]);
+    expect(mockGetWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('reports unknown editability when the caller does not ask for it', async () => {
+    const rows = await createCaller({ user }).list({ organizationId });
+
+    expect(rows).toEqual([expect.objectContaining({ canEdit: null, canEditReason: null })]);
+    expect(mockGetWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it("refuses another member's run-as-creator trigger and names the reason", async () => {
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: 'another-user' },
+    });
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows).toEqual([
+      expect.objectContaining({ canEdit: false, canEditReason: 'creator_run' }),
+    ]);
+  });
+
+  it('allows the creator, an owner, and an admin to write a run-as-creator trigger', async () => {
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: 'another-user' },
+    });
+    for (const role of ['owner', 'admin'] as const) {
+      mockEnsureOrganizationAccess.mockResolvedValueOnce(role);
+      const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+      expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+    }
+
+    mockEnsureOrganizationAccess.mockResolvedValueOnce('member');
+    mockGetWorkerTrigger.mockResolvedValueOnce({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+  });
+
+  it('refuses every row for a role outside the write roles', async () => {
+    mockEnsureOrganizationAccess
+      .mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }))
+      .mockResolvedValueOnce('billing_manager');
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows[0]).toMatchObject({ canEdit: false, canEditReason: 'role' });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+      undefined,
+    ]);
+  });
+
+  it('keeps child members writable when they also inherit a billing manager role', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) =>
+      roles?.includes('member') ? 'member' : 'billing_manager'
+    );
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+    ]);
+  });
+
+  it('keeps a role-permitted row writable when the worker cannot answer', async () => {
+    mockGetWorkerTrigger.mockResolvedValue({ found: 'error', error: 'Unavailable', status: 503 });
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+  });
+
+  it("keeps the rest of the list when one row's worker read rejects", async () => {
+    mockSelectWhere.mockResolvedValue([
+      listRow,
+      { ...listRow, id: '00000000-0000-4000-8000-000000000004', triggerId: 'other-trigger' },
+    ]);
+    mockGetWorkerTrigger.mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValueOnce({
+      found: true,
+      config: { ...triggerConfig, executionUserId: 'another-user' },
+    });
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+    expect(rows[1]).toMatchObject({ canEdit: false, canEditReason: 'creator_run' });
+  });
+});

@@ -38658,6 +38658,9 @@
             "webhook",
             "scheduled"
           ]
+        },
+        "withEditability": {
+          "type": "boolean"
         }
       }
     },
@@ -38666,9 +38669,10 @@
       "list",
       "organizationid",
       "targettype",
-      "activationmode"
+      "activationmode",
+      "witheditability"
     ],
-    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode organizationId targetType activationMode"
+    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode witheditability organizationId targetType activationMode withEditability"
   },
   "webhookTriggers.listRequests": {
     "path": "webhookTriggers.listRequests",

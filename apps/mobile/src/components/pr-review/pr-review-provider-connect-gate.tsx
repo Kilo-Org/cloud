@@ -1,4 +1,6 @@
+/* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +21,10 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
@@ -79,6 +80,7 @@ export function ProviderConnectGate({
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
+  const router = useRouter();
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
@@ -162,38 +164,34 @@ export function ProviderConnectGate({
     connectAbort.current = controller;
     setConnecting(true);
     try {
-      // The provider connections are web-side integrations: open the
-      // integration shell page and re-check the status when the app returns
-      // (pattern: `launchConnectGateBrowser`). GitLab's page is reached through
-      // a one-time hand-off token; Bitbucket has no shell page and keeps the
-      // full web page it always opened.
-      const integrationUrl =
-        platform === 'gitlab'
-          ? await appShellHandoffUrl({
-              page: 'integration',
-              platform: 'gitlab',
-              ...(organizationId ? { organizationId } : {}),
-            })
-          : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
-      await launchConnectGateBrowser(integrationUrl, {
-        signal: controller.signal,
-        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: () => {
-          // Detached on purpose: the browser closing is the user's edge, so the
-          // CTA returns to idle as soon as it happens. A status read that stays
-          // pending (the default `networkMode: 'online'` never settles while the
-          // online manager reports offline) must not keep Connect disabled — the
-          // read's own states carry the outcome, and a real failure renders the
-          // retryable QueryError below.
-          void status.refetch().catch(() => undefined);
-          return Promise.resolve();
-        },
-      });
+      // GitLab's OAuth callback lands on the web, so its connection stays a
+      // hand-off: mint the shell integration page's single-use URL and re-check
+      // the status on return. Bitbucket's token is pasted in the app's sheet.
+      await launchConnectGateBrowser(
+        await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(organizationId ? { organizationId } : {}),
+        }),
+        {
+          signal: controller.signal,
+          onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+          onReturn: () => {
+            // Detached on purpose: the browser closing is the user's edge, so the
+            // CTA returns to idle as soon as it happens. A status read that stays
+            // pending (the default `networkMode: 'online'` never settles while the
+            // online manager reports offline) must not keep Connect disabled — the
+            // read's own states carry the outcome, and a real failure renders the
+            // retryable QueryError below.
+            void status.refetch().catch(() => undefined);
+            return Promise.resolve();
+          },
+        }
+      );
     } catch {
       // A mint that failed never reached the browser, so nothing else reported
       // it. `launchConnectGateBrowser` reports a failed launch through
-      // `onOpenFailure`, and the status read's own error state renders the
-      // retryable QueryError.
+      // `onOpenFailure`; the status read's own states carry the rest.
       if (!controller.signal.aborted) {
         void toast.error(t('authErrors.couldNotOpenBrowser'));
       }
@@ -202,6 +200,15 @@ export function ProviderConnectGate({
         setConnecting(false);
       }
     }
+  };
+
+  const openBitbucketConnect = () => {
+    if (organizationId === null) {
+      return;
+    }
+    // The connect sheet changes the same status this gate reads, so its
+    // invalidation is what closes the gate; nothing else has to run on return.
+    router.push(bitbucketConnectHref(organizationId));
   };
 
   // A GitLab connection serves exactly one instance, and the status read names
@@ -399,6 +406,10 @@ export function ProviderConnectGate({
                   className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
                   disabled={connecting}
                   onPress={() => {
+                    if (platform === 'bitbucket') {
+                      openBitbucketConnect();
+                      return;
+                    }
                     void handleConnect();
                   }}
                 >

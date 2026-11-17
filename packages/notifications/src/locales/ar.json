@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "جلسة الوكيل لديك بها تحديث",
-      "chatMessage": "لديك رسالة جديدة",
-      "instanceLifecycle": "المثيل لديك به تحديث",
-      "scheduledAction": "إجراء مجدول به تحديث",
       "lowBalance": "رصيدك يحتاج إلى انتباه",
       "spendAlert": "إنفاقك يحتاج إلى انتباه",
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · بدون عنوان",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "فحص أمان به تحديث"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} جاهز",
-      "body": "اضغط لبدء الدردشة."
-    },
-    "startFailed": {
-      "title": "فشل بدء {{instanceName}}",
-      "body": "فشل البدء."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "سيُعاد تشغيل {{instanceName}} قريبًا",
-      "body": "إعادة التشغيل مجدولة في {{when}}."
-    },
-    "restartCancelled": {
-      "title": "تم إلغاء إعادة تشغيل {{instanceName}}",
-      "body": "تم إلغاء إعادة التشغيل المجدولة سابقًا."
-    },
-    "versionChangeNotice": {
-      "title": "ستتم ترقية {{instanceName}} قريبًا",
-      "bodyWithTag": "الترقية إلى {{targetImageTag}} في {{when}}.",
-      "bodyWithoutTag": "ترقية مجدولة في {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "تم إلغاء ترقية {{instanceName}}",
-      "body": "تم إلغاء الترقية المجدولة سابقًا."
     }
   },
   "sessionReady": {

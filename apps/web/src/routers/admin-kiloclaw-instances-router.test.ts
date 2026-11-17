@@ -2748,8 +2748,8 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('voids pending notice rows so the sweep does not deliver after cancel', async () => {
-      // scheduleAction with default notify=true queues 3 pending notice
-      // rows (email, webapp, mobile_push) per target. After cancel,
+      // scheduleAction with default notify=true queues a pending notice
+      // row per default channel (email, webapp) per target. After cancel,
       // those rows must transition to 'failed' so selectDueNotifications
       // never picks them up again.
       const caller = await createCallerForUser(adminUser.id);

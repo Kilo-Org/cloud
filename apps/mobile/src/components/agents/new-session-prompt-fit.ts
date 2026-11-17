@@ -16,33 +16,33 @@
  * on every frame change without shifting layout on load, refresh, or retry.
  */
 
-export type ResolveComposerTopFadeHeightInput = {
-  /** How far the field's text has scrolled above its text box, in points. */
+export type ResolveComposerEdgeFadeHeightInput = {
+  /** How far the field's cut edge sits into its line, in points. */
   scrollOffset: number;
   /** One text line's height, in points. */
   lineHeight: number;
 };
 
 /**
- * Height of the top fade over the composer input, in points.
+ * Height of the fade over the line a scrolled composer cuts, in points.
  *
- * A scrolled multiline field cuts its topmost line at the text box's top edge.
- * With line boxes `L` tall and the field scrolled by `y` into one of them, the
- * fragment left at the top is the bottom `L - y` of that line, and the next
- * whole line begins exactly `L - y` below the top edge. The fade has to cover
- * the fragment and must not reach the whole line under it, so it is the
- * smaller of the two: `min(y, L - y)`.
+ * A scrolled multiline field cuts a line at the top or the bottom edge it
+ * scrolls through. With line boxes `L` tall and the cut edge `y` into one of
+ * them, the fragment left on the visible side is the smaller of `y` and
+ * `L - y`, and one whole line begins on the other side of the edge. The fade
+ * covers the fragment and must not reach a whole line, so it is
+ * `min(y, L - y)`.
  *
  * That band is never taller than half a line, so a readable line is never
  * dimmed — the failure of both a fixed one-line fade (it washes the first line
  * of any overflowing draft) and a fade sized to the offset alone (past the
- * halfway point it swallows the whole next line). It is 0 at the top of the
- * field, where nothing is cut.
+ * halfway point it swallows the whole next line). It is 0 where the cut edge
+ * lands on a line boundary, because nothing is cut there.
  */
-export function resolveComposerTopFadeHeight({
+export function resolveComposerEdgeFadeHeight({
   scrollOffset,
   lineHeight,
-}: ResolveComposerTopFadeHeightInput): number {
+}: ResolveComposerEdgeFadeHeightInput): number {
   'worklet';
   if (!Number.isFinite(scrollOffset) || !Number.isFinite(lineHeight) || lineHeight <= 0) {
     return 0;

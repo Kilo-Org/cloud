@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The scroll gate and both clip-edge fade bands share one native-mock harness and the same mount helpers, so a second file would duplicate that harness. */
 import { createElement, useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +12,7 @@ import {
   resolveNewSessionPromptHeight,
 } from '@/components/agents/chat-composer-input-height';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
-import { resolveComposerTopFadeHeight } from '@/components/agents/new-session-prompt-fit';
+import { resolveComposerEdgeFadeHeight } from '@/components/agents/new-session-prompt-fit';
 
 /**
  * The platform the component reads at render. The input's scroll gate is the
@@ -194,6 +195,35 @@ async function mountPrompt(overrides: Partial<PromptProps> = {}): Promise<ReactT
   return holder.current;
 }
 
+/**
+ * Mount the prompt again after the platform flips. The band offsets and the
+ * clip edges are module-level constants read at import, so the component must be
+ * re-imported for the new platform. The persistent `vi.mock` factory is cached,
+ * so `doMock` re-registers it for the fresh import and `resetModules` clears the
+ * module cache.
+ */
+async function mountPromptAfterPlatformChange(overrides: Partial<PromptProps> = {}) {
+  vi.doMock('react-native', reactNativeMock);
+  vi.resetModules();
+  const { NewSessionPrompt: PlatformPrompt } =
+    await import('@/components/agents/new-session-prompt');
+  const { createElement: createPlatformElement } = await import('react');
+  const { act: platformAct, TestRenderer: PlatformRenderer } = await import('@/test/renderer');
+
+  const holder: { current?: ReactTestRenderer } = {};
+  await platformAct(async () => {
+    await Promise.resolve();
+    holder.current = PlatformRenderer.create(
+      createPlatformElement(PlatformPrompt, makeProps(overrides))
+    );
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('prompt did not mount');
+  }
+  return { platformAct, renderer };
+}
+
 /** Report the draft's laid-out height the way the native field does. */
 function reportContentHeight(renderer: ReactTestRenderer, height: number) {
   const props = findPromptInput(renderer).props as {
@@ -258,10 +288,7 @@ describe('NewSessionPrompt input scroll gate', () => {
     // A two-line draft overflows the closed field, so a drag over it scrolls the
     // draft; gating on the three-line open height left the second line
     // unreachable until the keyboard landed.
-    reportContentHeight(
-      renderer,
-      resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 2)
-    );
+    reportContentHeight(renderer, resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 2));
     expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
 
     // The draft fits the closed field again: the field goes back to its top.
@@ -281,13 +308,22 @@ const PROMPT_INPUT_INSET = 7;
  */
 const SCROLLED_OFFSET = PROMPT_INPUT_INSET + 10;
 
-/** The fade band over the cut top line: where it starts and how tall it is. */
-function findTopFade(renderer: ReactTestRenderer) {
-  const node = renderer.root.find(
-    instance => typeof instance.type === 'string' && (instance.type as string) === 'Animated.View'
-  );
-  const [frame, size] = node.props.style as [{ top?: number }, { height?: number }];
-  return { height: size.height, top: frame.top };
+/** A fade band over a cut line: the edge it sits on and how tall it is. */
+function findFade(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
+  const node = renderer.root.find(instance => {
+    if (typeof instance.type !== 'string' || (instance.type as string) !== 'Animated.View') {
+      return false;
+    }
+    const [frame] = instance.props.style as [{ bottom?: number; top?: number }];
+    return frame[edge] !== undefined;
+  });
+  const [frame, size] = node.props.style as [
+    { bottom?: number; top?: number },
+    { height?: number },
+  ];
+  return edge === 'top'
+    ? { height: size.height, top: frame.top }
+    : { bottom: frame.bottom, height: size.height };
 }
 
 /** Report the field's scroll offset the way the native field does. */
@@ -317,8 +353,8 @@ describe('NewSessionPrompt top fade band', () => {
     // The text view draws scrolled text through its padding and cuts it at its
     // own bounds, so the band starts at the field's top edge, and the offset
     // has to pass the padding before it reaches the cut line.
-    expect(findTopFade(renderer)).toEqual({
-      height: resolveComposerTopFadeHeight({
+    expect(findFade(renderer, 'top')).toEqual({
+      height: resolveComposerEdgeFadeHeight({
         lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
         scrollOffset: SCROLLED_OFFSET - PROMPT_INPUT_INSET,
       }),
@@ -331,36 +367,74 @@ describe('NewSessionPrompt top fade band', () => {
   it('fades from the text box on Android, where the edit text clips at its padding', async () => {
     platform.OS = 'android';
     // The band's top edge is a module-level constant, so the component must be
-    // re-imported after the platform flips. The persistent `vi.mock` factory is
-    // cached, so `doMock` re-registers it for the fresh import and
-    // `resetModules` clears the module cache.
-    vi.doMock('react-native', reactNativeMock);
-    vi.resetModules();
-    const { NewSessionPrompt: AndroidPrompt } =
-      await import('@/components/agents/new-session-prompt');
-    const { createElement: createAndroidElement } = await import('react');
-    const { act: androidAct, TestRenderer: AndroidRenderer } = await import('@/test/renderer');
+    // re-imported after the platform flips.
+    const { platformAct, renderer } = await mountPromptAfterPlatformChange();
 
-    const holder: { current?: ReactTestRenderer } = {};
-    await androidAct(async () => {
-      await Promise.resolve();
-      holder.current = AndroidRenderer.create(createAndroidElement(AndroidPrompt, makeProps()));
-    });
-    const renderer = holder.current;
-    if (!renderer) {
-      throw new Error('prompt did not mount');
-    }
-
-    reportScrollOffset(renderer, SCROLLED_OFFSET, androidAct);
+    reportScrollOffset(renderer, SCROLLED_OFFSET, platformAct);
 
     // The edit text cuts its text at the padding, so the band starts at the
     // text box, where the offset already measures the cut.
-    expect(findTopFade(renderer)).toEqual({
-      height: resolveComposerTopFadeHeight({
+    expect(findFade(renderer, 'top')).toEqual({
+      height: resolveComposerEdgeFadeHeight({
         lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
         scrollOffset: SCROLLED_OFFSET,
       }),
       top: PROMPT_INPUT_INSET,
+    });
+
+    renderer.unmount();
+  });
+});
+
+/**
+ * A scroll offset where the bottom cut differs by platform: with the three-line
+ * field, iOS's bottom edge lands 19 points into its line and Android's text-box
+ * edge lands on the halfway point of its own.
+ */
+const BOTTOM_SCROLLED_OFFSET = 10;
+
+describe('NewSessionPrompt bottom fade band', () => {
+  beforeEach(() => {
+    platform.OS = 'ios';
+    keyboardMotion.value = 0;
+  });
+
+  it('fades the cut bottom line at the field bottom on iOS', async () => {
+    const renderer = await mountPrompt();
+
+    reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, act);
+
+    // The text view clips at its own bounds, so the band's bottom is the field's
+    // bottom, and the cut edge is the scroll offset plus the field's rendered
+    // height, one inset below the first line box's start.
+    expect(findFade(renderer, 'bottom')).toEqual({
+      bottom: 0,
+      height: resolveComposerEdgeFadeHeight({
+        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
+        scrollOffset: BOTTOM_SCROLLED_OFFSET + PROMPT_HEIGHT - PROMPT_INPUT_INSET,
+      }),
+    });
+
+    renderer.unmount();
+  });
+
+  it('fades the cut bottom line at the text box on Android', async () => {
+    platform.OS = 'android';
+    // The bottom inset is a module-level constant, so the component must be
+    // re-imported after the platform flips.
+    const { platformAct, renderer } = await mountPromptAfterPlatformChange();
+
+    reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, platformAct);
+
+    // The edit text clips at its padding, so the band's bottom is one inset
+    // above the field's bottom and the cut edge is one inset higher.
+    expect(findFade(renderer, 'bottom')).toEqual({
+      bottom: PROMPT_INPUT_INSET,
+      height: resolveComposerEdgeFadeHeight({
+        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
+        scrollOffset:
+          BOTTOM_SCROLLED_OFFSET + PROMPT_HEIGHT - PROMPT_INPUT_INSET - PROMPT_INPUT_INSET,
+      }),
     });
 
     renderer.unmount();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveNewSessionPromptHeight } from './chat-composer-input-height';
 import {
-  resolveComposerTopFadeHeight,
+  resolveComposerEdgeFadeHeight,
   resolveNewSessionFormFrameHeight,
   resolveNewSessionPromptLineCount,
   resolveNewSessionPromptMinHeight,
@@ -219,21 +219,21 @@ describe('the New Session keyboard destination', () => {
   });
 });
 
-describe('resolveComposerTopFadeHeight', () => {
+describe('resolveComposerEdgeFadeHeight', () => {
   const LINE = 24;
 
   it('hides nothing at the top of the field, where no line is cut', () => {
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 0, lineHeight: LINE })).toBe(0);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 0, lineHeight: LINE })).toBe(0);
   });
 
   it('covers the fragment the field clips without reaching the line under it', () => {
     // 1 dp into the line: the fragment is 1 dp of cut glyph tops, and the next
     // whole line starts 23 dp below the edge, so only 1 dp may be masked.
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 1, lineHeight: LINE })).toBe(1);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 1, lineHeight: LINE })).toBe(1);
     // 23.9 dp in: the fragment is the last 0.1 dp of a glyph row and the next
     // whole line begins at 0.1 dp, so a one-line fade would wash a readable
     // line. The band is what is left of the fragment.
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 23.9, lineHeight: LINE })).toBeCloseTo(
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 23.9, lineHeight: LINE })).toBeCloseTo(
       0.1,
       5
     );
@@ -242,21 +242,23 @@ describe('resolveComposerTopFadeHeight', () => {
   it('never masks more than half a line', () => {
     for (const intoLine of [6, 12, 18]) {
       expect(
-        resolveComposerTopFadeHeight({ scrollOffset: intoLine, lineHeight: LINE })
+        resolveComposerEdgeFadeHeight({ scrollOffset: intoLine, lineHeight: LINE })
       ).toBeLessThanOrEqual(LINE / 2);
     }
     // The halfway point is where fragment and remaining line are equal.
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 12, lineHeight: LINE })).toBe(12);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 12, lineHeight: LINE })).toBe(12);
   });
 
   it('uses the position inside the current line across several lines of scroll', () => {
-    expect(resolveComposerTopFadeHeight({ scrollOffset: LINE + 4, lineHeight: LINE })).toBe(4);
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 3 * LINE + 20, lineHeight: LINE })).toBe(4);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: LINE + 4, lineHeight: LINE })).toBe(4);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 3 * LINE + 20, lineHeight: LINE })).toBe(
+      4
+    );
   });
 
   it('treats an unmeasurable line or offset as no fade', () => {
-    expect(resolveComposerTopFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
-    expect(resolveComposerTopFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
+    expect(resolveComposerEdgeFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
   });
 });
 

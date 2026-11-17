@@ -46,7 +46,7 @@ import {
   resolvePromptCounterRemaining,
 } from '@/components/agents/new-session-prompt-state';
 import {
-  resolveComposerTopFadeHeight,
+  resolveComposerEdgeFadeHeight,
   resolveNewSessionPromptMinHeight,
 } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
@@ -90,6 +90,13 @@ const PROMPT_INPUT_VERTICAL_INSET = 7;
  * own bounds, so the cut is at the field's top edge.
  */
 const PROMPT_TOP_CLIP_EDGE = Platform.OS === 'ios' ? 0 : PROMPT_INPUT_VERTICAL_INSET;
+/**
+ * Where a scrolled field cuts its bottom line, measured up from the field's
+ * bottom edge. Android's EditText clips at its padding here as it does at the
+ * top, so the cut is at the text box; the iOS text view clips at its own
+ * bounds, so the cut is at the field's bottom edge.
+ */
+const PROMPT_BOTTOM_CLIP_INSET = Platform.OS === 'ios' ? 0 : PROMPT_INPUT_VERTICAL_INSET;
 /** A sub-pixel scroll is not a hidden line above the field. */
 const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -106,7 +113,34 @@ const PROMPT_TOP_FADE_STYLE = {
   top: PROMPT_TOP_CLIP_EDGE,
 } as const;
 const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
+// The bottom band sits on the same clip edge as the top one, one inset up from
+// the field's bottom on Android and at the field's bottom on iOS. Its height
+// comes from the scroll offset and the field's current height, on the UI
+// thread.
+const PROMPT_BOTTOM_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: PROMPT_BOTTOM_CLIP_INSET,
+} as const;
+const PROMPT_BOTTOM_FADE_FILL = { flex: 1 } as const;
 const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
+
+/**
+ * The field's rendered height at a keyboard motion progress, in points. The
+ * field grows from its keyboard-closed floor to its keyboard-open floor as the
+ * keyboard lands, so the bottom fade's cut edge moves with it.
+ */
+function resolvePromptRenderedHeight(
+  closedPromptHeight: number,
+  promptHeight: number,
+  progress: number
+): number {
+  'worklet';
+  return (
+    closedPromptHeight + (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, progress))
+  );
+}
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -225,9 +259,7 @@ export function NewSessionPrompt({
   });
   const keyboardProgress = useKeyboardMotionProgress();
   const promptHeightStyle = useAnimatedStyle(() => ({
-    height:
-      closedPromptHeight +
-      (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, keyboardProgress.value)),
+    height: resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value),
   }));
 
   // The draft's own laid-out height, reported by the input on every content
@@ -264,7 +296,7 @@ export function NewSessionPrompt({
   // top, so the offset into the cut line is measured from the clip edge: on iOS
   // the field scrolls through the padding before it cuts any text.
   const promptTopFadeStyle = useAnimatedStyle(() => ({
-    height: resolveComposerTopFadeHeight({
+    height: resolveComposerEdgeFadeHeight({
       scrollOffset: Math.max(
         0,
         promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
@@ -272,6 +304,29 @@ export function NewSessionPrompt({
       lineHeight: promptLineHeight,
     }),
   }));
+  // The same band at the bottom edge, for the line a scrolled field cuts there.
+  // It covers only the slot of the line that crosses the edge and is never
+  // taller than half a line, so it cannot dim a whole line. No content height is
+  // needed: a draft that ends above that slot leaves the band over blank card,
+  // where it is invisible, which also matters because iOS cannot report the
+  // content height. The band stays mounted, and its height is 0 where the edge
+  // lands on a line boundary.
+  const promptBottomFadeStyle = useAnimatedStyle(() => {
+    // The bottom clip edge in content coordinates: the scroll offset plus the
+    // field's rendered height, less the inset the platform clips at. The first
+    // line box starts one inset into the content, so the edge is measured from
+    // that line box.
+    const clipEdge =
+      promptScrollOffset.value +
+      resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value) -
+      PROMPT_BOTTOM_CLIP_INSET;
+    return {
+      height: resolveComposerEdgeFadeHeight({
+        scrollOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        lineHeight: promptLineHeight,
+      }),
+    };
+  });
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = Math.max(0, event.nativeEvent.contentOffset.y);
@@ -595,6 +650,20 @@ export function NewSessionPrompt({
               />
             </Animated.View>
           ) : null}
+          <Animated.View
+            className="absolute left-0 right-0"
+            pointerEvents="none"
+            style={[PROMPT_BOTTOM_FADE_STYLE, promptBottomFadeStyle]}
+          >
+            <LinearGradient
+              // Transparent above and the card's own color at the cut edge, so
+              // the line fades into the surface under it instead of ending hard.
+              colors={[resolveAlphaColor(colors.card, 0), resolveAlphaColor(colors.card, 1)]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={PROMPT_BOTTOM_FADE_FILL}
+            />
+          </Animated.View>
         </View>
         <View
           onLayout={event => {

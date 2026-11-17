@@ -187,7 +187,7 @@ describe('bitbucketConnectionFailure', () => {
         bitbucketConnectionFailure({ data: { code: 'UNAUTHORIZED', message } }, translate)
       ).toEqual({
         kind: 'role-refused',
-        message: 'prReview.connect.bitbucketAdminOnlyDescription',
+        message: 'prReview.connect.adminOnlyConnectDescription',
       });
     }
   });

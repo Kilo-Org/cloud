@@ -179,11 +179,12 @@ export function IntegrationProviderRow({
   // roles that can change them. That press leaves the app for the browser, as
   // Connect already does, so the hub reads as a list of destinations rather than
   // a list of labels. Its name repeats the subtitle, because the row's own name
-  // replaces its visible text.
+  // replaces its visible text. Bitbucket's page is the app's own connect sheet,
+  // so its name claims no browser trip.
   const opensProviderPage = !rowStartsConnect && action === null && !row.actionPending;
-  const blockedRowName = [t('common.openInBrowser'), label, subtitle].join(
-    t('common.sentenceJoiner')
-  );
+  const blockedRowName = (
+    row.provider === 'bitbucket' ? [label, subtitle] : [t('common.openInBrowser'), label, subtitle]
+  ).join(t('common.sentenceJoiner'));
   const configuredRow = (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}

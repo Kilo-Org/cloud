@@ -203,25 +203,28 @@ describe('blockedConnectionRoles', () => {
     );
   });
 
-  it('names the manage roles for a billing manager, who reaches every other row', () => {
+  it('names the manage roles for a billing manager, blocked on GitHub and Slack alone', () => {
     // GitHub and Slack ask for ORGANIZATION_MANAGE_ROLES, so a billing manager
     // is blocked there and nowhere else — connected or not, since both actions
     // follow the same set.
     const result = blockedConnectionRoles({
-      rows: rows(['github', 'slack']),
+      rows: rows(['github', 'slack', 'bitbucket']),
       scope: 'organization',
       role: 'billing_manager',
     });
     expect(result).toEqual(['owner', 'admin']);
   });
 
-  it('names the billing manager for an admin, who is blocked on Bitbucket alone', () => {
+  it('names nothing for an admin, whom every row rule admits', () => {
+    // Every provider rule here — the manage set, the billing set, and
+    // Bitbucket's own procedure set — includes the admin, so no blocked row
+    // remains and no role is named.
     const result = blockedConnectionRoles({
-      rows: rows(['bitbucket']),
+      rows: rows(['github', 'slack', 'bitbucket']),
       scope: 'organization',
       role: 'admin',
     });
-    expect(result).toEqual(['owner', 'billing_manager']);
+    expect(result).toEqual([]);
   });
 
   it('names nothing for an owner, who is offered every row', () => {

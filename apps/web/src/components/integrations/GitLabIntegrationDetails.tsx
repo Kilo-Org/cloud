@@ -725,29 +725,97 @@ export function GitLabIntegrationDetails({
 
                   {connectionMethod === 'oauth' ? (
                     <>
-                      <p className="text-muted-foreground mb-2 text-sm">
-                        {shell ? (
-                          'Using a self-hosted GitLab instance is a feature of Kilo Code Enterprise.'
+                      {/* OAuth Flow - Client ID/Secret only needed for self-hosted */}
+                      {isSelfHostedInput && instanceValidation.status === 'valid' && (
+                        <>
+                          <Alert>
+                            <AlertDescription className="text-sm">
+                              For self-hosted GitLab, you need to create an OAuth application on
+                              your instance:
+                              <ol className="mt-2 list-inside list-decimal space-y-1">
+                                <li>
+                                  Go to <strong>Admin Area → Applications</strong> (or User Settings
+                                  → Applications)
+                                </li>
+                                <li>
+                                  Create a new application with:
+                                  <ul className="mt-1 ml-4 list-inside list-disc text-xs">
+                                    <li>
+                                      Redirect URI:{' '}
+                                      <code className="bg-muted rounded px-1">
+                                        {typeof window !== 'undefined'
+                                          ? `${window.location.origin}${gitLabOAuthCallbackPath}`
+                                          : `https://app.kilo.ai${gitLabOAuthCallbackPath}`}
+                                      </code>
+                                    </li>
+                                    <li>
+                                      Scopes: <code className="bg-muted rounded px-1">api</code>,{' '}
+                                      <code className="bg-muted rounded px-1">read_user</code>,{' '}
+                                      <code className="bg-muted rounded px-1">read_repository</code>
+                                      ,{' '}
+                                      <code className="bg-muted rounded px-1">
+                                        write_repository
+                                      </code>
+                                    </li>
+                                  </ul>
+                                </li>
+                                <li>Copy the Client ID and Secret below</li>
+                              </ol>
+                            </AlertDescription>
+                          </Alert>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clientId">Client ID</Label>
+                            <Input
+                              id="clientId"
+                              type="text"
+                              placeholder="Your GitLab Client ID"
+                              value={clientId}
+                              onChange={e => setClientId(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clientSecret">Client Secret</Label>
+                            <Input
+                              id="clientSecret"
+                              type="password"
+                              placeholder="Your GitLab Client Secret"
+                              value={clientSecret}
+                              onChange={e => setClientSecret(e.target.value)}
+                            />
+                            <p className="text-muted-foreground text-xs">
+                              Your credentials are encrypted and stored securely.
+                            </p>
+                          </div>
+                        </>
+                      )}
+
+                      <Button
+                        onClick={handleConnect}
+                        size="lg"
+                        className="w-full"
+                        disabled={
+                          isStartingOAuthConnection ||
+                          (isSelfHostedInput &&
+                            (!clientId || !clientSecret || instanceValidation.status !== 'valid'))
+                        }
+                      >
+                        {isStartingOAuthConnection ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            Using a self-hosted GitLab instance is a{' '}
-                            <a
-                              href="https://kilo.ai/docs/automate/integrations"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary underline"
-                            >
-                              feature of Kilo Code Enterprise
-                            </a>
-                            . Contact{' '}
-                            <a href="mailto:sales@kilocode.ai" className="text-primary underline">
-                              Sales
-                            </a>{' '}
-                            to learn more.
-                          </>
+                          <GitBranch className="mr-2 h-4 w-4" />
                         )}
-                      </p>
-                      <div className="space-y-4 rounded-lg border p-4">
+                        {isStartingOAuthConnection
+                          ? 'Connecting...'
+                          : `Connect ${isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab`}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {/* PAT Flow */}
+                      <div className="space-y-4">
+                        {/* PAT Input */}
                         <div className="space-y-2">
                           <Label htmlFor="patToken">Personal Access Token</Label>
                           <div className="relative">

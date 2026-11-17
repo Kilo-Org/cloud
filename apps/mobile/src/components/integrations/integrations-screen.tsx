@@ -165,9 +165,14 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
 
   // A GitHub row whose installations the hub cannot name is the only row with a
   // web management link, and it opens the app-shell integration page through a
-  // one-time hand-off. Bitbucket's controls run in the app's own connect sheet.
+  // one-time hand-off. A Bitbucket row has no web page here: its connect sheet
+  // is the app's own surface for that provider, and it states the connection's
+  // state and the roles that may change it for a viewer without them.
   const manageRowOnWeb = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
+      if (organizationId) {
+        router.push(bitbucketConnectHref(organizationId));
+      }
       return;
     }
     void openAppShellHandoff(

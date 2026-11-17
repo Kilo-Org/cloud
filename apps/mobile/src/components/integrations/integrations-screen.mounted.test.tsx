@@ -461,17 +461,32 @@ describe('IntegrationsScreen', () => {
     for (const title of ['GitHub', 'Slack', 'GitLab', 'Bitbucket']) {
       const row = rowTitled(root, title);
       expect(actionOf(row)).toBeNull();
-      expect(row.props.accessibilityLabel).toBe(`Open in browser. ${title}. ${row.props.subtitle}`);
+      // Bitbucket's press opens the app's own connect sheet, so its name claims
+      // no browser trip; the other rows open the provider's web page.
+      const expectedName =
+        title === 'Bitbucket'
+          ? `Bitbucket. ${row.props.subtitle}`
+          : `Open in browser. ${title}. ${row.props.subtitle}`;
+      expect(row.props.accessibilityLabel).toBe(expectedName);
     }
     // The blocked rows follow two role sets for a member: GitHub and Slack ask
-    // for the manage set, and Bitbucket's page gate adds the billing manager, so
+    // for the manage set, and every billing-role connect (GitLab, Linear,
+    // Discord, Bitbucket) adds the billing manager, so
     // the sentence names all three and nothing else is rendered.
     expect(sharedNotes(root)).toEqual([OWNER_ADMIN_BILLING_NOTE]);
 
     press(rowTitled(root, 'GitLab'));
-    expect(calls.openExternal).toHaveBeenCalledWith(
-      expect.stringContaining('/organizations/org-1/integrations/gitlab')
+    expect(calls.handoff).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 'integration', platform: 'gitlab', organizationId: 'org-1' })
     );
+
+    // A blocked Bitbucket row's press opens the app's own connect sheet, which
+    // states the connection's state and the roles that may change it.
+    press(rowTitled(root, 'Bitbucket'));
+    expect(calls.push).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
   });
 
   it('shows no shared note to an owner, who is offered every row', () => {
@@ -507,17 +522,18 @@ describe('IntegrationsScreen', () => {
     expect(sharedNotes(root)).toEqual([OWNER_ADMIN_NOTE]);
   });
 
-  it('names the billing manager for an admin, blocked on Bitbucket alone', () => {
+  it('shows no note to an admin, whom every provider rule admits', () => {
     state.role = 'admin';
     state.statuses.data = [
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
     const root = mount('org-1').root;
 
-    // Bitbucket's page gate is owner or billing manager, so an admin reaches a
-    // read-only page there and every other row offers its own control.
-    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    expect(sharedNotes(root)).toEqual([OWNER_BILLING_NOTE]);
+    // Bitbucket's row calls the same organization procedures every other
+    // provider follows, and their role sets all include the admin, so the row
+    // keeps its action and the hub names no role.
+    expect(actionOf(rowTitled(root, 'Bitbucket'))).not.toBeNull();
+    expect(sharedNotes(root)).toEqual([]);
   });
 
   it('names one role with the owner-only sentence, and none for an empty union', () => {

@@ -374,7 +374,7 @@ patchedDependencies:
   # text layout threw ("Required value was null"). Start each instance's tags at
   # the range it claims (apps/mobile/src/lib/view-tag-range.ts,
   # modules/kilo-view-tag-range), defaulting to the platform's own start.
-  react-native@0.88.0: patches/react-native@0.88.0.patch
+  react-native@0.88.1: patches/react-native@0.88.1.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.
   react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch

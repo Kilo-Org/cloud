@@ -153,10 +153,6 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
-  [
-    'ask an organization owner, admin, or billing manager to reconnect it',
-    'the GitLab reconnect ask, versus the Bitbucket reconnect ask, whose own key keeps a reword of one provider from changing the other',
-  ],
 ]);
 
 /**

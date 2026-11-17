@@ -242,7 +242,14 @@ export function ProfileScreen() {
     const { height } = event.nativeEvent.layout;
     // A guarded update: an equal height leaves the state identity untouched so
     // the reveal effect does not rerun on every unrelated layout pass.
-    setDeleteScrollFrameHeight(current => (current === height ? current : height));
+    // Deferred one frame: Fabric can deliver this layout callback in the same
+    // tick it places the screen's tree, and a setState inside that tick logs
+    // "Can't perform a React state update on a component that hasn't mounted
+    // yet". The next frame runs after the commit, so the measured height is the
+    // committed one and the update lands on a mounted fiber.
+    requestAnimationFrame(() => {
+      setDeleteScrollFrameHeight(current => (current === height ? current : height));
+    });
   }, []);
 
   // The confirmation is the app's own dialog, not the native alert: Android's

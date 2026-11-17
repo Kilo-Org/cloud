@@ -34,15 +34,16 @@ describe('applyDevLogBoxFilters', () => {
 });
 
 describe('design-gate probe', () => {
-  it('scopes the layout-measure suppression to the probe module, not the app entry', () => {
+  it('registers no LogBox filter anywhere in the app', () => {
     const probeSource = readFileSync(
       join(__dirname, '..', 'components', 'design-gate-probe.tsx'),
       'utf8'
     );
     const entrySource = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
-    // The Fabric layout-measure warning stays a live signal in ordinary dev
-    // builds; only the gate's own mount may drop it.
-    expect(probeSource).toContain("Can't perform a React state update on a component");
+    // The pre-mount state-update warning is a live defect signal; no module may
+    // drop it. (The layout-measure race it names is fixed at the measurement,
+    // not silenced.)
+    expect(probeSource).not.toContain('ignoreLogs');
     expect(entrySource).not.toContain("Can't perform a React state update on a component");
   });
 });

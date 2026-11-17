@@ -69,16 +69,28 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
     createTriggerDraft(deviceTimeZone())
   );
   const [draft, setDraft] = useState<TriggerDraft>(() => initialDraft);
+  // A create that succeeded owns this screen's submit: the hand-off should
+  // retire the form, but the navigator can refuse that retire and leave this
+  // screen focused with the created trigger's values on it. Submitting again
+  // would post the trigger a second time, so the form stays submitted for the
+  // life of the draft, and a field edit that sets a new draft starts a new one.
+  const [submittedDraft, setSubmittedDraft] = useState<TriggerDraft | null>(null);
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const create = useMutation(trpc.webhookTriggers.create.mutationOptions());
   const problems = triggerDraftProblems(draft, { mode: 'create', authConfigured: false });
   const submitting = feedback.status === 'pending';
+  // A create that succeeded owns this screen's save until an edit starts a new
+  // draft: the form the hand-off leaves mounted must not post a second copy.
+  const submitted = draft === submittedDraft;
   const guard = useMetadataLeaveGuard({
     enabled: true,
     isDirty: () => isDraftDirty(draft, initialDraft),
   });
 
   const submit = async () => {
+    if (submitted) {
+      return;
+    }
     const attempt = begin();
     if (attempt === null) {
       return;
@@ -98,6 +110,10 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
       // The saved values are the new baseline: a screen the hand-off leaves
       // mounted reads its own saved draft as clean, and a later edit asks.
       setInitialDraft(draft);
+      // A screen the hand-off leaves mounted must not post a second trigger:
+      // one create is the screen's only save. A field edit that replaces the
+      // draft starts a new one and re-enables the submit.
+      setSubmittedDraft(draft);
       // Landing on the detail replaces this create screen: Back must not return
       // to a form for a trigger that now exists. Leaving through the guard
       // disarms it first, so the retire `navigation.reset` that the push-then-
@@ -131,12 +147,13 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
           problems={problems}
           onDraftChange={next => {
             clearWhere(candidate => candidate.kind === 'rejected');
+            setSubmittedDraft(null);
             setDraft(next);
           }}
           authConfigured={false}
           submitting={submitting}
           submitLabel={t('cloudAgent.triggers.new')}
-          canSubmit={!hasTriggerDraftProblems(problems) && !submitting}
+          canSubmit={!hasTriggerDraftProblems(problems) && !submitting && !submitted}
           onSubmit={() => {
             void submit();
           }}

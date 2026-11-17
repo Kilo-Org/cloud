@@ -304,4 +304,49 @@ describe('TriggerCreateScreen leave guard', () => {
     pressBack();
     expect(h.confirm).toHaveBeenCalledTimes(1);
   });
+
+  it('a surviving screen does not post a second trigger before an edit', async () => {
+    // The hand-off dropped the retire: the screen still shows the created
+    // trigger's values and its New button reads as valid. Submitting again
+    // would post the trigger a second time, so the create stays done.
+    h.createMutation.mutateAsync.mockResolvedValue({ triggerId: 'trigger-new' });
+    const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
+
+    editDraft(renderer, {
+      name: 'trigger-new',
+      repository: 'owner/repo',
+      model: 'kilo-auto/efficient',
+    });
+    await submitForm(renderer);
+    await waitFor(() => h.replace.mock.calls.length === 1);
+
+    await submitForm(renderer);
+
+    expect(h.createMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.replace).toHaveBeenCalledTimes(1);
+    // The form paints the saved values and the New button is disabled: the
+    // screen reflects that its draft is saved until an edit starts a new one.
+    await waitFor(() => expect(h.guard.enabled).toBe(false));
+  });
+
+  it('an edit after a surviving create starts a new draft and re-enables the submit', async () => {
+    h.createMutation.mutateAsync.mockResolvedValue({ triggerId: 'trigger-new' });
+    const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
+
+    editDraft(renderer, {
+      name: 'trigger-new',
+      repository: 'owner/repo',
+      model: 'kilo-auto/efficient',
+    });
+    await submitForm(renderer);
+    await waitFor(() => h.replace.mock.calls.length === 1);
+
+    editDraft(renderer, { name: 'trigger-next' });
+    await submitForm(renderer);
+
+    expect(h.createMutation.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(h.createMutation.mutateAsync.mock.calls[1]?.[0]).toMatchObject({
+      triggerId: 'trigger-next',
+    });
+  });
 });

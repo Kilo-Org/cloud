@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "પ્રદાતા કી",
       "rowSubtitle": "તમારા પોતાના પ્રદાતાના બિલિંગનો ઉપયોગ કરો",
-      "manageOnWebReason": "આ પ્રદાતાઓને સંરચિત ઓળખપત્રોની જરૂર છે.",
+      "orgDescription": "આ કી સંસ્થાના દરેક સભ્ય સાથે શેર થાય છે અને તેનું બિલ સંસ્થાના પ્રદાતા એકાઉન્ટમાં લાગે છે.",
+      "viewOnly": "ફક્ત સંસ્થાના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ તેની કી બદલી શકે છે.",
       "description": "આ કી દ્વારા થતી વિનંતીઓનું બિલ તમારા Kilo બેલેન્સને બદલે તમારા પ્રદાતા એકાઉન્ટમાં લાગે છે.",
       "managedByPlan": "તમારા કોડિંગ પ્લાન દ્વારા સંચાલિત",
       "enableKey": "{{provider}} કી ચાલુ કરો",
@@ -370,6 +371,7 @@
       "removeMessage": "આ કીનો ઉપયોગ કરતી વિનંતીઓ હવે તમારા પ્રદાતાના બિલિંગનો ઉપયોગ કરશે નહીં.",
       "add": "કી ઉમેરો",
       "added": "કી ઉમેરી",
+      "updated": "કી અપડેટ કરી",
       "emptyTitle": "કોઈ પ્રદાતા કી નથી",
       "emptyDescription": "શરૂ કરવા કી ઉમેરો.",
       "chooseProvider": "પ્રદાતા પસંદ કરો",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "આ શોધ સાથે કોઈ પ્રદાતા મેળ ખાતો નથી.",
       "newKeyTitle": "નવી કી",
       "newKeyDescription": "કી એન્ક્રિપ્ટ કરીને સંગ્રહિત થાય છે અને ફરી બતાવી શકાતી નથી.",
+      "edit": "કી સંપાદિત કરો",
+      "editKeyTitle": "કી બદલો",
+      "editKeyDescription": "સંગ્રહિત મૂલ્ય બતાવી શકાતું નથી. તેને બદલવા માટે નવું મૂલ્ય દાખલ કરો.",
+      "editKeyMappingsWarning": "કી બદલવાથી સંગ્રહિત મોડેલ મેપિંગ પણ બદલાય છે: તમને હજી જરૂરી હોય તે દરેક મેપિંગ ફરીથી દાખલ કરો.",
+      "saveFailed": "કી સાચવી શકાઈ નથી.",
+      "invalidCredentials": "ઓળખપત્રો તપાસો અને ફરી પ્રયાસ કરો.",
+      "fieldRequired": "{{field}} જરૂરી છે.",
+      "incompleteMapping": "મેપિંગ {{number}} માટે ગેટવે મોડેલ સ્લગ અને ડિપ્લોયમેન્ટ નામ બંને જરૂરી છે.",
       "apiKeyLabel": "API કી",
       "apiKeyPlaceholder": "કી પેસ્ટ કરો",
-      "apiKeyRequired": "કી દાખલ કરો."
+      "apiKeyRequired": "કી દાખલ કરો.",
+      "authMethod": "પ્રમાણીકરણ પદ્ધતિ",
+      "authMethodAccessKeys": "ઍક્સેસ કી",
+      "resourceName": "Azure સંસાધનનું નામ",
+      "region": "AWS પ્રદેશ",
+      "accessKeyId": "ઍક્સેસ કી ID",
+      "secretAccessKey": "સિક્રેટ ઍક્સેસ કી",
+      "project": "Google Cloud પ્રોજેક્ટ",
+      "location": "Vertex સ્થાન",
+      "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
+      "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "modelMappings": "મોડેલ મેપિંગ",
+      "modelMappingsDescription": "ગેટવે મોડેલને કસ્ટમ ડિપ્લોયમેન્ટ નામ પર મોકલો.",
+      "mappingTitle": "મેપિંગ {{number}}",
+      "mappingGatewayModel": "ગેટવે મોડેલ સ્લગ",
+      "mappingCustomModel": "ડિપ્લોયમેન્ટ નામ",
+      "addMapping": "મેપિંગ ઉમેરો",
+      "removeMapping": "મેપિંગ {{number}} દૂર કરો"
     },
     "dataExport": {
       "title": "તમારો ડેટા",
@@ -453,7 +480,8 @@
       "nextStepFinal": "અપીલનો નિર્ણય અંતિમ છે. હવે વધુ અપીલ કરી શકાતી નથી.",
       "viewReceipt": "રસીદ જુઓ"
     },
-    "changelog": "નવું શું છે"
+    "changelog": "નવું શું છે",
+    "changelogVersionPending": "આ સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે."
   },
   "preferences": {
     "general": "સામાન્ય",

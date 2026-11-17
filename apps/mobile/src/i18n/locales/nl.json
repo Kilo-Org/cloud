@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
-      "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
+      "orgDescription": "Deze sleutels worden gedeeld met iedereen in de organisatie en gefactureerd aan de provideraccounts van de organisatie.",
+      "viewOnly": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de sleutels wijzigen.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
@@ -370,6 +371,7 @@
       "removeMessage": "Verzoeken die deze sleutel gebruikten, worden niet meer via je provider gefactureerd.",
       "add": "Sleutel toevoegen",
       "added": "Sleutel toegevoegd",
+      "updated": "Sleutel bijgewerkt",
       "emptyTitle": "Geen providersleutels",
       "emptyDescription": "Voeg een sleutel toe om te beginnen.",
       "chooseProvider": "Kies een provider",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Geen enkele provider komt overeen met deze zoekopdracht.",
       "newKeyTitle": "Nieuwe sleutel",
       "newKeyDescription": "De sleutel wordt versleuteld opgeslagen en kan niet opnieuw worden getoond.",
+      "edit": "Sleutel bewerken",
+      "editKeyTitle": "Sleutel vervangen",
+      "editKeyDescription": "De opgeslagen waarde kan niet worden getoond. Voer een nieuwe in om deze te vervangen.",
+      "editKeyMappingsWarning": "Bij het vervangen van de sleutel worden ook de opgeslagen modelkoppelingen vervangen: voer elke koppeling die u nog nodig hebt opnieuw in.",
+      "saveFailed": "Kan de sleutel niet opslaan.",
+      "invalidCredentials": "Controleer de inloggegevens en probeer het opnieuw.",
+      "fieldRequired": "{{field}} is verplicht.",
+      "incompleteMapping": "Koppeling {{number}} heeft zowel een slug van gatewaymodel als een deploymentnaam nodig.",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Plak de sleutel",
-      "apiKeyRequired": "Voer de sleutel in."
+      "apiKeyRequired": "Voer de sleutel in.",
+      "authMethod": "Verificatiemethode",
+      "authMethodAccessKeys": "Toegangssleutels",
+      "resourceName": "Azure-resourcenaam",
+      "region": "AWS-regio",
+      "accessKeyId": "Toegangssleutel-ID",
+      "secretAccessKey": "Geheime toegangssleutel",
+      "project": "Google Cloud-project",
+      "location": "Vertex-locatie",
+      "clientEmail": "E-mailadres van serviceaccount",
+      "privateKey": "Privésleutel van serviceaccount",
+      "modelMappings": "Modelkoppelingen",
+      "modelMappingsDescription": "Stuur een gatewaymodel door naar een aangepaste deploymentnaam.",
+      "mappingTitle": "Koppeling {{number}}",
+      "mappingGatewayModel": "Slug van gatewaymodel",
+      "mappingCustomModel": "Deploymentnaam",
+      "addMapping": "Koppeling toevoegen",
+      "removeMapping": "Koppeling {{number}} verwijderen"
     },
     "dataExport": {
       "title": "Je gegevens",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
-    "changelog": "Nieuw in deze versie"
+    "changelog": "Nieuw in deze versie",
+    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
   },
   "preferences": {
     "general": "Algemeen",

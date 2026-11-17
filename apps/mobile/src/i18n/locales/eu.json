@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Hornitzaileen gakoak",
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
-      "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
+      "orgDescription": "Gako hauek erakundeko guztiekin partekatzen dira, eta erakundearen hornitzaile-kontuetan fakturatzen dira.",
+      "viewOnly": "Erakundeko jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik alda ditzake erakundearen gakoak.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
       "managedByPlan": "Zure kodetze-planak kudeatzen du",
       "enableKey": "Gaitu {{provider}} gakoa",
@@ -370,6 +371,7 @@
       "removeMessage": "Gako hau erabiltzen zuten eskaerek ez dute aurrerantzean zure hornitzailearen fakturazioa erabiliko.",
       "add": "Gehitu gakoa",
       "added": "Gakoa gehitu da",
+      "updated": "Gakoa eguneratu da",
       "emptyTitle": "Ez dago hornitzaile-gakorik",
       "emptyDescription": "Gehitu gakoa hasteko.",
       "chooseProvider": "Aukeratu hornitzaile bat",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Ez dago bilaketa horrekin bat datorren hornitzailerik.",
       "newKeyTitle": "Gako berria",
       "newKeyDescription": "Gakoa zifratuta gordetzen da, eta ezin da berriro erakutsi.",
+      "edit": "Editatu gakoa",
+      "editKeyTitle": "Ordeztu gakoa",
+      "editKeyDescription": "Gordetako balioa ezin da erakutsi. Idatzi berri bat hura ordezteko.",
+      "editKeyMappingsWarning": "Gakoa ordezteak gordetako eredu-esleipenak ere ordezten ditu: sartu berriro oraindik behar dituzun esleipen guztiak.",
+      "saveFailed": "Ezin izan da gakoa gorde.",
+      "invalidCredentials": "Egiaztatu kredentzialak eta saiatu berriro.",
+      "fieldRequired": "{{field}} derrigorrezkoa da.",
+      "incompleteMapping": "{{number}}. esleipenak bai atebideko ereduaren slug-a bai inplementazio-izena behar ditu.",
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
-      "apiKeyRequired": "Idatzi gakoa."
+      "apiKeyRequired": "Idatzi gakoa.",
+      "authMethod": "Autentifikazio-metodoa",
+      "authMethodAccessKeys": "Sarbide-gakoak",
+      "resourceName": "Azure baliabidearen izena",
+      "region": "AWS eskualdea",
+      "accessKeyId": "Sarbide-gakoaren IDa",
+      "secretAccessKey": "Sarbide-gako sekretua",
+      "project": "Google Cloud proiektua",
+      "location": "Vertex kokapena",
+      "clientEmail": "Zerbitzu-kontuaren helbide elektronikoa",
+      "privateKey": "Zerbitzu-kontuaren gako pribatua",
+      "modelMappings": "Eredu-esleipenak",
+      "modelMappingsDescription": "Bideratu atebideko eredu bat inplementazio-izen pertsonalizatu batera.",
+      "mappingTitle": "{{number}}. esleipena",
+      "mappingGatewayModel": "Atebideko ereduaren slug-a",
+      "mappingCustomModel": "Inplementazio-izena",
+      "addMapping": "Gehitu esleipena",
+      "removeMapping": "Kendu {{number}}. esleipena"
     },
     "dataExport": {
       "title": "Zure datuak",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },
-    "changelog": "Berritasunak"
+    "changelog": "Berritasunak",
+    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
   },
   "preferences": {
     "general": "Orokorra",

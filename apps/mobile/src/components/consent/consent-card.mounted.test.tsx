@@ -1,6 +1,5 @@
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
-import * as WebBrowser from 'expo-web-browser';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -47,7 +46,6 @@ const mockedBack = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   LineChart: 'LineChart',
@@ -62,7 +60,6 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({
-  PRIVACY_URL: 'https://kilo.ai/privacy-app',
   WEB_BASE_URL: 'https://kilo.ai',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -636,8 +633,8 @@ describe('ConsentCard', () => {
     }
   });
 
-  it('gives the pinned disclosure privacy link a full target and opens the policy', async () => {
-    vi.mocked(WebBrowser.openBrowserAsync).mockClear();
+  it('gives the pinned disclosure privacy link a full target and opens the policy natively', async () => {
+    mockedPush.mockClear();
     const links = (['onboarding', 'review'] as const).map(mode => {
       const root = mountCard(mode).root;
       const found = root.findAll(
@@ -673,8 +670,10 @@ describe('ConsentCard', () => {
       }
     });
 
-    const openBrowser = vi.mocked(WebBrowser.openBrowserAsync);
-    expect(openBrowser).toHaveBeenCalledTimes(2);
-    expect(openBrowser).toHaveBeenCalledWith('https://kilo.ai/privacy-app');
+    expect(mockedPush).toHaveBeenCalledTimes(2);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 });

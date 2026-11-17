@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "제공업체 키",
       "rowSubtitle": "내 제공업체 결제 사용",
-      "manageOnWebReason": "이 제공업체에는 구조화된 자격 증명이 필요합니다.",
+      "orgDescription": "이 키는 조직의 모든 구성원과 공유되며 조직의 제공업체 계정으로 청구됩니다.",
+      "viewOnly": "조직 소유자, 관리자 또는 결제 관리자만 키를 변경할 수 있습니다.",
       "description": "이 키를 통한 요청은 Kilo 잔액 대신 제공업체 계정으로 청구됩니다.",
       "managedByPlan": "코딩 플랜에서 관리됨",
       "enableKey": "{{provider}} 키 사용",
@@ -370,6 +371,7 @@
       "removeMessage": "이 키를 사용하던 요청은 더 이상 제공업체 결제를 사용하지 않습니다.",
       "add": "키 추가",
       "added": "키 추가됨",
+      "updated": "키 업데이트됨",
       "emptyTitle": "제공업체 키 없음",
       "emptyDescription": "키 추가로 시작하세요.",
       "chooseProvider": "제공업체 선택",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "검색과 일치하는 제공업체가 없습니다.",
       "newKeyTitle": "새 키",
       "newKeyDescription": "키는 암호화되어 저장되며 다시 표시할 수 없습니다.",
+      "edit": "키 편집",
+      "editKeyTitle": "키 교체",
+      "editKeyDescription": "저장된 값은 표시할 수 없습니다. 교체하려면 새 값을 입력하세요.",
+      "editKeyMappingsWarning": "키를 교체하면 저장된 모델 매핑도 함께 교체되므로, 계속 사용할 매핑은 다시 입력하세요.",
+      "saveFailed": "키를 저장할 수 없습니다.",
+      "invalidCredentials": "자격 증명을 확인한 후 다시 시도하세요.",
+      "fieldRequired": "{{field}}은(는) 필수 항목입니다.",
+      "incompleteMapping": "매핑 {{number}}에는 게이트웨이 모델 슬러그와 배포 이름이 모두 필요합니다.",
       "apiKeyLabel": "API 키",
       "apiKeyPlaceholder": "키 붙여넣기",
-      "apiKeyRequired": "키를 입력하세요."
+      "apiKeyRequired": "키를 입력하세요.",
+      "authMethod": "인증 방법",
+      "authMethodAccessKeys": "액세스 키",
+      "resourceName": "Azure 리소스 이름",
+      "region": "AWS 리전",
+      "accessKeyId": "액세스 키 ID",
+      "secretAccessKey": "비밀 액세스 키",
+      "project": "Google Cloud 프로젝트",
+      "location": "Vertex 위치",
+      "clientEmail": "서비스 계정 이메일",
+      "privateKey": "서비스 계정 비공개 키",
+      "modelMappings": "모델 매핑",
+      "modelMappingsDescription": "게이트웨이 모델을 사용자 지정 배포 이름으로 보냅니다.",
+      "mappingTitle": "매핑 {{number}}",
+      "mappingGatewayModel": "게이트웨이 모델 슬러그",
+      "mappingCustomModel": "배포 이름",
+      "addMapping": "매핑 추가",
+      "removeMapping": "매핑 {{number}} 삭제"
     },
     "dataExport": {
       "title": "내 데이터",
@@ -453,7 +480,8 @@
       "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
       "viewReceipt": "접수증 보기"
     },
-    "changelog": "새로운 기능"
+    "changelog": "새로운 기능",
+    "changelogVersionPending": "이 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다."
   },
   "preferences": {
     "general": "일반",

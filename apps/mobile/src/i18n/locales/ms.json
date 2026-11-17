@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Kunci pembekal",
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
-      "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
+      "orgDescription": "Kunci ini dikongsi dengan semua orang dalam organisasi dan dibilkan kepada akaun pembekal organisasi tersebut.",
+      "viewOnly": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh menukar kuncinya.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
       "managedByPlan": "Diurus oleh pelan pengekodan anda",
       "enableKey": "Dayakan kunci {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Permintaan yang menggunakan kunci ini tidak lagi akan menggunakan pengebilan pembekal anda.",
       "add": "Tambah kunci",
       "added": "Kunci ditambah",
+      "updated": "Kunci dikemas kini",
       "emptyTitle": "Tiada kunci pembekal",
       "emptyDescription": "Tambah kunci untuk bermula.",
       "chooseProvider": "Pilih pembekal",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Tiada pembekal yang sepadan dengan carian itu.",
       "newKeyTitle": "Kunci baharu",
       "newKeyDescription": "Kunci disimpan secara tersulit dan tidak boleh ditunjukkan lagi.",
+      "edit": "Edit kunci",
+      "editKeyTitle": "Gantikan kunci",
+      "editKeyDescription": "Nilai yang disimpan tidak boleh ditunjukkan. Masukkan nilai baharu untuk menggantikannya.",
+      "editKeyMappingsWarning": "Menggantikan kunci turut menggantikan pemetaan model yang disimpan: masukkan semula setiap pemetaan yang masih anda perlukan.",
+      "saveFailed": "Tidak dapat menyimpan kunci.",
+      "invalidCredentials": "Semak kelayakan dan cuba lagi.",
+      "fieldRequired": "{{field}} diperlukan.",
+      "incompleteMapping": "Pemetaan {{number}} memerlukan kedua-dua slug model gateway dan nama deployment.",
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tampal kunci",
-      "apiKeyRequired": "Masukkan kunci."
+      "apiKeyRequired": "Masukkan kunci.",
+      "authMethod": "Kaedah pengesahan",
+      "authMethodAccessKeys": "Kunci akses",
+      "resourceName": "Nama sumber Azure",
+      "region": "Rantau AWS",
+      "accessKeyId": "ID kunci akses",
+      "secretAccessKey": "Kunci akses rahsia",
+      "project": "Projek Google Cloud",
+      "location": "Lokasi Vertex",
+      "clientEmail": "E-mel akaun perkhidmatan",
+      "privateKey": "Kunci peribadi akaun perkhidmatan",
+      "modelMappings": "Pemetaan model",
+      "modelMappingsDescription": "Halakan model gateway kepada nama deployment tersuai.",
+      "mappingTitle": "Pemetaan {{number}}",
+      "mappingGatewayModel": "Slug model gateway",
+      "mappingCustomModel": "Nama deployment",
+      "addMapping": "Tambah pemetaan",
+      "removeMapping": "Alih keluar pemetaan {{number}}"
     },
     "dataExport": {
       "title": "Data anda",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
     },
-    "changelog": "Yang baharu"
+    "changelog": "Yang baharu",
+    "changelogVersionPending": "Nota versi ini akan tiba bersama kemas kini apl seterusnya."
   },
   "preferences": {
     "general": "Umum",

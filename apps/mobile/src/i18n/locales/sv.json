@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Leverantörsnycklar",
       "rowSubtitle": "Använd din egen leverantörsfakturering",
-      "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
+      "orgDescription": "Dessa nycklar delas med alla i organisationen och faktureras organisationens leverantörskonton.",
+      "viewOnly": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan ändra nycklarna.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
       "managedByPlan": "Hanteras av din kodningsplan",
       "enableKey": "Aktivera nyckeln för {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Förfrågningar som använde den här nyckeln slutar att använda din leverantörsfakturering.",
       "add": "Lägg till nyckel",
       "added": "Nyckeln har lagts till",
+      "updated": "Nyckeln har uppdaterats",
       "emptyTitle": "Inga leverantörsnycklar",
       "emptyDescription": "Lägg till en nyckel för att komma igång.",
       "chooseProvider": "Välj en leverantör",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Ingen leverantör matchar sökningen.",
       "newKeyTitle": "Ny nyckel",
       "newKeyDescription": "Nyckeln lagras krypterad och kan inte visas igen.",
+      "edit": "Redigera nyckel",
+      "editKeyTitle": "Ersätt nyckel",
+      "editKeyDescription": "Det lagrade värdet kan inte visas. Ange ett nytt för att ersätta det.",
+      "editKeyMappingsWarning": "Att ersätta nyckeln ersätter även de sparade modellmappningarna: ange alla mappningar du fortfarande behöver på nytt.",
+      "saveFailed": "Det gick inte att spara nyckeln.",
+      "invalidCredentials": "Kontrollera autentiseringsuppgifterna och försök igen.",
+      "fieldRequired": "{{field}} måste anges.",
+      "incompleteMapping": "Mappning {{number}} måste ha både gatewaymodellens slug och ett distributionsnamn.",
       "apiKeyLabel": "API-nyckel",
       "apiKeyPlaceholder": "Klistra in nyckeln",
-      "apiKeyRequired": "Ange nyckeln."
+      "apiKeyRequired": "Ange nyckeln.",
+      "authMethod": "Autentiseringsmetod",
+      "authMethodAccessKeys": "Åtkomstnycklar",
+      "resourceName": "Azure-resursnamn",
+      "region": "AWS-region",
+      "accessKeyId": "Åtkomstnyckel-ID",
+      "secretAccessKey": "Hemlig åtkomstnyckel",
+      "project": "Google Cloud-projekt",
+      "location": "Vertex-plats",
+      "clientEmail": "E-postadress för tjänstkonto",
+      "privateKey": "Privat nyckel för tjänstkonto",
+      "modelMappings": "Modellmappningar",
+      "modelMappingsDescription": "Dirigera en gatewaymodell till ett anpassat distributionsnamn.",
+      "mappingTitle": "Mappning {{number}}",
+      "mappingGatewayModel": "Gatewaymodellens slug",
+      "mappingCustomModel": "Distributionsnamn",
+      "addMapping": "Lägg till mappning",
+      "removeMapping": "Ta bort mappning {{number}}"
     },
     "dataExport": {
       "title": "Dina data",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
-    "changelog": "Nyheter"
+    "changelog": "Nyheter",
+    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
   },
   "preferences": {
     "general": "Allmänt",

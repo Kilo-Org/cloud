@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "ਪ੍ਰਦਾਤਾ ਕੁੰਜੀਆਂ",
       "rowSubtitle": "ਆਪਣੇ ਪ੍ਰਦਾਤਾ ਦੀ ਬਿਲਿੰਗ ਵਰਤੋ",
-      "manageOnWebReason": "ਇਹਨਾਂ ਪ੍ਰਦਾਤਾਵਾਂ ਨੂੰ ਢਾਂਚਾਗਤ ਕ੍ਰੈਡੈਂਸ਼ੀਅਲਾਂ ਦੀ ਲੋੜ ਹੈ।",
+      "orgDescription": "ਇਹ ਕੁੰਜੀਆਂ ਸੰਗਠਨ ਦੇ ਸਾਰੇ ਮੈਂਬਰਾਂ ਨਾਲ ਸਾਂਝੀਆਂ ਕੀਤੀਆਂ ਜਾਂਦੀਆਂ ਹਨ ਅਤੇ ਇਨ੍ਹਾਂ ਦਾ ਬਿੱਲ ਸੰਗਠਨ ਦੇ ਪ੍ਰਦਾਤਾ ਖਾਤਿਆਂ ਵਿੱਚ ਜਾਂਦਾ ਹੈ।",
+      "viewOnly": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀਆਂ ਕੁੰਜੀਆਂ ਬਦਲ ਸਕਦਾ ਹੈ।",
       "description": "ਇਨ੍ਹਾਂ ਕੁੰਜੀਆਂ ਰਾਹੀਂ ਕੀਤੀਆਂ ਬੇਨਤੀਆਂ ਦਾ ਬਿੱਲ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਦੀ ਬਜਾਏ ਤੁਹਾਡੇ ਪ੍ਰਦਾਤਾ ਖਾਤੇ ਵਿੱਚ ਜਾਂਦਾ ਹੈ।",
       "managedByPlan": "ਤੁਹਾਡੇ ਕੋਡਿੰਗ ਪਲਾਨ ਵੱਲੋਂ ਪ੍ਰਬੰਧਿਤ",
       "enableKey": "{{provider}} ਕੁੰਜੀ ਚਾਲੂ ਕਰੋ",
@@ -370,6 +371,7 @@
       "removeMessage": "ਇਹ ਕੁੰਜੀ ਵਰਤਣ ਵਾਲੀਆਂ ਬੇਨਤੀਆਂ ਹੁਣ ਤੁਹਾਡੇ ਪ੍ਰਦਾਤਾ ਦੀ ਬਿਲਿੰਗ ਨਹੀਂ ਵਰਤਣਗੀਆਂ।",
       "add": "ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ",
       "added": "ਕੁੰਜੀ ਸ਼ਾਮਲ ਕੀਤੀ ਗਈ",
+      "updated": "ਕੁੰਜੀ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
       "emptyTitle": "ਕੋਈ ਪ੍ਰਦਾਤਾ ਕੁੰਜੀ ਨਹੀਂ",
       "emptyDescription": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ।",
       "chooseProvider": "ਪ੍ਰਦਾਤਾ ਚੁਣੋ",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "ਕੋਈ ਵੀ ਪ੍ਰਦਾਤਾ ਇਸ ਖੋਜ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "newKeyTitle": "ਨਵੀਂ ਕੁੰਜੀ",
       "newKeyDescription": "ਕੁੰਜੀ ਇਨਕ੍ਰਿਪਟ ਕਰਕੇ ਸਟੋਰ ਕੀਤੀ ਜਾਂਦੀ ਹੈ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਵਿਖਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
+      "edit": "ਕੁੰਜੀ ਸੋਧੋ",
+      "editKeyTitle": "ਕੁੰਜੀ ਬਦਲੋ",
+      "editKeyDescription": "ਸਟੋਰ ਕੀਤਾ ਮੁੱਲ ਵਿਖਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ। ਇਸਨੂੰ ਬਦਲਣ ਲਈ ਨਵਾਂ ਮੁੱਲ ਦਰਜ ਕਰੋ।",
+      "editKeyMappingsWarning": "ਕੁੰਜੀ ਬਦਲਣ ਨਾਲ ਸਟੋਰ ਕੀਤੀਆਂ ਮਾਡਲ ਮੈਪਿੰਗਾਂ ਵੀ ਬਦਲ ਜਾਣਗੀਆਂ: ਹਰ ਉਹ ਮੈਪਿੰਗ ਦੁਬਾਰਾ ਦਰਜ ਕਰੋ ਜੋ ਤੁਹਾਨੂੰ ਹਾਲੇ ਵੀ ਚਾਹੀਦੀ ਹੈ।",
+      "saveFailed": "ਕੁੰਜੀ ਸੇਵ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+      "invalidCredentials": "ਕ੍ਰੈਡੈਂਸ਼ੀਅਲਾਂ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "fieldRequired": "{{field}} ਲੋੜੀਂਦਾ ਹੈ।",
+      "incompleteMapping": "ਮੈਪਿੰਗ {{number}} ਲਈ ਗੇਟਵੇ ਮਾਡਲ slug ਅਤੇ ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ ਦੋਵੇਂ ਲੋੜੀਂਦੇ ਹਨ।",
       "apiKeyLabel": "API ਕੁੰਜੀ",
       "apiKeyPlaceholder": "ਕੁੰਜੀ ਪੇਸਟ ਕਰੋ",
-      "apiKeyRequired": "ਕੁੰਜੀ ਦਰਜ ਕਰੋ।"
+      "apiKeyRequired": "ਕੁੰਜੀ ਦਰਜ ਕਰੋ।",
+      "authMethod": "ਪ੍ਰਮਾਣੀਕਰਨ ਵਿਧੀ",
+      "authMethodAccessKeys": "ਐਕਸੈਸ ਕੁੰਜੀਆਂ",
+      "resourceName": "Azure ਰਿਸੋਰਸ ਨਾਮ",
+      "region": "AWS ਖੇਤਰ",
+      "accessKeyId": "ਐਕਸੈਸ ਕੁੰਜੀ ID",
+      "secretAccessKey": "ਗੁਪਤ ਐਕਸੈਸ ਕੁੰਜੀ",
+      "project": "Google Cloud ਪ੍ਰੋਜੈਕਟ",
+      "location": "Vertex ਟਿਕਾਣਾ",
+      "clientEmail": "ਸੇਵਾ ਖਾਤਾ ਈਮੇਲ",
+      "privateKey": "ਸੇਵਾ ਖਾਤੇ ਦੀ ਨਿੱਜੀ ਕੁੰਜੀ",
+      "modelMappings": "ਮਾਡਲ ਮੈਪਿੰਗਾਂ",
+      "modelMappingsDescription": "ਗੇਟਵੇ ਮਾਡਲ ਨੂੰ ਕਸਟਮ ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ ਤੇ ਭੇਜੋ।",
+      "mappingTitle": "ਮੈਪਿੰਗ {{number}}",
+      "mappingGatewayModel": "ਗੇਟਵੇ ਮਾਡਲ slug",
+      "mappingCustomModel": "ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ",
+      "addMapping": "ਮੈਪਿੰਗ ਸ਼ਾਮਲ ਕਰੋ",
+      "removeMapping": "ਮੈਪਿੰਗ {{number}} ਹਟਾਓ"
     },
     "dataExport": {
       "title": "ਤੁਹਾਡਾ ਡਾਟਾ",
@@ -453,7 +480,8 @@
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
-    "changelog": "ਕੀ ਨਵਾਂ ਹੈ"
+    "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
+    "changelogVersionPending": "ਇਸ ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।"
   },
   "preferences": {
     "general": "ਆਮ",

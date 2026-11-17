@@ -28,7 +28,8 @@ describe('extractPrivacyPolicyMainHtml', () => {
 
     expect(result).toContain('Privacy Policy');
     expect(result).toContain('Policy body');
-    expect(result).toContain('href="https://kilo.ai/support"');
+    expect(result).toMatch(/<span>Support<\/span>/);
+    expect(result).not.toContain('href="https://kilo.ai/support"');
     expect(result).not.toContain('Pricing');
     expect(result).not.toContain('Terms');
   });

@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Igodo ndị na-enye ọrụ",
       "rowSubtitle": "Jiri ịkwụ ụgwọ nke onye na-enye ọrụ gị",
-      "manageOnWebReason": "Ndị na-enye ọrụ ndị a chọrọ ozi nbanye ahaziri ahazi",
+      "orgDescription": "A na-ekerịta igodo ndị a na onye ọ bụla nọ na nzukọ ahụ, a na-akwụkwa ụgwọ ha n'akaụntụ ndị na-enye ọrụ nke nzukọ ahụ.",
+      "viewOnly": "Ọ bụ naanị onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịkwụ ụgwọ nwere ike ịgbanwe igodo ya.",
       "description": "A na-akwụ ụgwọ arịrịọ site n'igodo ndị a n'akaụntụ onye na-enye ọrụ gị kama n'ego fọdụrụ gị na Kilo.",
       "managedByPlan": "Atụmatụ koodu gị na-ahazi ya",
       "enableKey": "Gbanye igodo {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Arịrịọ ndị ji igodo a ga-akwụsị iji ịkwụ ụgwọ onye na-enye ọrụ gị.",
       "add": "Tinye igodo",
       "added": "Etinyere igodo",
+      "updated": "Emelitere igodo",
       "emptyTitle": "Enweghị igodo ndị na-enye ọrụ",
       "emptyDescription": "Tinye igodo iji bido.",
       "chooseProvider": "Họrọ onye na-enye ọrụ",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Ọ dịghị onye na-enye ọrụ dabara n'ọchụchọ ahụ.",
       "newKeyTitle": "Igodo ọhụrụ",
       "newKeyDescription": "A na-echekwa igodo ahụ n'ụdị ezoro ezo, a pụghịkwa igosi ya ọzọ.",
+      "edit": "Dezie igodo",
+      "editKeyTitle": "Dochie igodo",
+      "editKeyDescription": "A pụghị igosi uru echekwara. Tinye nke ọhụrụ iji dochie ya.",
+      "editKeyMappingsWarning": "Ịdochi igodo na-edochikwa njikọ model echekwara: tinyegharịa njikọ ọ bụla ị ka chọrọ.",
+      "saveFailed": "Enweghị ike ichekwa igodo ahụ.",
+      "invalidCredentials": "Lelee ozi nbanye ahụ wee nwaa ọzọ.",
+      "fieldRequired": "A chọrọ {{field}}.",
+      "incompleteMapping": "Njikọ {{number}} chọrọ ma gateway model slug ma aha deployment.",
       "apiKeyLabel": "Igodo API",
       "apiKeyPlaceholder": "Mado igodo ahụ",
-      "apiKeyRequired": "Tinye igodo ahụ."
+      "apiKeyRequired": "Tinye igodo ahụ.",
+      "authMethod": "Ụzọ nkwenye",
+      "authMethodAccessKeys": "Igodo nnweta",
+      "resourceName": "Aha akụrụngwa Azure",
+      "region": "Mpaghara AWS",
+      "accessKeyId": "ID igodo nnweta",
+      "secretAccessKey": "Igodo nnweta nzuzo",
+      "project": "Ọrụ Google Cloud",
+      "location": "Ebe Vertex",
+      "clientEmail": "Email nke service account",
+      "privateKey": "Igodo nkeonwe nke service account",
+      "modelMappings": "Njikọ model",
+      "modelMappingsDescription": "Zipu model gateway gaa n'aha deployment ahaziri ahazi.",
+      "mappingTitle": "Njikọ {{number}}",
+      "mappingGatewayModel": "Gateway model slug",
+      "mappingCustomModel": "Aha deployment",
+      "addMapping": "Tinye njikọ",
+      "removeMapping": "Wepụ njikọ {{number}}"
     },
     "dataExport": {
       "title": "Data gị",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
-    "changelog": "Ihe ọhụrụ"
+    "changelog": "Ihe ọhụrụ",
+    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
   },
   "preferences": {
     "general": "Izugbe",

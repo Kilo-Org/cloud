@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Okhiye babahlinzeki",
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
-      "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
+      "orgDescription": "Laba khiye basetshenziswa yibo bonke abasenhlanganweni futhi bakhokhiswa kuma-akhawunti abahlinzeki bayo.",
+      "viewOnly": "Umnikazi wenhlangano, umlawuli, noma umphathi wokukhokha kuphela abangashintsha okhiye bayo.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
       "managedByPlan": "Uphethwe uhlelo lwakho lokukhoda",
       "enableKey": "Vula ukhiye we-{{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Izicelo ebezisebenzisa lo khiye zizoyeka ukusebenzisa ukukhokhisa komhlinzeki wakho.",
       "add": "Engeza ukhiye",
       "added": "Ukhiye wengeziwe",
+      "updated": "Ukhiye ubuyekeziwe",
       "emptyTitle": "Abekho okhiye babahlinzeki",
       "emptyDescription": "Engeza ukhiye ukuze uqale.",
       "chooseProvider": "Khetha umhlinzeki",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Akekho umhlinzeki ofana nalokho okusesha.",
       "newKeyTitle": "Ukhiye omusha",
       "newKeyDescription": "Ukhiye ugcinwa ubethelwe futhi ngeke uphinde uboniswe.",
+      "edit": "Hlela ukhiye",
+      "editKeyTitle": "Shintsha ukhiye",
+      "editKeyDescription": "Inani eligciniwe alikwazi ukuboniswa. Faka elisha ukuze ulishintshe.",
+      "editKeyMappingsWarning": "Ukushintsha ukhiye kushintsha futhi ukufaniswa kwamamodeli agciniwe: faka kabusha konke ukufaniswa okusadingayo.",
+      "saveFailed": "Akukwazekanga ukulondoloza ukhiye.",
+      "invalidCredentials": "Hlola imininingwane yokungena bese uzama futhi.",
+      "fieldRequired": "{{field}} kuyadingeka.",
+      "incompleteMapping": "Ukufanisa {{number}} kudinga kokubili i-gateway model slug kanye negama le-deployment.",
       "apiKeyLabel": "Ukhiye we-API",
       "apiKeyPlaceholder": "Namathisela ukhiye",
-      "apiKeyRequired": "Faka ukhiye."
+      "apiKeyRequired": "Faka ukhiye.",
+      "authMethod": "Indlela yokuqinisekisa",
+      "authMethodAccessKeys": "Okhiye bokufinyelela",
+      "resourceName": "Igama lensiza ye-Azure",
+      "region": "Isifunda se-AWS",
+      "accessKeyId": "I-ID yokhiye wokufinyelela",
+      "secretAccessKey": "Ukhiye oyimfihlo wokufinyelela",
+      "project": "Iphrojekthi ye-Google Cloud",
+      "location": "Indawo ye-Vertex",
+      "clientEmail": "I-imeyili ye-service account",
+      "privateKey": "Ukhiye oyimfihlo we-service account",
+      "modelMappings": "Ukufanisa amamodeli",
+      "modelMappingsDescription": "Thumela imodeli ye-gateway kugama le-deployment langokwezifiso.",
+      "mappingTitle": "Ukufanisa {{number}}",
+      "mappingGatewayModel": "I-gateway model slug",
+      "mappingCustomModel": "Igama le-deployment",
+      "addMapping": "Engeza ukufanisa",
+      "removeMapping": "Susa ukufanisa {{number}}"
     },
     "dataExport": {
       "title": "Idatha yakho",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
-    "changelog": "Okusha"
+    "changelog": "Okusha",
+    "changelogVersionPending": "Amanothi ale nguqulo azofika nesibuyekezo esilandelayo."
   },
   "preferences": {
     "general": "Okujwayelekile",

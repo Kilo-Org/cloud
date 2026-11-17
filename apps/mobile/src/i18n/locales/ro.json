@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Chei de furnizor",
       "rowSubtitle": "Folosește facturarea propriului furnizor",
-      "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
+      "orgDescription": "Aceste chei sunt partajate cu toți membrii organizației și facturate în conturile de furnizor ale acesteia.",
+      "viewOnly": "Doar un proprietar, un administrator sau un manager de facturare al organizației îi poate modifica cheile.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
       "managedByPlan": "Gestionată de planul tău de coding",
       "enableKey": "Activează cheia {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Solicitările care foloseau această cheie nu vor mai folosi facturarea furnizorului tău.",
       "add": "Adaugă cheie",
       "added": "Cheie adăugată",
+      "updated": "Cheie actualizată",
       "emptyTitle": "Nicio cheie de furnizor",
       "emptyDescription": "Adaugă o cheie pentru a începe.",
       "chooseProvider": "Alege un furnizor",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Niciun furnizor nu corespunde căutării.",
       "newKeyTitle": "Cheie nouă",
       "newKeyDescription": "Cheia este stocată criptat și nu mai poate fi afișată din nou.",
+      "edit": "Editează cheia",
+      "editKeyTitle": "Înlocuiește cheia",
+      "editKeyDescription": "Valoarea stocată nu poate fi afișată. Introdu una nouă pentru a o înlocui.",
+      "editKeyMappingsWarning": "Înlocuirea cheii înlocuiește și mapările de modele salvate: introdu din nou fiecare mapare de care ai încă nevoie.",
+      "saveFailed": "Cheia nu a putut fi salvată.",
+      "invalidCredentials": "Verifică datele de autentificare și încearcă din nou.",
+      "fieldRequired": "Câmpul {{field}} este obligatoriu.",
+      "incompleteMapping": "Maparea {{number}} necesită atât un gateway model slug, cât și un deployment name.",
       "apiKeyLabel": "Cheie API",
       "apiKeyPlaceholder": "Lipește cheia",
-      "apiKeyRequired": "Introdu cheia."
+      "apiKeyRequired": "Introdu cheia.",
+      "authMethod": "Metodă de autentificare",
+      "authMethodAccessKeys": "Chei de acces",
+      "resourceName": "Numele resursei Azure",
+      "region": "Regiune AWS",
+      "accessKeyId": "ID-ul cheii de acces",
+      "secretAccessKey": "Cheie de acces secretă",
+      "project": "Proiect Google Cloud",
+      "location": "Locație Vertex",
+      "clientEmail": "E-mailul contului de serviciu",
+      "privateKey": "Cheia privată a contului de serviciu",
+      "modelMappings": "Mapări de modele",
+      "modelMappingsDescription": "Direcționează un model din gateway către un deployment name personalizat.",
+      "mappingTitle": "Maparea {{number}}",
+      "mappingGatewayModel": "Gateway model slug",
+      "mappingCustomModel": "Deployment name",
+      "addMapping": "Adaugă mapare",
+      "removeMapping": "Elimină maparea {{number}}"
     },
     "dataExport": {
       "title": "Datele tale",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
-    "changelog": "Noutăți"
+    "changelog": "Noutăți",
+    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
   },
   "preferences": {
     "general": "General",

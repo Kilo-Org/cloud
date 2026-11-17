@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmaiņas",
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
+    "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā."
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -1377,7 +1378,8 @@
       "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
-      "tokenPlaceholder": "Darbvietas piekļuves pilnvara"
+      "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
+      "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
     },
     "scopeList": {
       "personalStillAvailable": "Personīgie repozitoriji joprojām ir pieejami zemāk.",
@@ -1489,7 +1491,8 @@
       "repositoryLine": "Pārskatīšanas: {{reviews}} · Konstatējumi: {{findings}}",
       "empty": "Vēl nav pārskatīšanu ar analītiku",
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
-      "off": "Analītika šai organizācijai ir izslēgta.",
+      "offTitle": "{{platform}} platformā analītika ir izslēgta",
+      "offDescription": "Ieslēdz to organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
       "couldNotLoad": "Neizdevās ielādēt analītiku"
     },
     "council": {
@@ -3519,7 +3522,6 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
-      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -3528,9 +3530,19 @@
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
-      "requestLogs": "Pieprasījumu žurnāli",
-      "subOrganizations": "Apakšorganizācijas",
-      "distributeFunds": "Sadalīt līdzekļus"
+      "requestLogs": "Pieprasījumu žurnāli"
+    },
+    "requestLogs": {
+      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
+      "older": "Iepriekšējā stunda",
+      "newer": "Nākamā stunda",
+      "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
+      "emptyTitle": "Nav pieprasījumu",
+      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
+      "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "tokens": "{{input}} ievade · {{output}} izvade",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
@@ -4597,6 +4609,8 @@
     "topModels": "Populārākie modeļi",
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
+    "unavailableTitle": "Lietojums nav pieejams",
+    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },

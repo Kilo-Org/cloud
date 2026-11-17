@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Fiovana",
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
-    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana"
+    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
+    "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
-      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"
+      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
+      "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
     },
     "scopeList": {
       "personalStillAvailable": "Mbola azo ampiasaina eto ambany ny tahirin-kaody manokana.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
+      "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
+      "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
       "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
-      "integrations": "Fampifandraisana amin'ny tranonkala",
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO sy sehatra",
       "dataCollection": "Fanangonana angona",
       "auditLogs": "Rakitry ny fanaraha-maso",
-      "requestLogs": "Rakitry ny fangatahana",
-      "subOrganizations": "Zana-pikambanana",
-      "distributeFunds": "Hizara vola"
+      "requestLogs": "Rakitry ny fangatahana"
+    },
+    "requestLogs": {
+      "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",
+      "older": "Ora teo aloha",
+      "newer": "Ora manaraka",
+      "truncated": "Mihoatra noho izay aseho ao amin'ny lisitra ny fangatahana tamin'ity ora ity.",
+      "emptyTitle": "Tsy misy fangatahana",
+      "emptyDescription": "Tsy nisy fangatahana tamin'ny vavahady nandritra ity ora ity.",
+      "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
+      "tokens": "{{input}} miditra · {{output}} mivoaka",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",
@@ -4527,6 +4539,8 @@
     "topModels": "Modely be ampiasaina",
     "topFeatures": "Endri-javatra be ampiasaina",
     "emptyTitle": "Tsy nisy fampiasana tamin'io fe-potoana io",
+    "unavailableTitle": "Tsy azo ny fampiasana",
+    "unavailableDescription": "Tsy mitatitra fampiasana ity toeram-piasana ity. Tsy hamaha izany ny fanandramana indray.",
     "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
     "viewDetails": "Hijery ny antsipirian'ny fampiasana"
   },

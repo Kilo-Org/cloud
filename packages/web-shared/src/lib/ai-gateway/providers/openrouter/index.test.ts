@@ -550,6 +550,36 @@ describe('Vercel-only models', () => {
     }
   });
 
+  it("prices them at the preferred provider's Vercel endpoint peak price", async () => {
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: ['vendor/'], providers: ['together'] }],
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        endpoints: [
+          { provider_name: 'deepinfra', pricing: { prompt: '0.000009', completion: '0.000009' } },
+          {
+            provider_name: 'togetherai',
+            pricing: { prompt: '0.000002', completion: '0.00001', peak_pricing: { multiplier: 2 } },
+          },
+        ],
+      },
+    });
+
+    try {
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+      expect(models.data.find(model => model.id === vercelOnlyModel.id)?.pricing).toMatchObject({
+        prompt: '0.000004000000',
+        completion: '0.000020000000',
+      });
+    } finally {
+      jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
+    }
+  });
+
   it('hides unavailable ones', async () => {
     jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([vercelOnlyModel.id]));
 

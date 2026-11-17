@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "A conexión de Bitbucket desta organización xestiónase na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
-      "tokenPlaceholder": "Token de acceso ao espazo de traballo"
+      "tokenPlaceholder": "Token de acceso ao espazo de traballo",
+      "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositorios persoais seguen dispoñibles máis abaixo.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
       "empty": "Aínda non hai revisións con analítica",
       "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
-      "off": "A analítica está desactivada para esta organización.",
+      "offTitle": "A analítica está desactivada para {{platform}}",
+      "offDescription": "Actívaa na configuración da organización na web para rexistrar as revisións completadas.",
       "couldNotLoad": "Non se puido cargar a analítica"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Configuración da organización na web",
-      "integrations": "Integracións na web",
       "usageDetails": "Detalles de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Recollida de datos",
       "auditLogs": "Rexistros de auditoría",
-      "requestLogs": "Rexistros de solicitudes",
-      "subOrganizations": "Suborganizacións",
-      "distributeFunds": "Distribuír fondos"
+      "requestLogs": "Rexistros de solicitudes"
+    },
+    "requestLogs": {
+      "hint": "Solicitudes da hora previa ao fin do intervalo, primeiro as máis recentes.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora ten máis solicitudes das que mostra a lista.",
+      "emptyTitle": "Non hai solicitudes",
+      "emptyDescription": "Nesta hora non hai solicitudes á pasarela.",
+      "loadError": "Non se puideron cargar os rexistros de solicitudes.",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -4527,6 +4539,8 @@
     "topModels": "Modelos principais",
     "topFeatures": "Funcións principais",
     "emptyTitle": "Sen uso neste período",
+    "unavailableTitle": "Uso non dispoñible",
+    "unavailableDescription": "Este espazo de traballo non informa de uso. Volver intentalo non axudará.",
     "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
     "viewDetails": "Ver detalles do uso"
   },

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Mgbanwe",
     "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
-    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe"
+    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
+    "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee."
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke nzukọ a na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
-      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ"
+      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
+      "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
     },
     "scopeList": {
       "personalStillAvailable": "Ebe nchekwa nke gị ka dị n'okpuru.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Nyocha: {{reviews}} · Ihe achọpụtara: {{findings}}",
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
-      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka nzukọ a.",
+      "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
+      "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
       "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Ntọala òtù na weebụ",
-      "integrations": "Njikọ na weebụ",
       "usageDetails": "Nkọwa ojiji",
       "providersAndModels": "Ndị na-enye ọrụ na model",
       "groups": "Ìgwè",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO na domain",
       "dataCollection": "Nchịkọta data",
       "auditLogs": "Ndekọ nyocha",
-      "requestLogs": "Ndekọ arịrịọ",
-      "subOrganizations": "Òtù ndị dị n'okpuru",
-      "distributeFunds": "Kesaa ego"
+      "requestLogs": "Ndekọ arịrịọ"
+    },
+    "requestLogs": {
+      "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",
+      "older": "Awa gara aga",
+      "newer": "Awa na-esote",
+      "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
+      "emptyTitle": "Enweghị arịrịọ",
+      "emptyDescription": "Enweghị arịrịọ gateway n'awa a.",
+      "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
+      "tokens": "{{input}} batara · {{output}} pụtara",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
@@ -4527,6 +4539,8 @@
     "topModels": "Ụdị a kacha eji",
     "topFeatures": "Njirimara a kacha eji",
     "emptyTitle": "Enweghị ojiji n'oge a",
+    "unavailableTitle": "Ojiji adịghị",
+    "unavailableDescription": "Oghere ọrụ a anaghị akọ ojiji. Ịnwale ọzọ agaghị enyere aka.",
     "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
     "viewDetails": "Lee nkọwa ojiji"
   },

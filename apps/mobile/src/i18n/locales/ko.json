@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "변경 사항",
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
-    "privateRepositoryA11y": "{{name}}, 비공개 저장소"
+    "privateRepositoryA11y": "{{name}}, 비공개 저장소",
+    "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다."
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -676,7 +677,8 @@
       "managedOnWeb": "이 조직의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
       "description": "필요한 권한이 포함된 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
-      "tokenPlaceholder": "작업 영역 액세스 토큰"
+      "tokenPlaceholder": "작업 영역 액세스 토큰",
+      "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
     },
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
@@ -922,7 +924,8 @@
       "repositoryLine": "리뷰: {{reviews}} · 문제: {{findings}}",
       "empty": "아직 분석 데이터가 있는 리뷰가 없습니다",
       "emptyDescription": "분석은 조직에서 이 기능이 켜져 있는 동안 완료된 리뷰를 기록합니다.",
-      "off": "이 조직에서는 분석이 꺼져 있습니다.",
+      "offTitle": "{{platform}}의 분석이 꺼져 있습니다",
+      "offDescription": "완료된 리뷰를 기록하려면 웹의 조직 설정에서 분석을 활성화하세요.",
       "couldNotLoad": "분석을 불러오지 못했습니다"
     },
     "council": {
@@ -3467,7 +3470,6 @@
     },
     "settingsOnWeb": {
       "title": "웹에서 조직 설정",
-      "integrations": "웹에서 연동",
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
@@ -3476,9 +3478,19 @@
       "ssoAndDomain": "SSO 및 도메인",
       "dataCollection": "데이터 수집",
       "auditLogs": "감사 로그",
-      "requestLogs": "요청 로그",
-      "subOrganizations": "하위 조직",
-      "distributeFunds": "자금 배분"
+      "requestLogs": "요청 로그"
+    },
+    "requestLogs": {
+      "hint": "선택한 시간대가 끝나기 전 1시간의 요청을 최신순으로 표시합니다.",
+      "older": "이전 1시간",
+      "newer": "다음 1시간",
+      "truncated": "이 시간대에는 목록에 표시된 것보다 많은 요청이 있습니다.",
+      "emptyTitle": "요청 없음",
+      "emptyDescription": "이 시간대에는 게이트웨이 요청이 없습니다.",
+      "loadError": "요청 로그를 불러오지 못했습니다.",
+      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다.",
+      "tokens": "입력 {{input}} · 출력 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
@@ -4527,6 +4539,8 @@
     "topModels": "상위 모델",
     "topFeatures": "상위 기능",
     "emptyTitle": "이 기간에 사용량이 없습니다",
+    "unavailableTitle": "사용량을 사용할 수 없습니다",
+    "unavailableDescription": "이 워크스페이스는 사용량을 보고하지 않습니다. 다시 시도해도 해결되지 않습니다.",
     "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
     "viewDetails": "사용량 세부 정보 보기"
   },

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable import/max-dependencies, max-lines */
 import { storage } from '#imports';
 import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
@@ -8,6 +8,7 @@ import { runKiloBrowserTool } from '@/src/shared/browser-tool-dispatch';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
 import { createBrowserToolSession } from '@/src/shared/browser-tool-session';
 import type { BrowserToolSession } from '@/src/shared/browser-tool-session';
+import { startLocalAgentsHost } from '@/src/shared/local-agents/host';
 import { clearBrowserToolResize } from '@/src/shared/browser-tool-page-actions';
 import {
   ADD_TO_MEMORY_MENU_ID,
@@ -449,6 +450,9 @@ const handleAddToMemoryClick = (
 };
 
 export default defineBackground(() => {
+  // Local agents register every listener here so one service-worker wake serves either feature.
+  startLocalAgentsHost();
+
   const chromeApi = (
     globalThis as typeof globalThis & {
       chrome?: {

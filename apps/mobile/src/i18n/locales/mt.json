@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Bidliet",
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
-    "privateRepositoryA11y": "{{name}}, repositorju privat"
+    "privateRepositoryA11y": "{{name}}, repositorju privat",
+    "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss."
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1423,7 +1424,8 @@
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
-      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol"
+      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
+      "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
     },
     "scopeList": {
       "personalStillAvailable": "Ir-repożitorji personali xorta disponibbli hawn taħt.",
@@ -1537,7 +1539,8 @@
       "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
-      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "offTitle": "L-istatistika hija mitfija għal {{platform}}",
+      "offDescription": "Attivaha fis-settjar tal-organizzazzjoni fuq il-web biex tirrekordja reviżjonijiet kompluti.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
     },
     "council": {
@@ -3633,7 +3636,6 @@
     },
     "settingsOnWeb": {
       "title": "Issettjar tal-organizzazzjoni fuq il-web",
-      "integrations": "Integrazzjonijiet fuq il-web",
       "usageDetails": "Dettalji tal-użu",
       "providersAndModels": "Fornituri u mudelli",
       "groups": "Gruppi",
@@ -3642,9 +3644,19 @@
       "ssoAndDomain": "SSO u dominju",
       "dataCollection": "Ġbir tad-data",
       "auditLogs": "Reġistri tal-awditjar",
-      "requestLogs": "Reġistri tat-talbiet",
-      "subOrganizations": "Sotto-organizzazzjonijiet",
-      "distributeFunds": "Iddistribwixxi l-fondi"
+      "requestLogs": "Reġistri tat-talbiet"
+    },
+    "requestLogs": {
+      "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",
+      "older": "Siegħa qabel",
+      "newer": "Siegħa wara",
+      "truncated": "Din is-siegħa għandha aktar talbiet milli turi l-lista.",
+      "emptyTitle": "L-ebda talba",
+      "emptyDescription": "Din is-siegħa m'għandha l-ebda talba tal-gateway.",
+      "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
+      "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
+      "tokens": "{{input}} dħul · {{output}} ħruġ",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
@@ -4737,6 +4749,8 @@
     "topModels": "Il-mudelli l-aktar użati",
     "topFeatures": "Il-funzjonijiet l-aktar użati",
     "emptyTitle": "L-ebda użu f'dan il-perjodu",
+    "unavailableTitle": "L-użu mhux disponibbli",
+    "unavailableDescription": "Dan il-workspace mhuwiex jirrapporta l-użu. L-ippruvar mill-ġdid mhux se jgħin.",
     "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
     "viewDetails": "Ara d-dettalji tal-użu"
   },

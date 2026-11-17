@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
     "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
-    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
+    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
+    "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama."
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
-      "tokenPlaceholder": "Tokanii hayyama iddoo hojii"
+      "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
+      "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
     },
     "scopeList": {
       "personalStillAvailable": "Kuusaawwan koodii dhuunfaa ammallee armaan gaditti ni argamu.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Sakatta'a: {{reviews}} · Argamoota: {{findings}}",
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
-      "off": "Istaatiksiin dhaabbata kanaaf cufameera.",
+      "offTitle": "Istaatiksiin {{platform}} cufameera",
+      "offDescription": "Sakatta'awwan xumuraman galmeessuuf Istaatiksiin Qindaa'ina dhaabbataa weebii irratti isa bani.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
-      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO fi doomeenii",
       "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
-      "requestLogs": "Galmeewwan gaaffii",
-      "subOrganizations": "Dhaabbilee jalaa",
-      "distributeFunds": "Maallaqa qoodi"
+      "requestLogs": "Galmeewwan gaaffii"
+    },
+    "requestLogs": {
+      "hint": "Gaaffiiwwan sa'aatii xumura yeroo filatamee dura jiru, kan haaraan dura.",
+      "older": "Sa'aatii darbe",
+      "newer": "Sa'aatii itti aanu",
+      "truncated": "Sa'aatiin kun gaaffiiwwan tarree kana irratti mul'atan caalaa qaba.",
+      "emptyTitle": "Gaaffiin hin jiru",
+      "emptyDescription": "Sa'aatii kana keessa gaaffiin gateway hin jiru.",
+      "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "tokens": "{{input}} seene · {{output}} ba'e",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
@@ -4527,6 +4539,8 @@
     "topModels": "Moodeelota olaanoo",
     "topFeatures": "Amaloota olaanoo",
     "emptyTitle": "Yeroo kana keessa itti fayyadamni hin jiru",
+    "unavailableTitle": "Itti fayyadama hin argamne",
+    "unavailableDescription": "Iddoo hojii kun itti fayyadama hin gabaasu. Irra deebi'uun homaa hin fayyadu.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
     "viewDetails": "Bal'ina itti fayyadamaa ilaali"
   },

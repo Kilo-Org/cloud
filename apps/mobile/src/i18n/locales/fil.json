@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Mga pagbabago",
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "privateRepositoryA11y": "{{name}}, pribadong repositoryo"
+    "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
+    "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
-      "tokenPlaceholder": "Token para sa access sa workspace"
+      "tokenPlaceholder": "Token para sa access sa workspace",
+      "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
     },
     "scopeList": {
       "personalStillAvailable": "Magagamit pa rin sa ibaba ang mga personal na repository.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
-      "off": "Naka-off ang analitika para sa organisasyong ito.",
+      "offTitle": "Naka-off ang analitika para sa {{platform}}",
+      "offDescription": "Paganahin ito sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Mga setting ng organisasyon sa web",
-      "integrations": "Mga Integration sa web",
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO at domain",
       "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
-      "requestLogs": "Mga request log",
-      "subOrganizations": "Mga sub-organisasyon",
-      "distributeFunds": "Ipamahagi ang pondo"
+      "requestLogs": "Mga request log"
+    },
+    "requestLogs": {
+      "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",
+      "older": "Mas lumang oras",
+      "newer": "Mas bagong oras",
+      "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
+      "emptyTitle": "Walang request",
+      "emptyDescription": "Walang gateway request sa oras na ito.",
+      "loadError": "Hindi ma-load ang mga request log.",
+      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "tokens": "{{input}} input · {{output}} output",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
@@ -4527,6 +4539,8 @@
     "topModels": "Nangungunang mga model",
     "topFeatures": "Nangungunang mga feature",
     "emptyTitle": "Walang paggamit sa panahong ito",
+    "unavailableTitle": "Hindi available ang paggamit",
+    "unavailableDescription": "Hindi nag-uulat ng paggamit ang workspace na ito. Hindi makakatulong ang pagsubok muli.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
     "viewDetails": "Tingnan ang detalye ng paggamit"
   },

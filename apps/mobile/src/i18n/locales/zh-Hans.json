@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "更改",
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
-    "privateRepositoryA11y": "{{name}}，私有仓库"
+    "privateRepositoryA11y": "{{name}}，私有仓库",
+    "legalDocumentEnglishOnly": "本文件仅提供英文版本。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -676,7 +677,8 @@
       "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
-      "tokenPlaceholder": "工作区访问令牌"
+      "tokenPlaceholder": "工作区访问令牌",
+      "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
     },
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
@@ -922,7 +924,8 @@
       "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
-      "off": "此组织已关闭分析。",
+      "offTitle": "已关闭 {{platform}} 的分析",
+      "offDescription": "在网页版组织设置中启用分析，即可记录已完成的审查。",
       "couldNotLoad": "无法加载分析数据"
     },
     "council": {
@@ -3467,7 +3470,6 @@
     },
     "settingsOnWeb": {
       "title": "网页版组织设置",
-      "integrations": "网页版集成",
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
@@ -3476,9 +3478,19 @@
       "ssoAndDomain": "SSO 和域名",
       "dataCollection": "数据收集",
       "auditLogs": "审计日志",
-      "requestLogs": "请求日志",
-      "subOrganizations": "子组织",
-      "distributeFunds": "分配资金"
+      "requestLogs": "请求日志"
+    },
+    "requestLogs": {
+      "hint": "显示时段结束前一小时内的请求，最新的在前。",
+      "older": "上一小时",
+      "newer": "下一小时",
+      "truncated": "该小时的请求数超出列表可显示的数量。",
+      "emptyTitle": "暂无请求",
+      "emptyDescription": "该小时内没有网关请求。",
+      "loadError": "无法加载请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "tokens": "输入 {{input}} · 输出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "输入词元",
@@ -4527,6 +4539,8 @@
     "topModels": "常用模型",
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
+    "unavailableTitle": "用量不可用",
+    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },

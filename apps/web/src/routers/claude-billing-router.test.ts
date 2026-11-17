@@ -1,12 +1,15 @@
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
   getClaudeOperatorToken: jest.fn(async () => 'router-operator-token'),
   isClaudeOperatorConfigured: jest.fn(() => false),
   unlinkClaudeUserProfile: jest.fn(async () => ({ kind: 'unlinked', revokedConnectionIds: [] })),
 }));
 
+jest.mock('@kilocode/web-shared/lib/auth/claude/config', () => ({
+  ...jest.requireActual<typeof claudeConfigModule>('@kilocode/web-shared/lib/auth/claude/config'),
+  isClaudeBillingLinkingConfigured: jest.fn(() => true),
+}));
+
+import type * as claudeConfigModule from '@kilocode/web-shared/lib/auth/claude/config';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
@@ -18,11 +21,11 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   isClaudeOperatorConfigured,
   unlinkClaudeUserProfile,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import { isClaudeBillingLinkingConfigured } from '@kilocode/web-shared/lib/auth/claude/config';
 import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -77,8 +80,8 @@ async function seedConnectedOrganization(organizationId: string, createdBy: stri
 }
 
 beforeEach(() => {
-  jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(false);
+  jest.mocked(isClaudeBillingLinkingConfigured).mockReset().mockReturnValue(true);
   jest
     .mocked(unlinkClaudeUserProfile)
     .mockReset()
@@ -117,18 +120,6 @@ describe('claudeBillingRouter.sharePersonal', () => {
     });
     await seedConnectedPersonal(member.id);
     const caller = await callerFor(member.id);
-
-    await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-    });
-  });
-
-  it('forbids sharing when the release flag is off', async () => {
-    const user = await insertTestUser();
-    const org = await createTestOrganization('Claude router flag', user.id, 0);
-    await seedConnectedPersonal(user.id);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    const caller = await callerFor(user.id);
 
     await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -434,5 +425,29 @@ describe('claudeBillingRouter organization connector state', () => {
     const status = await (await callerFor(manager.id)).status({ organizationId: org.id });
 
     expect(status).toMatchObject({ state: 'billing_unavailable' });
+  });
+});
+
+describe('claudeBillingRouter.status linking availability', () => {
+  it('reports linking available when the OAuth app and operator are configured', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    const user = await insertTestUser();
+
+    const status = await (await callerFor(user.id)).status({});
+
+    expect(status).toMatchObject({ state: 'not_connected', linkingAvailable: true });
+  });
+
+  it.each<[string, boolean, boolean]>([
+    ['the billing OAuth app', false, true],
+    ['the operator credentials', true, false],
+  ])('reports linking unavailable without %s', async (_missing, linking, operator) => {
+    jest.mocked(isClaudeBillingLinkingConfigured).mockReturnValue(linking);
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(operator);
+    const user = await insertTestUser();
+
+    const status = await (await callerFor(user.id)).status({});
+
+    expect(status.linkingAvailable).toBe(false);
   });
 });

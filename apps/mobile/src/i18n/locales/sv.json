@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Ändringar",
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
-    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv",
+    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
-      "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
+      "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
+      "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
     },
     "scopeList": {
       "personalStillAvailable": "Personliga kodarkiv är fortfarande tillgängliga nedan.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Granskningar: {{reviews}} · Fynd: {{findings}}",
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
-      "off": "Statistiken är avstängd för denna organisation.",
+      "offTitle": "Statistiken är avstängd för {{platform}}",
+      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
-      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO och domän",
       "dataCollection": "Datainsamling",
       "auditLogs": "Granskningsloggar",
-      "requestLogs": "Förfrågningsloggar",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fördela medel"
+      "requestLogs": "Förfrågningsloggar"
+    },
+    "requestLogs": {
+      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
+      "older": "Tidigare timme",
+      "newer": "Senare timme",
+      "truncated": "Den här timmen har fler förfrågningar än listan visar.",
+      "emptyTitle": "Inga förfrågningar",
+      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
+      "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
+      "tokens": "{{input}} in · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
@@ -4527,6 +4539,8 @@
     "topModels": "Mest använda modeller",
     "topFeatures": "Mest använda funktioner",
     "emptyTitle": "Ingen användning under perioden",
+    "unavailableTitle": "Användning är inte tillgänglig",
+    "unavailableDescription": "Den här arbetsytan rapporterar ingen användning. Det hjälper inte att försöka igen.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
     "viewDetails": "Visa användningsdetaljer"
   },

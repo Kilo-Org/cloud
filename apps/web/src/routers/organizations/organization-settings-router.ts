@@ -25,7 +25,17 @@ import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/or
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
+import {
+  MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
+  OrganizationBrowserAllowedOriginSchema,
+  OrganizationBrowserControlSchema,
+  OrganizationDataRegionSchema,
+  normalizeOrganizationBrowserOrigin,
+} from '@kilocode/db/schema-types';
+import {
+  resolveOrganizationBrowserPolicy,
+  type OrganizationBrowserPolicy,
+} from '@/lib/organizations/browser-policy';
 import {
   isOrganizationFeatureEnabled,
   readOrganizationFeatures,
@@ -333,6 +343,35 @@ const UpdateRecommendationsDigestInputSchema = OrganizationIdInputSchema.extend(
 const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
 });
+
+const UpdateBrowserControlInputSchema = OrganizationIdInputSchema.extend({
+  browserControl: OrganizationBrowserControlSchema,
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS),
+});
+
+const BrowserControlResponseSchema = z.object({
+  browserControl: OrganizationBrowserControlSchema,
+  browserAllowedOrigins: z.array(OrganizationBrowserAllowedOriginSchema),
+});
+
+function normalizeBrowserOrigins(values: readonly string[]): string[] {
+  const origins = new Set<string>();
+  for (const value of values) {
+    const origin = normalizeOrganizationBrowserOrigin(value);
+    if (origin !== null) {
+      origins.add(origin);
+    }
+  }
+  return [...origins];
+}
+
+function createBrowserControlMessage(policy: OrganizationBrowserPolicy): string {
+  const origins =
+    policy.browserAllowedOrigins.length > 0 ? policy.browserAllowedOrigins.join(', ') : 'none';
+  return `Browser control: ${policy.browserControl} (allowed origins: ${origins})`;
+}
 
 const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
   disable_openrouter: z.boolean().optional(),
@@ -1059,5 +1098,68 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return {
         settings: updatedSettings,
       };
+    }),
+
+  // Browser automation policy: owners and admins decide whether members get browser
+  // tools, whether the bundled browser is the only backend, and which origins every
+  // member's client treats as already granted.
+  updateBrowserControl: organizationAdminMutationProcedure
+    .input(UpdateBrowserControlInputSchema)
+    .output(BrowserControlResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, browserControl, browserAllowedOrigins } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      const nextPolicy: OrganizationBrowserPolicy = {
+        browserControl,
+        browserAllowedOrigins: normalizeBrowserOrigins(browserAllowedOrigins),
+      };
+
+      const updatedSettings = await db.transaction(async tx => {
+        let previousPolicy = resolveOrganizationBrowserPolicy(existingOrg);
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousPolicy = resolveOrganizationBrowserPolicy(organization);
+            if (
+              previousPolicy.browserControl === nextPolicy.browserControl &&
+              previousPolicy.browserAllowedOrigins.join('\n') ===
+                nextPolicy.browserAllowedOrigins.join('\n')
+            ) {
+              return organization.settings;
+            }
+            return {
+              ...organization.settings,
+              browserControl: nextPolicy.browserControl,
+              browserAllowedOrigins: nextPolicy.browserAllowedOrigins,
+            };
+          },
+          tx
+        );
+
+        if (
+          previousPolicy.browserControl !== nextPolicy.browserControl ||
+          previousPolicy.browserAllowedOrigins.join('\n') !==
+            nextPolicy.browserAllowedOrigins.join('\n')
+        ) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: createBrowserControlMessage(nextPolicy),
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
+
+      return resolveOrganizationBrowserPolicy({ settings: updatedSettings });
     }),
 });

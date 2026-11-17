@@ -175,7 +175,8 @@
     "durationHourShort": "sa",
     "changes": "Değişiklikler",
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
-    "privateRepositoryA11y": "{{name}}, özel depo"
+    "privateRepositoryA11y": "{{name}}, özel depo",
+    "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -676,7 +677,8 @@
       "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
       "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
-      "tokenPlaceholder": "Çalışma alanı erişim belirteci"
+      "tokenPlaceholder": "Çalışma alanı erişim belirteci",
+      "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
     },
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
@@ -922,7 +924,8 @@
       "repositoryLine": "İncelemeler: {{reviews}} · Bulgular: {{findings}}",
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
-      "off": "Bu kuruluş için istatistikler kapalı.",
+      "offTitle": "{{platform}} için istatistikler kapalı",
+      "offDescription": "Tamamlanan incelemeleri kaydetmek için Web'deki kuruluş ayarlarında istatistikleri aç.",
       "couldNotLoad": "İstatistikler yüklenemedi"
     },
     "council": {
@@ -3467,7 +3470,6 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
-      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",
@@ -3476,9 +3478,19 @@
       "ssoAndDomain": "SSO ve alan adı",
       "dataCollection": "Veri toplama",
       "auditLogs": "Denetim günlükleri",
-      "requestLogs": "İstek günlükleri",
-      "subOrganizations": "Alt kuruluşlar",
-      "distributeFunds": "Fonları dağıt"
+      "requestLogs": "İstek günlükleri"
+    },
+    "requestLogs": {
+      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
+      "older": "Önceki saat",
+      "newer": "Sonraki saat",
+      "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
+      "emptyTitle": "İstek yok",
+      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
+      "loadError": "İstek günlükleri yüklenemedi.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "tokens": "{{input}} giriş · {{output}} çıkış",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
@@ -4527,6 +4539,8 @@
     "topModels": "En çok kullanılan modeller",
     "topFeatures": "En çok kullanılan özellikler",
     "emptyTitle": "Bu dönemde kullanım yok",
+    "unavailableTitle": "Kullanım kullanılamıyor",
+    "unavailableDescription": "Bu çalışma alanı kullanım bildirmiyor. Yeniden denemek işe yaramaz.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
     "viewDetails": "Kullanım ayrıntılarını görüntüle"
   },

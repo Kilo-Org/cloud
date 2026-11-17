@@ -23,7 +23,6 @@ import {
   claudeBillingOutcomeParam,
 } from '@/lib/claude-billing/constants';
 import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 /**
  * Completes a Claude billing connection. The pending cookie must belong to the
@@ -78,9 +77,6 @@ export async function GET(request: NextRequest) {
   // auth.claude.com returns the state with every outcome, including a refusal.
   if (params.get('state') !== pending.state) {
     return outcomeRedirect(returnPath, owner, 'failed');
-  }
-  if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
-    return outcomeRedirect(returnPath, owner, 'forbidden');
   }
   // Role can change while the person is on Claude's approval page.
   if (!(await mayComplete(owner, user.id))) {

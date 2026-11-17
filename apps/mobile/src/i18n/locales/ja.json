@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
+    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
+    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -676,7 +677,8 @@
       "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
-      "tokenPlaceholder": "ワークスペースアクセストークン"
+      "tokenPlaceholder": "ワークスペースアクセストークン",
+      "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
     },
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
@@ -922,7 +924,8 @@
       "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
-      "off": "この組織では分析がオフになっています。",
+      "offTitle": "{{platform}}の分析がオフになっています",
+      "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした"
     },
     "council": {
@@ -3467,7 +3470,6 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
-      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
@@ -3476,9 +3478,19 @@
       "ssoAndDomain": "SSOとドメイン",
       "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
+    },
+    "requestLogs": {
+      "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",
+      "older": "前の1時間",
+      "newer": "次の1時間",
+      "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
+      "emptyTitle": "リクエストはありません",
+      "emptyDescription": "この1時間にゲートウェイへのリクエストはありません。",
+      "loadError": "リクエストログを読み込めませんでした。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "tokens": "入力 {{input}} · 出力 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "入力トークン",
@@ -4527,6 +4539,8 @@
     "topModels": "上位のモデル",
     "topFeatures": "上位の機能",
     "emptyTitle": "この期間の使用はありません",
+    "unavailableTitle": "使用状況を利用できません",
+    "unavailableDescription": "このワークスペースは使用状況を報告していません。再試行しても解決しません。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
   },

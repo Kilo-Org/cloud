@@ -175,7 +175,8 @@
     "durationHourShort": "saa",
     "changes": "Mabadiliko",
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
-    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi"
+    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
+    "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
-      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"
+      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
+      "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
     },
     "scopeList": {
       "personalStillAvailable": "Hazina zako binafsi bado zinapatikana hapa chini.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Ukaguzi: {{reviews}} · Matatizo: {{findings}}",
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
-      "off": "Takwimu zimezimwa kwa shirika hili.",
+      "offTitle": "Takwimu zimezimwa kwa {{platform}}",
+      "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Mipangilio ya shirika kwenye wavuti",
-      "integrations": "Miunganisho kwenye wavuti",
       "usageDetails": "Maelezo ya matumizi",
       "providersAndModels": "Watoa huduma na miundo",
       "groups": "Vikundi",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO na kikoa",
       "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
-      "requestLogs": "Kumbukumbu za maombi",
-      "subOrganizations": "Mashirika tanzu",
-      "distributeFunds": "Gawa fedha"
+      "requestLogs": "Kumbukumbu za maombi"
+    },
+    "requestLogs": {
+      "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",
+      "older": "Saa iliyotangulia",
+      "newer": "Saa inayofuata",
+      "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
+      "emptyTitle": "Hakuna maombi",
+      "emptyDescription": "Hakuna maombi ya lango katika saa hii.",
+      "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
+      "tokens": "{{input}} ndani · {{output}} nje",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",
@@ -4527,6 +4539,8 @@
     "topModels": "Modeli zinazoongoza",
     "topFeatures": "Vipengele vinavyoongoza",
     "emptyTitle": "Hakuna matumizi katika kipindi hiki",
+    "unavailableTitle": "Matumizi hayapatikani",
+    "unavailableDescription": "Eneo hili la kazi haliripoti matumizi. Kujaribu tena hakutasaidia.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
     "viewDetails": "Angalia maelezo ya matumizi"
   },

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Ændringer",
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
-    "privateRepositoryA11y": "{{name}}, privat repository"
+    "privateRepositoryA11y": "{{name}}, privat repository",
+    "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Organisationens Bitbucket-forbindelse administreres på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet med de nødvendige tilladelser, og indsæt det nedenfor.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
-      "tokenPlaceholder": "Adgangstoken til arbejdsområdet"
+      "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
+      "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
     },
     "scopeList": {
       "personalStillAvailable": "Dine personlige kodelagre er stadig tilgængelige nedenfor.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Gennemgange: {{reviews}} · Fund: {{findings}}",
       "empty": "Ingen gennemgange med analysedata endnu",
       "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
-      "off": "Analyse er slået fra for denne organisation.",
+      "offTitle": "Analyse er slået fra for {{platform}}",
+      "offDescription": "Slå den til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
       "couldNotLoad": "Kunne ikke indlæse analysedata"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsindstillinger på nettet",
-      "integrations": "Integrationer på nettet",
       "usageDetails": "Forbrugsdetaljer",
       "providersAndModels": "Udbydere og modeller",
       "groups": "Grupper",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO og domæne",
       "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
-      "requestLogs": "Anmodningslogs",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Anmodningslogs"
+    },
+    "requestLogs": {
+      "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",
+      "older": "Forrige time",
+      "newer": "Næste time",
+      "truncated": "Denne time har flere anmodninger, end listen viser.",
+      "emptyTitle": "Ingen anmodninger",
+      "emptyDescription": "Der er ingen gateway-anmodninger i denne time.",
+      "loadError": "Anmodningslogs kunne ikke indlæses.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
+      "tokens": "{{input}} ind · {{output}} ud",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
@@ -4527,6 +4539,8 @@
     "topModels": "Mest brugte modeller",
     "topFeatures": "Mest brugte funktioner",
     "emptyTitle": "Intet forbrug i denne periode",
+    "unavailableTitle": "Forbrug er ikke tilgængeligt",
+    "unavailableDescription": "Dette arbejdsområde rapporterer ikke forbrug. Det hjælper ikke at prøve igen.",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer"
   },

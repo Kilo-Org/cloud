@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente.",
-    "privateRepositoryA11y": "{{name}}, repositório privado"
+    "privateRepositoryA11y": "{{name}}, repositório privado",
+    "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -643,7 +644,8 @@
       "managedOnWeb": "A conexão do Bitbucket desta organização é gerenciada na web, em um computador.",
       "description": "Crie um token de acesso do espaço de trabalho com os escopos necessários e cole-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/gravação · PRs: leitura · Webhooks: leitura/gravação",
-      "tokenPlaceholder": "Token de acesso do espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso do espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso do espaço de trabalho. Verifique se ele tem os escopos acima e tente novamente."
     },
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
@@ -890,7 +892,8 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para esta organização.",
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "Ative-as nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas"
     },
     "council": {
@@ -3530,7 +3533,6 @@
     },
     "settingsOnWeb": {
       "title": "Configurações da organização na web",
-      "integrations": "Integrações na web",
       "usageDetails": "Detalhes de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
@@ -3539,9 +3541,19 @@
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Coleta de dados",
       "auditLogs": "Registros de auditoria",
-      "requestLogs": "Registros de solicitações",
-      "subOrganizations": "Suborganizações",
-      "distributeFunds": "Distribuir fundos"
+      "requestLogs": "Registros de solicitações"
+    },
+    "requestLogs": {
+      "hint": "Solicitações da hora anterior ao fim da janela, mais recentes primeiro.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora tem mais solicitações do que a lista mostra.",
+      "emptyTitle": "Nenhuma solicitação",
+      "emptyDescription": "Esta hora não tem solicitações ao gateway.",
+      "loadError": "Não foi possível carregar os registros de solicitações.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -4603,6 +4615,8 @@
     "topModels": "Principais modelos",
     "topFeatures": "Principais recursos",
     "emptyTitle": "Nenhum uso neste período",
+    "unavailableTitle": "Uso indisponível",
+    "unavailableDescription": "Este workspace não está reportando uso. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Você está vendo seu próprio uso nesta organização.",
     "viewDetails": "Ver detalhes de uso"
   },

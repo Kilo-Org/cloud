@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -676,7 +677,8 @@
       "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
-      "tokenPlaceholder": "אסימון גישה לסביבת העבודה"
+      "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
+      "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
     },
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
@@ -923,7 +925,8 @@
       "repositoryLine": "סקירות: {{reviews}} · ממצאים: {{findings}}",
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
-      "off": "האנליטיקה כבויה עבור הארגון הזה.",
+      "offTitle": "האנליטיקה כבויה עבור {{platform}}",
+      "offDescription": "הפעל אותה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
       "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
     },
     "council": {
@@ -3524,7 +3527,6 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
-      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
@@ -3533,9 +3535,19 @@
       "ssoAndDomain": "SSO ודומיין",
       "dataCollection": "איסוף נתונים",
       "auditLogs": "יומני ביקורת",
-      "requestLogs": "יומני בקשות",
-      "subOrganizations": "ארגוני משנה",
-      "distributeFunds": "חלוקת כספים"
+      "requestLogs": "יומני בקשות"
+    },
+    "requestLogs": {
+      "hint": "בקשות מהשעה שלפני סוף החלון, מהחדשות לישנות.",
+      "older": "שעה קודמת",
+      "newer": "שעה הבאה",
+      "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
+      "emptyTitle": "אין בקשות",
+      "emptyDescription": "בשעה הזו אין בקשות ל-Gateway.",
+      "loadError": "לא ניתן לטעון את יומני הבקשות.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
+      "tokens": "קלט {{input}} · פלט {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
@@ -4597,6 +4609,8 @@
     "topModels": "מודלים מובילים",
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
+    "unavailableTitle": "השימוש אינו זמין",
+    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Modifiche",
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
-    "privateRepositoryA11y": "{{name}}, repository privato"
+    "privateRepositoryA11y": "{{name}}, repository privato",
+    "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -643,7 +644,8 @@
       "managedOnWeb": "La connessione Bitbucket di questa organizzazione si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
-      "tokenPlaceholder": "Token di accesso all'area di lavoro"
+      "tokenPlaceholder": "Token di accesso all'area di lavoro",
+      "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
     },
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",
@@ -890,7 +892,8 @@
       "repositoryLine": "Revisioni: {{reviews}} · Segnalazioni: {{findings}}",
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
-      "off": "Le statistiche sono disattivate per questa organizzazione.",
+      "offTitle": "Le statistiche sono disattivate per {{platform}}",
+      "offDescription": "Attivale nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche"
     },
     "council": {
@@ -3524,7 +3527,6 @@
     },
     "settingsOnWeb": {
       "title": "Impostazioni dell'organizzazione sul web",
-      "integrations": "Integrazioni sul web",
       "usageDetails": "Dettagli di utilizzo",
       "providersAndModels": "Provider e modelli",
       "groups": "Gruppi",
@@ -3533,9 +3535,19 @@
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Raccolta dati",
       "auditLogs": "Registri di controllo",
-      "requestLogs": "Registri delle richieste",
-      "subOrganizations": "Sotto-organizzazioni",
-      "distributeFunds": "Distribuisci fondi"
+      "requestLogs": "Registri delle richieste"
+    },
+    "requestLogs": {
+      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
+      "older": "Ora precedente",
+      "newer": "Ora successiva",
+      "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
+      "emptyTitle": "Nessuna richiesta",
+      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
+      "loadError": "Impossibile caricare i registri delle richieste.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
+      "tokens": "{{input}} input · {{output}} output",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
@@ -4597,6 +4609,8 @@
     "topModels": "Modelli più usati",
     "topFeatures": "Funzionalità più usate",
     "emptyTitle": "Nessun utilizzo in questo periodo",
+    "unavailableTitle": "Utilizzo non disponibile",
+    "unavailableDescription": "Questo spazio di lavoro non segnala utilizzo. Riprovare non aiuterà.",
     "orgSelfNotice": "Stai visualizzando il tuo utilizzo in questa organizzazione.",
     "viewDetails": "Visualizza dettagli utilizzo"
   },

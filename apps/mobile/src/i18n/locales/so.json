@@ -175,7 +175,8 @@
     "durationHourShort": "saac",
     "changes": "Isbeddellada",
     "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
-    "privateRepositoryA11y": "{{name}}, kaydka gaar ah"
+    "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
+    "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Xiriirka Bitbucket ee ururkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
-      "tokenPlaceholder": "Summadda gelitaanka goobta shaqada"
+      "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
+      "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
     },
     "scopeList": {
       "personalStillAvailable": "Kaydadkaaga shakhsiga ah weli hoos ayaa laga heli karaa.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Dib-u-eegisyo: {{reviews}} · Natiijooyin: {{findings}}",
       "empty": "Weli ma jiro dib-u-eegis leh tirakoob",
       "emptyDescription": "Tirakoobku wuxuu diiwaangeliyaa dib-u-eegisyo dhammaaday inta uu ururka u shidan yahay.",
-      "off": "Tirakoobku wuu dansan yahay ururkan.",
+      "offTitle": "Tirakoobku wuu dansan yahay {{platform}}",
+      "offDescription": "Shid tirakoobka gudaha dejinta ururka ee shabakadda si loo diiwaangeliyo dib-u-eegisyo dhammaaday.",
       "couldNotLoad": "Tirakoobka lama soo dejin karin"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Dejinta ururka ee shabakadda",
-      "integrations": "Isku-xidhka ee shabakadda",
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO iyo domain",
       "dataCollection": "Ururinta xogta",
       "auditLogs": "Diiwaannada hubinta",
-      "requestLogs": "Diiwaannada codsiyada",
-      "subOrganizations": "Ururrada hoose",
-      "distributeFunds": "Qaybi lacagta"
+      "requestLogs": "Diiwaannada codsiyada"
+    },
+    "requestLogs": {
+      "hint": "Codsiyadii saacadda ka horreysay dhammaadka muddada, kuwa ugu cusub ayaa ugu horreeya.",
+      "older": "Saacaddii hore",
+      "newer": "Saacadda xigta",
+      "truncated": "Saacaddan waxay leedahay codsiyo ka badan inta liisku muujinayo.",
+      "emptyTitle": "Ma jiraan codsiyo",
+      "emptyDescription": "Saacaddan ma jiraan codsiyo gateway.",
+      "loadError": "Lama soo rari karin diiwaannada codsiyada.",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka.",
+      "tokens": "{{input}} gal · {{output}} bax",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
@@ -4527,6 +4539,8 @@
     "topModels": "Moodeellada ugu badan",
     "topFeatures": "Astaamaha ugu badan",
     "emptyTitle": "Isticmaal kuma jiro muddadan",
+    "unavailableTitle": "Isticmaalka lama heli karo",
+    "unavailableDescription": "Hawlwadeenkan ma soo sheego isticmaalka. Dib u dayashada ma caawinayso.",
     "orgSelfNotice": "Waxaad arkaysaa isticmaalkaaga gaarka ah ee ururkan.",
     "viewDetails": "Eeg faahfaahinta isticmaalka"
   },

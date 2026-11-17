@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Modificări",
     "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
-    "privateRepositoryA11y": "{{name}}, repository privat"
+    "privateRepositoryA11y": "{{name}}, repository privat",
+    "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -1377,7 +1378,8 @@
       "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",
       "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
-      "tokenPlaceholder": "Token de acces la spațiul de lucru"
+      "tokenPlaceholder": "Token de acces la spațiul de lucru",
+      "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."
     },
     "scopeList": {
       "personalStillAvailable": "Depozitele personale sunt în continuare disponibile mai jos.",
@@ -1489,7 +1491,8 @@
       "repositoryLine": "Revizuiri: {{reviews}} · Constatări: {{findings}}",
       "empty": "Nicio revizuire cu statistici deocamdată",
       "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
-      "off": "Statisticile sunt dezactivate pentru această organizație.",
+      "offTitle": "Statisticile sunt dezactivate pentru {{platform}}",
+      "offDescription": "Activează statisticile în setările organizației pe web pentru a înregistra revizuirile finalizate.",
       "couldNotLoad": "Statisticile nu au putut fi încărcate"
     },
     "council": {
@@ -3519,7 +3522,6 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
-      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
@@ -3528,9 +3530,19 @@
       "ssoAndDomain": "SSO și domeniu",
       "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
-      "requestLogs": "Jurnale de cereri",
-      "subOrganizations": "Suborganizații",
-      "distributeFunds": "Distribuie fonduri"
+      "requestLogs": "Jurnale de cereri"
+    },
+    "requestLogs": {
+      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
+      "older": "Ora anterioară",
+      "newer": "Ora următoare",
+      "truncated": "Această oră are mai multe cereri decât arată lista.",
+      "emptyTitle": "Nicio cerere",
+      "emptyDescription": "Nu există cereri către gateway în această oră.",
+      "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "tokens": "{{input}} intrare · {{output}} ieșire",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
@@ -4597,6 +4609,8 @@
     "topModels": "Modele principale",
     "topFeatures": "Funcții principale",
     "emptyTitle": "Nicio utilizare în această perioadă",
+    "unavailableTitle": "Utilizarea nu este disponibilă",
+    "unavailableDescription": "Acest spațiu de lucru nu raportează utilizare. Reîncercarea nu va ajuta.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
   },

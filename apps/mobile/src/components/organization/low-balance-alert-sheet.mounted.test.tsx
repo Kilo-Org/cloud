@@ -48,6 +48,7 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
@@ -64,6 +65,26 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => vi.fn() }));
+// The switch row is the shared `PreferenceRow`: its trailing cell reaches the
+// icon barrel, whose lucide modules this project cannot parse in the mounted
+// environment, so the barrel is stubbed here the way every row suite does.
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    mutedForeground: '#6F6A61',
+    primary: '#000000',
+    primaryForeground: '#FFFFFF',
+  }),
+}));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -93,8 +114,9 @@ vi.mock('@/lib/format', () => ({
 
 const thresholdFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
   fieldByLabel(renderer, i18n.t('organization.lowBalanceAlert.thresholdLabel'));
+/** The header's Done control commits the form, so it owns the unavailable state. */
 const saveButtonOf = (renderer: ReactTestRenderer): ReactTestInstance =>
-  renderer.root.find(node => String(node.type) === 'Button');
+  renderer.root.find(node => String(node.type) === 'SheetHeader');
 
 /** The sentence the threshold field shows for an amount above the stored ceiling. */
 const capSentence = () =>
@@ -188,8 +210,7 @@ describe('low balance alert sheet', () => {
     expect(String(threshold.props.placeholder)).not.toMatch(/^[\d.,\s]+$/);
     expect(threshold.props.defaultValue).toBeUndefined();
 
-    const button = renderer.root.find(node => String(node.type) === 'Button');
-    expect(button.props.disabled).toBe(true);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(true);
     unmount();
   });
 
@@ -210,9 +231,8 @@ describe('low balance alert sheet', () => {
     expect(JSON.stringify(renderer.toJSON())).not.toContain('invalid_format');
 
     // The rejection does not take Save away: the draft is intact and the
-    // button stays usable.
-    const button = renderer.root.find(node => String(node.type) === 'Button');
-    expect(button.props.disabled).toBe(false);
+    // control stays usable.
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(false);
     unmount();
   });
 
@@ -240,8 +260,7 @@ describe('low balance alert sheet', () => {
       i18n.t('organization.lowBalanceAlert.saveEmailsError')
     );
     // Correcting the field leaves Save usable.
-    const button = renderer.root.find(node => String(node.type) === 'Button');
-    expect(button.props.disabled).toBe(false);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(false);
     unmount();
   });
 
@@ -258,7 +277,7 @@ describe('low balance alert sheet', () => {
       (threshold.props.onChangeText as (value: string) => void)(paste);
     });
 
-    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(true);
     expect(
       (thresholdFieldOf(renderer).props.validate as (value: string) => string | null)(paste)
     ).toBe(capSentence());
@@ -266,7 +285,7 @@ describe('low balance alert sheet', () => {
     await act(() => {
       (threshold.props.onChangeText as (value: string) => void)('250');
     });
-    expect(saveButtonOf(renderer).props.disabled).toBe(false);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(false);
 
     // Switching the alert off unmounts the field and switching it back on
     // remounts it with the draft still above the ceiling, so the field names
@@ -281,7 +300,7 @@ describe('low balance alert sheet', () => {
       (toggle.props.onValueChange as (value: boolean) => void)(true);
     });
     expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
-    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(true);
     unmount();
 
     // A stored amount above the ceiling names itself at the mount, with no
@@ -294,14 +313,14 @@ describe('low balance alert sheet', () => {
     };
     const seeded = await mountSheet();
     expect(thresholdFieldOf(seeded.renderer).props.error).toBe(capSentence());
-    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(true);
+    expect(saveButtonOf(seeded.renderer).props.doneDisabled).toBe(true);
 
     const seededThreshold = thresholdFieldOf(seeded.renderer);
     await act(() => {
       (seededThreshold.props.onChangeText as (value: string) => void)('250');
     });
     expect(thresholdFieldOf(seeded.renderer).props.error).toBeUndefined();
-    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(false);
+    expect(saveButtonOf(seeded.renderer).props.doneDisabled).toBe(false);
     seeded.unmount();
   });
 
@@ -314,14 +333,14 @@ describe('low balance alert sheet', () => {
     });
 
     expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
-    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(true);
 
     await act(() => {
       (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('250');
     });
 
     expect(thresholdFieldOf(renderer).props.error).toBeUndefined();
-    expect(saveButtonOf(renderer).props.disabled).toBe(false);
+    expect(saveButtonOf(renderer).props.doneDisabled).toBe(false);
     unmount();
   });
 

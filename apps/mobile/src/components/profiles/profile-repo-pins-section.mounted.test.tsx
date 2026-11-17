@@ -105,16 +105,6 @@ function pressPressable(root: ReactTestInstance, label: string): void {
   });
 }
 
-function pressButton(root: ReactTestInstance, label: string): void {
-  const button = findAll(root, 'Button').find(node => node.props.accessibilityLabel === label);
-  if (!button) {
-    throw new Error(`button ${label} was not rendered`);
-  }
-  act(() => {
-    (button.props as { onPress: () => void }).onPress();
-  });
-}
-
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSection(organizationId?: string, canManage = true) {
   return renderWithProviders(

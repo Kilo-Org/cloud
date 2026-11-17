@@ -21,17 +21,13 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { Switch } from '@/components/ui/switch';
-import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { cn } from '@/lib/utils';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -285,18 +281,14 @@ export function KiloCommandFormSheet({
           }}
         />
         <RowGroup>
-          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-            <Text {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 text-sm font-medium text-foreground">
-              {t('profiles.slashCommands.subtask')}
-            </Text>
-            <Switch
-              value={subtask}
-              disabled={isSaving}
-              accessibilityLabel={t('profiles.slashCommands.subtask')}
-              onValueChange={setSubtask}
-            />
-          </View>
+          <PreferenceRow
+            title={t('profiles.slashCommands.subtask')}
+            value={subtask}
+            disabled={isSaving}
+            onValueChange={setSubtask}
+          />
         </RowGroup>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

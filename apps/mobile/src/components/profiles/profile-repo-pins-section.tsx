@@ -41,7 +41,7 @@ function RepoPinsSkeleton() {
       <Skeleton className="h-2 w-32 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
       <RowGroup>
-        <RowSkeleton subtitle />
+        <RowSkeleton subtitle trailingControl />
       </RowGroup>
     </View>
   );
@@ -159,6 +159,7 @@ export function ProfileRepoPinsSection({
       label={t('profiles.repoBindings.pinnedTitle')}
       actionLabel={t('profiles.repoBindings.pinRepo')}
       actionHidden={!canManage}
+      actionDisabled={bind.isPending}
       onActionPress={() => {
         if (!bind.isPending) {
           setPickerOpen(true);

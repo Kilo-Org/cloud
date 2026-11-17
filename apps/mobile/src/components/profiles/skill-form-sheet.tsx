@@ -200,6 +200,7 @@ export function SkillFormSheet({
             }
           }}
         />
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

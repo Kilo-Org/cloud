@@ -384,6 +384,7 @@ export function AgentFormSheet({
             <Text variant="muted">{t('profiles.agents.wholeToolRule', { rule: wholeToolAction })}</Text>
           ) : null}
         </View>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

@@ -40,8 +40,6 @@ type MemberRowProps = {
   onRemovalStarted?: (memberId: string) => SurfaceAttempt<MemberRemovalFailure> | null;
   /** Retires this member's shown removal refusal; the row calls it when a newer action supersedes it. */
   onRemovalCleared?: (memberId: string) => void;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
 };
 
 const ROLE_LABEL_KEYS = {
@@ -66,7 +64,6 @@ export function MemberRow({
   removalFailure = null,
   onRemovalStarted,
   onRemovalCleared,
-  last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -236,13 +233,7 @@ export function MemberRow({
   }
 
   const inner = (
-    <View
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 px-4 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft'
-      )}
-    >
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {displayName}

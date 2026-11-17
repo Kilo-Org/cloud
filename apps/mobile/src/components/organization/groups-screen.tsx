@@ -30,7 +30,7 @@ const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as c
 
 function GroupsSkeleton() {
   return (
-    <Card className="mx-4">
+    <Card>
       <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-24 rounded bg-muted-soft" />
     </Card>
@@ -88,7 +88,7 @@ export function OrganizationGroupsScreen() {
     );
   } else if (memberGroups !== null) {
     body = (
-      <Section label={t('organization.groups.memberViewTitle')} className="mx-4">
+      <Section label={t('organization.groups.memberViewTitle')}>
         {memberGroups.length === 0 ? (
           <Text variant="muted">{t('organization.groups.memberViewEmpty')}</Text>
         ) : (
@@ -127,7 +127,7 @@ export function OrganizationGroupsScreen() {
     );
   } else {
     body = (
-      <RowGroup className="mx-4">
+      <RowGroup>
         {managerGroups.map(group => (
           <OrgRecordRow
             key={group.id}

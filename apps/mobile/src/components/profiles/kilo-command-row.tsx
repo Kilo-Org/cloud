@@ -135,7 +135,7 @@ export function KiloCommandRowView({
       onMoveDown !== undefined ||
       onEdit !== undefined ||
       onDelete !== undefined ? (
-        <View className="flex-row items-center justify-end gap-3">
+        <View className="flex-row items-center justify-end gap-5">
           {onMoveUp !== undefined ? (
             <Pressable
               className={controlClass(isFirst)}

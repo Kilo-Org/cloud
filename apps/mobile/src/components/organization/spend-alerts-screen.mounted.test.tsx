@@ -79,6 +79,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+// The shared row primitives reach the icon barrel through their trailing cells;
+// its lucide modules cannot be parsed in the mounted environment.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -215,6 +218,14 @@ function channelSwitches(renderer: ReactTestRenderer, channelKey: string): React
   const channelLabel = i18n.t(channelKey);
   return byType(renderer, 'Switch').filter(node =>
     String(node.props.accessibilityLabel).includes(channelLabel)
+  );
+}
+
+/** The row that stands in for the push switch when push is unavailable. */
+function pushOffRow(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  const caption = i18n.t('spendAlerts.pushOffByCategory');
+  return byType(renderer, 'Pressable').find(
+    node => node.findAll(child => child.props.children === caption).length > 0
   );
 }
 
@@ -723,7 +734,7 @@ describe('SpendAlertsScreen push agreement', () => {
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(channelSwitches(renderer, i18n.t('common.email'))).toHaveLength(2);
 
-    press(byType(renderer, 'Pressable')[0]);
+    press(pushOffRow(renderer));
 
     expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
@@ -732,6 +743,6 @@ describe('SpendAlertsScreen push agreement', () => {
     const { renderer } = await mountLoaded({ pushChannelBlocked: true });
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
-    expect(byType(renderer, 'Pressable')).toHaveLength(2);
+    expect(pushOffRow(renderer)).toBeDefined();
   });
 });

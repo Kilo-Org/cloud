@@ -21,7 +21,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { RowGroup } from '@/components/ui/row-group';
+import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
@@ -41,7 +41,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
 import { selectOrgListErrorView } from './org-list-error-view';
@@ -160,6 +160,17 @@ export function OrganizationMembersScreen() {
     />
   );
 
+  // A member's or invite's rounded corners follow its run inside one group: the
+  // rows after a section header start the run, and the last row of the group
+  // closes it.
+  const rowPosition = (index: number, last: boolean) => {
+    const isFirst = index === 0 || items[index - 1]?.kind === 'section';
+    if (last) {
+      return isFirst ? 'only' : 'last';
+    }
+    return isFirst ? 'first' : 'middle';
+  };
+
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
       case 'section': {
@@ -169,15 +180,8 @@ export function OrganizationMembersScreen() {
         return emptyState;
       }
       case 'member': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-4 bg-secondary',
-              isFirst && 'rounded-t-xl',
-              item.last && 'rounded-b-xl'
-            )}
-          >
+          <RowGroupItem position={rowPosition(index, item.last)}>
             <MemberRow
               member={item.member}
               canManage={
@@ -193,28 +197,19 @@ export function OrganizationMembersScreen() {
               removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
               onRemovalStarted={handleRemovalStarted}
               onRemovalCleared={handleRemovalCleared}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       case 'invite': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-4 bg-secondary',
-              isFirst && 'rounded-t-xl',
-              item.last && 'rounded-b-xl'
-            )}
-          >
+          <RowGroupItem position={rowPosition(index, item.last)}>
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       default: {

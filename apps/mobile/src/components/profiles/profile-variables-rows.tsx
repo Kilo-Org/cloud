@@ -29,7 +29,7 @@ export function VariablesSkeleton() {
   return (
     <RowGroup>
       {[0, 1, 2].map(index => (
-        <RowSkeleton key={index} subtitle />
+        <RowSkeleton key={index} subtitle trailingControl />
       ))}
     </RowGroup>
   );
@@ -104,7 +104,7 @@ export function VariableRowView({
   const colors = useThemeColors();
   const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   return (
-    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 py-2 pl-4 pr-1')}>
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 pl-4 pr-1')}>
       <Pressable
         className={cn(ROW_TARGET_CLASS, 'flex-1 flex-row items-center gap-2 active:opacity-70')}
         accessibilityRole="button"

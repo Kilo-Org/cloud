@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DirectionalArrowLeft, DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { FileText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -340,6 +341,7 @@ export function OrganizationRequestLogsScreen() {
             }}
             accessibilityLabel={t('organization.requestLogs.older')}
           >
+            <DirectionalArrowLeft size={16} className="text-foreground" />
             <Text>{t('organization.requestLogs.older')}</Text>
           </Button>
           <Button
@@ -353,6 +355,7 @@ export function OrganizationRequestLogsScreen() {
             accessibilityLabel={t('organization.requestLogs.newer')}
           >
             <Text>{t('organization.requestLogs.newer')}</Text>
+            <DirectionalArrowRight size={16} className="text-foreground" />
           </Button>
         </View>
         <Text variant="caption">{t('organization.requestLogs.hint')}</Text>

@@ -14,8 +14,8 @@ import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 /**
  * One stat card. The value slot keeps its height when the number resolves —
- * `text-lg` measures 24.8 dp and the loading block is 24 dp — so the label
- * under it cannot move when the query answers.
+ * the `stat` variant's `text-lg` measures 24.8 dp and the loading block is
+ * 24 dp — so the label under it cannot move when the query answers.
  */
 function StatTile({ label, value }: Readonly<{ label: string; value: string | null }>) {
   return (
@@ -27,7 +27,7 @@ function StatTile({ label, value }: Readonly<{ label: string; value: string | nu
         // line the same way.
         <Skeleton className="h-7 w-16 rounded-md bg-muted-soft" />
       ) : (
-        <Text variant="figure">{value}</Text>
+        <Text variant="stat">{value}</Text>
       )}
       <Text variant="caption">{label}</Text>
     </Card>

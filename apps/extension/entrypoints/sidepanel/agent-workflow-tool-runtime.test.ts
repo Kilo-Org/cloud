@@ -31,13 +31,13 @@ import { runWorkflow } from '@/src/shared/agent-workflow-runner';
 
 const createBaseCtx = (overrides: Partial<WorkflowToolContext> = {}): WorkflowToolContext => ({
   allowWorkflowsInSafeMode: false,
+  disposeBrowserCaller: vi.fn().mockResolvedValue(undefined),
   evalInTab: vi
     .fn()
     .mockResolvedValue({ ok: true, value: { ok: true, value: { done: true, result: 'ok' } } }),
   getTabUrl: vi.fn().mockResolvedValue('https://example.com/page'),
   mode: 'dangerous',
   navigateTab: vi.fn().mockResolvedValue(undefined),
-  releaseBrowserCaller: vi.fn().mockResolvedValue(undefined),
   requestApproval: vi.fn().mockResolvedValue({ savedId: 'test-id', status: 'approved' }),
   selectedTabId: 1,
   selectedTabTitle: 'Example Page',
@@ -862,8 +862,8 @@ describe('run_workflow', () => {
         workflow: expect.objectContaining({ id: 'wf-1' }),
       })
     );
-    // The run's page scripts go through the run's own workflow caller, and the lease ends with the run.
-    expect(ctx.releaseBrowserCaller).toHaveBeenCalledWith(
+    // The run's page scripts go through the run's own workflow caller, and the run is disposed with its refs at the end.
+    expect(ctx.disposeBrowserCaller).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'workflow' })
     );
   });

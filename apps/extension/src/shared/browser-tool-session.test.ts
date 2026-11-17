@@ -512,7 +512,7 @@ describe('browser tool session', () => {
     await expect(second.resolveTarget('e99')).resolves.toBeUndefined();
   });
 
-  it("drops a released caller's registry and keeps the other caller's refs", async () => {
+  it("drops a disposed caller's registry and keeps the other caller's refs", async () => {
     const { session } = createSession();
     const first = session.bindCaller('panel:panel-1:conversation-1');
     const second = session.bindCaller('panel:panel-1:conversation-2');
@@ -520,7 +520,7 @@ describe('browser tool session', () => {
     first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
     second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
 
-    session.releaseCaller('panel:panel-1:conversation-1');
+    session.disposeCaller('panel:panel-1:conversation-1');
 
     await expect(first.resolveTarget('e11')).resolves.toBeUndefined();
     await expect(second.resolveTarget('e77')).resolves.toStrictEqual({
@@ -528,6 +528,29 @@ describe('browser tool session', () => {
       kind: 'ref',
       ref: 'e77',
     });
+  });
+
+  it('keeps refs across turns and drops every registry on navigation', async () => {
+    const { debuggerApi, session } = createSession();
+    const first = session.bindCaller('panel:panel-1:conversation-1');
+    const second = session.bindCaller('panel:panel-1:conversation-2');
+
+    first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
+    second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
+
+    // Nothing a turn does clears a registry: only navigation or disposal does.
+    await expect(first.resolveTarget('e11')).resolves.toStrictEqual({
+      backendNodeId: 11,
+      kind: 'ref',
+      ref: 'e11',
+    });
+
+    debuggerApi.emitEvent(7, 'Page.frameNavigated', {
+      frame: { id: 'main', url: 'https://example.com/next' },
+    });
+
+    await expect(first.resolveTarget('e11')).resolves.toBeUndefined();
+    await expect(second.resolveTarget('e77')).resolves.toBeUndefined();
   });
 
   it('buffers console messages from Runtime and Log events and drops the oldest past the bound', async () => {

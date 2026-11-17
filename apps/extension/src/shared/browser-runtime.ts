@@ -53,6 +53,9 @@ export interface BrowserRuntime {
   readonly disposeTab: (tabId: number) => Promise<void>;
   /** Runs workflow `page` scripts through the tab's one attachment. */
   readonly evalInTab: (input: BrowserEvalRunInput) => Promise<EvalTabResult>;
+  /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
+  readonly disposeCaller: (caller: BrowserCaller) => number;
+  /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
 }
@@ -246,15 +249,22 @@ export const createBrowserRuntime = ({
     });
   };
 
-  const releaseCaller = (caller: BrowserCaller): number => {
+  const disposeCaller = (caller: BrowserCaller): number => {
     const key = browserCallerKey(caller);
 
     for (const session of sessions.values()) {
-      session.releaseCaller(key);
+      session.disposeCaller(key);
     }
 
     return leases.releaseCaller(caller);
   };
 
-  return { disposeTab, evalInTab, releaseCaller, runTool };
+  // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
+  return {
+    disposeCaller,
+    disposeTab,
+    evalInTab,
+    releaseCaller: caller => leases.releaseCaller(caller),
+    runTool,
+  };
 };

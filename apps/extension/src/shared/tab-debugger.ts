@@ -12,6 +12,7 @@ export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
 export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
 export const BROWSER_TOOL_MESSAGE = 'kilo.tabs.browserTool';
 export const RELEASE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.releaseBrowserCaller';
+export const DISPOSE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.disposeBrowserCaller';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 /**
  * The debugger can only attach to ordinary pages. `chrome://`, extension and
@@ -254,6 +255,10 @@ export type TabDebuggerRequest =
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
     }
   | {
+      readonly caller: BrowserCaller;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
       readonly query?: string;
       readonly tabId: number;
       readonly textStart?: number;
@@ -320,6 +325,11 @@ export type TabDebuggerResponse =
       readonly released: number;
       readonly ok: true;
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      readonly released: number;
+      readonly ok: true;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
     }
   | {
       readonly result: EvalTabResult;
@@ -391,6 +401,10 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
+    caller: browserCallerSchema,
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
     arguments: z.record(z.string(), z.unknown()),
     caller: browserCallerSchema,
     tabId: z.number(),
@@ -434,6 +448,11 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     released: z.number(),
     type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    released: z.number(),
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
     ok: z.literal(true),

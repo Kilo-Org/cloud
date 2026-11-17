@@ -26,6 +26,7 @@ import type {
 } from '@/src/shared/side-panel';
 import {
   BROWSER_TOOL_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
@@ -336,6 +337,23 @@ export const handleTabDebuggerRequest = async ({
         ok: true,
         released: runtime?.releaseCaller(request.caller) ?? 0,
         type: RELEASE_BROWSER_CALLER_MESSAGE,
+      };
+    }
+
+    if (request.type === DISPOSE_BROWSER_CALLER_MESSAGE) {
+      const runtime =
+        tabsApi === undefined
+          ? undefined
+          : getBrowserRuntime({
+              debuggerApi,
+              scriptingApi,
+              tabsApi,
+            });
+
+      return {
+        ok: true,
+        released: runtime?.disposeCaller(request.caller) ?? 0,
+        type: DISPOSE_BROWSER_CALLER_MESSAGE,
       };
     }
 

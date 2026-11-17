@@ -280,8 +280,14 @@ export interface BrowserToolSession {
     entries: readonly BrowserToolRefEntry[],
     options?: { readonly merge?: boolean }
   ) => void;
-  /** Drops a caller's ref registry; the attachment and other callers keep working. */
-  readonly releaseCaller: (callerKey: string) => void;
+  /**
+   * Drops a caller's ref registry for good: the caller itself is gone (its
+   * conversation was deleted, its workflow run or agent session finished). The
+   * attachment and other callers keep working. Releasing a lease at turn end
+   * does not call this, so a caller's refs outlive its turn like Playwright's
+   * page handles; only a navigation, a tab dispose or this call clears them.
+   */
+  readonly disposeCaller: (callerKey: string) => void;
   readonly resolveTarget: (target: string) => Promise<BrowserToolResolvedTarget | undefined>;
   readonly send: (
     method: string,
@@ -1361,6 +1367,10 @@ export const createBrowserToolSession = ({
 
   const clearRefs = (): void => {
     defaultRefs.clear();
+    // A caller view holds its own map by reference, so clear each one before dropping it: a view bound before the navigation must not keep resolving a ref of the old document.
+    for (const refs of refsByCaller.values()) {
+      refs.clear();
+    }
     refsByCaller.clear();
   };
 
@@ -2814,6 +2824,10 @@ export const createBrowserToolSession = ({
       refsByCaller.delete(callerKey);
       return Promise.resolve();
     },
+    disposeCaller: key => {
+      refsByCaller.get(key)?.clear();
+      refsByCaller.delete(key);
+    },
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,
@@ -2821,10 +2835,6 @@ export const createBrowserToolSession = ({
     networkRequestsSinceLoad,
     registerRefs: (entries, options) => {
       registerRefs(refs, entries, options);
-    },
-    releaseCaller: key => {
-      refsByCaller.get(key)?.clear();
-      refsByCaller.delete(key);
     },
     resolveTarget: targetText => resolveTarget(targetText, refs),
     send,
@@ -2844,6 +2854,10 @@ export const createBrowserToolSession = ({
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     consoleMessages: () => [...consoleBuffer],
     dispose,
+    disposeCaller: callerKey => {
+      refsByCaller.get(callerKey)?.clear();
+      refsByCaller.delete(callerKey);
+    },
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,
@@ -2851,10 +2865,6 @@ export const createBrowserToolSession = ({
     networkRequestsSinceLoad,
     registerRefs: (entries, options) => {
       registerRefs(defaultRefs, entries, options);
-    },
-    releaseCaller: callerKey => {
-      refsByCaller.get(callerKey)?.clear();
-      refsByCaller.delete(callerKey);
     },
     resolveTarget: targetText => resolveTarget(targetText, defaultRefs),
     send,

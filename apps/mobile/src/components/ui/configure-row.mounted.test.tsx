@@ -258,7 +258,9 @@ describe('ConfigureRow test handle', () => {
 
   it('puts it on the inert row, which has no Pressable', () => {
     const root = renderRow({ testID: 'configure-2', pressable: false });
-    const row = root.find(node => node.props.testID === 'configure-2');
+    const row = root.find(
+      node => typeof node.type === 'string' && node.props.testID === 'configure-2'
+    );
 
     expect(row.type).toBe('View');
   });

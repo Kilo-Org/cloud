@@ -317,7 +317,7 @@ describe('PreferenceRow', () => {
 describe('PreferenceRow test handle', () => {
   it('puts the caller\'s testID on the row container', () => {
     const row = renderRow({ value: true, onValueChange: () => undefined, testID: 'pref-1' }).find(
-      node => node.props.testID === 'pref-1'
+      node => typeof node.type === 'string' && node.props.testID === 'pref-1'
     );
 
     expect(row.type).toBe('View');

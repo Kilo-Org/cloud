@@ -544,14 +544,21 @@ export function ScreenHeader({
   // Refresh controls). The band keeps the eyebrow's line beside the heading, so
   // the visible title centers on the row and the arriving text cannot change
   // the height. The band is a sibling, so the row takes the taller of the two:
-  // it holds the eyebrow's line plus the title line the heading paints beside
-  // it, and one line is enough there — the heading already carries every line
-  // the title actually paints.
+  // it holds the eyebrow's line, one title line and, when the heading keeps a
+  // subtitle line, that line too, so it stays at least as tall as the heading
+  // once the eyebrow lands. The title still moves up by half the eyebrow's line
+  // when the label arrives: centring the title while the label is missing is
+  // the point of this band.
   const reservedTitleBand =
     reserveTitleSpace || (reserveEyebrow && !eyebrow) ? (
       <View className="w-0 overflow-hidden" aria-hidden>
         {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
         <View className={reservedTitleHeightClass(size, reserveTitleSpace ? titleLines : 1)} />
+        {reserveEyebrow && !eyebrow && (subtitle || reserveSubtitle || subtitlePlaceholder) ? (
+          <Text variant="muted" className="mt-0.5" numberOfLines={1}>
+            {'\u00A0'}
+          </Text>
+        ) : null}
       </View>
     ) : null;
 

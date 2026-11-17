@@ -28,6 +28,7 @@ import {
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -246,7 +247,7 @@ export function DeviceSessionsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.deviceSessions')} />
+      <ScreenHeader title={t('common.deviceSessions')} backFallback={PROFILE_TAB_HREF} />
       {body}
       {dialog}
     </View>

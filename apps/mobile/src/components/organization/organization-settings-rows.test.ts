@@ -42,20 +42,23 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
 }
 
 function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
-  return visibleInAppSettingsRows({
-    role: 'owner',
-    plan: 'enterprise',
-    guardrailsEnabled: true,
-    ...overrides,
-  }).map(row => row.area);
+  return visibleInAppSettingsRows(
+    {
+      role: 'owner',
+      plan: 'enterprise',
+      guardrailsEnabled: true,
+      ...overrides,
+    },
+    'org_1'
+  ).map(row => row.area);
 }
 
 describe('visibleOrgSettingsRows', () => {
-  it('lists every area for an owner of an enterprise organization', () => {
+  it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
       'customModes',
       'groups',
-      'byok',
+
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -74,7 +77,7 @@ describe('visibleOrgSettingsRows', () => {
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
       'customModes',
-      'byok',
+
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -86,12 +89,12 @@ describe('visibleOrgSettingsRows', () => {
     const rows = areas({ role: 'billing_manager', isTopLevel: false });
     expect(rows).not.toContain('subOrganizations');
     expect(rows).not.toContain('distributeFunds');
-    expect(rows).toContain('byok');
+    expect(rows).toContain('requestLogs');
   });
 
   it('drops the owner-only rows for a billing manager', () => {
     const rows = areas({ role: 'billing_manager' });
-    expect(rows).toContain('byok');
+    expect(rows).toContain('requestLogs');
   });
 
   it('opens a page of its own for every row, never the dashboard', () => {
@@ -127,18 +130,20 @@ describe('visibleOrgSettingsRows', () => {
         expect(rows).not.toContain('auditLogs');
         expect(rows).not.toContain('providersAndModels');
         expect(rows).not.toContain('guardrails');
+        expect(rows).not.toContain('byok');
       }
     }
   });
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns usage to every role and plan, plus the billing-role areas on enterprise', () => {
+  it('returns usage to every role and plan, and the audit log and keys to billing roles', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
       expect(inAppAreas({ role, guardrailsEnabled: false })).toEqual([
         'usageDetails',
         'auditLogs',
         'providersAndModels',
+        'byok',
       ]);
     }
   });
@@ -162,15 +167,25 @@ describe('visibleInAppSettingsRows', () => {
   it('keeps usage for a member, an unknown role and a teams plan', () => {
     expect(inAppAreas({ role: 'member' })).toEqual(['usageDetails']);
     expect(inAppAreas({ role: undefined })).toEqual(['usageDetails']);
-    expect(inAppAreas({ plan: 'teams', guardrailsEnabled: false })).toEqual(['usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['usageDetails']);
+  });
+
+  it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
+    expect(inAppAreas({ plan: 'teams', guardrailsEnabled: false })).toEqual([
+      'usageDetails',
+      'byok',
+    ]);
   });
 
   it('opens the app screens, not pages', () => {
-    const rows = visibleInAppSettingsRows({
-      role: 'owner',
-      plan: 'enterprise',
-      guardrailsEnabled: true,
-    });
+    const rows = visibleInAppSettingsRows(
+      {
+        role: 'owner',
+        plan: 'enterprise',
+        guardrailsEnabled: true,
+      },
+      'org_1'
+    );
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
@@ -180,6 +195,10 @@ describe('visibleInAppSettingsRows', () => {
     expect(byArea.get('guardrails')?.href).toBe(
       '/(app)/(tabs)/(3_profile)/organization/guardrails'
     );
+    expect(byArea.get('byok')?.href).toEqual({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org_1' },
+    });
   });
 });
 

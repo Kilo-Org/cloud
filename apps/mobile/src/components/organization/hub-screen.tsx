@@ -59,6 +59,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
@@ -158,6 +159,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     return (
       <OrganizationBoundary
         title={t('common.organization')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationIdOverride}
       />
     );
@@ -247,11 +249,14 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // Encrypt setting, so it arrives with the membership payload — the same
   // commit that paints the web group below it, so nothing already on screen
   // moves when it lands.
-  const inAppSettingsRows = visibleInAppSettingsRows({
-    role,
-    plan: org.plan,
-    guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt,
-  });
+  const inAppSettingsRows = visibleInAppSettingsRows(
+    {
+      role,
+      plan: org.plan,
+      guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt,
+    },
+    organizationId
+  );
 
   // The organization dashboard's own settings on the web, one row per area.
   // The group waits for the membership payload because the parent link decides
@@ -279,6 +284,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       <ScreenHeader
         title={org.organizationName}
         titleNumberOfLines={2}
+        backFallback={PROFILE_TAB_HREF}
         headerRight={
           showMoney ? (
             <IconButton {...renameControlProps(renameControl, t('organization.hub.renameTitle'))}>

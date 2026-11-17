@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -52,6 +52,7 @@ export function RepoBindingsScreen({
   organizationId,
   stack,
   openedFrom,
+  backFallback,
 }: Readonly<{
   organizationId?: string;
   /** The Stack this screen is mounted in; its create screen opens in it too. */
@@ -62,6 +63,8 @@ export function RepoBindingsScreen({
    * profiles list this screen never had.
    */
   openedFrom?: ProfileExternalOpener;
+  /** Where the header's Back lands when the screen opens with no history to pop. */
+  backFallback?: Href;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -153,7 +156,7 @@ export function RepoBindingsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.repoBindings.title')} />
+      <ScreenHeader title={t('profiles.repoBindings.title')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

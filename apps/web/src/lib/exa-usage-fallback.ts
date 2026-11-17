@@ -1,7 +1,6 @@
 import 'server-only';
 
 import type { ExaUsageRecord } from '@kilocode/usage-contracts';
-import { EXA_USAGE_QUEUE_FALLBACK_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import {
   enqueueExaUsage,
   isExaUsagePublicationConfigured,
@@ -12,7 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/usage-publication-outcome';
 
 export type ExaUsageFallbackOutcome =
-  | { fallback: 'disabled' | 'not_configured' | 'queued' }
+  | { fallback: 'not_configured' | 'queued' }
   | { fallback: 'rejected' | 'publish_failed'; fallback_reason: string }
   | {
       fallback: 'publish_failed';
@@ -25,7 +24,7 @@ export type ExaUsageFallbackOutcome =
  * this to reserve invocation time only for a publication that can actually happen.
  */
 export function isExaUsageQueueFallbackAvailable(): boolean {
-  return EXA_USAGE_QUEUE_FALLBACK_ENABLED && isExaUsagePublicationConfigured();
+  return isExaUsagePublicationConfigured();
 }
 
 /**
@@ -37,8 +36,6 @@ export function isExaUsageQueueFallbackAvailable(): boolean {
 export async function queueExaUsageAfterFailedWrite(
   record: ExaUsageRecord
 ): Promise<ExaUsageFallbackOutcome> {
-  if (!EXA_USAGE_QUEUE_FALLBACK_ENABLED) return { fallback: 'disabled' };
-
   let outcome: PublicationOutcome;
   try {
     outcome = await enqueueExaUsage(record);

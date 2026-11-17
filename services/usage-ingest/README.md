@@ -224,13 +224,14 @@ not logged). Untagged LLM logs keep exactly their existing fields, so filter LLM
 counts with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
 payer, user, session, cost or `occurredAt`-derived age.
 
-Deploy order: this consumer first, then the ingress, then the producer with its
-flag off. Never roll the consumer back to a version that does not route a kind
+Deploy order: this consumer first, then the ingress, then the producer (the Exa
+producer publishes only with a valid publisher configuration). Never roll the consumer back to a version that does not route a kind
 while messages of that kind may be in flight or retrying: such a consumer retries
 them as invalid or unsupported events and they reach the DLQ after 20 retries. In
 particular, never roll back to a consumer from before Exa routing while Exa
 messages may be queued. To stop tagged traffic, roll the producer back — revert the
-Enkrypt source, or turn off the Exa fallback flag — and let the consumer drain.
+Enkrypt source, or remove the web app's Exa publisher configuration or revert its producer
+source as described in Exa usage rollout — and let the consumer drain.
 
 ## Observability
 
@@ -763,32 +764,22 @@ fallback: when the direct write fails, the web app posts the same bare record, w
 `id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
 Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
 commit returns `duplicate` and makes no second debit; a replay must keep both values. The
-producer is a separate change behind the
-`kilocode-app` flag `EXA_USAGE_QUEUE_FALLBACK_ENABLED`; until it lands with the flag on,
-nothing sends Exa messages.
+`kilocode-app` producer publishes whenever its `USAGE_INGEST_URL` and
+`USAGE_INGEST_PUBLISH_SECRET` form a valid publisher configuration; it has no rollout selector.
 
-Deploy in this order. Each step must be deployed and verified before the next:
+The consumer that routes tagged Exa messages and its `/exa-usage` ingress, together with the
+web app's Exa writer taking the `non_llm` admission class for queue writes, must be deployed
+before any `kilocode-app` deployment whose publisher configuration is valid.
 
-1. This Worker's consumer that routes tagged Exa messages and its `/exa-usage` ingress, and
-   the web app's Exa writer taking the `non_llm` admission class for queue writes. They ship
-   together and nothing posts to the ingress yet. The production Worker deploy is not
-   ordered against the Vercel promotion, so confirm both before step 2.
-2. The web app producer, with the flag off.
-3. The flag on.
+Rollback: remove the web app's publisher configuration and redeploy, or revert the producer
+source change and redeploy with `EXA_USAGE_QUEUE_FALLBACK_ENABLED` absent or not `true`; the
+reverted source still publishes whenever that value is `true`. Failed direct writes then stop publishing, and the consumer drains what the
+queue already accepted. Never roll the consumer back to a version without Exa routing while
+Exa messages may still be in the source queue or in flight: they would fail every retry and
+reach the DLQ.
 
-Rollback: set the flag to anything other than `true` and redeploy the web app. Failed direct
-writes then stop publishing, and the consumer drains what the queue already accepted. Never
-roll the consumer back to a version without Exa routing while Exa messages may still be in
-the source queue or in flight: they would fail every retry and reach the DLQ.
-
-Human-only steps, before the flag is turned on:
-
-- give `kilocode-app` the ingress address and the existing `USAGE_INGEST_PUBLISH_SECRET`;
-  no new Worker secret is needed;
-- name a replay owner for the mixed DLQ, with a replay that handles LLM, Enkrypt and Exa
-  messages;
-- confirm the existing DLQ alerting covers it;
-- set the flag on `kilocode-app` and redeploy.
+The mixed DLQ needs a replay owner whose replay handles LLM, Enkrypt and Exa messages, and the
+existing DLQ alerting must cover it.
 
 ## Retention
 

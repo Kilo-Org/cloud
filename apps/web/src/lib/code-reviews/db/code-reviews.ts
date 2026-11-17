@@ -32,6 +32,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import type { ReviewGuidelineImport } from '@kilocode/db/schema-types';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import {
@@ -335,20 +336,25 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
  */
 export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCodeReview | null> {
   try {
-    // Do NOT select the heavy `council_result` JSONB: this getter feeds many hot, non-detail
-    // callers (status/usage callbacks, CLI, dispatch, cancel/retrigger) that never read it.
-    // The column is kept off the wire and returned as null; the one consumer that needs it —
-    // the review-detail `get` procedure — loads it explicitly via `getCodeReviewCouncilResult`.
-    // Returning the full row type (with council_result: null) avoids churning every caller.
-    const { council_result: _councilResult, ...columns } =
-      getTableColumns(cloud_agent_code_reviews);
+    // Do NOT select the heavy `council_result` or `repository_review_instructions_imports`
+    // JSONB: this getter feeds many hot, non-detail callers (status/usage callbacks, CLI,
+    // dispatch, cancel/retrigger) that never read them. The columns are kept off the wire and
+    // returned as null; the review-detail `get` procedure loads `council_result` explicitly
+    // via `getCodeReviewCouncilResult`. Returning the full row type avoids churning every caller.
+    const {
+      council_result: _councilResult,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
+      ...columns
+    } = getTableColumns(cloud_agent_code_reviews);
     const [review] = await db
       .select(columns)
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
       .limit(1);
 
-    return review ? { ...review, council_result: null } : null;
+    return review
+      ? { ...review, council_result: null, repository_review_instructions_imports: null }
+      : null;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'getCodeReviewById' },
@@ -1578,6 +1584,7 @@ export async function updateRepositoryReviewInstructionsMetadata(
     used: boolean;
     ref: string | null;
     truncated: boolean;
+    imports?: ReviewGuidelineImport[];
   }
 ): Promise<void> {
   try {
@@ -1587,13 +1594,23 @@ export async function updateRepositoryReviewInstructionsMetadata(
         repository_review_instructions_used: metadata.used,
         repository_review_instructions_ref: metadata.ref,
         repository_review_instructions_truncated: metadata.truncated,
+        repository_review_instructions_imports:
+          metadata.imports?.map(entry => ({
+            ...entry,
+            source: sanitizePostgresString(entry.source),
+          })) ?? [],
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateRepositoryReviewInstructionsMetadata' },
-      extra: { reviewId, metadata },
+      extra: {
+        reviewId,
+        used: metadata.used,
+        truncated: metadata.truncated,
+        importCount: metadata.imports?.length ?? 0,
+      },
     });
     throw error;
   }
@@ -1608,7 +1625,10 @@ export async function updateRepositoryReviewInstructionsMetadata(
  */
 export type CodeReviewListRow = Omit<
   CloudAgentCodeReview,
-  'council_result' | 'manual_config' | 'previous_summary_body'
+  | 'council_result'
+  | 'manual_config'
+  | 'previous_summary_body'
+  | 'repository_review_instructions_imports'
 >;
 
 export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListRow[]> {
@@ -1637,12 +1657,14 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
     }
 
     // Select every column except the heavy JSONB/text fields no list UI reads
-    // (council_result, manual_config, previous_summary_body). The review-detail
-    // path still returns them. total_cost_musd stays: the mobile detail renders it.
+    // (council_result, manual_config, previous_summary_body,
+    // repository_review_instructions_imports). The review-detail path still returns
+    // the first three. total_cost_musd stays: the mobile detail renders it.
     const {
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     const reviews = await db

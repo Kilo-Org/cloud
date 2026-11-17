@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 import { Keyboard, Pressable, View } from 'react-native';
@@ -11,6 +11,7 @@ import {
   formatInstanceTarget,
   formatInstanceValue,
 } from '@/lib/instance-target-label';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -70,7 +71,7 @@ export function InstanceSelector({
   onChange,
   disabled = false,
 }: Readonly<InstanceSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -100,7 +101,7 @@ export function InstanceSelector({
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,
     // so the keyboard must be down before this push.
     Keyboard.dismiss();
-    router.push('/(app)/agent-chat/instance-picker' as Href);
+    pushOnce('/(app)/agent-chat/instance-picker' as Href);
   }
 
   return (

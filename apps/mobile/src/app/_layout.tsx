@@ -96,6 +96,7 @@ import {
   runLanguageStartupDirectionGuardedAsync,
 } from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
+import { languageReturnNavigation } from '@/i18n/language-return-navigation';
 import {
   getResolvedLanguage,
   preloadLanguagePreference,
@@ -171,6 +172,7 @@ import {
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
 import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -449,16 +451,13 @@ function RootLayoutNav({
       return;
     }
     languageReturnTargetRef.current = null;
-    if (target === 'login') {
-      routerRef.current.replace('/(auth)/login');
-    } else if (target === 'profile') {
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+    const navigation = languageReturnNavigation(target);
+    // One navigation per target: `withAnchor` rebuilds the navigators between
+    // the shell and the reopened screen from the relaunch's empty state.
+    if (navigation.method === 'navigate') {
+      routerRef.current.navigate(navigation.href, { withAnchor: navigation.withAnchor });
     } else {
-      // Two steps, not one `replace`: the relaunched stack has no entry
-      // below the reopened screen, so a lone `replace` leaves the header's
-      // back control with nothing to pop.
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
-      routerRef.current.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+      routerRef.current.replace(navigation.href);
     }
   };
   const runLanguageReturnNavigation = () => {
@@ -698,9 +697,13 @@ function RootLayoutNav({
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error, {
-          tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
-        });
+        // A locked device refusing the keychain read is that device state, not
+        // a defect; the gate reports its own retry state below either way.
+        if (!isKeychainInteractionRefused(result.error)) {
+          Sentry.captureException(result.error, {
+            tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+          });
+        }
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);

@@ -393,16 +393,16 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
-  it.each(['high', 'High', 'a'.repeat(50)])('accepts valid create variant %s', variant => {
-    expect(WebhookTriggerCreateInput.safeParse({ ...createInput, variant }).success).toBe(true);
-  });
-
-  it.each(['', 'high-effort', 'high1', 'a'.repeat(51)])(
-    'rejects invalid create variant %s',
+  it.each(['high', 'High', 'high-2', 'a'.repeat(50)])(
+    'accepts valid create variant %s',
     variant => {
-      expect(WebhookTriggerCreateInput.safeParse({ ...createInput, variant }).success).toBe(false);
+      expect(WebhookTriggerCreateInput.safeParse({ ...createInput, variant }).success).toBe(true);
     }
   );
+
+  it.each(['', 'a'.repeat(51)])('rejects invalid create variant %s', variant => {
+    expect(WebhookTriggerCreateInput.safeParse({ ...createInput, variant }).success).toBe(false);
+  });
 
   it('accepts set and clear updates while preserving omission', () => {
     expect(WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id' })).toMatchObject({
@@ -417,14 +417,11 @@ describe('webhook trigger variant inputs', () => {
     ).toMatchObject({ success: true, data: { triggerId: 'trigger-id', variant: null } });
   });
 
-  it.each(['', 'high-effort', 'high1', 'a'.repeat(51)])(
-    'rejects invalid update variant %s',
-    variant => {
-      expect(
-        WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', variant }).success
-      ).toBe(false);
-    }
-  );
+  it.each(['', 'a'.repeat(51)])('rejects invalid update variant %s', variant => {
+    expect(WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', variant }).success).toBe(
+      false
+    );
+  });
 
   it('forwards an omitted create variant', async () => {
     await createCaller({ user }).create(createInput);

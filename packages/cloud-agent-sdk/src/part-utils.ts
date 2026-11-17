@@ -22,7 +22,7 @@ function isToolPart(part: Part): part is ToolPart {
  * reader validates for itself — `status`, `Array.isArray(attachments)`, and a
  * numeric `time.end`.
  */
-function toolStateOf(part: ToolPart): ToolState | null {
+export function toolStateOf(part: ToolPart): ToolState | null {
   const state: unknown = part.state;
   if (typeof state !== 'object' || state === null || Array.isArray(state)) {
     return null;

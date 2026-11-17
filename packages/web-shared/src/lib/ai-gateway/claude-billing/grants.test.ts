@@ -20,17 +20,17 @@ import {
   type ClaudeBillingOwner,
 } from './store';
 
-async function connectedPayer(userId: string, organizationId: string | null = null) {
+async function connectedPayer(kiloUserId: string | null, organizationId: string | null = null) {
   const [row] = await db
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: userId,
+      kilo_user_id: kiloUserId,
       organization_id: organizationId,
       user_profile_id: `uprof_${crypto.randomUUID()}`,
       connection_id: `ocon_${crypto.randomUUID()}`,
       status: 'connected',
       connected_at: new Date().toISOString(),
-      created_by: userId,
+      created_by: kiloUserId ?? 'fixture',
     })
     .returning();
   if (!row) throw new Error('Missing payer fixture');
@@ -50,47 +50,37 @@ async function activeGrants(payerConnectionId: string) {
 }
 
 describe('Claude billing grants', () => {
-  it('shares one payer across member and shared-services scopes', async () => {
+  it('shares one payer between a personal and an organization scope', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude grants', user.id, 0);
     const payer = await connectedPayer(user.id);
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
-      organizationId: organization.id,
-    };
-    const shared: ClaudeBillingOwner = {
-      kind: 'shared_services',
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: organization.id,
     };
 
-    await shareClaudeBillingConnection(personal, member, user.id);
-    await shareClaudeBillingConnection(personal, shared, user.id);
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
 
     await expect(
       Promise.all([
         getGrantedClaudeBillingConnection(personal),
-        getGrantedClaudeBillingConnection(member),
-        getGrantedClaudeBillingConnection(shared),
+        getGrantedClaudeBillingConnection(organizationOwner),
       ])
     ).resolves.toEqual([
       expect.objectContaining({ id: payer.id }),
       expect.objectContaining({ id: payer.id }),
-      expect.objectContaining({ id: payer.id }),
     ]);
-    await expect(activeGrants(payer.id)).resolves.toHaveLength(3);
+    await expect(activeGrants(payer.id)).resolves.toHaveLength(2);
 
-    await removeClaudeBillingGrant(member);
-    await removeClaudeBillingGrant(shared);
+    await removeClaudeBillingGrant(organizationOwner);
 
     await expect(
       Promise.all([
-        getGrantedClaudeBillingConnection(member),
-        getGrantedClaudeBillingConnection(shared),
+        getGrantedClaudeBillingConnection(organizationOwner),
         getGrantedClaudeBillingConnection(personal),
       ])
-    ).resolves.toEqual([null, null, expect.objectContaining({ id: payer.id })]);
+    ).resolves.toEqual([null, expect.objectContaining({ id: payer.id })]);
   });
 
   it('shares an organization-first link back to personal and deletes only the personal Anthropic key', async () => {
@@ -125,32 +115,20 @@ describe('Claude billing grants', () => {
       },
     ]);
 
-    const sharedA: ClaudeBillingOwner = { kind: 'shared_services', organizationId: orgA.id };
-    const memberA: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
-      organizationId: orgA.id,
-    };
+    const sharedA: ClaudeBillingOwner = { kind: 'organization', organizationId: orgA.id };
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const memberB: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
-      organizationId: orgB.id,
-    };
+    const sharedB: ClaudeBillingOwner = { kind: 'organization', organizationId: orgB.id };
 
     await shareClaudeBillingConnection(sharedA, personal, user.id);
-    await shareClaudeBillingConnection(personal, memberA, user.id);
-    await shareClaudeBillingConnection(memberA, memberB, user.id);
+    await shareClaudeBillingConnection(personal, sharedB, user.id);
 
     await expect(
       Promise.all([
         getGrantedClaudeBillingConnection(sharedA),
         getGrantedClaudeBillingConnection(personal),
-        getGrantedClaudeBillingConnection(memberA),
-        getGrantedClaudeBillingConnection(memberB),
+        getGrantedClaudeBillingConnection(sharedB),
       ])
     ).resolves.toEqual([
-      expect.objectContaining({ id: sharedFirstPayer.id }),
       expect.objectContaining({ id: sharedFirstPayer.id }),
       expect.objectContaining({ id: sharedFirstPayer.id }),
       expect.objectContaining({ id: sharedFirstPayer.id }),
@@ -170,17 +148,12 @@ describe('Claude billing grants', () => {
     const organization = await createTestOrganization('Claude multi account', user.id, 0);
     const firstPayer = await connectedPayer(user.id);
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
-      organizationId: organization.id,
-    };
-    const shared: ClaudeBillingOwner = {
-      kind: 'shared_services',
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: organization.id,
     };
 
-    await shareClaudeBillingConnection(personal, member, user.id);
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
     await expect(removeClaudeBillingGrant(personal)).resolves.toBeNull();
 
     const secondProfile = await insertClaudeBillingProfile(
@@ -197,7 +170,7 @@ describe('Claude billing grants', () => {
       })
       .where(eq(claude_billing_connections.id, secondProfile.id));
 
-    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       id: firstPayer.id,
       status: 'connected',
     });
@@ -206,18 +179,17 @@ describe('Claude billing grants', () => {
       status: 'connected',
     });
 
-    const sharedChoices = await describeClaudeBillingSharing(user.id, shared, true, null);
-    expect(sharedChoices.shareableLinks.map(link => link.payerId)).toEqual([
-      firstPayer.id,
-      secondProfile.id,
-    ]);
-    expect(sharedChoices.shareableLinks.map(link => link.label)).toEqual([
-      'Claude multi account (member)',
-      'Personal account',
+    const personalChoices = await describeClaudeBillingSharing(user.id, personal, true, null);
+    expect(personalChoices.shareableLinks).toEqual([
+      expect.objectContaining({
+        payerId: firstPayer.id,
+        label: 'Claude multi account',
+        source: { organizationId: organization.id },
+      }),
     ]);
   });
 
-  it('prevents another organization admin from sharing a shared-services payer they did not link', async () => {
+  it('prevents another organization admin from sharing the organization payer they did not link', async () => {
     const alice = await insertTestUser();
     const bob = await insertTestUser();
     const organization = await createTestOrganization('Claude admin boundary', alice.id, 0);
@@ -226,7 +198,7 @@ describe('Claude billing grants', () => {
       kilo_user_id: bob.id,
       role: 'admin',
     });
-    const [aliceSharedPayer] = await db
+    const [alicePayer] = await db
       .insert(claude_billing_connections)
       .values({
         kilo_user_id: null,
@@ -238,15 +210,17 @@ describe('Claude billing grants', () => {
         created_by: alice.id,
       })
       .returning();
-    if (!aliceSharedPayer) throw new Error('Missing Alice shared payer');
+    if (!alicePayer) throw new Error('Missing Alice organization payer');
 
-    const shared: ClaudeBillingOwner = {
-      kind: 'shared_services',
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: organization.id,
     };
     const bobPersonal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: bob.id };
 
-    await expect(shareClaudeBillingConnection(shared, bobPersonal, bob.id)).rejects.toMatchObject({
+    await expect(
+      shareClaudeBillingConnection(organizationOwner, bobPersonal, bob.id)
+    ).rejects.toMatchObject({
       reason: 'source_forbidden',
     } satisfies Partial<ClaudeBillingShareError>);
 
@@ -258,23 +232,54 @@ describe('Claude billing grants', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude occupied', user.id, 0);
     const personalPayer = await connectedPayer(user.id);
-    const memberPayer = await connectedPayer(user.id, organization.id);
+    const organizationPayer = await connectedPayer(null, organization.id);
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: organization.id,
     };
 
-    await expect(shareClaudeBillingConnection(personal, member, user.id)).rejects.toMatchObject({
+    await expect(
+      shareClaudeBillingConnection(personal, organizationOwner, user.id)
+    ).rejects.toMatchObject({
       reason: 'target_connected',
     } satisfies Partial<ClaudeBillingShareError>);
-    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
-      id: memberPayer.id,
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
+      id: organizationPayer.id,
     });
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
       id: personalPayer.id,
     });
+  });
+
+  it('hands a payer only to a scope Kilo still offers', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude retired scope', user.id, 0);
+    const payer = await connectedPayer(null, organization.id);
+    await db.insert(claude_billing_connection_grants).values([
+      {
+        payer_connection_id: payer.id,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        created_by: user.id,
+      },
+      {
+        payer_connection_id: payer.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        created_by: user.id,
+      },
+    ]);
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    await expect(removeClaudeBillingGrant(organizationOwner)).resolves.toEqual({
+      id: payer.id,
+      userProfileId: payer.user_profile_id,
+    });
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toBeNull();
   });
 
   it('preserves a removed target profile row across grant removal and user erasure', async () => {
@@ -293,27 +298,21 @@ describe('Claude billing grants', () => {
     if (!removedTarget) throw new Error('Missing removed target fixture');
     const payer = await connectedPayer(user.id);
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const shared: ClaudeBillingOwner = {
-      kind: 'shared_services',
-      organizationId: organization.id,
-    };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: organization.id,
     };
 
-    await shareClaudeBillingConnection(personal, shared, user.id);
-    await shareClaudeBillingConnection(personal, member, user.id);
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
     await removeClaudeBillingGrant(personal);
-    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       id: payer.id,
-      kilo_user_id: user.id,
+      kilo_user_id: null,
       organization_id: organization.id,
     });
 
     await removeUserClaudeBillingGrants(user.id, db);
-    await expect(getGrantedClaudeBillingConnection(shared)).resolves.toMatchObject({
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       id: payer.id,
       kilo_user_id: null,
       organization_id: organization.id,

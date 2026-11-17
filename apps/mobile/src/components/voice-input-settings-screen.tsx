@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Cpu, Globe, Mic } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -10,7 +10,9 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { VoiceTestField } from '@/components/voice-test-field';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
@@ -32,7 +34,7 @@ const NO_MODEL_VALUE = '—';
  * present state while the switch is on.
  */
 export function VoiceInputSettingsScreen() {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { organizationId } = useOrganization();
   const {
     gatewayTranscriptionEnabled,
@@ -80,7 +82,7 @@ export function VoiceInputSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.voiceInput')} />
+      <ScreenHeader title={t('preferences.voiceInput')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
@@ -111,7 +113,7 @@ export function VoiceInputSettingsScreen() {
           className="rounded-lg bg-secondary px-3"
           disabled={modelRowDisabled}
           onPress={() => {
-            router.push('/(app)/transcription-model-picker' as Href);
+            pushOnce('/(app)/transcription-model-picker' as Href);
           }}
         />
         <ConfigureRow
@@ -122,7 +124,7 @@ export function VoiceInputSettingsScreen() {
           last
           disabled={!languageLoaded}
           onPress={() => {
-            router.push('/(app)/voice-language-picker' as Href);
+            pushOnce('/(app)/voice-language-picker' as Href);
           }}
         />
         {status === 'unavailable' ? (

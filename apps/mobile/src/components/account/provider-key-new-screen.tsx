@@ -4,7 +4,6 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { toast } from 'sonner-native';
 import { z } from 'zod';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -18,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
@@ -78,7 +78,10 @@ export function ProviderKeyNewScreen() {
   if (providers.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('profile.providerKeys.newKeyTitle')} />
+        <ScreenHeader
+          title={t('profile.providerKeys.newKeyTitle')}
+          backFallback={PROFILE_TAB_HREF}
+        />
         <View className="gap-6 px-4 pt-4">
           <Skeleton className="h-[74px] rounded-lg" />
           <Skeleton className="h-11 rounded-lg" />
@@ -90,7 +93,10 @@ export function ProviderKeyNewScreen() {
   if (providers.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('profile.providerKeys.newKeyTitle')} />
+        <ScreenHeader
+          title={t('profile.providerKeys.newKeyTitle')}
+          backFallback={PROFILE_TAB_HREF}
+        />
         <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
       </View>
     );
@@ -105,7 +111,7 @@ export function ProviderKeyNewScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.newKeyTitle')} />
+      <ScreenHeader title={t('profile.providerKeys.newKeyTitle')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"
@@ -141,7 +147,7 @@ export function ProviderKeyNewScreen() {
           onPress={() => {
             const apiKey = keyRef.current.trim();
             if (apiKey === '') {
-              toast.error(t('profile.providerKeys.apiKeyRequired'));
+              setSubmitError(t('profile.providerKeys.apiKeyRequired'));
               return;
             }
             setSubmitError(null);

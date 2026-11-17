@@ -3,6 +3,11 @@ export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
 export type { DORetryConfig, DORetryScope } from './do-retry.js';
 
+export {
+  isTransientDurableObjectFailure,
+  isDurableObjectRetryDeadline,
+} from './durable-object-failure.js';
+
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
 
 export { withTimeout } from './timeout.js';

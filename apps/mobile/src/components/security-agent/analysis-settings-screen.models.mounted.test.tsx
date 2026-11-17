@@ -46,6 +46,11 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
+// The model rows open the picker through the guarded push; the picker itself is
+// mocked below, so the function only has to exist.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({ canManage: true }),

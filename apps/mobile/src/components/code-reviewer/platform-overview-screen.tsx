@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -50,7 +50,6 @@ export function PlatformOverviewScreen({
   scope,
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -189,7 +188,7 @@ export function PlatformOverviewScreen({
     if (data == null) {
       return;
     }
-    openModelPicker(router, {
+    openModelPicker(pushOnce, {
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',

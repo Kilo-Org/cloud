@@ -91,8 +91,6 @@
   "common": {
     "manageOnWeb": "Manage on the web",
     "creditHistory": "Credit history",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel",
@@ -319,8 +317,6 @@
   "profile": {
     "creditHistorySubtitle": "Purchases, receipts, and credit activity",
     "invoicesSubtitle": "Download invoices for your purchases",
-    "manageBilling": "Manage billing on kilo.ai",
-    "manageBillingIosNote": "Payment methods, auto top-up, and billing details are managed on kilo.ai.",
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
     "reviews": "Reviews",
@@ -474,7 +470,7 @@
       "codeRequired": "Enter the code from the email.",
       "download": "Download file",
       "downloadFailed": "Couldn't download the export. Check your connection and try again.",
-      "unavailableTitle": "Your data isn't available yet",
+      "unavailableTitle": "Data export isn't available yet",
       "unavailableDescription": "Data export is rolling out gradually. Check back soon."
     },
     "blockedPeople": {
@@ -2083,6 +2079,9 @@
       "completedWillAppear": "Completed sessions will appear here.",
       "noPastSessions": "No past sessions",
       "pastSessions": "Past sessions",
+      "sectionAccessibility_one": "{{title}}, {{displayCount}} session",
+      "sectionAccessibility": "{{title}}, {{displayCount}} sessions",
+      "sectionAccessibility_other": "{{title}}, {{displayCount}} sessions",
       "live": "LIVE"
     },
     "sessionRow": {
@@ -3013,7 +3012,7 @@
     "noSessions": "No active sessions",
     "noSessionsDescription": "Sign in with the Kilo app on another device and it will show up here.",
     "signedIn": "Signed in {{signedIn}} · Last seen {{lastSeen}}",
-    "signInScopeNote": "Sign-ins from the Kilo app and the Kilo CLI appear here. Editor sign-ins are not listed.",
+    "signInScopeNote": "Sign-ins from the Kilo app, the Kilo CLI, and a web browser appear here. Editor sign-ins are not listed.",
     "thisDevice": "This device",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
@@ -3132,6 +3131,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Search recent sessions",
     "connectedCli": "On a connected CLI",
+    "connectedCliAccessibility_one": "{{title}}, {{displayCount}} instance",
+    "connectedCliAccessibility": "{{title}}, {{displayCount}} instances",
+    "connectedCliAccessibility_other": "{{title}}, {{displayCount}} instances",
     "newSessionOn": "New session on {{name}}",
     "noMatchingSessions": "No matching sessions.",
     "onlyFirstFilesAttached_one": "Only the first {{displayCount}} file will be attached.",
@@ -3157,10 +3159,7 @@
       "cancelScheduled": "Cancels on {{date}}",
       "cancelScheduledChange": "Cancel scheduled change",
       "cancelled": "Cancelled subscription",
-      "changePlan": "Change plan on kilo.ai",
-      "changePlanIosNote": "Paid plan changes are available on kilo.ai.",
       "creditHistoryEmpty": "No Kilo Pass credits yet.",
-      "manageInStore": "Manage in {{store}}",
       "resume": "Resume subscription",
       "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
       "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
@@ -3197,9 +3196,6 @@
     "bonusFree": "Free bonus",
     "bonusReferral": "Referral bonus",
     "bonusAvailable": "Available free bonus",
-    "kiloPassManagement": "Kilo Pass management",
-    "kiloPassSetup": "Kilo Pass setup",
-    "opensManagementOnWeb": "Opens Kilo Pass management on web.",
     "loadFailedRetry": "Check your connection, then try again.",
     "legalTermsOfUse": "Terms of Use (EULA)",
     "purchaseDifferentAccount": "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.",
@@ -3376,15 +3372,15 @@
       "stateRenewsOn": "Renews on {{date}}",
       "seatsDropTo": "Drops to {{seats}} seats on {{date}}",
       "seats": "Seats",
+      "seatsInUse": "In use",
       "autoTopUp": "Auto top-up",
       "autoTopUpAmount": "Top-up amount",
       "autoTopUpThreshold": "When balance drops below",
-      "manageOnWeb": "Changes are made on the web",
+      "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
-      "webAddress": "Web address {{url}}",
       "opensOnWeb": "Opens on the web"
     },
     "boundary": {
@@ -3526,9 +3522,6 @@
       "groups": "Groups",
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
-      "ssoAndDomain": "SSO and domain",
-      "emailPreferences": "Email preferences",
-      "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
       "requestLogs": "Request logs",
       "subOrganizations": "Sub-organizations",
@@ -3568,8 +3561,7 @@
       "paymentPending": "Payment pending",
       "processingBlocked": "Processing blocked",
       "processingNeedsReview": "Processing needs review",
-      "retryHint": "Retries loading Kilo Pass status.",
-      "setupHint": "Opens Kilo Pass setup on web."
+      "retryHint": "Retries loading Kilo Pass status."
     }
   },
   "authErrors": {

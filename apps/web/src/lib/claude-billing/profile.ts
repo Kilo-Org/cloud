@@ -23,10 +23,10 @@ export type ClaudeBillingConnectionState =
   | 'reconnect_required';
 
 /**
- * The row's own state, plus the reconnect requirement of a shared-services row.
- * The organization's shared connection bills its service runs on whoever linked
- * it, so a row whose connector cannot pass that check reads as needing a
- * reconnect instead of as connected. Every other row keeps its stored state.
+ * The row's own state, plus the reconnect requirement of an organization row.
+ * The organization's connection bills on whoever linked it, so a row whose
+ * connector cannot pass that check reads as needing a reconnect instead of as
+ * connected. A personal row keeps its stored state.
  */
 export async function claudeBillingConnectionState(
   owner: ClaudeBillingOwner,
@@ -35,7 +35,7 @@ export async function claudeBillingConnectionState(
   if (!row || row.status === ClaudeBillingConnectionStatus.Removed) return 'not_connected';
   if (row.status === ClaudeBillingConnectionStatus.Pending) return 'pending';
   if (row.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'billing_unavailable';
-  if (owner.kind !== 'shared_services') return 'connected';
+  if (owner.kind !== 'organization') return 'connected';
   const connector = await resolveClaudeBillingConnector(row.created_by, db);
   return connector.kind === 'gone' ? 'reconnect_required' : 'connected';
 }

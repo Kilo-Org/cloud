@@ -13,10 +13,7 @@ import {
   CLAUDE_BILLING_CALLBACK_PATH,
   claudeBillingOutcomeParam,
 } from '@/lib/claude-billing/constants';
-import {
-  canManageClaudeBillingOrganization,
-  isClaudeBillingOrganizationMember,
-} from '@/lib/claude-billing/access';
+import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 function outcomeRedirect(
@@ -30,20 +27,21 @@ function outcomeRedirect(
 }
 
 /**
- * The scope the person asked for, used only to report a refusal: `personal`
- * cannot be told apart from `member` before the owner resolves, so a refusal
- * reports under the organization queries unless shared services was requested.
+ * The scope the person asked for, used only to report a refusal: any `owner`
+ * besides `personal` names an organization, whether or not the person may link
+ * it.
  */
-function requestedOwnerKind(request: NextRequest): Pick<ClaudeBillingOwner, 'kind'> {
-  const shared = request.nextUrl.searchParams.get('scope') === 'shared_services';
-  return { kind: shared ? 'shared_services' : 'member' };
+function requestedOwner(request: NextRequest): Pick<ClaudeBillingOwner, 'kind'> {
+  const ownerParam = request.nextUrl.searchParams.get('owner');
+  return ownerParam === null || ownerParam === 'personal'
+    ? { kind: 'personal' }
+    : { kind: 'organization' };
 }
 
 /**
  * Resolves the connection the link will serve: `owner=personal` for the
- * person's account, `owner=<organizationId>` for their own requests in an
- * organization, and the same with `scope=shared_services` for the
- * organization's platform services, which only a manager may link.
+ * person's account, and `owner=<organizationId>` for the organization, which
+ * only an organization owner or admin may link.
  */
 async function resolveOwner(
   request: NextRequest,
@@ -53,12 +51,8 @@ async function resolveOwner(
   if (ownerParam === 'personal') return { kind: 'personal', kiloUserId: userId };
   const organizationId = z.uuid().safeParse(ownerParam);
   if (!organizationId.success) return null;
-  if (request.nextUrl.searchParams.get('scope') === 'shared_services') {
-    if (!(await canManageClaudeBillingOrganization(userId, organizationId.data))) return null;
-    return { kind: 'shared_services', organizationId: organizationId.data };
-  }
-  if (!(await isClaudeBillingOrganizationMember(userId, organizationId.data))) return null;
-  return { kind: 'member', kiloUserId: userId, organizationId: organizationId.data };
+  if (!(await canManageClaudeBillingOrganization(userId, organizationId.data))) return null;
+  return { kind: 'organization', organizationId: organizationId.data };
 }
 
 export async function GET(request: NextRequest) {
@@ -72,7 +66,7 @@ export async function GET(request: NextRequest) {
   });
   if (authFailedResponse || !user) {
     if (authorizationRefused) {
-      return outcomeRedirect(returnPath, requestedOwnerKind(request), 'forbidden');
+      return outcomeRedirect(returnPath, requestedOwner(request), 'forbidden');
     }
     return NextResponse.redirect(
       new URL(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`, APP_URL)
@@ -80,7 +74,7 @@ export async function GET(request: NextRequest) {
   }
   const owner = await resolveOwner(request, user.id);
   if (!owner) {
-    return outcomeRedirect(returnPath, requestedOwnerKind(request), 'forbidden');
+    return outcomeRedirect(returnPath, requestedOwner(request), 'forbidden');
   }
   if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');

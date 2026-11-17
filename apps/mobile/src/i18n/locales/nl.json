@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Platform instellen",
+      "connectOwnerOnly": "Vraag een organisatie-eigenaar of beheerder om een platform te koppelen.",
       "couldNotLoad": "De reviews konden niet worden geladen.",
       "noReviews": "Nog geen reviews",
       "noReviewsDescription": "Reviews verschijnen hier zodra Code Reviewer een PR beoordeelt.",

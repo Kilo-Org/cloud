@@ -1366,7 +1366,8 @@
       "noReviews": "Ei vielä katselmointeja",
       "noReviewsDescription": "Katselmoinnit näkyvät tässä, kun koodikatselmoija on katselmoinut muutospyynnön.",
       "startManualReview": "Aloita manuaalinen katselmointi",
-      "configureProvider": "Määritä palveluntarjoaja"
+      "configureProvider": "Määritä palveluntarjoaja",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään palveluntarjoajan."
     },
     "platformList": {
       "checking": "Tarkistetaan…",

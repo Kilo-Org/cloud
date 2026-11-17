@@ -1366,7 +1366,8 @@
       "noReviews": "Ez dago berrikuspenik oraindik",
       "noReviewsDescription": "Kode-berrikusleak bateratze-eskaera bat berrikusi ondoren agertuko dira berrikuspenak hemen.",
       "startManualReview": "Hasi eskuzko berrikuspena",
-      "configureProvider": "Konfiguratu hornitzailea"
+      "configureProvider": "Konfiguratu hornitzailea",
+      "connectOwnerOnly": "Eskatu erakunde bateko jabeari edo administratzaileari hornitzaile bat konekta dezan."
     },
     "platformList": {
       "checking": "Egiaztatzen…",

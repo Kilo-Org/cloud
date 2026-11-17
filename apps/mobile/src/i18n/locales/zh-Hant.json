@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "設定平台",
+      "connectOwnerOnly": "請要求組織擁有者或管理員連結平台。",
       "couldNotLoad": "無法載入審查。",
       "noReviews": "尚無審查",
       "noReviewsDescription": "程式碼審查員審查 PR 後，這裡就會顯示審查記錄。",

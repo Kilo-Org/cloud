@@ -1366,7 +1366,8 @@
       "noReviews": "Mbola tsy misy fanamarinana",
       "noReviewsDescription": "Hiseho eto ny fanamarinana rehefa manamarina PR ny Code Reviewer.",
       "startManualReview": "Atombohy mivantana ny fanamarinana",
-      "configureProvider": "Amboary ny fikiran'ny mpanome tolotra"
+      "configureProvider": "Amboary ny fikiran'ny mpanome tolotra",
+      "connectOwnerOnly": "Mangataha ny tompon'ny fikambanana na ny mpitantana mba hampifandray mpanome tolotra."
     },
     "platformList": {
       "checking": "Manamarina…",

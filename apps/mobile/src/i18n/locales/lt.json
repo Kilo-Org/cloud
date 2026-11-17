@@ -1412,7 +1412,8 @@
       "noReviews": "Peržiūrų dar nėra",
       "noReviewsDescription": "Peržiūros bus rodomos čia, kai kodo peržiūros agentas peržiūrės PR.",
       "startManualReview": "Pradėti rankinę peržiūrą",
-      "configureProvider": "Konfigūruoti paslaugų teikėją"
+      "configureProvider": "Konfigūruoti paslaugų teikėją",
+      "connectOwnerOnly": "Paprašykite organizacijos savininko ar administratoriaus prijungti paslaugų teikėją."
     },
     "platformList": {
       "checking": "Tikrinama…",

@@ -1366,7 +1366,8 @@
       "noReviews": "እስካሁን ምንም ግምገማዎች የሉም",
       "noReviewsDescription": "የኮድ ገምጋሚው የኮድ ውህደት ጥያቄን ከገመገመ በኋላ ግምገማዎች እዚህ ይታያሉ።",
       "startManualReview": "ግምገማ ራስዎ ያስጀምሩ",
-      "configureProvider": "አቅራቢውን ያዋቅሩ"
+      "configureProvider": "አቅራቢውን ያዋቅሩ",
+      "connectOwnerOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ አቅራቢውን እንዲያገናኙ ይጠይቁ።"
     },
     "platformList": {
       "checking": "በመፈተሽ ላይ…",

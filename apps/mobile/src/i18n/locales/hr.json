@@ -1389,7 +1389,8 @@
       "noReviews": "Još nema pregleda",
       "noReviewsDescription": "Pregledi se pojavljuju ovdje nakon što agent za pregled koda pregleda zahtjev za spajanje.",
       "startManualReview": "Pokreni ručni pregled",
-      "configureProvider": "Konfiguriraj pružatelja"
+      "configureProvider": "Konfiguriraj pružatelja",
+      "connectOwnerOnly": "Zamolite vlasnika organizacije ili administratora da poveže pružatelja."
     },
     "platformList": {
       "checking": "Provjera…",

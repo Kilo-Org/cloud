@@ -1433,7 +1433,8 @@
       "noReviews": "No reviews yet",
       "noReviewsDescription": "Reviews appear here once the Code Reviewer runs on a pull request.",
       "startManualReview": "Start a manual review",
-      "configureProvider": "Configure provider"
+      "configureProvider": "Configure provider",
+      "connectOwnerOnly": "Ask an organization owner or admin to connect a provider."
     },
     "platformList": {
       "checking": "Checking…",

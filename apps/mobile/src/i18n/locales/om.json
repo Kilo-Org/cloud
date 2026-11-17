@@ -1366,7 +1366,8 @@
       "noReviews": "Ammaaf sakatta'iinsi hin jiru",
       "noReviewsDescription": "Sakatta'aan koodii gaaffii makuu irratti erga hojjeteen booda sakatta'awwan asitti mul'atu.",
       "startManualReview": "Sakatta'a harkaa jalqabi",
-      "configureProvider": "Waltajjii qindeessi"
+      "configureProvider": "Waltajjii qindeessi",
+      "connectOwnerOnly": "Waltajjii walqabsiisuuf abbaa dhaabbataa ykn bulchaa gaafadhu."
     },
     "platformList": {
       "checking": "Mirkaneessaa jira…",

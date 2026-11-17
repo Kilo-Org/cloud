@@ -1366,7 +1366,8 @@
       "noReviews": "Kāore anō he arotake",
       "noReviewsDescription": "Ka puta ngā arotake ki konei ina arotake te Kaiarotake waehere i tētahi tono kume.",
       "startManualReview": "Tīmatahia tētahi arotake ā-ringa",
-      "configureProvider": "Whirihorahia te kaiwhakarato"
+      "configureProvider": "Whirihorahia te kaiwhakarato",
+      "connectOwnerOnly": "Tonoa tētahi Rangatira, Kaiwhakahaere rānei o te whakahaere kia honoa tētahi kaiwhakarato."
     },
     "platformList": {
       "checking": "Kei te tirotiro…",

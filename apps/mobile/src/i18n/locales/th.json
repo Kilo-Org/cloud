@@ -1366,7 +1366,8 @@
       "noReviews": "ยังไม่มีการตรวจสอบ",
       "noReviewsDescription": "ผลการตรวจสอบจะแสดงที่นี่เมื่อตัวตรวจสอบโค้ดตรวจสอบ PR แล้ว",
       "startManualReview": "เริ่มการตรวจสอบด้วยตนเอง",
-      "configureProvider": "กำหนดค่าผู้ให้บริการ"
+      "configureProvider": "กำหนดค่าผู้ให้บริการ",
+      "connectOwnerOnly": "ขอให้เจ้าขององค์กรหรือผู้ดูแลระบบเชื่อมต่อผู้ให้บริการ"
     },
     "platformList": {
       "checking": "กำลังตรวจสอบ...",

@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
+      "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
       "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",

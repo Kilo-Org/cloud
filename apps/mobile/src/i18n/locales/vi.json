@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
+      "connectOwnerOnly": "Hãy yêu cầu chủ sở hữu tổ chức hoặc quản trị viên kết nối nhà cung cấp.",
       "couldNotLoad": "Không thể tải danh sách lượt rà soát.",
       "noReviews": "Chưa có lượt rà soát nào",
       "noReviewsDescription": "Kết quả sẽ xuất hiện tại đây sau khi Trình rà soát mã chạy trên một yêu cầu hợp nhất.",

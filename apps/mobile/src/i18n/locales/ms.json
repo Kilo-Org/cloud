@@ -1366,7 +1366,8 @@
       "noReviews": "Belum ada semakan",
       "noReviewsDescription": "Semakan muncul di sini selepas Penyemak Kod menyemak permintaan penarikan.",
       "startManualReview": "Mulakan semakan manual",
-      "configureProvider": "Konfigurasikan penyedia"
+      "configureProvider": "Konfigurasikan penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau pentadbir untuk menyambungkan penyedia."
     },
     "platformList": {
       "checking": "Menyemak…",

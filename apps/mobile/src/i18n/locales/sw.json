@@ -1366,7 +1366,8 @@
       "noReviews": "Hakuna ukaguzi bado",
       "noReviewsDescription": "Ukaguzi utaonekana hapa baada ya mkaguzi wa msimbo kukagua ombi la kuunganisha.",
       "startManualReview": "Anzisha ukaguzi mwenyewe",
-      "configureProvider": "Sanidi mtoa huduma"
+      "configureProvider": "Sanidi mtoa huduma",
+      "connectOwnerOnly": "Omba mmiliki wa shirika au msimamizi aunganishe mtoa huduma."
     },
     "platformList": {
       "checking": "Inaangalia…",

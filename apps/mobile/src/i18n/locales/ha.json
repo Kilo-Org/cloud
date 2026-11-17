@@ -1366,7 +1366,8 @@
       "noReviews": "Har yanzu babu bita",
       "noReviewsDescription": "Bitoci suna bayyana a nan da zarar Mai bitar lamba ya duba buƙatar haɗa canje-canje.",
       "startManualReview": "Fara bita da hannu",
-      "configureProvider": "Saita mai ba da sabis"
+      "configureProvider": "Saita mai ba da sabis",
+      "connectOwnerOnly": "Nemi Mai ƙungiya ko Mai gudanarwa ya haɗa mai ba da sabis."
     },
     "platformList": {
       "checking": "Ana duba…",

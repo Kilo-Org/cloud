@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
+      "connectOwnerOnly": "Sağlayıcıyı bağlaması için bir kuruluş sahibi veya yöneticiden istekte bulunun.",
       "couldNotLoad": "İncelemeler yüklenemedi.",
       "noReviews": "Henüz inceleme yok",
       "noReviewsDescription": "Kod inceleyici bir çekme isteğini inceledikten sonra sonuçlar burada görünür.",

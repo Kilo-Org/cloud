@@ -1389,7 +1389,8 @@
       "noReviews": "Koda pārskatīšana vēl nav veikta",
       "noReviewsDescription": "Koda pārskatīšanas būs redzamas šeit, kad koda pārskatītājs būs pārskatījis izmaiņu pieprasījuma kodu.",
       "startManualReview": "Sākt manuālu koda pārskatīšanu",
-      "configureProvider": "Konfigurēt pakalpojumu sniedzēju"
+      "configureProvider": "Konfigurēt pakalpojumu sniedzēju",
+      "connectOwnerOnly": "Lūdziet organizācijas īpašniekam vai administratoram pievienot pakalpojumu sniedzēju."
     },
     "platformList": {
       "checking": "Pārbauda…",

@@ -1366,7 +1366,8 @@
       "noReviews": "Ende pa shqyrtime",
       "noReviewsDescription": "Shqyrtimet shfaqen këtu pasi shqyrtuesi i kodit të ketë shqyrtuar një PR.",
       "startManualReview": "Fillo një shqyrtim manual",
-      "configureProvider": "Konfiguro ofruesin"
+      "configureProvider": "Konfiguro ofruesin",
+      "connectOwnerOnly": "Kërkoni nga një pronar ose administrator i organizatës të lidhë një ofrues."
     },
     "platformList": {
       "checking": "Duke kontrolluar…",

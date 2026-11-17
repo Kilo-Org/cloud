@@ -1366,7 +1366,8 @@
       "noReviews": "Még nincsenek kódellenőrzések",
       "noReviewsDescription": "A kódellenőrzések itt jelennek meg, miután a kódellenőrző lefut egy PR-en.",
       "startManualReview": "Kézi kódellenőrzés indítása",
-      "configureProvider": "Szolgáltató beállítása"
+      "configureProvider": "Szolgáltató beállítása",
+      "connectOwnerOnly": "Kérd meg a szervezet egy tulajdonosát vagy adminisztrátorát, hogy csatlakoztasson egy szolgáltatót."
     },
     "platformList": {
       "checking": "Ellenőrzés…",

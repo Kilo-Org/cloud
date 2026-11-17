@@ -1366,7 +1366,8 @@
       "noReviews": "Kò sí àtúnyẹ̀wò síbẹ̀",
       "noReviewsDescription": "Àwọn àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Olùṣàtúnyẹ̀wò kóòdù bá ṣiṣẹ́ lórí ìbéèrè àkópọ̀.",
       "startManualReview": "Bẹ̀rẹ̀ àtúnyẹ̀wò fúnra rẹ",
-      "configureProvider": "Ṣètò olùpèsè"
+      "configureProvider": "Ṣètò olùpèsè",
+      "connectOwnerOnly": "Ẹ bẹ̀ Ẹni tó ni àjọ tàbí Alákòóso kí wọ́n so olùpèsè kan pọ̀."
     },
     "platformList": {
       "checking": "A ń ṣàyẹ̀wò…",

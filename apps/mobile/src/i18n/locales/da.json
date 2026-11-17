@@ -1366,7 +1366,8 @@
       "noReviews": "Ingen gennemgange endnu",
       "noReviewsDescription": "Gennemgange vises her, når Code Reviewer har gennemgået en pull request.",
       "startManualReview": "Start en manuel gennemgang",
-      "configureProvider": "Konfigurér udbyder"
+      "configureProvider": "Konfigurér udbyder",
+      "connectOwnerOnly": "Bed en organisationsejer eller administrator om at oprette forbindelsen til en udbyder."
     },
     "platformList": {
       "checking": "Kontrollerer…",

@@ -1412,7 +1412,8 @@
       "noReviews": "Zatiaľ žiadne kontroly",
       "noReviewsDescription": "Kontroly sa tu zobrazia, keď kontrolór kódu skontroluje PR.",
       "startManualReview": "Spustiť manuálnu kontrolu",
-      "configureProvider": "Nastaviť poskytovateľa"
+      "configureProvider": "Nastaviť poskytovateľa",
+      "connectOwnerOnly": "Požiadajte vlastníka organizácie alebo správcu, aby pripojil poskytovateľa."
     },
     "platformList": {
       "checking": "Kontroluje sa…",

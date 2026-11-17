@@ -1366,7 +1366,8 @@
       "noReviews": "Inga granskningar ännu",
       "noReviewsDescription": "Granskningar visas här när Code Reviewer har granskat en pull-begäran.",
       "startManualReview": "Starta en manuell granskning",
-      "configureProvider": "Konfigurera leverantör"
+      "configureProvider": "Konfigurera leverantör",
+      "connectOwnerOnly": "Be en organisationsägare eller administratör att ansluta en leverantör."
     },
     "platformList": {
       "checking": "Kontrollerar…",

@@ -1366,7 +1366,8 @@
       "noReviews": "هنوز بررسی‌ای وجود ندارد",
       "noReviewsDescription": "پس از اجرای بررسی‌کننده کد روی یک درخواست ادغام، بررسی‌ها اینجا نمایش داده می‌شوند.",
       "startManualReview": "شروع بررسی دستی",
-      "configureProvider": "پیکربندی ارائه‌دهنده"
+      "configureProvider": "پیکربندی ارائه‌دهنده",
+      "connectOwnerOnly": "از مالک یا مدیر سازمان بخواهید یک ارائه‌دهنده را متصل کند."
     },
     "platformList": {
       "checking": "در حال بررسی…",

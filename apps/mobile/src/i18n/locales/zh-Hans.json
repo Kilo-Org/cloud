@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "配置代码托管平台",
+      "connectOwnerOnly": "请让组织所有者或管理员连接代码托管平台。",
       "couldNotLoad": "无法加载审查记录。",
       "noReviews": "暂无审查记录",
       "noReviewsDescription": "代码审查器审查拉取请求后，这里将显示审查记录。",

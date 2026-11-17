@@ -1366,7 +1366,8 @@
       "noReviews": "Wala pang pagsusuri",
       "noReviewsDescription": "Lalabas dito ang mga pagsusuri kapag nagsuri na ng pull request ang Code Reviewer.",
       "startManualReview": "Magsimula ng manu-manong pagsusuri",
-      "configureProvider": "Isaayos ang provider"
+      "configureProvider": "Isaayos ang provider",
+      "connectOwnerOnly": "Hilingin sa isang may-ari ng organisasyon o admin na ikonekta ang isang provider."
     },
     "platformList": {
       "checking": "Sinusuri…",

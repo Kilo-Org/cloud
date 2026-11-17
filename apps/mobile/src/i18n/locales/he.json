@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "הגדרת ספק",
+      "connectOwnerOnly": "בקש מבעלים של הארגון או מנהל לחבר ספק.",
       "couldNotLoad": "לא ניתן לטעון את הסקירות.",
       "noReviews": "אין עדיין סקירות",
       "noReviewsDescription": "סקירות יופיעו כאן לאחר שסוקר הקוד יסקור בקשת משיכה.",

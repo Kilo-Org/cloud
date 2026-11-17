@@ -1412,7 +1412,8 @@
       "noReviews": "Še ni pregledov",
       "noReviewsDescription": "Pregledi se prikažejo tukaj, ko pregledovalnik kode pregleda zahtevo za združitev.",
       "startManualReview": "Začni ročni pregled",
-      "configureProvider": "Nastavi ponudnika"
+      "configureProvider": "Nastavi ponudnika",
+      "connectOwnerOnly": "Prosite lastnika organizacije ali skrbnika, da poveže ponudnika."
     },
     "platformList": {
       "checking": "Preverjanje…",

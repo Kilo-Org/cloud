@@ -294,9 +294,8 @@ export const LIVE_ACTIVITY_RELEVANCE = {
 
 /**
  * The smallest positive gap between adjacent values of a relevance band
- * table, or `Infinity` when the values cannot space two bands apart (fewer
- * than two distinct values). The module's own table throws at load instead of
- * accepting that: a bands-less tie-break would make every recency score
+ * table; throws when the values cannot space two bands apart (fewer than two
+ * distinct values). A bands-less tie-break would make every recency score
  * non-finite and serialize an absent `relevance-score` in its place, so a
  * degenerate table fails loudly rather than silently degrading every score.
  */

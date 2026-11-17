@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Sarrafa a yanar gizo",
     "creditHistory": "Tarihin kiredit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Soke",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Sayayya, rasitai, da ayyukan kiredit",
     "invoicesSubtitle": "Sauke takardun kuɗi na sayayyarka",
-    "manageBilling": "Sarrafa biyan kuɗi a kilo.ai",
-    "manageBillingIosNote": "Ana sarrafa hanyoyin biyan kuɗi, cika kiredit kai tsaye, da bayanan biyan kuɗi a kilo.ai.",
     "codeReviewerSubtitle": "Bitar PR ta atomatik",
     "securityAgentSubtitle": "Nemo raunin tsaro ka gyara su",
     "reviews": "Bita",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Za a soke a ranar {{date}}",
       "cancelScheduledChange": "Soke canjin da aka tsara",
       "cancelled": "An soke rajista",
-      "changePlan": "Canja tsari a kilo.ai",
-      "changePlanIosNote": "Ana iya canja tsare-tsaren da ake biya a kilo.ai.",
       "creditHistoryEmpty": "Babu kiredit na Kilo Pass tukuna.",
-      "manageInStore": "Sarrafa a {{store}}",
       "resume": "Ci gaba da rajista",
       "resumeCancelledDescription": "Kilo Pass ɗinka zai sake fara sabuntawa kai tsaye.",
       "resumePausedDescription": "Kilo Pass ɗinka zai ci gaba yanzu, kafin ranar da aka tsara zai ci gaba.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Kyauta",
     "bonusReferral": "Kyautar gayyata",
     "bonusAvailable": "Kyautar da ke akwai",
-    "kiloPassManagement": "Sarrafa Kilo Pass",
-    "kiloPassSetup": "Saitin Kilo Pass",
-    "opensManagementOnWeb": "Yana buɗe shafin sarrafa Kilo Pass a yanar gizo.",
     "loadFailedRetry": "Duba haɗin ka, sannan sake gwadawa.",
     "legalTermsOfUse": "Sharuɗɗan amfani (EULA)",
     "purchaseDifferentAccount": "Ba a haɗa wannan sayayyar App Store da asusunka na Kilo ba. Shiga Apple Account ɗin da aka yi sayayyar da shi, sannan ka sake gwadawa.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Sayi gurabe",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
       "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
-      "webAddress": "Adireshin yanar gizo {{url}}",
       "opensOnWeb": "Yana buɗewa a yanar gizo"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Rukunoni",
       "guardrails": "Matakan kariya",
       "byok": "Kawo maɓallinka na kanka",
-      "ssoAndDomain": "SSO da yanki",
-      "emailPreferences": "Zaɓuɓɓukan imel",
-      "dataCollection": "Tattara bayanai",
       "auditLogs": "Rajistun bincike",
       "requestLogs": "Rajistun buƙatu",
       "subOrganizations": "Ƙananan ƙungiyoyi",
@@ -3495,8 +3481,7 @@
       "paymentPending": "Ana jiran biyan kuɗi",
       "processingBlocked": "An toshe sarrafawa",
       "processingNeedsReview": "Ana buƙatar duba yadda ake sarrafawa",
-      "retryHint": "Yana sake gwada loda halin Kilo Pass.",
-      "setupHint": "Yana buɗe saitin Kilo Pass akan gidan yanar gizo."
+      "retryHint": "Yana sake gwada loda halin Kilo Pass."
     }
   },
   "authErrors": {

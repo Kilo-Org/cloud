@@ -53,6 +53,17 @@ export function timestampMs(value: string | null | undefined): number | null {
 }
 
 /**
+ * ISO 8601 form of one epoch-millisecond instant.
+ *
+ * The one conversion from a stored instant already read as milliseconds (for
+ * example a `timestampMs` result) to the ISO string the payloads carry, so the
+ * precision and format of every published time come from one place.
+ */
+export function epochMsToIso(at: number): string {
+  return new Date(at).toISOString();
+}
+
+/**
  * ISO 8601 form of one backend time, or null when it is missing or does not
  * parse.
  *
@@ -62,7 +73,7 @@ export function timestampMs(value: string | null | undefined): number | null {
  */
 export function timestampToIso(value: string | null | undefined): string | null {
   const at = timestampMs(value);
-  return at === null ? null : new Date(at).toISOString();
+  return at === null ? null : epochMsToIso(at);
 }
 
 /** Returns the first non-empty string, or '' when none is set. */

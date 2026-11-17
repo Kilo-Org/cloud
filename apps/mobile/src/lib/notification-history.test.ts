@@ -6,6 +6,7 @@ import {
   notificationHistoryFilters,
   notificationHistoryTarget,
 } from '@/lib/notification-history';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 
 const LOW_BALANCE_PARAMS = { organizationName: 'Acme', minimumBalanceUsd: '5' };
 
@@ -139,8 +140,6 @@ describe('notificationHistoryCopy', () => {
   });
 });
 
-const WEB_BASE_URL = 'https://app.example.com';
-
 describe('notificationHistoryTarget', () => {
   it.each([
     [
@@ -149,49 +148,35 @@ describe('notificationHistoryTarget', () => {
     ],
     [{ type: 'agent_briefing', url: '/agent-briefing' }, '/(app)/agent-briefing'],
   ])('opens the push destination of a %o row without the push marker', (payload, href) => {
-    expect(notificationHistoryTarget(payload, WEB_BASE_URL)).toMatchObject({
-      destination: { kind: 'app', href },
-    });
+    expect(notificationHistoryTarget(payload)?.href).toBe(href);
   });
 
   it('keeps the other query params and drops only the push marker', () => {
     expect(
-      notificationHistoryTarget({ type: 'low_balance', organizationId: 'org-acme' }, WEB_BASE_URL)
-    ).toMatchObject({
-      destination: {
-        kind: 'app',
-        href: '/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-acme',
-      },
-    });
+      notificationHistoryTarget({ type: 'low_balance', organizationId: 'org-acme' })?.href
+    ).toBe('/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-acme');
     expect(
-      notificationHistoryTarget(
-        { type: 'spend_alert', scope: 'organization', organizationId: 'org-acme' },
-        WEB_BASE_URL
-      )
-    ).toMatchObject({
-      destination: {
-        kind: 'app',
-        href: '/(app)/(tabs)/(3_profile)/spend-alerts?org=org-acme',
-      },
-    });
+      notificationHistoryTarget({
+        type: 'spend_alert',
+        scope: 'organization',
+        organizationId: 'org-acme',
+      })?.href
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?org=org-acme');
   });
 
   it('routes a security finding row to its scope', () => {
     expect(
-      notificationHistoryTarget(
-        { type: 'security_finding', findingId: 'f-1', scope: 'org-9' },
-        WEB_BASE_URL
-      )
-    ).toMatchObject({
-      destination: { kind: 'app', href: '/(app)/security-agent/org-9/findings/f-1' },
-    });
+      notificationHistoryTarget({ type: 'security_finding', findingId: 'f-1', scope: 'org-9' })
+        ?.href
+    ).toBe('/(app)/security-agent/org-9/findings/f-1');
   });
 
   it('carries the payload the row was recorded from', () => {
-    const target = notificationHistoryTarget(
-      { type: 'cloud_agent_session', cliSessionId: 'ses_1', organizationId: 'org-2' },
-      WEB_BASE_URL
-    );
+    const target = notificationHistoryTarget({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_1',
+      organizationId: 'org-2',
+    });
 
     expect(target?.data).toEqual({
       type: 'cloud_agent_session',
@@ -201,36 +186,44 @@ describe('notificationHistoryTarget', () => {
   });
 
   it('reports no destination for a payload this app cannot parse', () => {
-    expect(notificationHistoryTarget({ type: 'retired_kind' }, WEB_BASE_URL)).toBeNull();
-    expect(notificationHistoryTarget({}, WEB_BASE_URL)).toBeNull();
+    expect(notificationHistoryTarget({ type: 'retired_kind' })).toBeNull();
+    expect(notificationHistoryTarget({})).toBeNull();
   });
 
-  it('opens a KiloClaw chat row on its web conversation', () => {
+  it('reports no destination for a kind the schema declares but this app retired', () => {
     expect(
-      notificationHistoryTarget(
-        {
-          type: 'chat.message',
-          sandboxId: 'sandbox-1',
-          conversationId: 'conversation-1',
-          messageId: 'm1',
-        },
-        WEB_BASE_URL
-      )
-    ).toMatchObject({
-      destination: {
-        kind: 'external',
-        url: 'https://app.example.com/claw/chat/conversation-1',
-      },
-    });
+      notificationHistoryTarget({
+        type: 'chat.message',
+        sandboxId: 's1',
+        conversationId: 'c1',
+        messageId: 'm1',
+      })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({ type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({
+        type: 'scheduled-action',
+        event: 'scheduled_restart_notice',
+        sandboxId: 's1',
+      })
+    ).toBeNull();
   });
+});
 
-  it.each([
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
-  ])('opens a KiloClaw $type row on the instance page', payload => {
-    expect(notificationHistoryTarget(payload, WEB_BASE_URL)).toMatchObject({
-      destination: { kind: 'external', url: 'https://app.example.com/claw' },
-    });
+describe('isRetiredPushType', () => {
+  it.each(['chat.message', 'instance-lifecycle', 'scheduled-action'])(
+    'retires a %s row',
+    pushType => {
+      expect(isRetiredPushType(pushType)).toBe(true);
+    }
+  );
+
+  it('keeps a kind the app still routes, and anything it does not know', () => {
+    expect(isRetiredPushType('cloud_agent_session')).toBe(false);
+    expect(isRetiredPushType('low_balance')).toBe(false);
+    expect(isRetiredPushType('retired_kind')).toBe(false);
   });
 });
 

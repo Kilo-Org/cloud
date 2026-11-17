@@ -46,7 +46,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
 
-  if (isResolving || readiness.isPending) {
+  if (isResolving || readiness.isPending || status.isPending) {
     return (
       <SheetScrollView
         className="flex-1 bg-background"
@@ -70,9 +70,29 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     return <OrganizationBoundary organizationIdOverride={scope} />;
   }
 
+  // An unanswered status read is not "no integration": it is the only read
+  // that can name a Bitbucket OAuth connection, so a failure asks again
+  // instead of offering a token form the server would refuse.
+  if (status.isError && status.data == null) {
+    return (
+      <>
+        <SheetTitle title={t('agentChat.repoPicker.platformBitbucket')} />
+        {isPermissionDeniedError(status.error) ? (
+          <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
+        ) : (
+          <QueryError
+            className="bg-background"
+            variant={trpcErrorVariant(status.error)}
+            onRetry={() => void status.refetch()}
+            isRetrying={status.isFetching}
+          />
+        )}
+      </>
+    );
+  }
+
   const integrationId = readiness.data?.integrationId ?? null;
-  const repair =
-    readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data ?? null);
+  const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
   // A workspace connected through Bitbucket OAuth has no token integration to
   // name, so the sheet is about the connection itself rather than about a form.
   const managesExisting = repair?.kind === 'manage-connection';

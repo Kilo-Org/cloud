@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,6 +17,7 @@ import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -32,7 +32,7 @@ type PickerSelectionFailure = { readonly kind: 'select-failed' };
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -208,7 +208,7 @@ export default function RepoPickerScreen() {
           className="flex-1"
           nestedScrollEnabled
           {...SEARCHABLE_PICKER_LIST_PROPS}
-          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           {listItems.map(item => {
             if (item.kind === 'header') {

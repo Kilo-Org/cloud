@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
 import { QueryError } from '@/components/query-error';
@@ -29,6 +28,7 @@ import {
 } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
@@ -80,7 +80,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const { organizationId } = useOrganization();
   const lists = useTodoLists(organizationId);
   const list = lists.data?.find(candidate => candidate.id === listId);
@@ -268,7 +268,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
         <Animated.ScrollView
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           {body}
         </Animated.ScrollView>

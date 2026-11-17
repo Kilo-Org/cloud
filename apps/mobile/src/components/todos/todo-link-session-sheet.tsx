@@ -2,7 +2,6 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
@@ -12,6 +11,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { buildStoredSessionsQueryOptions } from '@/lib/agent-session-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoLinkCandidates } from '@/lib/todos/todo-model';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -40,7 +40,7 @@ export function TodoLinkSessionSheet({
 }: Readonly<TodoLinkSessionSheetProps>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const sessions = useInfiniteQuery(
     buildStoredSessionsQueryOptions(trpc, {
       organizationId: list.organizationId,
@@ -121,7 +121,7 @@ export function TodoLinkSessionSheet({
     >
       <View className="flex-1 pt-4">
         <SheetTitleRow title={t('todos.linkSession.title')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>

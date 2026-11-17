@@ -42,7 +42,10 @@ function RepoPinsSkeleton() {
     <View className="gap-3 rounded-lg border border-border p-3">
       <View className="flex-row items-center justify-between gap-2">
         <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-        <Skeleton className="h-7 w-24 rounded-md bg-muted-soft" />
+        {/* The placeholder reserves the compact box the loaded action renders, not
+            a rem-scaled height: NativeWind's 14 pt rem draws `h-7` at 24.5 dp,
+            which would let the card grow when the bindings land. */}
+        <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
       </View>
       <Skeleton className="h-4 w-full rounded bg-muted-soft" />
       <Skeleton className="h-9 w-full rounded-md bg-muted-soft" />

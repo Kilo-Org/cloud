@@ -114,22 +114,20 @@ export function TriggerFormAgent({
       )}
 
       <View className="gap-2">
-        <View className="flex-row items-center gap-2">
-          <ModelSelector
-            value={draft.model}
-            variant={draft.variant}
-            options={models.models}
-            acceptsVariant
-            onSelect={(model, variant) => {
-              onDraftChange({ ...draft, model, variant });
-            }}
-            onOpen={() => {
-              markTouched('model');
-            }}
-            isLoading={models.isLoading}
-            disabled={models.isError && models.models.length === 0}
-          />
-        </View>
+        <ModelSelector
+          value={draft.model}
+          variant={draft.variant}
+          options={models.models}
+          acceptsVariant
+          onSelect={(model, variant) => {
+            onDraftChange({ ...draft, model, variant });
+          }}
+          onOpen={() => {
+            markTouched('model');
+          }}
+          isLoading={models.isLoading}
+          disabled={models.isError && models.models.length === 0}
+        />
         {models.isError ? (
           <View className="gap-2">
             <Text accessibilityRole="alert" className="text-xs text-destructive">

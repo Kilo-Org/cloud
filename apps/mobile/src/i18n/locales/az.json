@@ -1166,8 +1166,6 @@
       "clearMessage": "Boş sahənin yadda saxlanması bu rəyçi üçün saxlanılmış xüsusi təlimatları siləcək."
     },
     "repos": {
-      "unavailable": "Repozitoriyalar əlçatan deyil. Bitbucket quraşdırmasını kilo.ai saytında tamamla.",
-      "finishSetup": "Quraşdırmanı tamamla",
       "manageAccess": "Girişi idarə et",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket iş sahəsində repozitoriya mövcud deyil.",
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
-      "setupIncomplete": "Quraşdırma tamamlanmayıb. Tənzimləməni kilo.ai saytında tamamla.",
-      "setup": "Bitbucket quraşdırması"
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "gitlabAccount": "GitLab hesabı",
       "gitlabError": "GitLab quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
-      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur.",
-      "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
+      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur."
     },
     "overview": {
       "allAreas": "Bütün sahələr",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
       "connectGithubDescription": "Brauzerdə daxil ol, sonra GitHub repozitoriyası seçmək üçün buraya qayıt.",
       "connectGitlabDescription": "Brauzerdə daxil ol, sonra GitLab repozitoriyası seçmək üçün buraya qayıt.",
-      "connectBitbucketDescription": "Brauzerdə daxil ol, sonra Bitbucket repozitoriyası seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
       "openGitlab": "GitLab-ı aç",
-      "openBitbucket": "Bitbucket-ı aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
       "githubConnected": "GitHub qoşulub",
       "gitlabConnected": "GitLab qoşulub",

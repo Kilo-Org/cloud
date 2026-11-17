@@ -1189,8 +1189,6 @@
       "clearMessage": "Ako sačuvaš prazno polje, izbrisat ćeš prilagođene upute pohranjene za ovog recenzenta."
     },
     "repos": {
-      "unavailable": "Repozitoriji nisu dostupni. Završi podešavanje Bitbucketa na kilo.ai.",
-      "finishSetup": "Završi podešavanje",
       "manageAccess": "Upravljaj pristupom",
       "bitbucketNoRepositoriesDescription": "U ovom radnom prostoru na Bitbucketu nema dostupnih repozitorija.",
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
@@ -1345,11 +1343,10 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
-      "setupIncomplete": "Podešavanje nije završeno. Završi ga na kilo.ai.",
-      "setup": "Podešavanje Bitbucketa"
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru s potrebnim dozvolama i zalijepi ga ispod.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru"
@@ -1377,8 +1374,7 @@
       "githubError": "Nije moguće otvoriti podešavanje GitHuba. Pokušaj ponovo.",
       "gitlabAccount": "GitLab račun",
       "gitlabError": "Nije moguće otvoriti podešavanje GitLaba. Pokušaj ponovo.",
-      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje.",
-      "bitbucketError": "Nije moguće otvoriti podešavanje Bitbucketa. Pokušaj ponovo."
+      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje."
     },
     "overview": {
       "allAreas": "Sva područja",
@@ -2191,10 +2187,8 @@
       "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
       "connectGithubDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi GitHub repozitorij.",
       "connectGitlabDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi GitLab repozitorij.",
-      "connectBitbucketDescription": "Prijavi se u pregledniku, zatim se vrati ovdje i odaberi Bitbucket repozitorij.",
       "openGithub": "Otvori GitHub",
       "openGitlab": "Otvori GitLab",
-      "openBitbucket": "Otvori Bitbucket",
       "refreshRepositories": "Osvježi repozitorije",
       "githubConnected": "GitHub povezan",
       "gitlabConnected": "GitLab povezan",

@@ -1235,8 +1235,6 @@
       "clearMessage": "Jekk tissejvja kampt vojt, tiddelimina l-istruzzjonijiet personalizzati maħżuna għal dan ir-reviżur."
     },
     "repos": {
-      "unavailable": "Ir-repożitorji mhux disponibbli. Lesti l-konfigurazzjoni ta' Bitbucket fuq kilo.ai.",
-      "finishSetup": "Lesti l-konfigurazzjoni",
       "manageAccess": "Immaniġġja l-aċċess",
       "bitbucketNoRepositoriesDescription": "M'hemm l-ebda repożitorju disponibbli f'dan l-ispazju tax-xogħol ta' Bitbucket.",
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
@@ -1391,11 +1389,10 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
-      "setupIncomplete": "Il-konfigurazzjoni mhix lesta. Lestiha fuq kilo.ai.",
-      "setup": "Konfigurazzjoni ta' Bitbucket"
+      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol"
@@ -1423,8 +1420,7 @@
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
       "gitlabAccount": "il-Kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
-      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament.",
-      "bitbucketError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' Bitbucket. Jekk jogħġbok erġa' pprova."
+      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament."
     },
     "overview": {
       "allAreas": "L-oqsma kollha",
@@ -2277,10 +2273,8 @@
       "couldNotLoadBitbucketRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' Bitbucket.",
       "connectGithubDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju GitHub.",
       "connectGitlabDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju GitLab.",
-      "connectBitbucketDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju Bitbucket.",
       "openGithub": "Iftaħ GitHub",
       "openGitlab": "Iftaħ GitLab",
-      "openBitbucket": "Iftaħ Bitbucket",
       "refreshRepositories": "Aġġorna r-repożitorji",
       "githubConnected": "GitHub imqabbad",
       "gitlabConnected": "GitLab imqabbad",

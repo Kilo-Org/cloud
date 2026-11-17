@@ -1166,8 +1166,6 @@
       "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
     },
     "repos": {
-      "unavailable": "ማከማቻዎች አይገኙም። በkilo.ai ላይ Bitbucketን ማዋቀር ያጠናቅቁ።",
-      "finishSetup": "ማዋቀርን ያጠናቅቁ",
       "manageAccess": "መዳረሻን ያስተዳድሩ",
       "bitbucketNoRepositoriesDescription": "በዚህ የBitbucket የሥራ ቦታ ውስጥ ማከማቻዎች የሉም።",
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
-      "setupIncomplete": "ማዋቀሩ አልተጠናቀቀም። በkilo.ai ላይ ያጠናቅቁት።",
-      "setup": "የBitbucket ማዋቀር"
+      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን"
@@ -1354,8 +1351,7 @@
       "githubError": "የGitHub ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "gitlabAccount": "የGitLab መለያ",
       "gitlabError": "የGitLab ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።",
-      "bitbucketError": "የBitbucket ማዋቀር መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።"
     },
     "overview": {
       "allAreas": "ሁሉም ዘርፎች",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎችን መጫን አልተቻለም።",
       "connectGithubDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ GitHub ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "connectGitlabDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ GitLab ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
-      "connectBitbucketDescription": "በአሳሽዎ ውስጥ ይግቡ፣ ከዚያ Bitbucket ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
       "openGitlab": "GitLabን ይክፈቱ",
-      "openBitbucket": "Bitbucketን ይክፈቱ",
       "refreshRepositories": "ማከማቻዎችን ያድሱ",
       "githubConnected": "GitHub ተገናኝቷል",
       "gitlabConnected": "GitLab ተገናኝቷል",

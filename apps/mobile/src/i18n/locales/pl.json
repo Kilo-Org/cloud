@@ -623,8 +623,6 @@
       "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
     },
     "repos": {
-      "unavailable": "Repozytoria są niedostępne. Dokończ konfigurację Bitbucket na kilo.ai.",
-      "finishSetup": "Dokończ konfigurację",
       "manageAccess": "Zarządzaj dostępem",
       "bitbucketNoRepositoriesDescription": "W tym obszarze roboczym Bitbucket nie ma dostępnych repozytoriów.",
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
-      "setupIncomplete": "Konfiguracja jest niekompletna. Dokończ ją na kilo.ai.",
-      "setup": "Konfiguracja Bitbucket"
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego"
@@ -692,8 +689,7 @@
       "githubApp": "Aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
       "gitlabAccount": "Konto GitLab",
-      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie.",
-      "bitbucketError": "Nie udało się otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
+      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
       "byline": "#{{number}} · Autor: {{author}}",
@@ -1645,10 +1641,8 @@
       "couldNotLoadBitbucketRepositories": "Nie udało się wczytać repozytoriów z Bitbucket.",
       "connectGithubDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium GitHub.",
       "connectGitlabDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium GitLab.",
-      "connectBitbucketDescription": "Zaloguj się w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium Bitbucket.",
       "openGithub": "Otwórz GitHub",
       "openGitlab": "Otwórz GitLab",
-      "openBitbucket": "Otwórz Bitbucket",
       "refreshRepositories": "Odśwież repozytoria",
       "githubConnected": "Połączono z GitHub",
       "gitlabConnected": "Połączono z GitLab",

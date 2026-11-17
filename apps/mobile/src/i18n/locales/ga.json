@@ -1235,8 +1235,6 @@
       "clearMessage": "Má shábhálann tú réimse folamh, scriostar na treoracha saincheaptha atá stóráilte don athbhreithneoir seo."
     },
     "repos": {
-      "unavailable": "Níl na stórtha ar fáil. Críochnaigh socrú Bitbucket ar kilo.ai.",
-      "finishSetup": "Críochnaigh an socrú",
       "manageAccess": "Bainistigh rochtain",
       "bitbucketNoRepositoriesDescription": "Níl aon stór ar fáil sa spás oibre Bitbucket seo.",
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
@@ -1391,11 +1389,10 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
-      "setupIncomplete": "Níl an socrú críochnaithe. Críochnaigh an chumraíocht ar kilo.ai.",
-      "setup": "Socrú Bitbucket"
+      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bainistítear nasc Bitbucket na heagraíochta seo ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre"
@@ -1423,8 +1420,7 @@
       "githubError": "Níorbh fhéidir socrú GitHub a oscailt. Bain triail as arís le do thoil.",
       "gitlabAccount": "an cuntas GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
-      "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
+      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch."
     },
     "overview": {
       "allAreas": "Gach réimse",
@@ -2277,10 +2273,8 @@
       "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil.",
       "connectGithubDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór GitHub a roghnú.",
       "connectGitlabDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór GitLab a roghnú.",
-      "connectBitbucketDescription": "Logáil isteach ó do bhrabhsálaí, ansin fill anseo chun stór Bitbucket a roghnú.",
       "openGithub": "Oscail GitHub",
       "openGitlab": "Oscail GitLab",
-      "openBitbucket": "Oscail Bitbucket",
       "refreshRepositories": "Athnuaigh stórtha",
       "githubConnected": "GitHub ceangailte",
       "gitlabConnected": "GitLab ceangailte",

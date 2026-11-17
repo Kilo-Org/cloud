@@ -1166,8 +1166,6 @@
       "clearMessage": "ਖਾਲੀ ਫੀਲਡ ਸੇਵ ਕਰਨ ਨਾਲ ਇਸ ਸਮੀਖਿਅਕ ਲਈ ਸੰਭਾਲੀਆਂ ਗਈਆਂ ਕਸਟਮ ਹਦਾਇਤਾਂ ਮਿਟ ਜਾਣਗੀਆਂ।"
     },
     "repos": {
-      "unavailable": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ — kilo.ai 'ਤੇ Bitbucket ਦਾ ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ।",
-      "finishSetup": "ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ",
       "manageAccess": "ਪਹੁੰਚ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
       "bitbucketNoRepositoriesDescription": "ਇਸ Bitbucket ਵਰਕਸਪੇਸ ਵਿੱਚ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "gitlabNoRepositoriesDescription": "ਤੁਹਾਨੂੰ GitLab 'ਤੇ ਹੋਰ ਸਮੂਹਾਂ ਜਾਂ ਪ੍ਰੋਜੈਕਟਾਂ ਤੱਕ ਪਹੁੰਚ ਦੇਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ।",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "followReviewMdSubtitle": "ਹਰ ਰਿਪੋਜ਼ਟਰੀ ਦੀ REVIEW.md ਫਾਈਲ ਦੀਆਂ ਹਦਾਇਤਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
-      "setupIncomplete": "ਸੈੱਟਅੱਪ ਅਧੂਰਾ ਹੈ — kilo.ai 'ਤੇ ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ।",
-      "setup": "Bitbucket ਦਾ ਸੈੱਟਅੱਪ"
+      "notConnectedReadOnly": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "ਇਸ ਸੰਸਥਾ ਦਾ Bitbucket ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "description": "ਲੋੜੀਂਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਵਾਲਾ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "scopes": "ਖਾਤਾ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਰਿਪੋਜ਼ਟਰੀਆਂ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ · ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਵੈਬਹੁੱਕ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ",
       "tokenPlaceholder": "ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
-      "bitbucketError": "Bitbucket ਸੈੱਟਅੱਪ ਖੋਲ੍ਹ ਨਹੀਂ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
     },
     "overview": {
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ GitHub ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "connectGitlabDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ GitLab ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectBitbucketDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਤੋਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ Bitbucket ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
       "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
-      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੈ",
       "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੈ",

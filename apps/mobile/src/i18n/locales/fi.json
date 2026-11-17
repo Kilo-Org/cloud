@@ -1166,8 +1166,6 @@
       "clearMessage": "Tyhjän kentän tallentaminen poistaa tälle koodikatselmoijalle tallennetut mukautetut ohjeet."
     },
     "repos": {
-      "unavailable": "Koodivarastot eivät ole käytettävissä. Viimeistele Bitbucketin käyttöönotto osoitteessa kilo.ai.",
-      "finishSetup": "Viimeistele käyttöönotto",
       "manageAccess": "Hallinnoi käyttöoikeuksia",
       "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole saatavilla koodivarastoja.",
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
-      "setupIncomplete": "Käyttöönotto on kesken. Viimeistele määritys osoitteessa kilo.ai.",
-      "setup": "Bitbucketin käyttöönotto"
+      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHubin käyttöönottoa ei voitu avata. Yritä uudelleen.",
       "gitlabAccount": "GitLab-tili",
       "gitlabError": "GitLabin käyttöönottoa ei voitu avata. Yritä uudelleen.",
-      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti.",
-      "bitbucketError": "Bitbucketin käyttöönottoa ei voitu avata. Yritä uudelleen."
+      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti."
     },
     "overview": {
       "allAreas": "Kaikki osa-alueet",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket-koodivarastojen lataus epäonnistui.",
       "connectGithubDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan GitHub-koodivarasto.",
       "connectGitlabDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan GitLab-koodivarasto.",
-      "connectBitbucketDescription": "Kirjaudu sisään selaimessa ja palaa sitten tänne valitsemaan Bitbucket-koodivarasto.",
       "openGithub": "Avaa GitHub",
       "openGitlab": "Avaa GitLab",
-      "openBitbucket": "Avaa Bitbucket",
       "refreshRepositories": "Päivitä koodivarastot",
       "githubConnected": "GitHub yhdistetty",
       "gitlabConnected": "GitLab yhdistetty",

@@ -623,8 +623,6 @@
       "clearMessage": "Сохранение пустого поля удалит пользовательские инструкции, заданные для этого ревьюера."
     },
     "repos": {
-      "unavailable": "Репозитории недоступны — завершите настройку Bitbucket на kilo.ai.",
-      "finishSetup": "Завершить настройку",
       "manageAccess": "Настроить доступ",
       "bitbucketNoRepositoriesDescription": "В этом рабочем пространстве Bitbucket нет доступных репозиториев.",
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "Автоматические проверки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не подключён. Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
-      "setupIncomplete": "Завершите настройку на kilo.ai.",
-      "setup": "Настройка Bitbucket"
+      "notConnectedReadOnly": "Bitbucket не подключён. Подключить его могут только владельцы организации, администраторы и ответственные за оплату."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Подключение Bitbucket для этой организации управляется в веб-версии с компьютера.",
       "description": "Создайте токен доступа к рабочему пространству с нужными правами и вставьте его ниже.",
       "scopes": "Аккаунт: чтение · Репозитории: чтение/запись · Пул-реквесты: чтение · Вебхуки: чтение/запись",
       "tokenPlaceholder": "Токен доступа к рабочему пространству"
@@ -692,8 +689,7 @@
       "githubApp": "Приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
       "gitlabAccount": "Аккаунт GitLab",
-      "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова.",
-      "bitbucketError": "Не удалось открыть настройку Bitbucket. Попробуйте снова."
+      "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова."
     },
     "reviewDetail": {
       "byline": "#{{number}} · Автор: {{author}}",
@@ -1645,10 +1641,8 @@
       "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket.",
       "connectGithubDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий GitHub.",
       "connectGitlabDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий GitLab.",
-      "connectBitbucketDescription": "Войдите в браузере, затем вернитесь сюда, чтобы выбрать репозиторий Bitbucket.",
       "openGithub": "Открыть GitHub",
       "openGitlab": "Открыть GitLab",
-      "openBitbucket": "Открыть Bitbucket",
       "refreshRepositories": "Обновить список репозиториев",
       "githubConnected": "GitHub подключён",
       "gitlabConnected": "GitLab подключён",

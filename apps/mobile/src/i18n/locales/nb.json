@@ -1166,8 +1166,6 @@
       "clearMessage": "Hvis du lagrer et tomt felt, slettes de egendefinerte instruksjonene som er lagret for denne anmelderen."
     },
     "repos": {
-      "unavailable": "Kodelagrene er ikke tilgjengelige. Fullfør Bitbucket-oppsettet på kilo.ai.",
-      "finishSetup": "Fullfør oppsettet",
       "manageAccess": "Administrer tilgang",
       "bitbucketNoRepositoriesDescription": "Ingen kodelagre er tilgjengelige i dette Bitbucket-arbeidsområdet.",
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
-      "setupIncomplete": "Oppsettet er ikke fullført. Fullfør konfigurasjonen på kilo.ai.",
-      "setup": "Bitbucket-oppsett"
+      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
@@ -1354,8 +1351,7 @@
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
       "gitlabAccount": "GitLab-kontoen",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
-      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
-      "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."
+      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk."
     },
     "overview": {
       "allAreas": "Alle områder",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Kunne ikke laste inn kodelagre fra Bitbucket.",
       "connectGithubDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et GitHub-kodelager.",
       "connectGitlabDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et GitLab-kodelager.",
-      "connectBitbucketDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et Bitbucket-kodelager.",
       "openGithub": "Åpne GitHub",
       "openGitlab": "Åpne GitLab",
-      "openBitbucket": "Åpne Bitbucket",
       "refreshRepositories": "Oppdater kodelagre",
       "githubConnected": "GitHub tilkoblet",
       "gitlabConnected": "GitLab tilkoblet",

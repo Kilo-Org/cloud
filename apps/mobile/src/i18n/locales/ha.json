@@ -1166,8 +1166,6 @@
       "clearMessage": "Ajiye filin da babu komai ciki zai goge umarni na musamman da aka adana wa wannan mai dubawa."
     },
     "repos": {
-      "unavailable": "Ba a iya samun ma'ajiyoyi. Kammala saitin Bitbucket a kilo.ai.",
-      "finishSetup": "Gama saitin",
       "manageAccess": "Sarrafa dama",
       "bitbucketNoRepositoriesDescription": "Babu ma'ajiyoyin da ake iya samu a wannan muhallin aiki na Bitbucket.",
       "gitlabNoRepositoriesDescription": "Wataƙila kana buƙatar ba da damar shiga ƙarin ƙungiyoyi ko ayyuka a GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Bi REVIEW.md",
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
-      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
-      "setupIncomplete": "Ba a kammala saitin ba. Kammala shi a kilo.ai.",
-      "setup": "Saitin Bitbucket"
+      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Ana sarrafa haɗin Bitbucket na wannan ƙungiyar a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
       "tokenPlaceholder": "Lambar izinin shiga muhallin aiki"
@@ -1354,8 +1351,7 @@
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
       "gitlabAccount": "Asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
-      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik.",
-      "bitbucketError": "An kasa buɗe saitin Bitbucket. Sake gwadawa."
+      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
     },
     "overview": {
       "allAreas": "Duk fannoni",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
       "connectGithubDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitHub.",
       "connectGitlabDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitLab.",
-      "connectBitbucketDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta Bitbucket.",
       "openGithub": "Buɗe GitHub",
       "openGitlab": "Buɗe GitLab",
-      "openBitbucket": "Buɗe Bitbucket",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
       "githubConnected": "An haɗa GitHub",
       "gitlabConnected": "An haɗa GitLab",

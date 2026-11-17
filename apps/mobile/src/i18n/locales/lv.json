@@ -1189,8 +1189,6 @@
       "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
     },
     "repos": {
-      "unavailable": "Repozitoriji nav pieejami. Pabeidz Bitbucket iestatīšanu vietnē kilo.ai.",
-      "finishSetup": "Pabeigt iestatīšanu",
       "manageAccess": "Pārvaldīt piekļuvi",
       "bitbucketNoRepositoriesDescription": "Šajā Bitbucket darbvietā nav pieejamu repozitoriju.",
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
@@ -1345,11 +1343,10 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
-      "setupIncomplete": "Iestatīšana nav pabeigta. Pabeidz konfigurēšanu vietnē kilo.ai.",
-      "setup": "Bitbucket iestatīšana"
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara"
@@ -1377,8 +1374,7 @@
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģini vēlreiz.",
-      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus.",
-      "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģini vēlreiz."
+      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus."
     },
     "overview": {
       "allAreas": "Visas jomas",
@@ -2191,10 +2187,8 @@
       "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus.",
       "connectGithubDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos GitHub repozitoriju.",
       "connectGitlabDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos GitLab repozitoriju.",
-      "connectBitbucketDescription": "Piesakies pārlūkā, pēc tam atgriezies šeit, lai izvēlētos Bitbucket repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "openGitlab": "Atvērt GitLab",
-      "openBitbucket": "Atvērt Bitbucket",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
       "githubConnected": "GitHub konts pievienots",
       "gitlabConnected": "GitLab konts pievienots",

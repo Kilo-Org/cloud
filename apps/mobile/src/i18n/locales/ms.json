@@ -1166,8 +1166,6 @@
       "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
     },
     "repos": {
-      "unavailable": "Repositori tidak tersedia — selesaikan persediaan Bitbucket di kilo.ai.",
-      "finishSetup": "Selesaikan persediaan",
       "manageAccess": "Urus akses",
       "bitbucketNoRepositoriesDescription": "Tiada repositori tersedia dalam ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
-      "setupIncomplete": "Persediaan belum lengkap. Selesaikan konfigurasi di kilo.ai.",
-      "setup": "Persediaan Bitbucket"
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja"
@@ -1354,8 +1351,7 @@
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "Akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
-      "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
     },
     "overview": {
       "allAreas": "Semua bidang",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Tidak dapat memuatkan repositori Bitbucket.",
       "connectGithubDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitHub.",
       "connectGitlabDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitLab.",
-      "connectBitbucketDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori Bitbucket.",
       "openGithub": "Buka GitHub",
       "openGitlab": "Buka GitLab",
-      "openBitbucket": "Buka Bitbucket",
       "refreshRepositories": "Muat semula repositori",
       "githubConnected": "GitHub disambungkan",
       "gitlabConnected": "GitLab disambungkan",

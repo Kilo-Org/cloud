@@ -1166,8 +1166,6 @@
       "clearMessage": "খালি ফিল্ড সংরক্ষণ করলে এই রিভিউয়ারের জন্য সংরক্ষিত নিজস্ব নির্দেশনাগুলো মুছে যাবে।"
     },
     "repos": {
-      "unavailable": "রিপোজিটরিগুলো পাওয়া যাচ্ছে না — kilo.ai-এ Bitbucket সেটআপ শেষ করুন।",
-      "finishSetup": "সেটআপ শেষ করুন",
       "manageAccess": "অ্যাক্সেস পরিচালনা করুন",
       "bitbucketNoRepositoriesDescription": "এই Bitbucket ওয়ার্কস্পেসে কোনো রিপোজিটরি নেই।",
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
-      "setupIncomplete": "সেটআপ সম্পূর্ণ হয়নি — kilo.ai-এ কনফিগারেশন শেষ করুন।",
-      "setup": "Bitbucket সেটআপ"
+      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "এই সংস্থার Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",
       "description": "প্রয়োজনীয় অনুমতিসহ একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে নিচে পেস্ট করুন।",
       "scopes": "অ্যাকাউন্ট: পড়া · রিপোজিটরি: পড়া/লেখা · পুল রিকোয়েস্ট: পড়া · ওয়েবহুক: পড়া/লেখা।",
       "tokenPlaceholder": "ওয়ার্কস্পেস অ্যাক্সেস টোকেন"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
       "gitlabAccount": "GitLab অ্যাকাউন্ট",
       "gitlabError": "GitLab সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
-      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।",
-      "bitbucketError": "Bitbucket সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।"
+      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।"
     },
     "overview": {
       "allAreas": "সব বিষয়",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি।",
       "connectGithubDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitHub রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "connectGitlabDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitLab রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectBitbucketDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি Bitbucket রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
       "openGitlab": "GitLab খুলুন",
-      "openBitbucket": "Bitbucket খুলুন",
       "refreshRepositories": "রিপোজিটরি রিফ্রেশ করুন",
       "githubConnected": "GitHub সংযুক্ত",
       "gitlabConnected": "GitLab সংযুক্ত",

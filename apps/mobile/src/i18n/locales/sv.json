@@ -1166,8 +1166,6 @@
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
     },
     "repos": {
-      "unavailable": "Kodarkiven är inte tillgängliga. Slutför konfigurationen av Bitbucket på kilo.ai.",
-      "finishSetup": "Slutför konfigurationen",
       "manageAccess": "Hantera åtkomst",
       "bitbucketNoRepositoriesDescription": "Inga kodarkiv är tillgängliga i den här Bitbucket-arbetsytan.",
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
-      "setupIncomplete": "Konfigurationen är inte klar. Slutför den på kilo.ai",
-      "setup": "Konfiguration av Bitbucket"
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
@@ -1354,8 +1351,7 @@
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
-      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
-      "bitbucketError": "Kunde inte öppna konfigurationen för Bitbucket. Försök igen."
+      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt."
     },
     "overview": {
       "allAreas": "Alla områden",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
       "connectGithubDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett GitHub-kodarkiv.",
       "connectGitlabDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett GitLab-kodarkiv.",
-      "connectBitbucketDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett Bitbucket-kodarkiv.",
       "openGithub": "Öppna GitHub",
       "openGitlab": "Öppna GitLab",
-      "openBitbucket": "Öppna Bitbucket",
       "refreshRepositories": "Uppdatera kodarkiven",
       "githubConnected": "GitHub anslutet",
       "gitlabConnected": "GitLab anslutet",

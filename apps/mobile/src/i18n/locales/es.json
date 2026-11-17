@@ -623,8 +623,6 @@
       "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
     },
     "repos": {
-      "unavailable": "Los repositorios no están disponibles. Completa la configuración de Bitbucket en kilo.ai.",
-      "finishSetup": "Completar configuración",
       "manageAccess": "Gestionar acceso",
       "bitbucketNoRepositoriesDescription": "No hay repositorios disponibles en este espacio de trabajo de Bitbucket.",
       "gitlabNoRepositoriesDescription": "Es posible que debas conceder acceso a más grupos o proyectos en GitLab.",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
-      "setupIncomplete": "La configuración está incompleta. Complétala en kilo.ai.",
-      "setup": "Configuración de Bitbucket"
+      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo"
@@ -692,8 +689,7 @@
       "githubApp": "Aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
       "gitlabAccount": "Cuenta de GitLab",
-      "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo.",
-      "bitbucketError": "No se pudo abrir la configuración de Bitbucket. Inténtalo de nuevo."
+      "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo."
     },
     "reviewDetail": {
       "byline": "#{{number}} por {{author}}",
@@ -1625,10 +1621,8 @@
       "couldNotLoadBitbucketRepositories": "No se pudieron cargar los repositorios de Bitbucket.",
       "connectGithubDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de GitHub.",
       "connectGitlabDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de GitLab.",
-      "connectBitbucketDescription": "Inicia sesión desde tu navegador y vuelve aquí para elegir un repositorio de Bitbucket.",
       "openGithub": "Abrir GitHub",
       "openGitlab": "Abrir GitLab",
-      "openBitbucket": "Abrir Bitbucket",
       "refreshRepositories": "Actualizar repositorios",
       "githubConnected": "GitHub conectado",
       "gitlabConnected": "GitLab conectado",

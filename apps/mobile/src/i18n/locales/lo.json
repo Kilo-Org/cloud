@@ -1166,8 +1166,6 @@
       "clearMessage": "ການບັນທຶກຊ່ອງຫວ່າງເປົ່າຈະລຶບຄຳສັ່ງທີ່ກຳນົດເອງທີ່ເກັບໄວ້ສຳລັບຜູ້ກວດສອບນີ້ອອກ."
     },
     "repos": {
-      "unavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດໄດ້ — ຕັ້ງຄ່າ Bitbucket ໃຫ້ສຳເລັດໃນ kilo.ai.",
-      "finishSetup": "ຕັ້ງຄ່າໃຫ້ສຳເລັດ",
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງ",
       "bitbucketNoRepositoriesDescription": "ບໍ່ມີຄັງໂຄ້ດທີ່ໃຊ້ໄດ້ໃນພື້ນທີ່ເຮັດວຽກ Bitbucket ນີ້.",
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
-      "setupIncomplete": "ຍັງຕັ້ງຄ່າບໍ່ສຳເລັດ — ໄປຕັ້ງຄ່າໃຫ້ຄົບຢູ່ kilo.ai.",
-      "setup": "ການຕັ້ງຄ່າ Bitbucket"
+      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງອົງກອນນີ້ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
       "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກທີ່ມີສິດຕາມທີ່ກຳນົດ ແລ້ວວາງລົງດ້ານລຸ່ມ.",
       "scopes": "ບັນຊີ: ອ່ານ · ຄັງໂຄ້ດ: ອ່ານ/ຂຽນ · ຄຳຂໍລວມໂຄ້ດ: ອ່ານ · ເວັບຮຸກ: ອ່ານ/ຂຽນ",
       "tokenPlaceholder": "ໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ"
@@ -1354,8 +1351,7 @@
       "githubError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitHub ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "gitlabAccount": "ບັນຊີ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitLab ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ.",
-      "bitbucketError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ Bitbucket ໄດ້. ກະລຸນາລອງອີກຄັ້ງ."
+      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ."
     },
     "overview": {
       "allAreas": "ທຸກດ້ານ",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
       "connectGithubDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitHub.",
       "connectGitlabDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitLab.",
-      "connectBitbucketDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ Bitbucket.",
       "openGithub": "ເປີດ GitHub",
       "openGitlab": "ເປີດ GitLab",
-      "openBitbucket": "ເປີດ Bitbucket",
       "refreshRepositories": "ໂຫຼດລາຍການຄັງໂຄດໃໝ່",
       "githubConnected": "ເຊື່ອມຕໍ່ GitHub ແລ້ວ",
       "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",

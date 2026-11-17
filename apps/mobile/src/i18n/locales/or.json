@@ -1166,8 +1166,6 @@
       "clearMessage": "ଖାଲି କ୍ଷେତ୍ର ସଞ୍ଚୟ କଲେ ଏହି ସମୀକ୍ଷକ ପାଇଁ ସଂରକ୍ଷିତ ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ହଟିଯିବ।"
     },
     "repos": {
-      "unavailable": "ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ — kilo.ai ରେ Bitbucket ସେଟଅପ୍ ସମାପ୍ତ କରନ୍ତୁ।",
-      "finishSetup": "ସେଟଅପ୍ ସମାପ୍ତ କରନ୍ତୁ",
       "manageAccess": "ଅନୁମତି ପରିଚାଳନା କରନ୍ତୁ",
       "bitbucketNoRepositoriesDescription": "ଏହି Bitbucket କାର୍ଯ୍ୟକ୍ଷେତ୍ରରେ କୌଣସି ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ।",
       "gitlabNoRepositoriesDescription": "ଆପଣଙ୍କୁ GitLab ରେ ଅଧିକ ଗୋଷ୍ଠୀ କିମ୍ବା ପ୍ରୋଜେକ୍ଟ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦେବାକୁ ପଡ଼ିପାରେ।",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md ଅନୁସରଣ କରନ୍ତୁ",
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
-      "setupIncomplete": "ସେଟଅପ୍ ଅସମ୍ପୂର୍ଣ୍ଣ ଅଛି — kilo.ai ରେ ସେଟଅପ୍ ସମ୍ପୂର୍ଣ୍ଣ କରନ୍ତୁ।",
-      "setup": "Bitbucket ସେଟଅପ୍"
+      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "ଏହି ସଂସ୍ଥାର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
       "description": "ଆବଶ୍ୟକ ଅନୁମତି ସହିତ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ପାଇଁ ଏକ ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "scopes": "ଆକାଉଣ୍ଟ: ପଢ଼ିବା · ରିପୋଜିଟୋରୀ: ପଢ଼ିବା/ଲେଖିବା · ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ: ପଢ଼ିବା · ୱେବ୍‌ହୁକ୍: ପଢ଼ିବା/ଲେଖିବା",
       "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "gitlabAccount": "GitLab ଆକାଉଣ୍ଟ",
       "gitlabError": "GitLab ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "description": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକର ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ପାଇଁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।",
-      "bitbucketError": "Bitbucket ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "description": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକର ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ପାଇଁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।"
     },
     "overview": {
       "allAreas": "ସମସ୍ତ କ୍ଷେତ୍ର",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ GitHub ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ GitLab ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତା'ପରେ ଏକ Bitbucket ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
-      "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ କରନ୍ତୁ",
       "githubConnected": "GitHub ସଂଯୋଜିତ",
       "gitlabConnected": "GitLab ସଂଯୋଜିତ",

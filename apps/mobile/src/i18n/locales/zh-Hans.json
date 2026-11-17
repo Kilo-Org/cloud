@@ -623,8 +623,6 @@
       "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
     },
     "repos": {
-      "unavailable": "仓库暂不可用。请在 kilo.ai 上完成 Bitbucket 配置。",
-      "finishSetup": "完成设置",
       "manageAccess": "管理访问权限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作区中没有可用的仓库。",
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
-      "setupIncomplete": "配置尚未完成。请在 kilo.ai 上完成配置。",
-      "setup": "Bitbucket 设置"
+      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌"
@@ -692,8 +689,7 @@
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 配置页面。请重试。",
       "gitlabAccount": "GitLab 账户",
-      "gitlabError": "无法打开 GitLab 配置页面。请重试。",
-      "bitbucketError": "无法打开 Bitbucket 配置页面。请重试。"
+      "gitlabError": "无法打开 GitLab 配置页面。请重试。"
     },
     "reviewDetail": {
       "byline": "#{{number}}，作者 {{author}}",
@@ -1605,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "无法加载 Bitbucket 仓库。",
       "connectGithubDescription": "在浏览器中登录，然后返回此处选择 GitHub 仓库。",
       "connectGitlabDescription": "在浏览器中登录，然后返回此处选择 GitLab 仓库。",
-      "connectBitbucketDescription": "在浏览器中登录，然后返回此处选择 Bitbucket 仓库。",
       "openGithub": "打开 GitHub",
       "openGitlab": "打开 GitLab",
-      "openBitbucket": "打开 Bitbucket",
       "refreshRepositories": "刷新仓库",
       "githubConnected": "GitHub 已连接",
       "gitlabConnected": "GitLab 已连接",

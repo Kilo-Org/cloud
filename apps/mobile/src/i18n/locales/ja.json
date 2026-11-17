@@ -623,8 +623,6 @@
       "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
     },
     "repos": {
-      "unavailable": "リポジトリを利用できません。kilo.aiでBitbucketのセットアップを完了してください。",
-      "finishSetup": "セットアップを完了",
       "manageAccess": "アクセス権を管理",
       "bitbucketNoRepositoriesDescription": "このBitbucketワークスペースに利用可能なリポジトリはありません。",
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。",
-      "setupIncomplete": "セットアップが完了していません。kilo.aiで設定を完了してください。",
-      "setup": "Bitbucketのセットアップ"
+      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン"
@@ -692,8 +689,7 @@
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
       "gitlabAccount": "GitLabアカウント",
-      "gitlabError": "GitLabのセットアップを開けませんでした。もう一度お試しください。",
-      "bitbucketError": "Bitbucketのセットアップを開けませんでした。もう一度お試しください。"
+      "gitlabError": "GitLabのセットアップを開けませんでした。もう一度お試しください。"
     },
     "reviewDetail": {
       "byline": "#{{number}} · {{author}}",
@@ -1605,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
       "connectGithubDescription": "ブラウザーからサインインし、この画面に戻ってGitHubリポジトリを選択してください。",
       "connectGitlabDescription": "ブラウザーからサインインし、この画面に戻ってGitLabリポジトリを選択してください。",
-      "connectBitbucketDescription": "ブラウザーからサインインし、この画面に戻ってBitbucketリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
       "openGitlab": "GitLabを開く",
-      "openBitbucket": "Bitbucketを開く",
       "refreshRepositories": "リポジトリを更新",
       "githubConnected": "GitHubと連携済み",
       "gitlabConnected": "GitLabと連携済み",

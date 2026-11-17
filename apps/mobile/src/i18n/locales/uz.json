@@ -1166,8 +1166,6 @@
       "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
     },
     "repos": {
-      "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
-      "finishSetup": "Sozlashni yakunlash",
       "manageAccess": "Kirish huquqlarini boshqarish",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket ish maydonida repozitoriyalar mavjud emas.",
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
-      "setupIncomplete": "Sozlash yakunlanmagan. Uni kilo.ai saytida yakunlang.",
-      "setup": "Bitbucketni sozlash"
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
       "gitlabError": "GitLabni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
-      "bitbucketError": "Bitbucketni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
     },
     "overview": {
       "allAreas": "Barcha yo'nalishlar",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
       "connectGithubDescription": "Brauzerda hisobingizga kiring, so'ng GitHub repozitoriyasini tanlash uchun bu yerga qayting.",
       "connectGitlabDescription": "Brauzerda hisobingizga kiring, so'ng GitLab repozitoriyasini tanlash uchun bu yerga qayting.",
-      "connectBitbucketDescription": "Brauzerda hisobingizga kiring, so'ng Bitbucket repozitoriyasini tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
       "openGitlab": "GitLab saytini ochish",
-      "openBitbucket": "Bitbucket saytini ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
       "githubConnected": "GitHub ulandi",
       "gitlabConnected": "GitLab ulandi",

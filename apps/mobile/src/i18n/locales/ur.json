@@ -1166,8 +1166,6 @@
       "clearMessage": "خالی خانہ محفوظ کرنے سے اس جائزہ کار کے لیے محفوظ کی گئی اپنی ہدایات حذف ہو جائیں گی۔"
     },
     "repos": {
-      "unavailable": "ریپوزٹریز دستیاب نہیں — kilo.ai پر Bitbucket سیٹ اپ مکمل کریں۔",
-      "finishSetup": "سیٹ اپ مکمل کریں",
       "manageAccess": "رسائی کا انتظام کریں",
       "bitbucketNoRepositoriesDescription": "اس Bitbucket ورک اسپیس میں کوئی ریپوزٹری دستیاب نہیں ہے۔",
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
-      "setupIncomplete": "سیٹ اپ نامکمل ہے — kilo.ai پر ترتیبات مکمل کریں۔",
-      "setup": "Bitbucket کا سیٹ اپ"
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "اس تنظیم کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
       "description": "مطلوبہ اجازتوں کے ساتھ ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
       "scopes": "اکاؤنٹ: پڑھنے کی اجازت · ریپوزٹریز: پڑھنے اور لکھنے کی اجازت · پل ریکویسٹس: پڑھنے کی اجازت · ویب ہکس: پڑھنے اور لکھنے کی اجازت",
       "tokenPlaceholder": "ورک اسپیس تک رسائی کا ٹوکن"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "gitlabAccount": "GitLab اکاؤنٹ",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
-      "bitbucketError": "Bitbucket سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
     },
     "overview": {
       "allAreas": "تمام شعبے",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
       "connectGithubDescription": "اپنے براؤزر میں سائن ان کریں، پھر GitHub ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "connectGitlabDescription": "اپنے براؤزر میں سائن ان کریں، پھر GitLab ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectBitbucketDescription": "اپنے براؤزر میں سائن ان کریں، پھر Bitbucket ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
       "openGitlab": "GitLab کھولیں",
-      "openBitbucket": "Bitbucket کھولیں",
       "refreshRepositories": "ریپوزٹریوں کی فہرست تازہ کریں",
       "githubConnected": "GitHub منسلک",
       "gitlabConnected": "GitLab منسلک",

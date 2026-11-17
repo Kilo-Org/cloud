@@ -1212,8 +1212,6 @@
       "clearMessage": "Захаванне пустога поля выдаляе ўласныя інструкцыі, захаваныя для гэтага рэцэнзента."
     },
     "repos": {
-      "unavailable": "Рэпазіторыі недаступныя. Завяршыце наладжванне Bitbucket на kilo.ai.",
-      "finishSetup": "Завяршыць наладжванне",
       "manageAccess": "Кіраваць доступам",
       "bitbucketNoRepositoriesDescription": "У гэтай працоўнай прасторы Bitbucket няма даступных рэпазіторыяў.",
       "gitlabNoRepositoriesDescription": "Магчыма, вам трэба даць доступ да большай колькасці груп або праектаў на GitLab.",
@@ -1368,11 +1366,10 @@
     "followReviewMd": "Выконваць інструкцыі REVIEW.md",
     "followReviewMdSubtitle": "Выконваць інструкцыі з файла REVIEW.md у кожным рэпазіторыі",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
-      "setupIncomplete": "Наладжванне не завершана. Завяршыце яго на kilo.ai.",
-      "setup": "Наладжванне Bitbucket"
+      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Падключэнне гэтай арганізацыі да Bitbucket кіруецца ў вэб-версіі з камп’ютара.",
       "description": "Стварыце токен доступу да працоўнай прасторы з патрэбнымі правамі і ўстаўце яго ніжэй.",
       "scopes": "Уліковы запіс: чытанне · Рэпазіторыі: чытанне і запіс · Запыты на зліццё: чытанне · Вэбхукі: чытанне і запіс.",
       "tokenPlaceholder": "Токен доступу да працоўнай прасторы"
@@ -1400,8 +1397,7 @@
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
       "gitlabAccount": "Уліковы запіс GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
-      "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё.",
-      "bitbucketError": "Не атрымалася адкрыць наладжванне Bitbucket. Паспрабуйце яшчэ раз."
+      "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё."
     },
     "overview": {
       "allAreas": "Усе напрамкі",
@@ -2234,10 +2230,8 @@
       "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
       "connectGithubDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы GitHub.",
       "connectGitlabDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы GitLab.",
-      "connectBitbucketDescription": "Увайдзіце ў браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторы Bitbucket.",
       "openGithub": "Адкрыць GitHub",
       "openGitlab": "Адкрыць GitLab",
-      "openBitbucket": "Адкрыць Bitbucket",
       "refreshRepositories": "Абнавіць рэпазіторыі",
       "githubConnected": "GitHub падключаны",
       "gitlabConnected": "GitLab падключаны",

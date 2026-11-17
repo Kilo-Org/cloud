@@ -623,8 +623,6 @@
       "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
     },
     "repos": {
-      "unavailable": "저장소를 사용할 수 없습니다. kilo.ai에서 Bitbucket 설정을 완료하세요.",
-      "finishSetup": "설정 완료",
       "manageAccess": "접근 권한 관리",
       "bitbucketNoRepositoriesDescription": "이 Bitbucket 작업 영역에 사용 가능한 저장소가 없습니다.",
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
-      "setupIncomplete": "설정이 완료되지 않았습니다. kilo.ai에서 설정을 완료하세요.",
-      "setup": "Bitbucket 설정"
+      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "이 조직의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
       "description": "필요한 권한이 포함된 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
       "tokenPlaceholder": "작업 영역 액세스 토큰"
@@ -692,8 +689,7 @@
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
       "gitlabAccount": "GitLab 계정",
-      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요.",
-      "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
+      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "reviewDetail": {
       "byline": "#{{number}} · {{author}}",
@@ -1605,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다.",
       "connectGithubDescription": "브라우저에서 로그인한 후 여기로 돌아와 GitHub 저장소를 선택하세요.",
       "connectGitlabDescription": "브라우저에서 로그인한 후 여기로 돌아와 GitLab 저장소를 선택하세요.",
-      "connectBitbucketDescription": "브라우저에서 로그인한 후 여기로 돌아와 Bitbucket 저장소를 선택하세요.",
       "openGithub": "GitHub 열기",
       "openGitlab": "GitLab 열기",
-      "openBitbucket": "Bitbucket 열기",
       "refreshRepositories": "저장소 새로고침",
       "githubConnected": "GitHub 연결됨",
       "gitlabConnected": "GitLab 연결됨",

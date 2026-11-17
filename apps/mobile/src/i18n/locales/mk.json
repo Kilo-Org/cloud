@@ -1166,8 +1166,6 @@
       "clearMessage": "Зачувувањето на празно поле ги брише прилагодените упатства зачувани за овој рецензент."
     },
     "repos": {
-      "unavailable": "Складиштата не се достапни — заврши го поставувањето на Bitbucket на kilo.ai.",
-      "finishSetup": "Заврши го поставувањето",
       "manageAccess": "Управувај со пристапот",
       "bitbucketNoRepositoriesDescription": "Нема достапни складишта во овој работен простор на Bitbucket.",
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
-      "setupIncomplete": "Поставувањето не е завршено — заврши го на kilo.ai.",
-      "setup": "Поставување на Bitbucket"
+      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Врската со Bitbucket на оваа организација се управува преку веб од компјутер.",
       "description": "Создај токен за пристап до работниот простор со потребните дозволи и залепи го подолу.",
       "scopes": "Сметка: читање · Складишта: читање/запишување · Барања за спојување: читање · Веб-куки: читање/запишување",
       "tokenPlaceholder": "Токен за пристап до работниот простор"
@@ -1354,8 +1351,7 @@
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
       "gitlabAccount": "Сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
-      "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување.",
-      "bitbucketError": "Не можеше да се отвори поставувањето на Bitbucket. Обиди се повторно."
+      "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување."
     },
     "overview": {
       "allAreas": "Сите области",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Не успеа вчитувањето на репозиториумите од Bitbucket.",
       "connectGithubDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од GitHub.",
       "connectGitlabDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од GitLab.",
-      "connectBitbucketDescription": "Најави се преку прелистувачот, па врати се тука за да избереш репозиториум од Bitbucket.",
       "openGithub": "Отвори GitHub",
       "openGitlab": "Отвори GitLab",
-      "openBitbucket": "Отвори Bitbucket",
       "refreshRepositories": "Освежи ги репозиториумите",
       "githubConnected": "GitHub е поврзан",
       "gitlabConnected": "GitLab е поврзан",

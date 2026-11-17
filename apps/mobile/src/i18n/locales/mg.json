@@ -1166,8 +1166,6 @@
       "clearMessage": "Raha tahirizinao saha tsy misy votoaty, dia voafafa ny toromarika manokana voatahiry ho an'ity mpandinika ity."
     },
     "repos": {
-      "unavailable": "Tsy azo ampiasaina ny tahirin-kaody. Vitao ao amin'ny kilo.ai ny fametrahana ny Bitbucket.",
-      "finishSetup": "Vitao ny fametrahana",
       "manageAccess": "Tantano ny alalana hidirana",
       "bitbucketNoRepositoriesDescription": "Tsy misy tahirin-kaody azo ampiasaina ao amin'ity sehatra fiasana Bitbucket ity.",
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
-      "setupIncomplete": "Tsy vita ny fametrahana. Vitao ao amin'ny kilo.ai ny fikirana.",
-      "setup": "Fametrahana ny Bitbucket"
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
       "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"
@@ -1354,8 +1351,7 @@
       "githubError": "Tsy nety nosokafana ny fametrahana ny GitHub. Andramo indray azafady.",
       "gitlabAccount": "Kaonty GitLab",
       "gitlabError": "Tsy nety nosokafana ny fametrahana ny GitLab. Andramo indray azafady.",
-      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy.",
-      "bitbucketError": "Tsy nety nosokafana ny fametrahana ny Bitbucket. Andramo indray azafady."
+      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy."
     },
     "overview": {
       "allAreas": "Lafiny rehetra",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny Bitbucket.",
       "connectGithubDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody GitHub.",
       "connectGitlabDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody GitLab.",
-      "connectBitbucketDescription": "Hidio ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody Bitbucket.",
       "openGithub": "Sokafy ny GitHub",
       "openGitlab": "Sokafy ny GitLab",
-      "openBitbucket": "Sokafy ny Bitbucket",
       "refreshRepositories": "Havaozy ny lisitry ny tahirin-kaody",
       "githubConnected": "Voampifandraisina ny GitHub",
       "gitlabConnected": "Voampifandraisina ny GitLab",

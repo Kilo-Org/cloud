@@ -1189,8 +1189,6 @@
       "clearMessage": "Salvând un câmp gol, ștergi instrucțiunile personalizate stocate pentru acest recenzor."
     },
     "repos": {
-      "unavailable": "Depozitele nu sunt disponibile. Finalizează configurarea Bitbucket pe kilo.ai.",
-      "finishSetup": "Finalizează configurarea",
       "manageAccess": "Gestionează accesul",
       "bitbucketNoRepositoriesDescription": "Niciun depozit nu este disponibil în acest spațiu de lucru Bitbucket.",
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
@@ -1345,11 +1343,10 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
-      "setupIncomplete": "Configurarea este incompletă. Finalizeaz-o pe kilo.ai.",
-      "setup": "Configurare Bitbucket"
+      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",
       "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
       "tokenPlaceholder": "Token de acces la spațiul de lucru"
@@ -1377,8 +1374,7 @@
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
       "gitlabAccount": "Contul GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
-      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile.",
-      "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
+      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile."
     },
     "overview": {
       "allAreas": "Toate domeniile",
@@ -2191,10 +2187,8 @@
       "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
       "connectGithubDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit GitHub.",
       "connectGitlabDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit GitLab.",
-      "connectBitbucketDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit Bitbucket.",
       "openGithub": "Deschide GitHub",
       "openGitlab": "Deschide GitLab",
-      "openBitbucket": "Deschide Bitbucket",
       "refreshRepositories": "Reîmprospătează depozitele",
       "githubConnected": "GitHub conectat",
       "gitlabConnected": "GitLab conectat",

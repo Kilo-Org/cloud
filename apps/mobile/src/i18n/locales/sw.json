@@ -1166,8 +1166,6 @@
       "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
     },
     "repos": {
-      "unavailable": "Hazina hazipatikani — kamilisha usanidi wa Bitbucket kwenye kilo.ai.",
-      "finishSetup": "Kamilisha usanidi",
       "manageAccess": "Simamia ufikiaji",
       "bitbucketNoRepositoriesDescription": "Hakuna hazina zinazopatikana katika nafasi hii ya kazi ya Bitbucket.",
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
-      "setupIncomplete": "Usanidi haujakamilika — ukamilishe kwenye kilo.ai.",
-      "setup": "Usanidi wa Bitbucket"
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"
@@ -1354,8 +1351,7 @@
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
       "gitlabAccount": "Akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
-      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki.",
-      "bitbucketError": "Imeshindikana kufungua usanidi wa Bitbucket. Tafadhali jaribu tena."
+      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },
     "overview": {
       "allAreas": "Maeneo yote",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Imeshindikana kupakia hazina za Bitbucket.",
       "connectGithubDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya GitHub.",
       "connectGitlabDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya GitLab.",
-      "connectBitbucketDescription": "Ingia kwenye kivinjari chako, kisha rudi hapa kuchagua hazina ya Bitbucket.",
       "openGithub": "Fungua GitHub",
       "openGitlab": "Fungua GitLab",
-      "openBitbucket": "Fungua Bitbucket",
       "refreshRepositories": "Pakia upya hazina",
       "githubConnected": "GitHub imeunganishwa",
       "gitlabConnected": "GitLab imeunganishwa",

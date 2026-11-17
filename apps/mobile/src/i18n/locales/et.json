@@ -1166,8 +1166,6 @@
       "clearMessage": "Tühja välja salvestamine kustutab sellele retsensendile salvestatud kohandatud juhised."
     },
     "repos": {
-      "unavailable": "Hoidlad pole saadaval. Lõpeta Bitbucketi seadistamine saidil kilo.ai.",
-      "finishSetup": "Lõpeta seadistamine",
       "manageAccess": "Halda juurdepääsu",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
-      "setupIncomplete": "Seadistamine pole lõpetatud. Lõpeta see saidil kilo.ai.",
-      "setup": "Bitbucketi seadistamine"
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
       "gitlabError": "GitLabi seadistamist ei õnnestunud avada. Proovi uuesti.",
-      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata.",
-      "bitbucketError": "Bitbucketi seadistamist ei õnnestunud avada. Proovi uuesti."
+      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata."
     },
     "overview": {
       "allAreas": "Kõik valdkonnad",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
       "connectGithubDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitHubist.",
       "connectGitlabDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitLabist.",
-      "connectBitbucketDescription": "Logi sisse brauseris ja naase siia, et valida hoidla Bitbucketist.",
       "openGithub": "Ava GitHub",
       "openGitlab": "Ava GitLab",
-      "openBitbucket": "Ava Bitbucket",
       "refreshRepositories": "Värskenda hoidlaid",
       "githubConnected": "GitHub on ühendatud",
       "gitlabConnected": "GitLab on ühendatud",

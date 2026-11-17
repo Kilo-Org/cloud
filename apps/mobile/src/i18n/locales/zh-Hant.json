@@ -623,8 +623,6 @@
       "clearMessage": "儲存空白欄位將刪除此檢閱者所儲存的自訂指示。"
     },
     "repos": {
-      "unavailable": "目前無法存取存放庫。請在 kilo.ai 上完成 Bitbucket 設定。",
-      "finishSetup": "完成設定",
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
-      "setupIncomplete": "設定尚未完成。請在 kilo.ai 上完成設定。",
-      "setup": "Bitbucket 設定"
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "此組織的 Bitbucket 連線需在電腦上透過網頁版管理。",
       "description": "請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖"
@@ -692,8 +689,7 @@
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",
-      "gitlabError": "無法開啟 GitLab 設定。請再試一次。",
-      "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
+      "gitlabError": "無法開啟 GitLab 設定。請再試一次。"
     },
     "reviewDetail": {
       "byline": "#{{number}}，作者 {{author}}",
@@ -1605,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
       "connectGithubDescription": "請在瀏覽器中登入，再回到這裡選取 GitHub 儲存庫。",
       "connectGitlabDescription": "請在瀏覽器中登入，再回到這裡選取 GitLab 儲存庫。",
-      "connectBitbucketDescription": "請在瀏覽器中登入，再回到這裡選取 Bitbucket 儲存庫。",
       "openGithub": "開啟 GitHub",
       "openGitlab": "開啟 GitLab",
-      "openBitbucket": "開啟 Bitbucket",
       "refreshRepositories": "重新整理儲存庫",
       "githubConnected": "已連結 GitHub",
       "gitlabConnected": "已連結 GitLab",

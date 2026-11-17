@@ -1166,8 +1166,6 @@
       "clearMessage": "रिक्त फील्ड जतन केल्यास या पुनरावलोककासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
     },
     "repos": {
-      "unavailable": "रिपॉझिटरी उपलब्ध नाहीत — kilo.ai वर Bitbucket सेटअप पूर्ण करा.",
-      "finishSetup": "सेटअप पूर्ण करा",
       "manageAccess": "प्रवेश व्यवस्थापित करा",
       "bitbucketNoRepositoriesDescription": "या Bitbucket वर्कस्पेसमध्ये कोणतीही रिपॉझिटरी उपलब्ध नाही.",
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "REVIEW.md मधील सूचना पाळा",
     "followReviewMdSubtitle": "प्रत्येक रिपॉझिटरीतील REVIEW.md फाइलमधील सूचना पाळा",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
-      "setupIncomplete": "सेटअप अपूर्ण आहे — kilo.ai वर सेटिंग्ज पूर्ण करा.",
-      "setup": "Bitbucket सेटअप"
+      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "या संस्थेचे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
       "description": "आवश्यक परवानग्यांसह वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "scopes": "खाते: वाचन · रिपॉझिटरी: वाचन/लेखन · पुल रिक्वेस्ट: वाचन · वेबहूक: वाचन/लेखन",
       "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन"
@@ -1354,8 +1351,7 @@
       "githubError": "GitHub सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "gitlabAccount": "GitLab खाते",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा.",
-      "bitbucketError": "Bitbucket सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा."
+      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा."
     },
     "overview": {
       "allAreas": "सर्व क्षेत्रे",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉझिटरी लोड करता आल्या नाहीत.",
       "connectGithubDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर GitHub रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "connectGitlabDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर GitLab रिपॉझिटरी निवडण्यासाठी येथे परत या.",
-      "connectBitbucketDescription": "तुमच्या ब्राउझरमधून साइन इन करा, नंतर Bitbucket रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",
       "openGitlab": "GitLab उघडा",
-      "openBitbucket": "Bitbucket उघडा",
       "refreshRepositories": "रिपॉझिटरींची यादी रिफ्रेश करा",
       "githubConnected": "GitHub कनेक्ट झाले",
       "gitlabConnected": "GitLab कनेक्ट झाले",

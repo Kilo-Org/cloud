@@ -1189,8 +1189,6 @@
       "clearMessage": "Si deses el camp buit, s'eliminaran les instruccions personalitzades emmagatzemades per a aquest revisor."
     },
     "repos": {
-      "unavailable": "Els repositoris no estan disponibles. Acaba la configuració de Bitbucket a kilo.ai.",
-      "finishSetup": "Acaba la configuració",
       "manageAccess": "Gestiona l'accés",
       "bitbucketNoRepositoriesDescription": "No hi ha cap repositori disponible en aquest espai de treball de Bitbucket.",
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
@@ -1345,11 +1343,10 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
-      "setupIncomplete": "La configuració és incompleta. Acaba-la a kilo.ai.",
-      "setup": "Configuració de Bitbucket"
+      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball"
@@ -1377,8 +1374,7 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el Compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
-      "bitbucketError": "No s'ha pogut obrir la configuració de Bitbucket. Torna-ho a provar."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
     },
     "overview": {
       "allAreas": "Totes les àrees",
@@ -2191,10 +2187,8 @@
       "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket.",
       "connectGithubDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de GitHub.",
       "connectGitlabDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de GitLab.",
-      "connectBitbucketDescription": "Inicia la sessió des del navegador i torna aquí per triar un repositori de Bitbucket.",
       "openGithub": "Obre GitHub",
       "openGitlab": "Obre GitLab",
-      "openBitbucket": "Obre Bitbucket",
       "refreshRepositories": "Actualitza els repositoris",
       "githubConnected": "GitHub connectat",
       "gitlabConnected": "GitLab connectat",

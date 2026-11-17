@@ -623,8 +623,6 @@
       "clearMessage": "खाली फ़ील्ड सहेजने पर इस समीक्षक के लिए संग्रहीत कस्टम निर्देश हटा दिए जाएँगे।"
     },
     "repos": {
-      "unavailable": "रिपॉज़िटरी उपलब्ध नहीं हैं। kilo.ai पर Bitbucket का सेटअप पूरा करें।",
-      "finishSetup": "सेटअप पूरा करें",
       "manageAccess": "पहुँच प्रबंधित करें",
       "bitbucketNoRepositoriesDescription": "इस Bitbucket वर्कस्पेस में कोई रिपॉज़िटरी उपलब्ध नहीं है।",
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
@@ -644,11 +642,10 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
-      "setupIncomplete": "सेटअप अधूरा है। kilo.ai पर कॉन्फ़िगरेशन पूरा करें।",
-      "setup": "Bitbucket सेटअप"
+      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "इस संगठन का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
       "description": "आवश्यक स्कोप के साथ एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "scopes": "खाता: पढ़ना · रिपॉज़िटरी: पढ़ना/लिखना · पुल रिक्वेस्ट: पढ़ना · वेबहुक: पढ़ना/लिखना",
       "tokenPlaceholder": "वर्कस्पेस एक्सेस टोकन"
@@ -692,8 +689,7 @@
       "githubApp": "GitHub ऐप",
       "githubError": "GitHub सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।",
       "gitlabAccount": "GitLab खाता",
-      "gitlabError": "GitLab सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।",
-      "bitbucketError": "Bitbucket सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।"
+      "gitlabError": "GitLab सेटअप नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "reviewDetail": {
       "byline": "#{{number}} · लेखक: {{author}}",
@@ -1605,10 +1601,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉज़िटरी लोड नहीं हो सकीं।",
       "connectGithubDescription": "अपने ब्राउज़र से साइन इन करें, फिर GitHub रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
       "connectGitlabDescription": "अपने ब्राउज़र से साइन इन करें, फिर GitLab रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
-      "connectBitbucketDescription": "अपने ब्राउज़र से साइन इन करें, फिर Bitbucket रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
       "openGithub": "GitHub खोलें",
       "openGitlab": "GitLab खोलें",
-      "openBitbucket": "Bitbucket खोलें",
       "refreshRepositories": "रिपॉज़िटरी रीफ़्रेश करें",
       "githubConnected": "GitHub कनेक्ट है",
       "gitlabConnected": "GitLab कनेक्ट है",

@@ -1166,8 +1166,6 @@
       "clearMessage": "Fífi àyè tó ṣòfó pamọ́ yóò pa àwọn ìtọ́sọ́nà àdáni tí a fi pamọ́ fún olùṣàyẹ̀wò yìí run."
     },
     "repos": {
-      "unavailable": "Àwọn ibi ìpamọ́ kò sí — parí ìṣètò Bitbucket lórí kilo.ai.",
-      "finishSetup": "Parí ìṣètò",
       "manageAccess": "Ṣàkóso àṣẹ ìwọlé",
       "bitbucketNoRepositoriesDescription": "Kò sí ibi ìpamọ́ nínú àyè iṣẹ́ Bitbucket yìí.",
       "gitlabNoRepositoriesDescription": "Ó ṣeé ṣe kí o nílò láti fúnni ní àṣẹ láti wọlé sí àwọn ẹgbẹ́ tàbí iṣẹ́ sí i lórí GitLab.",
@@ -1322,11 +1320,10 @@
     "followReviewMd": "Tẹ̀lé REVIEW.md",
     "followReviewMdSubtitle": "Tẹ̀lé àwọn fáìlì ìtọ́sọ́nà REVIEW.md nínú ibi ìpamọ́ kọ̀ọ̀kan",
     "bitbucket": {
-      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
-      "setupIncomplete": "Ìṣètò kò tíì parí — parí rẹ̀ lórí kilo.ai.",
-      "setup": "Ìṣètò Bitbucket"
+      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket àjọ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ pẹ̀lú àwọn àṣẹ tó yẹ, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",
       "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́"
@@ -1354,8 +1351,7 @@
       "githubError": "A kò lè ṣí ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "gitlabAccount": "Àkọọ́lẹ̀ GitLab",
       "gitlabError": "A kò lè ṣí ìṣètò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe.",
-      "bitbucketError": "A kò lè ṣí ìṣètò Bitbucket. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe."
     },
     "overview": {
       "allAreas": "Gbogbo apá",
@@ -2148,10 +2144,8 @@
       "couldNotLoadBitbucketRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù Bitbucket wọlé.",
       "connectGithubDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù GitHub.",
       "connectGitlabDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù GitLab.",
-      "connectBitbucketDescription": "Forúkọsíwọ́ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù Bitbucket.",
       "openGithub": "Ṣí GitHub",
       "openGitlab": "Ṣí GitLab",
-      "openBitbucket": "Ṣí Bitbucket",
       "refreshRepositories": "Tún àwọn ibi ìpamọ́ kóòdù gbé wọlé",
       "githubConnected": "GitHub ti sopọ̀",
       "gitlabConnected": "GitLab ti sopọ̀",

@@ -28,11 +28,15 @@ export function pluralParts(key) {
   return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
-/** The locale tags on disk in `dir`, sorted, without the `.json` extension. */
+/**
+ * The locale tags on disk in `dir`, sorted, without the `.json` extension.
+ * Only regular files count: a directory named like a catalog is not a catalog,
+ * and reading it as one would end the audit in a stack trace.
+ */
 export function catalogTags(dir) {
-  return readdirSync(dir)
-    .filter(name => name.endsWith('.json'))
-    .map(name => name.replace(/\.json$/, ''))
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
+    .map(entry => entry.name.replace(/\.json$/, ''))
     .sort();
 }
 

@@ -398,6 +398,66 @@ test('runs the whole audit over a clean tree through the CLI and ignores test sc
   );
 });
 
+/**
+ * A root whose `react-native-css` is a stub package naming the compiler entry:
+ * the pins' subject is the compiler's behaviour, so a stub stands in for the
+ * API drift the audit exists to catch.
+ *
+ * `makeFixture` links the app's node_modules to the repository's own, so the
+ * stub cannot shadow one package in place. The require base walks app
+ * package.json → its node_modules → root node_modules, so the fixture swaps
+ * the app's link for a real directory that holds only the stub package, and
+ * copies the real package.json so the exports map still resolves `./compiler`.
+ */
+function stubbedCompilerFixture(context, entrySource) {
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+  });
+  const entry = join(root, 'apps/mobile/node_modules/react-native-css');
+  rmSync(join(root, 'apps/mobile/node_modules'), { recursive: true, force: true });
+  mkdirSync(join(entry, 'dist/commonjs/compiler'), { recursive: true });
+  copyFileSync(
+    join(REPO, 'node_modules/.pnpm/node_modules/react-native-css/package.json'),
+    join(entry, 'package.json')
+  );
+  writeFileSync(join(entry, 'dist/commonjs/compiler/index.js'), entrySource);
+  return root;
+}
+
+for (const [name, entrySource, expected] of [
+  [
+    'throws at compile',
+    "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
+    'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+  ],
+  [
+    'returns a warnings value with no text-align',
+    'module.exports = { compile() { return { warnings() { return undefined; } }; } };\n',
+    'text-align: start is no longer dropped — drop the text-start/end rule',
+  ],
+  [
+    'throws at stylesheet',
+    "module.exports = { compile() { return { warnings() { return ['text-align']; }, stylesheet() { throw new Error('stylesheet boom first line'); } }; } };\n",
+    'the compiler failed on the color-mix over an @theme inline variable fixture (stylesheet boom first line)',
+  ],
+]) {
+  test(`reports compiler pins the stub ${name}, keeping the source findings`, context => {
+    const root = stubbedCompilerFixture(context, entrySource);
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    // The source-tree findings made it out before the stub failed the pins.
+    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start\/end is dropped/);
+    assert.match(result.stderr, new RegExp(expected.replace(/[()]/g, m => `\\${m}`)));
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    assert.doesNotMatch(result.stderr, /Error:|at /);
+  });
+}
+
 test('importing the module neither scans nor runs the compiler probes', context => {
   const root = importOnlyRoot(context);
   // A static import from a root with no source dirs, no global.css and no

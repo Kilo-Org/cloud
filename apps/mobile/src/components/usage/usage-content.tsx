@@ -40,15 +40,14 @@ const METRIC_OPTIONS = [
 
 /**
  * One tile of the totals grid: a value, its caption directly under it, and the
- * detail slot. The caption comes before the detail so the two tiles of a row
- * keep one caption baseline when the detail wraps.
+ * optional detail line. The caption comes before the detail so the two tiles
+ * of a row keep one caption baseline when the detail wraps.
  *
- * The slot reserves two detail lines on every tile, so the tile whose detail is
- * one line in most locales and two in the long ones sits on the same height as
- * its neighbours and the whole 2x2 grid stays even: a floor that the shorter
- * tiles hold as empty space, never a cap that would ellipsize the figures. The
- * space is reserved rather than added later, so the grid does not shift when the
- * totals arrive. A larger font scale grows the slot with its text.
+ * The tile sizes to its own content: a wrapped detail grows only its own tile,
+ * and the row partner stays centered inside the shared row height, so the
+ * figures never ellipsize and no tile holds an empty reserved band. The
+ * detail may be ellipsis-free over two lines in the long locales and one line
+ * in the short ones. A larger font scale grows the tile with its text.
  */
 function StatTile({
   label,
@@ -60,12 +59,10 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
+    <View className="flex-1 justify-center gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
-      <View className="min-h-[32px]">
-        {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
-      </View>
+      {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
     </View>
   );
 }
@@ -135,12 +132,12 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[66px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[66px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[84px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[84px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />

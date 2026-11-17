@@ -73,7 +73,7 @@ const runSafeToolCall = async (
   return { error: 'This safe tool is not available.', ok: false };
 };
 
-export const createSafeToolExecutor = (
-  browserCaller: BrowserCaller
-): ((toolCall: DispatchableToolCall) => Promise<EvalTabResult>) => toolCall =>
-  runSafeToolCall(toolCall, browserCaller);
+export const createSafeToolExecutor =
+  (browserCaller: BrowserCaller): ((toolCall: DispatchableToolCall) => Promise<EvalTabResult>) =>
+  toolCall =>
+    runSafeToolCall(toolCall, browserCaller);

@@ -323,11 +323,14 @@ export const handleTabDebuggerRequest = async ({
     }
 
     if (request.type === RELEASE_BROWSER_CALLER_MESSAGE) {
-      const runtime = tabsApi === undefined ? undefined : getBrowserRuntime({
-        debuggerApi,
-        scriptingApi,
-        tabsApi,
-      });
+      const runtime =
+        tabsApi === undefined
+          ? undefined
+          : getBrowserRuntime({
+              debuggerApi,
+              scriptingApi,
+              tabsApi,
+            });
 
       return {
         ok: true,

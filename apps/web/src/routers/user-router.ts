@@ -864,7 +864,6 @@ export const userRouter = createTRPCRouter({
       }
 
       try {
-        // Create a secure linking session
         await createAccountLinkingSession(
           ctx.user.id,
           input.provider,
@@ -1140,7 +1139,6 @@ export const userRouter = createTRPCRouter({
 
       const dateThreshold = getDateThreshold(period);
 
-      // Build where conditions based on view type, filtering for autocomplete model
       const conditions = [
         eq(microdollar_usage.kilo_user_id, userId),
         eq(microdollar_usage.model, AUTOCOMPLETE_MODEL),

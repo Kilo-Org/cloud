@@ -473,7 +473,6 @@ export const byokRouter = createTRPCRouter({
         actorUserId: ctx.user.id,
       });
 
-      // Insert into database - either org-owned or user-owned
       const [newKey] = await db
         .insert(byok_api_keys)
         .values({
@@ -486,7 +485,6 @@ export const byokRouter = createTRPCRouter({
         })
         .returning(BYOK_KEY_COLUMNS);
 
-      // Create audit log only for organization keys
       if (organizationId) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -570,7 +568,6 @@ export const byokRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
       }
 
-      // Create audit log only for organization keys
       if (existingKey.organization_id) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -920,10 +917,8 @@ export const byokRouter = createTRPCRouter({
 
       rejectManagedKeyMutation(existingKey.management_source);
 
-      // Delete from database
       await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));
 
-      // Create audit log only for organization keys
       if (existingKey.organization_id) {
         await createAuditLog({
           action: 'organization.settings.change',

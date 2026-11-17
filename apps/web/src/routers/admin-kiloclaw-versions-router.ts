@@ -657,7 +657,6 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       ).map(row => row.image_tag)
     );
 
-    // Filter out entries that already exist in Postgres
     const newEntries = kvVersions.filter(entry => !existingTags.has(entry.imageTag));
 
     // Validate entries before inserting — KV data may be malformed.

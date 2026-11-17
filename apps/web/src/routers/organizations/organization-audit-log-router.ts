@@ -50,7 +50,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const { organizationId, before, after, action, actorEmail, fuzzySearch, startTime, endTime } =
         input;
 
-      // Build the where conditions for pagination and filtering
       const whereConditions = [eq(organization_audit_logs.organization_id, organizationId)];
 
       if (action && action.length > 0) {
@@ -78,7 +77,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
         ? asc(organization_audit_logs.created_at) // When going back (previous page), fetch oldest first
         : desc(organization_audit_logs.created_at); // Default and next page, fetch newest first
 
-      // Fetch one extra record to determine if there are more pages
       const logs = await db
         .select({
           id: organization_audit_logs.id,
@@ -99,7 +97,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
         logs.reverse();
       }
 
-      // Check if there are more pages
       const hasMore = logs.length > PAGE_SIZE;
       const resultLogs = hasMore ? logs.slice(0, PAGE_SIZE) : logs;
 
@@ -111,7 +108,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const hasNext = hasMore; // Has older events
       const hasPrevious = !!after || (!!before && logs.length > 0); // Has newer events
 
-      // Get boundary timestamps for pagination (convert to ISO 8601 format)
       const oldestTimestamp =
         maskedLogs.length > 0
           ? new Date(maskedLogs[maskedLogs.length - 1].created_at).toISOString()
@@ -130,13 +126,10 @@ export const organizationAuditLogRouter = createTRPCRouter({
       return response;
     }),
 
-  // Get all possible action types from the AuditLogAction enum
   getActionTypes: organizationBillingProcedure.input(OrganizationIdInputSchema).query(async () => {
-    // Return all possible action types from the enum
     return AuditLogAction.options;
   }),
 
-  // Get audit log summary statistics
   getSummary: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ input }) => {

@@ -440,7 +440,6 @@ export const extendClawTrialRouter = createTRPCRouter({
 
       const usersByEmail = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
-      // Fetch the most recently created subscription per user in one query
       const userIds = users.map(u => u.id);
       const latestSubByUserId = await fetchLatestSubscriptionPerUser(userIds);
 

@@ -2549,7 +2549,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       }
 
-      // Resolve the GitHub installation for this session's owner.
       let integration;
       if (session.organization_id) {
         integration = await getIntegrationForOwner(

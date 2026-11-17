@@ -3,7 +3,6 @@ import { posthogQuery } from '@/lib/posthog-query';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-// Types for feature interest data
 export type FeatureInterestLeaderboard = {
   feature: string;
   unique_signups: number;
@@ -190,7 +189,6 @@ export const adminFeatureInterestRouter = createTRPCRouter({
       OFFSET ${offset}
     `;
 
-    // Query for total count
     const countQuery = `
       SELECT count(DISTINCT properties.email) as total
       FROM events

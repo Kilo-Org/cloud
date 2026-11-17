@@ -428,7 +428,6 @@ export const githubAppsRouter = createTRPCRouter({
       return { token };
     }),
 
-  // Get GitHub App installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -473,7 +472,6 @@ export const githubAppsRouter = createTRPCRouter({
     };
   }),
 
-  // Update the model for GitHub App integration
   updateModel: baseProcedure
     .input(
       z.object({

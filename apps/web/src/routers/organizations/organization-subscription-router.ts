@@ -163,7 +163,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       const usages = await getOrganizationSeatUsage(organizationId);
 
-      // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
 
       if (!latestPurchase) {
@@ -360,7 +359,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId } = input;
 
-      // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
 
       if (!latestPurchase) {
@@ -384,7 +382,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId } = input;
 
-      // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
 
       if (!latestPurchase) {
@@ -415,7 +412,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
 
       if (!latestPurchase) {

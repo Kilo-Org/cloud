@@ -584,7 +584,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -771,7 +770,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                   organizationId: input.organizationId,

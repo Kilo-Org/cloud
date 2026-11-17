@@ -145,11 +145,9 @@ export const organizationSsoRouter = createTRPCRouter({
       return false;
     }
 
-    // Check domain verification status
     const isDomainVerified =
       result.domains?.some(domain => domain.state === OrganizationDomainState.Verified) || false;
 
-    // Check if organization has SSO connections
     const hasConnection = await hasWorkOsConnections(result.id);
 
     // The summary names the domain its verification state describes: the verified

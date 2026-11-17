@@ -1200,7 +1200,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .groupBy(sql`DATE(${kiloclaw_instances.destroyed_at})`)
       .orderBy(sql`DATE(${kiloclaw_instances.destroyed_at})`);
 
-    // Merge created and destroyed into a single daily series
     const destroyedByDate = new Map(dailyDestroyed.map(d => [d.date, d.destroyed]));
     const createdByDate = new Map(dailyStats.map(d => [d.date, d.created]));
 

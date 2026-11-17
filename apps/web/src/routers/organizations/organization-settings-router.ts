@@ -881,7 +881,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, projects_ui_enabled } = input;
 
-      // Check if organization is in the privileged list
       if (
         !PRIVILEGED_ORGANIZATION_IDS.includes(
           organizationId as (typeof PRIVILEGED_ORGANIZATION_IDS)[number]
@@ -953,7 +952,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
           organization => {
             previousSettings = organization.settings || {};
             if (!enabled) {
-              // Remove the fields when disabled
               const {
                 minimum_balance: _mb,
                 minimum_balance_alert_email: _mbae,

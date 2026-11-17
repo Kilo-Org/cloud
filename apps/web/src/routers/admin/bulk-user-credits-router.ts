@@ -62,7 +62,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
       // Normalize emails to lowercase and deduplicate
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
-      // Find all users with matching emails
       const users = await db
         .select({
           id: kilocode_users.id,
@@ -72,7 +71,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         .from(kilocode_users)
         .where(inArray(kilocode_users.google_user_email, normalizedEmails));
 
-      // Create a map of email -> user for quick lookup
       const usersByEmail = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
       const matched: MatchedUser[] = [];
@@ -107,7 +105,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
       // Normalize emails and deduplicate to prevent double-crediting
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
-      // Fetch all users at once
       const users = await db
         .select()
         .from(kilocode_users)
@@ -115,7 +112,6 @@ export const bulkUserCreditsRouter = createTRPCRouter({
 
       const usersByEmail = new Map(users.map(u => [u.google_user_email.toLowerCase(), u]));
 
-      // Process each email
       for (const email of normalizedEmails) {
         const user = usersByEmail.get(email);
 

@@ -225,7 +225,7 @@ patchedDependencies:
   react-native-enriched-markdown@1.1.1: 697d3f3512bb0fb136fa84b26368e62333ed972d6a4182864206c4c6713c343a
   react-native-screens@4.30.1: 471f23675c84307e7346c2b32bc093b92d991bf9db3c22a39a475fa413a17581
   react-native@0.88.1: eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e
-  stripe@23.0.0: 24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae
+  stripe@23.0.0: c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625
 
 importers:
 
@@ -19367,12 +19367,6 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       react: '>=17.0.0'
-
-  react-hook-form@7.73.1:
-    resolution: {integrity: sha512-VAfVYOPcx3piiEVQy95vyFmBwbVUsP/AUIN+mpFG8h11yshDd444nn0VyfaGWSRnhOLVgiDu7HIuBtAIzxn9dA==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      react: ^16.8.0 || ^17 || ^18 || ^19
 
   react-i18next@17.1.13:
     resolution: {integrity: sha512-ZxhOSlyKSKPtbUNPLwYMmE3w3bhoc0jaZJZ6bc7wGOT6cLbrbs//6m01HxCLtFdSjHvFpwFwoPhxxzIlHSs9cw==}
@@ -41535,10 +41529,6 @@ snapshots:
   react-freeze@1.0.4(react@19.3.0):
     dependencies:
       react: 19.3.0
-
-  react-hook-form@7.73.1(react@19.2.6):
-    dependencies:
-      react: 19.2.6
 
   react-i18next@17.1.13(i18next@27.1.1(typescript@7.0.2))(react-dom@19.2.6(react@19.3.0))(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
     dependencies:

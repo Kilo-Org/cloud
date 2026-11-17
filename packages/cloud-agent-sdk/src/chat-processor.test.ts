@@ -1251,6 +1251,98 @@ describe.each([
     }
   );
 
+  it('does not rebuild the parts snapshot while streaming versioned events', () => {
+    const base = createStorage();
+    const wrapper = {
+      ...base,
+      getParts: jest.fn((id: string) => base.getParts(id)),
+      getPart: jest.fn((m: string, p: string) => base.getPart(m, p)),
+    };
+    const processor = createChatProcessor(wrapper);
+    const part = makeTextPart('part-1', 'msg-1', 'streamed');
+    processor.process({
+      type: 'message.updated',
+      info: makeUserMsg('msg-1'),
+      version: { sourceId, eventId: 1, cursor: 1 },
+    });
+    processor.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 1 },
+    });
+    for (let i = 0; i < 40; i++) {
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        field: 'text',
+        delta: 'x',
+        version: { sourceId, eventId: 1, cursor: 2 + i },
+      });
+    }
+    const textless = {
+      id: part.id,
+      sessionID: part.sessionID,
+      messageID: part.messageID,
+      type: 'reasoning' as const,
+      time: { start: 1, end: 4 },
+    } as Part;
+    for (let i = 0; i < 3; i++) {
+      processor.process({
+        type: 'message.part.updated',
+        part: textless,
+        version: { sourceId, eventId: 1, cursor: 42 + i },
+      });
+    }
+    // The same-cursor duplicate of the last textless write arrives: only the
+    // version presence check can drop it, and it must be present.
+    processor.process({
+      type: 'message.part.updated',
+      part: textless,
+      version: { sourceId, eventId: 1, cursor: 44 },
+    });
+    expect(wrapper.getParts).not.toHaveBeenCalled();
+    expect(wrapper.getPart.mock.calls.length).toBeGreaterThanOrEqual(1);
+    const stored = base.getParts('msg-1');
+    expect(stored).toHaveLength(1);
+    expect((stored[0] satisfies Part as TextPart).text).toBe(`streamed${'x'.repeat(40)}`);
+  });
+
+  it('re-accepts the part version after the versioned removal took the row out', () => {
+    const storage = createStorage();
+    const processor = createChatProcessor(storage);
+    const part = makeTextPart('part-1', 'msg-1', 'streamed');
+    processor.process({
+      type: 'message.part.updated',
+      part,
+      version: { sourceId, eventId: 1, cursor: 10 },
+    });
+    processor.process({
+      type: 'message.part.removed',
+      sessionId: part.sessionID,
+      messageId: part.messageID,
+      partId: part.id,
+      version: { sourceId, eventId: 1, cursor: 11 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([]);
+    // The replay carries a cursor above the removal, so it stores the row again.
+    const replayed = { ...part, text: 'v2' };
+    processor.process({
+      type: 'message.part.updated',
+      part: replayed,
+      version: { sourceId, eventId: 1, cursor: 12 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([replayed]);
+    // The same version again is dropped: the stored row makes it a duplicate.
+    processor.process({
+      type: 'message.part.updated',
+      part: replayed,
+      version: { sourceId, eventId: 1, cursor: 12 },
+    });
+    expect(storage.getParts('msg-1')).toEqual([replayed]);
+  });
+
   it.each(['text', 'reasoning'] as const)(
     'accepts an explicit authoritative empty %s string and rejects an older nonempty snapshot',
     type => {

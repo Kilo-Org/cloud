@@ -111,6 +111,8 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
 }
 
 /**
+ * True when the project behind `apiKey` can serve `modelId`.
+ *
  * A missing key, a failed request, a 200 without a usable list, or an unreadable
  * body returns true: a transient problem must not hide the route, and the
  * upstream then answers exactly as it does today. A failure is remembered for

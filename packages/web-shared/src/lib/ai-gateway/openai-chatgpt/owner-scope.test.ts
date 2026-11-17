@@ -31,7 +31,9 @@ function connection(email: string): OpenAiChatGptConnection {
   return {
     access_token: 'access-token',
     refresh_token: 'refresh-token',
-    expires_at: 1_800_000_000,
+    // Far beyond the refresh window at test time, whatever year the suite runs:
+    // the stored token must always take refresh.ts's no-network fast path.
+    expires_at: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
     scope: 'openid profile email offline_access',
     token_type: 'Bearer',
     issuer: 'https://auth.openai.com',

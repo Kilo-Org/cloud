@@ -44,7 +44,13 @@ vi.mock('expo-router', () => ({
   },
   usePathname: () => '/(app)/(tabs)/(3_profile)/triggers/new',
   useNavigation: () => ({
-    getState: () => ({ index: 1, routes: [{ key: 'tab', name: '(tabs)' }, { key: 'new', name: 'triggers/new' }] }),
+    getState: () => ({
+      index: 1,
+      routes: [
+        { key: 'tab', name: '(tabs)' },
+        { key: 'new', name: 'triggers/new' },
+      ],
+    }),
     addListener: () => vi.fn(),
     isFocused: () => true,
   }),

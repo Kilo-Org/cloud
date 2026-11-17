@@ -65,9 +65,9 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', async () => {
-  const { createElement } = await import('react');
+  const { createElement: h } = await import('react');
   return {
-    ScreenHeader: (props: Record<string, unknown>) => createElement('ScreenHeader', props),
+    ScreenHeader: (props: Record<string, unknown>) => h('ScreenHeader', props),
   };
 });
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -83,8 +83,10 @@ const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
+const DEFAULT_DETAIL_PROPS = { triggerId: 'x' };
+
 async function mount(
-  props: { triggerId: string; organizationId?: string } = { triggerId: 'x' }
+  props: { triggerId: string; organizationId?: string } = DEFAULT_DETAIL_PROPS
 ): Promise<ReactTestRenderer['root']> {
   const view = await renderWithProviders(createElement(TriggerDetailScreen, props));
   renderer = view.renderer;
@@ -112,8 +114,6 @@ describe('TriggerDetailScreen target type', () => {
       root.findByProps({ title: 'x' }).props.onBack();
     });
 
-    expect(dismissTo).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/triggers?org=org-1'
-    );
+    expect(dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/triggers?org=org-1');
   });
 });

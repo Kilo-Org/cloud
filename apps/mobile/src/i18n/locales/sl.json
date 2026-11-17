@@ -943,6 +943,7 @@
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
+      "bitbucketReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
       "bitbucketAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da ga poveže.",
       "contextLine": "Za {{organization}}",

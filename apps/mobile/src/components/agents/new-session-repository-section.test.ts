@@ -335,7 +335,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
 
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
-    expect(text).toContain(i18n.t('prReview.connect.gitlabReconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketReconnectAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
     expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
@@ -374,7 +374,14 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     });
 
     const text = renderedText(renderer);
-    expect(text).toContain(i18n.t('prReview.connect.gitlabReconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketReconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
+    // The header agrees with the note rather than announcing a first connect.
+    expect(
+      connectHeader(renderer, i18n.t('prReview.connect.reconnectTitleBitbucket'))
+    ).toBeDefined();
+    expect(text).not.toContain(i18n.t('common.connectBitbucket'));
+    expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
     expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     // No action the server would refuse, and no first-connect copy either.
     expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();

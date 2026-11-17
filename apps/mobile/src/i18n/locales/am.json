@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "bitbucketReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
       "bitbucketAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "contextLine": "ለ{{organization}}",

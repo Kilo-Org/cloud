@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
+      "bitbucketReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
       "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
       "bitbucketAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou konekte l.",
       "contextLine": "Pou {{organization}}",

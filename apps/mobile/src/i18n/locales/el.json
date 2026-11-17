@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Άλλαξε τον λογαριασμό παραπάνω σε οργανισμό, για να αξιολογείς τα αιτήματα ενσωμάτωσής του στο Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Αυτός ο λογαριασμός δεν ανήκει ακόμα σε κανέναν οργανισμό. Μόλις δημιουργήσεις ή ενταχθείς σε οργανισμό, θα μπορείς να αξιολογείς αιτήματα ενσωμάτωσης στο Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει ξανά.",
+      "bitbucketReconnectAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει ξανά.",
       "bitbucketNotConnectedTitle": "Το Bitbucket δεν είναι συνδεδεμένο",
       "bitbucketAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει.",
       "contextLine": "Για {{organization}}",

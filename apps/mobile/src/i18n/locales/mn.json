@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "bitbucketReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
       "bitbucketAdminOnlyDescription": "Үүнийг холбуулахын тулд байгууллагын Эзэмшигч, Админ эсвэл Төлбөрийн менежерт хандана уу.",
       "contextLine": "{{organization}}-ийн хувьд",

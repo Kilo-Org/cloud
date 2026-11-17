@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
       "gitlabReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
+      "bitbucketReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
       "bitbucketNotConnectedTitle": "Tsy mifandray ny Bitbucket",
       "bitbucketAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy.",
       "contextLine": "Ho an'ny {{organization}}",

@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
+      "bitbucketReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
       "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
       "bitbucketAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta lidhë atë.",
       "contextLine": "Për {{organization}}",

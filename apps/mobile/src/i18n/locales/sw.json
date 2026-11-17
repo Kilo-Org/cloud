@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
+      "bitbucketReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
       "bitbucketAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe.",
       "contextLine": "Kwa {{organization}}",

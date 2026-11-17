@@ -2797,6 +2797,7 @@
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "gitlabReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
+      "bitbucketReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
       "bitbucketNotConnectedTitle": "Bitbucket non è connesso",
       "bitbucketAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo.",
       "contextLine": "Per {{organization}}",

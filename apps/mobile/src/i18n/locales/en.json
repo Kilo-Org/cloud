@@ -976,6 +976,7 @@
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
+      "bitbucketReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
       "bitbucketNotConnectedTitle": "Bitbucket not connected",
       "bitbucketAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to connect it.",
       "contextLine": "For {{organization}}",

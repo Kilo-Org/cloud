@@ -108,14 +108,15 @@ export function connectCardOffer(
     // step left to them instead of an action that can only end in a refusal.
     if (needsReconnect) {
       // The workspace is connected but cannot list: the step is a fresh
-      // selection or credentials, so the provider-neutral reconnect sentence
-      // applies. Both notes carry it because neither has a header to explain
-      // which connect step is left; the compact row states the provider name
-      // above it, since that sentence's only subject is a pronoun.
+      // selection or credentials, so the reconnect sentence applies. Both notes
+      // carry Bitbucket's own provider-neutral copy, so a GitLab reword cannot
+      // change this card; neither note has a header to explain which connect
+      // step is left, and the compact row states the provider name above it,
+      // since that sentence's only subject is a pronoun.
       return {
         offersAction: false,
-        noteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
-        compactNoteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
+        noteKey: 'prReview.connect.bitbucketReconnectAdminOnlyDescription',
+        compactNoteKey: 'prReview.connect.bitbucketReconnectAdminOnlyDescription',
         compactContextKey: 'prReview.connect.reconnectTitleBitbucket',
       };
     }

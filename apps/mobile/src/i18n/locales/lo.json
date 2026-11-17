@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
+      "bitbucketReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
       "bitbucketAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "contextLine": "ສຳລັບ {{organization}}",

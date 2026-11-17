@@ -2911,6 +2911,7 @@
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
       "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
+      "bitbucketReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
       "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
       "bitbucketAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",

@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
+      "bitbucketReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
       "bitbucketAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند.",
       "contextLine": "برای {{organization}}",

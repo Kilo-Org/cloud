@@ -2759,6 +2759,7 @@
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
+      "bitbucketReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
       "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
       "bitbucketAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het te koppelen.",
       "contextLine": "Voor {{organization}}",

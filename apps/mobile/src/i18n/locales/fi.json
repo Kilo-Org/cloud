@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
+      "bitbucketReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
       "bitbucketAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "contextLine": "{{organization}}-organisaatiolle",

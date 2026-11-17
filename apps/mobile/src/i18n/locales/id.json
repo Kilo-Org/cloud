@@ -2759,6 +2759,7 @@
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "bitbucketReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
       "bitbucketAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "contextLine": "Untuk {{organization}}",

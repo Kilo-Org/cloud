@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
+      "bitbucketReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
       "bitbucketAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma.",
       "contextLine": "Ku-{{organization}}",

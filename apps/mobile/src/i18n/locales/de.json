@@ -2759,6 +2759,7 @@
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
+      "bitbucketReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
       "bitbucketAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden.",
       "contextLine": "Für {{organization}}",

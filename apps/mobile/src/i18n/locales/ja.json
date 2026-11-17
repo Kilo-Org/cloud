@@ -2759,6 +2759,7 @@
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
+      "bitbucketReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
       "bitbucketAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に接続を依頼してください。",
       "contextLine": "{{organization}}用",

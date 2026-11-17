@@ -2797,6 +2797,7 @@
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
+      "bitbucketReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
       "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
       "bitbucketAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte.",
       "contextLine": "Para {{organization}}",

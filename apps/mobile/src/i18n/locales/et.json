@@ -909,6 +909,7 @@
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsiooni vastu, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
+      "bitbucketReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
       "bitbucketAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada.",
       "contextLine": "{{organization}} jaoks",

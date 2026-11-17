@@ -926,6 +926,7 @@
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
+      "bitbucketReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
       "bitbucketAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže.",
       "contextLine": "Za {{organization}}",

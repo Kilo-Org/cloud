@@ -943,6 +943,7 @@
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
+      "bitbucketReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
       "bitbucketAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho připojil.",
       "contextLine": "Pro {{organization}}",

@@ -231,6 +231,11 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     const offer = connectCardOffer(platform, role, needsReconnect);
+    // The reconnect state's note asks for a reconnect, so the header must agree
+    // with it; the compact row already says "Reconnect Bitbucket".
+    const title = needsReconnect
+      ? t('prReview.connect.reconnectTitleBitbucket')
+      : t(copy.connectTitle);
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"
@@ -240,7 +245,7 @@ export function NewSessionRepositorySection({
         // 14 dp inset instead of the section's 10.5 dp default.
         inset="roomy"
         titleClassName="font-semibold"
-        title={t(copy.connectTitle)}
+        title={title}
         // The card stacks under the repository picker in a scrolling column,
         // and the picker's height settles asynchronously (repos load, the
         // selection changes), while the branch row mounts above the card once a

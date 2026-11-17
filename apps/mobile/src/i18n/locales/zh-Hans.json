@@ -2759,6 +2759,7 @@
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
+      "bitbucketReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
       "bitbucketAdminOnlyDescription": "请让组织所有者、管理员或账单管理员进行连接。",
       "contextLine": "适用于 {{organization}}",

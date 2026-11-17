@@ -34,16 +34,6 @@ export function getGitLabIntegrationUrl(webBaseUrl: string, organizationId?: str
   return getIntegrationPageUrl(webBaseUrl, 'gitlab', organizationId);
 }
 
-// The BYOK key editor has no mobile screen, so a reviewer blocked by a broken
-// key sends the user to the web settings page that owns it.
-export function getByokUrl(webBaseUrl: string, organizationId?: string): string {
-  const baseUrl = trimTrailingSlash(webBaseUrl);
-  if (!organizationId) {
-    return `${baseUrl}/byok`;
-  }
-  return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/byok`;
-}
-
 // Bitbucket has no page here: its workspace access token is pasted in the
 // app's own connect sheet (`app/(app)/bitbucket-connect.tsx`), and a connection
 // the app cannot describe is named there in plain text rather than linked.

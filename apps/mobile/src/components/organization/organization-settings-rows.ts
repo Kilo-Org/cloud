@@ -12,7 +12,6 @@ import {
   KeyRound,
   LineChart,
   type LucideIcon,
-  Plug,
   ScrollText,
   Shield,
   SlidersHorizontal,
@@ -42,7 +41,10 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
- * - `providers-and-models`, `byok` and `integrations` render for every member;
+ * - `providers-and-models` and `byok` render for every member, and
+ *   `integrations` has no gate either — but the hub opens the app's own
+ *   integrations screen for it from its members card, so it lists no web row
+ *   here;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, and the
  *   dashboard links to the seats purchase, so the hub lists none of them.
@@ -60,7 +62,6 @@ type OrgSettingsArea =
   | 'providersAndModels'
   | 'guardrails'
   | 'requestLogs'
-  | 'integrations'
   | 'subOrganizations'
   | 'distributeFunds';
 
@@ -134,8 +135,8 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/request-logs',
     visible: gate => canManageOrganizationBilling(gate.role),
   },
-  // "Integrations": no gate in the sidebar or on the page.
-  { area: 'integrations', icon: Plug, suffix: '/integrations', visible: () => true },
+  // "Integrations": no gate in the sidebar or on the page. The hub opens the
+  // app's own integrations screen from its members card, so no web row lists it.
   // "Sub-organizations": billing role and a top-level organization.
   {
     area: 'subOrganizations',
@@ -157,9 +158,6 @@ const TITLE_KEYS = {
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   guardrails: 'organization.settingsOnWeb.guardrails',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
-  // The in-app organization Integrations row opens the app's own screen; this
-  // one opens the web page, so it names the web instead of repeating that title.
-  integrations: 'organization.settingsOnWeb.integrations',
   subOrganizations: 'organization.settingsOnWeb.subOrganizations',
   distributeFunds: 'organization.settingsOnWeb.distributeFunds',
 } satisfies Record<OrgSettingsArea, string>;

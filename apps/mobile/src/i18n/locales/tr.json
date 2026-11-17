@@ -3463,7 +3463,6 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
-      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",

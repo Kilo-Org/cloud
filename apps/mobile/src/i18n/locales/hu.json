@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
-      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",

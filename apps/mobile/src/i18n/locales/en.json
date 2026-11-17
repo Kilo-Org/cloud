@@ -3538,7 +3538,6 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
-      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",

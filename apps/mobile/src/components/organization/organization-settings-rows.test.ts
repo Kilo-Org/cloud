@@ -54,25 +54,20 @@ describe('visibleOrgSettingsRows', () => {
       'providersAndModels',
       'guardrails',
       'requestLogs',
-      'integrations',
       'subOrganizations',
       'distributeFunds',
     ]);
   });
 
-  it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual(['integrations']);
-  });
-
-  it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['integrations']);
+  it('lists no web area for a member, who reads every destination in the app', () => {
+    expect(areas({ role: 'member' })).toEqual([]);
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual([]);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
       'guardrails',
       'requestLogs',
-      'integrations',
       'subOrganizations',
       'distributeFunds',
     ]);

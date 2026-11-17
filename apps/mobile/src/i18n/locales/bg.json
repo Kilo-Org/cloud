@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Настройки на организацията в уеб",
-      "integrations": "Интеграции в уеб",
       "usageDetails": "Подробности за използването",
       "providersAndModels": "Доставчици и модели",
       "groups": "Групи",

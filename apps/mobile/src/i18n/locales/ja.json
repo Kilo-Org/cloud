@@ -3463,7 +3463,6 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
-      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",

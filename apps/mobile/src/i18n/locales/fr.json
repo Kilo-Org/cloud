@@ -3520,7 +3520,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramètres de l'organisation sur le web",
-      "integrations": "Intégrations sur le web",
       "usageDetails": "Détails d'utilisation",
       "providersAndModels": "Fournisseurs et modèles",
       "groups": "Groupes",

@@ -3572,7 +3572,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavení organizace na webu",
-      "integrations": "Integrace na webu",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",

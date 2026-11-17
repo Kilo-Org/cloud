@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "การตั้งค่าองค์กรบนเว็บ",
-      "integrations": "การเชื่อมต่อบนเว็บ",
       "usageDetails": "รายละเอียดการใช้งาน",
       "providersAndModels": "ผู้ให้บริการและโมเดล",
       "groups": "กลุ่ม",

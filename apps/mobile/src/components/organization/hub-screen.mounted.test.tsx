@@ -981,36 +981,50 @@ describe('Organization hub billing card while its data loads', () => {
   });
 });
 
-describe('Organization hub integrations rows', () => {
-  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+describe('Organization hub integrations row', () => {
+  it('opens the app integrations screen with the organization scope', async () => {
     const { renderer, unmount } = await renderHub();
 
-    // Both rows carry the same Plug glyph and reach different places, so the
-    // titles are the only thing that tells them apart.
+    // One row: the web page that showed the organization's integrations is
+    // gone, and this row opens the app's own screen for the same scope.
     const rows = renderer.root
       .findAllByType('ConfigureRow')
       .filter(node => node.props.icon === 'Plug');
-    expect(rows.map(node => node.props.title)).toEqual([
-      i18n.t('integrations.title'),
-      i18n.t('organization.settingsOnWeb.integrations'),
-    ]);
+    expect(rows.map(node => node.props.title)).toEqual([i18n.t('integrations.title')]);
 
-    const [inApp, web] = rows;
-    if (inApp === undefined || web === undefined) {
-      throw new Error('the hub shows both integrations rows');
+    const [row] = rows;
+    if (row === undefined) {
+      throw new Error('the hub shows the integrations row');
     }
     act(() => {
-      (inApp.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
 
-    act(() => {
-      (web.props.onPress as () => void)();
-    });
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      'https://app.kilo.test/organizations/org-1/integrations',
-      { label: i18n.t('organization.settingsOnWeb.integrations') }
-    );
+describe('Organization hub settings-on-the-web group', () => {
+  function headings(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.children === i18n.t('organization.settingsOnWeb.title'));
+  }
+
+  it('paints no heading for a member, whose destinations are all in the app', async () => {
+    boundary.role = 'member';
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the heading for a role that still has a web page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(1);
     unmount();
   });
 });

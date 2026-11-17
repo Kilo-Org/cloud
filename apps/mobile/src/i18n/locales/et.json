@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
-      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",

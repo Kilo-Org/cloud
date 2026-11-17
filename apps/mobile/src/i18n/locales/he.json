@@ -3520,7 +3520,6 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
-      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",

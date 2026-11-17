@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "ওয়েবে সংস্থার সেটিংস",
-      "integrations": "ওয়েবে ইন্টিগ্রেশন",
       "usageDetails": "ব্যবহারের বিবরণ",
       "providersAndModels": "প্রোভাইডার ও মডেল",
       "groups": "গ্রুপ",

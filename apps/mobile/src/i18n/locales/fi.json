@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
-      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",

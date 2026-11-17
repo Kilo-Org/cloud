@@ -3463,7 +3463,6 @@
     },
     "settingsOnWeb": {
       "title": "网页版组织设置",
-      "integrations": "网页版集成",
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",

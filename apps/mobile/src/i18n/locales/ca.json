@@ -3515,7 +3515,6 @@
     },
     "settingsOnWeb": {
       "title": "Configuració de l'organització al web",
-      "integrations": "Integracions al web",
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",

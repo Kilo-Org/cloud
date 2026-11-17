@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
-      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",

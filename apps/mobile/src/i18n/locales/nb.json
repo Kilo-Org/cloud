@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
-      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",

@@ -489,8 +489,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
         {/* The areas this app does not reimplement. Each row opens the page
             that already owns the setting, and the row set follows the web
-            sidebar's role and plan gates — see `visibleOrgSettingsRows`. */}
-        {settingsRows == null ? null : (
+            sidebar's role and plan gates — see `visibleOrgSettingsRows`. A role
+            the gates leave with no destination paints no heading: the group is
+            the only place they were listed, so an empty one would name nothing. */}
+        {settingsRows == null || settingsRows.length === 0 ? null : (
           <View className="gap-2">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('organization.settingsOnWeb.title')}

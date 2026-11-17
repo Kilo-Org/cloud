@@ -3458,7 +3458,6 @@
     },
     "settingsOnWeb": {
       "title": "Mga setting ng organisasyon sa web",
-      "integrations": "Mga Integration sa web",
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",

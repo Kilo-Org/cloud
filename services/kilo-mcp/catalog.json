@@ -16803,17 +16803,6 @@
     ],
     "searchBlob": "modelPreferences.setLastSelected Save the model and variant a user selected most recently, so the app can preselect it next time. modelpreferences setlastselected model variant model variant"
   },
-  "models.customPricing": {
-    "path": "models.customPricing",
-    "kind": "query",
-    "summary": "Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model.",
-    "inputSchema": {},
-    "tags": [
-      "models",
-      "custompricing"
-    ],
-    "searchBlob": "models.customPricing Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model. models custompricing"
-  },
   "models.list": {
     "path": "models.list",
     "kind": "query",
@@ -35339,18 +35328,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
-        },
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -35361,10 +35338,9 @@
       "todos",
       "items",
       "candidatesforsession",
-      "sessionid",
-      "organizationid"
+      "sessionid"
     ],
-    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid sessionId"
   },
   "todos.items.create": {
     "path": "todos.items.create",
@@ -37903,7 +37879,7 @@
         "sessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
         }
       },
       "required": [

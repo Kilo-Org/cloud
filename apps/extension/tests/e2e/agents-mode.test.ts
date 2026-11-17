@@ -768,16 +768,25 @@ test('Agents offline pill waits out the connect grace period', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
   try {
     const sidePanel = await getSidePanel();
+
+    /*
+     * The 5 s grace timer starts when this view mounts, which is the Agents tab click inside
+     * navigateToAgentsMode — and that helper waits another 500 ms before returning. Measuring
+     * from after it therefore undercounts the window by the whole navigation latency, so the
+     * old bound sat exactly on the grace and any slower click flipped it. Start the clock at the
+     * navigation instead: the mount is always later, so this window is never shorter than the real one.
+     */
+    const startedAt = Date.now();
     await navigateToAgentsMode(sidePanel);
 
     // The mocked ingest socket never completes the connected handshake. The
     // Pill must stay hidden for the whole grace period, then appear.
     const offlinePill = sidePanel.getByText('Offline');
-    const startedAt = Date.now();
     await expect(offlinePill).toBeHidden();
-    // Sample across the first 3s — one check could miss an immediate render.
+    // Sample up to 4 s after the navigation: the mount is later than this clock, so every
+    // Sample stays inside the grace period — one check could miss an immediate render.
     const samples = await Promise.all(
-      [0, 500, 1000, 1500, 2000, 2500, 3000].map(async delayMs => {
+      [0, 500, 1000, 1500, 2000, 2500, 3000, 4000].map(async delayMs => {
         await sidePanel.waitForTimeout(delayMs);
         return offlinePill.isVisible().catch(() => false);
       })

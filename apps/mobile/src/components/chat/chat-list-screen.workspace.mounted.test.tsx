@@ -118,7 +118,11 @@ vi.mock('sonner-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push, back: vi.fn() }),
-  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
+  useNavigation: () => ({
+    getState: () => undefined,
+    addListener: () => () => undefined,
+    isFocused: () => true,
+  }),
 }));
 // The scope row opens the shared picker through the press-burst guard; this
 // suite asserts the press reached the route, so the guarded push is the router

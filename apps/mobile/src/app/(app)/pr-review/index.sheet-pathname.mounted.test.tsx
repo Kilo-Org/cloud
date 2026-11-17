@@ -20,7 +20,11 @@ const organizationStorage = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() }),
-  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
+  useNavigation: () => ({
+    getState: () => undefined,
+    addListener: () => () => undefined,
+    isFocused: () => true,
+  }),
   useFocusEffect: () => undefined,
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));

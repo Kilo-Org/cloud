@@ -131,6 +131,28 @@ describe('prepareAgentSession post-create cleanup', () => {
     });
     expect(deps.rotateKey).toHaveBeenCalledOnce();
   });
+
+  it('keeps the intent retry copy for an interrupted clone', async () => {
+    const deps = createDeps();
+    prepareSessionMutate.mockRejectedValue(
+      Object.assign(new Error('source_digest_changed'), { data: { code: 'CONFLICT' } })
+    );
+
+    const outcome = await prepareAgentSession(
+      { ...INTENT, kind: 'continue', cloneFromKiloSessionId: 'ses_1234567890123456789012345' },
+      deps
+    );
+
+    // The worker settles the rejected create, so replaying the same operation
+    // key would only answer `session_creation_failed`; the intent ends here and
+    // the next attempt starts a fresh clone.
+    expect(outcome).toMatchObject({
+      ok: false,
+      retryable: false,
+      message: "Couldn't clone this session. Try again.",
+    });
+    expect(deps.rotateKey).toHaveBeenCalledOnce();
+  });
 });
 
 describe('prepareAgentSession environment', () => {

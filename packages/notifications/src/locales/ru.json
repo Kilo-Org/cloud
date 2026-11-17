@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "В вашей сессии агента есть обновление",
-      "chatMessage": "У вас новое сообщение",
-      "instanceLifecycle": "В вашем инстансе есть обновление",
-      "scheduledAction": "В запланированном действии есть обновление",
       "lowBalance": "Ваш баланс требует внимания",
       "spendAlert": "Ваши расходы требуют внимания",
       "securityFinding": "Результат безопасности требует внимания",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Без названия",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "У проверки безопасности есть обновление"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} готов",
-      "body": "Нажмите, чтобы начать чат."
-    },
-    "startFailed": {
-      "title": "Не удалось запустить {{instanceName}}",
-      "body": "Запуск не удался."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} скоро перезапустится",
-      "body": "Перезапуск запланирован на {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Перезапуск {{instanceName}} отменён",
-      "body": "Ранее запланированный перезапуск был отменён."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} скоро обновится",
-      "bodyWithTag": "Обновление до {{targetImageTag}} в {{when}}.",
-      "bodyWithoutTag": "Запланированное обновление в {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Обновление {{instanceName}} отменено",
-      "body": "Ранее запланированное обновление было отменено."
     }
   },
   "sessionReady": {

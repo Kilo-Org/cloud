@@ -2162,12 +2162,7 @@ export const CouncilSpecialistSchema = z.object({
   // model; unset falls back to the review's default model. Bounded to the downstream
   // runtime-agent model limit so a valid council request can't fail at session prep.
   model_slug: z.string().max(MAX_RUNTIME_AGENT_MODEL_LENGTH).optional(),
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
@@ -2295,12 +2290,7 @@ export const RepositoryModelOverrideSchema = z.object({
   model_slug: z.string().max(512),
   // Thinking effort variant name (e.g. "high", "max") — null means model default,
   // matching the global `thinking_effort` field below.
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
 
@@ -2338,12 +2328,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   custom_instructions: z.string().nullable().optional(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)

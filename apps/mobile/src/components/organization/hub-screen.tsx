@@ -15,7 +15,6 @@ import {
   Users,
   Wallet,
 } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -45,6 +44,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
@@ -59,6 +59,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,35 @@ type OrganizationHubScreenProps = Readonly<{
   /** Explicit org id from a deep link (e.g. /organizations/<id>/overview). */
   organizationIdOverride?: string;
 }>;
+
+/** Whether the rename control offers the dialog, or states why it cannot. */
+type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked'; reason: string };
+
+/**
+ * The rename control's props for its state. A blocked control keeps the same
+ * box and therefore the same header width: the title beside it cannot reflow to
+ * another line. It is dimmed the way the shared Button dims a disabled
+ * non-primary control, and the reason joins the control's own name, in the
+ * shape this screen's other composed labels use. A hint would not reach Android:
+ * React Native maps `accessibilityHint` to the platform's tooltip text, which
+ * TalkBack does not announce with the node, so the reason would be spoken on one
+ * platform only.
+ */
+function renameControlProps(control: RenameControl, label: string) {
+  if (control.kind === 'ready') {
+    return { accessibilityLabel: label, onPress: control.onPress };
+  }
+  // Built outside the props object: the shared screen-reader name is the
+  // control's title followed by the reason, the shape the rest of this screen
+  // composes its labels with.
+  const blockedLabel = `${label}. ${control.reason}`;
+  return {
+    disabled: true,
+    className: 'opacity-50',
+    accessibilityLabel: blockedLabel,
+    accessibilityState: { disabled: true },
+  };
+}
 
 export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHubScreenProps = {}) {
   const router = useRouter();
@@ -112,6 +142,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     organizationId,
     isMoneyRole(role) && parentLink === null
   );
+  // The storefront rule that decides whether the plan-ended banner may link to
+  // the web billing page. Read with the other hooks, before the boundary's
+  // early return.
+  const canLinkBilling = useCanLinkExternalPurchase();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
@@ -125,6 +159,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     return (
       <OrganizationBoundary
         title={t('common.organization')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationIdOverride}
       />
     );
@@ -141,8 +176,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         isError: kiloPassSummary.isError || kiloPassLinkUnavailable,
       })
     : null;
-  const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
-  const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   // The row shows a placeholder line, not loading copy, until the membership
   // payload supplies the value: the settled subtitle is one short phrase
@@ -196,10 +229,24 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
 
+  // The rename control's two states. `organizations.update` runs on the
+  // organization billing mutation procedure, which refuses every mutation once
+  // `classifyOrganizationEntitlement` reports the hard-expired trial, and that is
+  // the same server verdict `planEnded` reads. A lapsed plan therefore states the
+  // blocker on the control instead of opening a field whose save cannot succeed.
+  const renameControl: RenameControl = planEnded
+    ? { kind: 'blocked', reason: t('organization.hub.planEnded') }
+    : {
+        kind: 'ready',
+        onPress: () => {
+          setRenameVisible(true);
+        },
+      };
+
   // The in-app destinations the hub opens itself, and the only card rows that
   // need no payload: their gate reads the role and the plan, which the
   // organization row decides before this screen renders.
-  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan });
+  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan }, organizationId);
 
   // The organization dashboard's own settings on the web, one row per area.
   // The group waits for the membership payload because the parent link decides
@@ -228,14 +275,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       <ScreenHeader
         title={org.organizationName}
         titleNumberOfLines={2}
+        backFallback={PROFILE_TAB_HREF}
         headerRight={
           showMoney ? (
-            <IconButton
-              onPress={() => {
-                setRenameVisible(true);
-              }}
-              accessibilityLabel={t('organization.hub.renameTitle')}
-            >
+            <IconButton {...renameControlProps(renameControl, t('organization.hub.renameTitle'))}>
               <Pencil size={16} color={colors.mutedForeground} />
             </IconButton>
           ) : undefined
@@ -258,7 +301,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <OrganizationPlanRefusal
             message={planMessage}
             action={
-              showMoney
+              showMoney && canLinkBilling
                 ? {
                     label: t('organization.hub.manageBilling'),
                     onPress: () => {
@@ -382,16 +425,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {kiloPassRowState != null && (
                 <OrgKiloPassRow
                   state={kiloPassRowState}
-                  onManage={() => {
-                    void openExternalUrl(kiloPassManagementUrl, {
-                      label: t('kiloPass.kiloPassManagement'),
-                    });
-                  }}
-                  onSetup={() => {
-                    void openExternalUrl(kiloPassSetupUrl, {
-                      label: t('kiloPass.kiloPassSetup'),
-                    });
-                  }}
                   onRetry={() => {
                     // While the link is unknown the summary never fired, so the
                     // retry asks the payload that decides whether it should.
@@ -508,39 +541,28 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
 type OrgKiloPassRowProps = Readonly<{
   state: OrgKiloPassRowState;
-  onManage: () => void;
-  onSetup: () => void;
   onRetry: () => void;
 }>;
 
 /**
  * Compact Kilo Pass for Orgs row in the billing configuration group. Mirrors
  * ConfigureRow's layout and divider, but renders KiloPassIcon directly (it is
- * a plain function component, not a LucideIcon) and sets explicit
- * accessibility roles/labels for the manage, setup, and retry actions. Never
- * the last row — "Low balance alert" always follows it — so the divider is
- * permanent. Its icon tile follows ConfigureRow's rule too: the shared neutral
- * tile unless the state needs attention (warn), never a hue hashed from the
- * title.
+ * a plain function component, not a LucideIcon) and sets an explicit
+ * accessibility role and label for the one action it can offer, the retry.
+ * Never the last row — "Low balance alert" always follows it — so the divider
+ * is permanent. Its icon tile follows ConfigureRow's rule too: the shared
+ * neutral tile unless the state needs attention (warn), never a hue hashed from
+ * the title.
+ *
+ * The row opens nothing else: Kilo Pass is no longer sold in either store, so
+ * it has no setup or management page to send the reader to and carries no
+ * chevron.
  */
-function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
+function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
-  let onPress: (() => void) | null = null;
-  if (state.action === 'manage') {
-    onPress = onManage;
-  } else if (state.action === 'setup') {
-    onPress = onSetup;
-  } else if (state.action === 'retry') {
-    onPress = onRetry;
-  }
-  // Every settled state of this row but the retryable error opens the Kilo Pass
-  // management page on the web. The unresolved status (`action: 'none'`, shown
-  // while the summary query is in flight) keeps that chevron too: it lasts one
-  // request, and a momentary row without it reads as broken beside the rows
-  // above and below it.
-  const showsChevron = state.action !== 'retry';
+  const onPress = state.action === 'retry' ? onRetry : null;
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -574,7 +596,6 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {showsChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

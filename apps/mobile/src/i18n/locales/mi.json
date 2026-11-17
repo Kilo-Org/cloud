@@ -4081,7 +4081,7 @@
     "commandLabelPosition": "Whakahau {{position}}",
     "commandPlaceholder": "hei tauira pnpm install",
     "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
-    "commandsEmpty": "Kāre anō he whakahau tatūnga",
+    "commandsEmpty": "Kāore anō he whakahau tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā whakahau tatūnga",
     "commandLimitReached": "Ka taea e tētahi kōtaha te pupuri tae atu ki te {{max}} whakahau tatūnga. Mukua tētahi kia tāpirihia ai tētahi atu.",
     "moveCommandUp": "Neke whakahau {{position}} ki runga",
@@ -4218,7 +4218,7 @@
     "slashCommands": {
       "title": "Ngā whakahau rītaha",
       "add": "Tāpiri whakahau rītaha",
-      "empty": "Kāre anō he whakahau rītaha",
+      "empty": "Kāore anō he whakahau rītaha",
       "name": "Ingoa whakahau",
       "description": "Whakaahuatanga whakahau",
       "template": "tauira",

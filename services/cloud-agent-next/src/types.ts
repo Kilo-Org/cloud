@@ -508,6 +508,8 @@ export type Env = {
   RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Comma-separated org UUIDs, or `*` for all accounts' new cloud-agent-web sandboxes. */
   RUNTIME_KILO2_ORG_IDS?: string;
+  /** Comma-separated org UUIDs, or `*`, that select Kilo v2 from every session origin. */
+  RUNTIME_KILO2_ALL_SESSION_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

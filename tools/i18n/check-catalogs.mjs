@@ -175,6 +175,7 @@ const WORDED_COUNTS = new Set([
   'securityAgent.automation.queued:two:ar',
   'securityAgent.settingsOverview.repositoriesCount:one:ar',
   'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.composer.charactersRemaining:one:mi',
   'agentChat.partRenderer.updatedFileCount:one:ar',
   'agentChat.partRenderer.updatedFileCount:two:ar',
   'agentChat.olderMessages.omitted:two:ar',
@@ -1995,6 +1996,41 @@ function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFami
 }
 
 /**
+ * The English strings each catalog may render more than one way, and the
+ * problem that stopped the audit from reading them. A file that is missing,
+ * does not parse, or does not map each tag to a list of strings reports the
+ * same one line: the callers below read every tag's entry as a set, so a value
+ * of another shape must not reach them, and a fixture tree still gets the rest
+ * of the findings.
+ */
+function readWordingExceptions(root) {
+  const problems = [];
+  try {
+    const parsed = JSON.parse(
+      readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
+    );
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      Object.values(parsed).every(
+        entries => Array.isArray(entries) && entries.every(entry => typeof entry === 'string')
+      )
+    ) {
+      return { wordingExceptions: parsed, problems };
+    }
+    problems.push(
+      'check-catalogs: cannot read tools/i18n/wording-exceptions.json: ' +
+        'expected an object that maps each tag to a list of English strings'
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`check-catalogs: cannot read tools/i18n/wording-exceptions.json: ${message}`);
+  }
+  return { wordingExceptions: {}, problems };
+}
+
+/**
  * Every problem the catalogs under `root` have, and how many languages were
  * checked. The repository root is the default, so the CLI below and a test that
  * points at a fixture tree run the same audit. The findings are returned, not
@@ -2008,9 +2044,9 @@ export function checkCatalogs(root = ROOT) {
    * where English reuses the noun. Everything else must read the same way
    * everywhere in one catalog.
    */
-  const WORDING_EXCEPTIONS = JSON.parse(
-    readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
-  );
+  const wordingExceptionsRead = readWordingExceptions(root);
+  problems.push(...wordingExceptionsRead.problems);
+  const { wordingExceptions } = wordingExceptionsRead;
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
 
@@ -2090,7 +2126,7 @@ export function checkCatalogs(root = ROOT) {
       mustTranslateKeys,
       destructiveChecks,
       sharedWordings,
-      wordingExceptions: WORDING_EXCEPTIONS,
+      wordingExceptions,
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;

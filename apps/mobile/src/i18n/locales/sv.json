@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
-      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO och domän",
       "dataCollection": "Datainsamling",
       "auditLogs": "Granskningsloggar",
-      "requestLogs": "Förfrågningsloggar",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fördela medel"
+      "requestLogs": "Förfrågningsloggar"
+    },
+    "requestLogs": {
+      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
+      "older": "Tidigare timme",
+      "newer": "Senare timme",
+      "truncated": "Den här timmen har fler förfrågningar än listan visar.",
+      "emptyTitle": "Inga förfrågningar",
+      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
+      "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
+      "tokens": "{{input}} in · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
@@ -4527,6 +4536,8 @@
     "topModels": "Mest använda modeller",
     "topFeatures": "Mest använda funktioner",
     "emptyTitle": "Ingen användning under perioden",
+    "unavailableTitle": "Användning är inte tillgänglig",
+    "unavailableDescription": "Den här arbetsytan rapporterar ingen användning. Det hjälper inte att försöka igen.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
     "viewDetails": "Visa användningsdetaljer"
   },
@@ -4685,5 +4696,175 @@
     "unavailableDescription": "Den här delningslänken har gått ut eller återkallats.",
     "transcriptUnavailableTitle": "Det gick inte att läsa in det här transkriptet",
     "transcriptUnavailableDescription": "Länken fungerar fortfarande. Försök igen om en stund."
+  },
+  "organizationGuardrails": {
+    "title": "AI-skyddsräcken",
+    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken.",
+    "unavailable": "AI-skyddsräcken är inte tillgängliga för den här organisationen.",
+    "loadError": "AI-skyddsräcken kunde inte läsas in",
+    "statusSaving": "Sparar…",
+    "statusSaved": "Sparat",
+    "statusFailed": "Det gick inte att spara.",
+    "inputTitle": "Skyddsräcken för indata",
+    "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. En blockerande detektor avvisar en begäran när Enkrypt AI inte är tillgängligt.",
+    "outputTitle": "Skyddsräcken för utdata",
+    "outputDescription": "Skannar svar med Enkrypt AI innan medlemmar får dem. Avstängt om du inte aktiverar det.",
+    "detectorsHint": "Blockera avvisar en flaggad begäran. Endast logga registrerar den utan att fördröja begäran.",
+    "detectorsHintOutput": "Blockera underkänner ett flaggat svar. Endast logga registrerar det utan att fördröja svaret.",
+    "choiceLog": "Endast logga",
+    "applyTo": "Tillämpa på",
+    "applyToAllMembers": "Alla medlemmar",
+    "applyKiloDefault": "Tillämpa Kilo-standard",
+    "invalidSavedTitle": "Sparade inställningar för indatadetektorer kan inte läsas",
+    "invalidSavedBody": "Begäranden blockeras tills indatadetektorerna har sparats igen. Detektorerna nedan utgår från Kilo-standard.",
+    "invalidSavedOutputTitle": "Sparade inställningar för utdatadetektorer kan inte läsas",
+    "invalidSavedOutputBody": "Svar hålls tillbaka tills utdatadetektorerna har sparats igen. Välj utdatadetektorer nedan.",
+    "blockingOutputNote": "En blockerande utdatadetektor håller kvar ett svar tills Enkrypt AI har kontrollerat allt i det. Använd Endast logga för att undvika fördröjningen.",
+    "inputDetectorRequired": "Aktivera minst en indatadetektor.",
+    "outputDetectorRequired": "Aktivera minst en utdatadetektor.",
+    "rulesTooMany": "Lägg till upp till {{max}} regler.",
+    "ruleIdRequired": "Ange ett regel-ID.",
+    "ruleIdInvalid": "Ett regel-ID får endast använda bokstäver, siffror, punkter, bindestreck och understreck.",
+    "ruleTextRequired": "Beskriv vad regeln förbjuder eller kräver.",
+    "keywordTooLong": "Varje nyckelord får vara högst {{max}} tecken.",
+    "topicTooLong": "Varje ämne får vara högst {{max}} tecken.",
+    "keywordsTooMany": "Lägg till upp till {{max}} nyckelord.",
+    "topicsTooMany": "Lägg till upp till {{max}} ämnen.",
+    "piiEntityRequired": "Välj minst en typ av data att identifiera.",
+    "keywordRequired": "Lägg till minst ett nyckelord.",
+    "topicRequired": "Lägg till minst ett ämne.",
+    "policyTextRequired": "Ange policytexten.",
+    "ruleRequired": "Lägg till minst en regel.",
+    "ruleIdDuplicate": "Varje regel behöver ett eget regel-ID.",
+    "piiEntities": "Data att identifiera",
+    "keywordsLabel": "Nyckelord",
+    "keywordsHint": "Ett nyckelord per rad.",
+    "topicsHint": "Ett ämne per rad.",
+    "policyFormat": "Policyformat",
+    "policyFormatRules": "Strukturerade regler",
+    "policyFormatRulesDescription": "En regel per krav, med en kategori och allvarlighetsgrad. Rekommenderas.",
+    "policyFormatText": "Policytext",
+    "policyFormatTextDescription": "Klistra in en befintlig policy som oformaterad text.",
+    "rulesEmpty": "Inga regler ännu. Varje regel beskriver en sak som indata inte får innehålla eller fråga efter.",
+    "addRule": "Lägg till regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Ta bort regel {{number}}",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Namn (valfritt)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Riskkategori",
+    "ruleApplicability": "Omfattning",
+    "ruleFrameworks": "Ramverk",
+    "detector": {
+      "promptInjection": {
+        "label": "Promptinjektion",
+        "description": "Upptäcker försök att åsidosätta instruktioner eller kringgå modellens säkerhetsspärrar."
+      },
+      "policyViolation": {
+        "label": "Policyöverträdelse",
+        "description": "Flaggar indata som bryter mot organisationens policy, skriven som text eller regler.",
+        "descriptionOutput": "Flaggar svar som bryter mot organisationens policy, skriven som text eller regler."
+      },
+      "pii": {
+        "label": "PII och hemligheter",
+        "description": "Upptäcker personuppgifter, autentiseringsuppgifter, IP-adresser och URL:er."
+      },
+      "keywords": {
+        "label": "Förbjudna nyckelord",
+        "descriptionOutput": "Upptäcker svar som innehåller något av nyckelorden du listar."
+      },
+      "topics": {
+        "label": "Ämnen",
+        "descriptionOutput": "Flaggar svar om något av ämnena du listar."
+      },
+      "toxicity": {
+        "label": "Toxicitet",
+        "description": "Upptäcker toxiskt, förolämpande, hotfullt eller hatiskt språk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Upptäcker sexuellt eller på annat sätt olämpligt innehåll för arbetsplatsen."
+      },
+      "bias": {
+        "label": "Partiskhet",
+        "description": "Upptäcker partiskt eller diskriminerande språk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personuppgifter",
+        "description": "Namn, e-postadresser, telefonnummer."
+      },
+      "secrets": {
+        "label": "Hemligheter",
+        "description": "API-nycklar, åtkomsttoken, lösenord."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- och IPv6-adresser."
+      },
+      "url": {
+        "label": "URL:er",
+        "description": "Webbadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Säkerhet och bedrägeri",
+      "safetyHarm": "Trygghet och skada",
+      "privacyDataProtection": "Integritet och dataskydd",
+      "brandReputationTrust": "Varumärke och anseende",
+      "biasFairnessEthical": "Partiskhet och rättvisa",
+      "legalIpLiability": "Rättsligt och immaterialrättsligt ansvar",
+      "productMisuse": "Missbruk av produkten",
+      "performanceQuality": "Prestanda och kvalitet"
+    },
+    "applicability": {
+      "user": "Användarindata",
+      "userAssistant": "Användarindata och svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU:s AI-förordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Företagsfunktion",
+    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
+    "loadError": "Leverantörer och modeller kunde inte läsas in",
+    "tabModels": "Modeller",
+    "tabProviders": "Leverantörer",
+    "tabGateways": "Nätbryggor",
+    "modelsDescription": "Stäng av en modell för att blockera den för alla medlemmar. Modeller från tillåtna leverantörer är på från början.",
+    "modelsDeniedOnly": "Endast nekade",
+    "modelsEmpty": "Inga modeller matchar den här sökningen.",
+    "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
+    "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
+    "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "allowAllShown": "Tillåt alla som visas",
+    "denyAllShown": "Neka alla som visas",
+    "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",
+    "emptyProviderList": "Tillåt minst en leverantör. En tom lista blockerar alla Kilos modellvägar.",
+    "gatewaysUnavailable": "Inställningar för nätbryggor är inte tillgängliga för den här organisationen.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-begäranden är inte låsta till en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-begäranden till den här regionen. En modell som inte är tillgänglig där misslyckas.",
+    "disableOpenrouterNote": "Om OpenRouter inaktiveras blockeras även BYOK-nycklar som dirigerar begäranden genom det.",
+    "emptyModelList": "Låt minst en modell vara på. Om du nekar alla modeller har medlemmarna inget att använda.",
+    "catalogUnavailable": "Hela modellkatalogen kunde inte läsas in, så bara dina sparade listor visas. Försök igen för att läsa in alla modeller.",
+    "region": {
+      "global": "Globalt",
+      "us": "USA",
+      "eu": "Europeiska unionen",
+      "au": "Australien",
+      "jp": "Japan"
+    }
   }
 }

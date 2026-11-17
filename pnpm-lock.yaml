@@ -224,7 +224,7 @@ patchedDependencies:
   react-native-enriched-markdown@1.1.1: 697d3f3512bb0fb136fa84b26368e62333ed972d6a4182864206c4c6713c343a
   react-native-screens@4.30.0: 04f5928887daf68beb893363b4c73966d285f320360048c4555ed0bdfa66432a
   react-native@0.88.0: eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e
-  stripe@23.0.0: 24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae
+  stripe@23.0.0: c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625
 
 importers:
 
@@ -756,8 +756,8 @@ importers:
         specifier: 0.8.3
         version: 0.8.3
       i18next:
-        specifier: ^26.4.5
-        version: 26.4.7(typescript@7.0.2)
+        specifier: ^27.1.1
+        version: 27.1.1(typescript@7.0.2)
       jotai:
         specifier: 2.20.3
         version: 2.20.3(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.3.0)(react@19.3.0)
@@ -783,8 +783,8 @@ importers:
         specifier: 19.3.0
         version: 19.3.0
       react-i18next:
-        specifier: ^17.0.16
-        version: 17.0.21(i18next@26.4.7(typescript@7.0.2))(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
+        specifier: ^17.1.13
+        version: 17.1.13(i18next@27.1.1(typescript@7.0.2))(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       react-native:
         specifier: 0.88.0
         version: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
@@ -876,9 +876,6 @@ importers:
       eas-cli:
         specifier: 24.13.0
         version: 24.13.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      eslint-plugin-sonarjs:
-        specifier: 4.2.2
-        version: 4.2.2(eslint@9.39.4(jiti@2.7.0))
       knip:
         specifier: 6.41.0
         version: 6.41.0
@@ -1413,7 +1410,7 @@ importers:
         version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       stripe:
         specifier: 'catalog:'
-        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
+        version: 23.0.0(patch_hash=c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625)(@types/node@24.12.4)
       stytch:
         specifier: 12.43.1
         version: 12.43.1
@@ -1903,8 +1900,8 @@ importers:
         specifier: workspace:*
         version: link:../session-ingest-contracts
       i18next:
-        specifier: ^26.4.7
-        version: 26.4.7(typescript@7.0.2)
+        specifier: ^27.1.1
+        version: 27.1.1(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1991,7 +1988,7 @@ importers:
         version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       stripe:
         specifier: 'catalog:'
-        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
+        version: 23.0.0(patch_hash=c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625)(@types/node@24.12.4)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2216,7 +2213,7 @@ importers:
         version: 0.0.1
       stripe:
         specifier: 'catalog:'
-        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
+        version: 23.0.0(patch_hash=c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625)(@types/node@24.12.4)
       tldts:
         specifier: 7.4.18
         version: 7.4.18
@@ -10962,9 +10959,6 @@ packages:
     resolution: {integrity: sha512-O/IEdcCUKkubz60tFbGA7ceITTAJsty+lBjNoorP4Z6XRqaFb/OjQjZODophEcuq68nKm6/0r+6/lLQ+XVpk8g==}
     engines: {node: '>=18.0.0'}
 
-  '@sonarsource/analyzer-commons-configurations@2.31.0-5284':
-    resolution: {integrity: sha512-ruk3blMs9BE9RNSp9LPpWZAIjxJmq4Cp00E3cELIHz7Kym3WxdWGRlKOMYLRQ5tJg/de7jN5AtEElY3bGIfTcw==}
-
   '@speed-highlight/core@1.2.14':
     resolution: {integrity: sha512-G4ewlBNhUtlLvrJTb88d2mdy2KRijzs4UhnlrOSRT4bmjh/IqNElZa3zkrZ+TC47TwtlDWzVLFADljF1Ijp5hA==}
 
@@ -13514,10 +13508,6 @@ packages:
     resolution: {integrity: sha512-ZMANVnAixE6AWWnPzlW2KpUrxhm9woycYvPOo67jWHyFowASTEd9s+QN1EIMsSDtwhIxN4sWE1jotpuDUIgyIw==}
     engines: {node: '>=6.14.2'}
 
-  builtin-modules@3.3.0:
-    resolution: {integrity: sha512-zhaCDicdLuWN5UbN5IMnFqNMhNfo919sH85y2/ea+5Yg9TsTkeZxpL+JLbp6cgYFS4sRLp3YV4S6yDuqVWHYOw==}
-    engines: {node: '>=6'}
-
   builtin-status-codes@3.0.0:
     resolution: {integrity: sha512-HpGFw18DgFWlncDfjTa2rcQ4W88O1mC8e8yZ2AvQY5KDaktSTwo+KRf6nHK6FRI5FyRyb/5T6+TSxfP7QyGsmQ==}
 
@@ -14950,11 +14940,6 @@ packages:
     peerDependencies:
       eslint: ^9 || ^10
 
-  eslint-plugin-sonarjs@4.2.2:
-    resolution: {integrity: sha512-usNF9GfP89ibwhfxpZaCMW40sC7UEOusDgDCk7lyqAhh4AYdbBaAgLVL5Y/QS0jSed8eJ2ACGH6zzE8ezd/yZQ==}
-    peerDependencies:
-      eslint: ^8.0.0 || ^9.0.0 || ^10.0.0
-
   eslint-plugin-zod-utils@1.0.11:
     resolution: {integrity: sha512-mzV49rVHsHgEytdkCSBkVDRWygQQ9j6aPjCgucfie5QhbQdmwxZ7sOkuXNmFugkT1ahBXmBlcV3w75wAZ9/Byg==}
     peerDependencies:
@@ -15884,9 +15869,6 @@ packages:
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
 
-  functional-red-black-tree@1.0.1:
-    resolution: {integrity: sha512-dsKNQNdj6xA3T+QlADDA7mOSlX0qiMINjn0cgr+eGHGsbSHzTabcIogz2+p/iqP1Xs6EP/sS2SbqH+brGTbq0g==}
-
   fuzzysort@3.1.0:
     resolution: {integrity: sha512-sR9BNCjBg6LNgwvxlBd0sBABvQitkLzoVY9MYYROQVX/FvfJ4Mai9LsGhDgd8qYdds0bY77VzYd5iuB+v5rwQQ==}
 
@@ -16020,10 +16002,6 @@ packages:
 
   globals@14.0.0:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
-    engines: {node: '>=18'}
-
-  globals@17.12.0:
-    resolution: {integrity: sha512-cezEd/DTyyht9cvSSURyygXPfy04GtWO/5e6ZPvH7fCtjKz9PYOmuawphw1Ctd1f6C+5JypXfGD7ahNMXvevBA==}
     engines: {node: '>=18'}
 
   globby@11.1.0:
@@ -16294,8 +16272,9 @@ packages:
     resolution: {integrity: sha512-Ty8UblRWFEcfSuIaajM34LdPXIhbs1ajEX/BBPv24J+enSVaEVY63xQ6lTO9VRYS5LAoghIG0IDJ+p+IPzKUQQ==}
     engines: {node: '>=4'}
 
-  i18next@26.4.7:
-    resolution: {integrity: sha512-p/3hqy6EcuqRs6wNwBYwGGC1fzBJSMxV9zMuN814ab/7QjdZbXfjXwuPZdQbngX6KDOTxM01uUiZyqmMB8ghZg==}
+  i18next@27.1.1:
+    resolution: {integrity: sha512-Qq3aJizS3RXQ30crhx9BKQLrHoa6GKpgrOJjVZ9vgj3EBxAddrmVfDNUrAMxSUimw5Jc+ld4SSZUAzf1q4nGyQ==}
+    engines: {node: '>=22'}
     peerDependencies:
       typescript: ^5 || ^6 || ^7
     peerDependenciesMeta:
@@ -17307,10 +17286,6 @@ packages:
   jsrsasign@11.1.3:
     resolution: {integrity: sha512-nPnK5D/4lv0Dwr7TlzrKtAd8JlLZwFTqTUUB3NQCbtdobcRcohGFxjbPySDVh74iWUudcCsapYT6OxoyhJLhhA==}
     deprecated: This package is no longer maintained.
-
-  jsx-ast-utils-x@0.1.0:
-    resolution: {integrity: sha512-eQQBjBnsVtGacsG9uJNB8qOr3yA8rga4wAaGG1qRcBzSIvfhERLrWxMAM1hp5fcS6Abo8M4+bUBTekYR0qTPQw==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
@@ -19433,8 +19408,14 @@ packages:
     peerDependencies:
       react: '>=17.0.0'
 
-  react-i18next@17.0.21:
-    resolution: {integrity: sha512-bcOTaZQKsNb4KKIc+T6Dx1Cf0x3UTV5io8X1PyaC38oOeNEbU5CNkW+5QmOGEyDSEbK/QC2kLXOgL9zeCIxR3g==}
+  react-hook-form@7.73.1:
+    resolution: {integrity: sha512-VAfVYOPcx3piiEVQy95vyFmBwbVUsP/AUIN+mpFG8h11yshDd444nn0VyfaGWSRnhOLVgiDu7HIuBtAIzxn9dA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-i18next@17.1.13:
+    resolution: {integrity: sha512-ZxhOSlyKSKPtbUNPLwYMmE3w3bhoc0jaZJZ6bc7wGOT6cLbrbs//6m01HxCLtFdSjHvFpwFwoPhxxzIlHSs9cw==}
     peerDependencies:
       i18next: '>= 26.2.0'
       react: '>= 16.8.0'
@@ -19772,10 +19753,6 @@ packages:
   redux@5.0.1:
     resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
 
-  refa@0.12.1:
-    resolution: {integrity: sha512-J8rn6v4DBb2nnFqkqwy6/NnTYMcgLA+sLr0iIO41qpv0n+ngb7ksag2tMRl0inb1bbO/esUwzW1vbJi7K0sI0g==}
-    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
-
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
@@ -19800,10 +19777,6 @@ packages:
 
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
-
-  regexp-ast-analysis@0.7.1:
-    resolution: {integrity: sha512-sZuz1dYW/ZsfG17WSAG7eS85r5a0dDsvg+7BiiYR5o6lKCAtUrEwdmRmaGF6rwVj3LcmAeYkOWKEPlbPzN3Y3A==}
-    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
 
   regexp-tree@0.1.27:
     resolution: {integrity: sha512-iETxpjK6YoRWJG5o6hXLwvjYAoW+FEZn9os0PD/b6AP6xQwsa/Y7lCVgIixBbUPMfhu+i2LtdeAqVTgGlQarfA==}
@@ -20112,10 +20085,6 @@ packages:
   schema-utils@4.3.3:
     resolution: {integrity: sha512-eflK8wEtyOE6+hsaRVPxvUKYCpRgzLqDTb8krvAsRIwOGlHoSgYLgBXoubGgLd2fT41/OUYdb48v4k4WWHQurA==}
     engines: {node: '>= 10.13.0'}
-
-  scslre@0.3.0:
-    resolution: {integrity: sha512-3A6sD0WYP7+QrjbfNA2FN3FsOaGGFoekCVgTyypy53gPxhbkCIjtO6YWgdrfM+n/8sI8JeXZOIxsHjMTNxQ4nQ==}
-    engines: {node: ^14.0.0 || >=16.0.0}
 
   scule@1.3.0:
     resolution: {integrity: sha512-6FtHJEvt+pVMIB9IBY+IcCJ6Z5f1iQnytgyfKMhDKgmzYG+TeH/wx1y3l27rshSbLiSanrR9ffZDrEsmjlQF2g==}
@@ -30845,8 +30814,6 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@sonarsource/analyzer-commons-configurations@2.31.0-5284': {}
-
   '@speed-highlight/core@1.2.14': {}
 
   '@stablelib/base64@1.0.1': {}
@@ -33799,8 +33766,6 @@ snapshots:
     dependencies:
       node-gyp-build: 4.8.4
 
-  builtin-modules@3.3.0: {}
-
   builtin-status-codes@3.0.0: {}
 
   bun-types@1.4.4:
@@ -35281,24 +35246,6 @@ snapshots:
     dependencies:
       eslint: 9.39.4(jiti@2.7.0)
 
-  eslint-plugin-sonarjs@4.2.2(eslint@9.39.4(jiti@2.7.0)):
-    dependencies:
-      '@eslint-community/regexpp': 4.12.2
-      '@sonarsource/analyzer-commons-configurations': 2.31.0-5284
-      builtin-modules: 3.3.0
-      bytes: 3.1.2
-      eslint: 9.39.4(jiti@2.7.0)
-      functional-red-black-tree: 1.0.1
-      globals: 17.12.0
-      jsx-ast-utils-x: 0.1.0
-      lodash.merge: 4.6.2
-      minimatch: 10.2.6
-      scslre: 0.3.0
-      semver: 7.8.5
-      ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
-      yaml: 2.8.4
-
   eslint-plugin-zod-utils@1.0.11(eslint@9.39.4(jiti@2.7.0))(typescript@7.0.2):
     dependencies:
       '@typescript-eslint/utils': 8.67.0(eslint@9.39.4(jiti@2.7.0))(typescript@7.0.2)
@@ -36721,8 +36668,6 @@ snapshots:
 
   function-bind@1.1.2: {}
 
-  functional-red-black-tree@1.0.1: {}
-
   fuzzysort@3.1.0: {}
 
   fx-runner@1.4.0:
@@ -36874,8 +36819,6 @@ snapshots:
       which: 1.3.1
 
   globals@14.0.0: {}
-
-  globals@17.12.0: {}
 
   globby@11.1.0:
     dependencies:
@@ -37235,7 +37178,7 @@ snapshots:
 
   hyperlinker@1.0.0: {}
 
-  i18next@26.4.7(typescript@7.0.2):
+  i18next@27.1.1(typescript@7.0.2):
     optionalDependencies:
       typescript: 7.0.2
 
@@ -38809,8 +38752,6 @@ snapshots:
       semver: 7.8.5
 
   jsrsasign@11.1.3: {}
-
-  jsx-ast-utils-x@0.1.0: {}
 
   jszip@3.10.1:
     dependencies:
@@ -41667,11 +41608,15 @@ snapshots:
     dependencies:
       react: 19.3.0
 
-  react-i18next@17.0.21(i18next@26.4.7(typescript@7.0.2))(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
+  react-hook-form@7.73.1(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+
+  react-i18next@17.1.13(i18next@27.1.1(typescript@7.0.2))(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
     dependencies:
       '@babel/runtime': 7.29.7
       html-parse-stringify: 4.0.1
-      i18next: 26.4.7(typescript@7.0.2)
+      i18next: 27.1.1(typescript@7.0.2)
       react: 19.3.0
       use-sync-external-store: 1.7.0(react@19.3.0)
     optionalDependencies:
@@ -42365,10 +42310,6 @@ snapshots:
 
   redux@5.0.1: {}
 
-  refa@0.12.1:
-    dependencies:
-      '@eslint-community/regexpp': 4.12.2
-
   reflect-metadata@0.2.2: {}
 
   regenerate-unicode-properties@10.2.2:
@@ -42390,11 +42331,6 @@ snapshots:
   regex@6.1.0:
     dependencies:
       regex-utilities: 2.3.0
-
-  regexp-ast-analysis@0.7.1:
-    dependencies:
-      '@eslint-community/regexpp': 4.12.2
-      refa: 0.12.1
 
   regexp-tree@0.1.27: {}
 
@@ -42782,12 +42718,6 @@ snapshots:
       ajv: 8.20.0
       ajv-formats: 2.1.1
       ajv-keywords: 5.1.0(ajv@8.20.0)
-
-  scslre@0.3.0:
-    dependencies:
-      '@eslint-community/regexpp': 4.12.2
-      refa: 0.12.1
-      regexp-ast-analysis: 0.7.1
 
   scule@1.3.0: {}
 
@@ -43385,7 +43315,7 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  stripe@23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4):
+  stripe@23.0.0(patch_hash=c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625)(@types/node@24.12.4):
     optionalDependencies:
       '@types/node': 24.12.4
 
@@ -43755,10 +43685,6 @@ snapshots:
   trough@2.2.0: {}
 
   ts-algebra@2.0.0: {}
-
-  ts-api-utils@2.5.0(typescript@6.0.3):
-    dependencies:
-      typescript: 6.0.3
 
   ts-api-utils@2.5.0(typescript@7.0.2):
     dependencies:

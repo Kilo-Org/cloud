@@ -1,5 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { MessageInfo } from '../types';
+import type { MessageInfo, ReadonlyPart } from '../types';
 
 /**
  * Storage for a single cloud agent session.
@@ -23,11 +23,11 @@ type SessionStorage = {
    */
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
-  getParts(messageId: string): readonly Part[];
+  getParts(messageId: string): readonly ReadonlyPart[];
 
-  // Granular subscriptions
-  // Keys: "messageIds", "message:{id}", "parts:{messageId}"
-  subscribe(key: string, callback: () => void): () => void;
+  // Granular subscriptions. Channels: "messageIds", "message:{id}",
+  // "parts:{messageId}" (`SessionSubscriptionKey`).
+  subscribe(key: SessionSubscriptionKey, callback: () => void): () => void;
 
   // Bulk operations
   clear(): void;
@@ -35,6 +35,9 @@ type SessionStorage = {
   // Delete a message and all its parts
   deleteMessage(messageId: string): void;
 };
+
+/** Channel of a granular storage subscription. */
+type SessionSubscriptionKey = 'messageIds' | `message:${string}` | `parts:${string}`;
 
 /**
  * Storage mutation — the output of the reducer.
@@ -47,4 +50,4 @@ type StorageMutation =
   | { type: 'delete_part'; messageId: string; partId: string }
   | { type: 'delete_message'; messageId: string };
 
-export type { SessionStorage, StorageMutation };
+export type { SessionStorage, SessionSubscriptionKey, StorageMutation };

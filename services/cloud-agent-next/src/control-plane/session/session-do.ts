@@ -203,6 +203,10 @@ import {
   worktreeChangesReadySchema,
   type WorktreeChangesReady,
 } from '../worktree-changes-ready.js';
+import {
+  WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+  type WorkspaceArtifactsChanged,
+} from '../sandbox/notifications.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type {
@@ -318,6 +322,11 @@ const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
  */
 const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
 type RootStatus = z.infer<typeof rootStatusSchema>;
+
+const workspaceArtifactsChangedSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 const rootStatusEventSchema = z.object({
   sessionID: z.string(),
   status: z.object({ type: z.string() }),
@@ -2270,8 +2279,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Worker-facing live native read (spec §10). The route identity comes from
    * this DO's own registration, never from the caller, so a request cannot name
    * a sibling session or a stale runtime. A route that is not ready returns
-   * `not_ready` without preparing or waking the sandbox, and the Sandbox DO
-   * binds the request to the current wrapper socket as the generation fence.
+   * `runtime_offline`, which callers can tell apart from the Sandbox DO's
+   * transient `not_ready` wrapper failures, without preparing or waking the
+   * sandbox. The Sandbox DO binds the request to the current wrapper socket as
+   * the generation fence.
    */
   async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
     await this.initialized;
@@ -2285,14 +2296,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.route.state !== 'ready') {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+        error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
       };
     }
     const peer = this.sandboxPeer();
     if (peer === null) {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+        error: { code: 'runtime_offline', message: 'Sandbox is not available', retryable: true },
       };
     }
     const upstreamBranch = this.metadata?.repository?.upstreamBranch;
@@ -2640,6 +2651,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
       this.worktreeChanges.ready(parsed.revision);
       return true;
+    });
+  }
+
+  async onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void> {
+    await this.initialized;
+    const parsed = workspaceArtifactsChangedSchema.parse(notification);
+    return this.enqueue(async () => {
+      const payload = JSON.stringify({ revision: parsed.revision });
+      const timestamp = Date.now();
+      const id = this.eventQueries.insertUnique({
+        executionId: '',
+        sessionId: this.sessionId,
+        streamEventType: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+        entityId: `workspace-artifacts/${parsed.revision}`,
+      });
+      if (id === null) return;
+      this.broadcast({
+        id,
+        execution_id: '',
+        session_id: this.sessionId,
+        stream_event_type: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+      });
     });
   }
 

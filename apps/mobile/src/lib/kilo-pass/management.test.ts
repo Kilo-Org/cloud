@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isStoreManagedPass,
-  selectKiloPassManagementAction,
-  storeSubscriptionsUrl,
-} from './management';
+import { isStoreManagedPass, selectKiloPassManagementAction } from './management';
 
 describe('selectKiloPassManagementAction', () => {
   const base = { paymentProvider: 'stripe', status: 'active', cancelAtPeriodEnd: false };
@@ -56,12 +52,5 @@ describe('isStoreManagedPass', () => {
     expect(isStoreManagedPass({ paymentProvider: 'stripe' })).toBe(false);
     expect(isStoreManagedPass({ paymentProvider: 'app_store' })).toBe(true);
     expect(isStoreManagedPass({ paymentProvider: 'google_play' })).toBe(true);
-  });
-});
-
-describe('storeSubscriptionsUrl', () => {
-  it('points each store at its own subscription settings', () => {
-    expect(storeSubscriptionsUrl('app_store')).toContain('apps.apple.com');
-    expect(storeSubscriptionsUrl('google_play')).toContain('play.google.com');
   });
 });

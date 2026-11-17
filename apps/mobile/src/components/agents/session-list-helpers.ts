@@ -1,10 +1,11 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   CURRENCY_ZERO_THRESHOLD,
   formatClockTime,
-  formatCurrency,
   formatNumber,
+  formatPrefixedUsd,
 } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
@@ -21,6 +22,20 @@ export type SessionSection = {
    * names the same day the heading does. */
   timeZone: string;
 };
+
+/**
+ * Spoken heading for one session-list section: the day label with the number of
+ * sessions under it, counted in the active language. The visible row keeps the
+ * label and a bare numeral apart, so this is the one string that ties the count
+ * to what it counts.
+ */
+export function sessionSectionAccessibilityLabel(title: string, count: number): string {
+  return i18n.t('agents.sessionList.sectionAccessibility', {
+    title,
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
+}
 
 /** Platform buckets offered by the session filters, in display order. */
 export const PLATFORM_FILTERS = [
@@ -221,6 +236,26 @@ function visibleCostAmount(
 }
 
 /**
+ * One visible cost in the canonical shape: the sign leads the digits in every
+ * language, the digits, their separators and the minus glyph stay the
+ * language's own, and the whole run is wrapped in a left-to-right isolate
+ * (U+2066 … U+2069) because `$` is a neutral character a right-to-left
+ * paragraph would otherwise move behind the number.
+ */
+function prefixedVisibleCost(microdollars: number | null | undefined): string | null {
+  const amount = visibleCostAmount(microdollars);
+  if (amount === null) {
+    return null;
+  }
+  return isolateLtrBidiText(
+    formatPrefixedUsd(amount.usd, i18n.language, {
+      minimumFractionDigits: amount.fractionDigits,
+      maximumFractionDigits: amount.fractionDigits,
+    })
+  );
+}
+
+/**
  * Canonical visible cost for every mobile session surface (list row, detail
  * header, context sheet total).
  *
@@ -231,34 +266,27 @@ function visibleCostAmount(
  * Conversion: microdollars → USD. At or above half a cent (`>= 5000` µ$),
  * two-decimal dollars (e.g. `$0.01`, `$1.23`). Below half a cent, four
  * decimals (e.g. `$0.0031`); values that would render `$0.0000` (1..49 µ$)
- * are omitted instead of a false zero. Formatted with the active language so
- * the currency follows the applied locale.
+ * are omitted instead of a false zero.
+ *
+ * The string carries the sign in front of the digits in every language, so a
+ * right-to-left locale reads the same `$0.0005` the rest of the screen paints
+ * rather than its own suffix shape (`0.0005 $`). The digits, their separators
+ * and the minus glyph stay the language's own, and the run is wrapped in an
+ * LTR isolate (U+2066 … U+2069) because `$` is a neutral character an RTL
+ * paragraph would otherwise move behind the number.
  */
 export function formatSessionTotalCost(microdollars: number | null | undefined): string | null {
-  const amount = visibleCostAmount(microdollars);
-  if (amount === null) {
-    return null;
-  }
-  return formatCurrency(amount.usd, i18n.language, amount.fractionDigits);
+  return prefixedVisibleCost(microdollars);
 }
 
 /**
- * The header pill's cost slot: the same amount and digits as
- * `formatSessionTotalCost`, with the sign in front of the number and no
- * separator. Several languages format USD as a suffix (`0.0005 $`), which in a
- * right-to-left interface reads as a currency sign detached from its amount;
- * the pill shows the sign and the amount as one run in every language, the same
- * `$0.0005` the percentage sits beside.
+ * The header pill's cost slot: the same canonical string as
+ * `formatSessionTotalCost` (sign in front of the digits in every language, the
+ * digits and separators the language's own, the run in an LTR isolate), kept
+ * as its own slot-named export so the pill names the value it shows.
  */
 export function formatSessionCostBadge(microdollars: number | null | undefined): string | null {
-  const amount = visibleCostAmount(microdollars);
-  if (amount === null) {
-    return null;
-  }
-  return `$${formatNumber(amount.usd, i18n.language, {
-    minimumFractionDigits: amount.fractionDigits,
-    maximumFractionDigits: amount.fractionDigits,
-  })}`;
+  return prefixedVisibleCost(microdollars);
 }
 
 /**

@@ -59,6 +59,7 @@ vi.mock('expo-router', () => ({
       }
       h.back();
     },
+    canGoBack: () => true,
   }),
   usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
     h.guard.enabled = enabled;

@@ -153,7 +153,9 @@ export function ChatDetailsSheet({
                   {' '}
                   {content.capacityKnown && content.windowTokens
                     ? t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })
-                    : t('agentChat.contextUsage.tokens')}
+                    : t('agentChat.contextUsage.tokens', {
+                        count: content.usedTokensCount ?? 0,
+                      })}
                 </Text>
               ) : null}
             </Text>

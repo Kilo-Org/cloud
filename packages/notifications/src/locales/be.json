@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Ваш сеанс агента мае абнаўленне",
-      "chatMessage": "У вас новае паведамленне",
-      "instanceLifecycle": "Ваш інстанс мае абнаўленне",
-      "scheduledAction": "Запланаванае дзеянне мае абнаўленне",
       "lowBalance": "Ваш баланс патрабуе ўвагі",
       "spendAlert": "Вашы выдаткі патрабуюць увагі",
       "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Без назвы",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Апавяшчэнне аб нізкім балансе",
@@ -34,50 +25,21 @@
       "title": "Апавяшчэнне аб выдатках",
       "body": "Выдаткі {{scopeName}} перавысілі ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Новая знаходка ў бяспецы ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Новая знаходка ў бяспецы ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Папярэджанне SLA",
-      "body": "{{findingTitle}} у {{repoFullName}}"
+      "title": "Папярэджанне SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Парушэнне SLA",
-      "body": "{{findingTitle}} у {{repoFullName}}"
+      "title": "Парушэнне SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Праверка бяспекі мае абнаўленне"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} гатовы",
-      "body": "Націсніце, каб пачаць размову."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} не ўдалося запусціць",
-      "body": "Запуск не ўдаўся."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} хутка перазапусціцца",
-      "body": "Запланаваны перазапуск у {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Перазапуск {{instanceName}} адменены",
-      "body": "Раней запланаваны перазапуск адменены."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} хутка абновіцца",
-      "bodyWithTag": "Абнаўленне да {{targetImageTag}} у {{when}}.",
-      "bodyWithoutTag": "Запланаванае абнаўленне ў {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Абнаўленне {{instanceName}} адмененае",
-      "body": "Раней запланаванае абнаўленне адмененае."
     }
   },
   "sessionReady": {

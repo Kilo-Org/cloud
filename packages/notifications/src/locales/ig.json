@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Nnọkọ onye nnọchi anya gị nwere mmelite",
-      "chatMessage": "Ị nwere ozi ọhụrụ",
-      "instanceLifecycle": "Ihe atụ gị nwere mmelite",
-      "scheduledAction": "Omume ahaziri nwere mmelite",
       "lowBalance": "Nguzozi gị chọrọ nlebara anya",
       "spendAlert": "Mmefu gị chọrọ nlebara anya",
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Enweghị aha",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Ọkwa ịdọ aka na ntị nguzozi dị ala",
@@ -34,50 +25,21 @@
       "title": "Ọkwa mmefu",
       "body": "Mmefu {{scopeName}} gafere ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} na {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Ịdọ aka na ntị SLA",
-      "body": "{{findingTitle}} na {{repoFullName}}"
+      "title": "Ịdọ aka na ntị SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Mmebi SLA",
-      "body": "{{findingTitle}} na {{repoFullName}}"
+      "title": "Mmebi SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Nlele nchekwa nwere mmelite"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} dị njikere",
-      "body": "Pịa ka ịmalite mkparịta ụka."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} enweghị ike ịmalite",
-      "body": "Ịmalite dara."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} ga-amalitegharị n'oge na-adịghị anya",
-      "body": "Ahaziri ka ọ malitegharịa na {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Kagburu mmalitegharị {{instanceName}}",
-      "body": "Kagburu mmalitegharị ahaziri na mbụ."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ga-akwalite n'oge na-adịghị anya",
-      "bodyWithTag": "Kwalite na {{targetImageTag}} na {{when}}.",
-      "bodyWithoutTag": "Kwalite ahaziri na {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Kagburu nkwalite {{instanceName}}",
-      "body": "Kagburu nkwalite ahaziri na mbụ."
     }
   },
   "sessionReady": {

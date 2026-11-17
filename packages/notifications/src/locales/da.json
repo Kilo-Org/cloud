@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Din agentsession har en opdatering",
-      "chatMessage": "Du har en ny besked",
-      "instanceLifecycle": "Din instans har en opdatering",
-      "scheduledAction": "En planlagt handling har en opdatering",
       "lowBalance": "Din saldo kræver opmærksomhed",
       "spendAlert": "Dit forbrug kræver opmærksomhed",
       "securityFinding": "Et sikkerhedsfund kræver opmærksomhed",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Uden titel",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Lav saldo-alert",
@@ -34,50 +25,21 @@
       "title": "Forbrugsalert",
       "body": "{{scopeName}}s forbrug oversteg ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nyt sikkerhedsfund ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nyt sikkerhedsfund ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-advarsel",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "SLA-advarsel"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-overtrædelse",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "SLA-overtrædelse"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "En sikkerhedskontrol har en opdatering"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} er klar",
-      "body": "Tryk for at starte chatten."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} kunne ikke startes",
-      "body": "Start mislykkedes."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} genstarter snart",
-      "body": "Planlagt til genstart kl. {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} genstart annulleret",
-      "body": "Den tidligere planlagte genstart er blevet annulleret."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} opgraderes snart",
-      "bodyWithTag": "Opgrader til {{targetImageTag}} kl. {{when}}.",
-      "bodyWithoutTag": "Planlagt opgradering kl. {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} opgradering annulleret",
-      "body": "Den tidligere planlagte opgradering er blevet annulleret."
     }
   },
   "sessionReady": {

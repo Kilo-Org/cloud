@@ -6,7 +6,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
 import { eq, and, lt, isNull, gt } from 'drizzle-orm';
-import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
 import {
   appAttestClientDataHash,
@@ -14,7 +13,7 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
-import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
+import { checkFirewallRateLimit } from './firewall-rate-limit';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
@@ -112,33 +111,24 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
 /**
  * Issue a server-side challenge for native admission.
  *
- * Uses the shared `@vercel/firewall` check per client IP, matching the email
- * sign-in rate-limit pattern. Only an answer that permits the caller issues a
- * challenge: a limited caller is refused, and so is any answer that carries an
- * error, including a rule that is not configured. The unconfigured rule is
- * reported through the shared throttled reporter, so it stays visible without
- * one report per request.
+ * Runs the shared `checkFirewallRateLimit` per client IP, matching the email
+ * sign-in rate-limit pattern, so the whole app keeps one check-and-report path.
+ * Only an answer that permits the caller issues a challenge: a limited caller
+ * is refused, and so is a limiter that could not be consulted. The shared
+ * helper reports both an unconfigured rule and a limiter that could not be
+ * evaluated through one throttled reporter.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
   ipAddress: string
 ): Promise<{ challenge: string; expiresIn: number }> {
-  const { rateLimited, error } = await checkRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+  const limit = await checkFirewallRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+    source: 'native_admission_challenge',
     request,
     rateLimitKey: `native-challenge:${ipAddress}`,
   });
 
-  if (error === 'not-found') {
-    reportFirewallRateLimitIssue(
-      CHALLENGE_RATE_LIMIT_ID,
-      'native_admission_challenge',
-      `Firewall rate limit '${CHALLENGE_RATE_LIMIT_ID}' is not configured`
-    );
-  }
-
-  // Only an answer that permits the caller issues a challenge: a limited
-  // caller and an answer that carries an error both refuse here.
-  if (rateLimited || error) {
+  if (limit !== 'allowed') {
     throw new ChallengeRateLimitError();
   }
 
@@ -380,7 +370,6 @@ async function verifyAppleAdmission(
   // (we return the existing user id for that check)
 
   const assertionResult = await verifyAppleAssertion(
-    keyId,
     appAttestClientDataHash(challenge),
     payload,
     existingKey.public_key

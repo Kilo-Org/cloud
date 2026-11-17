@@ -14,6 +14,12 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
 }));
 
+// The account row opens the shared picker through the press-burst guard; this
+// suite asserts the row colours, not the navigation, so the push is a stub.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
+
 /**
  * The profile screen is a list of destinations, so the row palette gives every
  * row its section's hue (`agent-color.ts`, destination table). A row with no hue

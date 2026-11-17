@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "A túa sesión de axente ten unha actualización",
-      "chatMessage": "Tes unha nova mensaxe",
-      "instanceLifecycle": "A túa instancia ten unha actualización",
-      "scheduledAction": "Unha acción programada ten unha actualización",
       "lowBalance": "O teu saldo precisa atención",
       "spendAlert": "O teu gasto precisa atención",
       "securityFinding": "Un achado de seguridade precisa atención",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Sen título",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Alerta de saldo baixo",
@@ -34,50 +25,21 @@
       "title": "Alerta de gasto",
       "body": "O gasto de {{scopeName}} superou os ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Novo achado de seguridade ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} en {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Novo achado de seguridade ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Aviso de SLA",
-      "body": "{{findingTitle}} en {{repoFullName}}"
+      "title": "Aviso de SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Incumprimento de SLA",
-      "body": "{{findingTitle}} en {{repoFullName}}"
+      "title": "Incumprimento de SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Unha comprobación de seguridade ten unha actualización"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} está lista",
-      "body": "Toca para comezar a conversar."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} non puido iniciarse",
-      "body": "Fallou o inicio."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} reiniciarase pronto",
-      "body": "Programado para reiniciarse ás {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Cancelouse o reinicio de {{instanceName}}",
-      "body": "Cancelouse o reinicio programado anteriormente."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} actualizarase pronto",
-      "bodyWithTag": "Actualización a {{targetImageTag}} ás {{when}}.",
-      "bodyWithoutTag": "Actualización programada ás {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Cancelouse a actualización de {{instanceName}}",
-      "body": "Cancelouse a actualización programada anteriormente."
     }
   },
   "sessionReady": {

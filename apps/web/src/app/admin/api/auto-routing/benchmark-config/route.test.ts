@@ -37,23 +37,29 @@ function putRequest(body: unknown) {
 const validConfig = {
   router: 'efficient' as const,
   accuracyNoiseBand: 0.05,
-  frontierMinAccuracyDelta: 0,
   classifierModels: ['google/gemini-2.5-flash-lite'],
   deciderModels: [{ id: 'openai/gpt-5-mini' }],
   minAccuracy: 0.7,
-  switchCostFactor: 3,
-  bestAccuracySwitchThreshold: 0.05,
   productionTokenProfile: null,
   switchHorizonTurns: null,
-  lowConfidenceThreshold: null,
   benchmarkUserId: null,
   benchmarkOrgId: null,
-  classifierRepetitions: 1,
-  deciderRepetitions: 1,
-  classifierMaxP95LatencyMs: 1000,
   updatedAt: null,
   updatedBy: null,
 };
+
+// Fixed policy settings a previously deployed admin UI still sends. The
+// contract has no field for them, so a PUT body carrying them parses with the
+// keys stripped before the config is forwarded.
+const LEGACY_FIXED_POLICY_KEYS = [
+  'frontierMinAccuracyDelta',
+  'switchCostFactor',
+  'bestAccuracySwitchThreshold',
+  'lowConfidenceThreshold',
+  'classifierRepetitions',
+  'deciderRepetitions',
+  'classifierMaxP95LatencyMs',
+] as const;
 
 describe('PUT /admin/api/auto-routing/benchmark-config', () => {
   beforeEach(() => {
@@ -99,17 +105,36 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
         ...validConfig,
         router: 'frontier',
         accuracyNoiseBand: 0.02,
-        frontierMinAccuracyDelta: 0,
       })
     );
     expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         router: 'frontier',
         accuracyNoiseBand: 0.02,
-        frontierMinAccuracyDelta: 0,
       }),
       'admin@kilocode.ai'
     );
+  });
+
+  it('strips the legacy fixed policy keys from a PUT body and still returns 200', async () => {
+    const response = await PUT(
+      putRequest({
+        ...validConfig,
+        frontierMinAccuracyDelta: 0,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        lowConfidenceThreshold: 0.8,
+        classifierRepetitions: 1,
+        deciderRepetitions: 1,
+        classifierMaxP95LatencyMs: 1000,
+      })
+    );
+    expect(response.status).toBe(200);
+    const forwarded = mockUpdateBenchmarkConfig.mock.calls[0]?.[0];
+    expect(forwarded).toMatchObject({ router: 'efficient', accuracyNoiseBand: 0.05 });
+    for (const key of LEGACY_FIXED_POLICY_KEYS) {
+      expect(forwarded).not.toHaveProperty(key);
+    }
   });
 
   it('rejects a schema-invalid config with 400', async () => {

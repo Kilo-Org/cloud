@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import expo.modules.kotlin.records.Field
@@ -144,12 +143,7 @@ internal object SessionNotifications {
     if (quietAt <= nowMs || card.quietText == null) {
       return
     }
-    if (Build.VERSION.SDK_INT >= 31) {
-      // No exact-alarm permission: Android can defer delivery while idle.
-      alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
-    } else {
-      alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
-    }
+    alarmWhileIdle(alarmManager, quietAt, operation)
   }
 
   /**
@@ -201,12 +195,7 @@ internal object SessionNotifications {
       Intent(Intent.ACTION_VIEW, Uri.parse(card.openUrl)).setPackage(context.packageName),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= 26) {
-      Notification.Builder(context, CHANNEL_ID)
-    } else {
-      @Suppress("DEPRECATION")
-      Notification.Builder(context)
-    }
+    val builder = CardBuilders.builder(context, CHANNEL_ID)
     builder
       .setSmallIcon(icon)
       .setColor(Color.parseColor(card.color))
@@ -238,7 +227,7 @@ internal object SessionNotifications {
         builder.addAction(ApprovalGate.action(context, icon, label, approveIntent(context, card)))
       }
     }
-    builder.addAction(action(context, icon, card.openLabel, openIntent))
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, openIntent))
 
     // API 36.1+ Live Update: the one gate both Android cards request through.
     // An incapable or refused device keeps the expanded-only line below.
@@ -257,14 +246,6 @@ internal object SessionNotifications {
     }
     return builder
   }
-
-  private fun action(
-    context: Context,
-    icon: Int,
-    label: String,
-    intent: PendingIntent
-  ): Notification.Action =
-    Notification.Action.Builder(Icon.createWithResource(context, icon), label, intent).build()
 
   /** Answer the exact request this card shows, through the presence gate. */
   private fun approveIntent(context: Context, card: SessionNotificationCard): PendingIntent {

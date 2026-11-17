@@ -7,6 +7,7 @@ import {
   joinStoreCreditProducts,
   type StoreCreditProductListing,
 } from '@/lib/credits/store-products';
+import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
 import { TRPCProvider, useTRPC } from '@/lib/trpc';
@@ -23,9 +24,55 @@ import {
 // `state=partly-priced` leaves the largest pack unpriced, which is the only
 // state that renders a row-level price status beside a priced row, and
 // `state=completing` prices every pack and starts a purchase on the first one,
-// which an emulator cannot reach without a store.
+// which an emulator cannot reach without a store. The remaining states seed the
+// money-safety surfaces with inert exits: `unresolved` restores an earlier
+// charge on a current SKU, `legacy-unresolved` restores a retired Play SKU whose
+// replacement is the consent target, `refused-unresolved` restores a charge the
+// backend will never credit, `waiting` and `pending` show the store-wait and
+// pending-payment copy on the pack's row and in the card, and `failed` shows the
+// inline error beside it, in the storefront's own wording.
 
-export type CreditPackPricesFixtureState = 'priced' | 'partly-priced' | 'completing';
+export type CreditPackPricesFixtureState =
+  | 'priced'
+  | 'partly-priced'
+  | 'completing'
+  | 'unresolved'
+  | 'legacy-unresolved'
+  | 'refused-unresolved'
+  | 'waiting'
+  | 'pending'
+  | 'failed';
+
+const FIXTURE_STATES = [
+  'priced',
+  'partly-priced',
+  'completing',
+  'unresolved',
+  'legacy-unresolved',
+  'refused-unresolved',
+  'waiting',
+  'pending',
+  'failed',
+] as const satisfies readonly CreditPackPricesFixtureState[];
+
+export function isCreditPackPricesFixtureState(
+  value: string | undefined
+): value is CreditPackPricesFixtureState {
+  return value !== undefined && FIXTURE_STATES.some(state => state === value);
+}
+
+/** Which store wait each state paints, if any. */
+const WAIT_KIND_BY_STATE = {
+  priced: null,
+  'partly-priced': null,
+  completing: null,
+  unresolved: null,
+  'legacy-unresolved': null,
+  'refused-unresolved': null,
+  waiting: 'store',
+  pending: 'pending',
+  failed: null,
+} as const satisfies Record<CreditPackPricesFixtureState, 'store' | 'pending' | null>;
 
 /** Store prices in the shape the German Play store returns for these packs. */
 const PLAY_PRICES = ['10,99 €', '54,99 €', '109,99 €', '549,99 €'] as const;
@@ -195,32 +242,70 @@ function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
 }
 
 export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
-  const store = useMemo<CreditNativeIapContextValue>(
-    () => ({
+  const waitKind = WAIT_KIND_BY_STATE[state];
+
+  const store = useMemo<CreditNativeIapContextValue>(() => {
+    const fixtureListings = listings(state);
+    // An earlier charge the emulator cannot produce. `legacy-unresolved` keeps a
+    // retired Play SKU as the earlier request and names a current replacement as
+    // the consent target, which no row could ever name by itself.
+    const hasUnresolvedPurchase =
+      state === 'unresolved' || state === 'legacy-unresolved' || state === 'refused-unresolved';
+    let purchaseResolution: CreditNativeIapContextValue['purchaseResolution'] = 'unknown';
+    if (state === 'legacy-unresolved') {
+      purchaseResolution = 'not-found';
+    } else if (state === 'refused-unresolved') {
+      purchaseResolution = 'terminal-refusal';
+    }
+    return {
       connected: true,
       fetchStoreProducts: async () => {
         await Promise.resolve();
-        return listings(state);
+        return fixtureListings;
       },
       reconnectStore: async () => {
         await Promise.resolve();
         return true;
       },
       // A press in the fixture never reaches a store: nothing is chargeable
-      // here, and the state under test is the row layout, not a purchase.
+      // here, and the state under test is the layout, not a purchase.
       purchase: async () => {
         await Promise.resolve();
         return false;
       },
+      // The money exits are inert in every state, including the ones that
+      // restore an earlier charge: a reconciliation here reports nothing held
+      // and a Buy again tap charges nothing.
+      reconcilePurchase: async () => {
+        await Promise.resolve();
+        return false;
+      },
+      buyAgain: async () => {
+        await Promise.resolve();
+        return false;
+      },
+      buyAgainProductId:
+        state === 'legacy-unresolved' || state === 'refused-unresolved'
+          ? (fixtureListings[2]?.id ?? null)
+          : null,
+      hasUnresolvedPurchase,
+      purchaseResolution,
       // The completing state keeps the first pack's purchase open, which is the
       // only way to render its in-flight label without a store.
-      completingProductId: state === 'completing' ? (listings(state)[0]?.id ?? null) : null,
-      errorMessageKey: null,
+      completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
+      purchaseWait:
+        waitKind === null ? null : { productId: fixtureListings[0]?.id ?? '', kind: waitKind },
+      // The loader's own wording for a store that missed the deadline, which
+      // differs per storefront: the fixture must not show App Store copy on
+      // Android.
+      errorMessageKey:
+        state === 'failed'
+          ? getStoreUnavailableCopyKeys(getCreditStorefront()).timeoutBodyKey
+          : null,
       completedPurchaseCount: 0,
       clearError: () => undefined,
-    }),
-    [state]
-  );
+    };
+  }, [state, waitKind]);
 
   return (
     <CreditNativeIapContext.Provider value={store}>

@@ -105,7 +105,7 @@ const baseInput = (over: Partial<DispatchPushInput> = {}): DispatchPushInput => 
   push: {
     title: 'T',
     body: 'B',
-    data: { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+    data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
     sound: 'default',
     priority: 'high',
   },
@@ -474,7 +474,7 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(state.historyInserts).toHaveLength(1);
     expect(state.historyInserts?.[0]).toMatchObject({
       user_id: 'user-partial-ticket-error',
-      push_type: 'chat.message',
+      push_type: 'cloud_agent_session',
       idempotency_key: 'k-partial-ticket-error',
     });
 
@@ -1338,32 +1338,6 @@ describe('NotificationChannelDO preview mode and channel', () => {
     }
   );
 
-  it('adds channelId and time-sensitive level to every chat message', async () => {
-    installDbMock({
-      tokens: [
-        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.12' },
-        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.12' },
-      ],
-    });
-    const stub = getDO('user-chan');
-    const result = await stub.dispatchPush(
-      baseInput({ userId: 'user-chan', idempotencyKey: 'k-chan' })
-    );
-    expect(result.kind).toBe('delivered');
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages).toHaveLength(2);
-    for (const message of messages) {
-      // iOS has no per-kind channel: the interruption level is the iOS
-      // equivalent of the Android channel and breaks through Focus / DND.
-      expect(message.channelId).toBe('needs-input');
-      expect(message.interruptionLevel).toBe('time-sensitive');
-      // A needs-input push is never dropped by the per-Focus filter, so it
-      // skips the notification service extension entirely.
-      expect(message.mutableContent).toBeUndefined();
-      expect(message.categoryId).toBeUndefined();
-    }
-  });
-
   it('routes a status push to the agent-progress channel with an active level', async () => {
     installDbMock({
       tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.12' }],
@@ -1492,10 +1466,10 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const oldMessage = messages.find(m => m.to === 'tok-old');
     const splitMessage = messages.find(m => m.to === 'tok-split');
     const newMessage = messages.find(m => m.to === 'tok-new');
-    // Unknown clients omit the id; known pre-split clients retain the chat
-    // channel they created. Only the split build creates needs-input.
+    // Unknown clients omit the id; known pre-split clients retain the legacy
+    // agent channel they created. Only the split build creates needs-input.
     expect(oldMessage?.channelId).toBeUndefined();
-    expect(splitMessage?.channelId).toBe('chat');
+    expect(splitMessage?.channelId).toBe('agent');
     expect(newMessage?.channelId).toBe('needs-input');
     // The interruption level has no older-client failure mode (unlike the
     // Android channel), so it is attached to every message.
@@ -1649,6 +1623,39 @@ describe('NotificationChannelDO per-token locale translation', () => {
     expect(esMessage?.title).not.toBe(enMessage?.title);
   });
 
+  it('reads the shared body entry of a security finding push in the token language', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-security', token: 'tok-security', locale: 'es' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-security');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-security',
+        idempotencyKey: 'k-security',
+        push: {
+          title: 'SLA warning',
+          body: 'XSS in admin in acme/api',
+          i18nKey: 'internal.securityFindingSlaWarning',
+          i18nParams: {
+            severity: 'high',
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
+          data: { type: 'security_finding', findingId: 'finding-1', scope: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Aviso de SLA');
+    expect(messages[0].body).toBe('XSS in admin en acme/api');
+    expect(messages[0].title).not.toBe('SLA warning');
+    expect(messages[0].body).not.toBe('XSS in admin in acme/api');
+  });
+
   it('treats a null locale as English', async () => {
     installDbMock({
       tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],
@@ -1688,12 +1695,7 @@ describe('NotificationChannelDO per-token locale translation', () => {
         push: {
           title: 'My raw title',
           body: 'My raw body',
-          data: {
-            type: 'chat.message',
-            sandboxId: 'sb1',
-            conversationId: 'conv1',
-            messageId: 'm1',
-          },
+          data: { type: 'low_balance', organizationId: 'org-1' },
           sound: 'default',
           priority: 'high',
         },
@@ -1924,7 +1926,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     setPushSinkModeForTesting(undefined);
   });
 
-  const chatPush = (idempotencyKey: string): DispatchPushInput =>
+  const historyPush = (idempotencyKey: string): DispatchPushInput =>
     baseInput({
       presenceContext: null,
       badge: null,
@@ -1932,9 +1934,9 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
       push: {
         title: 'Fallback title',
         body: 'Fallback body',
-        data: { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
-        i18nKey: 'chat.message',
-        i18nParams: { conversationTitle: 'Private conversation' },
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        i18nKey: 'agentSession.notification',
+        i18nParams: { sessionTitle: 'Private session', message: 'Finished' },
       },
     });
 
@@ -1942,18 +1944,18 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
     installDbMock(state);
 
-    const input = chatPush('history-accepted');
+    const input = historyPush('history-accepted');
     const result = await getDO('history-accepted').dispatchPush(input);
 
     expect(result.kind).toBe('delivered');
     expect(state.historyInserts).toEqual([
       {
         user_id: 'user-1',
-        category: 'chatMessages',
-        push_type: 'chat.message',
+        category: 'sessionStatus',
+        push_type: 'cloud_agent_session',
         payload: input.push.data,
-        i18n_key: 'chat.message',
-        i18n_params: { conversationTitle: 'Private conversation' },
+        i18n_key: 'agentSession.notification',
+        i18n_params: { sessionTitle: 'Private session', message: 'Finished' },
         fallback_title: 'Fallback title',
         fallback_body: 'Fallback body',
         idempotency_key: 'history-accepted',
@@ -1966,7 +1968,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
     installDbMock(state);
     const stub = getDO('history-replay');
-    const input = chatPush('history-replay-key');
+    const input = historyPush('history-replay-key');
 
     expect((await stub.dispatchPush(input)).kind).toBe('delivered');
     expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
@@ -1980,7 +1982,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
 
     const result = await getDO('history-presence').dispatchPush({
-      ...chatPush('history-presence-key'),
+      ...historyPush('history-presence-key'),
       presenceContext: '/presence/sb1/conv1',
     });
 
@@ -1992,7 +1994,9 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     const state: DbState = { tokens: [] };
     installDbMock(state);
 
-    const result = await getDO('history-no-tokens').dispatchPush(chatPush('history-no-tokens-key'));
+    const result = await getDO('history-no-tokens').dispatchPush(
+      historyPush('history-no-tokens-key')
+    );
 
     expect(result.kind).toBe('no_tokens');
     expect(state.historyInserts ?? []).toHaveLength(0);
@@ -2004,10 +2008,10 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     const stub = getDO('history-rate-limit');
     const rateLimit = { key: 'history-rate-limit', limit: 1, windowSeconds: 60 };
 
-    expect((await stub.dispatchPush({ ...chatPush('history-rl-1'), rateLimit })).kind).toBe(
+    expect((await stub.dispatchPush({ ...historyPush('history-rl-1'), rateLimit })).kind).toBe(
       'delivered'
     );
-    expect((await stub.dispatchPush({ ...chatPush('history-rl-2'), rateLimit })).kind).toBe(
+    expect((await stub.dispatchPush({ ...historyPush('history-rl-2'), rateLimit })).kind).toBe(
       'suppressed_rate_limit'
     );
 
@@ -2049,7 +2053,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const result = await getDO('history-write-fails').dispatchPush(
-      chatPush('history-write-fails-key')
+      historyPush('history-write-fails-key')
     );
 
     expect(result.kind).toBe('delivered');
@@ -2057,7 +2061,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     // The failure is logged content-free: never the row, the user, or the
     // provider error text.
     expect(warn).toHaveBeenCalledWith('notification_history_write_failed', {
-      pushType: 'chat.message',
+      pushType: 'cloud_agent_session',
       errorName: 'Error',
     });
     warn.mockRestore();
@@ -2069,7 +2073,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     installDbMock(state);
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    const result = await getDO('history-sink').dispatchPush(chatPush('history-sink-key'));
+    const result = await getDO('history-sink').dispatchPush(historyPush('history-sink-key'));
 
     expect(result.kind).toBe('delivered');
     expect(state.historyInserts).toHaveLength(1);

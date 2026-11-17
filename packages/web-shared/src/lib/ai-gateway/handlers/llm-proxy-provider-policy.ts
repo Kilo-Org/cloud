@@ -8,14 +8,15 @@ import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers
 import type { FailoverRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
-  getManagedGatewayFromUrl,
   getOrganizationGatewaySettings,
-  isManagedGatewayDisabled,
   NO_ORGANIZATION_GATEWAY_SETTINGS,
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  managedGatewayRejection,
+  paidUsageRejection,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -39,7 +40,6 @@ import {
   efficientPoolBlockedResponse,
   getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
-  managedGatewayDisabledResponse,
   unknownModelResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
@@ -186,7 +186,6 @@ export async function resolveProviderAndPolicy(
     organizationId: input.organizationId,
     botId: input.botId,
     boundedSpending: input.boundedSpending,
-    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode: input.countryCode,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
@@ -203,8 +202,8 @@ export async function resolveProviderAndPolicy(
     return reject(chatGptReconnectResponse(getProviderResult.message));
   }
   if (getProviderResult.kind === 'claude-billing-reconnect') {
-    // The organization's shared-services Claude link was connected by a person
-    // who is gone. Only an owner reconnecting it changes the outcome.
+    // The organization's Claude link was connected by a person who is gone.
+    // Only an owner reconnecting it changes the outcome.
     return reject(claudeBillingReconnectResponse(getProviderResult.message, input.organizationId));
   }
   if (getProviderResult.kind === 'claude-billing-unavailable') {
@@ -245,14 +244,12 @@ export async function resolveProviderAndPolicy(
     ) {
       return modelNotAllowedResponse();
     }
-    if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
-      return managedGatewayDisabledResponse(providerType);
-    }
-    const providerBaseUrl = route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl;
-    const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
-    if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-      return managedGatewayDisabledResponse(gatewayByDomain);
-    }
+    const gatewayRejection = managedGatewayRejection(
+      organizationGatewaySettings,
+      providerType,
+      route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl
+    );
+    if (gatewayRejection) return gatewayRejection;
     if (orgAutoRouteTarget) {
       try {
         const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);

@@ -1,5 +1,5 @@
-import { usePreventRemove, useRouter } from 'expo-router';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type Href, usePreventRemove, useRouter } from 'expo-router';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -14,14 +14,15 @@ import {
   replaceCommand,
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
+import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
@@ -36,29 +37,31 @@ type CommandRow = Readonly<{ sequence: number; command: string }>;
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMAND_ROWS: readonly CommandRow[] = [];
 
-/** Content-shaped cards in the same slots as a loaded command row. */
-function CommandsSkeleton() {
-  return (
-    <View className="gap-3">
-      {[0, 1, 2].map(index => (
-        <View key={index} className="gap-1.5 rounded-lg bg-secondary p-3">
-          <View className="h-[48px] flex-row items-center justify-between">
-            <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-            <Skeleton className="h-[48px] w-[151px] rounded bg-muted-soft" />
-          </View>
-          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 export function ProfileCommandsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /**
+   * The Profiles list of the stack that mounted this screen: the screen's own
+   * "no history" destination, since both the Profile tab and the app-level
+   * Manage Profiles stack render it.
+   */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const router = useRouter();
+  // A cold link can render this route with nothing beneath it: Back then lands
+  // on the mounting stack's Profiles list instead of unwinding the stack.
+  const leaveScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.dismissTo(backFallback);
+  }, [router, backFallback]);
   const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -317,6 +320,13 @@ export function ProfileCommandsScreen({
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
         <ProfileManageSlot permission={permission}>
+          {commands.length >= MAX_SETUP_COMMANDS ? (
+            <AccessibleStatus
+              message={t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
@@ -331,9 +341,8 @@ export function ProfileCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.commandsTitle')}
-        onBack={() => {
-          router.back();
-        }}
+        backFallback={backFallback}
+        onBack={leaveScreen}
       />
       <TabScreenScrollView
         className="flex-1"

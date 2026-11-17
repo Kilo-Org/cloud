@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { formatLargeNumber } from '@/lib/utils';
+import { seatCountReadout } from '@kilocode/app-shared/organizations';
 import type { RootRouter } from '@/routers/root-router';
 import type { Granularity, PeriodOption } from '@/components/usage-analytics/types';
 
@@ -47,6 +48,15 @@ export type UsageByOrganization = Map<
 >;
 
 export type UsageDataStatus = 'loading' | 'available' | 'unavailable';
+
+/** A seats cell's value: the shared readout, linted against a zero total. */
+function formatSeatCell(input: {
+  seatsEnforced: boolean;
+  used: number;
+  total: number;
+}): string {
+  return seatCountReadout({ ...input, formatNumber: value => value.toLocaleString() });
+}
 
 function OrganizationLink({ id, name }: { id: string; name: string }) {
   return (
@@ -160,9 +170,11 @@ export function OverviewSection({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {child.requireSeats
-                        ? `${child.seatCount.used} / ${child.seatCount.total}`
-                        : 'Not required'}
+                      {formatSeatCell({
+                        seatsEnforced: child.requireSeats,
+                        used: child.seatCount.used,
+                        total: child.seatCount.total,
+                      })}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMicrodollars(child.balanceMicrodollars)}
@@ -243,7 +255,11 @@ export function PeopleSection({ data }: { data: People }) {
                     {child.pendingInvitationCount}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {child.seatCount.used} / {child.seatCount.total}
+                    {formatSeatCell({
+                      seatsEnforced: child.requireSeats,
+                      used: child.seatCount.used,
+                      total: child.seatCount.total,
+                    })}
                   </TableCell>
                   <TableCell className="max-w-64 truncate">
                     {child.owners.map(owner => owner.name).join(', ') || 'No direct owner'}

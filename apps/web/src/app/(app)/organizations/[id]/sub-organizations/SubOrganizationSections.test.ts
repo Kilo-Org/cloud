@@ -36,6 +36,7 @@ describe('PeopleSection direct owners', () => {
           name: 'Empty child',
           memberCount: 2,
           pendingInvitationCount: 0,
+          requireSeats: true,
           seatCount: { used: 2, total: 5 },
           roleBreakdown: { owner: 0, admin: 0, billing_manager: 0, member: 2 },
           owners: [],
@@ -45,6 +46,7 @@ describe('PeopleSection direct owners', () => {
           name: 'Owned child',
           memberCount: 2,
           pendingInvitationCount: 0,
+          requireSeats: false,
           seatCount: { used: 2, total: 5 },
           roleBreakdown: { owner: 2, admin: 0, billing_manager: 0, member: 0 },
           owners: [
@@ -83,6 +85,69 @@ describe('PeopleSection direct owners', () => {
       'Users with administrative permissions in the parent organization retain those permissions'
     );
     expect(html).toContain('regardless of whether they have a direct membership.');
+  });
+});
+
+describe('Sub-organization seats cells', () => {
+  it('prints the fraction only for a seats-enforcing organization that bought some', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(OverviewSection, {
+        organizationId: '4ab109e4-2558-4290-84d8-894bd50bbdac',
+        data: overview,
+        spendByOrganization: new Map(),
+        usageDataStatus: 'available',
+      })
+    );
+
+    expect(html).toContain(
+      '<td class="px-3 py-3 align-middle text-right tabular-nums">4 / 10</td>'
+    );
+  });
+
+  it('holds a zero-total child at the used count, without a fraction', () => {
+    const data = {
+      ...overview,
+      children: [
+        {
+          ...overview.children[0],
+          seatCount: { used: 4, total: 0 },
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(OverviewSection, {
+        organizationId: data.children[0].id,
+        data,
+        spendByOrganization: new Map(),
+        usageDataStatus: 'available',
+      })
+    );
+
+    expect(html).toContain('<td class="px-3 py-3 align-middle text-right tabular-nums">4</td>');
+    expect(html).not.toContain('4 / 0');
+  });
+
+  it('shows the people table an unenforced child as the used count', () => {
+    const data: React.ComponentProps<typeof PeopleSection>['data'] = {
+      children: [
+        {
+          id: 'd69f3c69-2fe8-4752-bd91-8a493b8581b3',
+          name: 'Owned child',
+          memberCount: 2,
+          pendingInvitationCount: 0,
+          requireSeats: false,
+          seatCount: { used: 2, total: 5 },
+          roleBreakdown: { owner: 2, admin: 0, billing_manager: 0, member: 0 },
+          owners: [],
+        },
+      ],
+      people: [],
+      pageInfo: { page: 1, pageSize: 25, total: 0, pageCount: 1 },
+    };
+    const html = renderToStaticMarkup(React.createElement(PeopleSection, { data }));
+
+    expect(html).toContain('<td class="px-3 py-3 align-middle text-right tabular-nums">2</td>');
+    expect(html).not.toContain('2 / 5');
   });
 });
 

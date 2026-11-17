@@ -42,3 +42,25 @@ export function hasInviteSeatCapacity({
 }: InviteSeatCapacity): boolean {
   return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
 }
+
+type SeatCountReadout = {
+  seatsEnforced: boolean;
+  used: number;
+  total: number;
+  /** Formats one number for the reader's language. */
+  formatNumber: (value: number) => string;
+};
+
+/**
+ * The seats row's value: the used-of-total fraction only when the organization
+ * enforces seats and actually bought some, otherwise the used count alone.
+ * `getOrganizationSeatUsage` answers `seat_count || 0`, so a legacy (or brand
+ * new) organization without purchases would otherwise read `3 / 0` — a row
+ * that reads as over capacity on creation day. The web sub-organizations
+ * tables and both mobile seat rows show this rule; keep them on one function.
+ */
+export function seatCountReadout({ seatsEnforced, used, total, formatNumber }: SeatCountReadout) {
+  return seatsEnforced && total > 0
+    ? `${formatNumber(used)} / ${formatNumber(total)}`
+    : formatNumber(used);
+}

@@ -90,6 +90,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),

@@ -187,6 +187,7 @@ vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   FolderGit2: 'FolderGit2',
   RefreshCw: 'RefreshCw',

@@ -36,6 +36,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Check: 'Check', Clock3: 'Clock3' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',

@@ -59,8 +59,15 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
   // The draft this screen started on, captured once: every field including the
   // time zone can be edited back to a different value, so the dirty test
   // compares against what the reader began with, not against a fresh draft
-  // rebuilt around the current value.
-  const [initialDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
+  // rebuilt around the current value. After a create succeeds, the baseline
+  // moves to the draft the trigger was saved from: the hand-off can drop its
+  // retire (a Back that lands before the push settles keeps this screen
+  // mounted), and a surviving screen must then read its saved values as saved
+  // — resetting the state would leave the form's `defaultValue` fields
+  // painting the created trigger's text over a blank draft.
+  const [initialDraft, setInitialDraft] = useState<TriggerDraft>(() =>
+    createTriggerDraft(deviceTimeZone())
+  );
   const [draft, setDraft] = useState<TriggerDraft>(() => initialDraft);
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const create = useMutation(trpc.webhookTriggers.create.mutationOptions());
@@ -88,12 +95,9 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
         return;
       }
       announcingToast.success(t('cloudAgent.triggers.created'));
-      // The hand-off can drop its retire (a Back that lands before the push
-      // settles keeps this screen mounted), and the guard re-arms once the
-      // leave settles: reset the draft to the screen's starting form so the
-      // re-armed test reads the trigger's saved values as saved, not as an
-      // unsaved draft.
-      setDraft(initialDraft);
+      // The saved values are the new baseline: a screen the hand-off leaves
+      // mounted reads its own saved draft as clean, and a later edit asks.
+      setInitialDraft(draft);
       // Landing on the detail replaces this create screen: Back must not return
       // to a form for a trigger that now exists. Leaving through the guard
       // disarms it first, so the retire `navigation.reset` that the push-then-

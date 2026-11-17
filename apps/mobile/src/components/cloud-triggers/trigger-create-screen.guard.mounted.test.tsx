@@ -223,7 +223,7 @@ describe('TriggerCreateScreen leave guard', () => {
     expect(h.guard.enabled).toBe(true);
   });
 
-  it('Discard replays the leave and disarms the guard', async () => {
+  it('Discard replays the leave, then re-arms the surviving screen', async () => {
     const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
 
     editDraft(renderer, { name: 'probe-draft' });
@@ -237,7 +237,15 @@ describe('TriggerCreateScreen leave guard', () => {
 
     expect(h.repeat).toHaveBeenCalledTimes(1);
     expect(h.repeatSawEnabled).toEqual([false]);
-    expect(h.guard.enabled).toBe(false);
+    // The replay went out disarmed; the effect takes the disarm back after it
+    // dispatches, because a screen the navigator kept (its removal refused)
+    // owes the next edit a prompt. The draft the form still holds keeps the
+    // re-armed test true right away.
+    await waitFor(() => h.guard.enabled);
+    expect(h.guard.enabled).toBe(true);
+
+    pressBack();
+    expect(h.confirm).toHaveBeenCalledTimes(1);
   });
 
   it('a create that succeeded leaves without asking about the saved draft', async () => {
@@ -280,7 +288,7 @@ describe('TriggerCreateScreen leave guard', () => {
     await waitFor(() => h.replace.mock.calls.length === 1);
     await waitFor(() => !h.guard.enabled);
 
-    // The create reset the draft to the screen's starting form, so the
+    // The create moved the dirty baseline to the saved draft, so the
     // re-armed test reads the trigger's saved values as saved: a Back on the
     // surviving screen leaves without a prompt about a draft that landed.
     expect(h.guard.enabled).toBe(false);
@@ -288,8 +296,8 @@ describe('TriggerCreateScreen leave guard', () => {
     expect(h.confirm).not.toHaveBeenCalled();
     expect(h.repeat).toHaveBeenCalledTimes(1);
 
-    // A later edit on the surviving screen must be guarded again: the latch
-    // cleared once the leave settled, so the derived recompute runs.
+    // A later edit on the surviving screen must be guarded again: the replay
+    // effect took the disarm back, so the derived recompute runs.
     editDraft(renderer, { name: 'trigger-new-edited' });
     expect(h.guard.enabled).toBe(true);
 

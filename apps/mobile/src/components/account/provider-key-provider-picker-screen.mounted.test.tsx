@@ -110,11 +110,14 @@ async function mount(organizationId?: string) {
  * Scoped to the mocked list so the row's own clear control — a labelled
  * `Pressable` beside the input — never counts as a provider row. */
 function rowLabels(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, 'FlashList')).flatMap(list =>
-    list.findAll(
-      node => Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
-    )
-  );
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .flatMap(list =>
+      list.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
+      )
+    );
 }
 
 function row(root: ReactTestRenderer['root'], index: number) {

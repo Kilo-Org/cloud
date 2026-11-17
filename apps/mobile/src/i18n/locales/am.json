@@ -4679,6 +4679,8 @@
     "allowAllShown": "የሚታዩትን ሁሉ ፍቀድ",
     "denyAllShown": "የሚታዩትን ሁሉ ከልክል",
     "gatewaysDescription": "Kilo የሞዴል ጥያቄዎችን በVercel AI Gateway ወይም በOpenRouter በኩል ያዘዋውራል። የተሰናከለ ጌትዌይ እነዚያን ጥያቄዎች ያከሽፋል።",
+    "emptyProviderList": "ቢያንስ አንድ አቅራቢ ይፍቀዱ። ባዶ ዝርዝር Kilo ወደ ማንኛውም ሞዴል እንዳያዘዋውር ያግዳል።",
+    "gatewaysUnavailable": "የጌትዌይ ቅንብሮች ለዚህ ድርጅት አይገኙም።",
     "openrouter": "OpenRouter",
     "openrouterNote": "የOpenRouter ጥያቄዎች ከአንድ የተወሰነ ክልል ጋር አልተቆራኙም።",
     "inferenceRegion": "የኢንፈረንስ ክልል",

@@ -4817,6 +4817,8 @@
     "allowAllShown": "Дозволити всі показані",
     "denyAllShown": "Заборонити всі показані",
     "gatewaysDescription": "Kilo спрямовує запити до моделей через Vercel AI Gateway або OpenRouter. Вимкнений шлюз відхиляє такі запити.",
+    "emptyProviderList": "Дозвольте щонайменше одного провайдера. Порожній список блокує всі маршрути до моделей Kilo.",
+    "gatewaysUnavailable": "Налаштування шлюзів недоступні для цієї організації.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Запити OpenRouter не прив’язані до регіону.",
     "inferenceRegion": "Регіон інференсу",

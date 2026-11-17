@@ -4679,6 +4679,8 @@
     "allowAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰੇ ਮਨਜ਼ੂਰ ਕਰੋ",
     "denyAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰਿਆਂ ਨੂੰ ਮਨਾਹੀ ਕਰੋ",
     "gatewaysDescription": "Kilo ਮਾਡਲ ਬੇਨਤੀਆਂ ਨੂੰ Vercel AI Gateway ਜਾਂ OpenRouter ਰਾਹੀਂ ਰੂਟ ਕਰਦਾ ਹੈ। ਬੰਦ ਕੀਤਾ ਗੇਟਵੇ ਉਨ੍ਹਾਂ ਬੇਨਤੀਆਂ ਨੂੰ ਫੇਲ੍ਹ ਕਰਦਾ ਹੈ।",
+    "emptyProviderList": "ਘੱਟੋ-ਘੱਟ ਇੱਕ ਪ੍ਰਦਾਤਾ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ। ਖਾਲੀ ਸੂਚੀ ਹਰ Kilo ਮਾਡਲ ਰੂਟ ਨੂੰ ਰੋਕ ਦਿੰਦੀ ਹੈ।",
+    "gatewaysUnavailable": "ਇਸ ਸੰਗਠਨ ਲਈ ਗੇਟਵੇ ਸੈਟਿੰਗਾਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter ਬੇਨਤੀਆਂ ਕਿਸੇ ਖੇਤਰ ਨਾਲ ਪਿੰਨ ਨਹੀਂ ਹੁੰਦੀਆਂ।",
     "inferenceRegion": "ਇਨਫਰੈਂਸ ਖੇਤਰ",

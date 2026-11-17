@@ -4679,6 +4679,8 @@
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",
     "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",
+    "emptyProviderList": "Tillat minst én leverandør. En tom liste blokkerer alle Kilo-modellruter.",
+    "gatewaysUnavailable": "Innstillinger for inngangsportaler er ikke tilgjengelige for denne organisasjonen.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-forespørsler er ikke låst til en region.",
     "inferenceRegion": "Inferensregion",

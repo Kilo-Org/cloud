@@ -4679,6 +4679,8 @@
     "allowAllShown": "Pèmèt tout sa ki afiche",
     "denyAllShown": "Refize tout sa ki afiche",
     "gatewaysDescription": "Kilo dirije demann modèl yo atravè Vercel AI Gateway oswa OpenRouter. Yon pòtay ki dezaktive fè demann sa yo echwe.",
+    "emptyProviderList": "Pèmèt omwen yon founisè. Yon lis vid bloke tout wout modèl Kilo yo.",
+    "gatewaysUnavailable": "Paramèt pòtay yo pa disponib pou òganizasyon sa a.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Demann OpenRouter yo pa fikse sou yon rejyon.",
     "inferenceRegion": "Rejyon enferans",

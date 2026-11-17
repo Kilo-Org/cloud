@@ -4679,6 +4679,8 @@
     "allowAllShown": "দেখানো সবগুলো অনুমোদন করুন",
     "denyAllShown": "দেখানো সবগুলো নিষিদ্ধ করুন",
     "gatewaysDescription": "Kilo মডেলের অনুরোধ Vercel AI Gateway বা OpenRouter-এর মাধ্যমে রাউট করে। কোনো গেটওয়ে বন্ধ থাকলে সেই অনুরোধগুলো ব্যর্থ হয়।",
+    "emptyProviderList": "অন্তত একটি প্রোভাইডার চালু রাখুন। তালিকা খালি থাকলে Kilo-র কোনো মডেলের অনুরোধই রাউট করা যাবে না।",
+    "gatewaysUnavailable": "এই প্রতিষ্ঠানের জন্য গেটওয়ে সেটিংস উপলব্ধ নয়।",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter অনুরোধগুলো কোনো নির্দিষ্ট অঞ্চলে সীমাবদ্ধ নয়।",
     "inferenceRegion": "ইনফারেন্স অঞ্চল",

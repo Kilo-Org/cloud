@@ -4679,6 +4679,8 @@
     "allowAllShown": "Baimendu erakutsitako guztiak",
     "denyAllShown": "Ukatu erakutsitako guztiak",
     "gatewaysDescription": "Kilok ereduen eskaerak Vercel AI Gateway edo OpenRouter bidez bideratzen ditu. Atebide bat desgaituta badago, eskaera horiek huts egiten dute.",
+    "emptyProviderList": "Baimendu gutxienez hornitzaile bat. Zerrenda hutsak Kiloren eredu-bide guztiak blokeatzen ditu.",
+    "gatewaysUnavailable": "Atebideen ezarpenak ez daude erabilgarri erakunde honetan.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter eskaerak ez daude eskualde bati lotuta.",
     "inferenceRegion": "Inferentzia-eskualdea",

@@ -4679,6 +4679,8 @@
     "allowAllShown": "Oggolow dhammaan kuwa la muujiyay",
     "denyAllShown": "Diid dhammaan kuwa la muujiyay",
     "gatewaysDescription": "Kilo wuxuu codsiyada moodeelka mariyaa Vercel AI Gateway ama OpenRouter. Irrid la damiyay waxay fashilmaa codsiyadaas.",
+    "emptyProviderList": "Oggolow ugu yaraan hal bixiye. Liis madhan wuxuu xannibaa jiheynta moodeel kasta oo Kilo ah.",
+    "gatewaysUnavailable": "Dejinta albaabbada lagama heli karo ururkan.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Codsiyada OpenRouter lama xidhna gobol.",
     "inferenceRegion": "Gobolka falanqaynta",

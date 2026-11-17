@@ -4679,6 +4679,8 @@
     "allowAllShown": "दाखवलेले सर्व अनुमत करा",
     "denyAllShown": "दाखवलेले सर्व नाकारा",
     "gatewaysDescription": "Kilo मॉडेल विनंत्या Vercel AI Gateway किंवा OpenRouter मार्फत राउट करते. बंद केलेला गेटवे त्या विनंत्या अयशस्वी करतो.",
+    "emptyProviderList": "किमान एका प्रदात्याला अनुमती द्या. रिकामी यादी Kilo चे सर्व मॉडेल राउट अवरोधित करते.",
+    "gatewaysUnavailable": "या संस्थेसाठी गेटवे सेटिंग्ज उपलब्ध नाहीत.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter विनंत्या विशिष्ट प्रदेशाशी जोडलेल्या नसतात.",
     "inferenceRegion": "इन्फरन्स प्रदेश",

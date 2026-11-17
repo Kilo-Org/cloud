@@ -4679,6 +4679,8 @@
     "allowAllShown": "Tillad alle viste",
     "denyAllShown": "Afvis alle viste",
     "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",
+    "emptyProviderList": "Tillad mindst én udbyder. En tom liste blokerer alle Kilo-modelruter.",
+    "gatewaysUnavailable": "Gateway-indstillinger er ikke tilgængelige for denne organisation.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-anmodninger er ikke låst til en region.",
     "inferenceRegion": "Inferensregion",

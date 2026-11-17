@@ -4679,6 +4679,8 @@
     "allowAllShown": "Whakaaetia ngā mea katoa e whakaatuhia ana",
     "denyAllShown": "Whakakāhoretia ngā mea katoa e whakaatuhia ana",
     "gatewaysDescription": "Ka tuku a Kilo i ngā tono tauira mā Vercel AI Gateway, mā OpenRouter rānei. Ka rahua ērā tono i tētahi kuwaha kua whakawetohia.",
+    "emptyProviderList": "Whakaaetia kia kotahi te kaiwhakarato i te iti rawa. Ki te kau te rārangi, ka aukatia ngā ara tauira katoa a Kilo.",
+    "gatewaysUnavailable": "Kāore e wātea ana ngā tautuhinga kuwaha mō tēnei whakahaere.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Kāore ngā tono OpenRouter e herea ana ki tētahi rohe.",
     "inferenceRegion": "Rohe whakatau",

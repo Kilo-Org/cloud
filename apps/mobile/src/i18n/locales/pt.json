@@ -4754,6 +4754,8 @@
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",
+    "emptyProviderList": "Permita pelo menos um fornecedor. Uma lista vazia bloqueia todas as rotas de modelos do Kilo.",
+    "gatewaysUnavailable": "As definições de passarelas não estão disponíveis para esta organização.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Os pedidos ao OpenRouter não estão fixados a uma região.",
     "inferenceRegion": "Região de inferência",

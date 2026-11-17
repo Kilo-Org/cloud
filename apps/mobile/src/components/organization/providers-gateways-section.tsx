@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import {
   SettingsSection,
   SettingsSwitchRow,
   SettingsValueRow,
 } from '@/components/organization/settings-form-sections';
 import { QueryError } from '@/components/query-error';
+import { Settings2 } from '@/components/ui/icons';
 import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -79,7 +81,14 @@ export function GatewaySettingsSection({
   }
 
   if (!settings.available) {
-    return null;
+    return (
+      <EmptyState
+        placement="top"
+        className="bg-background px-4 pt-4"
+        icon={Settings2}
+        title={t('organizationModelAccess.gatewaysUnavailable')}
+      />
+    );
   }
 
   const disabled = !canEdit || save.isPending;

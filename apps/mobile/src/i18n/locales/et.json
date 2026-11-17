@@ -4679,6 +4679,8 @@
     "allowAllShown": "Luba kõik kuvatud",
     "denyAllShown": "Keela kõik kuvatud",
     "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",
+    "emptyProviderList": "Luba vähemalt üks teenusepakkuja. Tühi loend blokeerib kõik Kilo mudelimarsruudid.",
+    "gatewaysUnavailable": "Lüüside seaded pole selle organisatsiooni jaoks saadaval.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouteri päringud pole seotud kindla piirkonnaga.",
     "inferenceRegion": "Järeldusepiirkond",

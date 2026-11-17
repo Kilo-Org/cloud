@@ -4679,6 +4679,8 @@
     "allowAllShown": "બતાવેલા બધાને મંજૂર કરો",
     "denyAllShown": "બતાવેલા બધાને નકારો",
     "gatewaysDescription": "Kilo મોડેલ વિનંતીઓને Vercel AI Gateway અથવા OpenRouter દ્વારા રૂટ કરે છે. નિષ્ક્રિય ગેટવે તે વિનંતીઓને નિષ્ફળ કરે છે.",
+    "emptyProviderList": "ઓછામાં ઓછા એક પ્રદાતાને મંજૂરી આપો. ખાલી સૂચિ દરેક Kilo મોડેલ રૂટને અવરોધિત કરે છે.",
+    "gatewaysUnavailable": "આ સંસ્થા માટે ગેટવે સેટિંગ્સ ઉપલબ્ધ નથી.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter વિનંતીઓ કોઈ પ્રદેશ સાથે પિન થયેલી નથી.",
     "inferenceRegion": "ઇન્ફરન્સ પ્રદેશ",

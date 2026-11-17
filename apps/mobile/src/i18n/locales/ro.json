@@ -4748,6 +4748,8 @@
     "allowAllShown": "Permite toate cele afișate",
     "denyAllShown": "Interzice toate cele afișate",
     "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",
+    "emptyProviderList": "Permiteți cel puțin un furnizor. O listă goală blochează toate rutele Kilo către modele.",
+    "gatewaysUnavailable": "Setările porților de acces nu sunt disponibile pentru această organizație.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Cererile OpenRouter nu sunt fixate la o regiune.",
     "inferenceRegion": "Regiune de inferență",

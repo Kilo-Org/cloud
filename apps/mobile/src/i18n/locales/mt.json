@@ -4886,6 +4886,8 @@
     "allowAllShown": "Ippermetti kollha li jidhru",
     "denyAllShown": "Irrifjuta kollha li jidhru",
     "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",
+    "emptyProviderList": "Ħalli mill-inqas fornitur wieħed attiv. Lista vojta timblokka r-rotot kollha tal-mudelli ta' Kilo.",
+    "gatewaysUnavailable": "L-issettjar tal-portali mhuwiex disponibbli għal din l-organizzazzjoni.",
     "openrouter": "OpenRouter",
     "openrouterNote": "It-talbiet ta' OpenRouter mhumiex marbuta ma' reġjun.",
     "inferenceRegion": "Reġjun tal-inferenza",

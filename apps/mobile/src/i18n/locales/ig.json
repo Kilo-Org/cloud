@@ -4679,6 +4679,8 @@
     "allowAllShown": "Kwe ka ihe niile egosiri",
     "denyAllShown": "Jụ ihe niile egosiri",
     "gatewaysDescription": "Kilo na-eziga arịrịọ ihe nlere site na Vercel AI Gateway ma ọ bụ OpenRouter. Ọnụ ụzọ agbanyụrụ na-eme ka arịrịọ ndị ahụ daa.",
+    "emptyProviderList": "Kwe ka ọ dịkarịa ala otu onye na-enye ọrụ. Ndepụta efu na-egbochi ụzọ ihe nlere Kilo niile.",
+    "gatewaysUnavailable": "Ntọala ọnụ ụzọ adịghị maka nzukọ a.",
     "openrouter": "OpenRouter",
     "openrouterNote": "A naghị agbanye arịrịọ OpenRouter na otu mpaghara.",
     "inferenceRegion": "Mpaghara ntule",

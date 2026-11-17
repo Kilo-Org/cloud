@@ -4679,6 +4679,8 @@
     "allowAllShown": "Разреши всички показани",
     "denyAllShown": "Забрани всички показани",
     "gatewaysDescription": "Kilo пренасочва заявките към моделите през Vercel AI Gateway или OpenRouter. Ако шлюзът е изключен, тези заявки са неуспешни.",
+    "emptyProviderList": "Разрешете поне един доставчик. При празен списък Kilo не може да пренасочва заявки към нито един модел.",
+    "gatewaysUnavailable": "Настройките за шлюзове не са налични за тази организация.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Заявките през OpenRouter не са обвързани с регион.",
     "inferenceRegion": "Регион за инференция",

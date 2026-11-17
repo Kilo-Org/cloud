@@ -4679,6 +4679,8 @@
     "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
     "denyAllShown": "Hana duk waɗanda aka nuna",
     "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",
+    "emptyProviderList": "Ba da izinin aƙalla mai bayarwa ɗaya. Jeri mara komai yana toshe duk hanyoyin tura samfuran Kilo.",
+    "gatewaysUnavailable": "Babu saitunan ƙofar shiga ga wannan ƙungiya.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Ba a kulle buƙatun OpenRouter ga yanki ba.",
     "inferenceRegion": "Yankin yin hasashe",

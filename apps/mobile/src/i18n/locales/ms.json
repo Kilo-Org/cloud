@@ -4679,6 +4679,8 @@
     "allowAllShown": "Benarkan semua yang dipaparkan",
     "denyAllShown": "Tolak semua yang dipaparkan",
     "gatewaysDescription": "Kilo menghalakan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dimatikan menggagalkan permintaan tersebut.",
+    "emptyProviderList": "Benarkan sekurang-kurangnya satu pembekal. Senarai kosong menyekat semua laluan model Kilo.",
+    "gatewaysUnavailable": "Tetapan gerbang tidak tersedia untuk organisasi ini.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Permintaan OpenRouter tidak ditetapkan kepada wilayah tertentu.",
     "inferenceRegion": "Wilayah inferens",

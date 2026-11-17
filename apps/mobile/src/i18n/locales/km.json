@@ -4679,6 +4679,8 @@
     "allowAllShown": "អនុញ្ញាតទាំងអស់ដែលបានបង្ហាញ",
     "denyAllShown": "បដិសេធទាំងអស់ដែលបានបង្ហាញ",
     "gatewaysDescription": "Kilo បញ្ជូនសំណើម៉ូដែលតាមរយៈ Vercel AI Gateway ឬ OpenRouter។ ច្រកផ្លូវដែលបានបិទ នឹងធ្វើឱ្យសំណើទាំងនោះបរាជ័យ។",
+    "emptyProviderList": "អនុញ្ញាតអ្នកផ្តល់សេវាយ៉ាងហោចណាស់មួយ។ បញ្ជីទទេនឹងរារាំងការបញ្ជូនសំណើទៅម៉ូដែល Kilo ទាំងអស់។",
+    "gatewaysUnavailable": "ការកំណត់ច្រកផ្លូវមិនមានសម្រាប់អង្គការនេះទេ។",
     "openrouter": "OpenRouter",
     "openrouterNote": "សំណើ OpenRouter មិនត្រូវបានកំណត់ឱ្យជាប់នឹងតំបន់ណាមួយទេ។",
     "inferenceRegion": "តំបន់អនុមាន",

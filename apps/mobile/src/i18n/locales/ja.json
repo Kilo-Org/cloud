@@ -4679,6 +4679,8 @@
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",
+    "emptyProviderList": "少なくとも1つのプロバイダーを許可してください。リストが空の場合、Kiloのすべてのモデルルーティングがブロックされます。",
+    "gatewaysUnavailable": "この組織ではゲートウェイ設定を利用できません。",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouterのリクエストはリージョンに固定されません。",
     "inferenceRegion": "推論リージョン",

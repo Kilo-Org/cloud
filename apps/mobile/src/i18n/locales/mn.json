@@ -4679,6 +4679,8 @@
     "allowAllShown": "Харагдаж буй бүгдийг зөвшөөрөх",
     "denyAllShown": "Харагдаж буй бүгдийг хориглох",
     "gatewaysDescription": "Kilo загварын хүсэлтүүдийг Vercel AI Gateway эсвэл OpenRouter-оор дамжуулна. Идэвхгүй гарц эдгээр хүсэлтийг амжилтгүй болгоно.",
+    "emptyProviderList": "Дор хаяж нэг нийлүүлэгч зөвшөөрнө үү. Жагсаалт хоосон бол Kilo загварын бүх чиглүүлэлт хаагдана.",
+    "gatewaysUnavailable": "Энэ байгууллагад гарцын тохиргоо боломжгүй байна.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-ийн хүсэлтүүд бүсэд бэхлэгдээгүй байна.",
     "inferenceRegion": "Дүгнэлт гаргах бүс",

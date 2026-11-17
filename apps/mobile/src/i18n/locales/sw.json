@@ -4679,6 +4679,8 @@
     "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
     "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
     "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",
+    "emptyProviderList": "Ruhusu angalau mtoa huduma mmoja. Orodha tupu inazuia njia zote za modeli za Kilo.",
+    "gatewaysUnavailable": "Mipangilio ya malango haipatikani kwa shirika hili.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Maombi ya OpenRouter hayafungwi kwa eneo.",
     "inferenceRegion": "Eneo la utambuzi",

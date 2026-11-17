@@ -4679,6 +4679,8 @@
     "allowAllShown": "ყველა ნაჩვენებულის დაშვება",
     "denyAllShown": "ყველა ნაჩვენებულის აკრძალვა",
     "gatewaysDescription": "Kilo მოდელის მოთხოვნებს Vercel AI Gateway-ის ან OpenRouter-ის მეშვეობით მარშრუტიზაციას უკეთებს. გამორთული გეითვეი ამ მოთხოვნებს წარუმატებელს ხდის.",
+    "emptyProviderList": "დაუშვით მინიმუმ ერთი პროვაიდერი. ცარიელი სია Kilo-ს მოდელების ყველა მარშრუტს ბლოკავს.",
+    "gatewaysUnavailable": "გეითვეის პარამეტრები ამ ორგანიზაციისთვის მიუწვდომელია.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-ის მოთხოვნები რეგიონზე არ არის მიმაგრებული.",
     "inferenceRegion": "ინფერენსის რეგიონი",

@@ -4679,6 +4679,8 @@
     "allowAllShown": "표시된 항목 모두 허용",
     "denyAllShown": "표시된 항목 모두 거부",
     "gatewaysDescription": "Kilo는 모델 요청을 Vercel AI Gateway 또는 OpenRouter를 통해 라우팅합니다. 비활성화된 게이트웨이는 해당 요청을 실패 처리합니다.",
+    "emptyProviderList": "공급자를 하나 이상 허용하세요. 목록이 비어 있으면 모든 Kilo 모델 라우팅이 차단됩니다.",
+    "gatewaysUnavailable": "이 조직에서는 게이트웨이 설정을 사용할 수 없습니다.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter 요청은 특정 리전에 고정되지 않습니다.",
     "inferenceRegion": "추론 리전",

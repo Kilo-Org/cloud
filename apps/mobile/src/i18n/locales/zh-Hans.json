@@ -4679,6 +4679,8 @@
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",
+    "emptyProviderList": "请至少允许一个提供商。列表为空会阻止所有 Kilo 模型路由。",
+    "gatewaysUnavailable": "此组织无法使用网关设置。",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter 请求不会固定到某个区域。",
     "inferenceRegion": "推理区域",

@@ -4748,6 +4748,8 @@
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",
     "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",
+    "emptyProviderList": "Atļaujiet vismaz vienu nodrošinātāju. Ja saraksts ir tukšs, tiek bloķēti visi Kilo modeļu maršruti.",
+    "gatewaysUnavailable": "Vārteju iestatījumi šai organizācijai nav pieejami.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter pieprasījumi netiek piesaistīti reģionam.",
     "inferenceRegion": "Secināšanas reģions",

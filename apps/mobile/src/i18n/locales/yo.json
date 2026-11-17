@@ -4679,6 +4679,8 @@
     "allowAllShown": "Gbà gbogbo èyí tí a fi hàn láàyè",
     "denyAllShown": "Kọ gbogbo èyí tí a fi hàn",
     "gatewaysDescription": "Kilo ń tọ́ àwọn ìbéèrè àwòṣe lọ sí Vercel AI Gateway tàbí OpenRouter. Ẹnu-ọ̀nà tí a pa dà yóò mú kí àwọn ìbéèrè yẹn kùnà.",
+    "emptyProviderList": "Fàyè gba ó kéré tán olùpèsè kan. Àtòkọ tí ó ṣófo yóò dí gbogbo ìtọ́sọ́nà àwòṣe Kilo.",
+    "gatewaysUnavailable": "Àwọn ètò ẹnu-ọ̀nà kò sí fún àjọ yìí.",
     "openrouter": "OpenRouter",
     "openrouterNote": "A kò so àwọn ìbéèrè OpenRouter mọ́ ẹkùn kan.",
     "inferenceRegion": "Ẹkùn ìṣàyẹ̀wò àwòṣe",

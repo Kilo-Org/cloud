@@ -4679,6 +4679,8 @@
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",
+    "emptyProviderList": "Salli vähintään yksi palveluntarjoaja. Tyhjä luettelo estää kaikki Kilon mallireitit.",
+    "gatewaysUnavailable": "Yhdyskäytäväasetukset eivät ole käytettävissä tässä organisaatiossa.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-pyyntöjä ei ole sidottu tiettyyn alueeseen.",
     "inferenceRegion": "Päättelyalue",

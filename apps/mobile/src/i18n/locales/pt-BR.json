@@ -4754,6 +4754,8 @@
     "allowAllShown": "Permitir todos os exibidos",
     "denyAllShown": "Negar todos os exibidos",
     "gatewaysDescription": "O Kilo encaminha solicitações de modelos por meio do Vercel AI Gateway ou do OpenRouter. Um portal de acesso desativado faz essas solicitações falharem.",
+    "emptyProviderList": "Permita pelo menos um provedor. Uma lista vazia bloqueia todas as rotas de modelos do Kilo.",
+    "gatewaysUnavailable": "As configurações de portais não estão disponíveis para esta organização.",
     "openrouter": "OpenRouter",
     "openrouterNote": "As solicitações do OpenRouter não são fixadas a uma região.",
     "inferenceRegion": "Região de inferência",

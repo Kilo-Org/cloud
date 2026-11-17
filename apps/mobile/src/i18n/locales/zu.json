@@ -4679,6 +4679,8 @@
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",
+    "emptyProviderList": "Vumela okungenani umhlinzeki oyedwa. Uhlu olungenalutho luvimba zonke izindlela zamamodeli e-Kilo.",
+    "gatewaysUnavailable": "Izilungiselelo zamasango azitholakali kule nhlangano.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Izicelo ze-OpenRouter aziboshelwe esifundeni.",
     "inferenceRegion": "Isifunda sokucabanga",

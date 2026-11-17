@@ -4679,6 +4679,8 @@
     "allowAllShown": "Cho phép tất cả mục đang hiển thị",
     "denyAllShown": "Từ chối tất cả mục đang hiển thị",
     "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",
+    "emptyProviderList": "Hãy cho phép ít nhất một nhà cung cấp. Danh sách trống sẽ chặn mọi tuyến mô hình của Kilo.",
+    "gatewaysUnavailable": "Cài đặt cổng kết nối không khả dụng cho tổ chức này.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Các yêu cầu OpenRouter không được ghim vào một khu vực.",
     "inferenceRegion": "Khu vực suy luận",

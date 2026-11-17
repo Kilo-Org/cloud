@@ -4679,6 +4679,8 @@
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",
+    "emptyProviderList": "Tillåt minst en leverantör. En tom lista blockerar alla Kilos modellvägar.",
+    "gatewaysUnavailable": "Inställningar för nätbryggor är inte tillgängliga för den här organisationen.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-begäranden är inte låsta till en region.",
     "inferenceRegion": "Inferensregion",

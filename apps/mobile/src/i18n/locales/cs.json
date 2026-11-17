@@ -4817,6 +4817,8 @@
     "allowAllShown": "Povolit vše zobrazené",
     "denyAllShown": "Zakázat vše zobrazené",
     "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",
+    "emptyProviderList": "Povolte alespoň jednoho poskytovatele. Při prázdném seznamu Kilo nemůže směrovat požadavky na žádný model.",
+    "gatewaysUnavailable": "Nastavení bran není pro tuto organizaci k dispozici.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Požadavky přes OpenRouter nejsou vázány na region.",
     "inferenceRegion": "Region inference",

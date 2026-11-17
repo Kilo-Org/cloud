@@ -4817,6 +4817,8 @@
     "allowAllShown": "Leisti visus rodomus",
     "denyAllShown": "Drausti visus rodomus",
     "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",
+    "emptyProviderList": "Leiskite bent vieną teikėją. Tuščias sąrašas užblokuoja visus Kilo modelių maršrutus.",
+    "gatewaysUnavailable": "Šiai organizacijai vartų nustatymai nepasiekiami.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter užklausos nėra pririštos prie regiono.",
     "inferenceRegion": "Inferencijos regionas",

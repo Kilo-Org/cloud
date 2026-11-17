@@ -4955,6 +4955,8 @@
     "allowAllShown": "السماح بكل المعروض",
     "denyAllShown": "رفض كل المعروض",
     "gatewaysDescription": "يوجّه Kilo طلبات النماذج عبر Vercel AI Gateway أو OpenRouter. تفشل هذه الطلبات إذا كانت البوابة معطّلة.",
+    "emptyProviderList": "اسمح بمزوّد واحد على الأقل. إذا كانت القائمة فارغة، فلن يتمكن Kilo من توجيه الطلبات إلى أي نموذج.",
+    "gatewaysUnavailable": "إعدادات البوابات غير متاحة لهذه المؤسسة.",
     "openrouter": "OpenRouter",
     "openrouterNote": "طلبات OpenRouter غير مثبّتة على منطقة معيّنة.",
     "inferenceRegion": "منطقة الاستدلال",

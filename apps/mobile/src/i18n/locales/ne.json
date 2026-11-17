@@ -4679,6 +4679,8 @@
     "allowAllShown": "देखाइएका सबैलाई अनुमति दिनुहोस्",
     "denyAllShown": "देखाइएका सबैलाई अस्वीकार गर्नुहोस्",
     "gatewaysDescription": "Kilo ले मोडेल अनुरोधहरू Vercel AI Gateway वा OpenRouter मार्फत रुट गर्छ। अक्षम गरिएको गेटवेले ती अनुरोधहरू असफल बनाउँछ।",
+    "emptyProviderList": "कम्तीमा एउटा प्रदायकलाई अनुमति दिनुहोस्। खाली सूचीले Kilo का सबै मोडेल रुटहरू रोक्छ।",
+    "gatewaysUnavailable": "यो संस्थाका लागि गेटवे सेटिङहरू उपलब्ध छैनन्।",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter का अनुरोधहरू कुनै क्षेत्रमा पिन गरिएका हुँदैनन्।",
     "inferenceRegion": "अनुमान क्षेत्र",

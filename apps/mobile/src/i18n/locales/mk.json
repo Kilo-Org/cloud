@@ -4679,6 +4679,8 @@
     "allowAllShown": "Дозволи ги сите прикажани",
     "denyAllShown": "Забрани ги сите прикажани",
     "gatewaysDescription": "Kilo ги насочува барањата за моделите преку Vercel AI Gateway или OpenRouter. Исклучен портал ги отфрла тие барања.",
+    "emptyProviderList": "Дозволете барем еден добавувач. Празна листа ги блокира сите патишта на Kilo до моделите.",
+    "gatewaysUnavailable": "Поставките за портали не се достапни за оваа организација.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Барањата на OpenRouter не се врзани за регион.",
     "inferenceRegion": "Регион за инференција",

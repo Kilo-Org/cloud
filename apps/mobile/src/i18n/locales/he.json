@@ -4748,6 +4748,8 @@
     "allowAllShown": "אשר את כל המוצגים",
     "denyAllShown": "חסום את כל המוצגים",
     "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",
+    "emptyProviderList": "יש לאפשר לפחות ספק אחד. רשימה ריקה חוסמת את כל נתיבי המודלים של Kilo.",
+    "gatewaysUnavailable": "הגדרות השערים אינן זמינות עבור הארגון הזה.",
     "openrouter": "OpenRouter",
     "openrouterNote": "בקשות OpenRouter אינן מוצמדות לאזור.",
     "inferenceRegion": "אזור הסקה",

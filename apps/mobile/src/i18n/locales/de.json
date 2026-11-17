@@ -4679,6 +4679,8 @@
     "allowAllShown": "Alle angezeigten zulassen",
     "denyAllShown": "Alle angezeigten sperren",
     "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",
+    "emptyProviderList": "Erlaube mindestens einen Anbieter. Ohne Anbieter kann Kilo keine Modellanfragen weiterleiten.",
+    "gatewaysUnavailable": "Gateway-Einstellungen sind für diese Organisation nicht verfügbar.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-Anfragen sind an keine Region gebunden.",
     "inferenceRegion": "Inferenzregion",

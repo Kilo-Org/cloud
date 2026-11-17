@@ -4679,6 +4679,8 @@
     "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
     "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
     "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",
+    "emptyProviderList": "Kamida bitta provayderga ruxsat bering. Bo'sh ro'yxat barcha Kilo model yo'naltirishlarini to'sib qo'yadi.",
+    "gatewaysUnavailable": "Shlyuz sozlamalari bu tashkilot uchun mavjud emas.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter so'rovlari hududga qat'iy biriktirilmagan.",
     "inferenceRegion": "Xulosa chiqarish hududi",

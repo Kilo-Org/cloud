@@ -4886,6 +4886,8 @@
     "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
     "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
     "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",
+    "emptyProviderList": "Ceadaigh soláthraí amháin ar a laghad. Le liosta folamh, ní féidir le Kilo aon samhail a ródú.",
+    "gatewaysUnavailable": "Níl socruithe geata ar fáil don eagraíocht seo.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Níl iarratais OpenRouter ceangailte le réigiún.",
     "inferenceRegion": "Réigiún tátail",

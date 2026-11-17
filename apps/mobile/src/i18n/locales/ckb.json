@@ -4679,6 +4679,8 @@
     "allowAllShown": "ڕێگەدان بە هەموو پیشاندراوەکان",
     "denyAllShown": "ڕەتکردنەوەی هەموو پیشاندراوەکان",
     "gatewaysDescription": "Kilo داواکارییەکانی مۆدێل لە ڕێگەی Vercel AI Gateway یان OpenRouter ئاڕاستە دەکات. ئەگەر دەروازەیەک ناچالاک بێت، ئەو داواکارییانە سەرناکەون.",
+    "emptyProviderList": "لانیکەم ڕێگە بە یەک دابینکەر بدە. لیستێکی بەتاڵ ڕێگری لە هەموو ئاڕاستەکردنێکی مۆدێلی Kilo دەکات.",
+    "gatewaysUnavailable": "ڕێکخستنەکانی دەروازە بۆ ئەم ڕێکخراوە بەردەست نین.",
     "openrouter": "OpenRouter",
     "openrouterNote": "داواکارییەکانی OpenRouter بە هیچ ناوچەیەکەوە نەبەستراون.",
     "inferenceRegion": "ناوچەی ئینفەرێنس",

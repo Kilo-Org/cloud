@@ -4748,6 +4748,8 @@
     "allowAllShown": "Autoriser tous ceux affichés",
     "denyAllShown": "Refuser tous ceux affichés",
     "gatewaysDescription": "Kilo achemine les requêtes de modèles via Vercel AI Gateway ou OpenRouter. Une passerelle désactivée fait échouer ces requêtes.",
+    "emptyProviderList": "Autorisez au moins un fournisseur. Une liste vide bloque tout acheminement vers les modèles Kilo.",
+    "gatewaysUnavailable": "Les paramètres de passerelle ne sont pas disponibles pour cette organisation.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Les requêtes OpenRouter ne sont pas rattachées à une région.",
     "inferenceRegion": "Région d'inférence",

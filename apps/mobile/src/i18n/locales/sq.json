@@ -4679,6 +4679,8 @@
     "allowAllShown": "Lejo çdo gjë të shfaqur",
     "denyAllShown": "Ndal çdo gjë të shfaqur",
     "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",
+    "emptyProviderList": "Lejoni të paktën një ofrues. Një listë bosh bllokon çdo rrugëzim të modeleve të Kilo.",
+    "gatewaysUnavailable": "Cilësimet e portave nuk janë të disponueshme për këtë organizatë.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Kërkesat e OpenRouter nuk fiksohen në një rajon.",
     "inferenceRegion": "Rajoni i inferencës",

@@ -4679,6 +4679,8 @@
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",
+    "emptyProviderList": "En az bir sağlayıcıya izin verin. Boş bir liste tüm Kilo model yönlendirmelerini engeller.",
+    "gatewaysUnavailable": "Ağ geçidi ayarları bu kuruluş için kullanılamıyor.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter istekleri bir bölgeye sabitlenmez.",
     "inferenceRegion": "Çıkarım bölgesi",

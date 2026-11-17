@@ -4679,6 +4679,8 @@
     "allowAllShown": "دکھائے گئے سب کی اجازت دیں",
     "denyAllShown": "دکھائے گئے سب کو مسترد کریں",
     "gatewaysDescription": "Kilo ماڈل کی درخواستیں Vercel AI Gateway یا OpenRouter کے ذریعے روٹ کرتا ہے۔ غیر فعال گیٹ وے ان درخواستوں کو ناکام کر دیتا ہے۔",
+    "emptyProviderList": "کم از کم ایک پرووائیڈر کی اجازت دیں۔ خالی فہرست Kilo ماڈل کے تمام روٹس بند کر دیتی ہے۔",
+    "gatewaysUnavailable": "اس تنظیم کے لیے گیٹ وے کی ترتیبات دستیاب نہیں ہیں۔",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter کی درخواستیں کسی خطے سے منسلک نہیں ہوتیں۔",
     "inferenceRegion": "انفرنس کا خطہ",

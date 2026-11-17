@@ -4955,6 +4955,8 @@
     "allowAllShown": "Caniatáu pob un a ddangosir",
     "denyAllShown": "Gwrthod pob un a ddangosir",
     "gatewaysDescription": "Mae Kilo yn anfon ceisiadau model drwy Vercel AI Gateway neu OpenRouter. Bydd y ceisiadau hynny'n methu os yw'r porth wedi'i analluogi.",
+    "emptyProviderList": "Caniatewch o leiaf un darparwr. Mae rhestr wag yn rhwystro pob llwybr model Kilo.",
+    "gatewaysUnavailable": "Nid yw gosodiadau pyrth ar gael ar gyfer y sefydliad hwn.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Nid yw ceisiadau OpenRouter wedi'u pinio i ranbarth.",
     "inferenceRegion": "Rhanbarth casgliadu",

@@ -4679,6 +4679,8 @@
     "allowAllShown": "Avelao daholo izay aseho",
     "denyAllShown": "Lavina daholo izay aseho",
     "gatewaysDescription": "Ny Kilo dia mandefa fangatahana modely amin'ny alalan'ny Vercel AI Gateway na OpenRouter. Ny vavahady voavono dia mahatonga ireo fangatahana ireo tsy hahomby.",
+    "emptyProviderList": "Avelao hiasa mpamatsy iray farafahakeliny. Ny lisitra foana dia manakana ny lalana rehetra mankany amin'ny modely Kilo.",
+    "gatewaysUnavailable": "Tsy azo ampiasaina ho an'ity fikambanana ity ny fikirana vavahady.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Ny fangatahana OpenRouter dia tsy mifatotra amin'ny faritra iray.",
     "inferenceRegion": "Faritra fanodinana",

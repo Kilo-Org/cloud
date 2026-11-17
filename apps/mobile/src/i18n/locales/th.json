@@ -4679,6 +4679,8 @@
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",
+    "emptyProviderList": "อนุญาตผู้ให้บริการอย่างน้อยหนึ่งราย หากรายการว่างจะบล็อกการกำหนดเส้นทางโมเดลทั้งหมดของ Kilo",
+    "gatewaysUnavailable": "การตั้งค่าเกตเวย์ไม่พร้อมใช้งานสำหรับองค์กรนี้",
     "openrouter": "OpenRouter",
     "openrouterNote": "คำขอของ OpenRouter ไม่ได้ถูกตรึงไว้กับภูมิภาคใดภูมิภาคหนึ่ง",
     "inferenceRegion": "ภูมิภาคการอนุมาน",

@@ -4748,6 +4748,8 @@
     "allowAllShown": "Consenti tutti quelli mostrati",
     "denyAllShown": "Nega tutti quelli mostrati",
     "gatewaysDescription": "Kilo instrada le richieste dei modelli tramite Vercel AI Gateway o OpenRouter. Un canale di accesso disattivato fa fallire tali richieste.",
+    "emptyProviderList": "Consenti almeno un fornitore. Con un elenco vuoto, tutte le route dei modelli Kilo vengono bloccate.",
+    "gatewaysUnavailable": "Le impostazioni dei canali di accesso non sono disponibili per questa organizzazione.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Le richieste a OpenRouter non sono vincolate a una regione.",
     "inferenceRegion": "Regione di inferenza",

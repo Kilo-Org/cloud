@@ -4679,6 +4679,8 @@
     "allowAllShown": "Kan mul'atan hunda hayyami",
     "denyAllShown": "Kan mul'atan hunda dhorki",
     "gatewaysDescription": "Kilo gaaffiiwwan moodelaa Vercel AI Gateway yookaan OpenRouter keessa geessa. Kallattiin cufame gaaffiiwwan sana ni kasaasa.",
+    "emptyProviderList": "Yoo xiqqaate dhiyeessaa tokko hayyami. Tarreen duwwaan karaa moodelaa Kilo hunda ni cufa.",
+    "gatewaysUnavailable": "Qindaa'inni kallattiiwwanii dhaabbata kanaaf hin argamu.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Gaaffiiwwan OpenRouter naannoo tokkoon hin hidhamne.",
     "inferenceRegion": "Naannoo raawwii",

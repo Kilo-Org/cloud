@@ -4817,6 +4817,8 @@
     "allowAllShown": "Dovoli vse prikazane",
     "denyAllShown": "Zavrni vse prikazane",
     "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",
+    "emptyProviderList": "Dovolite vsaj enega ponudnika. Prazen seznam blokira vse poti modelov Kilo.",
+    "gatewaysUnavailable": "Nastavitve prehodov za to organizacijo niso na voljo.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Zahteve OpenRouter niso vezane na regijo.",
     "inferenceRegion": "Regija sklepanja",

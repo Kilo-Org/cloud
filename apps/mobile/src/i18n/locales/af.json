@@ -4679,6 +4679,8 @@
     "allowAllShown": "Laat almal wat gewys word toe",
     "denyAllShown": "Weier almal wat gewys word",
     "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",
+    "emptyProviderList": "Laat ten minste een verskaffer toe. 'n Leë lys blokkeer elke Kilo-modelroete.",
+    "gatewaysUnavailable": "Gateway-instellings is nie vir hierdie organisasie beskikbaar nie.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter-versoeke is nie aan 'n streek vasgepen nie.",
     "inferenceRegion": "Inferensiestreek",

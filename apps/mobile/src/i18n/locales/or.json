@@ -4679,6 +4679,8 @@
     "allowAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ଅନୁମତି ଦିଅନ୍ତୁ",
     "denyAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ବାରଣ କରନ୍ତୁ",
     "gatewaysDescription": "Kilo ମଡେଲ ଅନୁରୋଧଗୁଡ଼ିକୁ Vercel AI Gateway କିମ୍ବା OpenRouter ମାଧ୍ୟମରେ ରୁଟ କରେ। ନିଷ୍କ୍ରିୟ ଗେଟୱେ ସେହି ଅନୁରୋଧଗୁଡ଼ିକୁ ବିଫଳ କରେ।",
+    "emptyProviderList": "ଅତିକମରେ ଗୋଟିଏ ପ୍ରଦାତାକୁ ଅନୁମତି ଦିଅନ୍ତୁ। ଖାଲି ତାଲିକା ସମସ୍ତ Kilo ମଡେଲ ରୁଟକୁ ଅବରୋଧ କରେ।",
+    "gatewaysUnavailable": "ଏହି ସଂସ୍ଥା ପାଇଁ ଗେଟୱେ ସେଟିଂସ ଉପଲବ୍ଧ ନାହିଁ।",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter ଅନୁରୋଧଗୁଡ଼ିକ ଏକ ଅଞ୍ଚଳ ସହିତ ପିନ ହୋଇନଥାଏ।",
     "inferenceRegion": "ଇନଫରେନ୍ସ ଅଞ୍ଚଳ",

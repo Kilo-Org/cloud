@@ -4679,6 +4679,8 @@
     "allowAllShown": "Leyfa allt sem sýnt er",
     "denyAllShown": "Hafna öllu sem sýnt er",
     "gatewaysDescription": "Kilo beinir beiðnum um líkön í gegnum Vercel AI Gateway eða OpenRouter. Óvirk gátt lætur þessar beiðnir mistakast.",
+    "emptyProviderList": "Leyfðu að minnsta kosti einn veitanda. Tómur listi lokar á allar beiningar Kilo til líkana.",
+    "gatewaysUnavailable": "Gáttastillingar eru ekki í boði fyrir þessi samtök.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Beiðnir OpenRouter eru ekki bundnar við svæði.",
     "inferenceRegion": "Ályktunarsvæði",

@@ -4679,6 +4679,8 @@
     "allowAllShown": "చూపిన అన్నింటినీ అనుమతించు",
     "denyAllShown": "చూపిన అన్నింటినీ నిరాకరించు",
     "gatewaysDescription": "Kilo మోడల్ అభ్యర్థనలను Vercel AI Gateway లేదా OpenRouter ద్వారా రూట్ చేస్తుంది. నిలిపివేయబడిన గేట్వే ఆ అభ్యర్థనలను విఫలం చేస్తుంది.",
+    "emptyProviderList": "కనీసం ఒక ప్రొవైడర్ను అనుమతించండి. ఖాళీ జాబితా అన్ని Kilo మోడల్ రూట్లను బ్లాక్ చేస్తుంది.",
+    "gatewaysUnavailable": "ఈ సంస్థకు గేట్వే సెట్టింగ్లు అందుబాటులో లేవు.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter అభ్యర్థనలు ఏ ప్రాంతానికీ పిన్ చేయబడవు.",
     "inferenceRegion": "ఇన్ఫరెన్స్ ప్రాంతం",

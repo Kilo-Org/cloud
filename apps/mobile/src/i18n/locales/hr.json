@@ -4748,6 +4748,8 @@
     "allowAllShown": "Dopusti sve prikazano",
     "denyAllShown": "Zabrani sve prikazano",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modela kroz Vercel AI Gateway ili OpenRouter. Onemogućen pristupnik odbija te zahtjeve.",
+    "emptyProviderList": "Dopustite barem jednog pružatelja. Prazan popis blokira sve Kilo rute modela.",
+    "gatewaysUnavailable": "Postavke pristupnika nisu dostupne za ovu organizaciju.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Zahtjevi kroz OpenRouter nisu vezani uz regiju.",
     "inferenceRegion": "Regija zaključivanja",

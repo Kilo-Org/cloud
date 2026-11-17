@@ -4679,6 +4679,8 @@
     "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
     "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
     "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",
+    "emptyProviderList": "අවම වශයෙන් එක් සපයන්නෙකුට ඉඩ දෙන්න. හිස් ලැයිස්තුවක් සෑම Kilo ආකෘති මාර්ගයක්ම අවහිර කරයි.",
+    "gatewaysUnavailable": "මෙම සංවිධානය සඳහා ද්වාර සැකසීම් ලබා ගත නොහැක.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter ඉල්ලීම් කලාපයකට සවි නොකෙරේ.",
     "inferenceRegion": "අනුමාන කලාපය",

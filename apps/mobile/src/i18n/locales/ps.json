@@ -4679,6 +4679,8 @@
     "allowAllShown": "ټولو ښودل شوو ته اجازه ورکړه",
     "denyAllShown": "ټول ښودل شوي منع کړه",
     "gatewaysDescription": "Kilo د ماډل غوښتنې د Vercel AI Gateway یا OpenRouter له لارې لېږي. یوه غیر فعاله دروازه هغه غوښتنې ناکاموي.",
+    "emptyProviderList": "لږ تر لږه یو عرضه کوونکي ته اجازه ورکړئ. تش لېست د Kilo د ماډل ټولې لارې بندوي.",
+    "gatewaysUnavailable": "د دروازې تنظیمات د دې سازمان لپاره شتون نه لري.",
     "openrouter": "OpenRouter",
     "openrouterNote": "د OpenRouter غوښتنې یوې سیمې ته نه ټاکل کېږي.",
     "inferenceRegion": "د استنباط سیمه",

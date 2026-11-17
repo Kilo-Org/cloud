@@ -4817,6 +4817,8 @@
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",
+    "emptyProviderList": "Zezwól na co najmniej jednego dostawcę. Pusta lista blokuje wszystkie trasy modeli Kilo.",
+    "gatewaysUnavailable": "Ustawienia bram nie są dostępne dla tej organizacji.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Żądania OpenRouter nie są przypisane do regionu.",
     "inferenceRegion": "Region wnioskowania",

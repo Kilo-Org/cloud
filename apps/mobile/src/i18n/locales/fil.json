@@ -4679,6 +4679,8 @@
     "allowAllShown": "Payagan lahat ng nakikita",
     "denyAllShown": "Tanggihan lahat ng nakikita",
     "gatewaysDescription": "Ina-route ng Kilo ang mga request sa modelo sa pamamagitan ng Vercel AI Gateway o OpenRouter. Papalya ang mga request na iyon kapag naka-disable ang gateway.",
+    "emptyProviderList": "Mag-allow ng kahit isang provider. Kapag walang laman ang listahan, maba-block ang lahat ng route ng modelo ng Kilo.",
+    "gatewaysUnavailable": "Hindi available ang mga setting ng gateway para sa organisasyong ito.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Hindi naka-pin sa isang rehiyon ang mga request sa OpenRouter.",
     "inferenceRegion": "Rehiyon ng inference",

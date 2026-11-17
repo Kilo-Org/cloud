@@ -4679,6 +4679,8 @@
     "allowAllShown": "Az összes megjelenített engedélyezése",
     "denyAllShown": "Az összes megjelenített letiltása",
     "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",
+    "emptyProviderList": "Engedélyezzen legalább egy szolgáltatót. Üres lista esetén a Kilo egyetlen modellútvonala sem működik.",
+    "gatewaysUnavailable": "Az átjárók beállításai ennél a szervezetnél nem érhetők el.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Az OpenRouter esetében a kérések nincsenek régióhoz rögzítve.",
     "inferenceRegion": "Következtetési régió",

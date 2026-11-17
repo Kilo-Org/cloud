@@ -4679,6 +4679,8 @@
     "allowAllShown": "Göstərilənlərin hamısına icazə ver",
     "denyAllShown": "Göstərilənlərin hamısını qadağan et",
     "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",
+    "emptyProviderList": "Ən azı bir provayderə icazə verin. Boş siyahı bütün Kilo model yönləndirmələrini bloklayır.",
+    "gatewaysUnavailable": "Şlüz ayarları bu təşkilat üçün əlçatan deyil.",
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter sorğuları regiona bağlanmır.",
     "inferenceRegion": "İnferens regionu",

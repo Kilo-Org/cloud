@@ -4679,6 +4679,8 @@
     "allowAllShown": "Alle getoonde toestaan",
     "denyAllShown": "Alle getoonde weigeren",
     "gatewaysDescription": "Kilo routeert modelverzoeken via Vercel AI Gateway of OpenRouter. Een uitgeschakelde toegangspoort laat die verzoeken mislukken.",
+    "emptyProviderList": "Sta minstens één aanbieder toe. Met een lege lijst worden alle modelroutes van Kilo geblokkeerd.",
+    "gatewaysUnavailable": "Instellingen voor toegangspoorten zijn niet beschikbaar voor deze organisatie.",
     "openrouter": "OpenRouter",
     "openrouterNote": "Verzoeken via OpenRouter worden niet aan een regio gekoppeld.",
     "inferenceRegion": "Inferentieregio",

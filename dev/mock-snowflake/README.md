@@ -132,6 +132,6 @@ account's fixture file.
 
 To exercise the usage screen's error state, stop the mock (`pnpm dev:start app
 --without=mock-snowflake`, or kill the mock's tmux pane — not the web app —
-that removes the screen) and reload the screen; the totals and the chart each
-report the failure with a Retry. Start the mock again and press Retry to see it
-recover.
+that removes the screen) and reload the screen; the totals and the breakdowns
+each report the failure with a Try again button. Start the mock again and press
+it to see them recover.

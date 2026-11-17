@@ -3524,7 +3524,6 @@
     },
     "settingsOnWeb": {
       "title": "Impostazioni dell'organizzazione sul web",
-      "integrations": "Integrazioni sul web",
       "usageDetails": "Dettagli di utilizzo",
       "providersAndModels": "Provider e modelli",
       "groups": "Gruppi",
@@ -3533,9 +3532,19 @@
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Raccolta dati",
       "auditLogs": "Registri di controllo",
-      "requestLogs": "Registri delle richieste",
-      "subOrganizations": "Sotto-organizzazioni",
-      "distributeFunds": "Distribuisci fondi"
+      "requestLogs": "Registri delle richieste"
+    },
+    "requestLogs": {
+      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
+      "older": "Ora precedente",
+      "newer": "Ora successiva",
+      "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
+      "emptyTitle": "Nessuna richiesta",
+      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
+      "loadError": "Impossibile caricare i registri delle richieste.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
+      "tokens": "{{input}} input · {{output}} output",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",

@@ -3519,7 +3519,6 @@
     },
     "settingsOnWeb": {
       "title": "Podešavanja organizacije na vebu",
-      "integrations": "Integracije na vebu",
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
@@ -3528,9 +3527,19 @@
       "ssoAndDomain": "SSO i domen",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
-      "requestLogs": "Dnevnici zahteva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodela sredstava"
+      "requestLogs": "Dnevnici zahteva"
+    },
+    "requestLogs": {
+      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
+      "older": "Prethodni sat",
+      "newer": "Sledeći sat",
+      "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
+      "emptyTitle": "Nema zahteva",
+      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
+      "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "tokens": "{{input}} ulaz · {{output}} izlaz",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

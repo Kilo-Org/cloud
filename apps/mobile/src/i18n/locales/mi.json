@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Ngā tautuhinga rōpū i te ipurangi",
-      "integrations": "Ngā Tūhononga i te ipurangi",
       "usageDetails": "Ngā taipitopito whakamahinga",
       "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
       "groups": "Ngā kāhui",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO me te rohe",
       "dataCollection": "Kohinga raraunga",
       "auditLogs": "Ngā pūkete arotake",
-      "requestLogs": "Ngā pūkete tono",
-      "subOrganizations": "Ngā rōpū iti",
-      "distributeFunds": "Tohaina ngā pūtea"
+      "requestLogs": "Ngā pūkete tono"
+    },
+    "requestLogs": {
+      "hint": "Ngā tono o te haora i mua i te mutunga o te awhe, ko ngā mea hou rawa ki mua.",
+      "older": "Haora o mua",
+      "newer": "Haora o muri",
+      "truncated": "He maha ake ngā tono o tēnei haora i ērā e whakaaturia ana i te rārangi.",
+      "emptyTitle": "Kāore he tono",
+      "emptyDescription": "Kāore he tono tomokanga i tēnei haora.",
+      "loadError": "Kāore i taea te uta i ngā pūkete tono.",
+      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū anake e pānui ōna pūkete tono.",
+      "tokens": "{{input}} ki roto · {{output}} ki waho",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",

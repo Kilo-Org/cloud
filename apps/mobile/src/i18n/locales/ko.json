@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "웹에서 조직 설정",
-      "integrations": "웹에서 연동",
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO 및 도메인",
       "dataCollection": "데이터 수집",
       "auditLogs": "감사 로그",
-      "requestLogs": "요청 로그",
-      "subOrganizations": "하위 조직",
-      "distributeFunds": "자금 배분"
+      "requestLogs": "요청 로그"
+    },
+    "requestLogs": {
+      "hint": "선택한 시간대가 끝나기 전 1시간의 요청을 최신순으로 표시합니다.",
+      "older": "이전 1시간",
+      "newer": "다음 1시간",
+      "truncated": "이 시간대에는 목록에 표시된 것보다 많은 요청이 있습니다.",
+      "emptyTitle": "요청 없음",
+      "emptyDescription": "이 시간대에는 게이트웨이 요청이 없습니다.",
+      "loadError": "요청 로그를 불러오지 못했습니다.",
+      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다.",
+      "tokens": "입력 {{input}} · 출력 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "입력 토큰",

@@ -6,20 +6,17 @@ import {
 import { type Href } from 'expo-router';
 
 import {
-  Building2,
   Cpu,
   FileText,
   KeyRound,
   LineChart,
   Lock,
   type LucideIcon,
-  Plug,
   ScrollText,
   Server,
   Shield,
   SlidersHorizontal,
   Users,
-  Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
 import { type AppShellTarget } from '@/lib/app-shell-handoff';
@@ -32,46 +29,42 @@ import { WEB_BASE_URL } from '@/lib/config';
  * reads and writes itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
- * role and plan gates, and its destinations follow
+ * plan gate, and its destinations follow
  * `apps/web/src/app/(app)/components/OrganizationAppSidebar.tsx` plus the gate
  * each web page applies to itself, so a member never sees a row that would
  * bounce them off the page it opened:
  *
- * - the sidebar hides Request logs, Invoices, Sub-organizations and BYOK from a
- *   role without billing authority (`canManageOrganizationBilling`);
- * - the sidebar hides Groups below the enterprise plan;
- * - `sub-organizations` and `distribute-funds` additionally redirect for a
- *   child organization (`parent_organization_id !== null`);
- * - `integrations` renders for every member;
- * - `custom-modes` is one of the areas the app opens itself, so it is an in-app
- *   row rather than a web one;
- * - `data-collection` is the dashboard card a teams plan shows where an
- *   enterprise plan shows providers and models;
  * - `sso-and-domain` and `data-collection` are dashboard cards on the full web,
  *   but the app shell owns both, so those two rows hand off to shell pages
- *   instead of the full-web dashboard. Email preferences is a card with no
- *   shell page, so it has no row: the dashboard is a billing surface.
+ *   instead of the full-web dashboard. The first renders on an enterprise
+ *   dashboard and the second on a teams one, the card a teams plan shows where
+ *   an enterprise plan shows providers and models;
+ * - Email preferences is a card with no shell page, so it has no row: the
+ *   dashboard is a billing surface.
  *
- * Seven areas are in-app destinations instead, and each carries the gate its
- * own procedure applies: usage (every member), the audit log (billing role,
- * enterprise plan), Model Access (billing role, enterprise plan), guardrails
- * (`owner`/`admin` and the organization's Kilo Encrypt setting), custom modes
- * (no gate) and groups (the enterprise plan), and BYOK (the billing role,
- * opening the app's own provider-keys screen with the organization's scope).
+ * Usage, the audit log, request logs, Model Access, guardrails, custom modes,
+ * groups and BYOK are the areas the app reads and writes itself, so their rows
+ * open the app's own screens instead of a page. Usage is visible to every
+ * member, as on the web sidebar; the audit log's gate is the one its procedure
+ * applies (billing role and the enterprise plan); groups take the enterprise
+ * plan they are sold with; request logs and BYOK take the sidebar's billing-role
+ * gate, which their procedures apply too; Model Access takes the sidebar's
+ * billing-role gate and the enterprise plan its page refuses below; guardrails
+ * take `owner`/`admin` and the organization's Kilo Encrypt setting, which the
+ * guardrails procedure enforces; custom modes take no gate, which is the gate
+ * their page has. BYOK additionally opens the app's own provider-keys screen
+ * with the organization's scope.
+ *
+ * Three sidebar destinations have no row here at all: `sub-organizations` and
+ * its `distribute-funds` section are a parent-only administration area this app
+ * does not reimplement, and `integrations` opens the app's own integrations
+ * screen from the members card, so the hub names none of them and links nowhere
+ * for them.
  */
-type OrgSettingsArea =
-  | 'ssoAndDomain'
-  | 'dataCollection'
-  | 'requestLogs'
-  | 'integrations'
-  | 'subOrganizations'
-  | 'distributeFunds';
+type OrgSettingsArea = 'ssoAndDomain' | 'dataCollection';
 
 export type OrgSettingsGate = Readonly<{
-  role: OrganizationRole | undefined;
   plan: 'teams' | 'enterprise';
-  /** The organization has no parent: `parent_organization_id === null`. */
-  isTopLevel: boolean;
 }>;
 
 /** Where a row opens: a full-web page, or a shell page reached by hand-off. */
@@ -96,6 +89,7 @@ type OrgInAppSettingsArea =
   | 'groups'
   | 'usageDetails'
   | 'auditLogs'
+  | 'requestLogs'
   | 'providersAndModels'
   | 'guardrails'
   | 'byok';
@@ -160,41 +154,11 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     shellPage: 'organization-data-collection',
     visible: gate => gate.plan === 'teams',
   },
-  // "Request Logs": billing role.
-  {
-    area: 'requestLogs',
-    icon: FileText,
-    suffix: '/request-logs',
-    visible: gate => canManageOrganizationBilling(gate.role),
-  },
-  // "Integrations": no gate in the sidebar or on the page.
-  { area: 'integrations', icon: Plug, suffix: '/integrations', visible: () => true },
-  // "Sub-organizations": billing role and a top-level organization.
-  {
-    area: 'subOrganizations',
-    icon: Building2,
-    suffix: '/sub-organizations',
-    visible: gate => canManageOrganizationBilling(gate.role) && gate.isTopLevel,
-  },
-  // Distribute funds is a sub-organizations section, so it carries that
-  // section's gate rather than a page of its own.
-  {
-    area: 'distributeFunds',
-    icon: Wallet,
-    suffix: '/sub-organizations/distribute-funds',
-    visible: gate => canManageOrganizationBilling(gate.role) && gate.isTopLevel,
-  },
 ];
 
 const TITLE_KEYS = {
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
   dataCollection: 'organization.settingsOnWeb.dataCollection',
-  requestLogs: 'organization.settingsOnWeb.requestLogs',
-  // The in-app organization Integrations row opens the app's own screen; this
-  // one opens the web page, so it names the web instead of repeating that title.
-  integrations: 'organization.settingsOnWeb.integrations',
-  subOrganizations: 'organization.settingsOnWeb.subOrganizations',
-  distributeFunds: 'organization.settingsOnWeb.distributeFunds',
 } satisfies Record<OrgSettingsArea, string>;
 
 /**
@@ -250,6 +214,14 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
     href: () => '/(app)/(tabs)/(3_profile)/organization/audit-log',
     visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
   },
+  // "Request logs": the sidebar's billing-role gate, and the procedure behind
+  // the page answers only that role, so the row and the screen read one gate.
+  {
+    area: 'requestLogs',
+    icon: FileText,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/request-logs',
+    visible: gate => canManageOrganizationBilling(gate.role),
+  },
   // "Model Access": the sidebar's own gate (billing role, enterprise plan),
   // which is also the plan the page itself refuses below.
   {
@@ -283,15 +255,16 @@ const IN_APP_TITLE_KEYS = {
   // area under Dashboard, and check:i18n refuses a second key with this copy.
   usageDetails: 'organization.settingsOnWeb.usageDetails',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
+  requestLogs: 'organization.settingsOnWeb.requestLogs',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   guardrails: 'organization.settingsOnWeb.guardrails',
   byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;
 
 /**
- * The rows this role and plan may open, in the order the section shows them.
- * A row whose gate fails is absent rather than disabled: the web page would
- * refuse it too, and a control that cannot work is not a control.
+ * The rows this plan may open, in the order the section shows them. A row whose
+ * gate fails is absent rather than disabled: the web page would refuse it too,
+ * and a control that cannot work is not a control.
  */
 export function visibleOrgSettingsRows(
   gate: OrgSettingsGate,
@@ -313,10 +286,10 @@ export function visibleOrgSettingsRows(
  * them, each already carrying the organization it was opened for.
  *
  * The role and the plan arrive on the organization row that decides whether the
- * hub renders at all, so usage, the audit log and Model Access paint on the
- * hub's first frame. Guardrails also reads the organization's Kilo Encrypt
- * setting, so it lands with the membership payload — the same commit that
- * paints the web rows below it, so nothing already on screen moves.
+ * hub renders at all, so usage, the audit log, request logs and Model Access
+ * paint on the hub's first frame. Guardrails also reads the organization's Kilo
+ * Encrypt setting, so it lands with the membership payload — the same commit
+ * that paints the web rows below it, so nothing already on screen moves.
  */
 export function visibleInAppSettingsRows(
   gate: OrgInAppSettingsGate,

@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "په ویب کې د سازمان ترتیبات",
-      "integrations": "په ویب کې ادغامونه",
       "usageDetails": "د کارونې جزئیات",
       "providersAndModels": "وړاندې کوونکي او ماډلونه",
       "groups": "ډلې",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO او ډومېن",
       "dataCollection": "د معلوماتو راټولول",
       "auditLogs": "د پلټنې لاګونه",
-      "requestLogs": "د غوښتنو لاګونه",
-      "subOrganizations": "فرعي سازمانونه",
-      "distributeFunds": "پیسې ووېشئ"
+      "requestLogs": "د غوښتنو لاګونه"
+    },
+    "requestLogs": {
+      "hint": "د کړکۍ تر پای وړاندې د یو ساعت غوښتنې، نوې یې لومړی.",
+      "older": "پخوانی ساعت",
+      "newer": "نوی ساعت",
+      "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
+      "emptyTitle": "غوښتنې نشته",
+      "emptyDescription": "په دې ساعت کې د ګېټوې غوښتنې نشته.",
+      "loadError": "د غوښتنو لاګونه بار نه شول.",
+      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
+      "tokens": "{{input}} ننوتي · {{output}} وتلي",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",

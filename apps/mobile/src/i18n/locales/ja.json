@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
-      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSOとドメイン",
       "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
+    },
+    "requestLogs": {
+      "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",
+      "older": "前の1時間",
+      "newer": "次の1時間",
+      "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
+      "emptyTitle": "リクエストはありません",
+      "emptyDescription": "この1時間にゲートウェイへのリクエストはありません。",
+      "loadError": "リクエストログを読み込めませんでした。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "tokens": "入力 {{input}} · 出力 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "入力トークン",

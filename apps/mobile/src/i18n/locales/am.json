@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
-      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO እና ጎራ",
       "dataCollection": "የውሂብ አሰባሰብ",
       "auditLogs": "የኦዲት መዝገቦች",
-      "requestLogs": "የጥያቄ መዝገቦች",
-      "subOrganizations": "ንዑስ ድርጅቶች",
-      "distributeFunds": "ገንዘብ ያከፋፍሉ"
+      "requestLogs": "የጥያቄ መዝገቦች"
+    },
+    "requestLogs": {
+      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
+      "older": "ቀዳሚ ሰዓት",
+      "newer": "ቀጣይ ሰዓት",
+      "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
+      "emptyTitle": "ምንም ጥያቄዎች የሉም",
+      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
+      "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
+      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

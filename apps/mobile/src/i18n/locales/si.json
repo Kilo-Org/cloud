@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "වෙබයේ ඇති සංවිධාන සැකසීම්",
-      "integrations": "වෙබයේ ඒකාබද්ධ කිරීම්",
       "usageDetails": "භාවිත විස්තර",
       "providersAndModels": "සපයන්නන් සහ මාදිලි",
       "groups": "කණ්ඩායම්",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO සහ වසම",
       "dataCollection": "දත්ත එකතු කිරීම",
       "auditLogs": "විගණන ලොග",
-      "requestLogs": "ඉල්ලීම් ලොග",
-      "subOrganizations": "උප සංවිධාන",
-      "distributeFunds": "අරමුදල් බෙදා හරින්න"
+      "requestLogs": "ඉල්ලීම් ලොග"
+    },
+    "requestLogs": {
+      "hint": "කාල පරාසය අවසන් වීමට පෙර පැයේ ඉල්ලීම්, නවතම ඒවා මුලින්.",
+      "older": "පෙර පැය",
+      "newer": "ඊළඟ පැය",
+      "truncated": "ලැයිස්තුවේ පෙන්වන ප්‍රමාණයට වඩා ඉල්ලීම් මෙම පැයේ ඇත.",
+      "emptyTitle": "ඉල්ලීම් නැත",
+      "emptyDescription": "මෙම පැයේ gateway ඉල්ලීම් නැත.",
+      "loadError": "ඉල්ලීම් ලොග පූරණය කළ නොහැකි විය.",
+      "permissionDenied": "සංවිධානයක ඉල්ලීම් ලොග කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "tokens": "ආදාන {{input}} · ප්‍රතිදාන {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "ආදාන ටෝකන",

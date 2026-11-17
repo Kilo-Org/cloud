@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
-      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO og domene",
       "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
-      "requestLogs": "Forespørselslogger",
-      "subOrganizations": "Underorganisasjoner",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Forespørselslogger"
+    },
+    "requestLogs": {
+      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
+      "older": "Eldre time",
+      "newer": "Nyere time",
+      "truncated": "Denne timen har flere forespørsler enn listen viser.",
+      "emptyTitle": "Ingen forespørsler",
+      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
+      "loadError": "Kunne ikke laste inn forespørselslogger.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "tokens": "{{input}} inn · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",

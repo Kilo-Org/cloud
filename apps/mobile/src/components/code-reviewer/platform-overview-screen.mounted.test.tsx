@@ -53,6 +53,9 @@ const handoffUrl = vi.hoisted(() =>
   )
 );
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const routerPush = vi.hoisted(() => vi.fn());
+/** Every focus effect the screen registered, in call order; the test re-runs one. */
+const focusEffects = vi.hoisted(() => [] as (() => undefined | (() => void))[]);
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
 
@@ -83,8 +86,13 @@ vi.mock('@/lib/a11y/motion', () => ({
     reducedMotion ? undefined : entrance,
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useFocusEffect: () => undefined,
+  useRouter: () => ({ push: routerPush }),
+  // The real hook runs the effect while the screen is focused; recording it
+  // also lets a test re-run the latest one as the screen regains focus.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    focusEffects.push(effect);
+    effect();
+  },
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -311,6 +319,8 @@ beforeEach(() => {
   scrollView.mockClear();
   handoffUrl.mockClear();
   launchBrowser.mockClear();
+  routerPush.mockClear();
+  focusEffects.length = 0;
   openExternal.mockClear();
   openPicker.mockClear();
 });
@@ -596,12 +606,44 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     expect(config.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the BYOK settings page for an invalid key', async () => {
+  it('opens the app provider-keys screen for an invalid key, without a browser', async () => {
     config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
 
     await pressRecovery('Update BYOK settings');
 
-    expect(launchBrowser).toHaveBeenCalledWith('https://app.kilo.ai/byok');
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-keys');
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('scopes the provider-keys screen to the organization', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings', 'org-1');
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org-1' },
+    });
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the config when the key screen hands the reviewer back', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings');
+    // Nothing to re-read yet: the fix happens on the screen just pushed.
+    expect(config.refetch).not.toHaveBeenCalled();
+
+    // Coming back to the reviewer focuses this screen again.
+    const refocus = focusEffects.at(-1);
+    if (refocus === undefined) {
+      throw new Error('the banner registered no focus effect');
+    }
+    act(() => {
+      refocus();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('opens the reviewer model picker for an unavailable model', async () => {

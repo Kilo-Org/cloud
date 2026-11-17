@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
-      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO ja domeen",
       "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
-      "requestLogs": "Päringulogid",
-      "subOrganizations": "Alamorganisatsioonid",
-      "distributeFunds": "Jaota vahendeid"
+      "requestLogs": "Päringulogid"
+    },
+    "requestLogs": {
+      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
+      "older": "Varasem tund",
+      "newer": "Hilisem tund",
+      "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
+      "emptyTitle": "Päringuid pole",
+      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
+      "loadError": "Päringulogide laadimine ebaõnnestus.",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "tokens": "{{input}} sisse · {{output}} välja",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

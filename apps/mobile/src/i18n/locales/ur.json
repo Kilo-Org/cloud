@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "ویب پر تنظیم کی سیٹنگز",
-      "integrations": "ویب پر انٹیگریشنز",
       "usageDetails": "استعمال کی تفصیلات",
       "providersAndModels": "فراہم کنندگان اور ماڈلز",
       "groups": "گروپس",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO اور ڈومین",
       "dataCollection": "ڈیٹا کا حصول",
       "auditLogs": "آڈٹ لاگز",
-      "requestLogs": "درخواست لاگز",
-      "subOrganizations": "ذیلی تنظیمیں",
-      "distributeFunds": "فنڈز تقسیم کریں"
+      "requestLogs": "درخواست لاگز"
+    },
+    "requestLogs": {
+      "hint": "ونڈو ختم ہونے سے پہلے کے ایک گھنٹے کی درخواستیں، تازہ ترین پہلے۔",
+      "older": "پچھلا گھنٹہ",
+      "newer": "اگلا گھنٹہ",
+      "truncated": "اس گھنٹے میں فہرست میں دکھائی گئی درخواستوں سے زیادہ درخواستیں ہیں۔",
+      "emptyTitle": "کوئی درخواست نہیں",
+      "emptyDescription": "اس گھنٹے میں کوئی گیٹ وے درخواست نہیں۔",
+      "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
+      "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

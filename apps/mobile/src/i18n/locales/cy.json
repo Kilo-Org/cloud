@@ -3690,7 +3690,6 @@
     },
     "settingsOnWeb": {
       "title": "Gosodiadau'r sefydliad ar y we",
-      "integrations": "Integreiddiadau ar y we",
       "usageDetails": "Manylion defnydd",
       "providersAndModels": "Darparwyr a modelau",
       "groups": "Grwpiau",
@@ -3699,9 +3698,19 @@
       "ssoAndDomain": "SSO a pharth",
       "dataCollection": "Casglu data",
       "auditLogs": "Logiau archwilio",
-      "requestLogs": "Logiau ceisiadau",
-      "subOrganizations": "Is-sefydliadau",
-      "distributeFunds": "Dosbarthu arian"
+      "requestLogs": "Logiau ceisiadau"
+    },
+    "requestLogs": {
+      "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",
+      "older": "Awr gynharach",
+      "newer": "Awr ddiweddarach",
+      "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
+      "emptyTitle": "Dim ceisiadau",
+      "emptyDescription": "Does dim ceisiadau porth yn yr awr hon.",
+      "loadError": "Methu llwytho logiau ceisiadau.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
+      "tokens": "{{input}} i mewn · {{output}} allan",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",

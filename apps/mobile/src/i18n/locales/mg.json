@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
-      "integrations": "Fampifandraisana amin'ny tranonkala",
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO sy sehatra",
       "dataCollection": "Fanangonana angona",
       "auditLogs": "Rakitry ny fanaraha-maso",
-      "requestLogs": "Rakitry ny fangatahana",
-      "subOrganizations": "Zana-pikambanana",
-      "distributeFunds": "Hizara vola"
+      "requestLogs": "Rakitry ny fangatahana"
+    },
+    "requestLogs": {
+      "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",
+      "older": "Ora teo aloha",
+      "newer": "Ora manaraka",
+      "truncated": "Mihoatra noho izay aseho ao amin'ny lisitra ny fangatahana tamin'ity ora ity.",
+      "emptyTitle": "Tsy misy fangatahana",
+      "emptyDescription": "Tsy nisy fangatahana tamin'ny vavahady nandritra ity ora ity.",
+      "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
+      "tokens": "{{input}} miditra · {{output}} mivoaka",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

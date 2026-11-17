@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
-      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO és domain",
       "dataCollection": "Adatgyűjtés",
       "auditLogs": "Auditnaplók",
-      "requestLogs": "Kérésnaplók",
-      "subOrganizations": "Alszervezetek",
-      "distributeFunds": "Pénzeszközök elosztása"
+      "requestLogs": "Kérésnaplók"
+    },
+    "requestLogs": {
+      "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",
+      "older": "Korábbi óra",
+      "newer": "Későbbi óra",
+      "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
+      "emptyTitle": "Nincsenek kérések",
+      "emptyDescription": "Ebben az órában nem volt gateway-kérés.",
+      "loadError": "Nem sikerült betölteni a kérésnaplókat.",
+      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "tokens": "{{input}} be · {{output}} ki",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

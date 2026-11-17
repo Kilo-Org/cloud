@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
-      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO ve alan adı",
       "dataCollection": "Veri toplama",
       "auditLogs": "Denetim günlükleri",
-      "requestLogs": "İstek günlükleri",
-      "subOrganizations": "Alt kuruluşlar",
-      "distributeFunds": "Fonları dağıt"
+      "requestLogs": "İstek günlükleri"
+    },
+    "requestLogs": {
+      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
+      "older": "Önceki saat",
+      "newer": "Sonraki saat",
+      "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
+      "emptyTitle": "İstek yok",
+      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
+      "loadError": "İstek günlükleri yüklenemedi.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "tokens": "{{input}} giriş · {{output}} çıkış",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

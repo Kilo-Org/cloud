@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
-      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO fi doomeenii",
       "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
-      "requestLogs": "Galmeewwan gaaffii",
-      "subOrganizations": "Dhaabbilee jalaa",
-      "distributeFunds": "Maallaqa qoodi"
+      "requestLogs": "Galmeewwan gaaffii"
+    },
+    "requestLogs": {
+      "hint": "Gaaffiiwwan sa'aatii xumura yeroo filatamee dura jiru, kan haaraan dura.",
+      "older": "Sa'aatii darbe",
+      "newer": "Sa'aatii itti aanu",
+      "truncated": "Sa'aatiin kun gaaffiiwwan tarree kana irratti mul'atan caalaa qaba.",
+      "emptyTitle": "Gaaffiin hin jiru",
+      "emptyDescription": "Sa'aatii kana keessa gaaffiin gateway hin jiru.",
+      "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "tokens": "{{input}} seene · {{output}} ba'e",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",

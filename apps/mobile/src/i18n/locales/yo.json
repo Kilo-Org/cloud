@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Ààtò àjọ lórí wẹ́ẹ̀bù",
-      "integrations": "Àwọn ìsopọ̀ lórí wẹ́ẹ̀bù",
       "usageDetails": "Àlàyé ìlò",
       "providersAndModels": "Àwọn olùpèsè àti àwòṣe",
       "groups": "Àwọn ẹgbẹ́",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO àti dómèènì",
       "dataCollection": "Gbígba dátà",
       "auditLogs": "Àwọn àkọsílẹ̀ àyẹ̀wò",
-      "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè",
-      "subOrganizations": "Àwọn àjọ abẹ́lé",
-      "distributeFunds": "Pín owó"
+      "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè"
+    },
+    "requestLogs": {
+      "hint": "Àwọn ìbéèrè inú wákàtí kan kí àkókò yìí tó parí, tuntun jùlọ lákọ̀ọ́kọ́.",
+      "older": "Wákàtí tó ṣáájú",
+      "newer": "Wákàtí tó tẹ̀lé",
+      "truncated": "Wákàtí yìí ní ìbéèrè ju èyí tí àtòjọ fi hàn lọ.",
+      "emptyTitle": "Kò sí ìbéèrè",
+      "emptyDescription": "Kò sí ìbéèrè sí ẹnu-ọ̀nà AI nínú wákàtí yìí.",
+      "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
+      "tokens": "{{input}} wọlé · {{output}} jáde",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",

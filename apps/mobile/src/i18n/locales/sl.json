@@ -3576,7 +3576,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavitve organizacije na spletu",
-      "integrations": "Integracije na spletu",
       "usageDetails": "Podrobnosti porabe",
       "providersAndModels": "Ponudniki in modeli",
       "groups": "Skupine",
@@ -3585,9 +3584,19 @@
       "ssoAndDomain": "SSO in domena",
       "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
-      "requestLogs": "Dnevniki zahtev",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Razdeli sredstva"
+      "requestLogs": "Dnevniki zahtev"
+    },
+    "requestLogs": {
+      "hint": "Zahteve iz ure pred koncem časovnega okna, od najnovejše naprej.",
+      "older": "Prejšnja ura",
+      "newer": "Naslednja ura",
+      "truncated": "V tej uri je več zahtev, kot jih prikazuje seznam.",
+      "emptyTitle": "Ni zahtev",
+      "emptyDescription": "V tej uri ni zahtev prek prehoda.",
+      "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "tokens": "{{input}} vhod · {{output}} izhod",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "वेब पर संगठन की सेटिंग्स",
-      "integrations": "वेब पर इंटीग्रेशन",
       "usageDetails": "इस्तेमाल का विवरण",
       "providersAndModels": "प्रदाता और मॉडल",
       "groups": "ग्रुप",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO और डोमेन",
       "dataCollection": "डेटा कलेक्शन",
       "auditLogs": "ऑडिट लॉग",
-      "requestLogs": "रिक्वेस्ट लॉग",
-      "subOrganizations": "सब-संगठन",
-      "distributeFunds": "फ़ंड बाँटें"
+      "requestLogs": "रिक्वेस्ट लॉग"
+    },
+    "requestLogs": {
+      "hint": "विंडो ख़त्म होने से पहले के एक घंटे की रिक्वेस्ट, सबसे नई पहले।",
+      "older": "पिछला घंटा",
+      "newer": "अगला घंटा",
+      "truncated": "इस घंटे की सभी रिक्वेस्ट सूची में नहीं दिख रही हैं।",
+      "emptyTitle": "कोई रिक्वेस्ट नहीं",
+      "emptyDescription": "इस घंटे में कोई गेटवे रिक्वेस्ट नहीं है।",
+      "loadError": "रिक्वेस्ट लॉग लोड नहीं हो सके।",
+      "permissionDenied": "सिर्फ़ संगठन के मालिक, एडमिन या बिलिंग प्रबंधक ही इसके रिक्वेस्ट लॉग देख सकते हैं।",
+      "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

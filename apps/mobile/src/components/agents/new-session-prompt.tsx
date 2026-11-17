@@ -119,6 +119,13 @@ const PROMPT_BOTTOM_FADE_STYLE = {
   bottom: 0,
 } as const;
 const PROMPT_BOTTOM_FADE_FILL = { flex: 1 } as const;
+/**
+ * How far past the hidden part a fade band reaches, in lines. iOS gets a quarter
+ * line, so a clipped descender or ascender fades instead of ending flat at the
+ * edge. Android gets none: its band stays at the hidden part, the rule it
+ * shipped with, because no device run proved a change there.
+ */
+const PROMPT_EDGE_FADE_RAMP_LINES = Platform.OS === 'ios' ? 0.25 : 0;
 const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
 
 /**
@@ -227,6 +234,8 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The band's extra reach past the hidden part, in points at this font scale.
+  const promptEdgeFadeRamp = PROMPT_EDGE_FADE_RAMP_LINES * promptLineHeight;
   // The card rows that render only in some states, read by name in the render
   // below (the measured card chrome covers their height without a static
   // budget, so they need no separate reservation here).
@@ -286,20 +295,22 @@ export function NewSessionPrompt({
   // the field scrolls through the padding before it cuts any text.
   const promptTopFadeStyle = useAnimatedStyle(() => ({
     height: resolveComposerEdgeFadeHeight({
-      scrollOffset: Math.max(
+      clipEdgeOffset: Math.max(
         0,
         promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
       ),
+      edge: 'top',
       lineHeight: promptLineHeight,
+      ramp: promptEdgeFadeRamp,
     }),
   }));
   // The same band at the bottom edge, for the line a scrolled field cuts there.
-  // It covers only the slot of the line that crosses the edge and is never
-  // taller than half a line, so it cannot dim a whole line. No content height is
-  // needed: a draft that ends above that slot leaves the band over blank card,
-  // where it is invisible, which also matters because iOS cannot report the
-  // content height. The band stays mounted, and its height is 0 where the edge
-  // lands on a line boundary. Only iOS renders it.
+  // It covers only the part of that line still inside the field, so it cannot
+  // dim the line above it. No content height is needed: a draft that ends above
+  // that slot leaves the band over blank card, where it is invisible, which also
+  // matters because iOS cannot report the content height. The band stays
+  // mounted, and its height is 0 where the edge lands on a line boundary. Only
+  // iOS renders it.
   const promptBottomFadeStyle = useAnimatedStyle(() => {
     // The bottom clip edge in content coordinates: the scroll offset plus the
     // field's rendered height, where the iOS text view clips at its own bounds.
@@ -310,8 +321,10 @@ export function NewSessionPrompt({
       resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
     return {
       height: resolveComposerEdgeFadeHeight({
-        scrollOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        edge: 'bottom',
         lineHeight: promptLineHeight,
+        ramp: promptEdgeFadeRamp,
       }),
     };
   });

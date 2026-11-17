@@ -12,7 +12,6 @@ import {
   resolveNewSessionPromptHeight,
 } from '@/components/agents/chat-composer-input-height';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
-import { resolveComposerEdgeFadeHeight } from '@/components/agents/new-session-prompt-fit';
 
 /**
  * The platform the component reads at render. The input's scroll gate is the
@@ -330,14 +329,13 @@ describe('NewSessionPrompt top fade band', () => {
 
     // The text view draws scrolled text through its padding and cuts it at its
     // own bounds, so the band starts at the field's top edge, and the offset
-    // has to pass the padding before it reaches the cut line.
-    expect(findFade(renderer, 'top')).toEqual({
-      height: resolveComposerEdgeFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: SCROLLED_OFFSET - PROMPT_INPUT_INSET,
-      }),
-      top: 0,
-    });
+    // has to pass the padding before it reaches the cut line. That leaves 10
+    // points of the cut line above the edge and 14 below it. iOS adds its
+    // quarter-line ramp (6 points at the 24-point line), so the band would reach
+    // 16 points and the 14 points inside the field cap it: the whole cut line
+    // fades. The shipped `min(visible, hidden)` rule gave 10, which left the
+    // clipped ascenders at full contrast.
+    expect(findFade(renderer, 'top')).toEqual({ height: 14, top: 0 });
 
     renderer.unmount();
   });
@@ -351,14 +349,11 @@ describe('NewSessionPrompt top fade band', () => {
     reportScrollOffset(renderer, SCROLLED_OFFSET, platformAct);
 
     // The edit text cuts its text at the padding, so the band starts at the
-    // text box, where the offset already measures the cut.
-    expect(findFade(renderer, 'top')).toEqual({
-      height: resolveComposerEdgeFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: SCROLLED_OFFSET,
-      }),
-      top: PROMPT_INPUT_INSET,
-    });
+    // text box, where the offset already measures the cut: 17 points past the
+    // top edge and 7 inside it. Android passes no ramp and keeps the shipped
+    // `min(visible, hidden)` rule, so the band stays at those 7 points: its
+    // rendering is not proven on a device and must not change.
+    expect(findFade(renderer, 'top')).toEqual({ height: 7, top: PROMPT_INPUT_INSET });
 
     renderer.unmount();
   });
@@ -369,6 +364,14 @@ describe('NewSessionPrompt top fade band', () => {
  * the three-line field, the edge falls 19 points into the line.
  */
 const BOTTOM_SCROLLED_OFFSET = 10;
+
+/**
+ * A scroll offset that leaves the bottom line 88% inside the field: the
+ * three-line field puts the cut edge at the offset plus 81 points, so 12.12
+ * lands it 21.12 points into the line and 2.88 points of the line's box are
+ * past the edge.
+ */
+const ALMOST_WHOLE_LINE_SCROLLED_OFFSET = 12.12;
 
 describe('NewSessionPrompt bottom fade band', () => {
   beforeEach(() => {
@@ -383,14 +386,29 @@ describe('NewSessionPrompt bottom fade band', () => {
 
     // The text view clips at its own bounds, so the band's bottom is the field's
     // bottom, and the cut edge is the scroll offset plus the field's rendered
-    // height, one inset below the first line box's start.
-    expect(findFade(renderer, 'bottom')).toEqual({
-      bottom: 0,
-      height: resolveComposerEdgeFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: BOTTOM_SCROLLED_OFFSET + PROMPT_HEIGHT - PROMPT_INPUT_INSET,
-      }),
-    });
+    // height, one inset below the first line box's start: 19 points into the
+    // line, so 5 points of it are past the edge and 19 are inside. The 6-point
+    // iOS ramp doubles the hidden 5, and the band is 10 points. The shipped
+    // `min(visible, hidden)` rule gave 5.
+    expect(findFade(renderer, 'bottom')).toEqual({ bottom: 0, height: 10 });
+
+    renderer.unmount();
+  });
+
+  it('fades the descenders of a bottom line that is almost wholly visible', async () => {
+    const renderer = await mountPrompt();
+
+    // A slow scroll stops before the line leaves the field: at this offset the
+    // bottom edge sits 21.12 points into the line, so the line is 88% visible
+    // and 2.88 points of its box — the clipped descenders, the 'g' in 'eight' —
+    // are past the edge. The shipped rule gave those 2.88 points, a band too
+    // thin to fade a descender, which then ended flat at full contrast. The
+    // 6-point iOS ramp doubles the hidden part, and the band is 5.76 points.
+    reportScrollOffset(renderer, ALMOST_WHOLE_LINE_SCROLLED_OFFSET, act);
+
+    const band = findFade(renderer, 'bottom');
+    expect(band.bottom).toBe(0);
+    expect(band.height).toBeCloseTo(5.76, 5);
 
     renderer.unmount();
   });
@@ -415,9 +433,10 @@ describe('NewSessionPrompt bottom fade band', () => {
     // keyboard-open floor while the keyboard lands, so the band's cut edge
     // moves with it. One closed line and three open lines put the rendered
     // height at 52 points a quarter of the way through the motion, which places
-    // the cut edge 9 points into its line: the band is 9 points tall there,
-    // where the closed height would place it 21 points in and make it 3, and
-    // the open height would place it 21 points in and make it 3 as well.
+    // the cut edge 9 points into its line: the edge leaves 15 points of the line
+    // past it, so the band takes the 9 points inside the field. The closed
+    // height would place the edge 21 points in and make the band 6, the open
+    // height would place it 21 points in and make it 6 as well.
     const closedHeight = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1);
     const openHeight = resolveNewSessionPromptHeight(
       NEW_SESSION_PROMPT_LINE_HEIGHT,
@@ -426,6 +445,9 @@ describe('NewSessionPrompt bottom fade band', () => {
     const progress = 0.25;
     const renderedHeight = closedHeight + (openHeight - closedHeight) * progress;
     const scrollY = 12;
+
+    // The precondition: the motion renders the field at 52 points.
+    expect(renderedHeight).toBe(52);
 
     keyboardMotion.value = progress;
     const renderer = await mountPrompt({
@@ -440,13 +462,7 @@ describe('NewSessionPrompt bottom fade band', () => {
     // The text view clips at its own bounds, so the band's bottom is the field's
     // bottom at its rendered height, and the cut edge is the scroll offset plus
     // that height, one inset below the first line box's start.
-    expect(findFade(renderer, 'bottom')).toEqual({
-      bottom: 0,
-      height: resolveComposerEdgeFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: scrollY + renderedHeight - PROMPT_INPUT_INSET,
-      }),
-    });
+    expect(findFade(renderer, 'bottom')).toEqual({ bottom: 0, height: 9 });
 
     keyboardMotion.value = 0;
     renderer.unmount();

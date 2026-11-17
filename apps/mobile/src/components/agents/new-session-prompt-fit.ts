@@ -16,39 +16,68 @@
  * on every frame change without shifting layout on load, refresh, or retry.
  */
 
+/** The geometry of the line a scrolled field cuts at one of its edges. */
 export type ResolveComposerEdgeFadeHeightInput = {
-  /** How far the field's cut edge sits into its line, in points. */
-  scrollOffset: number;
+  /** How far the clip edge sits into the field's text, from its first line box, in points. */
+  clipEdgeOffset: number;
+  /** The edge that cuts a line: the field's top or its bottom. */
+  edge: 'top' | 'bottom';
   /** One text line's height, in points. */
   lineHeight: number;
+  /** How far the band may reach past the hidden part, in points. `0` keeps it at the hidden part. */
+  ramp: number;
 };
 
 /**
  * Height of the fade over the line a scrolled composer cuts, in points.
  *
- * A scrolled multiline field cuts a line at the top or the bottom edge it
- * scrolls through. With line boxes `L` tall and the cut edge `y` into one of
- * them, the fragment left on the visible side is the smaller of `y` and
- * `L - y`, and one whole line begins on the other side of the edge. The fade
- * covers the fragment and must not reach a whole line, so it is
- * `min(y, L - y)`.
+ * A scrolled multiline field cuts one line at the edge the draft scrolls
+ * through. That line's box is `L` tall; the part past the clip edge is
+ * `hidden`, and the part still inside the field is `visible = L - hidden`. The
+ * band is
  *
- * That band is never taller than half a line, so a readable line is never
- * dimmed — the failure of both a fixed one-line fade (it washes the first line
- * of any overflowing draft) and a fade sized to the offset alone (past the
- * halfway point it swallows the whole next line). It is 0 where the cut edge
- * lands on a line boundary, because nothing is cut there.
+ *   `min(visible, hidden + min(hidden, ramp))`
+ *
+ * The band always covers the hidden part, which is the half of the glyphs the
+ * edge slices: the clipped ascenders at the top edge and the clipped descenders
+ * at the bottom edge (the 'g' in 'eight'). It then reaches one more `hidden`
+ * into the visible part, capped at `ramp`, so a line that is only slightly cut
+ * gets a band about twice its hidden part and the sliced glyph fades instead of
+ * ending flat at full contrast against the edge. `ramp = 0` gives back
+ * `min(visible, hidden)`.
+ *
+ * The band is never taller than `visible`, so it stays inside the cut line and
+ * cannot dim the whole line above or below it. With `ramp` at a quarter line or
+ * less, it is never taller than five eighths of a line. It is 0 where the clip
+ * edge lands on a line boundary, so a whole line touching the edge mounts no
+ * band and the band does not jump as the draft scrolls.
+ *
+ * iOS passes `ramp = L / 4`, so clipped descenders and ascenders fade. Android
+ * passes `ramp = 0` and keeps the rule it shipped with, because its rendering is
+ * not proven on a device and must not change.
  */
 export function resolveComposerEdgeFadeHeight({
-  scrollOffset,
+  clipEdgeOffset,
+  edge,
   lineHeight,
+  ramp,
 }: ResolveComposerEdgeFadeHeightInput): number {
   'worklet';
-  if (!Number.isFinite(scrollOffset) || !Number.isFinite(lineHeight) || lineHeight <= 0) {
+  if (
+    !Number.isFinite(clipEdgeOffset) ||
+    !Number.isFinite(lineHeight) ||
+    !Number.isFinite(ramp) ||
+    lineHeight <= 0
+  ) {
     return 0;
   }
-  const intoLine = scrollOffset % lineHeight;
-  return Math.max(0, Math.min(intoLine, lineHeight - intoLine));
+  // Where the edge falls inside the cut line, and so how much of that line's box
+  // is past the edge: the part above it at the top edge, the part below it at
+  // the bottom edge.
+  const intoLine = ((clipEdgeOffset % lineHeight) + lineHeight) % lineHeight;
+  const hidden = edge === 'top' ? intoLine : (lineHeight - intoLine) % lineHeight;
+  const visible = lineHeight - hidden;
+  return Math.max(0, Math.min(visible, hidden + Math.min(hidden, Math.max(0, ramp))));
 }
 
 /**

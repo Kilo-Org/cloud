@@ -221,44 +221,101 @@ describe('the New Session keyboard destination', () => {
 
 describe('resolveComposerEdgeFadeHeight', () => {
   const LINE = 24;
+  /** The iOS extra reach past the hidden part: a quarter line. */
+  const IOS_RAMP = LINE / 4;
+  /** Android's extra reach: none, so the band is the hidden part alone. */
+  const ANDROID_RAMP = 0;
 
-  it('hides nothing at the top of the field, where no line is cut', () => {
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 0, lineHeight: LINE })).toBe(0);
+  function at(edge: 'top' | 'bottom', clipEdgeOffset: number, ramp: number) {
+    return resolveComposerEdgeFadeHeight({ clipEdgeOffset, edge, lineHeight: LINE, ramp });
+  }
+
+  it('hides nothing where the clip edge lands on a line boundary', () => {
+    // A whole line touches the edge: no line is cut, at either edge.
+    expect(at('top', 0, IOS_RAMP)).toBe(0);
+    expect(at('bottom', 0, IOS_RAMP)).toBe(0);
+    expect(at('top', 2 * LINE, IOS_RAMP)).toBe(0);
+    expect(at('bottom', LINE, IOS_RAMP)).toBe(0);
   });
 
-  it('covers the fragment the field clips without reaching the line under it', () => {
-    // 1 dp into the line: the fragment is 1 dp of cut glyph tops, and the next
-    // whole line starts 23 dp below the edge, so only 1 dp may be masked.
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 1, lineHeight: LINE })).toBe(1);
-    // 23.9 dp in: the fragment is the last 0.1 dp of a glyph row and the next
-    // whole line begins at 0.1 dp, so a one-line fade would wash a readable
-    // line. The band is what is left of the fragment.
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 23.9, lineHeight: LINE })).toBeCloseTo(
-      0.1,
-      5
-    );
+  it('covers the fragment the field clips at either edge', () => {
+    // 1 dp into the line at the top edge is 1 dp of cut glyph tops, so Android
+    // masks 1 dp and iOS masks the hidden part plus 1 dp of the visible one.
+    expect(at('top', 1, ANDROID_RAMP)).toBe(1);
+    expect(at('top', 1, IOS_RAMP)).toBe(2);
+    // 23.9 dp in at the top edge leaves 0.1 dp inside the field, which caps the
+    // band there: a one-line fade would wash the readable line under it.
+    expect(at('top', 23.9, IOS_RAMP)).toBeCloseTo(0.1, 5);
   });
 
-  it('never masks more than half a line', () => {
-    for (const intoLine of [6, 12, 18]) {
-      expect(
-        resolveComposerEdgeFadeHeight({ scrollOffset: intoLine, lineHeight: LINE })
-      ).toBeLessThanOrEqual(LINE / 2);
+  it('doubles the hidden part on iOS so a clipped descender or ascender fades', () => {
+    // 2.9 dp of the line's box is past the edge, so the cut descenders (the 'g'
+    // in 'eight') end flat at full contrast under the shipped rule. The band is
+    // 5.8 dp: the hidden 2.9 plus 2.9 of the visible part.
+    expect(at('top', 2.9, IOS_RAMP)).toBeCloseTo(5.8, 5);
+    expect(at('bottom', LINE - 2.9, IOS_RAMP)).toBeCloseTo(5.8, 5);
+    // Android keeps the rule it shipped with: the hidden part alone.
+    expect(at('top', 2.9, ANDROID_RAMP)).toBeCloseTo(2.9, 5);
+    expect(at('bottom', LINE - 2.9, ANDROID_RAMP)).toBeCloseTo(2.9, 5);
+  });
+
+  it('caps the extra reach at the ramp', () => {
+    // At the ramp's own 6 dp the band is the hidden part plus the whole ramp.
+    expect(at('top', IOS_RAMP, IOS_RAMP)).toBe(12);
+    // Past the ramp the extra reach stops growing: 7 hidden gives 7 + 6, not
+    // 7 + 7.
+    expect(at('top', 7, IOS_RAMP)).toBe(13);
+  });
+
+  it('takes only the visible part once half a line or more is hidden', () => {
+    // Half a line hidden: 12 dp is inside the field, and the band stops there.
+    expect(at('top', LINE / 2, IOS_RAMP)).toBe(12);
+    expect(at('bottom', LINE / 2, IOS_RAMP)).toBe(12);
+    // More than half hidden: 6 dp is inside the field, so 6 dp is all it takes.
+    expect(at('top', 18, IOS_RAMP)).toBe(6);
+    expect(at('bottom', LINE - 18, IOS_RAMP)).toBe(6);
+    expect(at('top', 18, ANDROID_RAMP)).toBe(6);
+  });
+
+  it('never reaches past the cut line into the line above or below it', () => {
+    for (const intoLine of [0.5, 2, 6, 7, 9, 12, 18, 23.5]) {
+      for (const edge of ['top', 'bottom'] as const) {
+        const hidden = edge === 'top' ? intoLine : LINE - intoLine;
+        const visible = LINE - hidden;
+        expect(at(edge, intoLine, IOS_RAMP)).toBeLessThanOrEqual(visible + 1e-9);
+      }
     }
-    // The halfway point is where fragment and remaining line are equal.
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 12, lineHeight: LINE })).toBe(12);
   });
 
   it('uses the position inside the current line across several lines of scroll', () => {
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: LINE + 4, lineHeight: LINE })).toBe(4);
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 3 * LINE + 20, lineHeight: LINE })).toBe(
-      4
-    );
+    // 4 dp of that line is past the top edge: 4 + 4 on iOS, 4 on Android.
+    expect(at('top', LINE + 4, IOS_RAMP)).toBe(8);
+    expect(at('top', LINE + 4, ANDROID_RAMP)).toBe(4);
+    // At the bottom edge an offset 20 dp into the line leaves 4 dp past it.
+    expect(at('bottom', 3 * LINE + 20, IOS_RAMP)).toBe(8);
+    expect(at('bottom', 3 * LINE + 20, ANDROID_RAMP)).toBe(4);
   });
 
-  it('treats an unmeasurable line or offset as no fade', () => {
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
-    expect(resolveComposerEdgeFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
+  it('treats an unmeasurable line, offset, or ramp as no fade', () => {
+    expect(
+      resolveComposerEdgeFadeHeight({ clipEdgeOffset: 8, edge: 'top', lineHeight: 0, ramp: 6 })
+    ).toBe(0);
+    expect(
+      resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: Number.NaN,
+        edge: 'top',
+        lineHeight: LINE,
+        ramp: IOS_RAMP,
+      })
+    ).toBe(0);
+    expect(
+      resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: 8,
+        edge: 'top',
+        lineHeight: LINE,
+        ramp: Number.NaN,
+      })
+    ).toBe(0);
   });
 });
 

@@ -121,6 +121,20 @@ const UNREADABLE_NOTES = {
   'answer the request a glanceable approval names': true,
 } satisfies Readonly<Record<string, true>>;
 
+/**
+ * The policy the NEW group and the Release composer share: the scopes that
+ * never reach the phone app, the subjects that name no phone change, and the
+ * leading verbs that state a removal or a restriction instead of a feature.
+ */
+const DROP_SCOPES = new Set(areas.newGroup.dropScopes.map(scope => scope.toLocaleLowerCase('en')));
+const DROP_SUBJECT_PATTERNS = areas.newGroup.dropSubjectPatterns.map(
+  pattern => new RegExp(pattern, 'i')
+);
+const CHANGE_PREFIX = new RegExp(`^(?:${areas.newGroup.changePrefixes.join('|')})\\b`, 'i');
+
+/** How many areas the fixes line names; the rest are the polish behind them. */
+const FIXES_AREA_LIMIT = 3;
+
 /** `1.0.16` from its heading; the heading's own words when it names no version. */
 function versionOf(heading: string): string {
   const text = heading.trim();
@@ -165,18 +179,29 @@ function readerFacingNote(bullet: string): ReaderNote | null {
   if (type !== undefined && Object.hasOwn(INTERNAL_TYPES, type)) {
     return null;
   }
+  const scope = conventional?.[2];
+  if (scope !== undefined && DROP_SCOPES.has(scope.trim().toLocaleLowerCase('en'))) {
+    return null;
+  }
   const subject = withoutPullRequest(conventional?.[3] ?? line);
-  if (subject === '' || UNSEEN_WORK.some(pattern => pattern.test(subject))) {
+  if (
+    subject === '' ||
+    UNSEEN_WORK.some(pattern => pattern.test(subject)) ||
+    DROP_SUBJECT_PATTERNS.some(pattern => pattern.test(subject))
+  ) {
     return null;
   }
   if (Object.hasOwn(UNREADABLE_NOTES, subject.toLocaleLowerCase('en'))) {
     return null;
   }
-  const isFix = type !== undefined && !Object.hasOwn(FEATURE_TYPES, type);
+  // A removal or a restriction is a change the reader should see, but it is
+  // not a new feature: it joins the fixes the areas line counts.
+  const isFix =
+    (type !== undefined && !Object.hasOwn(FEATURE_TYPES, type)) || CHANGE_PREFIX.test(subject);
   // The notes are English commit subjects, so the English casing is the right
   // one: a Turkish device would otherwise take the leading `i` to `İ`.
   const text = subject.charAt(0).toLocaleUpperCase('en') + subject.slice(1);
-  return isFix ? { kind: 'fix', text, scope: conventional?.[2] } : { kind: 'new', text };
+  return isFix ? { kind: 'fix', text, scope } : { kind: 'new', text };
 }
 
 /** The areas a list of scopes names, in the map's own order. */
@@ -211,12 +236,25 @@ type Draft = {
   /** A section the workflow composed: its blocks are already curated and ordered. */
   curated: boolean;
   newNotes: string[];
-  fixesSeen: ChangelogArea[];
+  /** How many fixes named each area; the line names the busiest few. */
+  fixesCounts: Map<ChangelogArea, number>;
   isFix: boolean;
 };
 
 function emptyDraft(version: string): Draft {
-  return { version, group: null, curated: false, newNotes: [], fixesSeen: [], isFix: false };
+  return {
+    version,
+    group: null,
+    curated: false,
+    newNotes: [],
+    fixesCounts: new Map(),
+    isFix: false,
+  };
+}
+
+/** One more fix for `area`. */
+function countArea(counts: Map<ChangelogArea, number>, area: ChangelogArea): void {
+  counts.set(area, (counts.get(area) ?? 0) + 1);
 }
 
 /**
@@ -226,7 +264,9 @@ function emptyDraft(version: string): Draft {
  */
 function absorb(draft: Draft, bullet: string): void {
   if (draft.group === 'fixes') {
-    draft.fixesSeen = orderedAreas([...draft.fixesSeen, ...areasOfLine(bullet)]);
+    for (const area of areasOfLine(bullet)) {
+      countArea(draft.fixesCounts, area);
+    }
     draft.isFix = true;
     return;
   }
@@ -250,8 +290,19 @@ function absorb(draft: Draft, bullet: string): void {
   draft.isFix = true;
   const area = areaOfScope(note.scope);
   if (area !== null) {
-    draft.fixesSeen = orderedAreas([...draft.fixesSeen, area]);
+    countArea(draft.fixesCounts, area);
   }
+}
+
+/**
+ * The areas with the most fixes first, at most `FIXES_AREA_LIMIT`; a tie keeps
+ * the map's own order so a section reads stably.
+ */
+function topAreas(counts: ReadonlyMap<ChangelogArea, number>): ChangelogArea[] {
+  return (Object.keys(areas.areas) as ChangelogArea[])
+    .filter(area => (counts.get(area) ?? 0) > 0)
+    .sort((left, right) => (counts.get(right) ?? 0) - (counts.get(left) ?? 0))
+    .slice(0, FIXES_AREA_LIMIT);
 }
 
 /** The draft as the screen gets it: the newest few features, then the areas. */
@@ -265,7 +316,7 @@ function toSection(draft: Draft): ChangelogSection | null {
   return {
     version: draft.version,
     newNotes,
-    fixesAreas: orderedAreas(draft.fixesSeen),
+    fixesAreas: topAreas(draft.fixesCounts),
     hasFixes: draft.isFix,
   };
 }
@@ -312,7 +363,25 @@ export function changelogSections(markdown: string): ChangelogSection[] {
     }
   }
   flush();
-  return sections;
+  return withoutRepeatedAreas(sections);
+}
+
+/**
+ * The areas line a version shows next to the one above it: when a release's
+ * busiest areas are the previous release's own, the line names polish instead,
+ * because repeating the same three names tells the reader nothing new.
+ */
+function withoutRepeatedAreas(sections: ChangelogSection[]): ChangelogSection[] {
+  return sections.map((section, index) => {
+    const previous = sections[index + 1];
+    if (previous === undefined || section.fixesAreas.length === 0) {
+      return section;
+    }
+    const repeated =
+      section.fixesAreas.length === previous.fixesAreas.length &&
+      section.fixesAreas.every((area, position) => area === previous.fixesAreas[position]);
+    return repeated ? { ...section, fixesAreas: [] } : section;
+  });
 }
 
 /** `1.0.16` in `## 1.0.16 (build 720 iOS, 721 Android)`; anything else is null. */

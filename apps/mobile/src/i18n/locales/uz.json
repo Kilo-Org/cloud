@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
     "changelogGroupNew": "Yangi",
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
-    "changelogFixesAcrossApp": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
+    "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
       "signIn": "Kirish",
       "profileOrganizations": "Profil va tashkilotlar"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
     "changelogGroupNew": "Nytt",
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
-    "changelogFixesAcrossApp": "Feilrettinger og forbedringer i hele appen.",
+    "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Innlogging",
       "profileOrganizations": "Profil og organisasjoner"

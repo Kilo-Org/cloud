@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।",
     "changelogGroupNew": "ਨਵਾਂ",
     "changelogFixesIn": "{{areas}} ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
-    "changelogFixesAcrossApp": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
+    "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
       "signIn": "ਸਾਈਨ ਇਨ",
       "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ"

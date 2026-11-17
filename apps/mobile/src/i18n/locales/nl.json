@@ -484,7 +484,7 @@
     "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
     "changelogGroupNew": "Nieuw",
     "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
-    "changelogFixesAcrossApp": "Oplossingen en verbeteringen in de hele app.",
+    "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
       "signIn": "Inloggen",
       "profileOrganizations": "Profiel en organisaties"

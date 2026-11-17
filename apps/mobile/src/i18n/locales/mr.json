@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
     "changelogGroupNew": "नवीन",
     "changelogFixesIn": "{{areas}} मध्ये दुरुस्त्या आणि सुधारणा.",
-    "changelogFixesAcrossApp": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
       "profileOrganizations": "प्रोफाइल आणि संस्था"

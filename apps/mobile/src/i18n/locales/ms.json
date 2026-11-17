@@ -484,7 +484,7 @@
     "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
     "changelogGroupNew": "Baharu",
     "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
-    "changelogFixesAcrossApp": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
+    "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
     "changelogAreas": {
       "signIn": "Log masuk",
       "profileOrganizations": "Profil dan organisasi"

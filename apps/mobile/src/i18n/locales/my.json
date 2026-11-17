@@ -484,7 +484,7 @@
     "changelogVersionPending": "ဗားရှင်း {{version}} အတွက် မှတ်စုများသည် နောက်အက်ပ်အပ်ဒိတ်တွင် ပါလာပါမည်။",
     "changelogGroupNew": "အသစ်",
     "changelogFixesIn": "{{areas}} တွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
-    "changelogFixesAcrossApp": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
+    "changelogFixesPolish": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
     "changelogAreas": {
       "signIn": "အကောင့်ဝင်ခြင်း",
       "profileOrganizations": "ပရိုဖိုင်နှင့် အဖွဲ့အစည်းများ"

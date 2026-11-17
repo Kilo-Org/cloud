@@ -484,7 +484,7 @@
     "changelogVersionPending": "یادداشت‌های نسخهٔ {{version}} با به‌روزرسانی بعدی برنامه می‌رسند.",
     "changelogGroupNew": "تازه‌ها",
     "changelogFixesIn": "رفع اشکالات و بهبودها در {{areas}}.",
-    "changelogFixesAcrossApp": "رفع اشکالات و بهبودها در سراسر برنامه.",
+    "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
       "profileOrganizations": "نمایه و سازمان‌ها"

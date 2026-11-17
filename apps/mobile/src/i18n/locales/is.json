@@ -484,7 +484,7 @@
     "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
     "changelogGroupNew": "Nýtt",
     "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
-    "changelogFixesAcrossApp": "Lagfæringar og endurbætur í öllu forritinu.",
+    "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
     "changelogAreas": {
       "signIn": "Innskráning",
       "profileOrganizations": "Prófíll og stofnanir"

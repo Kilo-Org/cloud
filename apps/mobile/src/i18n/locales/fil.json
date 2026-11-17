@@ -484,7 +484,7 @@
     "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
     "changelogGroupNew": "Bago",
     "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
-    "changelogFixesAcrossApp": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
+    "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
       "signIn": "Pagpasok",
       "profileOrganizations": "Propayl at mga organisasyon"

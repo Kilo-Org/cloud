@@ -484,7 +484,7 @@
     "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
     "changelogGroupNew": "نوي",
     "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
-    "changelogFixesAcrossApp": "په ټول اپ کې سمونې او ښه والی.",
+    "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
       "signIn": "ننوتل",
       "profileOrganizations": "پروفایل او سازمانونه"

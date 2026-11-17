@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।",
     "changelogGroupNew": "নতুন",
     "changelogFixesIn": "{{areas}} বিভাগে সংশোধন ও উন্নতি।",
-    "changelogFixesAcrossApp": "পুরো অ্যাপ জুড়ে সংশোধন ও উন্নতি।",
+    "changelogFixesPolish": "পুরো অ্যাপ জুড়ে সংশোধন ও উন্নতি।",
     "changelogAreas": {
       "signIn": "সাইন-ইন",
       "profileOrganizations": "প্রোফাইল ও সংস্থা"

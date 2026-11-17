@@ -1,5 +1,6 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import * as Application from 'expo-application';
+import { type TFunction } from 'i18next';
 import { type ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -55,27 +56,26 @@ const keyExtractor = (section: ChangelogSection) => section.version;
 const groupLabelClass = 'uppercase tracking-wide text-muted-foreground';
 
 /**
- * The catalog key that names each area. Six of the areas already carry a label
- * the app paints elsewhere, so the changelog reuses those keys instead of
- * wording the same product name a second time; only sign-in and the profile
- * have no existing label of their own.
+ * The label one area reads as. The three agent products keep their own names in
+ * Latin in every locale, the way the app names them elsewhere; the rest reuse
+ * the labels the app paints in its own chrome instead of a second wording.
  */
-const AREA_LABEL_KEYS = {
-  chat: 'common.chat',
-  cloudAgent: 'agentChat.instancePicker.cloudAgent',
-  securityAgent: 'common.securityAgent',
-  codeReviewer: 'common.codeReviewer',
-  signIn: 'profile.changelogAreas.signIn',
-  profileOrganizations: 'profile.changelogAreas.profileOrganizations',
-  notifications: 'common.notifications',
-  integrations: 'integrations.title',
-} as const satisfies Record<ChangelogArea, string>;
+const AREA_LABELS = {
+  cloudAgent: () => 'Cloud Agent',
+  securityAgent: () => 'Security Agent',
+  codeReviewer: () => 'Code Reviewer',
+  chat: (t: TFunction) => t('common.chat'),
+  notifications: (t: TFunction) => t('common.notifications'),
+  integrations: (t: TFunction) => t('integrations.title'),
+  signIn: (t: TFunction) => t('profile.changelogAreas.signIn'),
+  profileOrganizations: (t: TFunction) => t('profile.changelogAreas.profileOrganizations'),
+} as const satisfies Record<ChangelogArea, (t: TFunction) => string>;
 
 function NoteRow({ text }: Readonly<{ text: string }>) {
   return (
     <View className="flex-row gap-2">
       <Text className="text-sm text-muted-foreground">•</Text>
-      <Text className="flex-1 text-sm text-muted-foreground">{text}</Text>
+      <Text className="flex-1 text-sm">{text}</Text>
     </View>
   );
 }
@@ -87,10 +87,10 @@ function NoteRow({ text }: Readonly<{ text: string }>) {
  */
 function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
   const { t, i18n } = useTranslation();
-  const areas = section.fixesAreas.map(area => t(AREA_LABEL_KEYS[area]));
+  const areas = section.fixesAreas.map(area => AREA_LABELS[area](t));
   const fixesLabel =
     areas.length === 0
-      ? t('profile.changelogFixesAcrossApp')
+      ? t('profile.changelogFixesPolish')
       : t('profile.changelogFixesIn', { areas: formatList(areas, i18n.language) });
   const fixesClass =
     section.newNotes.length === 0

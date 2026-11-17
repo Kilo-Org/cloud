@@ -484,7 +484,7 @@
     "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
     "changelogGroupNew": "Nouvo",
     "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
-    "changelogFixesAcrossApp": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
+    "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
     "changelogAreas": {
       "signIn": "Koneksyon",
       "profileOrganizations": "Pwofil ak òganizasyon"

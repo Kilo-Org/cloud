@@ -484,7 +484,7 @@
     "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
     "changelogGroupNew": "Nua",
     "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
-    "changelogFixesAcrossApp": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
+    "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
       "signIn": "Síniú isteach",
       "profileOrganizations": "Próifíl agus eagraíochtaí"

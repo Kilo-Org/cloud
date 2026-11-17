@@ -550,7 +550,7 @@
     "changelog": "What's New",
     "changelogGroupNew": "New",
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
-    "changelogFixesAcrossApp": "Fixes and improvements across the app.",
+    "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
       "signIn": "Sign-in",
       "profileOrganizations": "Profile and organizations"

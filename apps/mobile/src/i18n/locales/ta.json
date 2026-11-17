@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} பதிப்புக்கான குறிப்புகள் அடுத்த செயலி புதுப்பிப்புடன் வரும்.",
     "changelogGroupNew": "புதியவை",
     "changelogFixesIn": "இந்தப் பகுதிகளில் திருத்தங்களும் மேம்பாடுகளும்: {{areas}}.",
-    "changelogFixesAcrossApp": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
+    "changelogFixesPolish": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
     "changelogAreas": {
       "signIn": "உள்நுழைவு",
       "profileOrganizations": "சுயவிவரம் மற்றும் நிறுவனங்கள்"

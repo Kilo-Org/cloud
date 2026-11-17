@@ -484,7 +484,7 @@
     "changelogVersionPending": "In-noti għall-verżjoni {{version}} jaslu mal-aġġornament li jmiss tal-app.",
     "changelogGroupNew": "Ġdid",
     "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
-    "changelogFixesAcrossApp": "Tiswijiet u titjib fl-applikazzjoni kollha.",
+    "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
       "signIn": "Dħul",
       "profileOrganizations": "Profil u organizzazzjonijiet"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
     "changelogGroupNew": "Berrikuntzak",
     "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
-    "changelogFixesAcrossApp": "Zuzenketak eta hobekuntzak aplikazio osoan.",
+    "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
       "signIn": "Saioa hastea",
       "profileOrganizations": "Profila eta erakundeak"

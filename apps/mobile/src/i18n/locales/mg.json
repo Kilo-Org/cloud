@@ -484,7 +484,7 @@
     "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
     "changelogGroupNew": "Vaovao",
     "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
-    "changelogFixesAcrossApp": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
+    "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
     "changelogAreas": {
       "signIn": "Fidirana",
       "profileOrganizations": "Mombamomba sy fikambanana"

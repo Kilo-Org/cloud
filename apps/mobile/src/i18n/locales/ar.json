@@ -484,7 +484,7 @@
     "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
     "changelogGroupNew": "جديد",
     "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
-    "changelogFixesAcrossApp": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
       "signIn": "تسجيل الدخول",
       "profileOrganizations": "الملف الشخصي والمؤسسات"

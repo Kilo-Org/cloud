@@ -484,7 +484,7 @@
     "changelogVersionPending": "Примітки до версії {{version}} з’являться з наступним оновленням застосунку.",
     "changelogGroupNew": "Нове",
     "changelogFixesIn": "Виправлення та покращення в розділах: {{areas}}.",
-    "changelogFixesAcrossApp": "Виправлення та покращення в усьому застосунку.",
+    "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
     "changelogAreas": {
       "signIn": "Вхід",
       "profileOrganizations": "Профіль і організації"

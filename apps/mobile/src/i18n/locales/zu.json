@@ -484,7 +484,7 @@
     "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
     "changelogGroupNew": "Okusha",
     "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
-    "changelogFixesAcrossApp": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
+    "changelogFixesPolish": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
     "changelogAreas": {
       "signIn": "Ukungena ngemvume",
       "profileOrganizations": "Iphrofayela nezinhlangano"

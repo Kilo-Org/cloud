@@ -484,7 +484,7 @@
     "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
     "changelogGroupNew": "Nowości",
     "changelogFixesIn": "Poprawki i ulepszenia w obszarach: {{areas}}.",
-    "changelogFixesAcrossApp": "Poprawki i ulepszenia w całej aplikacji.",
+    "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
       "profileOrganizations": "Profil i organizacje"

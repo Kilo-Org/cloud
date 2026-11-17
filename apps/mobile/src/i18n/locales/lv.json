@@ -484,7 +484,7 @@
     "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
     "changelogGroupNew": "Jaunumi",
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
-    "changelogFixesAcrossApp": "Labojumi un uzlabojumi visā lietotnē.",
+    "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
       "signIn": "Pierakstīšanās",
       "profileOrganizations": "Profils un organizācijas"

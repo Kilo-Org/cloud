@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે.",
     "changelogGroupNew": "નવું",
     "changelogFixesIn": "{{areas}} માં ભૂલ સુધારા અને સુધારણાઓ.",
-    "changelogFixesAcrossApp": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
     "changelogAreas": {
       "signIn": "સાઇન-ઇન",
       "profileOrganizations": "પ્રોફાઇલ અને સંસ્થાઓ"

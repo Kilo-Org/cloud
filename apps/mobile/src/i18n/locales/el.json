@@ -484,7 +484,7 @@
     "changelogVersionPending": "Οι σημειώσεις της έκδοσης {{version}} θα έρθουν με την επόμενη ενημέρωση της εφαρμογής.",
     "changelogGroupNew": "Νέα",
     "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
-    "changelogFixesAcrossApp": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
+    "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
       "signIn": "Σύνδεση",
       "profileOrganizations": "Προφίλ και οργανισμοί"

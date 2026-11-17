@@ -484,7 +484,7 @@
     "changelogVersionPending": "កំណត់ចំណាំសម្រាប់កំណែ {{version}} នឹងមកជាមួយបច្ចុប្បន្នភាពកម្មវិធីលើកក្រោយ។",
     "changelogGroupNew": "ថ្មី",
     "changelogFixesIn": "ការជួសជុល និងការកែលម្អនៅក្នុង {{areas}}។",
-    "changelogFixesAcrossApp": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
+    "changelogFixesPolish": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
     "changelogAreas": {
       "signIn": "ការចូល",
       "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន"

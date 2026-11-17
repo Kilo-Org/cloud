@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
     "changelogGroupNew": "新功能",
     "changelogFixesIn": "{{areas}}的修正與改進。",
-    "changelogFixesAcrossApp": "整個應用程式的修正與改進。",
+    "changelogFixesPolish": "整個應用程式的修正與改進。",
     "changelogAreas": {
       "signIn": "登入",
       "profileOrganizations": "個人資料與組織"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
     "changelogGroupNew": "Cusub",
     "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
-    "changelogFixesAcrossApp": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
+    "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
       "signIn": "Gelitaanka",
       "profileOrganizations": "Xogta shakhsiga iyo ururada"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} പതിപ്പിന്റെ കുറിപ്പുകൾ അടുത്ത ആപ്പ് അപ്ഡേറ്റിനൊപ്പം എത്തും.",
     "changelogGroupNew": "പുതിയത്",
     "changelogFixesIn": "{{areas}} എന്നിവയിൽ പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
-    "changelogFixesAcrossApp": "ആപ്പിലുടനീളം പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
+    "changelogFixesPolish": "ആപ്പിലുടനീളം പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
     "changelogAreas": {
       "signIn": "സൈൻ ഇൻ",
       "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും"

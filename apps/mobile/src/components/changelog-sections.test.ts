@@ -86,7 +86,7 @@ describe('changelogSections', () => {
     });
   });
 
-  it('names the areas the fixes touched, in the map’s order', () => {
+  it('names the three busiest areas the fixes touched, map order on a tie', () => {
     const fixes = `## 1.0.15 (build 710 iOS, 711 Android)
 
 - fix(notifications): lead with the message
@@ -100,8 +100,81 @@ describe('changelogSections', () => {
       {
         version: '1.0.15',
         newNotes: [],
-        // Canonical order, not the order the bullets name them.
-        fixesAreas: ['chat', 'cloudAgent', 'securityAgent', 'signIn', 'notifications'],
+        // Every area has one fix, so the map's order breaks the tie.
+        fixesAreas: ['chat', 'cloudAgent', 'securityAgent'],
+        hasFixes: true,
+      },
+    ]);
+  });
+
+  it('leads with the area that has the most fixes', () => {
+    const fixes = `## 1.0.15 (build 710 iOS, 711 Android)
+
+- fix(chat): one
+- fix(chat): two
+- fix(chat): three
+- fix(auth): four
+- fix(notifications): five
+- fix(session): six
+- fix(security-agent): seven
+`;
+    expect(changelogSections(fixes)[0]?.fixesAreas).toEqual([
+      'chat',
+      'cloudAgent',
+      'securityAgent',
+    ]);
+  });
+
+  it('falls back to polish when a release repeats the previous release’s areas', () => {
+    const repeated = `## 1.0.16 (build 720 iOS, 721 Android)
+
+- fix(chat): one
+- fix(auth): two
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+- fix(chat): three
+- fix(auth): four
+`;
+    expect(changelogSections(repeated).map(section => section.fixesAreas)).toEqual([
+      [],
+      ['chat', 'signIn'],
+    ]);
+  });
+
+  it('drops backend, web and API work that never ships in the app', () => {
+    const backend = `## 1.0.15 (build 710 iOS, 711 Android)
+
+- feat(ai-gateway): add a standalone gateway serving /api/v1
+- feat(web-shared): add the shared header
+- feat(mobile): record push history over tRPC
+- feat(chat): expose the new API route
+- feat(trpc): add a review list
+- feat(chat): keep the composer visible
+`;
+    expect(changelogSections(backend)).toEqual([
+      {
+        version: '1.0.15',
+        newNotes: ['Keep the composer visible'],
+        fixesAreas: [],
+        hasFixes: false,
+      },
+    ]);
+  });
+
+  it('counts a removal as a fix instead of a new feature', () => {
+    const removals = `## 1.0.15 (build 710 iOS, 711 Android)
+
+- feat(kilo-pass): stop in-app Kilo Pass sales
+- feat(credits): expire paid credits a year after purchase
+- feat(chat): keep the composer visible
+`;
+    expect(changelogSections(removals)).toEqual([
+      {
+        version: '1.0.15',
+        newNotes: ['Keep the composer visible'],
+        // The credits removal still counts for the area its scope names.
+        fixesAreas: ['profileOrganizations'],
         hasFixes: true,
       },
     ]);

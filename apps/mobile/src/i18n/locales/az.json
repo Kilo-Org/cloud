@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
     "changelogGroupNew": "Yeni",
     "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
-    "changelogFixesAcrossApp": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
       "profileOrganizations": "Profil və təşkilatlar"

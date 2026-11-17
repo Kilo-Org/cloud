@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} տարբերակի նշումները կհայտնվեն հավելվածի հաջորդ թարմացմամբ։",
     "changelogGroupNew": "Նոր",
     "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
-    "changelogFixesAcrossApp": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
+    "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
       "signIn": "Մուտք",
       "profileOrganizations": "Պրոֆիլ և կազմակերպություններ"

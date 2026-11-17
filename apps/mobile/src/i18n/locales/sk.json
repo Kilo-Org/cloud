@@ -484,7 +484,7 @@
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
     "changelogGroupNew": "Novinky",
     "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
-    "changelogFixesAcrossApp": "Opravy a vylepšenia v celej aplikácii.",
+    "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
       "signIn": "Prihlásenie",
       "profileOrganizations": "Profil a organizácie"

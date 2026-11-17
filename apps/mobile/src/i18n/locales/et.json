@@ -484,7 +484,7 @@
     "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
     "changelogGroupNew": "Uut",
     "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
-    "changelogFixesAcrossApp": "Parandused ja täiustused kogu rakenduses.",
+    "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
       "signIn": "Sisselogimine",
       "profileOrganizations": "Profiil ja organisatsioonid"

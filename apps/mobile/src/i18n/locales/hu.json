@@ -484,7 +484,7 @@
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
     "changelogGroupNew": "Újdonságok",
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
-    "changelogFixesAcrossApp": "Javítások és fejlesztések az egész alkalmazásban.",
+    "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
       "signIn": "Bejelentkezés",
       "profileOrganizations": "Profil és szervezetek"

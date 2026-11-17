@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
     "changelogGroupNew": "Yeni",
     "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
-    "changelogFixesAcrossApp": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
+    "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
       "signIn": "Oturum açma",
       "profileOrganizations": "Profil ve kuruluşlar"

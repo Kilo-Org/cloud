@@ -484,7 +484,7 @@
     "changelogVersionPending": "Белешките за верзијата {{version}} ќе стигнат со следното ажурирање.",
     "changelogGroupNew": "Ново",
     "changelogFixesIn": "Поправки и подобрувања во следниве области: {{areas}}.",
-    "changelogFixesAcrossApp": "Поправки и подобрувања низ целата апликација.",
+    "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
       "signIn": "Најава",
       "profileOrganizations": "Профил и организации"

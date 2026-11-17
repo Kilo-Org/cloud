@@ -484,7 +484,7 @@
     "changelogVersionPending": "संस्करण {{version}} का नोटहरू अर्को एप अपडेटसँगै आउनेछन्।",
     "changelogGroupNew": "नयाँ",
     "changelogFixesIn": "{{areas}} मा समाधान र सुधारहरू।",
-    "changelogFixesAcrossApp": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
+    "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
     "changelogAreas": {
       "signIn": "साइन इन",
       "profileOrganizations": "प्रोफाइल र संस्थाहरू"

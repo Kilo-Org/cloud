@@ -484,7 +484,7 @@
     "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
     "changelogGroupNew": "Noutăți",
     "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
-    "changelogFixesAcrossApp": "Remedieri și îmbunătățiri în întreaga aplicație.",
+    "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {
       "signIn": "Autentificare",
       "profileOrganizations": "Profil și organizații"

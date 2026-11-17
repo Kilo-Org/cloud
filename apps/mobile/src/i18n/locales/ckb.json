@@ -484,7 +484,7 @@
     "changelogVersionPending": "تێبینییەکانی وەشانی {{version}} لەگەڵ نوێکردنەوەی داهاتووی ئەپەکە دێن.",
     "changelogGroupNew": "نوێ",
     "changelogFixesIn": "چاککردن و باشترکردن لەم بەشانەدا: {{areas}}.",
-    "changelogFixesAcrossApp": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
+    "changelogFixesPolish": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
     "changelogAreas": {
       "signIn": "چوونەژوورەوە",
       "profileOrganizations": "پرۆفایل و ڕێکخراوەکان"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} ಆವೃತ್ತಿಯ ಟಿಪ್ಪಣಿಗಳು ಮುಂದಿನ ಆ್ಯಪ್ ಅಪ್‌ಡೇಟ್‌ನೊಂದಿಗೆ ಬರುತ್ತವೆ.",
     "changelogGroupNew": "ಹೊಸದು",
     "changelogFixesIn": "ಈ ವಿಭಾಗಗಳಲ್ಲಿ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು: {{areas}}.",
-    "changelogFixesAcrossApp": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
+    "changelogFixesPolish": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
     "changelogAreas": {
       "signIn": "ಸೈನ್ ಇನ್",
       "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು"

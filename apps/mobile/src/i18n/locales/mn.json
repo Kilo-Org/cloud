@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ.",
     "changelogGroupNew": "Шинэ",
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
-    "changelogFixesAcrossApp": "Апп даяар засвар, сайжруулалт хийгдсэн.",
+    "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
       "signIn": "Нэвтрэх",
       "profileOrganizations": "Профайл ба байгууллагууд"

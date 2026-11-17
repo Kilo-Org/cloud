@@ -484,7 +484,7 @@
     "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
     "changelogGroupNew": "Ọhụrụ",
     "changelogFixesIn": "Ndozi na mmezi na {{areas}}.",
-    "changelogFixesAcrossApp": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
+    "changelogFixesPolish": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
     "changelogAreas": {
       "signIn": "Ịbanye",
       "profileOrganizations": "Profaịlụ na òtù"

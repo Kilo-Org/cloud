@@ -484,7 +484,7 @@
     "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
     "changelogGroupNew": "Të reja",
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
-    "changelogFixesAcrossApp": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
       "signIn": "Hyrja",
       "profileOrganizations": "Profili dhe organizatat"

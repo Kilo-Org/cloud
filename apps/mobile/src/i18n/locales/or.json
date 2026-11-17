@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} ସଂସ୍କରଣର ନୋଟ୍ସ ପରବର୍ତ୍ତୀ ଆପ୍ ଅପଡେଟ୍ ସହିତ ଆସିବ।",
     "changelogGroupNew": "ନୂଆ",
     "changelogFixesIn": "{{areas}}ରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
-    "changelogFixesAcrossApp": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
+    "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
       "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଓ ସଂଗଠନ"

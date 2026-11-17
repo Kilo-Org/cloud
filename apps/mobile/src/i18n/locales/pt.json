@@ -484,7 +484,7 @@
     "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
     "changelogGroupNew": "Novidades",
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
-    "changelogFixesAcrossApp": "Correções e melhorias em toda a aplicação.",
+    "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
       "signIn": "Início de sessão",
       "profileOrganizations": "Perfil e organizações"

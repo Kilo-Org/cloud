@@ -484,7 +484,7 @@
     "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
     "changelogGroupNew": "Mới",
     "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
-    "changelogFixesAcrossApp": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
+    "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
       "signIn": "Đăng nhập",
       "profileOrganizations": "Hồ sơ và tổ chức"

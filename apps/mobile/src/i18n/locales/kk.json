@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} нұсқасының жазбалары қолданбаның келесі жаңартуымен келеді.",
     "changelogGroupNew": "Жаңа",
     "changelogFixesIn": "Келесі бөлімдердегі түзетулер мен жақсартулар: {{areas}}.",
-    "changelogFixesAcrossApp": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
+    "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
     "changelogAreas": {
       "signIn": "Кіру",
       "profileOrganizations": "Профиль және ұйымдар"

@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
     "changelogGroupNew": "Nauja",
     "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
-    "changelogFixesAcrossApp": "Pataisymai ir patobulinimai visoje programėlėje.",
+    "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
     "changelogAreas": {
       "signIn": "Prisijungimas",
       "profileOrganizations": "Profilis ir organizacijos"

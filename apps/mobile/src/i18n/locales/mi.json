@@ -484,7 +484,7 @@
     "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
     "changelogGroupNew": "Hou",
     "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
-    "changelogFixesAcrossApp": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
+    "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
     "changelogAreas": {
       "signIn": "Takiuru",
       "profileOrganizations": "Kōtaha me ngā whakahaere"

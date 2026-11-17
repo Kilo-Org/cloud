@@ -342,6 +342,15 @@ test('readerFacingSubject classifies a subject and links it', () => {
     readerFacingSubject('feat(mobile): add shared client transport and web demo (#120)'),
     null
   );
+  // Backend, web and API work never reaches the phone app's notes.
+  assert.equal(readerFacingSubject('feat(ai-gateway): serve /api/v1 (#126)'), null);
+  assert.equal(readerFacingSubject('feat(web-shared): add a header (#127)'), null);
+  assert.equal(readerFacingSubject('feat(mobile): record push history over tRPC (#128)'), null);
+  assert.equal(readerFacingSubject('feat(chat): expose the API route (#129)'), null);
+  // A removal or a restriction is a change, but it is not a new feature.
+  assert.equal(readerFacingSubject('feat(kilo-pass): stop in-app sales (#130)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(credits): expire paid credits (#131)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(chat): remove the old composer (#132)')?.kind, 'fix');
 });
 
 test('linkPullRequest links only the trailing pull-request ref', () => {

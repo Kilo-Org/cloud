@@ -484,7 +484,7 @@
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
     "changelogGroupNew": "نیا",
     "changelogFixesIn": "ان حصوں میں اصلاحات اور بہتریاں: {{areas}}۔",
-    "changelogFixesAcrossApp": "پوری ایپ میں اصلاحات اور بہتریاں۔",
+    "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
       "profileOrganizations": "پروفائل اور تنظیمیں"

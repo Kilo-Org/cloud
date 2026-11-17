@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
     "changelogGroupNew": "නව",
     "changelogFixesIn": "{{areas}} හි නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
-    "changelogFixesAcrossApp": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
       "profileOrganizations": "පැතිකඩ සහ සංවිධාන"

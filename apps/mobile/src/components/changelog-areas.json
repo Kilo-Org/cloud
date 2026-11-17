@@ -10,6 +10,11 @@
     "notifications": "Notifications",
     "integrations": "Integrations"
   },
+  "newGroup": {
+    "dropScopes": ["ai-gateway", "api", "trpc", "web", "web-shared", "worker", "workers"],
+    "dropSubjectPatterns": ["\\btrpc\\b", "\\bapi routes?\\b", "/api/"],
+    "changePrefixes": ["stop", "expire", "remove", "deprecate", "disable", "restrict"]
+  },
   "scopeToArea": {
     "agent": "cloudAgent",
     "agents": "cloudAgent",

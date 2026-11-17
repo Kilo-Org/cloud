@@ -205,6 +205,16 @@ const UNSEEN_WORK = [
  */
 const UNREADABLE_SUBJECTS = ['answer the request a glanceable approval names'];
 
+// The NEW group policy both this composer and the bundled screen read
+// (`apps/mobile/src/components/changelog-sections.ts`): scopes that never reach
+// the phone app, subjects that name no phone change, and the leading verbs that
+// state a removal or a restriction rather than a feature.
+const DROP_SCOPES = new Set(AREA_MAP.newGroup.dropScopes.map(scope => scope.toLowerCase()));
+const DROP_SUBJECT_PATTERNS = AREA_MAP.newGroup.dropSubjectPatterns.map(
+  pattern => new RegExp(pattern, 'i')
+);
+const CHANGE_PREFIX = new RegExp(`^(?:${AREA_MAP.newGroup.changePrefixes.join('|')})\\b`, 'i');
+
 /** The area a commit scope names, or the map's generic tag when it names none. */
 export function areaOfScope(scope) {
   const key = scope === undefined ? '' : scope.trim().toLowerCase();
@@ -227,8 +237,14 @@ export function readerFacingSubject(subject) {
     return null;
   }
   const scope = conventional ? conventional[2] : undefined;
+  if (scope !== undefined && DROP_SCOPES.has(scope.trim().toLowerCase())) {
+    return null;
+  }
   const body = conventional ? conventional[3] : subject;
-  if (UNSEEN_WORK.some(pattern => pattern.test(body))) {
+  if (
+    UNSEEN_WORK.some(pattern => pattern.test(body)) ||
+    DROP_SUBJECT_PATTERNS.some(pattern => pattern.test(body))
+  ) {
     return null;
   }
   const plain = body
@@ -238,8 +254,11 @@ export function readerFacingSubject(subject) {
   if (UNREADABLE_SUBJECTS.includes(plain)) {
     return null;
   }
+  // A removal or a restriction is a change the reader should see, but it is not
+  // a new feature: it joins the fixes the areas line counts.
+  const isFeature = (type === null || type === 'feat') && !CHANGE_PREFIX.test(body);
   return {
-    kind: type === null || type === 'feat' ? 'new' : 'fix',
+    kind: isFeature ? 'new' : 'fix',
     text: linkPullRequest(subject),
     scope,
   };

@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
     "changelogGroupNew": "새로운 기능",
     "changelogFixesIn": "{{areas}} 관련 수정 및 개선 사항.",
-    "changelogFixesAcrossApp": "앱 전반의 수정 및 개선 사항.",
+    "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
       "profileOrganizations": "프로필 및 조직"

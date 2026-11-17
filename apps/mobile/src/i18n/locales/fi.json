@@ -484,7 +484,7 @@
     "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
     "changelogGroupNew": "Uutta",
     "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
-    "changelogFixesAcrossApp": "Korjauksia ja parannuksia koko sovellukseen.",
+    "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
       "signIn": "Kirjautuminen",
       "profileOrganizations": "Profiili ja organisaatiot"

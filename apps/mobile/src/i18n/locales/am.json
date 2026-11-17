@@ -484,7 +484,7 @@
     "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
     "changelogGroupNew": "አዲስ",
     "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
-    "changelogFixesAcrossApp": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
+    "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
       "profileOrganizations": "መገለጫ እና ድርጅቶች"

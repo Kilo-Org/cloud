@@ -484,7 +484,7 @@
     "changelogVersionPending": "{{version}} ვერსიის სიახლეები აპის შემდეგ განახლებასთან ერთად გამოჩნდება.",
     "changelogGroupNew": "ახალი",
     "changelogFixesIn": "შესწორებები და გაუმჯობესებები შემდეგ სექციებში: {{areas}}.",
-    "changelogFixesAcrossApp": "შესწორებები და გაუმჯობესებები მთელ აპში.",
+    "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
       "profileOrganizations": "პროფილი და ორგანიზაციები"

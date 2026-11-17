@@ -484,7 +484,7 @@
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
     "changelogGroupNew": "Mpya",
     "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
-    "changelogFixesAcrossApp": "Marekebisho na maboresho katika programu nzima.",
+    "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
       "signIn": "Kuingia",
       "profileOrganizations": "Wasifu na mashirika"

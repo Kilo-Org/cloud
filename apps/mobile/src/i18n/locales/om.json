@@ -484,7 +484,7 @@
     "changelogVersionPending": "Yaadannoon {{version}} haaromsa appii itti aanu waliin dhufa.",
     "changelogGroupNew": "Haaraa",
     "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
-    "changelogFixesAcrossApp": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
+    "changelogFixesPolish": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
     "changelogAreas": {
       "signIn": "Seenuu",
       "profileOrganizations": "Piroofaayilii fi dhaabbilee"

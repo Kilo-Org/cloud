@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Validator, type Schema } from '@cfworker/json-schema';
 import { SignJWT } from 'jose';
 import {
   CloudAgentAuthoritySchema,
@@ -886,4 +887,193 @@ describe('scoped JWT policy', () => {
       }).cloudAgentAuthority
     ).toMatchObject({ organizationId });
   });
+});
+
+describe('organization binding parity', () => {
+  type Verdict = 'accepted' | 'refused';
+  type OrganizationVariant = 'omitted' | 'own' | 'other' | 'null' | 'empty string' | 'non-string';
+  type OrganizationBindingRow = {
+    authority: 'personal' | 'organization';
+    authorityValue: CloudAgentAuthority;
+    procedure: string;
+    body: Record<string, unknown>;
+    expected: Record<OrganizationVariant, Verdict>;
+  };
+
+  const otherOrganizationId = '33333333-3333-4333-8333-333333333333';
+  const organizationAuthority: CloudAgentAuthority = { ...scope, organizationId };
+  const environmentRequest = { repository: { platform: 'github', fullName: 'acme/repo' } };
+  const variants: OrganizationVariant[] = [
+    'omitted',
+    'own',
+    'other',
+    'null',
+    'empty string',
+    'non-string',
+  ];
+
+  function organizationValue(variant: OrganizationVariant, authority: CloudAgentAuthority) {
+    switch (variant) {
+      case 'omitted':
+      case 'null':
+        return null;
+      case 'own':
+        return authority.organizationId ?? organizationId;
+      case 'other':
+        return otherOrganizationId;
+      case 'empty string':
+        return '';
+      case 'non-string':
+        return 123;
+    }
+  }
+
+  function requestBody(
+    body: Record<string, unknown>,
+    variant: OrganizationVariant,
+    authority: CloudAgentAuthority
+  ): Record<string, unknown> {
+    if (variant === 'omitted') {
+      return { ...body };
+    }
+    return { ...body, organizationId: organizationValue(variant, authority) };
+  }
+
+  function schemaVerdict(
+    authority: CloudAgentAuthority,
+    procedure: string,
+    input: unknown
+  ): Verdict {
+    const schema: Schema = cloudAgentAuthorityInputSchema(authority, procedure) as Schema;
+    return new Validator(schema, '2020-12').validate(input).valid ? 'accepted' : 'refused';
+  }
+
+  function validatorVerdict(
+    authority: CloudAgentAuthority,
+    procedure: string,
+    input: unknown
+  ): { verdict: Verdict; refusal: unknown } {
+    try {
+      validateCloudAgentAuthorityRequest(authority, procedure, input, now);
+      return { verdict: 'accepted', refusal: undefined };
+    } catch (error) {
+      return { verdict: 'refused', refusal: error };
+    }
+  }
+
+  const rows: OrganizationBindingRow[] = [
+    {
+      authority: 'personal',
+      authorityValue: scope,
+      procedure: 'cloudAgentNext.prepareSession',
+      body: launch,
+      expected: {
+        omitted: 'accepted',
+        own: 'refused',
+        other: 'refused',
+        null: 'refused',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+    {
+      authority: 'organization',
+      authorityValue: organizationAuthority,
+      procedure: 'organizations.cloudAgentNext.prepareSession',
+      body: launch,
+      expected: {
+        omitted: 'refused',
+        own: 'accepted',
+        other: 'refused',
+        null: 'refused',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+    {
+      authority: 'personal',
+      authorityValue: scope,
+      procedure: 'cloudEnvironments.list',
+      body: environmentRequest,
+      expected: {
+        omitted: 'accepted',
+        own: 'refused',
+        other: 'refused',
+        null: 'refused',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+    {
+      authority: 'organization',
+      authorityValue: organizationAuthority,
+      procedure: 'cloudEnvironments.list',
+      body: environmentRequest,
+      expected: {
+        omitted: 'refused',
+        own: 'accepted',
+        other: 'refused',
+        null: 'refused',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+    {
+      authority: 'personal',
+      authorityValue: scope,
+      procedure: 'workspaceFolders.list',
+      body: {},
+      expected: {
+        omitted: 'refused',
+        own: 'refused',
+        other: 'refused',
+        null: 'accepted',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+    {
+      authority: 'organization',
+      authorityValue: organizationAuthority,
+      procedure: 'workspaceFolders.list',
+      body: {},
+      expected: {
+        omitted: 'refused',
+        own: 'accepted',
+        other: 'refused',
+        null: 'refused',
+        'empty string': 'refused',
+        'non-string': 'refused',
+      },
+    },
+  ];
+
+  const matrix = rows.flatMap(row =>
+    variants.map(variant => ({
+      ...row,
+      variant,
+      input: requestBody(row.body, variant, row.authorityValue),
+      expected: row.expected[variant],
+    }))
+  );
+
+  it.each(matrix)(
+    'advertised schema and validator agree on $authority $procedure with $variant organizationId',
+    ({ authorityValue, procedure, input, expected }) => {
+      const validated = validatorVerdict(authorityValue, procedure, input);
+      expect(schemaVerdict(authorityValue, procedure, input)).toBe(expected);
+      expect(validated.verdict).toBe(expected);
+      const stringOrganizationId =
+        typeof input.organizationId === 'string' ? input.organizationId : '';
+      if (
+        expected === 'refused' &&
+        stringOrganizationId !== '' &&
+        !procedure.startsWith('workspaceFolders.')
+      ) {
+        expect(validated.refusal instanceof Error ? validated.refusal.message : null).toBe(
+          'Cloud Agent launch exceeds its authority'
+        );
+      }
+    }
+  );
 });

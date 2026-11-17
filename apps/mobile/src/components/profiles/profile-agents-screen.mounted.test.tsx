@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { isolateBidiText } from '@/lib/bidi';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
@@ -41,6 +42,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -308,7 +310,7 @@ describe('ProfileAgentsScreen save ownership', () => {
       await Promise.resolve();
     });
 
-    expect(second.props.slugConflictFromServer).toBe(false);
+    expect(second.props.saveFailure).toBeNull();
     expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
     unmount();
   });
@@ -470,6 +472,108 @@ describe('ProfileAgentsScreen delete confirmation', () => {
       profileId: 'profile-1',
       agentId: AGENT_NAME,
     });
+
+    unmount();
+  });
+});
+
+/** The translated cap line, as the footer renders it. */
+function capMessage(): string {
+  return i18n.t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
+}
+
+/** `length` distinct agents, so the list holds exactly the count the server caps. */
+function agentsAt(length: number): AgentSource[] {
+  return Array.from({ length }, (_, index) => agent(`agent-${index}`, 'primary'));
+}
+
+describe('ProfileAgentsScreen agent cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('states the cap above the Add action and disables it at the cap', async () => {
+    h.query.data = agentsAt(MAX_PROFILE_AGENTS);
+    const { renderer, unmount } = await mountScreen();
+
+    // One pre-order walk, so the indexes compare the footer's own order.
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(-1);
+    expect(noticeIndex).toBeLessThan(addIndex);
+    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
+    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(true);
+
+    unmount();
+  });
+
+  it('offers the Add action without a notice one agent below the cap', async () => {
+    h.query.data = agentsAt(MAX_PROFILE_AGENTS - 1);
+    const { renderer, unmount } = await mountScreen();
+
+    expect(screenTexts(renderer)).not.toContain(capMessage());
+    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a create the cap refuses as the cap line, not a generic failure', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    h.mutations.createAgent.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Profiles are limited to 20 agents'), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAdd(renderer);
+    const sheet = openSheet(renderer);
+    await act(async () => {
+      (sheet.props.onSave as (payload: unknown) => void)({
+        slug: 'beta',
+        name: 'Beta',
+        config: {},
+      });
+      await Promise.resolve();
+    });
+
+    expect(openSheet(renderer).props.saveFailure).toEqual({ kind: 'limit' });
+
+    unmount();
+  });
+
+  it('reports any other refused create as a generic failure', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    h.mutations.createAgent.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Internal server error'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAdd(renderer);
+    const sheet = openSheet(renderer);
+    await act(async () => {
+      (sheet.props.onSave as (payload: unknown) => void)({
+        slug: 'beta',
+        name: 'Beta',
+        config: {},
+      });
+      await Promise.resolve();
+    });
+
+    expect(openSheet(renderer).props.saveFailure).toEqual({ kind: 'refused' });
 
     unmount();
   });

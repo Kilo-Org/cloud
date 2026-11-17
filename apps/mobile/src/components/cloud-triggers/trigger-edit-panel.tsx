@@ -155,7 +155,12 @@ export function TriggerEditPanel({
               onPress={() => {
                 confirm({
                   title: t('cloudAgent.triggers.deleteTitle'),
-                  message: t('cloudAgent.triggers.deleteMessage', { name: detail.triggerId }),
+                  message: t(
+                    isScheduled
+                      ? 'cloudAgent.triggers.deleteMessageScheduled'
+                      : 'cloudAgent.triggers.deleteMessage',
+                    { name: detail.triggerId }
+                  ),
                   confirmLabel: t('common.delete'),
                   onConfirm: () => {
                     remove.mutate(

@@ -759,7 +759,7 @@ const itemsRouter = createTRPCRouter({
     }),
 
   candidatesForSession: baseProcedure
-    .input(z.object({ sessionId: sessionIdSchema, organizationId: organizationIdSchema }))
+    .input(z.object({ sessionId: sessionIdSchema }))
     .query(async ({ ctx, input }) => {
       const [session] = await db
         .select({
@@ -774,10 +774,8 @@ const itemsRouter = createTRPCRouter({
           )
         );
       if (!session) throw notFound('Session not found');
-      const organizationId =
-        input.organizationId === undefined
-          ? session.organizationId
-          : await resolveOrganizationScope(ctx, input.organizationId);
+      // The session's own organization decides the scope; the caller cannot pick another.
+      const organizationId = session.organizationId;
       const rows = await selectOpenItemsWithList(ctx.user.id, organizationId);
       const candidates = rows.map(({ item, list }) => ({
         ...item,

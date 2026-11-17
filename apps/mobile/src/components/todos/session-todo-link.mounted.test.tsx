@@ -61,9 +61,6 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666', primaryForeground: '#000' }),
 }));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null }),
-}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     todos: {
@@ -75,7 +72,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/lib/hooks/use-todos', () => ({
   useSessionTodo: () => ({ data: state.todo }),
-  useTodoCandidates: () => ({
+  useTodoCandidates: (_sessionId: string, _enabled: boolean) => ({
     data: [],
     isPending: false,
     isError: false,

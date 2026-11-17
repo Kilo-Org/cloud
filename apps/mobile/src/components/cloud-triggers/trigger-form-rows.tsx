@@ -8,7 +8,6 @@
  */
 
 import { type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { ChevronDown } from '@/components/ui/icons';
@@ -81,7 +80,6 @@ export function TriggerSwitchRow({
   onValueChange,
   disabled = false,
 }: TriggerSwitchRowProps) {
-  const { t } = useTranslation();
   return (
     <View className="flex-row items-start gap-3 py-2">
       <View className="min-w-0 flex-1 gap-1">
@@ -100,7 +98,7 @@ export function TriggerSwitchRow({
         )}
       </View>
       <Switch
-        accessibilityLabel={t('common.enabled')}
+        accessibilityLabel={title}
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}

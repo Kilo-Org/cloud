@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
@@ -62,6 +63,15 @@ function errorKeyFor(
   return error !== null && match.includes(error) ? t(ERROR_KEYS[error]) : undefined;
 }
 
+/**
+ * The save's refusal: the per-profile server cap, a name the server already
+ * has, or any other refusal.
+ */
+export type McpSaveFailure =
+  | { readonly kind: 'limit' }
+  | { readonly kind: 'name-conflict' }
+  | { readonly kind: 'refused' };
+
 type McpFormSheetProps = Readonly<{
   /**
    * The form draft the fields belong to (see `lib/form-draft`). The screen
@@ -80,16 +90,18 @@ type McpFormSheetProps = Readonly<{
    * the sheet on success; on failure it returns with the sheet still open.
    */
   onSave: (payload: McpServerPayload) => void;
-  /** A server-side name conflict, shown on the name field like a validation error. */
-  nameConflictFromServer?: boolean;
-  /** A failure the caller cannot name, shown inside the sheet instead of only a toast. */
-  saveFailure?: string | null;
+  /** The last save refusal, each arm rendered where it belongs in the sheet. */
+  saveFailure?: McpSaveFailure | null;
 }>;
 
 /**
  * The add/edit MCP server sheet. Mounted only while open, so every open seeds
  * fresh fields from the server it edits. Text fields are uncontrolled (refs),
  * per the app's iOS text-input rule; the type and enabled controls are state.
+ * A create the profile's cap refuses arrives as `limit` and renders the cap
+ * copy as a warning; any other refused save arrives as `refused` and renders
+ * one line inside the sheet; a name only the server can detect arrives as
+ * `name-conflict` and shows under the name field.
  */
 export function McpFormSheet({
   draftScope,
@@ -98,7 +110,6 @@ export function McpFormSheet({
   isSaving,
   onClose,
   onSave,
-  nameConflictFromServer = false,
   saveFailure = null,
 }: Readonly<McpFormSheetProps>) {
   const { t } = useTranslation();
@@ -115,6 +126,7 @@ export function McpFormSheet({
   const [error, setError] = useState<McpFormError | null>(null);
   // The screen raises the server-reported conflict after a refused save; it stays
   // up until the name changes, so it never outlives the input it describes.
+  const nameConflictFromServer = saveFailure?.kind === 'name-conflict';
   const [serverConflict, setServerConflict] = useState(nameConflictFromServer);
   useEffect(() => {
     if (nameConflictFromServer) {
@@ -167,6 +179,17 @@ export function McpFormSheet({
     { value: 'remote' as const, label: t('profiles.mcp.remoteType') },
   ];
 
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.mcp.saveFailed');
+  }
+
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
@@ -185,7 +208,7 @@ export function McpFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus message={saveFailure} className="text-sm" />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         {server === null ? (
           <View className="gap-1.5">
             <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>

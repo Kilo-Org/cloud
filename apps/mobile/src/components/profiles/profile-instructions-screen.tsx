@@ -297,9 +297,6 @@ export function ProfileInstructionsScreen({
           />
         ))}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={handleStartAdd}>
-            <Text>{t('profiles.addInstruction')}</Text>
-          </Button>
           {atInstructionCap ? (
             <AccessibleStatus
               message={t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS })}
@@ -307,6 +304,9 @@ export function ProfileInstructionsScreen({
               className="text-sm"
             />
           ) : null}
+          <Button disabled={atInstructionCap} onPress={handleStartAdd}>
+            <Text>{t('profiles.addInstruction')}</Text>
+          </Button>
         </ProfileManageSlot>
       </>
     );

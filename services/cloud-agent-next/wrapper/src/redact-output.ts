@@ -13,6 +13,11 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
     replacement: `$1=${REDACTED}`,
   },
   {
+    // Compact JWS/JWT, for example sandbox transfer grants renewed at runtime.
+    pattern: /\beyJ[A-Za-z0-9_-]{4,}\.eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{16,}/g,
+    replacement: REDACTED,
+  },
+  {
     pattern: /(Authorization\s*:\s*Bearer\s+)(\S+)/gi,
     replacement: `$1${REDACTED}`,
   },

@@ -134,6 +134,14 @@ import {
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  deleteWorkspaceArtifactOutputSchema,
+  getWorkspaceArtifactDownloadUrlOutputSchema,
+  listWorkspaceArtifactsOutputSchema,
+  workspaceArtifactDeleteInputSchema,
+  workspaceArtifactDownloadInputSchema,
+  workspaceArtifactSessionInputSchema,
+} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
 import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
 import { sessionReadTrpcError } from '@/lib/session-trpc-errors';
 
@@ -287,6 +295,18 @@ const SyncWorktreeBranchInput = baseSyncWorktreeBranchNextSchema.extend({
 });
 
 const RestackWorktreeBranchInput = baseRestackWorktreeBranchNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactsInput = workspaceArtifactSessionInputSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactDownloadInput = workspaceArtifactDownloadInputSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactDeleteInput = workspaceArtifactDeleteInputSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -922,6 +942,67 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
+      });
+    }),
+
+  listWorkspaceArtifacts: organizationMemberProcedure
+    .input(WorkspaceArtifactsInput)
+    .output(listWorkspaceArtifactsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+    }),
+
+  getWorkspaceArtifactDownloadUrl: organizationMemberProcedure
+    .input(WorkspaceArtifactDownloadInput)
+    .output(getWorkspaceArtifactDownloadUrlOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorkspaceArtifactDownloadUrl(
+        input.cloudAgentSessionId,
+        input.relativePath
+      );
+    }),
+
+  deleteWorkspaceArtifact: organizationMemberProcedure
+    .input(WorkspaceArtifactDeleteInput)
+    .output(deleteWorkspaceArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.deleteWorkspaceArtifact({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        relativePath: input.relativePath,
+        expectedHash: input.expectedHash,
       });
     }),
 

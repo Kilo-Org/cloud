@@ -170,9 +170,9 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
     : await getBYOKforUser(readDb, user.id, byokProviderKeys);
-  const userByokEntry = byokProviderKeys
-    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
-    .find(entry => entry !== undefined);
+  // Keys arrive in `BYOK_KEY_ORDER`, so the key the owner ranked first serves the model; its
+  // provider also selects the upstream host.
+  const userByokEntry = userByok?.find(entry => byokProviderKeys.includes(entry.providerId));
 
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,

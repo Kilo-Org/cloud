@@ -1620,8 +1620,9 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
-  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
-  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
+  // organization feature is enabled in the gateway configuration. A null or absent data_region
+  // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
   disable_openrouter: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
@@ -3300,6 +3301,14 @@ export const CustomPricingConfigSchema = z.object({
           ctx.addIssue({
             code: 'custom',
             message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
             path: [index, 'model'],
           });
         }

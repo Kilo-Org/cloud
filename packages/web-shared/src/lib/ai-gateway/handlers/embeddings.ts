@@ -26,7 +26,7 @@ import {
   validateEmbeddingDimensions,
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   handleUsageEndpointRequest,
@@ -74,14 +74,20 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
 
   // The provider depends on the routes the organization member may use, so the decision is
   // resolved first.
-  async resolveProvider({ requestedModelLowerCased, user, organizationId, organizationDecision }) {
+  async resolveProvider({
+    requestedModelLowerCased,
+    user,
+    organizationId,
+    organizationDecision,
+    gatewaySettings,
+  }) {
     const decision = await organizationDecision();
-    return await getEmbeddingProvider(
-      requestedModelLowerCased,
-      user,
-      organizationId,
-      decision?.eligibleProviderRoutes
-    );
+    return await getEmbeddingProvider(requestedModelLowerCased, user, organizationId, {
+      // A denied model leaves no provider allowed, as on chat; the pipeline then rejects it.
+      allowedProviders:
+        decision && !decision.allowed ? new Set() : decision?.eligibleProviderRoutes,
+      openRouterDisabled: gatewaySettings.openRouterDisabled,
+    });
   },
 
   validate(body, requestedModelLowerCased) {
@@ -102,45 +108,47 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
 
   async buildUpstreamBody(input) {
     const { body, provider, userByok, dataRegion } = input;
+    // The organization's provider preferences replace the request's own, as on OpenRouter.
+    const routingPreferences =
+      input.organizationProvider ?? providerPreferencesSchema.optional().parse(body.provider);
     if (input.organizationProvider) body.provider = input.organizationProvider;
     body.safety_identifier = input.safetyIdentifier;
-
-    // BYOK: for Vercel gateway, pass the user's key via providerOptions (same as chat completions).
-    const isVercelByok = !!userByok && userByok.length > 0 && provider.type === 'vercel';
-    if (isVercelByok) {
-      body.model = await mapModelIdToVercel(body.model);
-    }
 
     const effectivePrivacy = getEffectiveProviderPrivacy(
       input.requestProvider,
       input.organizationSettings?.data_collection
     );
+    const providerPreferences =
+      Object.keys(effectivePrivacy).length > 0
+        ? { ...body.provider, ...effectivePrivacy }
+        : body.provider;
+    if (provider.type !== 'vercel') {
+      return {
+        body: buildUpstreamBody(
+          { ...body, ...(providerPreferences && { provider: providerPreferences }) },
+          input.requestedModelLowerCased
+        ),
+      };
+    }
+
+    // Vercel names models by its own ids and takes routing options under `providerOptions`.
+    body.model = await mapModelIdToVercel(body.model);
     const upstreamBody = buildUpstreamBody(
-      {
-        ...body,
-        ...(Object.keys(effectivePrivacy).length > 0 && {
-          provider: { ...body.provider, ...effectivePrivacy },
-        }),
-      },
+      { ...body, provider: undefined },
       input.requestedModelLowerCased
     );
-
-    if (!isVercelByok) return { body: upstreamBody };
-
-    const byokProviders: Record<string, unknown[]> = {};
-    for (const byokEntry of userByok) {
-      const [key, list] = getVercelInferenceProviderConfigForUserByok(byokEntry);
-      byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
-    }
     upstreamBody.providerOptions = {
-      gateway: {
-        only: Object.keys(byokProviders),
-        byok: byokProviders,
-        zeroDataRetention: effectivePrivacy.zdr,
-        disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
-        // Vercel fails the request instead of leaving the region, as on chat.
-        ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
-      },
+      gateway: await getUsageEndpointGatewayOptions({
+        vercelModelId: body.model,
+        userByok,
+        provider: {
+          only: routingPreferences?.only ?? undefined,
+          ignore: routingPreferences?.ignore ?? undefined,
+          order: routingPreferences?.order ?? undefined,
+          ...effectivePrivacy,
+        },
+        dataRegion,
+      }),
     };
     return { body: upstreamBody, inferenceRegion: dataRegion };
   },

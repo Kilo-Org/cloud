@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Бағалар біздің негізгі провайдерге арналған. Сұрау басқа провайдерге ауысса немесе провайдер шектеулері бапталса, нақты төлем өзгеше, тіпті жоғарырақ болуы мүмкін."
     },
     "partDetail": {
       "detailsUnavailable": "Мәліметтер қолжетімсіз.",

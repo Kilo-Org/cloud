@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ಬೆಲೆಗಳು ನಮ್ಮ ಆದ್ಯತೆಯ ಪೂರೈಕೆದಾರರದ್ದು. ವಿನಂತಿಯು ಬೇರೆ ಪೂರೈಕೆದಾರರಿಗೆ ಬದಲಾದರೆ ಅಥವಾ ಪೂರೈಕೆದಾರರ ನಿರ್ಬಂಧಗಳನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಿದ್ದರೆ, ನಿಜವಾದ ಶುಲ್ಕ ಬೇರೆಯಾಗಬಹುದು ಮತ್ತು ಹೆಚ್ಚೂ ಆಗಬಹುದು."
     },
     "partDetail": {
       "detailsUnavailable": "ವಿವರಗಳು ಲಭ್ಯವಿಲ್ಲ.",

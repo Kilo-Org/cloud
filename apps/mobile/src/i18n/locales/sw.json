@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Bei hizi ni za mtoa huduma wetu tunayempendelea. Malipo halisi yanaweza kutofautiana, na hata kuwa juu zaidi, ikiwa ombi litahamishiwa kwa mtoa huduma mwingine au ikiwa vikwazo vya watoa huduma vimewekwa."
     },
     "partDetail": {
       "detailsUnavailable": "Maelezo hayapatikani.",

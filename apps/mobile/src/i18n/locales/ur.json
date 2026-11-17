@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "قیمتیں ہمارے ترجیحی فراہم کنندہ کی ہیں۔ اگر کوئی درخواست کسی دوسرے فراہم کنندہ پر منتقل ہو جائے یا فراہم کنندہ کی پابندیاں کنفیگر کی گئی ہوں تو اصل چارجز مختلف، بلکہ زیادہ بھی، ہو سکتے ہیں۔"
     },
     "partDetail": {
       "detailsUnavailable": "تفصیلات دستیاب نہیں ہیں۔",

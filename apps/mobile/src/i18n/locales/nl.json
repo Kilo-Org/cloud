@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "De prijzen gelden voor onze voorkeursaanbieder. De werkelijke kosten kunnen afwijken en hoger uitvallen als een verzoek overschakelt naar een andere aanbieder of als er aanbiederbeperkingen zijn ingesteld."
     },
     "partDetail": {
       "detailsUnavailable": "Er zijn geen details beschikbaar.",

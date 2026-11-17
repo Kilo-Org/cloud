@@ -1974,7 +1974,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ceny dotyczą naszego preferowanego dostawcy. Rzeczywiste opłaty mogą się różnić, a nawet być wyższe, jeśli żądanie zostanie przełączone do innego dostawcy lub skonfigurowano ograniczenia dostawców."
     },
     "partDetail": {
       "detailsUnavailable": "Szczegóły są niedostępne.",

@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Hinnad kehtivad meie eelistatud pakkuja kohta. Tegelik tasu võib erineda ja olla ka suurem, kui päring suunatakse teisele pakkujale või kui on seadistatud pakkujapiirangud."
     },
     "partDetail": {
       "detailsUnavailable": "Üksikasjad pole saadaval",

@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ក្នុងមួយ {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ក្នុងមួយ {{million}} {{tokens}}",
+      "preferredProviderNote": "តម្លៃទាំងនេះសម្រាប់អ្នកផ្តល់សេវាដែលយើងពេញចិត្ត។ ការគិតថ្លៃជាក់ស្តែងអាចខុសគ្នា និងអាចខ្ពស់ជាងនេះ ប្រសិនបើសំណើត្រូវបានប្តូរទៅអ្នកផ្តល់សេវាផ្សេង ឬមានការកំណត់ការរឹតបន្តឹងអ្នកផ្តល់សេវា។"
     },
     "partDetail": {
       "detailsUnavailable": "មិនមានព័ត៌មានលម្អិតទេ។",

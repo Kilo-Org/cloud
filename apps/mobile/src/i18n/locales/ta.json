@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "விலைகள் எங்கள் விருப்ப வழங்குநருக்கானவை. கோரிக்கை வேறொரு வழங்குநருக்கு மாறினாலோ வழங்குநர் கட்டுப்பாடுகள் உள்ளமைக்கப்பட்டிருந்தாலோ உண்மையான கட்டணம் மாறுபடலாம், அதிகமாகவும் இருக்கலாம்."
     },
     "partDetail": {
       "detailsUnavailable": "விவரங்கள் கிடைக்கவில்லை.",

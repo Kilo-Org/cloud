@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Fiyatlar tercih ettiğimiz sağlayıcıya aittir. Bir istek başka bir sağlayıcıya aktarılırsa veya sağlayıcı kısıtlamaları yapılandırılmışsa gerçek ücretler farklı, hatta daha yüksek olabilir."
     },
     "partDetail": {
       "detailsUnavailable": "Ayrıntılar kullanılamıyor.",

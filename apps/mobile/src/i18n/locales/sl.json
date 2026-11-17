@@ -2563,7 +2563,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Cene veljajo za našega prednostnega ponudnika. Dejanski stroški se lahko razlikujejo in so lahko tudi višji, če se zahteva preusmeri k drugemu ponudniku ali če so nastavljene omejitve ponudnikov."
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti niso na voljo.",

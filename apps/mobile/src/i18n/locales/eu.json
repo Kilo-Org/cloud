@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Prezioak gure hornitzaile hobetsiarenak dira. Benetako kargak desberdinak izan daitezke, baita handiagoak ere, eskaera bat beste hornitzaile batera igarotzen bada edo hornitzaile-murrizketak konfiguratuta badaude."
     },
     "partDetail": {
       "detailsUnavailable": "Xehetasunak ez daude erabilgarri.",

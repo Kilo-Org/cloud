@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "{{amount}} အောက်",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "စျေးနှုန်းများသည် ကျွန်ုပ်တို့၏ ဦးစားပေး ဝန်ဆောင်မှုပေးသူအတွက် ဖြစ်သည်။ တောင်းဆိုမှုသည် အခြားဝန်ဆောင်မှုပေးသူထံ ပြောင်းသွားလျှင် သို့မဟုတ် ဝန်ဆောင်မှုပေးသူ ကန့်သတ်ချက်များ သတ်မှတ်ထားလျှင် အမှန်တကယ် ကောက်ခံငွေ ကွာခြားနိုင်ပြီး ပိုများနိုင်သည်။"
     },
     "partDetail": {
       "detailsUnavailable": "အသေးစိတ်ကို ရယူ၍မရပါ။",

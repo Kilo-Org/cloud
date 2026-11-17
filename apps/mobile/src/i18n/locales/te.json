@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ధరలు మా ప్రాధాన్య ప్రొవైడర్‌వి. అభ్యర్థన వేరే ప్రొవైడర్‌కు మారినా లేదా ప్రొవైడర్ పరిమితులు కాన్ఫిగర్ చేసి ఉన్నా, అసలు ఛార్జీలు వేరుగా ఉండవచ్చు, ఎక్కువగా కూడా ఉండవచ్చు."
     },
     "partDetail": {
       "detailsUnavailable": "వివరాలు అందుబాటులో లేవు.",

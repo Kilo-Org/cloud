@@ -2547,7 +2547,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Prices are for our preferred provider. Actual charges can differ, and may be higher, if a request fails over to another provider or provider restrictions are configured."
     },
     "partDetail": {
       "detailsUnavailable": "Details unavailable",

@@ -2563,7 +2563,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} už {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} už {{million}} {{tokens}}",
+      "preferredProviderNote": "Kainos taikomos mūsų pirmenybiniam teikėjui. Faktiniai mokesčiai gali skirtis ir net būti didesni, jei užklausa perjungiama kitam teikėjui arba nustatyti teikėjų apribojimai."
     },
     "partDetail": {
       "detailsUnavailable": "Informacija nepasiekiama",

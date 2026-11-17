@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ਕੀਮਤਾਂ ਸਾਡੇ ਤਰਜੀਹੀ ਪ੍ਰਦਾਤਾ ਦੀਆਂ ਹਨ। ਜੇ ਕੋਈ ਬੇਨਤੀ ਕਿਸੇ ਹੋਰ ਪ੍ਰਦਾਤਾ 'ਤੇ ਚਲੀ ਜਾਵੇ ਜਾਂ ਪ੍ਰਦਾਤਾ ਪਾਬੰਦੀਆਂ ਕੌਂਫਿਗਰ ਕੀਤੀਆਂ ਹੋਣ, ਤਾਂ ਅਸਲ ਖਰਚਾ ਵੱਖਰਾ, ਅਤੇ ਵੱਧ ਵੀ, ਹੋ ਸਕਦਾ ਹੈ।"
     },
     "partDetail": {
       "detailsUnavailable": "ਵੇਰਵੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",

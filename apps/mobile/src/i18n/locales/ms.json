@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "kurang daripada {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Harga adalah untuk penyedia pilihan kami. Caj sebenar mungkin berbeza, malah lebih tinggi, jika permintaan beralih kepada penyedia lain atau sekatan penyedia telah dikonfigurasikan."
     },
     "partDetail": {
       "detailsUnavailable": "Butiran tidak tersedia.",

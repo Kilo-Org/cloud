@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{tokens}} {{million}}당 {{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "{{tokens}} {{million}}당 {{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "가격은 우선 제공업체 기준입니다. 요청이 다른 제공업체로 전환되거나 제공업체 제한이 설정된 경우 실제 요금은 달라질 수 있으며 더 높을 수도 있습니다."
     },
     "partDetail": {
       "detailsUnavailable": "세부 정보를 확인할 수 없습니다.",

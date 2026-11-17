@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "{{amount}} पेक्षा कमी",
-      "perMillion": "प्रति {{million}} {{tokens}}: {{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "प्रति {{million}} {{tokens}}: {{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "किमती आमच्या पसंतीच्या सेवा पुरवठादाराच्या आहेत. विनंती दुसऱ्या पुरवठादाराकडे वळवली गेल्यास किंवा पुरवठादार निर्बंध कॉन्फिगर केलेले असल्यास प्रत्यक्ष शुल्क वेगळे, आणि जास्तही, असू शकते."
     },
     "partDetail": {
       "detailsUnavailable": "तपशील उपलब्ध नाहीत.",

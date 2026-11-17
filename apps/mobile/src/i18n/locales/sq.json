@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Çmimet janë për ofruesin tonë të preferuar. Tarifat reale mund të ndryshojnë, madje të jenë më të larta, nëse një kërkesë kalon te një ofrues tjetër ose nëse janë konfiguruar kufizime ofruesish."
     },
     "partDetail": {
       "detailsUnavailable": "Detajet nuk janë të disponueshme.",

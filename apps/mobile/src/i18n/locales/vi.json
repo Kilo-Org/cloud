@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Giá áp dụng cho nhà cung cấp ưu tiên của chúng tôi. Mức phí thực tế có thể khác, thậm chí cao hơn, nếu yêu cầu được chuyển sang nhà cung cấp khác hoặc đã cấu hình giới hạn nhà cung cấp."
     },
     "partDetail": {
       "detailsUnavailable": "Không thể xem thông tin chi tiết.",

@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "latsaky ny {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ho an'ny mpamatsy tianay indrindra ireo vidiny ireo. Mety ho hafa, ary mety ho ambony kokoa aza, ny sarany tena izy raha mifindra amin'ny mpamatsy hafa ny fangatahana na misy fameperana mpamatsy voapetraka."
     },
     "partDetail": {
       "detailsUnavailable": "Tsy azo aseho ny antsipiriany.",

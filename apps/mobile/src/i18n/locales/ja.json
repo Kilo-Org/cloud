@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{million}}{{tokens}}あたり：{{inputLabel}} {{input}}・{{outputLabel}} {{output}}"
+      "perMillion": "{{million}}{{tokens}}あたり：{{inputLabel}} {{input}}・{{outputLabel}} {{output}}",
+      "preferredProviderNote": "価格は優先プロバイダーのものです。リクエストが別のプロバイダーにフェイルオーバーした場合や、プロバイダーの制限が設定されている場合は、実際の料金が異なり、高くなることもあります。"
     },
     "partDetail": {
       "detailsUnavailable": "詳細を表示できません。",

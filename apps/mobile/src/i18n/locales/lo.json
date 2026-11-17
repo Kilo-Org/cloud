@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ລາຄາເຫຼົ່ານີ້ແມ່ນສຳລັບຜູ້ໃຫ້ບໍລິການຫຼັກຂອງພວກເຮົາ. ຄ່າໃຊ້ຈ່າຍຕົວຈິງອາດແຕກຕ່າງ ແລະ ອາດສູງກວ່າ ຖ້າຄຳຂໍຖືກໂອນໄປຫາຜູ້ໃຫ້ບໍລິການອື່ນ ຫຼື ມີການຕັ້ງຄ່າຂໍ້ຈຳກັດຜູ້ໃຫ້ບໍລິການ."
     },
     "partDetail": {
       "detailsUnavailable": "ບໍ່ສາມາດສະແດງລາຍລະອຽດໄດ້.",

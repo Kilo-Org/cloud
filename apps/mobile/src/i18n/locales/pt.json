@@ -2522,7 +2522,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Os preços são os do nosso fornecedor preferencial. As cobranças reais podem ser diferentes, e até mais elevadas, se um pedido passar para outro fornecedor ou se estiverem configuradas restrições de fornecedores."
     },
     "partDetail": {
       "detailsUnavailable": "Os detalhes não estão disponíveis.",

@@ -2563,7 +2563,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ceny platia pre nášho preferovaného poskytovateľa. Skutočné poplatky sa môžu líšiť a môžu byť aj vyššie, ak sa požiadavka presunie k inému poskytovateľovi alebo sú nastavené obmedzenia poskytovateľov."
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti nie sú dostupné.",

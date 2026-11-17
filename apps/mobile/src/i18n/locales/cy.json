@@ -2657,7 +2657,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Mae'r prisiau ar gyfer ein darparwr dewisol. Gall y ffioedd gwirioneddol fod yn wahanol, ac yn uwch o bosibl, os bydd cais yn symud i ddarparwr arall neu os oes cyfyngiadau darparwyr wedi'u gosod."
     },
     "partDetail": {
       "detailsUnavailable": "Nid yw'r manylion ar gael.",

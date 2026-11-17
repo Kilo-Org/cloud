@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "કિંમતો અમારા પસંદગીના પ્રદાતાની છે. જો વિનંતી બીજા પ્રદાતા પર જાય અથવા પ્રદાતા પ્રતિબંધો ગોઠવેલા હોય, તો વાસ્તવિક શુલ્ક અલગ હોઈ શકે છે, અને વધુ પણ હોઈ શકે છે."
     },
     "modeOptions": {
       "code": "કોડ",

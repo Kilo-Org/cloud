@@ -1974,7 +1974,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Цены указаны для нашего приоритетного провайдера. Фактическая плата может отличаться и даже быть выше, если запрос переключится на другого провайдера или настроены ограничения провайдеров."
     },
     "partDetail": {
       "detailsUnavailable": "Сведения недоступны.",

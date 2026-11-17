@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ფასები ჩვენი პრიორიტეტული პროვაიდერისაა. ფაქტობრივი საფასური შეიძლება განსხვავდებოდეს და უფრო მაღალიც იყოს, თუ მოთხოვნა სხვა პროვაიდერზე გადავა ან პროვაიდერების შეზღუდვებია დაყენებული."
     },
     "partDetail": {
       "detailsUnavailable": "დეტალები მიუწვდომელია.",

@@ -1881,7 +1881,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Harga berlaku untuk penyedia pilihan kami. Biaya sebenarnya dapat berbeda, bahkan lebih tinggi, jika permintaan dialihkan ke penyedia lain atau pembatasan penyedia telah dikonfigurasi."
     },
     "modeOptions": {
       "code": "Tulis kode",

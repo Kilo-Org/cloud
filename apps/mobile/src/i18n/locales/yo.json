@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Iye owó wọ̀nyí jẹ́ ti olùpèsè tí a fẹ́ràn jù. Owó gidi tí a ó gbà lè yàtọ̀, ó sì lè ga jù, tí ìbéèrè bá yí sí olùpèsè mìíràn tàbí tí a bá ṣètò ìhámọ́ àwọn olùpèsè."
     },
     "partDetail": {
       "detailsUnavailable": "Àwọn àlàyé kò sí lárọ̀ọ́wọ́tó.",

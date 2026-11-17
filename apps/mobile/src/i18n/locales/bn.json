@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "প্রতি {{million}} {{tokens}}: {{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "প্রতি {{million}} {{tokens}}: {{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "দামগুলো আমাদের পছন্দের প্রোভাইডারের। কোনো অনুরোধ অন্য প্রোভাইডারে চলে গেলে বা প্রোভাইডার সীমাবদ্ধতা কনফিগার করা থাকলে প্রকৃত চার্জ ভিন্ন হতে পারে, এমনকি বেশিও হতে পারে।"
     },
     "partDetail": {
       "detailsUnavailable": "বিস্তারিত তথ্য পাওয়া যাচ্ছে না।",

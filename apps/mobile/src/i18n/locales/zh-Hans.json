@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "每 {{million}} {{tokens}}：{{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "每 {{million}} {{tokens}}：{{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "价格以我们的首选提供商为准。如果请求故障转移到其他提供商，或配置了提供商限制，实际费用可能会有所不同，甚至更高。"
     },
     "partDetail": {
       "detailsUnavailable": "无法查看详情。",

@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Amanani awomhlinzeki wethu esimkhethayo. Izindleko zangempela zingehluka, futhi zingaba phezulu, uma isicelo sidluliselwa komunye umhlinzeki noma kusethwe imikhawulo yabahlinzeki."
     },
     "partDetail": {
       "detailsUnavailable": "Imininingwane ayitholakali.",

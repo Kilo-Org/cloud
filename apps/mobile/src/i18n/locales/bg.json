@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Цените са за предпочитания от нас доставчик. Действителните такси може да се различават и дори да са по-високи, ако заявката бъде пренасочена към друг доставчик или са зададени ограничения за доставчиците."
     },
     "partDetail": {
       "detailsUnavailable": "Подробностите са недостъпни.",

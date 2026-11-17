@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Qiimayaashu waa kuwa bixiyaha aan doorbidno. Lacagta dhabta ah way kala duwanaan kartaa, xitaa way sarrayn kartaa, haddii codsigu u wareego bixiye kale ama haddii la dejiyay xaddidaadyo bixiye."
     },
     "partDetail": {
       "detailsUnavailable": "Faahfaahinta lama heli karo.",

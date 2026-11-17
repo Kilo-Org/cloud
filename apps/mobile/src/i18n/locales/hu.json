@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Az árak az általunk előnyben részesített szolgáltatóra vonatkoznak. A tényleges díjak eltérhetnek, akár magasabbak is lehetnek, ha egy kérés másik szolgáltatóhoz kerül át, vagy szolgáltatói korlátozások vannak beállítva."
     },
     "modeOptions": {
       "code": "Kódolás",

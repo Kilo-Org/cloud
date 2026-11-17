@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Verðin miðast við þann veitanda sem við kjósum helst. Raunverulegur kostnaður getur verið annar, og jafnvel hærri, ef beiðni færist yfir á annan veitanda eða ef takmarkanir á veitendum eru stilltar."
     },
     "partDetail": {
       "detailsUnavailable": "Nánari upplýsingar eru ekki tiltækar.",

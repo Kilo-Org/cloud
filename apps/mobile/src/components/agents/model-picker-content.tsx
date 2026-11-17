@@ -7,6 +7,7 @@ import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { ModelPickerPriceNote } from '@/components/agents/model-picker-price-note';
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
@@ -363,6 +364,7 @@ export function ModelPickerContent() {
           getItemType={(item: ModelPickerRow | undefined) => item?.type}
           {...SEARCHABLE_PICKER_LIST_PROPS}
           renderItem={renderItem}
+          ListFooterComponent={<ModelPickerPriceNote options={bridge.options} />}
         />
       )}
     </PickerSheet>

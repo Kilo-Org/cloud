@@ -1917,7 +1917,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "I prezzi si riferiscono al nostro fornitore preferito. Gli addebiti effettivi possono variare, ed essere anche più alti, se una richiesta passa a un altro fornitore o se sono configurate restrizioni sui fornitori."
     },
     "partDetail": {
       "detailsUnavailable": "I dettagli non sono disponibili.",

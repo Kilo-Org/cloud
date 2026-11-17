@@ -2516,7 +2516,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} per {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} per {{million}} {{tokens}}",
+      "preferredProviderNote": "Els preus corresponen al nostre proveïdor preferit. Els càrrecs reals poden variar, i fins i tot ser més alts, si una sol·licitud passa a un altre proveïdor o si hi ha restriccions de proveïdors configurades."
     },
     "partDetail": {
       "detailsUnavailable": "Els detalls no estan disponibles.",

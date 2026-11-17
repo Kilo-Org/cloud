@@ -1837,7 +1837,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "कीमतें हमारे पसंदीदा प्रदाता की हैं। अगर कोई अनुरोध किसी दूसरे प्रदाता पर चला जाए या प्रदाता प्रतिबंध कॉन्फ़िगर किए गए हों, तो वास्तविक शुल्क अलग हो सकता है और ज़्यादा भी हो सकता है।"
     },
     "modeOptions": {
       "code": "कोड लिखें",

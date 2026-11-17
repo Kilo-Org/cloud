@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "मूल्यहरू हाम्रो रोजाइको प्रदायकका हुन्। अनुरोध अर्को प्रदायकमा सरेमा वा प्रदायक प्रतिबन्धहरू कन्फिगर गरिएमा वास्तविक शुल्क फरक, र बढी पनि, हुन सक्छ।"
     },
     "partDetail": {
       "detailsUnavailable": "विवरण उपलब्ध छैन।",

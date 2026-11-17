@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "每 {{million}} {{tokens}}：{{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "每 {{million}} {{tokens}}：{{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "價格以我們的首選供應商為準。如果請求容錯移轉至其他供應商，或已設定供應商限制，實際費用可能會不同，甚至更高。"
     },
     "partDetail": {
       "detailsUnavailable": "無法取得詳細資料。",

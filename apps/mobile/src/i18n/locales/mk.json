@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "помалку од {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Цените се однесуваат на нашиот претпочитан давател. Вистинската наплата може да се разликува, па и да биде повисока, ако барањето се префрли на друг давател или ако се поставени ограничувања за давателите."
     },
     "partDetail": {
       "detailsUnavailable": "Деталите не се достапни.",

@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Pri yo se pou founisè nou prefere a. Frè reyèl yo ka diferan, e yo ka pi wo, si yon demann pase bay yon lòt founisè oswa si gen restriksyon founisè ki konfigire."
     },
     "modeOptions": {
       "code": "Ekri kòd",

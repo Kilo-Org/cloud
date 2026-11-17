@@ -1923,7 +1923,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Os preços são do nosso provedor preferencial. As cobranças reais podem ser diferentes, e até mais altas, se uma solicitação for redirecionada para outro provedor ou se houver restrições de provedores configuradas."
     },
     "partDetail": {
       "detailsUnavailable": "Os detalhes não estão disponíveis.",

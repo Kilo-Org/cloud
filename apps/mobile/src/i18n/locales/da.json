@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Priserne gælder vores foretrukne udbyder. De faktiske omkostninger kan afvige og kan være højere, hvis en anmodning skifter til en anden udbyder, eller hvis der er konfigureret udbyderbegrænsninger."
     },
     "partDetail": {
       "detailsUnavailable": "Oplysningerne er ikke tilgængelige.",

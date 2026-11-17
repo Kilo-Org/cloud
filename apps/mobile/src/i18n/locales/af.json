@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Pryse geld vir ons voorkeurverskaffer. Werklike heffings kan verskil, en selfs hoër wees, as 'n versoek na 'n ander verskaffer oorskakel of as verskafferbeperkings ingestel is."
     },
     "partDetail": {
       "detailsUnavailable": "Die besonderhede is nie beskikbaar nie.",

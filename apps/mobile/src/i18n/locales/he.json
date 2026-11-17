@@ -1905,7 +1905,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "המחירים הם של הספק המועדף עלינו. החיובים בפועל עשויים להיות שונים, ואף גבוהים יותר, אם בקשה עוברת לספק אחר או אם הוגדרו הגבלות ספקים."
     },
     "modeOptions": {
       "code": "כתיבת קוד",

@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "ለ{{million}} {{tokens}}፦ {{inputLabel}} {{input}} · {{outputLabel}} {{output}}"
+      "perMillion": "ለ{{million}} {{tokens}}፦ {{inputLabel}} {{input}} · {{outputLabel}} {{output}}",
+      "preferredProviderNote": "ዋጋዎቹ የተመራጭ አቅራቢያችን ናቸው። ጥያቄ ወደ ሌላ አቅራቢ ከተዛወረ ወይም የአቅራቢ ገደቦች ከተዋቀሩ ትክክለኛው ክፍያ ሊለያይ፣ እንዲያውም ከፍ ሊል ይችላል።"
     },
     "partDetail": {
       "detailsUnavailable": "ዝርዝሮች አይገኙም።",

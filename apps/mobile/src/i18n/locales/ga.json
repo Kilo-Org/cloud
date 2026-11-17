@@ -2565,7 +2565,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Is do ár soláthraí tosaíochta na praghsanna. D'fhéadfadh na muirir iarbhír a bheith difriúil, agus níos airde fiú, má aistrítear iarratas chuig soláthraí eile nó má tá srianta soláthraí cumraithe."
     },
     "modeOptions": {
       "code": "Scríobh cód",

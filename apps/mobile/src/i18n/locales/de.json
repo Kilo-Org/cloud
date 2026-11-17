@@ -1926,7 +1926,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Die Preise gelten für unseren bevorzugten Anbieter. Die tatsächlichen Kosten können abweichen und auch höher ausfallen, wenn eine Anfrage auf einen anderen Anbieter ausweicht oder Anbieterbeschränkungen konfiguriert sind."
     },
     "partDetail": {
       "detailsUnavailable": "Es sind keine Details verfügbar.",

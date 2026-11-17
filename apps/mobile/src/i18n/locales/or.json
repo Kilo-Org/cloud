@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "ମୂଲ୍ୟଗୁଡ଼ିକ ଆମର ପସନ୍ଦର ସେବା ପ୍ରଦାନକାରୀଙ୍କ ପାଇଁ। ଅନୁରୋଧ ଅନ୍ୟ ସେବା ପ୍ରଦାନକାରୀଙ୍କ ପାଖକୁ ଗଲେ କିମ୍ବା ସେବା ପ୍ରଦାନକାରୀ ପ୍ରତିବନ୍ଧକ କନଫିଗର୍ କରାଯାଇଥିଲେ ପ୍ରକୃତ ଶୁଳ୍କ ଭିନ୍ନ ହୋଇପାରେ, ଏପରିକି ଅଧିକ ମଧ୍ୟ ହୋଇପାରେ।"
     },
     "partDetail": {
       "detailsUnavailable": "ବିବରଣୀ ଉପଲବ୍ଧ ନାହିଁ।",

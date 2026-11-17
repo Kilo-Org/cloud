@@ -2516,7 +2516,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Cene se odnose na našeg preferiranog provajdera. Stvarna naplata može da se razlikuje, pa i da bude veća, ako se zahtev prebaci na drugog provajdera ili ako su podešena ograničenja provajdera."
     },
     "partDetail": {
       "detailsUnavailable": "Detalji nisu dostupni.",

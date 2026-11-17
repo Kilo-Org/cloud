@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "بیې زموږ د غوره چمتو کوونکي لپاره دي. که غوښتنه بل چمتو کوونکي ته واوړي یا د چمتو کوونکو محدودیتونه ترتیب شوي وي، اصلي لګښت ښايي توپیر ولري او حتی لوړ وي."
     },
     "partDetail": {
       "detailsUnavailable": "جزیات د لاسرسي وړ نه دي.",

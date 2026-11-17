@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Os prezos corresponden ao noso provedor preferido. Os cargos reais poden variar, e mesmo ser máis altos, se unha solicitude pasa a outro provedor ou se hai restricións de provedores configuradas."
     },
     "modeOptions": {
       "code": "Programar",

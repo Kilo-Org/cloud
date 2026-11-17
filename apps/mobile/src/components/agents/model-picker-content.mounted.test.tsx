@@ -84,6 +84,7 @@ vi.mock('@shopify/flash-list', async () => {
       getItemType?: (item: ModelPickerRow | undefined) => string | undefined;
       style?: unknown;
       contentContainerStyle?: unknown;
+      ListFooterComponent?: ReactNode;
     }) => {
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
@@ -103,7 +104,8 @@ vi.mock('@shopify/flash-list', async () => {
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
         },
-        ...rows
+        ...rows,
+        props.ListFooterComponent
       );
     },
   };
@@ -802,6 +804,60 @@ describe('ModelPickerContent selected row', () => {
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
 
     expect(selectedIds).toEqual(['remote-model-17']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('ModelPickerContent preferred-provider price note', () => {
+  const priceNote = () => i18n.t('agentChat.modelCost.preferredProviderNote');
+
+  function renderedTexts(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return findByType(renderer.root, 'Text').map(node => node.props.children as unknown);
+  }
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+  });
+
+  it('notes under the list that the listed prices are for the preferred provider', async () => {
+    const priced: SessionModelOption = {
+      ...makeOption(0),
+      pricing: { prompt: '0.000003', completion: '0.000015' },
+    };
+    slotState.bridge = { ...makeBridge(), options: [priced, makeOption(1)] };
+    const renderer = await mount();
+
+    expect(renderedTexts(renderer)).toContain(priceNote());
+
+    // The note follows the catalog, so a query that hides the priced row
+    // leaves it in place.
+    await act(async () => {
+      typeSearch(renderer, 'model-1');
+      await Promise.resolve();
+    });
+    expect(listedDisplayIds(renderer)).toEqual(['model-1']);
+    expect(renderedTexts(renderer)).toContain(priceNote());
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows no note when no row shows a price', async () => {
+    const freePriced: SessionModelOption = {
+      ...makeOption(0),
+      isFree: true,
+      pricing: { prompt: '0.000003', completion: '0.000015' },
+    };
+    slotState.bridge = { ...makeBridge(), options: [freePriced, makeOption(1)] };
+    const renderer = await mount();
+
+    expect(renderedTexts(renderer)).not.toContain(priceNote());
 
     act(() => {
       renderer.unmount();

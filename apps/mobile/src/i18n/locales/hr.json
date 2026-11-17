@@ -2471,7 +2471,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Cijene se odnose na našeg preferiranog pružatelja. Stvarna naplata može se razlikovati, pa i biti veća, ako se zahtjev prebaci na drugog pružatelja ili ako su postavljena ograničenja pružatelja."
     },
     "modeOptions": {
       "code": "Programiraj",

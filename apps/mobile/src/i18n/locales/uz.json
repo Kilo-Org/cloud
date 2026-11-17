@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Narxlar biz afzal ko'rgan provayder uchun ko'rsatilgan. Agar so'rov boshqa provayderga o'tsa yoki provayder cheklovlari sozlangan bo'lsa, haqiqiy to'lov farq qilishi, hatto yuqoriroq bo'lishi mumkin."
     },
     "partDetail": {
       "detailsUnavailable": "Tafsilotlar mavjud emas.",

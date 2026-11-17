@@ -2516,7 +2516,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Prețurile sunt pentru furnizorul nostru preferat. Taxele reale pot diferi și pot fi chiar mai mari dacă o cerere este redirecționată către alt furnizor sau dacă sunt configurate restricții pentru furnizori."
     },
     "partDetail": {
       "detailsUnavailable": "Detaliile nu sunt disponibile.",

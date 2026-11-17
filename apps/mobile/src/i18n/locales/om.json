@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Gatiin kun kan dhiyeessaa nuti filannee ti. Gaaffiin gara dhiyeessaa biraatti yoo darbe ykn daangaan dhiyeessaa yoo qindaa'e, kaffaltiin dhugaa garaagar ta'uu, ol aanaa illee ta'uu danda'a."
     },
     "partDetail": {
       "detailsUnavailable": "Ibsi hin argamu.",

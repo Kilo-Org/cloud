@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "{{amount}}-ൽ കുറവ്",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "വിലകൾ ഞങ്ങളുടെ മുൻഗണനാ ദാതാവിന്റേതാണ്. അഭ്യർത്ഥന മറ്റൊരു ദാതാവിലേക്ക് മാറുകയോ ദാതാവ് നിയന്ത്രണങ്ങൾ കോൺഫിഗർ ചെയ്തിരിക്കുകയോ ചെയ്താൽ യഥാർത്ഥ നിരക്ക് വ്യത്യാസപ്പെടാം, കൂടുതലുമാകാം."
     },
     "partDetail": {
       "detailsUnavailable": "വിശദാംശങ്ങൾ ലഭ്യമല്ല.",

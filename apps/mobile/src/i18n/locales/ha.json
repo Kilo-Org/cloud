@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Farashin na mai ba da sabis da muka fi so ne. Ainihin kuɗin da ake caji na iya bambanta, har ma ya fi yawa, idan buƙata ta koma ga wani mai ba da sabis ko kuma an saita ƙuntatawar masu ba da sabis."
     },
     "modeOptions": {
       "code": "Rubuta lambar shiri",

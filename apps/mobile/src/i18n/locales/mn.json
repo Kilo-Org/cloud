@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "{{amount}}-аас бага",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Үнэ нь бидний сонгосон үндсэн үйлчилгээ үзүүлэгчийнх юм. Хүсэлт өөр үйлчилгээ үзүүлэгч рүү шилжих эсвэл үйлчилгээ үзүүлэгчийн хязгаарлалт тохируулсан бол бодит төлбөр өөр, бүр өндөр байж болно."
     },
     "partDetail": {
       "detailsUnavailable": "Дэлгэрэнгүй мэдээлэл алга.",

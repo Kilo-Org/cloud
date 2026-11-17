@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ang mga presyo ay para sa aming pinipiling tagapagbigay ng serbisyo. Maaaring mag-iba, at maaaring mas mataas pa, ang aktuwal na singil kung lilipat ang kahilingan sa ibang tagapagbigay ng serbisyo o kung may nakatakdang mga paghihigpit sa tagapagbigay."
     },
     "partDetail": {
       "detailsUnavailable": "Hindi makuha ang mga detalye.",

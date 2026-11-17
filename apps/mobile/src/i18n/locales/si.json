@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "මිල ගණන් අපගේ ප්‍රමුඛ සැපයුම්කරු සඳහා වේ. ඉල්ලීමක් වෙනත් සැපයුම්කරුවෙකු වෙත මාරු වුවහොත් හෝ සැපයුම්කරු සීමා වින්‍යාස කර ඇත්නම්, සැබෑ ගාස්තු වෙනස් විය හැකි අතර ඊටත් වඩා වැඩි විය හැක."
     },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබා ගත නොහැක.",

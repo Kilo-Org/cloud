@@ -2516,7 +2516,8 @@
     },
     "modelCost": {
       "lessThan": "mazāk par {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Cenas attiecas uz mūsu vēlamo pakalpojumu sniedzēju. Faktiskā maksa var atšķirties un pat būt lielāka, ja pieprasījums tiek pārslēgts uz citu pakalpojumu sniedzēju vai ir konfigurēti pakalpojumu sniedzēju ierobežojumi."
     },
     "partDetail": {
       "detailsUnavailable": "Detalizēta informācija nav pieejama.",

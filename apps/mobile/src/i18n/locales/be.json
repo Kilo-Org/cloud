@@ -2563,7 +2563,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Цэны пазначаны для нашага прыярытэтнага пастаўшчыка. Фактычная плата можа адрознівацца і нават быць вышэйшай, калі запыт пераключыцца на іншага пастаўшчыка або калі наладжаны абмежаванні пастаўшчыкоў."
     },
     "partDetail": {
       "detailsUnavailable": "Падрабязнасці недаступныя.",

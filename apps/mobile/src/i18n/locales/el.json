@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ανά {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ανά {{million}} {{tokens}}",
+      "preferredProviderNote": "Οι τιμές αφορούν τον προτιμώμενο πάροχό μας. Οι πραγματικές χρεώσεις ενδέχεται να διαφέρουν, ακόμη και να είναι υψηλότερες, αν ένα αίτημα μεταφερθεί σε άλλον πάροχο ή αν έχουν ρυθμιστεί περιορισμοί παρόχων."
     },
     "partDetail": {
       "detailsUnavailable": "Οι λεπτομέρειες δεν είναι διαθέσιμες.",

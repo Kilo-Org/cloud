@@ -2424,7 +2424,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Գները մեր նախընտրած մատակարարինն են։ Փաստացի վճարները կարող են տարբերվել և նույնիսկ ավելի բարձր լինել, եթե հարցումը փոխանցվի այլ մատակարարի կամ եթե կարգավորված են մատակարարների սահմանափակումներ։"
     },
     "modeOptions": {
       "code": "Կոդ",

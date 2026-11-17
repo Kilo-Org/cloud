@@ -1950,7 +1950,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Los precios corresponden a nuestro proveedor preferido. Los cargos reales pueden variar, e incluso ser más altos, si una solicitud pasa a otro proveedor o si hay restricciones de proveedores configuradas."
     },
     "partDetail": {
       "detailsUnavailable": "Los detalles no están disponibles.",

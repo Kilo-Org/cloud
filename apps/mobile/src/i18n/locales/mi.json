@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "iti iho i te {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ko ngā utu nei mō tō mātou kaiwhakarato matua. Ka rerekē pea ngā utu tūturu, ā, ka nui ake pea, mēnā ka whakawhitia tētahi tono ki tētahi atu kaiwhakarato, ka whakaritea rānei ngā here kaiwhakarato."
     },
     "partDetail": {
       "detailsUnavailable": "Kāore e wātea ana ngā taipitopito.",

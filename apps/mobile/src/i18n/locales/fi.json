@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Hinnat koskevat ensisijaista palveluntarjoajaamme. Todelliset veloitukset voivat poiketa ja olla suurempiakin, jos pyyntö siirtyy toiselle palveluntarjoajalle tai palveluntarjoajarajoituksia on määritetty."
     },
     "partDetail": {
       "detailsUnavailable": "Tiedot eivät ole käytettävissä.",

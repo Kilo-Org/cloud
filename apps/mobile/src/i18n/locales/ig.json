@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ọnụ ahịa ndị a bụ nke onye na-enye ọrụ anyị kacha họrọ. Ụgwọ n'ezie nwere ike ịdị iche, ma ọ bụ karịa, ma ọ bụrụ na arịrịọ agafee n'onye ọzọ na-enye ọrụ ma ọ bụ e debere mmachi ndị na-enye ọrụ."
     },
     "partDetail": {
       "detailsUnavailable": "Nkọwa adịghị.",

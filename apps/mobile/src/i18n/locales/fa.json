@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "قیمت‌ها مربوط به ارائه‌دهندهٔ ترجیحی ما هستند. اگر درخواستی به ارائه‌دهندهٔ دیگری منتقل شود یا محدودیت‌های ارائه‌دهنده پیکربندی شده باشد، هزینهٔ واقعی ممکن است متفاوت و حتی بیشتر باشد."
     },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست.",

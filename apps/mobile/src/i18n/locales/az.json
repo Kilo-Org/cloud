@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Qiymətlər üstünlük verdiyimiz təminatçıya aiddir. Sorğu başqa təminatçıya keçərsə və ya təminatçı məhdudiyyətləri qurulubsa, faktiki ödəniş fərqli, hətta daha yüksək ola bilər."
     },
     "partDetail": {
       "detailsUnavailable": "Təfərrüatlar əlçatan deyil.",

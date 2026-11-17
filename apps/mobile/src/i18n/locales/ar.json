@@ -2022,7 +2022,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} لكل {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} لكل {{million}} {{tokens}}",
+      "preferredProviderNote": "الأسعار خاصة بالمزوّد المفضّل لدينا. قد تختلف الرسوم الفعلية، وقد تكون أعلى، إذا انتقل الطلب إلى مزوّد آخر أو إذا ضُبطت قيود على المزوّدين."
     },
     "partDetail": {
       "detailsUnavailable": "التفاصيل غير متاحة.",

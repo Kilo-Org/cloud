@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "نرخەکان هی دابینکەری پەسەندکراوی ئێمەن. ئەگەر داواکارییەک بگوازرێتەوە بۆ دابینکەرێکی تر یان سنووردارکردنی دابینکەر ڕێکخرابێت، لەوانەیە تێچووی ڕاستەقینە جیاواز بێت، تەنانەت زیاتریش بێت."
     },
     "partDetail": {
       "detailsUnavailable": "وردەکارییەکان بەردەست نین.",

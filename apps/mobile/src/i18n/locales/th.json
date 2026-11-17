@@ -2469,7 +2469,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ต่อ {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ต่อ {{million}} {{tokens}}",
+      "preferredProviderNote": "ราคาเป็นของผู้ให้บริการหลักที่เราเลือก ค่าบริการจริงอาจแตกต่างและอาจสูงกว่านี้ หากคำขอถูกสลับไปยังผู้ให้บริการอื่นหรือมีการกำหนดข้อจำกัดผู้ให้บริการไว้"
     },
     "partDetail": {
       "detailsUnavailable": "ไม่มีรายละเอียด",

@@ -1974,7 +1974,8 @@
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Ціни вказано для нашого пріоритетного постачальника. Фактична плата може відрізнятися й навіть бути вищою, якщо запит перемкнеться на іншого постачальника або налаштовано обмеження постачальників."
     },
     "partDetail": {
       "detailsUnavailable": "Відомості недоступні.",

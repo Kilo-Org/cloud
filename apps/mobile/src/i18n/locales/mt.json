@@ -2610,7 +2610,8 @@
     },
     "modelCost": {
       "lessThan": "inqas minn {{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}",
+      "preferredProviderNote": "Il-prezzijiet huma għall-fornitur preferut tagħna. Il-ħlasijiet attwali jistgħu jvarjaw, u saħansitra jkunu ogħla, jekk talba tgħaddi għal fornitur ieħor jew jekk ikunu kkonfigurati restrizzjonijiet tal-fornituri."
     },
     "partDetail": {
       "detailsUnavailable": "Id-dettalji mhumiex disponibbli.",

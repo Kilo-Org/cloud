@@ -51,7 +51,7 @@ export function resolveUsageDashboardState(args: {
 
 /**
  * The tRPC error's own message, when the failure carries one. Matches
- * {@link USAGE_SOURCE_NOT_CONFIGURED_MESSAGE} by identity, the one signal the
+ * `USAGE_SOURCE_NOT_CONFIGURED_MESSAGE` by identity, the one signal the
  * wire gives a client for the condition.
  */
 function readTrpcErrorMessage(error: unknown): string | undefined {

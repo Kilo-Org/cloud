@@ -15,9 +15,12 @@ const BulkUserCreditsInputSchema = z.object({
     .refine(
       dateStr => {
         const date = new Date(dateStr);
-        return !isNaN(date.getTime());
+        if (isNaN(date.getTime())) return false;
+        // A YYYY-MM-DD date is interpreted as midnight UTC, so a same-day
+        // expiry is still an instant in the past and must be refused.
+        return date.getTime() > Date.now();
       },
-      { message: 'Invalid date' }
+      { message: 'Expiration date must be in the future' }
     )
     .optional(),
   description: z.string().optional(),

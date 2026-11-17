@@ -50,6 +50,13 @@ export async function POST(
     return warnAndCreateErrorResponse('Invalid credit kind');
   }
   const credit_expiry_date = requestData.credit_expiry_date ?? requestData.creditExpiryDate;
+  if (
+    creditKind === 'promotional' &&
+    credit_expiry_date &&
+    new Date(credit_expiry_date).getTime() <= Date.now()
+  ) {
+    return warnAndCreateErrorResponse('Credit expiry date must be in the future');
+  }
   const options = {
     amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,
     creditKind,

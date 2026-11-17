@@ -5,6 +5,7 @@ import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organizat
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import type { ExaUsageRecord, ExaUsageWriteResponse } from '@kilocode/usage-contracts';
 
@@ -173,7 +174,10 @@ export async function recordExaUsage(
   });
 
   if (outcome.status === 'rejected') {
-    console.error('[exa-usage] usage record rejected: payer could not be resolved', {
+    // Warning level plus a Sentry capture: a step change in rejected volume must be visible in
+    // alerting, not only as log noise. The reason distinguishes an unknown payer from a
+    // membership the record no longer names.
+    sentryLogger('exa-usage', 'warning')('usage record rejected: payer could not be resolved', {
       usage_id: id,
       reason: outcome.rejectionReason,
     });

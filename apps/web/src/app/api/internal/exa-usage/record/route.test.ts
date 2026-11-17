@@ -249,7 +249,6 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
   );
 
   test('returns a rejected status for a record naming an unknown user and writes no row', async () => {
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     const record = await personalRecord();
     const unknownUserRecord = { ...record, userId: `missing-exa-user-${randomUUID()}` };
 
@@ -257,10 +256,6 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: 'rejected', usageId: record.id });
-    expect(consoleError).toHaveBeenCalledWith(
-      '[exa-usage] usage record rejected: payer could not be resolved',
-      { usage_id: record.id, reason: 'user_not_found' }
-    );
     expect(await logRows(unknownUserRecord.userId)).toEqual([]);
   });
 

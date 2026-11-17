@@ -37,7 +37,15 @@ jest.mock('next/server', () => ({
 // Suppress Sentry in tests
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
+
+// sentryLogger is console-silent in automated tests; capture its calls for the rejection assertions.
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+const mockedSentryLogger = jest.mocked(sentryLogger);
 
 describe('Exa Usage Tracking', () => {
   const passFixtureOrganizationIds: string[] = [];
@@ -45,7 +53,7 @@ describe('Exa Usage Tracking', () => {
 
   afterEach(async () => {
     jest.restoreAllMocks();
-
+    mockedSentryLogger.mockClear();
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(exa_monthly_usage);
 
@@ -340,7 +348,6 @@ describe('Exa Usage Tracking', () => {
     });
 
     test('rejects a record naming an unknown user and writes no rows', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
       const identity = usageIdentity();
 
@@ -366,15 +373,14 @@ describe('Exa Usage Tracking', () => {
         .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(0);
       expect(monthlyRows).toHaveLength(0);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith(
-        '[exa-usage] usage record rejected: payer could not be resolved',
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
         { usage_id: identity.id, reason: 'user_not_found' }
       );
     });
 
     test('rejects the same unresolvable record on every submission and writes no rows', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
       const input: ExaUsageRecord = {
         ...usageIdentity(),
@@ -399,11 +405,10 @@ describe('Exa Usage Tracking', () => {
         .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(0);
       expect(monthlyRows).toHaveLength(0);
-      expect(consoleError).toHaveBeenCalledTimes(2);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(2);
     });
 
     test('rejects an organization record for a user outside that organization', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const user = await insertTestUser({
         microdollars_used: 0,
         total_microdollars_acquired: 100_000_000,
@@ -450,9 +455,9 @@ describe('Exa Usage Tracking', () => {
       expect(monthlyRows).toHaveLength(0);
       expect(memberUsageRows).toHaveLength(0);
       expect(chargedOrganization.microdollars_used).toBe(0);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith(
-        '[exa-usage] usage record rejected: payer could not be resolved',
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
         { usage_id: identity.id, reason: 'organization_membership_missing' }
       );
     });
@@ -499,7 +504,6 @@ describe('Exa Usage Tracking', () => {
     });
 
     test('rejects a record the parent-role holder cannot resolve and a plain parent member inherits nothing', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const parentOwner = await insertTestUser();
       const parent = await createTestOrganization(
         `exa-parent-${crypto.randomUUID()}`,
@@ -537,15 +541,14 @@ describe('Exa Usage Tracking', () => {
         .from(exa_usage_log)
         .where(eq(exa_usage_log.organization_id, child.id));
       expect(sourceRows).toHaveLength(0);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith(
-        '[exa-usage] usage record rejected: payer could not be resolved',
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
         { usage_id: identity.id, reason: 'organization_membership_missing' }
       );
     });
 
     test('rejects an organization record once the organization is marked deleted', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const user = await insertTestUser({
         microdollars_used: 0,
         total_microdollars_acquired: 100_000_000,
@@ -605,15 +608,14 @@ describe('Exa Usage Tracking', () => {
       expect(monthlyRows).toHaveLength(0);
       expect(memberUsageRows).toHaveLength(0);
       expect(chargedOrganization.microdollars_used).toBe(0);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith(
-        '[exa-usage] usage record rejected: payer could not be resolved',
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
         { usage_id: identity.id, reason: 'organization_membership_missing' }
       );
     });
 
     test('answers duplicate when a committed record is replayed after its membership is removed', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const user = await insertTestUser({
         microdollars_used: 0,
         total_microdollars_acquired: 100_000_000,
@@ -664,7 +666,7 @@ describe('Exa Usage Tracking', () => {
       expect(memberUsageRows).toHaveLength(1);
       expect(memberUsageRows[0].microdollar_usage).toBe(9000);
       expect(chargedOrganization.microdollars_used).toBe(9000);
-      expect(consoleError).not.toHaveBeenCalled();
+      expect(mockedSentryLogger).not.toHaveBeenCalled();
     });
 
     test('does not deduct from balance when chargedToBalance is false', async () => {

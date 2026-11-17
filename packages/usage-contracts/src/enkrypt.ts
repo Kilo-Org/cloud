@@ -28,9 +28,10 @@ const ENKRYPT_DETECTOR_IDS = [
 ] as const;
 
 /**
- * New members stay rejected because they derive by subtraction from the package's single
- * `GatewayApiKindSchema`: Enkrypt only scans LLM text calls, so the write accepts only these
- * kinds, with their tuple spelled once in the shared enum.
+ * Selects an explicit allow-list of the package's `GatewayApiKindSchema` members: Enkrypt
+ * only scans LLM text calls, so the write accepts only these kinds and every new kind stays
+ * rejected by default. The shared enum type-checks this allow-list, so a rename or removal
+ * of a listed kind fails here instead of silently changing the accepted set.
  */
 const EnkryptApiKindSchema = GatewayApiKindSchema.extract([
   'chat_completions',

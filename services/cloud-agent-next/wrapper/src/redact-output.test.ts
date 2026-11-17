@@ -152,6 +152,13 @@ describe('redactSecrets', () => {
     }
   );
 
+  it('redacts compact JWTs such as renewed transfer grants', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiJ9.eyJ0eXBlIjoic2FuZGJveF90cmFuc2ZlciJ9.c2lnbmF0dXJlLXNpZ25hdHVyZS1zaWc';
+    expect(redactSecrets(`grant ${jwt} leaked`)).toBe('grant [REDACTED] leaked');
+    expect(redactSecrets('version eyJ.eyJ.short')).toBe('version eyJ.eyJ.short');
+  });
+
   it('leaves non-secret content unchanged', () => {
     expect(redactSecrets('npm install')).toBe('npm install');
     expect(redactSecrets('added 42 packages in 3s')).toBe('added 42 packages in 3s');

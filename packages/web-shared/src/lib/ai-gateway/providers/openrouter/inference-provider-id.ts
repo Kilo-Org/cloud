@@ -5,6 +5,7 @@ import {
   GoogleServiceAccountSigningKeySchema,
   type ByokEndpointProviderId,
 } from '@kilocode/db/schema-types';
+import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -81,6 +82,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'streamlake',
   'tencent',
   'together',
+  'typesafe',
   'upstage',
   'venice',
   'wafer',
@@ -247,6 +249,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'stepfun',
   'streamlake',
   'togetherai',
+  'typesafe-ai',
   'vertexAnthropic',
   'voyage',
   'wafer',
@@ -277,6 +280,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.zai,
   [OpenRouterInferenceProviderIdSchema.enum.together]:
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
+  [OpenRouterInferenceProviderIdSchema.enum.typesafe]:
+    VercelNonUserByokInferenceProviderIdSchema.enum['typesafe-ai'],
 } as Record<string, VercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;
@@ -353,49 +358,18 @@ export function normalizeVercelInferenceProviderIdForRouting(providerId: string 
     : providerId;
 }
 
-export const AwsCredentialsSchema = z.object({
-  accessKeyId: z.string(),
-  secretAccessKey: z.string(),
-  region: z.string(),
-});
-
-export const BedrockCredentialsSchema = z.union([
-  AwsCredentialsSchema.extend({ apiKey: z.never().optional() }),
-  z.object({
-    apiKey: z.string().trim().min(1),
-    region: z.string().trim().min(1),
-    accessKeyId: z.never().optional(),
-    secretAccessKey: z.never().optional(),
-  }),
-]);
-
-export type BedrockCredentials = z.infer<typeof BedrockCredentialsSchema>;
-
-export const AzureCredentialsSchema = z.object({
-  apiKey: z.string().trim().min(1),
-  resourceName: z.string().trim().min(1),
-  modelMappings: z
-    .array(
-      z.object({
-        gatewayModelSlug: z.string().trim().min(1),
-        customModelId: z.string().trim().min(1),
-      })
-    )
-    .optional(),
-});
-
-export type AzureCredentials = z.infer<typeof AzureCredentialsSchema>;
-
-export const VertexCredentialsSchema = z.object({
-  project: z.string().min(1),
-  location: z.string().min(1),
-  googleCredentials: z.object({
-    privateKey: z.string().min(1),
-    clientEmail: z.string().min(1),
-  }),
-});
-
-export type VertexCredentials = z.infer<typeof VertexCredentialsSchema>;
+// The credential shapes live in app-shared so the mobile key form validates a
+// credential with exactly the rule this file's callers apply. They are
+// re-exported here because every existing web import reads them from this path.
+export {
+  AwsCredentialsSchema,
+  BedrockCredentialsSchema,
+  AzureCredentialsSchema,
+  VertexCredentialsSchema,
+  type BedrockCredentials,
+  type AzureCredentials,
+  type VertexCredentials,
+} from '@kilocode/app-shared/byok-credentials';
 
 /**
  * A Google Cloud service account key file, as downloaded from the console, with

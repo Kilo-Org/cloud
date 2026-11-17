@@ -46,6 +46,7 @@ import {
 import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
+  getSystemOneModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -61,6 +62,7 @@ import {
   getByokKmsContext,
   getModelGatewayUserByokProviders,
   readByokEndpointDefinition,
+  isGatewayUserByokEligibleModel,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -76,6 +78,9 @@ import {
   getVercelOnlyModelName,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import type { NonChatVercelModelType } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -383,9 +388,13 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     }
   };
 
+  // System One models are listed with their label below.
+  const systemOneModelIds = new Set(getSystemOneModelIds(openRouterModelMetadata));
   const openRouterModels = Object.values(openRouterModelMetadata);
   for (const openRouterModel of openRouterModels) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
+    if (isAutoSmallFreeModel(openRouterModel.id) || systemOneModelIds.has(openRouterModel.id)) {
+      continue;
+    }
     await addGatewayModel(openRouterModel);
   }
 
@@ -401,6 +410,43 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
       id: vercelOnlyModel.id,
       name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
     });
+  }
+
+  // Embeddings and System One use the OpenRouter key, the Vercel AI Gateway key, and provider keys
+  // sent through Vercel, but only for OpenRouter catalog ids Vercel serves under the mapped id.
+  // Direct BYOK keys never serve them. Transcriptions use only the OpenRouter key.
+  const addNonChatModel = async (
+    model: { id: string; name: string },
+    endpoint: { label: string; vercelType?: NonChatVercelModelType }
+  ) => {
+    if (!isGatewayUserByokEligibleModel(model.id)) return;
+    const labelled = { id: model.id, name: `${model.name}, ${endpoint.label}` };
+    addSupportedModel('openrouter', labelled);
+    if (!endpoint.vercelType) return;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== endpoint.vercelType) return;
+    addSupportedModel('vercel-ai-gateway', labelled);
+    for (const vercelEndpoint of vercelModel.endpoints) {
+      const providerId = getVercelUserByokProviderIdForEndpoint(
+        vercelEndpoint.provider_name ?? vercelEndpoint.tag
+      );
+      if (providerId) addSupportedModel(providerId, labelled);
+    }
+  };
+  for (const modelId of systemOneModelIds) {
+    if (modelId.startsWith('~')) continue;
+    const model = openRouterModelMetadata[modelId];
+    await addNonChatModel(
+      { id: modelId, name: model?.name ?? modelId },
+      { label: 'System One', vercelType: 'evaluation' }
+    );
+  }
+  for (const model of (await getKiloEmbeddingModelCatalogFromDatabase())?.models ?? []) {
+    await addNonChatModel(model, { label: 'embeddings', vercelType: 'embedding' });
+  }
+  const transcriptionModels = await getOpenRouterTranscriptionModels().catch(() => null);
+  for (const model of transcriptionModels?.data ?? []) {
+    await addNonChatModel(model, { label: 'transcription' });
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {

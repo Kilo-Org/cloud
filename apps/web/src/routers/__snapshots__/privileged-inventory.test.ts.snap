@@ -64,6 +64,7 @@ exports[`privileged inventory covers discovered route handlers the privileged ro
   "/api/integrations/google/disconnect read -> rest.integrations",
   "/api/integrations/google/disconnect write -> rest.integrations",
   "/api/internal/glanceable-agents-snapshot write -> rest.internal",
+  "/api/organizations/[id]/browser-policy read -> rest.orgRoutes",
   "/api/organizations/[id]/defaults read -> rest.orgRoutes",
   "/api/organizations/[id]/guardrails read -> rest.orgRoutes",
   "/api/organizations/[id]/guardrails/mcp-connections write -> rest.orgRoutes",

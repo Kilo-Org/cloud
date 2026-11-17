@@ -48,7 +48,7 @@ originating run identity, and old teardown owns only that run's resources.
 Foreign-run events are dropped before controller delivery and iOS transcript
 deduplication. A genuine failed-start error and end remain valid without start.
 
-The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+The versioned `expo-speech-recognition@58.0.1` patch, its workspace registration,
 and its lockfile hash form one native compatibility change. Rebuild both native
 clients; reloading JavaScript onto an older recognizer binary is not supported.
 

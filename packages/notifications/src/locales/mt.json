@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Is-sessjoni tal-aġent tiegħek għandha aġġornament",
-      "chatMessage": "Għandek messaġġ ġdid",
-      "instanceLifecycle": "L-instance tiegħek għandha aġġornament",
-      "scheduledAction": "Azzjoni skedata għandha aġġornament",
       "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
       "spendAlert": "L-infiq tiegħek għandu bżonn attenzjoni",
       "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Mingħajr titlu",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -45,43 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ksur tal-SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Verifika tas-sigurtà għandha aġġornament"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} lest",
-      "body": "Tektek biex tibda tħaddet."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} fallejt jibda",
-      "body": "Il-bidu fallejt."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} dalwaqt jerġa' jibda",
-      "body": "Skedat biex jerġa' jibda fil-{{when}}."
-    },
-    "restartCancelled": {
-      "title": "Ir-restart ta' {{instanceName}} ġie kkanċellat",
-      "body": "Ir-restart li kien skedat qabel ġie kkanċellat."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} dalwaqt jitjieb",
-      "bodyWithTag": "Aġġorna għal {{targetImageTag}} fil-{{when}}.",
-      "bodyWithoutTag": "Aġġornament skedat fil-{{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "L-aġġornament ta' {{instanceName}} ġie kkanċellat",
-      "body": "L-aġġornament li kien skedat qabel ġie kkanċellat."
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Is-sessjoni ta' Kilo tiegħek hi lesta biex tikkontrollaha mit-telefon tiegħek"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

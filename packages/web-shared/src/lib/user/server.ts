@@ -23,12 +23,12 @@ import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib
 import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
-import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 import {
   isApiTokenPepperCurrent,
-  isOrganizationMember,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -50,6 +50,7 @@ import {
 import {
   deriveCredentialKind,
   StepUpRequiredError,
+  type PrivilegedActionClass,
   type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
@@ -250,97 +251,96 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
-  if (opts.adminOnly === true && result.user) {
+  if (opts.adminOnly === true && (result.user || authViaToken)) {
+    // One header read and one privileged-inventory lookup per admin request, so
+    // the step-up guard and the token outcome event that reports it cannot name
+    // different actions.
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);
-    emitAdminAccessEvent({
-      surface,
-      kind: 'admin_guard',
-      user: result.user,
-      authViaToken,
-      tokenSource: result.tokenSource ?? null,
-      credential,
-      route,
-      method,
-      userAgentProduct: userAgentProductFromHeaders(headersList),
-      ip: clientIpFromHeaders(headersList),
-    });
+    let attribution: { actionClass: PrivilegedActionClass; inventoryId: string | null } | undefined;
+    const routeAttribution = () =>
+      (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
 
-    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
-      const { actionClass, inventoryId } = actionClassForRoute({
+    if (result.user) {
+      emitAdminAccessEvent({
         surface,
-        route: route ?? '',
+        kind: 'admin_guard',
+        user: result.user,
+        authViaToken,
+        tokenSource: result.tokenSource ?? null,
+        credential,
+        route,
         method,
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        ip: clientIpFromHeaders(headersList),
       });
-      try {
-        await runStepUpGuard({
-          userId: result.user.id,
-          credential,
-          webSessionId: result.webSessionId,
-          actionClass,
-          enabled: true,
-          route,
-          method,
-          surface,
-        });
-      } catch (error) {
-        // One privileged-access outcome per guarded non-session request:
-        // `denied` for a policy verdict, `failed` for an unexpected throw.
-        // Session traffic stays on `admin_guard`.
-        const emitOutcome = (outcome: 'denied' | 'failed') => {
-          if (credential === 'session') return;
-          emitPrivilegedAccessEvent({
-            surface,
-            user: result.user,
+
+      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+        const { actionClass, inventoryId } = routeAttribution();
+        try {
+          await runStepUpGuard({
+            userId: result.user.id,
             credential,
-            outcome,
+            webSessionId: result.webSessionId,
             actionClass,
-            actionId: inventoryId,
-            target: null,
-            wouldBlock: true,
-            userAgentProduct: userAgentProductFromHeaders(headersList),
-            tokenSource: result.tokenSource ?? null,
+            enabled: true,
             route,
             method,
-            ip: clientIpFromHeaders(headersList),
+            surface,
           });
-        };
-        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
-          emitOutcome('denied');
-          return authError(403, error.cause.code, result.user.id);
+        } catch (error) {
+          // One privileged-access outcome per guarded non-session request:
+          // `denied` for a policy verdict, `failed` for an unexpected throw.
+          // Session traffic stays on `admin_guard`.
+          const emitOutcome = (outcome: 'denied' | 'failed') => {
+            if (credential === 'session') return;
+            emitPrivilegedAccessEvent({
+              surface,
+              user: result.user,
+              credential,
+              outcome,
+              actionClass,
+              actionId: inventoryId,
+              target: null,
+              wouldBlock: true,
+              userAgentProduct: userAgentProductFromHeaders(headersList),
+              tokenSource: result.tokenSource ?? null,
+              route,
+              method,
+              ip: clientIpFromHeaders(headersList),
+            });
+          };
+          if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+            emitOutcome('denied');
+            return authError(403, error.cause.code, result.user.id);
+          }
+          // Fail closed. The guard normally converts evaluation failures itself;
+          // this covers anything unexpected around it.
+          emitOutcome('failed');
+          reportStepUpFailure('admin_step_up_rest', error);
+          return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
         }
-        // Fail closed. The guard normally converts evaluation failures itself;
-        // this covers anything unexpected around it.
-        emitOutcome('failed');
-        reportStepUpFailure('admin_step_up_rest', error);
-        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }
     }
-  }
 
-  if (opts.adminOnly === true && authViaToken) {
-    const route = routeFromHeaders(headersList);
-    const method = methodFromHeaders(headersList, opts.requestMethod);
-    const { actionClass, inventoryId } = actionClassForRoute({
-      surface,
-      route: route ?? '',
-      method,
-    });
-    emitPrivilegedAccessEvent({
-      surface,
-      user: result.user ?? undefined,
-      credential,
-      outcome: result.user ? 'succeeded' : 'denied',
-      actionClass,
-      actionId: inventoryId,
-      target: null,
-      wouldBlock: credential !== 'session',
-      userAgentProduct: userAgentProductFromHeaders(headersList),
-      tokenSource: result.tokenSource ?? null,
-      route,
-      method,
-      ip: clientIpFromHeaders(headersList),
-    });
+    if (authViaToken) {
+      const { actionClass, inventoryId } = routeAttribution();
+      emitPrivilegedAccessEvent({
+        surface,
+        user: result.user ?? undefined,
+        credential,
+        outcome: result.user ? 'succeeded' : 'denied',
+        actionClass,
+        actionId: inventoryId,
+        target: null,
+        wouldBlock: credential !== 'session',
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        route,
+        method,
+        ip: clientIpFromHeaders(headersList),
+      });
+    }
   }
 
   if (result.user) {
@@ -751,8 +751,16 @@ async function validateUserAuthorization({
         ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
       });
     }
-    const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
-    if (!isMember) {
+    // An organization context resolves through the effective-membership rule:
+    // the caller holds a direct membership in the live organization, or a
+    // permitted role (owner, admin, billing_manager) on its live parent
+    // organization. The balance and member-allowance rules are separate and do
+    // not follow inheritance.
+    const hasAccess = await hasEffectiveOrganizationAccess(fromDb, {
+      kiloUserId,
+      organizationId,
+    });
+    if (!hasAccess) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
         authorizationRefused: true,
         internalApiUse,

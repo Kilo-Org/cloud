@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PickerSheet } from './picker-sheet';
+import { SheetHeader } from './sheet-header';
 import '@/i18n';
 
 const NAVIGATION_CONTEXT_MODULE = 'expo-router/build/react-navigation/core/NavigationContext';
@@ -45,15 +46,19 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827' }),
 }));
 
-async function mountExpiredSheet(focused: boolean): Promise<TestRenderer.ReactTestRenderer> {
+async function mountSheet(
+  focused: boolean,
+  props: { onCancel?: () => void; expired: boolean }
+): Promise<TestRenderer.ReactTestRenderer> {
   const { NavigationContext }: { NavigationContext: Context<unknown> } = await import(
     NAVIGATION_CONTEXT_MODULE
   );
   const element: ReactElement = createElement(PickerSheet, {
     title: 'Repository',
     onDone: () => undefined,
+    onCancel: props.onCancel,
     scrollable: false,
-    expired: true,
+    expired: props.expired,
   });
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -74,7 +79,7 @@ async function mountExpiredSheet(focused: boolean): Promise<TestRenderer.ReactTe
 
 describe('PickerSheet expired shell', () => {
   it('paints nothing while its route is not the one on screen', async () => {
-    const renderer = await mountExpiredSheet(false);
+    const renderer = await mountSheet(false, { expired: true });
 
     // The caller's data is gone and this sheet is no longer the screen the user
     // is on: a dead modal must not appear over another screen.
@@ -86,9 +91,63 @@ describe('PickerSheet expired shell', () => {
   });
 
   it('still explains the expired options while its route is on screen', async () => {
-    const renderer = await mountExpiredSheet(true);
+    const renderer = await mountSheet(true, { expired: true });
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('leaves Done as the only exit while an expired shell has no Cancel', async () => {
+    const renderer = await mountSheet(true, { expired: true });
+    const [header] = renderer.root.findAllByType(SheetHeader);
+    if (!header) {
+      throw new Error('the expired shell rendered no header');
+    }
+
+    // Done is the one way out of a shell with no Cancel, so it must stay
+    // pressable even though there is nothing to commit.
+    expect(header.props.doneDisabled).toBe(false);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('disables Done while an expired shell offers Cancel', async () => {
+    const onCancel = vi.fn<() => void>();
+    const renderer = await mountSheet(true, { expired: true, onCancel });
+    const [header] = renderer.root.findAllByType(SheetHeader);
+    if (!header) {
+      throw new Error('the expired shell rendered no header');
+    }
+
+    // Two controls that both only close the sheet leave Done promising a
+    // selection that cannot exist: Cancel is the single exit instead.
+    expect(header.props.doneDisabled).toBe(true);
+
+    act(() => {
+      (header.props.onCancel as () => void)();
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps Done pressable on a live picker that offers Cancel', async () => {
+    const renderer = await mountSheet(true, { expired: false, onCancel: () => undefined });
+    const [header] = renderer.root.findAllByType(SheetHeader);
+    if (!header) {
+      throw new Error('the picker rendered no header');
+    }
+
+    // A live sheet commits a choice through Done, so its Cancel must not
+    // withdraw that action.
+    expect(header.props.doneDisabled).toBe(false);
 
     act(() => {
       renderer.unmount();

@@ -22,6 +22,7 @@ export function useReviewerPermission(scope: string): PermissionState {
     isLoading: query.isLoading,
     isError: query.isError,
     isFetching: query.isFetching,
+    hasData: query.data !== undefined,
     role,
     refetch: () => void query.refetch(),
   });

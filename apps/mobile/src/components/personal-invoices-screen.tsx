@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { InvoiceListScreen } from '@/components/invoice-list-screen';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { usePersonalInvoicesPage } from '@/lib/hooks/use-personal-credits';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * The person's own Stripe invoices. It reads the same page the web `/invoices`
@@ -19,6 +20,7 @@ export function PersonalInvoicesScreen() {
   return (
     <InvoiceListScreen
       title={t('organization.invoices.title')}
+      backFallback={PROFILE_TAB_HREF}
       query={query}
       entries={entries}
       hasMore={hasMore}

@@ -7,10 +7,7 @@ import {
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
-import {
-  getSnapshotModelVariantId,
-  normalizeModelId,
-} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -41,11 +38,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
-import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { GatewaysTab } from '@/components/organizations/providers-and-models/GatewaysTab';
+import { AdvancedPoliciesTab } from '@/components/organizations/providers-and-models/AdvancedPoliciesTab';
 
 type Props = {
   organizationId: string;
@@ -108,7 +104,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       { enabled: organizationData?.plan === 'enterprise' }
     )
   );
-  const showGatewaysTab = gatewaySettings?.available === true;
+  const showAdvancedPoliciesTab = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -121,7 +117,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   });
 
   const preferredModels = usePreferredModels();
-  const customPricingConfig = useCustomPricingConfig();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -295,17 +290,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         byokOnly: provider.byokOnly,
-        ...getOfferingPricing(
-          customPricingConfig,
-          getSnapshotModelVariantId(model),
-          model.endpoint.pricing
-        ),
+        vercelInferenceRegions: model.endpoint.vercel_inference_regions ?? [],
+        ...getOfferingPricing(model.endpoint.pricing),
       });
     }
 
     offerings.sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
     return offerings;
-  }, [customPricingConfig, infoModel, openRouterProviders]);
+  }, [infoModel, openRouterProviders]);
 
   const enabledModelCountByProviderSlug = useMemo(() => {
     const map = new Map<string, number>();
@@ -449,11 +441,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        ...getOfferingPricing(
-          customPricingConfig,
-          getSnapshotModelVariantId(model),
-          model.endpoint.pricing
-        ),
+        ...getOfferingPricing(model.endpoint.pricing),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
@@ -462,7 +450,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [customPricingConfig, infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.
@@ -502,7 +490,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
-            {showGatewaysTab && <TabsTrigger value="gateways">Gateways</TabsTrigger>}
+            {showAdvancedPoliciesTab && (
+              <TabsTrigger value="advanced-policies">Advanced policies</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -559,9 +549,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
 
-          {showGatewaysTab && (
-            <TabsContent value="gateways" className="mt-6">
-              <GatewaysTab
+          {showAdvancedPoliciesTab && (
+            <TabsContent value="advanced-policies" className="mt-6">
+              <AdvancedPoliciesTab
                 organizationId={organizationId}
                 canEdit={canEdit}
                 settings={gatewaySettings}
@@ -572,7 +562,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
         <ModelDetailsDialog
           organizationId={organizationId}
-          showGatewayAvailability={showGatewaysTab}
+          showGatewayAvailability={showAdvancedPoliciesTab}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

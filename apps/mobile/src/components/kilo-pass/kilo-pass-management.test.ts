@@ -52,7 +52,6 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/credits/external-billing-link', () => ({ canOpenExternalBilling: () => true }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/query/infinite-retention', () => ({
   reconcileFirstPage: mocks.reconcileFirstPage,
@@ -94,12 +93,14 @@ function passState(): KiloPassSubscriptionState {
   };
 }
 
-async function renderSections(): Promise<TestRenderer.ReactTestRenderer> {
+async function renderSections(
+  subscription: KiloPassSubscriptionState = passState()
+): Promise<TestRenderer.ReactTestRenderer> {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     holder.current = TestRenderer.create(
       createElement(KiloPassManagementSections, {
-        subscription: passState(),
+        subscription,
         scheduledChange: null,
       })
     );
@@ -150,6 +151,19 @@ describe('KiloPassManagementSections', () => {
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['kiloPass', 'getState'],
     });
+    renderer.unmount();
+  });
+
+  it('offers no manage control for a pass the store sold', async () => {
+    // Kilo Pass is no longer sold in either store, so a store-managed pass
+    // states its details and carries no manage or change-plan control.
+    const renderer = await renderSections({
+      ...passState(),
+      paymentProvider: 'app_store' as KiloPassSubscriptionState['paymentProvider'],
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(renderer.toJSON()).toBeNull();
     renderer.unmount();
   });
 });

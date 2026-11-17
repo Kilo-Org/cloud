@@ -50,7 +50,6 @@ export function useOrgAutoTopUpConfig(organizationId: string | null, enabled: bo
 }
 
 export type OrgAuditLogEntry = RouterOutputs['organizations']['auditLogs']['list']['logs'][number];
-
 type OrgAuditLogPage = RouterOutputs['organizations']['auditLogs']['list'];
 
 /**
@@ -85,4 +84,30 @@ export function useOrgAuditLogPage(organizationId: string | null, enabled: boole
   const pages = query.data?.pages;
   const entries = useMemo(() => (pages ?? []).flatMap(page => page.logs), [pages]);
   return { query, entries, hasMore: query.hasNextPage };
+}
+
+export type OrgRequestLogEntry = RouterOutputs['organizations']['requestLogs']['list'][number];
+
+/**
+ * One hour of the organization's gateway requests, newest first.
+ *
+ * The procedure answers at most 100 rows from the hour before `startTime`
+ * (`REQUEST_LOGS_LIMIT` and `REQUEST_LOGS_WINDOW_HOURS` in apps/web), so the
+ * window end is this screen's paging control: every end time is its own query
+ * key, and stepping to another hour asks the server instead of filtering a page
+ * the app already holds. `enabled` must be the billing role's own verdict,
+ * because the procedure refuses every other role rather than answering emptily.
+ */
+export function useOrgRequestLogs(
+  organizationId: string | null,
+  startTime: string,
+  enabled: boolean
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.requestLogs.list.queryOptions(
+      { organizationId: organizationId ?? '', startTime },
+      { enabled: enabled && organizationId != null }
+    )
+  );
 }

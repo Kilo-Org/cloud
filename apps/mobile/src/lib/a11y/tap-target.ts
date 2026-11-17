@@ -521,45 +521,26 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
- * The class a control renders when it ends a labelled line and no slop can
- * finish the target: React Native keeps a touch area inside its parent's
- * bounds, so a box that floats over a one-line label row is only as tall as
- * that row, and its vertical slop is clipped.
+ * The class a control renders when it ends a labelled line: the control is the
+ * target itself. React Native keeps a touch area inside its parent's bounds, so
+ * a box that floats over a one-line label row is only as tall as that row, and
+ * no vertical `hitSlop` can finish the target; `{@link
+ * LABELLED_LINE_ACTION_HIT_SLOP}` therefore reaches on the horizontal axis
+ * only.
  *
- * The label row is `text-sm`'s 17.5dp line and the target is
- * {@link TOUCH_TARGET_DP}, so the control is the target itself: its own box
- * carries the whole 44dp, laid out below the first line by
- * {@link LABELLED_LINE_MIN_HEIGHT_CLASS}. Its content starts at the box's top,
- * on the label's own line, and the rest of the target hangs below the line. The
- * horizontal side still reaches with {@link LABELLED_LINE_ACTION_HIT_SLOP},
- * because the row owns that axis.
+ * The box carries the whole {@link TOUCH_TARGET_DP} on both axes, so it also
+ * sets the row's height. Its content is centred, which keeps a glyph on the
+ * label's own line instead of hanging below it, so the label and its controls
+ * read as one row rather than a band with a hole under the card's top padding.
  */
-export const LABELLED_LINE_ACTION_CLASS = 'h-[44px] min-w-[44px] items-center justify-start';
+export const LABELLED_LINE_ACTION_CLASS = 'h-[44px] min-w-[44px] items-center justify-center';
 
 /**
  * Per-side `hitSlop` of {@link LABELLED_LINE_ACTION_CLASS}. Only the horizontal
- * side can reach past the box: the parent row's height is what the control
- * fills, so a vertical slop is clipped and would only claim a reach it cannot
- * deliver.
+ * side reaches past the box: the row owns the vertical axis, so a vertical slop
+ * would be clipped and would only claim a reach it cannot deliver.
  */
 export const LABELLED_LINE_ACTION_HIT_SLOP = { left: 5, right: 5 } as const;
-
-/**
- * The floor a labelled line takes when its controls are
- * {@link LABELLED_LINE_ACTION_CLASS}. The first line is `text-sm`'s 17.5dp and
- * the control is {@link TOUCH_TARGET_DP}, so the row lays out one target tall
- * and the label's copy sits at its top: the card's top padding stays the same
- * and the extra height falls below the label, between it and the field.
- */
-export const LABELLED_LINE_MIN_HEIGHT_CLASS = 'min-h-[44px]';
-
-/**
- * The alignment a {@link LABELLED_LINE_MIN_HEIGHT_CLASS} row uses. The copy and
- * the target both start at the row's top, so the target's content sits on the
- * label's line and its extra height falls below it. Stretching both children
- * also keeps their centres level, which is what a row of unlike heights needs.
- */
-export const LABELLED_LINE_ROW_CLASS = 'flex-row items-stretch gap-2';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

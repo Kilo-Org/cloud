@@ -21,14 +21,7 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
-import { LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
-
-/**
- * The target a control carries on its own node. A box that floats over the
- * label line is only as tall as that line, because React Native clips a touch
- * area to its parent's bounds, so the box itself has to be the target.
- */
-const TOUCH_TARGET_BOX_CLASS_TOKEN = 'h-[44px]';
+import { LABELLED_LINE_ACTION_CLASS, LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -336,7 +329,7 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('gives each row control the whole touch target on its own node', async () => {
+  it('gives each row control the whole target on its own box', async () => {
     h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
@@ -352,22 +345,26 @@ describe('ProfileCommandsScreen', () => {
 
     for (const control of controls) {
       // React Native clips a touch area to its parent's bounds, so the target
-      // has to be the control's own box rather than a slop outside it: a box
-      // that floats over a one-line label row is only as tall as that row.
-      expect(String(control.props.className)).toContain(TOUCH_TARGET_BOX_CLASS_TOKEN);
-      // Only the horizontal side can reach past the box; a vertical slop would
-      // be clipped by the row the control fills.
+      // has to be the control's own box rather than a slop outside it: every
+      // token of the shared class is on the node, and the slop is the shared
+      // horizontal one, which is all a parent row can let through.
+      const className = String(control.props.className);
+      for (const token of LABELLED_LINE_ACTION_CLASS.split(' ')) {
+        expect(className).toContain(token);
+      }
       expect(control.props.hitSlop).toEqual(LABELLED_LINE_ACTION_HIT_SLOP);
     }
-    // The target has to fit inside the row it sits in, and this suite renders
-    // no layout engine, so what it can hold is the contract at the screen's
-    // boundary: the field is asked to lay out a target-tall row with the copy
-    // at its top. The row's measured height and the copy's offset inside it are
-    // proved by the design-gate cells, which read the real frames.
+    // The row draws no extra height around the accessory: the control's own box
+    // is what sets the row height, so the screen passes no target-shaped flag to
+    // the field. What the row measures is what the design-gate cells read from
+    // real frames.
     const fields = findAll(renderer.root, 'FormField');
     expect(fields).toHaveLength(3);
     for (const field of fields) {
-      expect(field.props.labelAccessoryIsTarget).toBe(true);
+      const targetFlags = Object.keys(field.props).filter(key =>
+        key.toLowerCase().includes('target')
+      );
+      expect(targetFlags).toEqual([]);
     }
     unmount();
   });

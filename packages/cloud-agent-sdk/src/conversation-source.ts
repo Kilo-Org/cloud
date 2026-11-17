@@ -102,7 +102,10 @@ export function createConversationSourceReader() {
       try {
         display = readKilo2Messages(source.session, [message])[0];
       } catch (error) {
-        console.error(`[ConversationSource] Native message ${message.id} projection failed:`, error);
+        console.error(
+          `[ConversationSource] Native message ${message.id} projection failed:`,
+          error
+        );
         display = undefined;
       }
       if (!display) return [];

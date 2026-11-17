@@ -480,7 +480,8 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
-    "changelog": "Yangiliklar"
+    "changelog": "Yangiliklar",
+    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
   },
   "preferences": {
     "general": "Umumiy",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "Barcha a'zolar · Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
+    },
+    "modes": {
+      "create": "Yangi rejim",
+      "deleteAction": "Rejimni o‘chirish",
+      "deleteMessage": "Rejim ushbu tashkilotdagi barcha uchun olib tashlanadi. O‘rnatilgan rejimni almashtirgan rejim o‘rnatilgan sozlamalarga qaytadi.",
+      "deleteTitle": "Bu rejim o‘chirilsinmi?",
+      "descriptionLabel": "Rejim tavsifi",
+      "emptyDescription": "Bu yerga qo‘shilgan rejimlar ushbu tashkilotdagi barcha uchun mavjud.",
+      "emptyTitle": "Hozircha maxsus rejimlar yo‘q",
+      "identifierHint": "Kichik harflar, raqamlar va defislar.",
+      "identifierInvalid": "Faqat kichik harflar, raqamlar va defislardan foydalaning.",
+      "identifierLabel": "Identifikator",
+      "identifierRequired": "Identifikator kiriting.",
+      "identifierTaken": "Bu identifikatordan boshqa rejim allaqachon foydalanmoqda.",
+      "nameLabel": "Rejim nomi",
+      "nameRequired": "Rejim nomini kiriting.",
+      "notFound": "Bu rejim endi mavjud emas.",
+      "restrictionHint": "Faqat ushbu naqshga mos fayllarni tahrirlash mumkin. Barcha fayllarga ruxsat berish uchun bo‘sh qoldiring.",
+      "restrictionInvalid": "Yaroqli naqsh kiriting.",
+      "restrictionLabel": "Cheklov yorlig‘i",
+      "restrictionPattern": "Fayl naqshi",
+      "roleLabel": "Rol ta’rifi",
+      "roleRequired": "Bu rejim nima qilishini ta’riflang.",
+      "tool": {
+        "browser": "Brauzerdan foydalanish",
+        "command": "Buyruqlarni bajarish",
+        "edit": "Fayllarni tahrirlash",
+        "mcp": "MCPdan foydalanish",
+        "read": "Fayllarni o‘qish"
+      },
+      "whenToUseLabel": "Bu rejimdan qachon foydalanish kerak"
+    },
+    "groups": {
+      "create": "Yangi guruh",
+      "deleteAction": "Guruhni o‘chirish",
+      "deleteMessage": "Guruh, uning siyosatlari va a'zolar biriktirilishi olib tashlanadi.",
+      "deleteTitle": "Bu guruh o‘chirilsinmi?",
+      "descriptionLabel": "Guruh tavsifi",
+      "emptyDescription": "Guruh a'zolarni jamlaydi, shunda bitta siyosat barchasiga qo‘llanadi.",
+      "emptyTitle": "Hozircha guruhlar yo‘q",
+      "enterpriseOnly": "Guruhlar Enterprise tarifida mavjud.",
+      "memberCount": "{{displayCount}} a'zo",
+      "memberCount_one": "{{displayCount}} a'zo",
+      "memberCount_other": "{{displayCount}} a'zo",
+      "memberViewEmpty": "Siz ushbu tashkilotning birorta guruhida emassiz.",
+      "memberViewTitle": "Sizning guruhlaringiz",
+      "membersEmpty": "Qidiruvingizga hech qanday faol a'zo mos kelmadi.",
+      "membersLabel": "Guruh a'zolari",
+      "nameLabel": "Guruh nomi",
+      "nameRequired": "Guruh nomini kiriting.",
+      "nameTooLong": "Nomni 80 belgidan oshirmang.",
+      "notFound": "Bu guruh endi mavjud emas.",
+      "permissionDenied": "Faqat tashkilot egasi yoki administrator guruhlarni o‘zgartira oladi.",
+      "searchMembers": "A'zolarni qidirish",
+      "selectAllVisible": "Ko‘rsatilgan a'zolarning barchasini tanlash"
     },
     "hub": {
       "renameTitle": "Tashkilot nomini o'zgartirish",

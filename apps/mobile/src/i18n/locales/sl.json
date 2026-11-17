@@ -480,7 +480,8 @@
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
     },
-    "changelog": "Kaj je novega"
+    "changelog": "Kaj je novega",
+    "changelogVersionPending": "Opombe za to različico prinese naslednja posodobitev aplikacije."
   },
   "preferences": {
     "general": "Splošno",
@@ -3587,6 +3588,63 @@
       "orgLast30Days": "Vsi člani · Zadnjih 30 dni",
       "outputTokens": "Izhodni žetoni",
       "requests": "Zahteve"
+    },
+    "modes": {
+      "create": "Nov način",
+      "deleteAction": "Izbriši način",
+      "deleteMessage": "Način se odstrani za vse v tej organizaciji. Način, ki nadomesti vgrajeni način, se vrne na vgrajene nastavitve.",
+      "deleteTitle": "Izbrisati ta način?",
+      "descriptionLabel": "Opis načina",
+      "emptyDescription": "Tukaj dodani načini so na voljo vsem v tej organizaciji.",
+      "emptyTitle": "Načinov po meri še ni",
+      "identifierHint": "Male črke, številke in vezaji.",
+      "identifierInvalid": "Uporabi samo male črke, številke in vezaje.",
+      "identifierLabel": "Identifikator",
+      "identifierRequired": "Vnesi identifikator.",
+      "identifierTaken": "Drug način že uporablja ta identifikator.",
+      "nameLabel": "Ime načina",
+      "nameRequired": "Vnesi ime načina.",
+      "notFound": "Ta način ne obstaja več.",
+      "restrictionHint": "Urejati je mogoče samo datoteke, ki ustrezajo temu vzorcu. Pusti prazno, da dovoliš vse datoteke.",
+      "restrictionInvalid": "Vnesi veljaven vzorec.",
+      "restrictionLabel": "Oznaka omejitve",
+      "restrictionPattern": "Vzorec datotek",
+      "roleLabel": "Opredelitev vloge",
+      "roleRequired": "Opiši, kaj ta način počne.",
+      "tool": {
+        "browser": "Uporabi brskalnik",
+        "command": "Zaženi ukaze",
+        "edit": "Urejaj datoteke",
+        "mcp": "Uporabi MCP",
+        "read": "Beri datoteke"
+      },
+      "whenToUseLabel": "Kdaj uporabiti ta način"
+    },
+    "groups": {
+      "create": "Nova skupina",
+      "deleteAction": "Izbriši skupino",
+      "deleteMessage": "Skupina se odstrani skupaj s svojimi pravilniki in dodelitvami članov.",
+      "deleteTitle": "Izbrisati to skupino?",
+      "descriptionLabel": "Opis skupine",
+      "emptyDescription": "Skupina združuje člane, da lahko en pravilnik velja za vse.",
+      "emptyTitle": "Skupin še ni",
+      "enterpriseOnly": "Skupine so na voljo v paketu Enterprise.",
+      "memberCount": "Člani: {{displayCount}}",
+      "memberCount_few": "{{displayCount}} člani",
+      "memberCount_one": "{{displayCount}} član",
+      "memberCount_other": "{{displayCount}} članov",
+      "memberCount_two": "{{displayCount}} člana",
+      "memberViewEmpty": "Nisi v nobeni skupini te organizacije.",
+      "memberViewTitle": "Tvoje skupine",
+      "membersEmpty": "Noben aktivni član ne ustreza tvojemu iskanju.",
+      "membersLabel": "Člani skupine",
+      "nameLabel": "Ime skupine",
+      "nameRequired": "Vnesi ime skupine.",
+      "nameTooLong": "Ime naj ima največ 80 znakov.",
+      "notFound": "Ta skupina ne obstaja več.",
+      "permissionDenied": "Samo lastnik ali skrbnik organizacije lahko spreminja njene skupine.",
+      "searchMembers": "Išči člane",
+      "selectAllVisible": "Izberi vse prikazane"
     },
     "hub": {
       "renameTitle": "Preimenuj organizacijo",

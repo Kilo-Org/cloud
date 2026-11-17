@@ -480,7 +480,8 @@
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
     },
-    "changelog": "Mitä uutta"
+    "changelog": "Mitä uutta",
+    "changelogVersionPending": "Tämän version julkaisutiedot tulevat seuraavan päivityksen mukana."
   },
   "preferences": {
     "general": "Yleiset",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "Kaikki jäsenet · Viimeiset 30 päivää",
       "outputTokens": "Tulostetokenit",
       "requests": "Pyynnöt"
+    },
+    "modes": {
+      "create": "Uusi tila",
+      "deleteAction": "Poista tila",
+      "deleteMessage": "Tila poistetaan kaikilta tämän organisaation käyttäjiltä. Sisäänrakennetun tilan korvaava tila palaa sisäänrakennettuihin asetuksiin.",
+      "deleteTitle": "Poistetaanko tämä tila?",
+      "descriptionLabel": "Tilan kuvaus",
+      "emptyDescription": "Tänne lisätyt tilat ovat kaikkien tämän organisaation käyttäjien saatavilla.",
+      "emptyTitle": "Ei vielä mukautettuja tiloja",
+      "identifierHint": "Pieniä kirjaimia, numeroita ja yhdysviivoja.",
+      "identifierInvalid": "Käytä vain pieniä kirjaimia, numeroita ja yhdysviivoja.",
+      "identifierLabel": "Tunniste",
+      "identifierRequired": "Anna tunniste.",
+      "identifierTaken": "Toinen tila käyttää jo tätä tunnistetta.",
+      "nameLabel": "Tilan nimi",
+      "nameRequired": "Anna tilalle nimi.",
+      "notFound": "Tätä tilaa ei enää ole.",
+      "restrictionHint": "Vain tähän kaavaan sopivia tiedostoja voi muokata. Jätä tyhjäksi, jos sallit kaikki tiedostot.",
+      "restrictionInvalid": "Anna kelvollinen kaava.",
+      "restrictionLabel": "Rajoituksen nimi",
+      "restrictionPattern": "Tiedostokaava",
+      "roleLabel": "Roolin määritelmä",
+      "roleRequired": "Kuvaile, mitä tämä tila tekee.",
+      "tool": {
+        "browser": "Käytä selainta",
+        "command": "Suorita komentoja",
+        "edit": "Muokkaa tiedostoja",
+        "mcp": "Käytä MCP:tä",
+        "read": "Lue tiedostoja"
+      },
+      "whenToUseLabel": "Milloin tätä tilaa käytetään"
+    },
+    "groups": {
+      "create": "Uusi ryhmä",
+      "deleteAction": "Poista ryhmä",
+      "deleteMessage": "Ryhmä, sen käytännöt ja jäsenyydet poistetaan.",
+      "deleteTitle": "Poistetaanko tämä ryhmä?",
+      "descriptionLabel": "Ryhmän kuvaus",
+      "emptyDescription": "Ryhmä kokoaa jäsenet, jotta yksi käytäntö voidaan kohdistaa kaikkiin.",
+      "emptyTitle": "Ei vielä ryhmiä",
+      "enterpriseOnly": "Ryhmät ovat saatavilla Enterprise-paketissa.",
+      "memberCount": "Jäseniä: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} jäsen",
+      "memberCount_other": "{{displayCount}} jäsentä",
+      "memberViewEmpty": "Et kuulu mihinkään tämän organisaation ryhmään.",
+      "memberViewTitle": "Omat ryhmäsi",
+      "membersEmpty": "Yksikään aktiivinen jäsen ei vastaa hakuasi.",
+      "membersLabel": "Ryhmän jäsenet",
+      "nameLabel": "Ryhmän nimi",
+      "nameRequired": "Anna ryhmälle nimi.",
+      "nameTooLong": "Nimen pituus saa olla enintään 80 merkkiä.",
+      "notFound": "Tätä ryhmää ei enää ole.",
+      "permissionDenied": "Vain organisaation omistaja tai ylläpitäjä voi muuttaa sen ryhmiä.",
+      "searchMembers": "Hae jäseniä",
+      "selectAllVisible": "Valitse kaikki näkyvät"
     },
     "hub": {
       "renameTitle": "Nimeä organisaatio uudelleen",

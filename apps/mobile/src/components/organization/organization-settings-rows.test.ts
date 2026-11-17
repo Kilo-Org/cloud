@@ -56,9 +56,6 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
-      'customModes',
-      'groups',
-
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -67,17 +64,15 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual(['customModes', 'groups', 'integrations']);
+    expect(areas({ role: 'member' })).toEqual(['integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['customModes', 'integrations']);
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'customModes',
-
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -126,8 +121,10 @@ describe('visibleOrgSettingsRows', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
         const rows = areas({ role, plan });
-        expect(rows).not.toContain('usageDetails');
         expect(rows).not.toContain('auditLogs');
+        expect(rows).not.toContain('usageDetails');
+        expect(rows).not.toContain('customModes');
+        expect(rows).not.toContain('groups');
         expect(rows).not.toContain('providersAndModels');
         expect(rows).not.toContain('guardrails');
         expect(rows).not.toContain('byok');
@@ -137,20 +134,11 @@ describe('visibleOrgSettingsRows', () => {
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns usage to every role and plan, and the audit log and keys to billing roles', () => {
-    for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role, guardrailsEnabled: false })).toEqual([
-        'usageDetails',
-        'auditLogs',
-        'providersAndModels',
-        'byok',
-      ]);
-    }
-  });
-
-  it('adds guardrails for the roles that manage the organization', () => {
+  it('returns every in-app area to a billing role on enterprise', () => {
     for (const role of ['owner', 'admin'] as const) {
       expect(inAppAreas({ role })).toEqual([
+        'customModes',
+        'groups',
         'usageDetails',
         'auditLogs',
         'providersAndModels',
@@ -158,6 +146,16 @@ describe('visibleInAppSettingsRows', () => {
         'byok',
       ]);
     }
+    // A billing manager reaches Model Access, but guardrails stays with the
+    // roles that manage the organization.
+    expect(inAppAreas({ role: 'billing_manager' })).toEqual([
+      'customModes',
+      'groups',
+      'usageDetails',
+      'auditLogs',
+      'providersAndModels',
+      'byok',
+    ]);
   });
 
   it('hides guardrails until the organization enables Kilo Encrypt', () => {
@@ -165,20 +163,21 @@ describe('visibleInAppSettingsRows', () => {
     expect(inAppAreas({ guardrailsEnabled: undefined })).not.toContain('guardrails');
   });
 
-  it('keeps usage for a member, an unknown role and a teams plan', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual(['usageDetails']);
-    expect(inAppAreas({ role: undefined })).toEqual(['usageDetails']);
-    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['usageDetails']);
+  it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
   });
 
   it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
     expect(inAppAreas({ plan: 'teams', guardrailsEnabled: false })).toEqual([
+      'customModes',
       'usageDetails',
       'byok',
     ]);
   });
 
-  it('opens the app screens, not pages', () => {
+  it('opens the native screen that owns each setting', () => {
     const rows = visibleInAppSettingsRows(
       {
         role: 'owner',
@@ -188,6 +187,8 @@ describe('visibleInAppSettingsRows', () => {
       'org_1'
     );
     const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
+    expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
     expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
     expect(byArea.get('providersAndModels')?.href).toBe(

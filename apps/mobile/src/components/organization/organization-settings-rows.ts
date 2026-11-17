@@ -25,8 +25,8 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 /**
  * The organization destinations the hub lists, in the two shapes it opens
- * them: the screens this app reads itself, and the web pages it does not
- * reimplement.
+ * them: the web pages this app does not reimplement, and the areas the app
+ * reads and writes itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
  * role and plan gates, and its destinations follow
@@ -39,21 +39,19 @@ import { WEB_BASE_URL } from '@/lib/config';
  * - the sidebar hides Groups below the enterprise plan;
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
- * - `custom-modes`, `byok` and `integrations` render for every member;
+ * - `integrations` renders for every member;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, and the
  *   dashboard links to the seats purchase, so the hub lists none of them.
  *
- * Five areas are in-app destinations instead, and each carries the gate its
+ * Seven areas are in-app destinations instead, and each carries the gate its
  * own procedure applies: usage (every member), the audit log (billing role,
  * enterprise plan), Model Access (billing role, enterprise plan), guardrails
- * (`owner`/`admin` and the organization's Kilo Encrypt setting) and BYOK (the
- * billing role, opening the app's own provider-keys screen with the
- * organization's scope).
+ * (`owner`/`admin` and the organization's Kilo Encrypt setting), custom modes
+ * (no gate) and groups (the enterprise plan), and BYOK (the billing role,
+ * opening the app's own provider-keys screen with the organization's scope).
  */
 type OrgSettingsArea =
-  | 'customModes'
-  | 'groups'
   | 'requestLogs'
   | 'integrations'
   | 'subOrganizations'
@@ -74,7 +72,13 @@ export type OrgSettingsRow = Readonly<{
   url: string;
 }>;
 
+/**
+ * The areas the app reads and writes itself, each opening its own screen
+ * instead of a web page.
+ */
 type OrgInAppSettingsArea =
+  | 'customModes'
+  | 'groups'
   | 'usageDetails'
   | 'auditLogs'
   | 'providersAndModels'
@@ -110,10 +114,6 @@ type OrgSettingsRowSpec = Readonly<{
 }>;
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
-  // "Custom Modes": no gate in the sidebar or on the page.
-  { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
-  // "Groups": enterprise only; the page redirects every other plan.
-  { area: 'groups', icon: Users, suffix: '/groups', visible: gate => gate.plan === 'enterprise' },
   // The SSO card, the email preferences card and the data collection card live
   // on the organization dashboard itself, and that page links to the seats
   // purchase. The hub does not list a row that lands there: no suffix means a
@@ -145,8 +145,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 ];
 
 const TITLE_KEYS = {
-  customModes: 'agentChat.modePicker.customModes',
-  groups: 'organization.settingsOnWeb.groups',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
   // one opens the web page, so it names the web instead of repeating that title.
@@ -176,6 +174,21 @@ type OrgInAppSettingsRowSpec = Readonly<{
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Custom modes": no gate in the sidebar or on the page, so every member
+  // reaches the native list and the server decides whether a write lands.
+  {
+    area: 'customModes',
+    icon: SlidersHorizontal,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/modes',
+    visible: () => true,
+  },
+  // "Groups": enterprise only, which is the plan its page redirects away from.
+  {
+    area: 'groups',
+    icon: Users,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/groups',
+    visible: gate => gate.plan === 'enterprise',
+  },
   // "Usage": the app's own usage screen reads the same summary, series and
   // breakdown the web page charts, so the row opens the screen. Every member
   // sees it, as on the web sidebar, and nothing in its gate needs a payload.
@@ -220,6 +233,8 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
 ];
 
 const IN_APP_TITLE_KEYS = {
+  customModes: 'agentChat.modePicker.customModes',
+  groups: 'organization.settingsOnWeb.groups',
   // The copy's own name keeps its group prefix: the web sidebar lists the same
   // area under Dashboard, and check:i18n refuses a second key with this copy.
   usageDetails: 'organization.settingsOnWeb.usageDetails',

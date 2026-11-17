@@ -46,7 +46,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { providerLabel } from '@/lib/auth/provider-label';
 import { SESSION_SYNC_URL } from '@/lib/config';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
-import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -61,10 +60,6 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
-
-// The app changelog lives on `main` and is written per store build by the
-// kilo-app Release workflow; never pin it to a version or a per-build copy.
-const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
 
 type AuthProvider =
   inferRouterOutputs<MobileRouter>['user']['getAuthProviders']['providers'][number];
@@ -472,9 +467,7 @@ export function ProfileScreen() {
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
-              void openExternalUrl(CHANGELOG_URL, {
-                label: t('profile.changelog'),
-              });
+              router.push('/(app)/changelog' as Href);
             }}
           />
         </View>

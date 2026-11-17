@@ -1,4 +1,3 @@
-import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
 import { LineChart, Shield } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -17,7 +16,6 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
-import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -200,7 +198,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
 
   const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+    router.push({ pathname: '/(app)/legal/[document]', params: { document: 'privacy' } });
   };
 
   const handleToggleOptional = useCallback(

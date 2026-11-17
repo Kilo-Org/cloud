@@ -480,7 +480,8 @@
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
     },
-    "changelog": "Novedades"
+    "changelog": "Novedades",
+    "changelogVersionPending": "Las notas de esta versión llegan con la próxima actualización."
   },
   "preferences": {
     "general": "General",
@@ -3535,6 +3536,62 @@
       "orgLast30Days": "Todos los miembros · Últimos 30 días",
       "outputTokens": "Tokens de salida",
       "requests": "Solicitudes"
+    },
+    "modes": {
+      "create": "Nuevo modo",
+      "deleteAction": "Eliminar modo",
+      "deleteMessage": "El modo se elimina para todos en esta organización. Un modo que reemplaza a uno integrado vuelve a la configuración integrada.",
+      "deleteTitle": "¿Eliminar este modo?",
+      "descriptionLabel": "Descripción del modo",
+      "emptyDescription": "Los modos añadidos aquí están disponibles para todos en esta organización.",
+      "emptyTitle": "Aún no hay modos personalizados",
+      "identifierHint": "Letras minúsculas, números y guiones.",
+      "identifierInvalid": "Usa solo letras minúsculas, números y guiones.",
+      "identifierLabel": "Identificador",
+      "identifierRequired": "Introduce un identificador.",
+      "identifierTaken": "Otro modo ya usa este identificador.",
+      "nameLabel": "Nombre del modo",
+      "nameRequired": "Introduce un nombre de modo.",
+      "notFound": "Este modo ya no existe.",
+      "restrictionHint": "Solo se pueden editar los archivos que coincidan con este patrón. Déjalo vacío para permitir todos los archivos.",
+      "restrictionInvalid": "Introduce un patrón válido.",
+      "restrictionLabel": "Etiqueta de restricción",
+      "restrictionPattern": "Patrón de archivo",
+      "roleLabel": "Definición del rol",
+      "roleRequired": "Describe qué hace este modo.",
+      "tool": {
+        "browser": "Usar navegador",
+        "command": "Ejecutar comandos",
+        "edit": "Editar archivos",
+        "mcp": "Usar MCP",
+        "read": "Leer archivos"
+      },
+      "whenToUseLabel": "Cuándo usar este modo"
+    },
+    "groups": {
+      "create": "Nuevo grupo",
+      "deleteAction": "Eliminar grupo",
+      "deleteMessage": "Se eliminan el grupo, sus políticas y las asignaciones de sus miembros.",
+      "deleteTitle": "¿Eliminar este grupo?",
+      "descriptionLabel": "Descripción del grupo",
+      "emptyDescription": "Un grupo reúne miembros para que una política se aplique a todos ellos.",
+      "emptyTitle": "Aún no hay grupos",
+      "enterpriseOnly": "Los grupos están disponibles en el plan Enterprise.",
+      "memberCount": "{{displayCount}} miembros",
+      "memberCount_many": "{{displayCount}} de miembros",
+      "memberCount_one": "{{displayCount}} miembro",
+      "memberCount_other": "{{displayCount}} miembros",
+      "memberViewEmpty": "No estás en ningún grupo de esta organización.",
+      "memberViewTitle": "Tus grupos",
+      "membersEmpty": "Ningún miembro activo coincide con tu búsqueda.",
+      "membersLabel": "Miembros del grupo",
+      "nameLabel": "Nombre del grupo",
+      "nameRequired": "Introduce un nombre de grupo.",
+      "nameTooLong": "El nombre debe tener 80 caracteres o menos.",
+      "notFound": "Este grupo ya no existe.",
+      "permissionDenied": "Solo un propietario o administrador de la organización puede cambiar sus grupos.",
+      "searchMembers": "Buscar miembros",
+      "selectAllVisible": "Seleccionar todos los mostrados"
     },
     "kiloPass": {
       "activating": "Activando",

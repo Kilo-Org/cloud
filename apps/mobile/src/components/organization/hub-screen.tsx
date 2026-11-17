@@ -480,8 +480,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             </>
           )}
-          {/* The destinations this app reads itself. They close the card —
-              see `visibleInAppSettingsRows`. */}
+          {/* The destinations this app reads and writes itself. They close the
+              card — see `visibleInAppSettingsRows`. */}
           {inAppSettingsRows.map((row, index) => (
             <ConfigureRow
               key={row.area}

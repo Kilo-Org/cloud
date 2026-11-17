@@ -480,7 +480,8 @@
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
     },
-    "changelog": "Novidades"
+    "changelog": "Novidades",
+    "changelogVersionPending": "As notas desta versão vêm na próxima atualização da app."
   },
   "preferences": {
     "general": "Geral",
@@ -3536,6 +3537,62 @@
       "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Pedidos"
+    },
+    "modes": {
+      "create": "Novo modo",
+      "deleteAction": "Eliminar modo",
+      "deleteMessage": "O modo é removido para todos nesta organização. Um modo que substitui um modo incorporado volta às configurações incorporadas.",
+      "deleteTitle": "Eliminar este modo?",
+      "descriptionLabel": "Descrição do modo",
+      "emptyDescription": "Os modos adicionados aqui ficam disponíveis para todos nesta organização.",
+      "emptyTitle": "Ainda não há modos personalizados",
+      "identifierHint": "Letras minúsculas, números e hífenes.",
+      "identifierInvalid": "Utilize apenas letras minúsculas, números e hífenes.",
+      "identifierLabel": "Identificador",
+      "identifierRequired": "Introduza um identificador.",
+      "identifierTaken": "Outro modo já utiliza este identificador.",
+      "nameLabel": "Nome do modo",
+      "nameRequired": "Introduza um nome de modo.",
+      "notFound": "Este modo já não existe.",
+      "restrictionHint": "Só os ficheiros que correspondem a este padrão podem ser editados. Deixe vazio para permitir todos os ficheiros.",
+      "restrictionInvalid": "Introduza um padrão válido.",
+      "restrictionLabel": "Etiqueta de restrição",
+      "restrictionPattern": "Padrão de ficheiro",
+      "roleLabel": "Definição da função",
+      "roleRequired": "Descreva o que este modo faz.",
+      "tool": {
+        "browser": "Utilizar navegador",
+        "command": "Executar comandos",
+        "edit": "Editar ficheiros",
+        "mcp": "Utilizar MCP",
+        "read": "Ler ficheiros"
+      },
+      "whenToUseLabel": "Quando utilizar este modo"
+    },
+    "groups": {
+      "create": "Novo grupo",
+      "deleteAction": "Eliminar grupo",
+      "deleteMessage": "O grupo, as suas políticas e as atribuições de membros são removidos.",
+      "deleteTitle": "Eliminar este grupo?",
+      "descriptionLabel": "Descrição do grupo",
+      "emptyDescription": "Um grupo reúne membros para que uma política se aplique a todos eles.",
+      "emptyTitle": "Ainda não há grupos",
+      "enterpriseOnly": "Os grupos estão disponíveis no plano Enterprise.",
+      "memberCount": "Membros: {{displayCount}}",
+      "memberCount_many": "{{displayCount}} membros",
+      "memberCount_one": "{{displayCount}} membro",
+      "memberCount_other": "{{displayCount}} membros",
+      "memberViewEmpty": "Não pertence a nenhum grupo desta organização.",
+      "memberViewTitle": "Os seus grupos",
+      "membersEmpty": "Nenhum membro ativo corresponde à sua pesquisa.",
+      "membersLabel": "Membros do grupo",
+      "nameLabel": "Nome do grupo",
+      "nameRequired": "Introduza um nome de grupo.",
+      "nameTooLong": "Mantenha o nome com 80 caracteres ou menos.",
+      "notFound": "Este grupo já não existe.",
+      "permissionDenied": "Apenas um proprietário ou administrador da organização pode alterar os grupos.",
+      "searchMembers": "Pesquisar membros",
+      "selectAllVisible": "Selecionar todos os visíveis"
     },
     "hub": {
       "renameTitle": "Renomear organização",

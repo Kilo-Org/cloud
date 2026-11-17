@@ -480,7 +480,8 @@
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },
-    "changelog": "Novetats"
+    "changelog": "Novetats",
+    "changelogVersionPending": "Les notes d'aquesta versió arribaran amb la propera actualització de l'app."
   },
   "preferences": {
     "general": "General",
@@ -3530,6 +3531,62 @@
       "orgLast30Days": "Tots els membres · Últims 30 dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
+    },
+    "modes": {
+      "create": "Mode nou",
+      "deleteAction": "Elimina el mode",
+      "deleteMessage": "El mode s'elimina per a tothom d'aquesta organització. Un mode que substitueix un mode integrat torna a la configuració integrada.",
+      "deleteTitle": "Eliminar aquest mode?",
+      "descriptionLabel": "Descripció del mode",
+      "emptyDescription": "Els modes afegits aquí estan disponibles per a tothom d'aquesta organització.",
+      "emptyTitle": "Encara no hi ha modes personalitzats",
+      "identifierHint": "Lletres minúscules, números i guions.",
+      "identifierInvalid": "Utilitza només lletres minúscules, números i guions.",
+      "identifierLabel": "Identificador",
+      "identifierRequired": "Introdueix un identificador.",
+      "identifierTaken": "Un altre mode ja utilitza aquest identificador.",
+      "nameLabel": "Nom del mode",
+      "nameRequired": "Introdueix un nom de mode.",
+      "notFound": "Aquest mode ja no existeix.",
+      "restrictionHint": "Només es poden editar els fitxers que coincideixin amb aquest patró. Deixa'l buit per permetre tots els fitxers.",
+      "restrictionInvalid": "Introdueix un patró vàlid.",
+      "restrictionLabel": "Etiqueta de restricció",
+      "restrictionPattern": "Patró de fitxer",
+      "roleLabel": "Definició del rol",
+      "roleRequired": "Descriu què fa aquest mode.",
+      "tool": {
+        "browser": "Utilitza el navegador",
+        "command": "Executa ordres",
+        "edit": "Edita fitxers",
+        "mcp": "Utilitza MCP",
+        "read": "Llegeix fitxers"
+      },
+      "whenToUseLabel": "Quan utilitzar aquest mode"
+    },
+    "groups": {
+      "create": "Grup nou",
+      "deleteAction": "Elimina el grup",
+      "deleteMessage": "S'eliminen el grup, les seves polítiques i les assignacions de membres.",
+      "deleteTitle": "Eliminar aquest grup?",
+      "descriptionLabel": "Descripció del grup",
+      "emptyDescription": "Un grup reuneix membres perquè una política s'apliqui a tots ells.",
+      "emptyTitle": "Encara no hi ha grups",
+      "enterpriseOnly": "Els grups estan disponibles al pla Enterprise.",
+      "memberCount": "Membres: {{displayCount}}",
+      "memberCount_many": "{{displayCount}} de membres",
+      "memberCount_one": "{{displayCount}} membre",
+      "memberCount_other": "{{displayCount}} membres",
+      "memberViewEmpty": "No ets a cap grup d'aquesta organització.",
+      "memberViewTitle": "Els teus grups",
+      "membersEmpty": "Cap membre actiu coincideix amb la cerca.",
+      "membersLabel": "Membres del grup",
+      "nameLabel": "Nom del grup",
+      "nameRequired": "Introdueix un nom de grup.",
+      "nameTooLong": "El nom ha de tenir 80 caràcters o menys.",
+      "notFound": "Aquest grup ja no existeix.",
+      "permissionDenied": "Només un propietari o administrador de l'organització pot canviar-ne els grups.",
+      "searchMembers": "Cerca membres",
+      "selectAllVisible": "Selecciona tothom qui es mostra"
     },
     "hub": {
       "renameTitle": "Reanomena l'organització",

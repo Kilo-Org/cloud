@@ -9,7 +9,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { HOST, PORT, fixturesDir, loadTls, writeEnvSnippet } from './tls-env';
+import { HOST, PORT, caBundlePath, fixturesDir, loadTls, writeEnvSnippet } from './tls-env';
 import { answerStatement, loadFixtureRows, type SnowflakeBinding } from './warehouse';
 
 const BASE_URL = `https://${HOST}:${PORT}`;
@@ -89,10 +89,10 @@ export async function startMockSnowflake(): Promise<Server> {
     console.log(`mock Snowflake listening on ${BASE_URL}`);
     console.log(`fixture rows: ${join(fixturesDir, '*.json')}`);
     console.log(`environment block: ${envPath}`);
-    console.log('The local stack wires these into .env.local for you; by hand:');
+    console.log('The local stack wires these into .env.local and exports the CA bundle:');
+    console.log(`NODE_EXTRA_CA_CERTS=${caBundlePath()}`);
+    console.log('to next dev. By hand, name the certificate (dev/mock-snowflake/README.md):');
     console.log(`NODE_EXTRA_CA_CERTS=${join(fixturesDir, 'tls', 'cert.pem')}`);
-    console.log('Then start the web app with `pnpm dev:start app`. The web dev script');
-    console.log('exports that CA before next dev, so the app trusts this server alone.');
     resolve();
   });
   await promise;

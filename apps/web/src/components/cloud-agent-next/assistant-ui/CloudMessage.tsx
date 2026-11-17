@@ -54,7 +54,8 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
   const review = isUser ? parseWorktreeReviewMessage(text) : null;
   const callback = isUser ? parseChildSessionCallbackPrompt(text) : null;
-  const continuation = isUser ? parseRuntimeContinuation(parts) : null;
+  const continuation =
+    isUser && first.info.synthetic !== true ? parseRuntimeContinuation(parts) : null;
   const userCopyText = callback ? (callback.result ?? callback.errorMessage) : text;
   const files = parts.filter(isFilePart);
   const imageCount = files.filter(part => part.mime.startsWith('image/')).length;

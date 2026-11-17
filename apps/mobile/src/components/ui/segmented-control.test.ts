@@ -113,6 +113,7 @@ describe('SegmentedControl', () => {
     const segments = collectByType(element, 'Pressable');
     expect(segments[0]?.props?.disabled).toBe(true);
     expect(segments[0]?.props?.accessibilityState).toEqual({
+      busy: false,
       checked: false,
       disabled: true,
     });
@@ -121,6 +122,7 @@ describe('SegmentedControl', () => {
     expect(segments[1]?.props?.testID).toBe('window-custom');
     expect(segments[1]?.props?.disabled).toBe(false);
     expect(segments[1]?.props?.accessibilityState).toEqual({
+      busy: false,
       checked: true,
       disabled: false,
     });
@@ -161,7 +163,9 @@ describe('SegmentedControl', () => {
     }) as ReactElement;
 
     const [segment] = collectByType(element, 'Pressable');
-    const children = segment?.props?.children as ElementNode[];
+    // One child expression, so React hands the element itself instead of a list.
+    const rendered = segment?.props?.children as ElementNode | ElementNode[];
+    const children = Array.isArray(rendered) ? rendered : [rendered];
     expect(children).toHaveLength(1);
     expect(children[0]?.type).toBe('Text');
     expect(String(children[0]?.props?.className)).not.toContain('shrink');

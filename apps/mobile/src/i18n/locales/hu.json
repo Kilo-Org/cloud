@@ -1464,7 +1464,7 @@
       "repositoryLine": "Kódellenőrzések: {{reviews}} · Találatok: {{findings}}",
       "empty": "Még nincs statisztikával rendelkező kódellenőrzés",
       "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
-      "off": "A statisztika ki van kapcsolva ennél a szervezetnél.",
+      "off": "A statisztika ki van kapcsolva ennél a szervezetnél a {{platform}} platformhoz.",
       "couldNotLoad": "Nem sikerült betölteni a statisztikát"
     },
     "council": {

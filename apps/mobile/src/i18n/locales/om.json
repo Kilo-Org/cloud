@@ -1464,7 +1464,7 @@
       "repositoryLine": "Sakatta'a: {{reviews}} · Argamoota: {{findings}}",
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
-      "off": "Istaatiksiin dhaabbata kanaaf cufameera.",
+      "off": "Istaatiksiin {{platform}} dhaabbata kana keessatti cufameera.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
     },
     "council": {

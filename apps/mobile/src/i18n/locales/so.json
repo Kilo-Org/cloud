@@ -1464,7 +1464,7 @@
       "repositoryLine": "Dib-u-eegisyo: {{reviews}} · Natiijooyin: {{findings}}",
       "empty": "Weli ma jiro dib-u-eegis leh tirakoob",
       "emptyDescription": "Tirakoobku wuxuu diiwaangeliyaa dib-u-eegisyo dhammaaday inta uu ururka u shidan yahay.",
-      "off": "Tirakoobku wuu dansan yahay ururkan.",
+      "off": "Tirakoobku wuu dansan yahay {{platform}} ururkan dhexdiisa.",
       "couldNotLoad": "Tirakoobka lama soo dejin karin"
     },
     "council": {

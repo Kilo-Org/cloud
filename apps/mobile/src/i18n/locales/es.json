@@ -922,7 +922,7 @@
       "repositoryLine": "Revisiones: {{reviews}} · Hallazgos: {{findings}}",
       "empty": "Aún no hay revisiones con analíticas",
       "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
-      "off": "Las analíticas están desactivadas para esta organización.",
+      "off": "Las analíticas están desactivadas para {{platform}} en esta organización.",
       "couldNotLoad": "No se pudieron cargar las analíticas"
     },
     "council": {

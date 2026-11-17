@@ -921,7 +921,7 @@
       "repositoryLine": "Rà soát: {{reviews}} · Vấn đề: {{findings}}",
       "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
       "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
-      "off": "Phân tích đang tắt cho tổ chức này.",
+      "off": "Phân tích đang tắt cho {{platform}} trong tổ chức này.",
       "couldNotLoad": "Không thể tải dữ liệu phân tích"
     },
     "council": {

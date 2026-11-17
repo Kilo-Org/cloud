@@ -1464,7 +1464,7 @@
       "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
+      "off": "Maty ny antontan'isa ho an'i {{platform}} ao amin'ity fikambanana ity.",
       "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
     },
     "council": {

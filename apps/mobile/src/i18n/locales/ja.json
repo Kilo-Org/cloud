@@ -921,7 +921,7 @@
       "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
-      "off": "この組織では分析がオフになっています。",
+      "off": "この組織では{{platform}}の分析がオフになっています。",
       "couldNotLoad": "分析を読み込めませんでした"
     },
     "council": {

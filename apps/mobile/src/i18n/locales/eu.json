@@ -1464,7 +1464,7 @@
       "repositoryLine": "Berrikuspenak: {{reviews}} · Aurkikuntzak: {{findings}}",
       "empty": "Oraindik ez dago analitikadun berrikuspenik",
       "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
-      "off": "Analitika desgaituta dago erakunde honetan.",
+      "off": "Erakunde honetan {{platform}} plataformarako analitika desgaituta dago.",
       "couldNotLoad": "Ezin izan da analitika kargatu"
     },
     "council": {

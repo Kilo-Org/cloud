@@ -889,7 +889,7 @@
       "repositoryLine": "Revues : {{reviews}} · Signalements : {{findings}}",
       "empty": "Aucune revue avec statistiques pour l'instant",
       "emptyDescription": "Les statistiques enregistrent les revues terminées tant qu'elles sont activées pour l'organisation.",
-      "off": "Les statistiques sont désactivées pour cette organisation.",
+      "off": "Les statistiques sont désactivées pour {{platform}} dans cette organisation.",
       "couldNotLoad": "Impossible de charger les statistiques"
     },
     "council": {

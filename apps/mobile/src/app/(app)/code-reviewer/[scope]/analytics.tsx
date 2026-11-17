@@ -19,7 +19,11 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import {
+  PERSONAL_SCOPE,
+  PLATFORM_CAPABILITIES,
+  reviewerPlatformLabel,
+} from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
@@ -172,7 +176,9 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       <View className="gap-6 px-6 pt-4">
         {!settings.enabled ? (
           <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.off')}
+            {t('codeReviewer.analytics.off', {
+              platform: reviewerPlatformLabel(settings.platform),
+            })}
           </Text>
         ) : null}
         <View className="gap-3">

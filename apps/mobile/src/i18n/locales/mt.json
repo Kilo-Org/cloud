@@ -1536,7 +1536,7 @@
       "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
-      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "off": "L-istatistika hija mitfija għal {{platform}} f'din l-organizzazzjoni.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
     },
     "council": {

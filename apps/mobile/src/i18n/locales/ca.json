@@ -1488,7 +1488,7 @@
       "repositoryLine": "Revisions: {{reviews}} · Troballes: {{findings}}",
       "empty": "Encara no hi ha revisions amb analítica",
       "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
-      "off": "L'analítica està desactivada per a aquesta organització.",
+      "off": "L'analítica està desactivada per a {{platform}} en aquesta organització.",
       "couldNotLoad": "No s'ha pogut carregar l'analítica"
     },
     "council": {

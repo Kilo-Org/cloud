@@ -343,17 +343,32 @@ describe('CodeReviewerAnalytics period labels', () => {
 
 describe('CodeReviewerAnalytics empty state', () => {
   it('drops the generic description when analytics is off and keeps it when analytics is on', () => {
-    queries.dashboard.data = { ...dashboard, settings: { enabled: false } };
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'github' } };
     const offRenderer = mountScreen();
 
     const offTexts = findByType(offRenderer.root, 'TextMock').map(node => node.props.children);
-    expect(offTexts).toContain('Analytics is off for this organization.');
+    expect(offTexts).toContain('Analytics is off for GitHub in this organization.');
     const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
     expect(offEmpty?.props.title).toBe('No reviews with analytics yet');
     expect(offEmpty?.props.description).toBeUndefined();
 
     act(() => {
       offRenderer.unmount();
+    });
+
+    // Analytics is enabled per platform, so the note names the platform whose
+    // setting it renders: the same organization with GitLab off reads as GitLab
+    // being off, not the whole organization.
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'gitlab' } };
+    const offGitLabRenderer = mountScreen();
+
+    const offGitLabTexts = findByType(offGitLabRenderer.root, 'TextMock').map(
+      node => node.props.children
+    );
+    expect(offGitLabTexts).toContain('Analytics is off for GitLab in this organization.');
+
+    act(() => {
+      offGitLabRenderer.unmount();
     });
 
     queries.dashboard.data = dashboard;

@@ -1464,7 +1464,7 @@
       "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
       "empty": "Ende nuk ka shqyrtime me statistika",
       "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
-      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
+      "off": "Statistikat janë çaktivizuar për {{platform}} në këtë organizatë.",
       "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
     },
     "council": {

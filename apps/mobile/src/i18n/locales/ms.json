@@ -1464,7 +1464,7 @@
       "repositoryLine": "Semakan: {{reviews}} · Penemuan: {{findings}}",
       "empty": "Belum ada semakan dengan analitik",
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
-      "off": "Analitik dimatikan untuk organisasi ini.",
+      "off": "Analitik dimatikan untuk {{platform}} dalam organisasi ini.",
       "couldNotLoad": "Tidak dapat memuatkan analitik"
     },
     "council": {

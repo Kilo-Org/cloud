@@ -1560,7 +1560,7 @@
       "repositoryLine": "Adolygiadau: {{reviews}} · Canfyddiadau: {{findings}}",
       "empty": "Dim adolygiadau â dadansoddeg eto",
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
-      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn.",
+      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}} yn y sefydliad hwn.",
       "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
     },
     "council": {

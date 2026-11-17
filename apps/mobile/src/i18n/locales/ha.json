@@ -1464,7 +1464,7 @@
       "repositoryLine": "Bitoci: {{reviews}} · Abubuwan da aka gano: {{findings}}",
       "empty": "Babu bitoci masu nazari tukuna",
       "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
-      "off": "An kashe nazari ga wannan ƙungiyar.",
+      "off": "An kashe nazari ga {{platform}} a wannan ƙungiyar.",
       "couldNotLoad": "An kasa loda nazari"
     },
     "council": {

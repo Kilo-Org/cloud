@@ -921,7 +921,7 @@
       "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
-      "off": "此组织已关闭分析。",
+      "off": "此组织已关闭 {{platform}} 的分析。",
       "couldNotLoad": "无法加载分析数据"
     },
     "council": {

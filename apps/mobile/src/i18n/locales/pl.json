@@ -923,7 +923,7 @@
       "repositoryLine": "Przeglądy: {{reviews}} · Problemy: {{findings}}",
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
-      "off": "Analityka jest wyłączona dla tej organizacji.",
+      "off": "Analityka jest wyłączona dla {{platform}} w tej organizacji.",
       "couldNotLoad": "Nie udało się wczytać analityki"
     },
     "council": {

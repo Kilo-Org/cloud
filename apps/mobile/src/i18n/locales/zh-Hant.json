@@ -921,7 +921,7 @@
       "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
-      "off": "此組織已關閉分析。",
+      "off": "此組織已關閉 {{platform}} 的分析。",
       "couldNotLoad": "無法載入分析資料"
     },
     "council": {

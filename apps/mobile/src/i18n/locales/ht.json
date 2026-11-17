@@ -1464,7 +1464,7 @@
       "repositoryLine": "Revizyon: {{reviews}} · Konsta: {{findings}}",
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
-      "off": "Estatistik yo dezaktive pou òganizasyon sa a.",
+      "off": "Estatistik yo dezaktive pou {{platform}} nan òganizasyon sa a.",
       "couldNotLoad": "Nou pa t ka chaje estatistik yo"
     },
     "council": {

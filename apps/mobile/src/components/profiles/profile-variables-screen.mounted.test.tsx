@@ -169,7 +169,7 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+  it('names the profile variable limit above a disabled add', async () => {
     h.query.data = testVars(
       Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
         key: `VAR_${String(index)}`,
@@ -181,21 +181,40 @@ describe('ProfileVariablesScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
     const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
-    expect(
-      findAll(renderer.root, 'Text')
-        .map(node => node.props.children)
-        .includes(limitCopy)
-    ).toBe(true);
 
-    pressButton(renderer.root, 'Add variable');
-    changeText(renderer.root, 'Key', 'NEW_VAR');
-    changeText(renderer.root, 'Value', 'v');
-    pressButton(renderer.root, 'Save');
+    // The limit sits above the add control, inside the same slot it fills.
+    const footer = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === limitCopy)
+    );
+    const noticeIndex = footer.findIndex(
+      node => String(node.type) === 'Text' && node.props.children === limitCopy
+    );
+    const addIndex = footer.findIndex(node => String(node.type) === 'Button');
+    expect(noticeIndex).toBeGreaterThanOrEqual(0);
+    expect(noticeIndex).toBeLessThan(addIndex);
 
-    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(h.error).toHaveBeenCalledWith(limitCopy);
+    // At the limit the add control is disabled, so the form cannot open from it.
+    expect(footer[addIndex]?.props.disabled).toBe(true);
 
     unmount();
+
+    // One row below the limit the same control is offered and says nothing.
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    const belowLimit = await mountScreen();
+    expect(findOne(belowLimit.renderer.root, 'Button').props.disabled).toBe(false);
+    expect(
+      findAll(belowLimit.renderer.root, 'Text').map(node => node.props.children)
+    ).not.toContain(limitCopy);
+
+    belowLimit.unmount();
   });
 
   const atVariableLimit = (): TestVars =>

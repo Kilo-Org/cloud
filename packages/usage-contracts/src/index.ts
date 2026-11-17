@@ -39,21 +39,21 @@ export type {
 const bigintAsNumber = z.number().int().safe();
 
 const CoreUsageSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   kilo_user_id: z.string(),
   cost: bigintAsNumber,
   input_tokens: bigintAsNumber,
   output_tokens: bigintAsNumber,
   cache_write_tokens: bigintAsNumber,
   cache_hit_tokens: bigintAsNumber,
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   requested_model: z.string().nullable(),
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
-  abuse_classification: z.nativeEnum(ABUSE_CLASSIFICATION),
-  organization_id: z.string().uuid().nullable(),
+  abuse_classification: z.enum(ABUSE_CLASSIFICATION),
+  organization_id: z.uuid().nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),
 });
@@ -61,7 +61,7 @@ const CoreUsageSchema = z.object({
 const UsageMetadataSchema = z.object({
   id: z.string(),
   message_id: z.string(),
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   http_x_forwarded_for: z.string().nullable(),
   http_x_vercel_ip_city: z.string().nullable(),
   http_x_vercel_ip_country: z.string().nullable(),

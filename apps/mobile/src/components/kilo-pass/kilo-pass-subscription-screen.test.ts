@@ -71,6 +71,13 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The body's blocks have their own suites. The screen owns which state it
 // shows and when it prints the page, so they render as hosts here.

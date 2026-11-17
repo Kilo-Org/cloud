@@ -99,7 +99,7 @@ export function VoiceInputSettingsScreen() {
         // dismiss.
         keyboardShouldPersistTaps="handled"
       >
-        <RowGroup>
+        <RowGroup leadingTile>
           <PreferenceRow
             icon={Mic}
             title={t('preferences.gatewayTranscription')}

@@ -98,7 +98,7 @@ export function ToolSummaryTranslationSettingsScreen() {
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <RowGroup>
+        <RowGroup leadingTile>
           <PreferenceRow
             icon={WandSparkles}
             title={t('preferences.translateSummaries')}

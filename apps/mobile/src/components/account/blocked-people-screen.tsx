@@ -151,7 +151,9 @@ export function BlockedPeopleScreen() {
     body = (
       <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <RowSkeleton key={row} tile />
+          // Every hidden-login row ends in an Unblock/Mute action, which the
+          // skeleton holds so neither list changes height when it loads.
+          <RowSkeleton key={row} tile trailingControl />
         ))}
       </RowGroup>
     );

@@ -13,6 +13,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
@@ -260,11 +261,17 @@ function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?
         showsVerticalScrollIndicator={false}
       >
         <Animated.View exiting={FadeOut.duration(150)}>
-          <RowGroup leadingTile>
-            {Array.from({ length: 5 }, (_, index) => (
-              <RowSkeleton key={index} tile subtitle />
-            ))}
-          </RowGroup>
+          <Section>
+            {/* The section's intro copy runs to two lines on a phone; it is
+                reserved here so the rows do not rise when it arrives. */}
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <RowGroup leadingTile>
+              {Array.from({ length: 5 }, (_, index) => (
+                <RowSkeleton key={index} tile subtitle />
+              ))}
+            </RowGroup>
+          </Section>
         </Animated.View>
       </TabScreenScrollView>
     </View>

@@ -233,6 +233,30 @@ vi.mock('@/components/ui/configure-row', () => ({
       props.trailing ?? null
     ),
 }));
+// The passkey row keeps each fact on its own line, so it composes the frame
+// directly: the title, the added date and the optional last-used line.
+vi.mock('@/components/ui/row-frame', () => ({
+  RowFrame: (props: {
+    icon?: ElementType;
+    title?: string;
+    subtitle?: { text: string };
+    secondSubtitle?: { text: string };
+    trailing?: { kind: 'node'; node: ReactNode };
+  }) =>
+    createElement(
+      'View',
+      null,
+      props.icon === undefined ? null : createElement(props.icon),
+      props.title === undefined
+        ? null
+        : createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle.text),
+      props.secondSubtitle === undefined
+        ? null
+        : createElement('Text', null, props.secondSubtitle.text),
+      props.trailing === undefined ? null : props.trailing.node
+    ),
+}));
 vi.mock('@/components/ui/icon-button', () => ({
   IconButton: (props: { children?: ReactNode; accessibilityLabel?: string; onPress?: () => void }) =>
     createElement(

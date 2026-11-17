@@ -11,10 +11,17 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 844, scale: 3, width: 390 }),
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The sheet header draws its own close control and reads the window insets.
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share', X: 'X' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));

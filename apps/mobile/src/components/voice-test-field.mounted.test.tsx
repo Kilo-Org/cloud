@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { renderWithProviders } from '@/test/render-with-providers';
-import { TOUCH_TARGET_DP, tapTargetReachDp } from '@/lib/a11y/tap-target';
+import { TOUCH_TARGET_DP, tapTargetReachDp, textActionTargetClass } from '@/lib/a11y/tap-target';
 
 type VoiceInputOptions = {
   disabled: boolean;
@@ -31,8 +31,10 @@ const applyVoiceDraftToInput = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   // The field renders the shared Input, whose alignment helper reads
-  // `I18nManager.isRTL` on every render.
+  // `I18nManager.isRTL` on every render, and the Clear control's frame comes
+  // from the tap-target helper, which reads the platform.
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -192,14 +194,16 @@ describe('VoiceTestField', () => {
     const renderer = await mountVoiceTestField();
 
     const clear = findByLabel(renderer, 'Clear text');
-    // The compact action is the shared `Button`'s `sm` size: a 36pt frame plus
-    // the primitive's per-side slop, which is what carries the target past
-    // 44pt. The frame, the slop and the inactive state belong to the primitive,
-    // so the assertion is the size the call site asks for.
+    // The action keeps the platform's text-action frame — 44pt on iOS, 48dp on
+    // Android — rather than the compact `sm` height, so the control's own node
+    // reaches the touch-target floor without depending on hit slop.
     expect(clear.props.size).toBe('sm');
+    expect(String(clear.props.className).split(' ')).toEqual(
+      expect.arrayContaining(textActionTargetClass().split(' '))
+    );
+    expect(String(clear.props.className).split(' ')).toContain('ml-auto');
     expect(clear.props.disabled).toBe(true);
-    // `sm` draws a 36pt frame and the primitive adds 5pt of slop per side.
-    expect(tapTargetReachDp(36, 5)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(tapTargetReachDp(TOUCH_TARGET_DP, 0)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('renders a transient failure inline, where the accessibility tree can see it', async () => {

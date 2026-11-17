@@ -2,9 +2,11 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 export type DestructiveConfirmDialogProps = {
   title: string;
@@ -86,13 +88,18 @@ export function DestructiveConfirmDialog({
       }}
       showHandle={false}
     >
-      <View className="gap-5 px-5 pt-6">
-        <View className="gap-2">
-          <Text accessibilityRole="header" className="text-lg font-semibold">
-            {title}
-          </Text>
-          <Text className="text-sm text-muted-foreground">{message}</Text>
-        </View>
+      <SheetHeader
+        title={title}
+        variant="close"
+        // The sheet floats above its content, never at the window top, so the
+        // header reserves no status-bar clearance.
+        topInset="never"
+        onDone={() => {
+          dismiss(onCancel);
+        }}
+      />
+      <View className={SCREEN_BODY_CLASS}>
+        <Text variant="muted">{message}</Text>
         <View className="gap-2">
           <Button
             variant="destructive"

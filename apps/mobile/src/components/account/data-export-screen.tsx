@@ -139,7 +139,9 @@ export function DataExportScreen() {
               answers and the real content arrives. */}
           <RowGroup>
             {SKELETON_ROWS.map(row => (
-              <RowSkeleton key={row} tile subtitle />
+              // The export row's subtitle is the server's own status sentence,
+              // which the row lets run to two lines.
+              <RowSkeleton key={row} tile lines={3} />
             ))}
           </RowGroup>
           <Skeleton className="h-11 rounded-md" />
@@ -177,7 +179,7 @@ export function DataExportScreen() {
     body = (
       <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <RowSkeleton key={row} tile subtitle />
+          <RowSkeleton key={row} tile lines={3} />
         ))}
       </RowGroup>
     );

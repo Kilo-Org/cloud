@@ -127,24 +127,28 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       )}
 
       {loading && (
+        // The four tiles and the chart at their loaded size: a tile is a
+        // `Card` stack of a figure line, the tokens tile's caption and the
+        // label line, so the skeleton prints the same bars in the same order.
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Card className="flex-1 gap-2">
+              <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />
                 <Skeleton className="h-3 w-20" />
               </Card>
-              <Card className="flex-1 gap-2">
+              <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />
                 <Skeleton className="h-3 w-20" />
               </Card>
             </View>
             <View className="flex-row gap-3">
-              <Card className="flex-1 gap-2">
+              <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />
                 <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-20" />
               </Card>
-              <Card className="flex-1 gap-2">
+              <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />
                 <Skeleton className="h-3 w-20" />
               </Card>

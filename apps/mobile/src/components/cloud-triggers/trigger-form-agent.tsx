@@ -17,6 +17,7 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
@@ -133,7 +134,7 @@ export function TriggerFormAgent({
           ) : null}
         </View>
         {modelProblemText === undefined ? null : (
-          <Text className="text-xs text-destructive">{modelProblemText}</Text>
+          <AccessibleStatus message={modelProblemText} className="text-sm" />
         )}
       </View>
 

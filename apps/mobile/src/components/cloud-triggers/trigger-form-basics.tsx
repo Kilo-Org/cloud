@@ -12,6 +12,7 @@ import { View } from 'react-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
@@ -86,9 +87,7 @@ export function TriggerFormBasics({
         />
       ) : (
         <View className="gap-1">
-          <Text className="text-sm text-muted-foreground">
-            {t('cloudAgent.triggers.fieldName')}
-          </Text>
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldName')} />
           <Text variant="mono">{draft.name}</Text>
           <Text variant="muted" className="text-xs">
             {t('cloudAgent.triggers.nameLocked')}
@@ -97,9 +96,7 @@ export function TriggerFormBasics({
       )}
 
       <View className="gap-2">
-        <Text className="text-sm text-muted-foreground">
-          {t('cloudAgent.triggers.fieldActivation')}
-        </Text>
+        <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
         {mode === 'create' ? (
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
@@ -174,7 +171,7 @@ export function TriggerFormBasics({
           </>
         ) : (
           <>
-            <Text className="text-sm text-muted-foreground">{t('common.repository')}</Text>
+            <FormFieldLabel label={t('common.repository')} />
             <Text variant="mono">{draft.repository}</Text>
             <Text variant="muted" className="text-xs">
               {t('cloudAgent.triggers.repositoryLocked')}

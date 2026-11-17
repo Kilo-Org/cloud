@@ -2008,9 +2008,15 @@ export function checkCatalogs(root = ROOT) {
    * where English reuses the noun. Everything else must read the same way
    * everywhere in one catalog.
    */
-  const WORDING_EXCEPTIONS = JSON.parse(
-    readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
-  );
+  let wordingExceptions = {};
+  try {
+    wordingExceptions = JSON.parse(
+      readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`check-catalogs: cannot read tools/i18n/wording-exceptions.json: ${message}`);
+  }
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
 
@@ -2090,7 +2096,7 @@ export function checkCatalogs(root = ROOT) {
       mustTranslateKeys,
       destructiveChecks,
       sharedWordings,
-      wordingExceptions: WORDING_EXCEPTIONS,
+      wordingExceptions,
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;

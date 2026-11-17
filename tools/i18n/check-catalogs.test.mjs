@@ -73,6 +73,7 @@ function run({
   pushEnglish = {},
   pushTranslated = {},
   pushSource = '',
+  wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -90,7 +91,9 @@ function run({
       `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
       `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
     ].join('\n'),
-    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+    ...(wordingExceptions === null
+      ? {}
+      : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
   return checkCatalogs(root).problems;
@@ -365,6 +368,33 @@ test('reports an unreadable locale catalog without inventing missing keys', () =
   assert.match(
     found[0],
     /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
+});
+
+test('reports a missing wording-exceptions file instead of throwing', () => {
+  // The exception map is read before the language registry, so a tree without
+  // one reports it once and still audits everything else: the copy that reads
+  // the same in every locale is reported alongside the read failure.
+  const found = run({
+    wordingExceptions: null,
+    english: { agents: { title: 'Agents' } },
+    translated: { agents: { title: 'Agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(found.length > 0, 'expected problems');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: /
+  );
+  assert.match(found.join('\n'), /mobile: "agents\.title" equals English in every locale/);
+});
+
+test('reports a malformed wording-exceptions file instead of throwing', () => {
+  const found = run({ wordingExceptions: '{' });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: ./
   );
 });
 

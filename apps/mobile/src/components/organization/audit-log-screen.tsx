@@ -23,11 +23,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// FlashList takes `contentContainerStyle` (no className), so the header's and
+// the skeleton's `px-6 pt-4` inset is spelled in pixels here. NativeWind's
+// native rem is 14, which makes px-6 21 dp and pt-4 14 dp; 24/16 is the web rem
+// and leaves the rows 3 dp inside the date and the stepper above them. The tab
+// bar's own bottom padding rides on the footer, which `gap` would not cover.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 

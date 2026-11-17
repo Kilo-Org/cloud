@@ -5,7 +5,6 @@ import {
   AGENT_BRIEFING_CHANNEL_APP_VERSION,
   AGENT_CHANNEL_SPLIT_APP_VERSION,
   AGENT_NOTIFICATION_KINDS,
-  ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
   agentNotificationKindForAndroidChannelId,
   agentNotificationKindForGlanceableSnapshot,
@@ -392,7 +391,6 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
   });
 
   it('shares the channel gate and preserves the legacy glanceable route', () => {
-    expect(ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION).toBe(AGENT_CHANNEL_SPLIT_APP_VERSION);
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
@@ -497,7 +495,7 @@ describe('genericPushContentForPushData', () => {
 });
 
 describe('androidChannelIdForRegisteredClient', () => {
-  const splitVersion = ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION;
+  const splitVersion = AGENT_CHANNEL_SPLIT_APP_VERSION;
 
   it('hands a named agent channel to a client that creates it', () => {
     expect(androidChannelIdForRegisteredClient('needs-input', splitVersion)).toBe('needs-input');

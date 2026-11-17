@@ -17,7 +17,7 @@ import {
   toDraftDetectors,
   type EnkryptGuardrailsDraft,
 } from './enkrypt-guardrails-draft';
-import { KILO_DEFAULT_POLICY_TEXT } from './kilo-default-policy';
+import { KILO_DEFAULT_POLICY_TEXT } from '@kilocode/app-shared/organizations';
 
 function offOutput() {
   return { enabled: false, detectors: createEmptyEnkryptOutputDetectors() };

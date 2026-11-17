@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA மீறல்"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "பாதுகாப்பு சரிபார்ப்பில் ஒரு புதுப்பிப்பு உள்ளது"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "உங்கள் Kilo அமர்வு உங்கள் தொலைபேசியிலிருந்து கட்டுப்படுத்த தயாராக உள்ளது"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

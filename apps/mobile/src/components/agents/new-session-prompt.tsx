@@ -80,25 +80,30 @@ const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 /**
  * The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is
- * 7, which the design-gate dump reports as `paddingBlock: 7`. The top fade
- * starts here, at the text box, so the 1 dp band where a scrolled line is
- * clipped is covered rather than left as a hard cut.
+ * 7, which the design-gate dump reports as `paddingBlock: 7`.
  */
 const PROMPT_INPUT_VERTICAL_INSET = 7;
+/**
+ * Where a scrolled field cuts its topmost line, from the field's top. Android's
+ * EditText clips scrolled text at its padding, so the cut is at the text box.
+ * The iOS text view draws scrolled text through its padding and clips at its
+ * own bounds, so the cut is at the field's top edge.
+ */
+const PROMPT_TOP_CLIP_EDGE = Platform.OS === 'ios' ? 0 : PROMPT_INPUT_VERTICAL_INSET;
 /** A sub-pixel scroll is not a hidden line above the field. */
 const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 // LinearGradient is not NativeWind-mapped; the physical style objects follow
-// the skeleton.tsx overlay pattern. The band starts at the text box, where a
-// scrolled field clips its topmost line, and its height comes from the scroll
+// the skeleton.tsx overlay pattern. The band starts at the clip edge, where a
+// scrolled field cuts its topmost line, and its height comes from the scroll
 // offset on the UI thread.
 const PROMPT_TOP_FADE_STYLE = {
   position: 'absolute',
   left: 0,
   right: 0,
-  top: PROMPT_INPUT_VERTICAL_INSET,
+  top: PROMPT_TOP_CLIP_EDGE,
 } as const;
 const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
 const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
@@ -226,12 +231,21 @@ export function NewSessionPrompt({
   }));
 
   // The draft's own laid-out height, reported by the input on every content
-  // change. The field keeps its size, so this only decides whether a vertical
-  // drag over the field scrolls the draft or the form behind it: a drag over a
-  // field whose text fits belongs to the form, exactly as it did when the field
-  // grew to its text and only scrolled once the cap stopped it.
+  // change on Android. The field keeps its size, so this only decides whether a
+  // vertical drag over the field scrolls the draft or the form behind it: a
+  // drag over a field whose text fits belongs to the form, exactly as it did
+  // when the field grew to its text and only scrolled once the cap stopped it.
+  //
+  // iOS cannot use the report: Fabric emits `onContentSizeChange` only when the
+  // field's own frame changes (`RCTTextInputComponentView` `updateLayoutMetrics`),
+  // and this field's frame does not change while the user types. The gate stayed
+  // closed, and a text view that cannot scroll never follows its caret, so the
+  // lines past the third and the caret were hidden. The iOS field always scrolls:
+  // a text view whose content fits does not take a vertical drag, so the form
+  // still gets it.
   const [contentHeight, setContentHeight] = useState(0);
-  const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  const promptScrolls =
+    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
   // The fade band over the clipped top line, driven from the field's scroll
   // offset. It lives in a shared value, not React state: a drag reports a frame
   // per few pixels, and this card's toolbar, attachment strip and controls are
@@ -240,9 +254,15 @@ export function NewSessionPrompt({
   // gradient is state.
   const promptScrollOffset = useSharedValue(0);
   const [promptFaded, setPromptFaded] = useState(false);
+  // The first line box starts `PROMPT_INPUT_VERTICAL_INSET` below the content's
+  // top, so the offset into the cut line is measured from the clip edge: on iOS
+  // the field scrolls through the padding before it cuts any text.
   const promptTopFadeStyle = useAnimatedStyle(() => ({
     height: resolveComposerTopFadeHeight({
-      scrollOffset: promptScrollOffset.value,
+      scrollOffset: Math.max(
+        0,
+        promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
+      ),
       lineHeight: promptLineHeight,
     }),
   }));

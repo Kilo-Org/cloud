@@ -3,8 +3,12 @@ import { z } from 'zod';
 import type { EnkryptUsageQueueMessage } from './enkrypt';
 import type { ExaUsageQueueMessage } from './exa';
 
-export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
-export type { AbuseClassification, GatewayApiKind } from './schema-types';
+export {
+  ABUSE_CLASSIFICATION,
+  GatewayApiKindSchema,
+  KiloOrganizationIdSchema,
+} from './schema-types';
+export type { AbuseClassification, GatewayApiKind, KiloOrganizationId } from './schema-types';
 export {
   EXA_ALLOWED_PATHS,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,

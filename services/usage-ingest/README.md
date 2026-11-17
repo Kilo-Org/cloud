@@ -224,13 +224,14 @@ not logged). Untagged LLM logs keep exactly their existing fields, so filter LLM
 counts with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
 payer, user, session, cost or `occurredAt`-derived age.
 
-Deploy order: this consumer first, then the ingress, then the producer with its
-flag off. Never roll the consumer back to a version that does not route a kind
+Deploy order: this consumer first, then the ingress, then the producer (the Exa
+producer publishes only with a valid publisher configuration). Never roll the consumer back to a version that does not route a kind
 while messages of that kind may be in flight or retrying: such a consumer retries
 them as invalid or unsupported events and they reach the DLQ after 20 retries. In
 particular, never roll back to a consumer from before Exa routing while Exa
 messages may be queued. To stop tagged traffic, roll the producer back — revert the
-Enkrypt source, or turn off the Exa fallback flag — and let the consumer drain.
+Enkrypt source, or remove the web app's Exa publisher configuration or revert its producer
+source as described in Exa usage rollout — and let the consumer drain.
 
 ## Observability
 
@@ -374,14 +375,15 @@ and [known limitations](https://developers.cloudflare.com/workers/observability/
 
 ## Queue policy
 
-Production uses batch size 6 and staging keeps batch size 2. Both allow at most
-two writer slots per invocation:
+EU consumers use batch size 6 in production and 2 in staging, with at most
+two writer slots per invocation. Global hedge consumers use batch size 1 and
+can use only one slot:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
+| `max_batch_size` | EU: `6` in production, `2` in staging; global hedge: `1` in both | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer adds `25 × 2 = 50` in each environment. |
+| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer has cap `25` and adds `25 × 1 = 25`, for combined bounds of `475` / `425`. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -763,32 +765,22 @@ fallback: when the direct write fails, the web app posts the same bare record, w
 `id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
 Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
 commit returns `duplicate` and makes no second debit; a replay must keep both values. The
-producer is a separate change behind the
-`kilocode-app` flag `EXA_USAGE_QUEUE_FALLBACK_ENABLED`; until it lands with the flag on,
-nothing sends Exa messages.
+`kilocode-app` producer publishes whenever its `USAGE_INGEST_URL` and
+`USAGE_INGEST_PUBLISH_SECRET` form a valid publisher configuration; it has no rollout selector.
 
-Deploy in this order. Each step must be deployed and verified before the next:
+The consumer that routes tagged Exa messages and its `/exa-usage` ingress, together with the
+web app's Exa writer taking the `non_llm` admission class for queue writes, must be deployed
+before any `kilocode-app` deployment whose publisher configuration is valid.
 
-1. This Worker's consumer that routes tagged Exa messages and its `/exa-usage` ingress, and
-   the web app's Exa writer taking the `non_llm` admission class for queue writes. They ship
-   together and nothing posts to the ingress yet. The production Worker deploy is not
-   ordered against the Vercel promotion, so confirm both before step 2.
-2. The web app producer, with the flag off.
-3. The flag on.
+Rollback: remove the web app's publisher configuration and redeploy, or revert the producer
+source change and redeploy with `EXA_USAGE_QUEUE_FALLBACK_ENABLED` absent or not `true`; the
+reverted source still publishes whenever that value is `true`. Failed direct writes then stop publishing, and the consumer drains what the
+queue already accepted. Never roll the consumer back to a version without Exa routing while
+Exa messages may still be in the source queue or in flight: they would fail every retry and
+reach the DLQ.
 
-Rollback: set the flag to anything other than `true` and redeploy the web app. Failed direct
-writes then stop publishing, and the consumer drains what the queue already accepted. Never
-roll the consumer back to a version without Exa routing while Exa messages may still be in
-the source queue or in flight: they would fail every retry and reach the DLQ.
-
-Human-only steps, before the flag is turned on:
-
-- give `kilocode-app` the ingress address and the existing `USAGE_INGEST_PUBLISH_SECRET`;
-  no new Worker secret is needed;
-- name a replay owner for the mixed DLQ, with a replay that handles LLM, Enkrypt and Exa
-  messages;
-- confirm the existing DLQ alerting covers it;
-- set the flag on `kilocode-app` and redeploy.
+The mixed DLQ needs a replay owner whose replay handles LLM, Enkrypt and Exa messages, and the
+existing DLQ alerting must cover it.
 
 ## Retention
 
@@ -962,16 +954,16 @@ so the hedge consumer dead-letters into the global DLQ, which queue preparation 
 at maximum [retention](#retention). Dead-letter alerting must cover
 `usage-ingest-processing-dlq` as well as the EU DLQ.
 
-The hedge consumer stays attached whatever the mode, with production batch 6 and
-staging batch 2, timeout 0, 20 retries, retry delay 60 and `max_concurrency` 25. The
+The hedge consumer stays attached whatever the mode, with production and
+staging batch 1, timeout 0, 20 retries, retry delay 60 and `max_concurrency` 25. The
 consumer handler is queue-agnostic and logs `batch.queue`. So:
 
 - Turning the hedge off stops new hedge sends; copies already in the hedge queue keep
   draining.
 - Turning it on needs nothing else.
-- Capacity: the hedge consumer adds up to 25 invocations × parallelism 2 = 50 writer
-  calls, so the nominal production consumer ceiling is 500 instead of 450 (staging
-  450 instead of 400) while hedged copies are being consumed. Writer admission is
+- Capacity: the hedge consumer adds up to 25 invocations × one message = 25 writer
+  calls, so the nominal production consumer ceiling is 475 instead of 450 (staging
+  425 instead of 400) while hedged copies are being consumed. Writer admission is
   unchanged.
 
 A hedged event can be accepted by both queues. Duplicate deliveries of one LLM usage
@@ -980,6 +972,37 @@ no post-commit side effects. The redelivery test in
 `packages/web-shared/src/lib/ai-gateway/first-usage-events.test.ts` shows one debit and
 one set of first-usage events for two deliveries of one usage ID. Duplicate
 completions rise by roughly the hedged share.
+
+### Global single-message batch experiment
+
+Only the existing global hedge consumers use `max_batch_size: 1`: production
+`usage-ingest-processing` changes from 6, staging `usage-ingest-processing-staging`
+from 2. EU batches stay 6 in production and 2 in staging. All caps, fill timeouts,
+retry settings, source parallelism, hedge selection/delay, logs and traces stay fixed.
+
+Cloudflare [checks autoscaling after a whole batch finishes](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/).
+Shorter batches may allow faster scaling decisions; this is a hypothesis, not a
+proven cold-start fix or production benefit, and lower lag is not guaranteed.
+Each global invocation can use only one processing slot despite parallelism 2.
+At the configured cap of 25 invocations, the maximum messages held in delivered
+hedge batches falls from 150 to 25 in production (25 × batch 6→1), and from 50
+to 25 in staging (25 × batch 2→1). These are bounds, not observed occupancy.
+This can reduce throughput, increase invocation cost and increase retry pressure.
+It does not force a warm Worker or provide minimum concurrency.
+
+For a separately authorized rollout, first retain a baseline and then verify the
+executing deployment and actual consumer settings in each environment. Compare
+matched traffic, stall windows and mature completion cutoffs before/after: all
+assigned LLM treatment/control completion-age tails (including fast requests that
+never hedge), global handler-entry age, native consumer concurrency, backlog/lag,
+writer rejections, retries, duplicates and extra invocations/cost. Keep sampling
+and coverage limits explicit; acceptance winners are not persistence winners.
+Treat sustained global hedge queue depth or oldest-message age growth under
+matched traffic, or failure to drain after a stall, as a rollback trigger; assess
+it alongside writer rejection/retry pressure and assigned completion-age tails.
+No new telemetry is needed. Roll back in a future small PR by restoring only the
+production global batch 1→6 (staging global 1→2 to restore its baseline), leaving
+EU and the hedge protocol/settings intact; verify readback and recovery afterward.
 
 ### Flipping the toggle
 

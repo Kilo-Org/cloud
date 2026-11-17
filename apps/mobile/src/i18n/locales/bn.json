@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "একটি সঠিক ইমেইল ঠিকানা লিখুন।",
-      "emailPlaceholder": "ইমেইল ঠিকানা",
+      "emailPlaceholder": "নাম@company.com",
       "permissionDenied": "সদস্যদের আমন্ত্রণ জানানোর অনুমতি আপনার নেই।",
       "roleMember": "ভূমিকা: সদস্য",
       "sendInvite": "আমন্ত্রণ পাঠান",

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "nextjs"],
+  "plugins": ["typescript", "nextjs"],
   "jsPlugins": [{ "name": "drizzle", "specifier": "./oxlint-plugin-drizzle.js" }],
   "options": {
     "typeAware": true

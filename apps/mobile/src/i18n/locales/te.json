@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి.",
-      "emailPlaceholder": "ఇమెయిల్ చిరునామా",
+      "emailPlaceholder": "పేరు@company.com",
       "permissionDenied": "సభ్యులను ఆహ్వానించడానికి మీకు అనుమతి లేదు.",
       "roleMember": "పాత్ర: సభ్యుడు",
       "sendInvite": "ఆహ్వానం పంపండి",

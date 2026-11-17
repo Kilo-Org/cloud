@@ -27,6 +27,19 @@ import { cn } from '@/lib/utils';
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
 /**
+ * A navigator the presented-picker lookup can read: its own route state and the
+ * navigator above it. The chain walk is bounded — real chains are two or three
+ * deep, so the limit only stops a navigator that reports a cycle instead of a
+ * root (the same bound `usePopOnce` uses).
+ */
+type PickerGuardNavigator = Readonly<{
+  getState(): { index?: number; routes?: { name?: string }[] } | undefined;
+  getParent?(): PickerGuardNavigator | undefined;
+}>;
+
+const NAVIGATOR_CHAIN_LIMIT = 8;
+
+/**
  * The caller supplies its cached memberships; the picker does not fetch data.
  * Returns the opener for its control: the picker is the shared
  * `/context-picker` formSheet route, so every surface presents the same sheet
@@ -87,8 +100,24 @@ export function useContextPicker(
       }
       // While the sheet is presented, a second open must not write the slot
       // again or push another copy of the route — one Done then returns to the
-      // screen underneath instead of walking a stack of copies.
-      if (pickerRouteOnTop(navigation.getState())) {
+      // screen underneath instead of walking a stack of copies. The picker
+      // route lives on the `(app)` stack, several navigators above the tab
+      // stack that hosts this control, so the walk reads every level's state;
+      // the nearest navigator's own state still shows the tab row on top.
+      let navigator: PickerGuardNavigator | undefined = navigation;
+      let pickerPresented = false;
+      for (let depth = 0; navigator !== undefined && depth < NAVIGATOR_CHAIN_LIMIT; depth += 1) {
+        if (pickerRouteOnTop(navigator.getState())) {
+          pickerPresented = true;
+          break;
+        }
+        const parent: PickerGuardNavigator | undefined = navigator.getParent?.();
+        if (parent === undefined || parent === navigator) {
+          break;
+        }
+        navigator = parent;
+      }
+      if (pickerPresented) {
         return;
       }
       // The route reads its rows and its pick from the registry, so the

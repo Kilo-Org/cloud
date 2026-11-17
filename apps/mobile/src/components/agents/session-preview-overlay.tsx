@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one preview surface: the backdrop, the card's open/close gesture, the polled live row, the action menu and the delete/rename confirmations read as one component */
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Portal } from '@rn-primitives/portal';
 import { useQuery } from '@tanstack/react-query';

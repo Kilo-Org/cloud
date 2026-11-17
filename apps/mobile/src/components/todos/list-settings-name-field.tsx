@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 
 import { showNamePreview } from '@/components/todos/list-settings-name-selection';
-import { INPUT_BOX_SHAPE_CLASS, Input } from '@/components/ui/input';
+import { Input, INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 

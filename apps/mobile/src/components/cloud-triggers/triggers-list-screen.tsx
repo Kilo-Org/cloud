@@ -34,7 +34,10 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 
 const SKELETON_ROWS = [0, 1];
 
-/** The height two rows occupy, held by every state so the New action never moves. */
+/**
+ * The height two rows occupy, held by every state so the New action never
+ * moves. The error state is the one state that does not render the footer.
+ */
 const BODY_BAND_CLASS = 'min-h-[220px]';
 
 type TriggersListScreenProps = Readonly<{
@@ -207,16 +210,18 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
           {t('cloudAgent.triggers.subtitle')}
         </Text>
         <View className={BODY_BAND_CLASS}>{body}</View>
-        <Button
-          variant="outline"
-          className={STATE_ACTION_CLASS}
-          onPress={() => {
-            router.push(triggerCreateHref(organizationId) as Href);
-          }}
-        >
-          <Plus size={16} color={colors.foreground} />
-          <Text>{t('cloudAgent.triggers.new')}</Text>
-        </Button>
+        {!list.isError && (
+          <Button
+            variant="outline"
+            className={STATE_ACTION_CLASS}
+            onPress={() => {
+              router.push(triggerCreateHref(organizationId) as Href);
+            }}
+          >
+            <Plus size={16} color={colors.foreground} />
+            <Text>{t('cloudAgent.triggers.new')}</Text>
+          </Button>
+        )}
       </TabScreenScrollView>
     </View>
   );

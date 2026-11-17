@@ -27,6 +27,7 @@ function emit(line: string): void {
 const readyConnection: ControlPlaneConnection = {
   wrapperId: 'fixture',
   snapshot: () => ({ phase: 'idle', attempt: 0, outboxBytes: 0 }),
+  supportsTransferGrants: () => false,
   start: () => undefined,
   send: () => undefined,
   recycle: () => undefined,

@@ -21,20 +21,13 @@ const configResponse = {
   config: {
     router: 'efficient' as const,
     accuracyNoiseBand: 0.05,
-    frontierMinAccuracyDelta: 0,
     classifierModels: ['anthropic/claude-haiku-4'],
     deciderModels: [{ id: 'anthropic/claude-sonnet-4' }],
     minAccuracy: 0.8,
-    switchCostFactor: 3,
-    bestAccuracySwitchThreshold: 0.05,
     productionTokenProfile: null,
     switchHorizonTurns: null,
-    lowConfidenceThreshold: null,
     benchmarkUserId: null,
     benchmarkOrgId: null,
-    classifierRepetitions: 1,
-    deciderRepetitions: 1,
-    classifierMaxP95LatencyMs: 1000,
     updatedAt: null,
     updatedBy: null,
   },
@@ -303,6 +296,59 @@ describe('auto routing benchmark admin client', () => {
       status: 400,
       error: { error: 'Custom profiles are only supported by the efficient router' },
     });
+  });
+
+  it('resolves the registration path from an endpoint with a trailing slash', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ statuses: [] }),
+    });
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      AUTO_ROUTING_BENCHMARK_WORKER_URL: 'https://benchmark-worker.example.com/',
+      INTERNAL_API_SECRET: 'test-internal-secret',
+    }));
+    const clientWithTrailingSlash = await import('./auto-routing-benchmark-admin-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    const result = await clientWithTrailingSlash.registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://benchmark-worker.example.com/admin/profiles/register?router=frontier'
+    );
+  });
+
+  it('requires an https or loopback benchmark worker endpoint', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      AUTO_ROUTING_BENCHMARK_WORKER_URL: 'http://benchmark-worker.example.com',
+      INTERNAL_API_SECRET: 'test-internal-secret',
+    }));
+    // The worker URL is read when the module loads, so the check needs a second module instance.
+    const clientWithRejectedEndpoint = await import('./auto-routing-benchmark-admin-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    const result = await clientWithRejectedEndpoint.registerOwnerBenchmarkProfiles({
+      router: 'efficient',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      error: { error: 'Auto routing benchmark worker is not configured' },
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('applies an abort deadline to profile registration', async () => {

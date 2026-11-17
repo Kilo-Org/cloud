@@ -1,5 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -58,6 +58,7 @@ export function NewProfileScreen({
   stack,
   initialOwner,
   returnToCaller = false,
+  backFallback,
   organizationId,
 }: Readonly<{
   /** The Stack this screen is mounted in; the created profile opens in it. */
@@ -73,6 +74,8 @@ export function NewProfileScreen({
    * profile: a caller collecting a profile keeps its own state and place.
    */
   returnToCaller?: boolean;
+  /** Where the header's Back lands when the form opens with no history to pop. */
+  backFallback?: Href;
   /**
    * The organization the caller is scoped to. It replaces the active account
    * for this form, so a caller whose scope is not the active account still
@@ -151,7 +154,7 @@ export function NewProfileScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.newProfile')} />
+      <ScreenHeader title={t('profiles.newProfile')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"

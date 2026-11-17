@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard inset, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,7 @@ import {
 } from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
@@ -42,7 +43,7 @@ import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const {
     status,
     token,
@@ -277,7 +278,7 @@ export function LoginScreen() {
         <Pressable
           onPress={() => {
             setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-            router.push('/(auth)/language-picker' as Href);
+            pushOnce('/(auth)/language-picker' as Href);
           }}
           disabled={globeDisabled}
           accessibilityRole="button"

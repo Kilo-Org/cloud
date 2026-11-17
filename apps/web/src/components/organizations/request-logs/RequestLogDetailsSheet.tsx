@@ -77,6 +77,7 @@ export function RequestSummary({
           { label: 'Feature', value: row.feature ?? ABSENT },
           { label: 'Project', value: row.project_id ?? ABSENT },
           { label: 'Editor', value: request?.editor_name ?? ABSENT },
+          { label: 'User Agent', value: row.user_agent_name },
           { label: 'Mode', value: request?.mode ?? ABSENT },
           copyableItem('Session', request?.session_id),
           copyableItem('Request ID', row.id),

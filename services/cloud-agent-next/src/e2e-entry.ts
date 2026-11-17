@@ -36,10 +36,10 @@ export default {
     }
     return production.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
-    return production.queue(batch, env);
+  async queue(batch: MessageBatch<unknown>, env: Env, ctx: ExecutionContext): Promise<void> {
+    return production.queue(batch, env, ctx);
   },
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    return production.scheduled(controller, env);
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    return production.scheduled(controller, env, ctx);
   },
 };

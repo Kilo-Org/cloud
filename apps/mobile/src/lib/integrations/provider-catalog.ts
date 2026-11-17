@@ -33,9 +33,6 @@ type ProviderDefinition = {
   disconnectRoles: readonly OrganizationRole[];
 };
 
-/** Bitbucket's hub page gate: `organizationBitbucketRouter.getStatus.canManage`. */
-const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly OrganizationRole[];
-
 /**
  * Mirrors the server, per action, instead of one role set per provider. The
  * Slack connect, the Slack uninstall and the GitHub uninstall ask for
@@ -44,6 +41,10 @@ const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly
  * Every organization GitLab connect starts at `resolveGitLabOAuthOwner`, which
  * requires `ORGANIZATION_BILLING_ROLES` at the OAuth start and at the callback,
  * for a first connect and for a replacement.
+ *
+ * Bitbucket's row runs the same organization procedures its connect sheet does
+ * (`organizations.bitbucket.connect`/`replaceToken`/`refreshRepositories`/
+ * `disconnect`), and every one of them is an `organizationBillingProcedure`.
  */
 const PROVIDERS = {
   github: {
@@ -76,16 +77,14 @@ const PROVIDERS = {
     connectRoles: ORGANIZATION_BILLING_ROLES,
     disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
-  // Bitbucket is org-only and web-managed: the row opens the web page, so the
-  // page's own gate is the rule. `organizationBitbucketRouter.getStatus`
-  // computes `canManage = role === 'owner' || role === 'billing_manager'`, and
-  // that flag is what renders its Connect form and its management controls —
-  // admins land on a read-only notice, so they get no mobile action either.
+  // Bitbucket is org-only and connected in the app: the hub's Connect opens the
+  // workspace-token sheet and a connected row disconnects natively, so the row
+  // follows the procedure it calls rather than a page's own gate.
   bitbucket: {
     scope: ['organization'],
     hiddenUnlessInstalled: false,
-    connectRoles: BITBUCKET_ROLES,
-    disconnectRoles: BITBUCKET_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
 } satisfies Record<IntegrationProvider, ProviderDefinition>;
 

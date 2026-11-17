@@ -28,6 +28,10 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn() }),
 }));
+// The composer's pickers open through the guarded push; nothing here asserts it.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Bot: 'Bot',
@@ -382,21 +386,30 @@ describe('ChatToolbar long model name', () => {
 });
 
 describe('ChatToolbar model chip while the model list loads', () => {
-  it('keeps the chip shell labelled while the model list loads instead of a blank pill', () => {
+  it('holds the name slot with a skeleton and a busy label while the model list loads', () => {
     const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', MODEL_OPTIONS, {
       isLoadingModels: true,
     });
-    // The chip must read as the control it is: its own label, not an empty pill.
-    const loadingLabel = renderer.root.findAll(
+
+    // The chip must read as the control it is without printing a placeholder
+    // model name: a skeleton holds the name slot, and the wrapper's busy
+    // accessibility label is what assistive tech announces.
+    const chip = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.children === i18n.t('common.model')
-    );
-    expect(loadingLabel).toHaveLength(1);
-    expect(loadingLabel[0]?.props.numberOfLines).toBe(1);
+        (node.type as string) === 'View' &&
+        (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    )[0];
+    expect(chip).toBeDefined();
+    expect(chip?.props.accessible).toBe(true);
+    expect(chip?.props.accessibilityRole).toBe('button');
+    expect(chip?.props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(chip?.props.accessibilityLabel).toBe(i18n.t('common.model'));
 
-    // The loading chip is not the skeleton placeholder: it renders its own shell.
-    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(1);
+    const labels = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => node.props.children);
+    expect(labels).not.toContain(i18n.t('common.model'));
   });
 });

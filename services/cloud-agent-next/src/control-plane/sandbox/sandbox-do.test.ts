@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderAdapter, ProviderLaunchOptions } from '../../sandbox-control/provider.js';
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
+import { CONTROL_PLANE_TIMERS } from '../../shared/control-plane-timers.js';
 import { logger } from '../../logger.js';
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
@@ -39,9 +40,22 @@ const input = {
   launchOptions,
 };
 const RETRY_DEADLINE = 11_000 + DEADLINE_MS.repositoryStartup;
+const { providerStopAttemptMs, snapshotRetryStopMs } = CONTROL_PLANE_TIMERS.sandbox;
+
+// Six unconfirmed 30-s stops with the ladder's pauses (5 s, then 10 s each):
+// a seventh stop would end after the 4-min retry stop bound.
+const UNCONFIRMED_STOP_ATTEMPTS = 6;
+const UNCONFIRMED_STOP_WAIT_MS = 225_000;
+
+/** A provider stop that uses its whole attempt bound and is not confirmed. */
+function unconfirmedStop() {
+  vi.setSystemTime(Date.now() + providerStopAttemptMs);
+  return { confirmed: false, errorName: 'none', cause: 'stop_not_confirmed' };
+}
 
 type SandboxUnit = {
   sandboxId: string;
+  env: Record<string, string>;
   provider: Pick<ProviderAdapter, 'launch' | 'environmentSnapshots'>;
   readAllocation: () => Promise<{ kind: string; allocationId: string }>;
   stopRef: () => Promise<{ confirmed: boolean; errorName: string; cause: string }>;
@@ -50,7 +64,7 @@ type SandboxUnit = {
     createDeadlineAt: number,
     step: 'restore' | 'environment_snapshot'
   ) => Promise<boolean>;
-  notifySnapshotStartFailure: () => Promise<void>;
+  notifySnapshotStartStep: (allocationId: string, step: string, detail: string) => Promise<void>;
   failCreationRoutes: () => Promise<void>;
   launchWithSnapshotRetry: (request: typeof input) => Promise<unknown>;
   failSnapshotStart: (allocationId: string, error: unknown) => Promise<void>;
@@ -59,6 +73,7 @@ type SandboxUnit = {
 function unit(launch: ProviderAdapter['launch']) {
   const sandbox = Object.create(SandboxControlV2.prototype) as SandboxUnit;
   sandbox.sandboxId = SANDBOX_ID;
+  sandbox.env = {};
   sandbox.provider = { launch };
   sandbox.readAllocation = async () => ({ kind: 'creating', allocationId: ALLOCATION_ID });
   sandbox.stopRef = vi.fn(async () => ({
@@ -67,7 +82,7 @@ function unit(launch: ProviderAdapter['launch']) {
     cause: 'stop_confirmed',
   }));
   sandbox.startSnapshotRetry = vi.fn(async () => true);
-  sandbox.notifySnapshotStartFailure = vi.fn(async () => {});
+  sandbox.notifySnapshotStartStep = vi.fn(async () => {});
   sandbox.failCreationRoutes = vi.fn(async () => {});
   return sandbox;
 }
@@ -134,14 +149,11 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
     async scenario => {
       const fields = vi.spyOn(logger, 'withFields');
       const sandbox = unit(scenario.launch);
-      sandbox.stopRef = vi.fn(async () => ({
-        confirmed: false,
-        errorName: 'none',
-        cause: 'stop_not_confirmed',
-      }));
+      sandbox.stopRef = vi.fn(async () => unconfirmedStop());
       const failed = sandbox.launchWithSnapshotRetry(input).catch(error => error);
-      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(1_000 + snapshotRetryStopMs);
       const error = await failed;
+      expect(sandbox.stopRef).toHaveBeenCalledTimes(UNCONFIRMED_STOP_ATTEMPTS);
       expect(error).toBeInstanceOf(Error);
       await sandbox.failSnapshotStart(ALLOCATION_ID, error);
 
@@ -160,7 +172,7 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
             launchErrorName: scenario.launchErrorName,
             launchCause: scenario.launchCause,
             attempt: 1,
-            elapsedMs: scenario.elapsedMs,
+            elapsedMs: scenario.elapsedMs + UNCONFIRMED_STOP_WAIT_MS,
           }),
         ]
       );
@@ -406,12 +418,12 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
     const sandbox = unit(async () => {
       throw new TypeError('provider rejected start');
     });
-    sandbox.stopRef = async () => ({
-      confirmed: false,
-      errorName: 'none',
-      cause: 'stop_not_confirmed',
+    sandbox.stopRef = async () => unconfirmedStop();
+    const failed = sandbox.launchWithSnapshotRetry(input).catch(error => error);
+    await vi.advanceTimersByTimeAsync(snapshotRetryStopMs);
+    expect(await failed).toMatchObject({
+      message: expect.stringContaining('Snapshot start failed'),
     });
-    await expect(sandbox.launchWithSnapshotRetry(input)).rejects.toThrow('Snapshot start failed');
     expect(
       fields.mock.calls
         .map(([record]) => record)
@@ -425,6 +437,81 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
         launchCause: 'provider_rejected_start',
       }),
     ]);
+  });
+
+  it('repeats an unconfirmed stop and retries the launch once the stop is confirmed', async () => {
+    const launch = vi.fn<ProviderAdapter['launch']>(async () => {
+      if (launch.mock.calls.length === 1) throw new TypeError('provider rejected start');
+      return { startSource: 'repository' };
+    });
+    const sandbox = unit(launch);
+    sandbox.stopRef = vi
+      .fn<SandboxUnit['stopRef']>()
+      .mockImplementationOnce(async () => unconfirmedStop())
+      .mockImplementationOnce(async () => unconfirmedStop())
+      .mockResolvedValue({ confirmed: true, errorName: 'none', cause: 'stop_confirmed' });
+    const launched = sandbox.launchWithSnapshotRetry(input);
+    await vi.advanceTimersByTimeAsync(snapshotRetryStopMs);
+
+    await expect(launched).resolves.toMatchObject({ owned: false });
+    expect(sandbox.stopRef).toHaveBeenCalledTimes(3);
+    // The wait shows once, after the first unconfirmed stop.
+    expect(sandbox.notifySnapshotStartStep).toHaveBeenCalledTimes(1);
+    expect(sandbox.notifySnapshotStartStep).toHaveBeenCalledWith(
+      ALLOCATION_ID,
+      'environment_snapshot',
+      'Waiting for the failed sandbox to stop'
+    );
+    expect(sandbox.startSnapshotRetry).toHaveBeenCalledTimes(1);
+    expect(launch).toHaveBeenCalledTimes(2);
+  });
+
+  it('ends the stop wait within the retry stop bound when no stop is confirmed', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const launch = vi.fn(async () => {
+      throw new TypeError('provider rejected start');
+    });
+    const sandbox = unit(launch);
+    sandbox.stopRef = vi.fn(async () => unconfirmedStop());
+    const failed = sandbox.launchWithSnapshotRetry(input).catch(error => error);
+    await vi.advanceTimersByTimeAsync(snapshotRetryStopMs);
+
+    expect(await failed).toMatchObject({ reason: 'transient' });
+    const [stopFailure] = fields.mock.calls
+      .map(([record]) => record)
+      .filter(record => record.diagnosticEvent === 'snapshot_launch_failed');
+    expect(stopFailure).toMatchObject({ failureStage: 'retry_stop', reason: 'stop_failed' });
+    // The provider rejected at once, so the elapsed time is the stop wait.
+    expect(stopFailure?.elapsedMs).toBe(UNCONFIRMED_STOP_WAIT_MS);
+    expect(UNCONFIRMED_STOP_WAIT_MS).toBeLessThanOrEqual(snapshotRetryStopMs);
+    expect(sandbox.stopRef).toHaveBeenCalledTimes(UNCONFIRMED_STOP_ATTEMPTS);
+    expect(sandbox.startSnapshotRetry).not.toHaveBeenCalled();
+    expect(launch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops waiting when another attempt takes the allocation during the stop wait', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const launch = vi.fn(async () => {
+      throw new TypeError('provider rejected start');
+    });
+    const sandbox = unit(launch);
+    let owner = ALLOCATION_ID;
+    sandbox.readAllocation = async () => ({ kind: 'creating', allocationId: owner });
+    sandbox.stopRef = vi.fn(async () => {
+      owner = 'allocation-next';
+      return unconfirmedStop();
+    });
+    const launched = sandbox.launchWithSnapshotRetry(input);
+    await vi.advanceTimersByTimeAsync(snapshotRetryStopMs);
+
+    await expect(launched).resolves.toMatchObject({ owned: true });
+    expect(sandbox.stopRef).toHaveBeenCalledTimes(1);
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(
+      fields.mock.calls
+        .map(([record]) => record)
+        .filter(record => record.diagnosticEvent === 'snapshot_launch_failed')
+    ).toEqual([expect.objectContaining({ failureStage: 'allocation_owned', attempt: 1 })]);
   });
 
   it('bounds and sanitizes provider error names and causes', async () => {

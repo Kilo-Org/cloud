@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { Keyboard, Pressable, View } from 'react-native';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { ChevronDown } from '@/components/ui/icons';
@@ -20,6 +20,7 @@ import {
   FIELD_TRIGGER_FRAME_CLASS,
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -78,7 +79,7 @@ export function RepositoryBranchSelector({
   disabled,
 }: Readonly<RepositoryBranchSelectorProps>) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const branches = useRepositoryBranches(repository, organizationId);
   const branchState = useSyncExternalStore(
@@ -277,6 +278,6 @@ export function RepositoryBranchSelector({
         setSelectedBranchOverride(repository, branch === branches.defaultBranch ? null : branch);
       },
     });
-    router.push('/(app)/agent-chat/branch-picker' as Href);
+    pushOnce('/(app)/agent-chat/branch-picker' as Href);
   }
 }

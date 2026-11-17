@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { GatewayApiKindSchema } from './schema-types';
+
 /**
  * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
  * larger header value is an Enkrypt bug. Clamping keeps the ledger insert and the balance debit
@@ -26,7 +28,19 @@ const ENKRYPT_DETECTOR_IDS = [
 ] as const;
 
 /**
- * Wire contract for `POST /api/internal/enkrypt-usage/record`.
+ * Selects an explicit allow-list of the package's `GatewayApiKindSchema` members: Enkrypt
+ * only scans LLM text calls, so the write accepts only these kinds and every new kind stays
+ * rejected by default. The shared enum type-checks this allow-list, so a rename or removal
+ * of a listed kind fails here instead of silently changing the accepted set.
+ */
+const EnkryptApiKindSchema = GatewayApiKindSchema.extract([
+  'chat_completions',
+  'messages',
+  'responses',
+]);
+
+/**
+ * Wire contract for the Enkrypt usage record endpoint:
  *
  * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key, so
  * every resend must reuse them. `organizationId` accepts any GUID rather than only RFC UUIDs, so
@@ -39,7 +53,7 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
   microdollarUsageId: z.uuid().optional(),
-  apiKind: z.enum(['chat_completions', 'messages', 'responses']),
+  apiKind: EnkryptApiKindSchema,
   decision: z.enum(['allowed', 'blocked', 'error']),
   creditsCost: z.number().nonnegative().max(MAX_ENKRYPT_CREDITS_PER_CALL).nullable(),
   addedLatencyMs: z.number().int().nonnegative().nullable(),

@@ -82,11 +82,11 @@ describe('canManageProvider', () => {
     { provider: 'discord', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'linear', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'linear', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
-    // Bitbucket is web-managed: the page it opens gates its controls on
-    // owner or billing manager (`organizationBitbucketRouter.getStatus`), so an
-    // admin reaches a read-only notice and gets no mobile action.
-    { provider: 'bitbucket', action: 'connect', allowed: ['owner', 'billing_manager'] },
-    { provider: 'bitbucket', action: 'disconnect', allowed: ['owner', 'billing_manager'] },
+    // Bitbucket is connected in the app: the row runs the organization
+    // procedures its sheet calls, and each is an `organizationBillingProcedure`
+    // (owner, admin, billing manager).
+    { provider: 'bitbucket', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'bitbucket', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
   ];
 
   const ROLES = ['owner', 'admin', 'billing_manager', 'member'] as const;
@@ -123,8 +123,9 @@ describe('canManageProvider', () => {
 
 describe('providerRowBlocked', () => {
   // A member's row offers nothing wherever the action's rule needs an owner:
-  // the manage set and the billing set both name one, and so does Bitbucket's
-  // page. `installed` only picks which action the row would show.
+  // the manage set and the billing set both name one, and Bitbucket's connect
+  // and disconnect procedures are billing procedures too. `installed` only
+  // picks which action the row would show.
   it('blocks a member on every organization provider whose rule needs an owner', () => {
     for (const provider of [
       'github',
@@ -152,22 +153,14 @@ describe('providerRowBlocked', () => {
     }
   });
 
-  it('blocks an admin on Bitbucket only, whose page turns an admin away', () => {
-    for (const provider of ['github', 'slack', 'gitlab', 'discord', 'linear'] as const) {
+  it('offers every organization row to an admin, who holds every gated role', () => {
+    for (const provider of INTEGRATION_PROVIDERS) {
       for (const installed of [false, true]) {
         expect(
           providerRowBlocked({ provider, scope: 'organization', role: 'admin', installed })
         ).toBe(false);
       }
     }
-    expect(
-      providerRowBlocked({
-        provider: 'bitbucket',
-        scope: 'organization',
-        role: 'admin',
-        installed: true,
-      })
-    ).toBe(true);
   });
 
   it('blocks nothing for an owner, because every rule that gates a row names one', () => {

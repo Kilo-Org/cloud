@@ -21,9 +21,12 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 type Props = Parameters<typeof ScreenFooter>[0];
 
-function renderFooter(props: Partial<Props> = {}) {
+function renderFooter(props: Partial<Omit<Props, 'children'>> = {}) {
   act(() => {
-    const element = createElement(ScreenFooter, props, createElement('View'));
+    const element = createElement(ScreenFooter, {
+      ...props,
+      children: createElement('View'),
+    });
     if (renderer) {
       renderer.update(element);
     } else {
@@ -119,5 +122,15 @@ describe('ScreenFooter', () => {
 
     expect(bar.props.style).toMatchObject({ paddingLeft: 40 });
     expect(String(gutter.props.className).split(' ')).toContain('px-4');
+  });
+
+  it('hands the bar its own layout to a screen that measures the footer', () => {
+    const onLayout = vi.fn();
+    const { bar } = renderFooter({ onLayout });
+
+    // The measured bar is the one that carries the reserved band and the
+    // gutter's parent, so a screen reserving its height in the scroll body
+    // measures the same box the content sits above.
+    expect(bar.props.onLayout).toBe(onLayout);
   });
 });

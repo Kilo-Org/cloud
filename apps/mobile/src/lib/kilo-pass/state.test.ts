@@ -270,7 +270,25 @@ describe('getKiloPassCardContentState', () => {
       title: "Couldn't load Kilo Pass.",
       description: 'Check your connection, then try again.',
       actionLabel: 'Retry',
+      accessibilityLabel: "Couldn't load Kilo Pass. Check your connection, then try again. Retry",
     });
+  });
+
+  it('announces each error sentence with a single full stop', async () => {
+    await i18n.changeLanguage('pt-BR');
+
+    const state = getKiloPassCardContentState({
+      subscription: undefined,
+      isError: true,
+      isPending: false,
+    });
+
+    if (state.kind !== 'error') {
+      throw new Error(`unexpected state: ${state.kind}`);
+    }
+    expect(state.accessibilityLabel).toBe(
+      'O Kilo Pass está indisponível. Verifique sua conexão e tente novamente. Tentar novamente'
+    );
   });
 
   it('tells a subscriber-less account that the app does not offer a pass', () => {

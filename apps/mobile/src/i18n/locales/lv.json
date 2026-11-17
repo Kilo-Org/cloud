@@ -3175,7 +3175,6 @@
     "completingPurchase": "Tiek pabeigts pirkums",
     "subscriptionLoading": "Kilo Pass abonements tiek ielādēts",
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Beidzies {{date}}",
     "notAvailableInApp": "Kilo Pass lietotnē nav pieejams.",
     "statusActive": "Aktīvs",

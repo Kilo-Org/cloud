@@ -269,8 +269,44 @@ export function getKiloPassDetailState(params: KiloPassQueryFields): KiloPassDet
 
 export type KiloPassCardContentState =
   | { kind: 'loading' }
-  | { kind: 'error'; title: string; description: string; actionLabel: string }
+  | {
+      kind: 'error';
+      title: string;
+      description: string;
+      actionLabel: string;
+      accessibilityLabel: string;
+    }
   | { kind: 'card'; title: string; description: string; accessibilityLabel: string };
+
+/**
+ * Join the card's sentences into the reader's name. A sentence keeps exactly
+ * one terminator: the catalog's sentence joiner supplies the separator between
+ * two sentences, a sentence that already ends with that same stop drops it so
+ * the join never writes it twice, and the last sentence keeps the closing stop
+ * it brought.
+ */
+export function joinKiloPassCardSentences(parts: readonly string[]): string {
+  const joiner = i18n.t('common.sentenceJoiner');
+  // Every catalog's `common.sentenceJoiner` is one sentence terminator followed
+  // by optional spaces (`. `, `। `, `۔ `, `。`), so its first non-space
+  // character is the exact stop the join already writes between sentences.
+  const terminator = joiner.trimStart().charAt(0);
+  const sentences = parts.map(part => part.trimEnd()).filter(part => part.length > 0);
+
+  return sentences
+    .map((sentence, index) => {
+      let text = sentence;
+      let closed = false;
+      while (terminator !== '' && text.endsWith(terminator)) {
+        closed = true;
+        text = text.slice(0, -1).trimEnd();
+      }
+      // The join only separates sentences, so the last one restores the closing
+      // stop it brought. A sentence that brought none still gets none.
+      return index === sentences.length - 1 && closed ? `${text}${terminator}` : text;
+    })
+    .join(joiner);
+}
 
 /**
  * The profile card carries the same two user-visible states as the screen, in
@@ -284,13 +320,17 @@ export function getKiloPassCardContentState(params: KiloPassQueryFields): KiloPa
     return { kind: 'loading' };
   }
   if (state.kind === 'error') {
+    const title = i18n.t('kiloPass.unavailable');
+    // The card sits on the Profile screen, so it names the action instead of
+    // sending the reader to the screen they are already on.
+    const description = i18n.t('kiloPass.loadFailedRetry');
+    const actionLabel = i18n.t('common.retry');
     return {
       kind: 'error',
-      title: i18n.t('kiloPass.unavailable'),
-      // The card sits on the Profile screen, so it names the action instead of
-      // sending the reader to the screen they are already on.
-      description: i18n.t('kiloPass.loadFailedRetry'),
-      actionLabel: i18n.t('common.retry'),
+      title,
+      description,
+      actionLabel,
+      accessibilityLabel: joinKiloPassCardSentences([title, description, actionLabel]),
     };
   }
 
@@ -310,6 +350,6 @@ function cardState(description: string): KiloPassCardContentState {
     kind: 'card',
     title: KILO_PASS_TITLE,
     description,
-    accessibilityLabel: [KILO_PASS_TITLE, description].join(i18n.t('common.sentenceJoiner')),
+    accessibilityLabel: joinKiloPassCardSentences([KILO_PASS_TITLE, description]),
   };
 }

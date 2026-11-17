@@ -3118,7 +3118,6 @@
     "completingPurchase": "შესყიდვა სრულდება",
     "subscriptionLoading": "Kilo Pass-ის გამოწერა იტვირთება",
     "retryHint": "ხელახლა ამოწმებს Kilo Pass-ის მდგომარეობას.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "დასრულდა {{date}}",
     "notAvailableInApp": "Kilo Pass აპში მიუწვდომელია.",
     "statusActive": "აქტიური",

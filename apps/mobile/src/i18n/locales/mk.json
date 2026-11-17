@@ -3118,7 +3118,6 @@
     "completingPurchase": "Се завршува купувањето",
     "subscriptionLoading": "Се вчитува претплатата на Kilo Pass",
     "retryHint": "Повторно ја проверува состојбата на Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Завршено на {{date}}",
     "notAvailableInApp": "Kilo Pass не е достапен во апликацијата.",
     "statusActive": "Активен",

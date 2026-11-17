@@ -3289,7 +3289,6 @@
     "completingPurchase": "Qed jitlesta x-xiri",
     "subscriptionLoading": "Qed titgħabba s-sottoskrizzjoni ta' Kilo Pass",
     "retryHint": "Jerġa' jipprova jgħabbi l-istat ta' Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Spiċċa {{date}}",
     "notAvailableInApp": "Kilo Pass mhux disponibbli fl-app.",
     "statusActive": "Attiv",

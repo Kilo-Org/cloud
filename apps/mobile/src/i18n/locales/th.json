@@ -3118,7 +3118,6 @@
     "completingPurchase": "กำลังดำเนินการซื้อ",
     "subscriptionLoading": "กำลังโหลดการสมัครสมาชิก Kilo Pass",
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
-    "cardAccessibility": "{{title}} {{description}} {{actionLabel}}",
     "endedOn": "สิ้นสุดวันที่ {{date}}",
     "notAvailableInApp": "Kilo Pass ไม่พร้อมใช้งานในแอป",
     "statusActive": "ใช้งานอยู่",

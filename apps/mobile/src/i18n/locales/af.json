@@ -3118,7 +3118,6 @@
     "completingPurchase": "Aankoop word voltooi",
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Geëindig op {{date}}",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
     "statusActive": "Aktief",

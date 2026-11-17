@@ -2643,7 +2643,6 @@
     "completingPurchase": "Finalizowanie zakupu",
     "subscriptionLoading": "Ładowanie subskrypcji Kilo Pass",
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Działanie: {{actionLabel}}",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
     "statusActive": "Aktywny",

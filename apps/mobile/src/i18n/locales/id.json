@@ -2575,7 +2575,6 @@
     "completingPurchase": "Menyelesaikan pembelian",
     "subscriptionLoading": "Memuat langganan Kilo Pass",
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
     "statusActive": "Aktif",

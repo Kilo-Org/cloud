@@ -3346,7 +3346,6 @@
     "completingPurchase": "Yn cwblhau'r pryniant",
     "subscriptionLoading": "Yn llwytho tanysgrifiad Kilo Pass",
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Wedi dod i ben {{date}}",
     "notAvailableInApp": "Nid yw Kilo Pass ar gael yn yr ap.",
     "statusActive": "Gweithredol",

@@ -3118,7 +3118,6 @@
     "completingPurchase": "Худалдан авалтыг дуусгаж байна",
     "subscriptionLoading": "Kilo Pass захиалгыг ачаалж байна",
     "retryHint": "Kilo Pass-ын төлөвийг дахин ачаална.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Дууссан {{date}}",
     "notAvailableInApp": "Kilo Pass апп дотор боломжгүй байна.",
     "statusActive": "Идэвхтэй",

@@ -3118,7 +3118,6 @@
     "completingPurchase": "Сатып алу аяқталуда",
     "subscriptionLoading": "Kilo Pass жазылымы жүктелуде",
     "retryHint": "Kilo Pass күйін қайта тексереді.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Аяқталды: {{date}}",
     "notAvailableInApp": "Kilo Pass қолданбада қолжетімсіз.",
     "statusActive": "Белсенді",

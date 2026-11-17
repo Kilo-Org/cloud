@@ -3118,7 +3118,6 @@
     "completingPurchase": "Slutför köpet…",
     "subscriptionLoading": "Läser in Kilo Pass-prenumerationen",
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
     "statusActive": "Aktiv",

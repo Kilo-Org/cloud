@@ -3118,7 +3118,6 @@
     "completingPurchase": "Kinukumpleto ang pagbili",
     "subscriptionLoading": "Nilo-load ang subscription sa Kilo Pass",
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
     "statusActive": "Aktibo",

@@ -12,7 +12,6 @@ import {
   CLAUDE_API_BASE_URL,
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
@@ -49,7 +48,6 @@ export type ClaudeBillingRoutingInput = {
   request: GatewayRequest;
   requestedModel: string;
   userId: string | null;
-  requesterEmail: string | null;
   organizationId: string | undefined;
 };
 
@@ -58,8 +56,8 @@ export type ClaudeBillingRoutingResult =
   /** The owner has a connection that cannot bill. Never serve it another way. */
   | { kind: 'unavailable'; message: string; retryable?: boolean }
   /**
-   * The organization's connection was linked by a person who is gone, so it can
-   * no longer be gated. Never serve it another way, and never retry: only an
+   * The organization's connection was linked by a person who is gone, so it
+   * cannot bill. Never serve it another way, and never retry: only an
    * organization owner reconnecting it changes the outcome.
    */
   | { kind: 'reconnect'; message: string };
@@ -78,24 +76,18 @@ function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[]
 }
 
 /**
- * The flag check for a connection, or the reconnect requirement when an
- * organization connection's connector is gone. A personal connection is gated
- * on the person making the request. An organization connection is gated on the
- * person who linked it last, because the caller may be a bot that no release
- * flag covers and a member who did not link it. An answer that does not report
- * that person falls back to the requester.
+ * True when an organization connection's connector is gone: the account that
+ * linked it is missing, soft-deleted, being deleted, or has no usable email.
+ * A personal connection has no connector to lose, and an organization
+ * connection with no recorded connector keeps serving.
  */
-async function gateEmail(
-  input: ClaudeBillingRoutingInput,
+async function connectorGone(
   owner: ClaudeBillingOwner,
   connection: ClaudeBillingPayerState
-): Promise<{ kind: 'email'; email: string | null } | { kind: 'connector-gone' }> {
-  if (owner.kind !== 'organization' || !connection.created_by) {
-    return { kind: 'email', email: input.requesterEmail };
-  }
+): Promise<boolean> {
+  if (owner.kind !== 'organization' || !connection.created_by) return false;
   const connector = await resolveClaudeBillingConnector(connection.created_by, readDb);
-  if (connector.kind === 'gone') return { kind: 'connector-gone' };
-  return { kind: 'email', email: connector.kind === 'present' ? connector.email : null };
+  return connector.kind === 'gone';
 }
 
 /** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */
@@ -209,16 +201,8 @@ export async function checkClaudeBilling(
       return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
     }
     if (connection.status !== ClaudeBillingConnectionStatus.Connected) continue;
-    const gate = await gateEmail(input, owner, connection);
-    if (gate.kind === 'connector-gone') {
+    if (await connectorGone(owner, connection)) {
       return { kind: 'reconnect', message: CLAUDE_BILLING_RECONNECT_MESSAGE };
-    }
-    if (!gate.email || !(await isClaudePlatformOAuthEnabled(gate.email))) {
-      return {
-        kind: 'unavailable',
-        message:
-          'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
-      };
     }
     if (!servesApiKind(input.request.kind)) {
       return {

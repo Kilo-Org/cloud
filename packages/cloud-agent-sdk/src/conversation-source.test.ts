@@ -926,3 +926,93 @@ it.each(['completed', 'error'])(
     ]);
   }
 );
+
+describe('unresolved native attachments degrade at message granularity', () => {
+  const unresolvedTool = kilo2MessageSchema.parse({
+    id: 'msg_unresolved_file',
+    type: 'assistant',
+    time: { created: 2, completed: 3 },
+    content: [
+      { type: 'text', text: 'kept text' },
+      {
+        type: 'tool',
+        id: 'call_unresolved',
+        name: 'browser',
+        state: {
+          status: 'completed',
+          input: {},
+          content: [
+            { type: 'file', uri: 'media:///private/shot.png', mime: 'image/png' },
+            { type: 'text', text: 'browser result' },
+          ],
+        },
+      },
+    ],
+  });
+
+  it('omits only the unresolved message from a history page and keeps its siblings', () => {
+    const resolvedSibling = {
+      id: 'msg_resolved',
+      type: 'assistant',
+      time: { created: 4, completed: 5 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_shell',
+          name: 'shell',
+          state: {
+            status: 'completed',
+            input: { command: 'pwd' },
+            content: [{ type: 'text', text: '/workspace/app' }],
+          },
+        },
+      ],
+    };
+    const display = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [
+        { message: user },
+        { message: unresolvedTool, parentID: user.id },
+        { message: resolvedSibling, parentID: user.id },
+      ],
+    });
+    expect(display?.messages.map(message => message.info.id)).toEqual([
+      user.id,
+      resolvedSibling.id,
+    ]);
+    expect(display?.messages.at(-1)?.parts).toHaveLength(1);
+    expect(display?.omittedItemCount).toBe(1);
+    expect(display?.messages[0].parts[0]).toMatchObject({ type: 'text', text: 'remember this' });
+  });
+
+  it('returns no events for a live update holding an unresolved attachment and keeps later events', () => {
+    const reader = createConversationSourceReader();
+    const first = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: unresolvedTool,
+      })
+    ).events;
+    expect(first).toEqual([]);
+    const followup = {
+      id: 'msg_after_unresolved',
+      type: 'assistant',
+      time: { created: 4 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const second = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(second[0]).toMatchObject({
+      type: 'message.updated',
+      info: { id: followup.id, parentID: user.id },
+    });
+    expect(second).toHaveLength(2);
+  });
+});

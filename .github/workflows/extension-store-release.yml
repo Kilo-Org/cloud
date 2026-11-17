@@ -65,7 +65,7 @@ jobs:
           echo "Building version $CURRENT"
           PENDING=$(git ls-remote --heads origin 'extension-version-bump-*' | awk '{print $2}' | paste -sd' ' -)
           if [ -n "$PENDING" ]; then
-            echo "::error::Pending version-bump branch(es): $PENDING — merge the open bump PR, then press again. Closing it instead does not help: version $CURRENT is already tagged, so the next build needs the higher version the bump carries. Re-using a version produces artifacts the stores reject."
+            echo "::error::Pending version-bump branch(es): $PENDING — merge the open bump PR, then press again. Version $CURRENT was already built, so the next build needs the higher version the bump carries; closing the PR leaves $CURRENT in place. Re-using a version produces artifacts the stores reject."
             exit 1
           fi
           # A version is released once. The tag records the commit the store

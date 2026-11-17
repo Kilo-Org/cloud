@@ -521,28 +521,6 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
- * The class a control renders when it ends a labelled line: the control is the
- * target itself. React Native keeps a touch area inside its parent's bounds, so
- * a box that floats over a one-line label row is only as tall as that row, and
- * no vertical `hitSlop` can finish the target; `{@link
- * LABELLED_LINE_ACTION_HIT_SLOP}` therefore reaches on the horizontal axis
- * only.
- *
- * The box carries the whole {@link TOUCH_TARGET_DP} on both axes, so it also
- * sets the row's height. Its content is centred, which keeps a glyph on the
- * label's own line instead of hanging below it, so the label and its controls
- * read as one row rather than a band with a hole under the card's top padding.
- */
-export const LABELLED_LINE_ACTION_CLASS = 'h-[44px] min-w-[44px] items-center justify-center';
-
-/**
- * Per-side `hitSlop` of {@link LABELLED_LINE_ACTION_CLASS}. Only the horizontal
- * side reaches past the box: the row owns the vertical axis, so a vertical slop
- * would be clipped and would only claim a reach it cannot deliver.
- */
-export const LABELLED_LINE_ACTION_HIT_SLOP = { left: 5, right: 5 } as const;
-
-/**
  * The class an inline-link connector carries so the two links' facing reaches do
  * not overlap. The connector node is the only thing between them, so its floor
  * is `2 * {@link INLINE_LINK_FACING_HIT_SLOP_DP}` = 8dp plus 2dp of headroom, so

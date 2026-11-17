@@ -21,7 +21,13 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
-import { LABELLED_LINE_ACTION_CLASS, LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -329,7 +335,7 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('gives each row control the whole target on its own box', async () => {
+  it('floats each row control on the label line and reaches the touch target with slop', async () => {
     h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
@@ -344,19 +350,28 @@ describe('ProfileCommandsScreen', () => {
     expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
 
     for (const control of controls) {
-      // React Native clips a touch area to its parent's bounds, so the target
-      // has to be the control's own box rather than a slop outside it: every
-      // token of the shared class is on the node, and the slop is the shared
-      // horizontal one, which is all a parent row can let through.
-      const className = String(control.props.className);
-      for (const token of LABELLED_LINE_ACTION_CLASS.split(' ')) {
-        expect(className).toContain(token);
+      // The box floats over the label's line instead of setting the row's
+      // height, so the card's top padding stays the screen's own gap.
+      for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+        expect(String(control.props.className)).toContain(token);
       }
-      expect(control.props.hitSlop).toEqual(LABELLED_LINE_ACTION_HIT_SLOP);
+      expect(control.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
+      // A `min-h-[28px]` box measures 27.8dp on Android: the slop carries the
+      // reach the shortened box gives up on its own node.
+      expect(
+        tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      // The icon is 20dp, below the audit floor, so the rect keeps a 36dp
+      // width, which measures 35.81dp on Android and still reaches 44dp across
+      // with its 5dp side slop.
+      expect(String(control.props.className)).toContain('min-w-[36px]');
+      expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
+      );
     }
-    // The row draws no extra height around the accessory: the control's own box
-    // is what sets the row height, so the screen passes no target-shaped flag to
-    // the field. What the row measures is what the design-gate cells read from
+    // The control's own box floats over the accessory line, so the row draws
+    // no extra height around it and still passes no target-shaped flag to the
+    // field. What the row measures is what the design-gate cells read from
     // real frames.
     const fields = findAll(renderer.root, 'FormField');
     expect(fields).toHaveLength(3);

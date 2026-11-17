@@ -3,7 +3,13 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Trash2 } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
-import { LABELLED_LINE_ACTION_CLASS, LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+
+/** The box a row's control floats on the field's label line, at the 36 dp width floor. */
+const ROW_CONTROL_BOX_CLASS = cn(
+  LINE_ACTION_BOX_CLASS,
+  'min-w-[36px] items-center justify-center active:opacity-70'
+);
 
 function LineIconButton({
   label,
@@ -18,15 +24,12 @@ function LineIconButton({
   onPress: () => void;
   children: ReactNode;
 }>) {
-  // React Native keeps a touch area inside its parent's bounds, so a box that
-  // floats over the label line is only as tall as that line: no vertical slop
-  // can finish the target. The control is the 44 dp target itself, on both
-  // axes, and its content is centred so the glyph stays on the label's own
-  // line next to the copy instead of hanging below it.
+  // The box floats a 28 dp high, 36 dp wide frame over the label line, so the
+  // row is one text line tall. The 5 dp side slop reaches 45.8 dp across.
   return (
     <Pressable
-      className={cn(LABELLED_LINE_ACTION_CLASS, 'active:opacity-70', disabled && 'opacity-40')}
-      hitSlop={LABELLED_LINE_ACTION_HIT_SLOP}
+      className={cn(ROW_CONTROL_BOX_CLASS, disabled && 'opacity-40')}
+      hitSlop={LINE_ACTION_HIT_SLOP}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -39,16 +42,13 @@ function LineIconButton({
 }
 
 /**
- * A setup command field's reorder and delete controls. They sit on the field's
- * own label line as its accessory, so the card is its label row and its input
- * and carries no separate control band under the input. They still name their
- * own position, and the row's 10.5 dp gap keeps the neighbouring 5 dp
- * horizontal slop bands from meeting (10 dp), so a tap beside one control never
- * reaches the next.
- *
- * Nothing here relies on a vertical slop: each control's own 44 dp box is the
- * whole target, the label row centres the copy on it, and the horizontal slop
- * only widens the reach toward its neighbour.
+ * A setup command field's reorder and delete controls. Each control floats the
+ * shared line action box, with a 36 dp width floor, on the field's label line,
+ * so the card's header row is the one 17.5 dp text line and the card's top
+ * padding equals its bottom padding. The 5 dp side slop reaches 45.8 dp
+ * across. The row's 10.66 dp gap keeps the neighbouring 5 dp slop bands apart
+ * with 0.66 dp clearance, so a tap beside one control never reaches the next.
+ * They still name their own position.
  */
 export function ProfileCommandRowControls({
   color,

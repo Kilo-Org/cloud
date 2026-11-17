@@ -21,6 +21,8 @@ type LinearIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
 };
 
 const linearConnectionErrorMessages: Record<string, string> = {
@@ -44,6 +46,7 @@ export function LinearIntegrationDetails({
   organizationId,
   success,
   error,
+  connectPath,
 }: LinearIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -121,7 +124,8 @@ export function LinearIntegrationDetails({
 
   const handleInstall = () => {
     setIsStartingLinearConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
+    window.location.href =
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
   };
 
   const handleUninstall = async () => {

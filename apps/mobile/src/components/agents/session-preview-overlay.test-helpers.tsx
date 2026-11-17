@@ -248,6 +248,18 @@ vi.mock('@/components/agents/message-bubble', async () => {
   };
 });
 
+// The transcript mounts the part-detail host, and the host's sheet body reaches
+// expo-file-system and the tool-card barrel, which this suite's partial
+// `react-native` mock cannot load. The sheet's own behaviour is covered by its
+// suite; this one only needs the host to mount.
+vi.mock('@/components/agents/part-detail-sheet', async () => {
+  const React = await import('react');
+  return {
+    PartDetailSheet: (props: { visible: boolean }) =>
+      React.createElement('PartDetailSheet', { visible: props.visible }),
+  };
+});
+
 export const BASE_TARGET: SessionPreviewTarget = {
   onOpen: () => undefined,
   sessionId: 'ses-1',

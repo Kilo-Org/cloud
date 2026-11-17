@@ -14,9 +14,9 @@
 
 export const TOOL_DISPLAY_PROJECTION_VERSION = 1;
 /** Complete tool outputs up to this many UTF-8 bytes are kept whole. */
-export const TOOL_OUTPUT_PREVIEW_BYTES = 4 * 1024;
+export const TOOL_OUTPUT_PREVIEW_BYTES = 1024;
 /** Every other string inside tool input or metadata is bounded separately. */
-export const TOOL_FIELD_PREVIEW_BYTES = 4 * 1024;
+export const TOOL_FIELD_PREVIEW_BYTES = 1024;
 export const TOOL_DETAIL_MARKER_FIELD = 'cloudDetail';
 
 const MAX_OMITTED_PATHS = 32;

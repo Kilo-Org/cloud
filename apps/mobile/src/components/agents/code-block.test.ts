@@ -759,7 +759,7 @@ describe('CodeBlock fence walk lifetime', () => {
     expect(fenceWalkCacheStatsForTests().entries).toBe(1);
 
     await unmount(renderer);
-    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
   });
 
   it('keeps the fence walk while the block is mounted', async () => {
@@ -793,7 +793,7 @@ describe('CodeBlock fence walk lifetime', () => {
     expect(fenceWalkCacheStatsForTests().entries).toBe(1);
 
     await unmount(renderer);
-    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
   });
 
   it('keeps the walk when one block replaces another for the same fence', async () => {
@@ -819,7 +819,7 @@ describe('CodeBlock fence walk lifetime', () => {
 
     expect(fenceWalkCacheStatsForTests().entries).toBe(1);
     await unmount(renderer);
-    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
   });
 
   it('releases the previous fence walk when the fence text is replaced', async () => {

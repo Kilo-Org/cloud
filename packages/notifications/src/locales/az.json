@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Agent sessiyanızda yenilənmə var",
-      "chatMessage": "Yeni mesajınız var",
-      "instanceLifecycle": "İnstansiyanızda yenilənmə var",
-      "scheduledAction": "Planlaşdırılmış əməliyyatda yenilənmə var",
       "lowBalance": "Balansınız diqqət tələb edir",
       "spendAlert": "Xərciniz diqqət tələb edir",
       "securityFinding": "Təhlükəsizlik tapıntısı diqqət tələb edir",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Adsız",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Aşağı balans xəbərdarlığı",
@@ -34,50 +25,21 @@
       "title": "Xərc xəbərdarlığı",
       "body": "{{scopeName}} xərci ${{amountUsd}} həddini keçdi"
     },
-    "securityFindingNew": {
-      "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} içində {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA xəbərdarlığı",
-      "body": "{{repoFullName}} içində {{findingTitle}}"
+      "title": "SLA xəbərdarlığı"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pozuntusu",
-      "body": "{{repoFullName}} içində {{findingTitle}}"
+      "title": "SLA pozuntusu"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Təhlükəsizlik yoxlamasında yenilənmə var"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} hazırdır",
-      "body": "Söhbətə başlamaq üçün toxunun."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} başlaya bilmədi",
-      "body": "Başlama uğursuz oldu."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} tezliklə yenidən başladılacaq",
-      "body": "{{when}} tarixində yenidən başladılması planlaşdırılıb."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} yenidən başladılması ləğv edildi",
-      "body": "Əvvəlcədən planlaşdırılmış yenidən başlatma ləğv edilib."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} tezliklə təkmilləşdiriləcək",
-      "bodyWithTag": "{{when}} tarixində {{targetImageTag}} versiyasına təkmilləşdirmə.",
-      "bodyWithoutTag": "{{when}} tarixində planlaşdırılmış təkmilləşdirmə."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} təkmilləşdirməsi ləğv edildi",
-      "body": "Əvvəlcədən planlaşdırılmış təkmilləşdirmə ləğv edilib."
     }
   },
   "sessionReady": {

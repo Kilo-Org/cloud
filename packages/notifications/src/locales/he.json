@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "לסשן הסוכן שלך יש עדכון",
-      "chatMessage": "יש לך הודעה חדשה",
-      "instanceLifecycle": "למופע שלך יש עדכון",
-      "scheduledAction": "לפעולה מתוזמנת יש עדכון",
       "lowBalance": "היתרה שלך דורשת תשומת לב",
       "spendAlert": "ההוצאה שלך דורשת תשומת לב",
       "securityFinding": "ממצא אבטחה דורש תשומת לב",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · ללא כותרת",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "התראת יתרה נמוכה",
@@ -34,50 +25,21 @@
       "title": "התראת הוצאה",
       "body": "ההוצאה של {{scopeName}} חצתה ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ממצא אבטחה חדש ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ממצא אבטחה חדש ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "אזהרת SLA",
-      "body": "{{findingTitle}} ב-{{repoFullName}}"
+      "title": "אזהרת SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "הפרת SLA",
-      "body": "{{findingTitle}} ב-{{repoFullName}}"
+      "title": "הפרת SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "לבדיקת אבטחה יש עדכון"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} מוכן",
-      "body": "הקש כדי להתחיל לשוחח."
-    },
-    "startFailed": {
-      "title": "לא ניתן היה להפעיל את {{instanceName}}",
-      "body": "ההפעלה נכשלה."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} יופעל מחדש בקרוב",
-      "body": "הפעלה מחדש מתוזמנת ל-{{when}}."
-    },
-    "restartCancelled": {
-      "title": "ההפעלה מחדש של {{instanceName}} בוטלה",
-      "body": "ההפעלה מחדש שתוזמנה קודם בוטלה."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ישודרג בקרוב",
-      "bodyWithTag": "שדרוג ל-{{targetImageTag}} ב-{{when}}.",
-      "bodyWithoutTag": "שדרוג מתוזמן ב-{{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "השדרוג של {{instanceName}} בוטל",
-      "body": "השדרוג שתוזמן קודם בוטל."
     }
   },
   "sessionReady": {

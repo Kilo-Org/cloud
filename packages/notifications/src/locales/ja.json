@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "エージェントセッションに更新があります",
-      "chatMessage": "新しいメッセージがあります",
-      "instanceLifecycle": "インスタンスに更新があります",
-      "scheduledAction": "スケジュールされたアクションに更新があります",
       "lowBalance": "残高の確認が必要です",
       "spendAlert": "支出の確認が必要です",
       "securityFinding": "セキュリティの検出結果の確認が必要です",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · 無題",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "残高低下アラート",
@@ -34,50 +25,21 @@
       "title": "支出アラート",
       "body": "{{scopeName}} の支出が ${{amountUsd}} を超えました"
     },
-    "securityFindingNew": {
-      "title": "新しいセキュリティ検出結果 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} の {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "新しいセキュリティ検出結果 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 警告",
-      "body": "{{repoFullName}} の {{findingTitle}}"
+      "title": "SLA 警告"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 違反",
-      "body": "{{repoFullName}} の {{findingTitle}}"
+      "title": "SLA 違反"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "セキュリティチェックに更新があります"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} の準備ができました",
-      "body": "タップしてチャットを開始します。"
-    },
-    "startFailed": {
-      "title": "{{instanceName}} を開始できませんでした",
-      "body": "開始に失敗しました。"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} はまもなく再起動します",
-      "body": "{{when}} に再起動を予定しています。"
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} の再起動がキャンセルされました",
-      "body": "以前に予定されていた再起動はキャンセルされました。"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} はまもなくアップグレードされます",
-      "bodyWithTag": "{{when}} に {{targetImageTag}} へアップグレードします。",
-      "bodyWithoutTag": "{{when}} にアップグレードを予定しています。"
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} のアップグレードがキャンセルされました",
-      "body": "以前に予定されていたアップグレードはキャンセルされました。"
     }
   },
   "sessionReady": {

@@ -42,10 +42,12 @@ import {
 } from './session-follow-restore';
 import { sessionCardStaleAfterSeconds } from './session-card-facts';
 import {
+  _sessionCardPressKeysForTests,
+  beginSessionCardPress,
   renderSessionCardPress,
   SESSION_CARD_STALE_AFTER_SECONDS,
   type SessionActivity,
-  sessionCardPress,
+  sessionCardPressKey,
 } from './session-card-press';
 
 type Props = Record<string, unknown>;
@@ -616,30 +618,44 @@ describe('dismissFinishedSessionCard', () => {
   });
 
   it('drops the press state of the dismissed card', async () => {
-    const card = fakeActivity('native-3', { sessionId: 'session-3', statusKind: 'needsInput' });
+    const card = fakeActivity('native-3', {
+      sessionId: 'session-3',
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'approval-3',
+    });
     mocks.instances = [card];
     discoverSessionCards();
-    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
-    expect(sessionCardPress('session-3')).toEqual({ notice: 'Approve failed' });
+    const key = sessionCardPressKey('session-3', 'approval-3');
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: 'Approve failed' });
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
+    expect(_sessionCardPressKeysForTests()).toEqual([key]);
     card.props = { ...card.props, statusKind: 'idle' };
 
     dismissFinishedSessionCard('session-3');
 
     expect(isSessionFollowed('session-3')).toBe(false);
-    expect(sessionCardPress('session-3')).toBeUndefined();
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
   });
 
   it('drops the press state of a card iOS ended', async () => {
-    const card = fakeActivity('native-4', { sessionId: 'session-4', statusKind: 'needsInput' });
+    const card = fakeActivity('native-4', {
+      sessionId: 'session-4',
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'approval-4',
+    });
     mocks.instances = [card];
     discoverSessionCards();
-    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
+    const key = sessionCardPressKey('session-4', 'approval-4');
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: 'Approve failed' });
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
 
     mocks.instances = [];
     discoverSessionCards();
 
     expect(isSessionFollowed('session-4')).toBe(false);
-    expect(sessionCardPress('session-4')).toBeUndefined();
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
   });
 });
 
@@ -932,5 +948,150 @@ describe('follow revision and card freshness', () => {
     );
     // Quiet long ago: it is stale now.
     expect(sessionCardStaleAfterSeconds(active, NOW + 60 * 60_000)).toBe(0);
+  });
+});
+
+// A press belongs to the request the card shows, not to the session. These
+// cases pin which card a press may repaint and how far the store may grow.
+describe('the Approve press of one session card', () => {
+  const APPROVAL_A = 'a'.repeat(64);
+  const APPROVAL_B = 'b'.repeat(64);
+  const FAILED_LINE = 'Approve failed';
+
+  function followOne(): FakeActivity {
+    followSession(RUNNING, CTX, NOW);
+    const card = mocks.instances[0];
+    if (card === undefined) {
+      throw new Error('expected a card');
+    }
+    return card;
+  }
+
+  function awaitRequest(card: FakeActivity, approvalKey: string): void {
+    card.props = {
+      ...card.props,
+      statusKind: 'needsInput',
+      statusSince: '2026-10-12T10:02:00.000Z',
+      awaitingPermission: true,
+      approvalKey,
+    };
+  }
+
+  function failPress(key: string): void {
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: FAILED_LINE });
+  }
+
+  it('keeps the failure line through a tray update of the same request', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const key = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(key);
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
+
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(card.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        notice: FAILED_LINE,
+        awaitingPermission: true,
+        approvalKey: APPROVAL_A,
+      }),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('never draws a failed request on the request that replaced it', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+    await renderSessionCardPress(card as unknown as SessionActivity, keyA);
+
+    awaitRequest(card, APPROVAL_B);
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+    // `settleCardWork` awaits the native update, which assigns the new props.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(card.props.notice).toBeUndefined();
+    expect(card.props.approving).not.toBe(true);
+    expect(card.props).toMatchObject({ awaitingPermission: true, approvalKey: APPROVAL_B });
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
+  });
+
+  it('does not clear a newer request when an older one is settled late', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_B);
+    card.update.mockClear();
+    card.props = { ...card.props, approving: true };
+
+    await renderSessionCardPress(
+      card as unknown as SessionActivity,
+      sessionCardPressKey('session-1', APPROVAL_A),
+      true
+    );
+
+    expect(card.update).not.toHaveBeenCalled();
+    expect(card.props).toMatchObject({
+      approving: true,
+      awaitingPermission: true,
+      approvalKey: APPROVAL_B,
+    });
+  });
+
+  it('retires a superseded entry even when the card already draws the pushed request', () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+
+    // A server push moved the card to the next request, so the tray rebuild
+    // draws exactly what is already on screen and no update runs; only the
+    // unconditional prune can retire the failed entry.
+    awaitRequest(card, APPROVAL_B);
+    // The rebuild stamps the sync's own version; matching it keeps the drawn
+    // content identical to the pushed card.
+    card.props = { ...card.props, updatedAt: new Date(NOW + 60_000).toISOString() };
+    syncFollowedSessionCards(
+      // The row reports the same request the push already drew.
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:02:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(_sessionCardPressKeysForTests()).not.toContain(keyA);
+    expect(card.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps one entry per current request and refuses a token minted for a deleted key', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+    await renderSessionCardPress(card as unknown as SessionActivity, keyA);
+
+    const retired = beginSessionCardPress(sessionCardPressKey('session-1', 'retired-request'));
+    for (let index = 0; index < 20; index += 1) {
+      failPress(sessionCardPressKey('session-1', `request-${index}`));
+    }
+
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(_sessionCardPressKeysForTests()).toEqual([keyA]);
+    // The merge retired the older entry, so its token is dead. A later
+    // admission for the same key string is a different attempt.
+    expect(retired?.fail({ kind: 'approve-failed', notice: FAILED_LINE })).toBe(false);
+    const reused = beginSessionCardPress(sessionCardPressKey('session-1', 'retired-request'));
+    expect(reused).not.toBeNull();
+    reused?.abandon();
   });
 });

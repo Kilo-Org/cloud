@@ -5,8 +5,56 @@ import { ErrorCode, type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type StoreCreditProduct } from './store-products';
+import { STORE_TIMEOUT_KEY, STORE_TIMEOUT_PLAY_KEY } from './store-products-loader';
+
+/**
+ * The purchase's outcome as the owner publishes it. `messageKey` is a catalog
+ * key the screen translates; `kind` says which sentence belongs beside it.
+ */
+export type CreditPurchaseFailure =
+  | { readonly kind: 'store-timeout'; readonly messageKey: string }
+  | { readonly kind: 'purchase-refused'; readonly messageKey: string };
+
+/**
+ * What one `purchase` call did. `started: false` with `failure: null` is a
+ * store-side cancel or a Play pending payment: no outcome to publish.
+ */
+export type CreditPurchaseOutcome =
+  | { readonly started: true }
+  | { readonly started: false; readonly failure: CreditPurchaseFailure | null };
+
+/**
+ * How a credit-pack completion ended, as its caller sees it.
+ *
+ * `completed` is the only outcome that credits the account for this session.
+ * `pending` means the store has not finished the charge: the token is not
+ * submittable yet, and the store re-delivers it when it is. `terminal-refusal`
+ * names a receipt the backend will never accept (a revoked transaction, a
+ * processed refund), so waiting for the store queue to drain cannot help and
+ * the caller can offer a way out. `retryable-refusal` is every other failure —
+ * a missing token, an account or session refusal, a backend error — with
+ * `messageKey: null` when the refusal names nothing to show. `stale` means the
+ * account changed before the receipt was posted: the outcome belongs to the
+ * session that is gone, so it is neither reported nor retried for the new one.
+ */
+export type CreditPurchaseCompletion =
+  | { readonly status: 'completed' }
+  | { readonly status: 'pending' }
+  | { readonly status: 'terminal-refusal'; readonly messageKey: string }
+  | { readonly status: 'retryable-refusal'; readonly messageKey: string | null }
+  | { readonly status: 'stale' };
+
+/**
+ * The catalog key for a store call that never answered. The same pair the
+ * store-unavailable card shows, chosen from the storefront this device buys
+ * from, so one place decides which store the copy names.
+ */
+export function creditStoreTimeoutKey(storefront: 'app_store' | 'play'): string {
+  return storefront === 'play' ? STORE_TIMEOUT_PLAY_KEY : STORE_TIMEOUT_KEY;
+}
 
 /**
  * Catalog keys, never translated copy: the screen translates them. The keys
@@ -141,11 +189,14 @@ export type StoreCreditPurchaseActionsDeps = {
 };
 
 type PurchaseCompletionResult =
-  | { completed: true; stale?: boolean; errorMessageKey?: never }
-  | { completed: false; stale?: boolean; errorMessageKey: string | null };
+  | { status: 'completed'; stale: boolean }
+  | { status: 'pending' }
+  | { status: 'terminal-refusal'; messageKey: string }
+  | { status: 'retryable-refusal'; messageKey: string | null }
+  | { status: 'stale' };
 
 type PurchaseCompletionOutcome = {
-  completed: boolean;
+  completion: CreditPurchaseCompletion;
   /**
    * True when this caller is the one that announces the successful completion.
    * The store can re-deliver one transaction while its first completion is still
@@ -286,7 +337,7 @@ function missingTokenKey(purchase: Purchase): string {
  * outstanding transaction first; only the backend's explicit ownership refusal
  * earns the different-account copy.
  */
-export function isStoreAlreadyOwnedError(error: unknown): boolean {
+function isStoreAlreadyOwnedError(error: unknown): boolean {
   return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
 }
 
@@ -298,6 +349,10 @@ export function isStoreAlreadyOwnedError(error: unknown): boolean {
  */
 export function isStoreNotReadyError(error: unknown): boolean {
   return notReadyStoreErrorSchema.safeParse(error).success;
+}
+
+export function isStorePendingPurchaseError(error: unknown): boolean {
+  return pendingPurchaseErrorSchema.safeParse(error).success;
 }
 
 /**
@@ -368,6 +423,14 @@ export function getPurchaseCompletionId(purchase: Purchase): string {
   return purchase.transactionId ?? purchase.id;
 }
 
+/**
+ * The caller's view of a completion: the internal result keeps whether a grant
+ * outlived its account, while every caller only needs the public status.
+ */
+function toCreditPurchaseCompletion(result: PurchaseCompletionResult): CreditPurchaseCompletion {
+  return result.status === 'completed' ? { status: 'completed' } : result;
+}
+
 export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseActionsDeps) {
   async function completePurchase(
     purchase: Purchase,
@@ -380,12 +443,20 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     // moment later. Leave the store transaction queued: the store re-delivers
     // it once it completes the charge, and that delivery completes it once.
     if (purchase.purchaseState === 'pending') {
-      return { completed: false, errorMessageKey: null };
+      return { status: 'pending' };
+    }
+
+    // A receipt the backend already refused for good is not posted again: the
+    // store keeps re-delivering it until the app finishes it, and every post
+    // would earn the same refusal. The caller still learns it can never complete.
+    const rememberedMessageKey = terminallyRejectedPurchases.get(getPurchaseCompletionId(purchase));
+    if (rememberedMessageKey !== undefined) {
+      return { status: 'terminal-refusal', messageKey: rememberedMessageKey };
     }
 
     const token = purchase.purchaseToken;
     if (!token) {
-      return { completed: false, errorMessageKey: missingTokenKey(purchase) };
+      return { status: 'retryable-refusal', messageKey: missingTokenKey(purchase) };
     }
 
     // The account can change between this completion being queued and reaching
@@ -393,7 +464,7 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     // that waited behind another await). Never post the receipt under the new
     // session, and never report the old account's outcome onto it.
     if (!deps.isAccountCurrent()) {
-      return { completed: false, stale: true, errorMessageKey: null };
+      return { status: 'stale' };
     }
 
     try {
@@ -413,8 +484,9 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
         // Remember the key the refusal maps to, so a later explicit recovery can
         // show it without posting this receipt again.
         terminallyRejectedPurchases.set(getPurchaseCompletionId(purchase), errorMessageKey);
+        return { status: 'terminal-refusal', messageKey: errorMessageKey };
       }
-      return { completed: false, errorMessageKey };
+      return { status: 'retryable-refusal', messageKey: errorMessageKey };
     }
 
     // The account can also change while the backend answers. The grant is the
@@ -422,7 +494,7 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     // announcement, no balance refresh. The store transaction is still finished,
     // because the store holds it for this device whatever Kilo account is signed
     // in and leaving it queued would only re-deliver it.
-    const stale = !deps.isAccountCurrent();
+    const staleAfterPost = !deps.isAccountCurrent();
 
     // The backend granted the credits, so the purchase succeeded. Finishing the
     // store transaction and refreshing the balance are best-effort follow-ups:
@@ -434,6 +506,10 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     } catch {
       // The store still holds the unfinished transaction; recovery retries it.
     }
+    // The account can change during the finish call too. The refresh is the new
+    // account's UI reacting to the old session's grant, so it is checked once
+    // more right before it runs.
+    const stale = staleAfterPost || !deps.isAccountCurrent();
     if (!stale && (options.invalidateAfterCompletion ?? true)) {
       try {
         await deps.invalidateAfterCompletion();
@@ -441,7 +517,7 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
         // The balance refresh is cosmetic; the screen refetches on focus.
       }
     }
-    return { completed: true, stale };
+    return { status: 'completed', stale };
   }
 
   function reportPurchaseCompletionErrorIfNeeded(
@@ -449,12 +525,12 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     options: PurchaseCompletionOptions
   ) {
     if (
-      !result.completed &&
-      result.errorMessageKey &&
+      (result.status === 'terminal-refusal' || result.status === 'retryable-refusal') &&
+      result.messageKey &&
       (options.notifyErrors ?? true) &&
       deps.isAccountCurrent()
     ) {
-      deps.showError(result.errorMessageKey);
+      deps.showError(result.messageKey);
     }
   }
 
@@ -486,11 +562,11 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       const result = await existingCompletion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
       return {
-        completed: result.completed,
+        completion: toCreditPurchaseCompletion(result),
         // Re-checked after the await: the account may have changed while this
         // caller waited on the shared completion.
         shouldNotifyCompletion: shouldNotifyCompletion && deps.isAccountCurrent(),
-        stale: result.stale ?? false,
+        stale: result.status === 'stale' || (result.status === 'completed' && result.stale),
       };
     }
 
@@ -503,9 +579,9 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       const result = await completion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
       return {
-        completed: result.completed,
+        completion: toCreditPurchaseCompletion(result),
         shouldNotifyCompletion: notifyCompletion && deps.isAccountCurrent(),
-        stale: result.stale ?? false,
+        stale: result.status === 'stale' || (result.status === 'completed' && result.stale),
       };
     } finally {
       sharedPurchaseCompletions.delete(purchaseId);
@@ -520,7 +596,7 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     // One announcement per granted completion: a re-delivery that joins a
     // notifying caller stays silent, and a live delivery that coalesces with the
     // silent recovery pass is that completion's first notifier.
-    if (outcome.shouldNotifyCompletion && outcome.completed) {
+    if (outcome.shouldNotifyCompletion && outcome.completion.status === 'completed') {
       deps.onPurchaseCompleted?.();
     }
     return outcome;
@@ -529,9 +605,9 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
   async function handlePurchaseSuccess(
     purchase: Purchase,
     options: PurchaseSuccessOptions = {}
-  ): Promise<boolean> {
+  ): Promise<CreditPurchaseCompletion> {
     const outcome = await completeAndAnnounce(purchase, options);
-    return outcome.completed;
+    return outcome.completion;
   }
 
   async function recoverPurchases(
@@ -603,7 +679,7 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     // refresh the new account's balance: the grant, if any, is the old
     // session's, and its own UI is gone.
     const completedPurchases = recoveryResults
-      .filter(result => result.outcome.completed && !result.outcome.stale)
+      .filter(result => result.outcome.completion.status === 'completed' && !result.outcome.stale)
       .map(result => result.purchase);
     if (completedPurchases.length > 0) {
       await deps.invalidateAfterCompletion();
@@ -612,12 +688,21 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
   }
 
   return {
-    purchase: async (pack: StoreCreditProduct): Promise<boolean> => {
+    /**
+     * Starts one store purchase. The owner publishes the outcome: a refused
+     * request comes back as a failure the screen renders, never as a toast from
+     * here, so one place decides what the person sees.
+     *
+     * The store call is bounded like every other call in the flow: a store that
+     * never answers must release the row instead of holding it for the life of
+     * the screen.
+     */
+    purchase: async (pack: StoreCreditProduct): Promise<CreditPurchaseOutcome> => {
       const storeProductId = pack.storeProductId;
       if (!storeProductId) {
         // The store priced no such pack; the screen disables the row, so this
         // only guards a stale tap.
-        return false;
+        return { started: false, failure: null };
       }
 
       try {
@@ -632,9 +717,24 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
             : {
                 apple: { appAccountToken: deps.appAccountToken, sku: storeProductId },
               };
-        await deps.requestPurchase({ request, type: 'in-app' });
-        return true;
+        await withStoreDeadline(
+          deps.requestPurchase({ request, type: 'in-app' }),
+          'the purchase request'
+        );
+        return { started: true };
       } catch (error) {
+        if (isStoreDeadlineError(error)) {
+          // The SDK has no cancellation, so the charge may still land. The
+          // owner records the product as unreconciled and reconciles before it
+          // lets the same pack be bought again.
+          return {
+            started: false,
+            failure: {
+              kind: 'store-timeout',
+              messageKey: creditStoreTimeoutKey(deps.storefront),
+            },
+          };
+        }
         if (
           isStoreAlreadyOwnedError(error) &&
           deps.recoverOwnedPurchase &&
@@ -644,15 +744,27 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
           // transaction before saying anything: for a consumable it is usually
           // a charge whose backend completion failed, owned by this same user.
           // A real cross-account refusal surfaces from that completion.
-          return false;
+          return { started: false, failure: null };
         }
         const errorMessageKey = getStoreCreditPurchaseErrorMessageKey(error, deps.storefront);
-        if (errorMessageKey) {
-          deps.showError(errorMessageKey);
-        }
-        return false;
+        return {
+          started: false,
+          failure:
+            errorMessageKey === null
+              ? null
+              : { kind: 'purchase-refused', messageKey: errorMessageKey },
+        };
       }
     },
+    /**
+     * Completes one store transaction and reports how it ended.
+     *
+     * `status` is the caller's decision: only `completed` credits this account;
+     * `pending` and `retryable-refusal` leave the charge to be retried or
+     * re-delivered; `terminal-refusal` means this receipt can never complete, so
+     * the caller can offer a way out; `stale` means the outcome belongs to a
+     * session that is gone. `messageKey` is a catalog key, never translated copy.
+     */
     handlePurchaseSuccess,
     recoverPurchases,
   };

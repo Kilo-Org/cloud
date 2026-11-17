@@ -44,7 +44,7 @@
     "@swc/jest": "0.2.39",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
-    "dotenv": "18.0.8",
+    "dotenv": "catalog:",
     "drizzle-kit": "catalog:",
     "jest": "30.5.2",
     "typescript": "catalog:"

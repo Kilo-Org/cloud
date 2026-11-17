@@ -1,4 +1,3 @@
-/** Dropdown to select an environment profile with default indicator. */
 'use client';
 
 import { useState } from 'react';
@@ -59,7 +58,6 @@ export function ProfileSelector({
 }: ProfileSelectorProps) {
   const [showManageDialog, setShowManageDialog] = useState(false);
 
-  // Use combined profiles when in org context, otherwise use regular profiles
   const combinedQuery = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -72,9 +70,7 @@ export function ProfileSelector({
   const isLoading = organizationId ? combinedQuery.isLoading : regularQuery.isLoading;
   const error = organizationId ? combinedQuery.error : regularQuery.error;
 
-  // Get profiles based on context
   const orgProfiles = organizationId ? (combinedQuery.data?.orgProfiles ?? []) : [];
-  // Hide personal profiles in org context when orgProfilesOnly is true
   const personalProfiles = organizationId
     ? orgProfilesOnly
       ? []
@@ -114,7 +110,6 @@ export function ProfileSelector({
     );
   }
 
-  // Render profile item with owner icon
   const renderProfileItem = (profile: ProfileSummaryWithOwner, isEffectiveDefault: boolean) => (
     <SelectItem key={profile.id} value={profile.id}>
       <div className="flex items-center gap-2">

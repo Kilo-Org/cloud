@@ -1,13 +1,19 @@
+import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted case per slash-command screen state: list, add, duplicate, conflict, failure, and save */
 import { createElement, type ReactNode, type Ref } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-commands-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -202,7 +208,12 @@ function pressSheetDone(root: ReactTestInstance): void {
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountScreen() {
-  return renderWithProviders(createElement(ProfileKiloCommandsScreen, { profileId: 'profile-1' }));
+  return renderWithProviders(
+    createElement(ProfileKiloCommandsScreen, {
+      profileId: 'profile-1',
+      backFallback: PROFILES_LIST_HREF,
+    })
+  );
 }
 
 /**
@@ -222,6 +233,8 @@ function afterTapGuardWindow(action: () => void): void {
 describe('ProfileKiloCommandsScreen save refusals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The open form is a draft now, so no case may reopen on an earlier one.
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -232,6 +245,185 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
       Object.assign(mutation, { isPending: false });
     }
     permissionState.permission = 'allowed';
+  });
+
+  it('a save that settles onto another command’s form leaves that form open', async () => {
+    h.query.data = [testCommand(), testCommand({ id: 'cmd-2', name: 'deploy' })];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // The reader cancels A on the real clock (a save in flight closes without
+    // asking) and opens B once the row guard's window has passed.
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command deploy');
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(1);
+
+    await act(async () => {
+      held.resolve({ success: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A's success landed after its form was replaced: B's sheet stays open.
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('refuses a second save of the command whose save is already pending', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    afterTapGuardWindow(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+
+    // Reopening the same command keeps its admission, so Save stays down.
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(true);
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      held.resolve({ success: true });
+      await Promise.resolve();
+    });
+    unmount();
+  });
+
+  it('does not open the reopened command on the refusal of the form it replaced', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    changeText(renderer.root, 'Command name', 'renamed');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // A save in flight closes without asking, and the reader reopens the same
+    // command once the row guard's window has passed.
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    await act(async () => {
+      held.reject(
+        Object.assign(new Error('A command with this name already exists in this profile'), {
+          data: { code: 'CONFLICT' },
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The refusal belonged to the form that closed: the reopened one is clean.
+    expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
+
+    unmount();
+  });
+
+  it('clears the refusal of the command it reopens, not the closed add form’s', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    h.mutations.updateKiloCommand.mutateAsync.mockRejectedValue(new Error('Internal server error'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    // Reopening the refused command retires that refusal: the fresh form starts
+    // clean instead of carrying the closed form's line.
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('leaves a reopened add form alone when the previous add form’s save settles', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.createKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Command name', 'first');
+    changeText(renderer.root, 'Template', 'Do it');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressAddButton(renderer.root);
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    // Reopening the add form does not reset the running save's admission: Save
+    // stays down and a second save is refused until the first settles.
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(true);
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      held.resolve({ id: 'cmd-9' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The settle closes nothing: the generation it captured belongs to the
+    // previous form, so the reopened add form stays on screen.
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(1);
+
+    unmount();
   });
 
   it('refuses a name a loaded command already uses, without calling the server', async () => {
@@ -356,6 +548,43 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     );
 
     unmount();
+  });
+});
+
+describe('ProfileKiloCommandsScreen open form draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    Object.assign(h.query, {
+      data: [testCommand()],
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    permissionState.permission = 'allowed';
+  });
+
+  afterEach(() => {
+    // The draft is module-level: a later case in this file must not reopen on it.
+    resetFormDraftsForTests();
+  });
+
+  it('reopens the add form on what was typed after a remount', async () => {
+    const first = await mountScreen();
+    pressAddButton(first.renderer.root);
+    changeText(first.renderer.root, 'Command name', 'summarize');
+    changeText(first.renderer.root, 'Template', 'Summarize the diff');
+    first.unmount();
+
+    // An Android activity recreation opens the same form again: the claim the
+    // screen's draft makes is that the reader's fields survive it.
+    const second = await mountScreen();
+    expect(findField(second.renderer.root, 'Command name').props.defaultValue).toBe('summarize');
+    expect(findField(second.renderer.root, 'Template').props.defaultValue).toBe(
+      'Summarize the diff'
+    );
+
+    second.unmount();
   });
 });
 
@@ -590,6 +819,93 @@ describe('ProfileKiloCommandsScreen delete confirmation', () => {
       profileId: 'profile-1',
       commandId: 'cmd-1',
     });
+
+    unmount();
+  });
+});
+
+/** The translated cap line, as the footer and the sheet render it. */
+function capMessage(): string {
+  return i18n.t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS });
+}
+
+/** True for the rendered `Text` that carries the cap line. */
+function isCapLine(node: ReactTestInstance): boolean {
+  return node.props.children === capMessage();
+}
+
+/** `length` distinct commands, so the list holds exactly the count the server caps. */
+function commandsAt(length: number): TestCommand[] {
+  return Array.from({ length }, (_, index) =>
+    testCommand({ id: `cmd-${index}`, name: `command-${index}`, description: null })
+  );
+}
+
+describe('ProfileKiloCommandsScreen command cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    permissionState.permission = 'allowed';
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('states the cap above the Add action and disables it at the cap', async () => {
+    h.query.data = commandsAt(MAX_PROFILE_KILO_COMMANDS);
+    const { renderer, unmount } = await mountScreen();
+
+    // One pre-order walk, so the indexes compare the footer's own order.
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => isCapLine(node));
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(-1);
+    expect(noticeIndex).toBeLessThan(addIndex);
+    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(true);
+
+    unmount();
+  });
+
+  it('offers the Add action without a notice one command below the cap', async () => {
+    h.query.data = commandsAt(MAX_PROFILE_KILO_COMMANDS - 1);
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Text').some(node => isCapLine(node))).toBe(false);
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a create the cap refuses as the cap line, not a generic failure', async () => {
+    h.query.data = [testCommand()];
+    h.mutations.createKiloCommand.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Profiles are limited to 50 custom commands'), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Command name', 'deploy');
+    changeText(renderer.root, 'Template', 'Do it');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() => findAll(renderer.root, 'Text').some(node => isCapLine(node)));
+    const status = findAll(renderer.root, 'Text').find(node => isCapLine(node));
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
 
     unmount();
   });

@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "ನಿಮ್ಮ ಏಜೆಂಟ್ ಸೆಷನ್‌ಗೆ ನವೀಕರಣವಿದೆ",
-      "chatMessage": "ನಿಮಗೆ ಹೊಸ ಸಂದೇಶವಿದೆ",
-      "instanceLifecycle": "ನಿಮ್ಮ ಇನ್‌ಸ್ಟಾನ್ಸ್‌ಗೆ ನವೀಕರಣವಿದೆ",
-      "scheduledAction": "ನಿಗದಿತ ಕ್ರಿಯೆಗೆ ನವೀಕರಣವಿದೆ",
       "lowBalance": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್‌ಗೆ ಗಮನ ಬೇಕು",
       "spendAlert": "ನಿಮ್ಮ ಖರ್ಚಿಗೆ ಗಮನ ಬೇಕು",
       "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · ಶೀರ್ಷಿಕೆಯಿಲ್ಲದ",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "ಕಡಿಮೆ ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆ",
@@ -34,50 +25,21 @@
       "title": "ಖರ್ಚು ಎಚ್ಚರಿಕೆ",
       "body": "{{scopeName}} ಖರ್ಚು ${{amountUsd}} ಮೀರಿದೆ"
     },
-    "securityFindingNew": {
-      "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA ಎಚ್ಚರಿಕೆ",
-      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+      "title": "SLA ಎಚ್ಚರಿಕೆ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ಉಲ್ಲಂಘನೆ",
-      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+      "title": "SLA ಉಲ್ಲಂಘನೆ"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "ಭದ್ರತಾ ಪರಿಶೀಲನೆಗೆ ನವೀಕರಣವಿದೆ"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} ಸಿದ್ಧವಾಗಿದೆ",
-      "body": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} ಪ್ರಾರಂಭವಾಗಲು ವಿಫಲವಾಗಿದೆ",
-      "body": "ಪ್ರಾರಂಭ ವಿಫಲವಾಗಿದೆ."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} ಶೀಘ್ರದಲ್ಲೇ ಮರುಪ್ರಾರಂಭಗೊಳ್ಳುತ್ತದೆ",
-      "body": "{{when}} ಕ್ಕೆ ಮರುಪ್ರಾರಂಭಿಸಲು ನಿಗದಿಯಾಗಿದೆ."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} ಮರುಪ್ರಾರಂಭ ರದ್ದಾಗಿದೆ",
-      "body": "ಹಿಂದೆ ನಿಗದಿಯಾದ ಮರುಪ್ರಾರಂಭವನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ಶೀಘ್ರದಲ್ಲೇ ಅಪ್‌ಗ್ರೇಡ್ ಆಗುತ್ತದೆ",
-      "bodyWithTag": "{{when}} ಕ್ಕೆ {{targetImageTag}} ಗೆ ಅಪ್‌ಗ್ರೇಡ್ ಮಾಡಿ.",
-      "bodyWithoutTag": "{{when}} ಕ್ಕೆ ನಿಗದಿಯಾದ ಅಪ್‌ಗ್ರೇಡ್."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} ಅಪ್‌ಗ್ರೇಡ್ ರದ್ದಾಗಿದೆ",
-      "body": "ಹಿಂದೆ ನಿಗದಿಯಾದ ಅಪ್‌ಗ್ರೇಡ್ ಅನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ."
     }
   },
   "sessionReady": {

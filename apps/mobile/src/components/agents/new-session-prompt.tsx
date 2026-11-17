@@ -400,7 +400,7 @@ export function NewSessionPrompt({
       return;
     }
     if (hasAnyFailedAttachment(attachments)) {
-      toast.error(t('agentChat.composer.removeOrRetryFailed'));
+      toast.error(t('agentChat.composer.removeFailedAttachments'));
       return;
     }
     if (isAnyAttachmentUploading(attachments)) {

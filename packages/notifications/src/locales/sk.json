@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Vaša relácia agenta má aktualizáciu",
-      "chatMessage": "Máte novú správu",
-      "instanceLifecycle": "Vaša inštancia má aktualizáciu",
-      "scheduledAction": "Naplánovaná akcia má aktualizáciu",
       "lowBalance": "Váš zostatok si vyžaduje pozornosť",
       "spendAlert": "Vaša útrata si vyžaduje pozornosť",
       "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Bez názvu",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Upozornenie na nízky zostatok",
@@ -34,50 +25,21 @@
       "title": "Upozornenie na útratu",
       "body": "Útrata {{scopeName}} prekročila ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nový bezpečnostný problém ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový bezpečnostný problém ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Upozornenie na SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Upozornenie na SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Porušenie SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Porušenie SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Bezpečnostná kontrola má aktualizáciu"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} je pripravený",
-      "body": "Klepnutím začnete chatovať."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} sa nepodarilo spustiť",
-      "body": "Spustenie zlyhalo."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} sa čoskoro reštartuje",
-      "body": "Reštart naplánovaný na {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Reštart {{instanceName}} bol zrušený",
-      "body": "Predtým naplánovaný reštart bol zrušený."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} sa čoskoro aktualizuje",
-      "bodyWithTag": "Aktualizácia na {{targetImageTag}} v {{when}}.",
-      "bodyWithoutTag": "Naplánovaná aktualizácia v {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Aktualizácia {{instanceName}} bola zrušená",
-      "body": "Predtým naplánovaná aktualizácia bola zrušená."
     }
   },
   "sessionReady": {

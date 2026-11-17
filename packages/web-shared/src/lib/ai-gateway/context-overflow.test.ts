@@ -178,6 +178,16 @@ describe('detectContextOverflow', () => {
     expect(String(json.message)).toMatch(/maximum context length/i);
   });
 
+  it('does not estimate without a chat request', async () => {
+    const result = await detectContextOverflow({
+      requestedModel: GEMMA_4_26B_A4B_IT_FREE_ID,
+      request: null,
+      response: new Response('Internal Server Error', { status: 500 }),
+    });
+
+    expect(result).toBeNull();
+  });
+
   it('does not trigger on a 500 when the estimate fits the window', async () => {
     const smallRequest = chatRequest({
       model: GEMMA_4_26B_A4B_IT_FREE_ID,

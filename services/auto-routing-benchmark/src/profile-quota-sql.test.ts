@@ -20,7 +20,13 @@ describe('platform-paid admission quota (real SQLite)', () => {
   const admit = (router: AutoRouter, models: string[], ownerId = owner.ownerId) =>
     registerProfiles(
       db,
-      { router, deciderRepetitions: 1 },
+      {
+        router,
+        minAccuracy: 0.7,
+        accuracyNoiseBand: 0.05,
+        productionTokenProfile: null,
+        switchHorizonTurns: null,
+      },
       {
         ownerType: owner.ownerType,
         ownerId,

@@ -540,9 +540,17 @@ describe('CustomRoutingTableSchema', () => {
 
 describe('EfficientModelPoolSchema', () => {
   it('rejects duplicate models', () => {
-    expect(EfficientModelPoolSchema.safeParse([{ model: 'a/b' }, { model: 'a/b' }]).success).toBe(
-      false
-    );
+    const result = EfficientModelPoolSchema.safeParse([{ model: 'a/b' }, { model: 'a/b' }]);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: [1],
+          message: 'Duplicate pool entry: ["a/b"]',
+        })
+      );
+    }
   });
 
   it('rejects the same model with different legacy variants', () => {

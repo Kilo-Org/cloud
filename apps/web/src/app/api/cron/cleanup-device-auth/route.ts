@@ -12,6 +12,7 @@ import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
+import { cleanupExpiredAppShellHandoffTokens } from '@/lib/app-shell/handoff-token';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const CRON_SECRET = process.env['CRON_SECRET'];
@@ -63,11 +64,24 @@ export async function GET(request: Request) {
       'info'
     )(`Cleaned up ${passkeyRowsDeleted.tickets} expired passkey sign-in tickets`);
 
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${passkeyRowsDeleted.managementAuthorizations} expired passkey management authorizations`
+    );
+
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
 
     const installStatesDeleted = await cleanupExpiredInstallStates();
     sentryLogger('cron', 'info')(`Cleaned up ${installStatesDeleted} expired install states`);
+
+    const handoffTokensDeleted = await cleanupExpiredAppShellHandoffTokens();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${handoffTokensDeleted} expired or consumed app-shell hand-off tokens`);
 
     const stepUpDeleted = await cleanupExpiredSessionStepUpRows();
     sentryLogger(
@@ -84,8 +98,10 @@ export async function GET(request: Request) {
         deleted_admission_challenge_count: challengesDeleted,
         deleted_passkey_challenge_count: passkeyRowsDeleted.challenges,
         deleted_passkey_sign_in_ticket_count: passkeyRowsDeleted.tickets,
+        deleted_passkey_management_authorization_count: passkeyRowsDeleted.managementAuthorizations,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
+        deleted_app_shell_handoff_token_count: handoffTokensDeleted,
         deleted_step_up_challenge_count: stepUpDeleted.challenges,
         deleted_step_up_proof_count: stepUpDeleted.proofs,
       })
@@ -98,8 +114,10 @@ export async function GET(request: Request) {
       challengesDeleted,
       passkeyChallengesDeleted: passkeyRowsDeleted.challenges,
       passkeySignInTicketsDeleted: passkeyRowsDeleted.tickets,
+      passkeyManagementAuthorizationsDeleted: passkeyRowsDeleted.managementAuthorizations,
       accessCodesDeleted,
       installStatesDeleted,
+      handoffTokensDeleted,
       stepUpChallengesDeleted: stepUpDeleted.challenges,
       stepUpProofsDeleted: stepUpDeleted.proofs,
       timestamp: new Date().toISOString(),

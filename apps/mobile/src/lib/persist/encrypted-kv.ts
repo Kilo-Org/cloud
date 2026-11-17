@@ -392,11 +392,24 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
+type KvWrite = { readonly value: string; readonly signal?: AbortSignal };
+
 /** Writes or overwrites one value, recording `Date.now()`. */
-export async function setItem(scope: string, k: string, v: string): Promise<void> {
+export async function setItem(scope: string, k: string, value: string): Promise<void> {
+  await setItemWithSignal(scope, k, { value });
+}
+
+export async function setItemWithSignal(
+  scope: string,
+  k: string,
+  { value: v, signal }: KvWrite
+): Promise<void> {
   validateItemKey(scope, k);
   validateValue(v);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   const updatedAt = Date.now();
   db.insert(kv)
     .values({ scope, k, v, updatedAt })
@@ -405,9 +418,12 @@ export async function setItem(scope: string, k: string, v: string): Promise<void
 }
 
 /** Removes one value; a missing key is not an error. */
-export async function removeItem(scope: string, k: string): Promise<void> {
+export async function removeItem(scope: string, k: string, signal?: AbortSignal): Promise<void> {
   validateItemKey(scope, k);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   db.delete(kv)
     .where(and(eq(kv.scope, scope), eq(kv.k, k)))
     .run();

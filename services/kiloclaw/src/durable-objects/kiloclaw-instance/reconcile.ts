@@ -46,7 +46,6 @@ import { syncInstanceTypeToPostgresHelper } from './postgres';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
-import { maybeDispatchStartFailurePush } from './lifecycle-push';
 
 export type FinalizeDestroyRetention = {
   entries: Record<string, unknown>;
@@ -147,14 +146,11 @@ export async function maybeEmitDestroyStuckTelemetry(
 }
 
 /**
- * Record a start-attempt failure: write the analytics event and dispatch the
- * one-shot mobile push for this attempt. Single entry point so callers can't
- * accidentally emit one without the other.
+ * Record a start-attempt failure: write the analytics event for this attempt.
  */
 async function recordStartFailure(
   env: KiloClawEnv,
   state: InstanceMutableState,
-  ctx: DurableObjectState,
   label: string,
   error?: string | null
 ): Promise<void> {
@@ -166,7 +162,6 @@ async function recordStartFailure(
     error: error ?? undefined,
     ...eventContextFromState(state),
   });
-  await maybeDispatchStartFailurePush(env, state, ctx, label, error);
 }
 
 /**
@@ -443,7 +438,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      await recordStartFailure(env, state, ctx, 'starting_timeout', state.lastStartErrorMessage);
+      await recordStartFailure(env, state, 'starting_timeout', state.lastStartErrorMessage);
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -490,7 +485,6 @@ async function reconcileStarting(
       await recordStartFailure(
         env,
         state,
-        ctx,
         'starting_timeout_with_machine',
         state.lastStartErrorMessage
       );
@@ -519,13 +513,7 @@ async function reconcileStarting(
           })
         )
       );
-      await recordStartFailure(
-        env,
-        state,
-        ctx,
-        'starting_machine_gone',
-        'machine gone during start'
-      );
+      await recordStartFailure(env, state, 'starting_machine_gone', 'machine gone during start');
     } else if (isTimedOut) {
       // Transient Fly API error but we've exceeded the starting timeout.
       // Fall back to 'stopped' so the user can retry instead of staying
@@ -552,7 +540,6 @@ async function reconcileStarting(
       await recordStartFailure(
         env,
         state,
-        ctx,
         'starting_timeout_transient_error',
         err instanceof Error ? err.message : String(err)
       );
@@ -1105,7 +1092,6 @@ export async function syncStatusWithFly(
       await recordStartFailure(
         rctx.env,
         state,
-        ctx,
         'fly_failed_state',
         'fly machine entered failed state'
       );

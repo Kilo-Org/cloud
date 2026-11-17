@@ -1,17 +1,18 @@
 import type {
   AutoRouter,
-  BenchmarkConfig,
   BenchmarkProfileEntryStatus,
   BenchmarkProfileQuotaError,
   BenchmarkProfileStatus,
   BenchmarkProfileStatusesResponse,
   BenchmarkPair,
+  PolicySettingSource,
 } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
   MAX_POOL_ENTRIES,
   MeasuredAsModelIdSchema,
   benchmarkPairKey,
+  resolveEffectivePolicy,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm';
@@ -61,12 +62,12 @@ export function isCurrentBenchmarkProfile(
 }
 
 export function currentProfileContextFromConfig(
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>
+  config: PolicySettingSource & { router?: AutoRouter }
 ): CurrentProfileContext {
   return {
     router: config.router ?? 'efficient',
     engineIdentity: computeEngineIdentity('decider', config.router ?? 'efficient'),
-    repetitions: config.deciderRepetitions,
+    repetitions: resolveEffectivePolicy(config).deciderRepetitions,
   };
 }
 
@@ -526,7 +527,7 @@ export type RegisterProfilesInput = {
  */
 export async function registerProfiles(
   db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
+  config: PolicySettingSource & { router?: AutoRouter },
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);
@@ -684,7 +685,7 @@ export type LookupProfileStatusesInput = {
  */
 export async function lookupProfileStatuses(
   db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
+  config: PolicySettingSource & { router?: AutoRouter },
   input: LookupProfileStatusesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);

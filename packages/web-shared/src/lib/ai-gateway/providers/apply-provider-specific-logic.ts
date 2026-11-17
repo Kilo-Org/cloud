@@ -2,7 +2,6 @@ import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
-  isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
@@ -13,6 +12,7 @@ import {
   applyMistralModelSettings,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import {
   AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
   isAutoSmallFreeModel,
@@ -20,7 +20,10 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import {
+  applyOpenAiModelSettings,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -73,10 +76,6 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
   const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
@@ -204,9 +203,7 @@ export function applyPreferredProvider(
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
-  const provider = isOpenRouterProviderConfig(requestToMutate.provider)
-    ? requestToMutate.provider
-    : {};
+  const provider = isRecord(requestToMutate.provider) ? requestToMutate.provider : {};
   if (preferredProviderOrder.length > 0 && !provider.order) {
     console.debug(
       `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
@@ -393,6 +390,10 @@ export async function applyProviderSpecificLogic(
 
   if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
+  }
+
+  if (isOpenAiModel(requestedModel)) {
+    applyOpenAiModelSettings(requestToMutate);
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.

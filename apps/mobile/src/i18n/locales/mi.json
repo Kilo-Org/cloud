@@ -457,7 +457,8 @@
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
     },
-    "changelog": "Ngā mea hou"
+    "changelog": "Ngā mea hou",
+    "changelogVersionPending": "Ka tae mai ngā tuhipoka o tēnei putanga me te whakahōu taupānga e whai ake."
   },
   "preferences": {
     "general": "Whānui",

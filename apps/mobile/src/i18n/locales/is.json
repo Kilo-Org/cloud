@@ -457,7 +457,8 @@
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
     },
-    "changelog": "Nýjungar"
+    "changelog": "Nýjungar",
+    "changelogVersionPending": "Upplýsingar um þessa útgáfu berast með næstu uppfærslu forritsins."
   },
   "preferences": {
     "general": "Almennt",

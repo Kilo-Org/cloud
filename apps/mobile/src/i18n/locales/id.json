@@ -457,7 +457,8 @@
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },
-    "changelog": "Yang baru"
+    "changelog": "Yang baru",
+    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
   },
   "preferences": {
     "general": "Umum",

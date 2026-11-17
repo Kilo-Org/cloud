@@ -457,7 +457,8 @@
       "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
       "viewReceipt": "Ver xustificante"
     },
-    "changelog": "Novidades"
+    "changelog": "Novidades",
+    "changelogVersionPending": "As notas desta versión chegarán coa próxima actualización."
   },
   "preferences": {
     "general": "Xeral",

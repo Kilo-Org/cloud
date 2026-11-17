@@ -457,7 +457,8 @@
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
     },
-    "changelog": "Yang baharu"
+    "changelog": "Yang baharu",
+    "changelogVersionPending": "Nota versi ini akan tiba bersama kemas kini apl seterusnya."
   },
   "preferences": {
     "general": "Umum",

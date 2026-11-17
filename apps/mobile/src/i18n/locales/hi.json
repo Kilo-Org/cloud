@@ -457,7 +457,8 @@
       "nextStepFinal": "अपील का निर्णय अंतिम है। अब और कोई अपील दर्ज नहीं की जा सकती।",
       "viewReceipt": "रसीद देखें"
     },
-    "changelog": "नया क्या है"
+    "changelog": "नया क्या है",
+    "changelogVersionPending": "इस वर्शन के नोट्स अगले ऐप अपडेट के साथ आएंगे।"
   },
   "preferences": {
     "general": "सामान्य",

@@ -457,7 +457,8 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
-    "changelog": "Nyheter"
+    "changelog": "Nyheter",
+    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
   },
   "preferences": {
     "general": "Allmänt",

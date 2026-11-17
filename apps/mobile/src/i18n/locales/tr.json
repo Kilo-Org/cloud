@@ -457,7 +457,8 @@
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
       "viewReceipt": "Alındıyı görüntüle"
     },
-    "changelog": "Yenilikler"
+    "changelog": "Yenilikler",
+    "changelogVersionPending": "Bu sürümün notları sonraki uygulama güncellemesiyle gelir."
   },
   "preferences": {
     "general": "Genel",

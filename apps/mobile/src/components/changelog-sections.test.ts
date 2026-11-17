@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { splitChangelogSections } from './changelog-sections';
+import { changelogNotesArePending, splitChangelogSections } from './changelog-sections';
 
 const CHANGELOG = `# Kilo App Changelog
 
@@ -31,5 +31,35 @@ describe('splitChangelogSections', () => {
   it('handles a file with no release heading and an empty file', () => {
     expect(splitChangelogSections('# Kilo App Changelog\n')).toEqual(['# Kilo App Changelog\n']);
     expect(splitChangelogSections('')).toEqual(['']);
+  });
+});
+
+describe('changelogNotesArePending', () => {
+  it('reports notes that end before the installed version', () => {
+    expect(changelogNotesArePending(CHANGELOG, '1.0.17')).toBe(true);
+    expect(changelogNotesArePending(CHANGELOG, '1.1.0')).toBe(true);
+  });
+
+  it('says nothing when the newest section is the installed version', () => {
+    expect(changelogNotesArePending(CHANGELOG, '1.0.16')).toBe(false);
+  });
+
+  it('says nothing when the bundle already carries a later version', () => {
+    expect(changelogNotesArePending(CHANGELOG, '1.0.15')).toBe(false);
+    expect(changelogNotesArePending(CHANGELOG, '0.9.99')).toBe(false);
+  });
+
+  it('reads the newest heading, not the first', () => {
+    const outOfOrder = `## 1.0.14 (build 690 iOS, 691 Android)\n\n## 1.0.15 (build 710 iOS, 711 Android)\n`;
+    expect(changelogNotesArePending(outOfOrder, '1.0.16')).toBe(true);
+    expect(changelogNotesArePending(outOfOrder, '1.0.15')).toBe(false);
+  });
+
+  it('says nothing when a heading or the installed version does not parse', () => {
+    expect(changelogNotesArePending('## Unreleased\n\n- something\n', '1.0.16')).toBe(false);
+    expect(changelogNotesArePending('# Kilo App Changelog\n', '1.0.16')).toBe(false);
+    expect(changelogNotesArePending('', '1.0.16')).toBe(false);
+    expect(changelogNotesArePending(CHANGELOG, null)).toBe(false);
+    expect(changelogNotesArePending(CHANGELOG, '1.0')).toBe(false);
   });
 });

@@ -457,7 +457,8 @@
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },
-    "changelog": "Kas jauns"
+    "changelog": "Kas jauns",
+    "changelogVersionPending": "Šīs versijas piezīmes pienāks ar nākamo atjauninājumu."
   },
   "preferences": {
     "general": "Vispārīgi",

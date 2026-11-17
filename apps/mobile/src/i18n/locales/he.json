@@ -457,7 +457,8 @@
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
       "viewReceipt": "הצגת האישור"
     },
-    "changelog": "מה חדש"
+    "changelog": "מה חדש",
+    "changelogVersionPending": "ההערות לגרסה זו יגיעו עם עדכון האפליקציה הבא."
   },
   "preferences": {
     "general": "כללי",

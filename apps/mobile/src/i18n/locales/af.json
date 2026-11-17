@@ -457,7 +457,8 @@
       "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
       "viewReceipt": "Bekyk ontvangsbewys"
     },
-    "changelog": "Wat is nuut"
+    "changelog": "Wat is nuut",
+    "changelogVersionPending": "Hierdie weergawe se notas kom met die volgende opdatering."
   },
   "preferences": {
     "general": "Algemeen",

@@ -457,7 +457,8 @@
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
     },
-    "changelog": "Kaj je novega"
+    "changelog": "Kaj je novega",
+    "changelogVersionPending": "Opombe za to različico prinese naslednja posodobitev aplikacije."
   },
   "preferences": {
     "general": "Splošno",

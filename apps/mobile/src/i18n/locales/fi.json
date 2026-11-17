@@ -457,7 +457,8 @@
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
     },
-    "changelog": "Mitä uutta"
+    "changelog": "Mitä uutta",
+    "changelogVersionPending": "Tämän version julkaisutiedot tulevat seuraavan päivityksen mukana."
   },
   "preferences": {
     "general": "Yleiset",

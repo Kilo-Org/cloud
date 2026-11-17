@@ -457,7 +457,8 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
-    "changelog": "更新内容"
+    "changelog": "更新内容",
+    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
   },
   "preferences": {
     "general": "通用",

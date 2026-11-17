@@ -457,7 +457,8 @@
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
-    "changelog": "Kas naujo"
+    "changelog": "Kas naujo",
+    "changelogVersionPending": "Šios versijos pastabos pasirodys su kitu programėlės atnaujinimu."
   },
   "preferences": {
     "general": "Bendra",

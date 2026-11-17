@@ -457,7 +457,8 @@
       "nextStepFinal": "بڕیاری تانە کۆتاییە. تانەی زیاتر ناتوانرێت بنێردرێت.",
       "viewReceipt": "بینینی پسوولە"
     },
-    "changelog": "تازەکان"
+    "changelog": "تازەکان",
+    "changelogVersionPending": "تێبینییەکانی ئەم وەشانە لەگەڵ نوێکردنەوەی داهاتووی ئەپەکە دێن."
   },
   "preferences": {
     "general": "گشتی",

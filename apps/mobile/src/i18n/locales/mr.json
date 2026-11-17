@@ -457,7 +457,8 @@
       "nextStepFinal": "अपीलचा निर्णय अंतिम आहे. आता पुढील अपील दाखल करता येणार नाही.",
       "viewReceipt": "पावती पहा"
     },
-    "changelog": "नवीन बदल"
+    "changelog": "नवीन बदल",
+    "changelogVersionPending": "या आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील."
   },
   "preferences": {
     "general": "सामान्य",

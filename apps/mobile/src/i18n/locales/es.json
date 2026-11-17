@@ -457,7 +457,8 @@
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
     },
-    "changelog": "Novedades"
+    "changelog": "Novedades",
+    "changelogVersionPending": "Las notas de esta versión llegan con la próxima actualización."
   },
   "preferences": {
     "general": "General",

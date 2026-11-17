@@ -457,7 +457,8 @@
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
       "viewReceipt": "Wyświetl potwierdzenie"
     },
-    "changelog": "Co nowego"
+    "changelog": "Co nowego",
+    "changelogVersionPending": "Opis tej wersji dotrze z kolejną aktualizacją aplikacji."
   },
   "preferences": {
     "general": "Ogólne",

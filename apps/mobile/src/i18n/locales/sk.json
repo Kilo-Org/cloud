@@ -457,7 +457,8 @@
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
     },
-    "changelog": "Čo je nové"
+    "changelog": "Čo je nové",
+    "changelogVersionPending": "Poznámky k tejto verzii prídu s ďalšou aktualizáciou."
   },
   "preferences": {
     "general": "Všeobecné",

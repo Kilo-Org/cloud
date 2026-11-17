@@ -457,7 +457,8 @@
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },
-    "changelog": "Mga bago"
+    "changelog": "Mga bago",
+    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong ito."
   },
   "preferences": {
     "general": "Pangkalahatan",

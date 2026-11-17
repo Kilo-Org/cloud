@@ -457,7 +457,8 @@
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
       "viewReceipt": "Féach ar an admháil"
     },
-    "changelog": "Na rudaí nua"
+    "changelog": "Na rudaí nua",
+    "changelogVersionPending": "Beidh nótaí an leagain seo sa chéad nuashonrú eile den aip."
   },
   "preferences": {
     "general": "Ginearálta",

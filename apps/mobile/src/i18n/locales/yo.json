@@ -457,7 +457,8 @@
       "nextStepFinal": "Ìpinnu ẹ̀bẹ̀ yìí ti di ìparí. A kò lè fi ẹ̀bẹ̀ mìíràn ránṣẹ́ mọ́.",
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
-    "changelog": "Àwọn ohun tuntun"
+    "changelog": "Àwọn ohun tuntun",
+    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà yìí yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn."
   },
   "preferences": {
     "general": "Gbogbogbo",

@@ -457,7 +457,8 @@
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
-    "changelog": "ਕੀ ਨਵਾਂ ਹੈ"
+    "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
+    "changelogVersionPending": "ਇਸ ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।"
   },
   "preferences": {
     "general": "ਆਮ",

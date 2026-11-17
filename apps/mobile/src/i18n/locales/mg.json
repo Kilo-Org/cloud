@@ -457,7 +457,8 @@
       "nextStepFinal": "Farany ny fanapahan-kevitra momba ny fampakarana. Tsy misy fampakarana hafa azo alefa intsony.",
       "viewReceipt": "Jereo ny porofo"
     },
-    "changelog": "Ny vaovao"
+    "changelog": "Ny vaovao",
+    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
   },
   "preferences": {
     "general": "Ankapobeny",

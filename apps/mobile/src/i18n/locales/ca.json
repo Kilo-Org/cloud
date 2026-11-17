@@ -457,7 +457,8 @@
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },
-    "changelog": "Novetats"
+    "changelog": "Novetats",
+    "changelogVersionPending": "Les notes d'aquesta versió arribaran amb la propera actualització de l'app."
   },
   "preferences": {
     "general": "General",

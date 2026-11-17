@@ -457,7 +457,8 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
-    "changelog": "Yangiliklar"
+    "changelog": "Yangiliklar",
+    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
   },
   "preferences": {
     "general": "Umumiy",

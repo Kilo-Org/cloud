@@ -457,7 +457,8 @@
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
-    "changelog": "Noutăți"
+    "changelog": "Noutăți",
+    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
   },
   "preferences": {
     "general": "General",

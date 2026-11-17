@@ -457,7 +457,8 @@
       "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
       "viewReceipt": "Qəbzə bax"
     },
-    "changelog": "Yeniliklər"
+    "changelog": "Yeniliklər",
+    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
   },
   "preferences": {
     "general": "Ümumi",

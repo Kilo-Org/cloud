@@ -457,7 +457,8 @@
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
-    "changelog": "Okusha"
+    "changelog": "Okusha",
+    "changelogVersionPending": "Amanothi ale nguqulo azofika nesibuyekezo esilandelayo."
   },
   "preferences": {
     "general": "Okujwayelekile",

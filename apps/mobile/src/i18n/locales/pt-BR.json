@@ -457,7 +457,8 @@
       "nextStepFinal": "A decisão do recurso é definitiva. Não é possível enviar outro recurso.",
       "viewReceipt": "Ver comprovante"
     },
-    "changelog": "Novidades"
+    "changelog": "Novidades",
+    "changelogVersionPending": "As notas desta versão vêm na próxima atualização do app."
   },
   "notifications": {
     "channel": {

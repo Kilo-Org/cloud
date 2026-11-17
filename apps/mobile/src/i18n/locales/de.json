@@ -457,7 +457,8 @@
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
       "viewReceipt": "Bestätigung anzeigen"
     },
-    "changelog": "Neuigkeiten"
+    "changelog": "Neuigkeiten",
+    "changelogVersionPending": "Neuigkeiten zu dieser Version folgen im nächsten Update."
   },
   "preferences": {
     "general": "Allgemein",

@@ -457,7 +457,8 @@
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
       "viewReceipt": "රිසිට්පත බලන්න"
     },
-    "changelog": "අලුත් දේ"
+    "changelog": "අලුත් දේ",
+    "changelogVersionPending": "මේ අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ."
   },
   "preferences": {
     "general": "සාමාන්‍ය",

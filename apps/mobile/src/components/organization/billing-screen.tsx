@@ -133,6 +133,12 @@ export function OrganizationBillingScreen() {
   const subscriptionsUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   const changePlanLabel = t('organization.billing.changePlan');
   const planChange = externalBillingAction(subscriptionsUrl);
+  // The banner is the one place the change-plan destination belongs while the
+  // plan has lapsed and the platform may link, so the card's copy of it would
+  // only outweigh the banner. One value feeds both, so the two cannot drift.
+  // A platform that gets text only (iOS) keeps the card's copy: its banner has
+  // no action.
+  const changePlanOnBanner = planEnded && planChange.kind === 'link';
 
   const subscriptionState = subscription.data ? getOrgSubscriptionState(subscription.data) : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
@@ -178,12 +184,7 @@ export function OrganizationBillingScreen() {
     }
     return (
       <BillingCard>
-        <KvRow
-          label={t('organization.hub.plan')}
-          value={planName}
-          valueFace="text"
-          valueTone={planEnded ? 'danger' : 'default'}
-        />
+        <KvRow label={t('organization.hub.plan')} value={planName} valueFace="text" />
         <KvRow
           label={t('organization.billing.state')}
           value={subscriptionState.label}
@@ -257,7 +258,7 @@ export function OrganizationBillingScreen() {
           <OrganizationPlanRefusal
             message={t('organization.hub.planEnded')}
             action={
-              planChange.kind === 'link'
+              changePlanOnBanner
                 ? {
                     label: changePlanLabel,
                     onPress: () => {
@@ -278,7 +279,7 @@ export function OrganizationBillingScreen() {
           <SectionLabel>{t('organization.billing.seats')}</SectionLabel>
           <BillingCard>
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              label={t('organization.billing.seatsInUse')}
               value={seatCountValue}
               valueFace="numeric"
               last
@@ -326,7 +327,9 @@ export function OrganizationBillingScreen() {
         <View className="gap-2">
           <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
           <View className="gap-3 rounded-lg bg-secondary p-3">
-            <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
+            {changePlanOnBanner ? null : (
+              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
+            )}
             <ExternalBillingLink
               url={`${subscriptionsUrl}/seats`}
               label={t('organization.billing.buySeats')}

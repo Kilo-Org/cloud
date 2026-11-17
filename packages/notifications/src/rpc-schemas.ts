@@ -38,6 +38,18 @@ type DeliveryOutcomeReason = (typeof DELIVERY_OUTCOME_REASONS)[number];
 const CHANNEL_DELIVERY_OUTCOME_REASONS = ['suppressed_expired', 'suppressed_access'] as const;
 type ChannelDeliveryOutcomeReason = (typeof CHANNEL_DELIVERY_OUTCOME_REASONS)[number];
 
+// The cloud-agent and session-ready responses report the shared
+// `suppressed_preference` as-is, spell the shared `failed` outcome
+// `dispatch_failed`, and add `missing_session`, which no dispatch reports.
+// The `satisfies` keeps the shared member tied to the vocabulary above.
+const CLOUD_AGENT_MISSING_SESSION_REASON = 'missing_session' as const;
+const CLOUD_AGENT_DISPATCH_FAILED_REASON = 'dispatch_failed' as const;
+const CLOUD_AGENT_SESSION_REASONS = [
+  CLOUD_AGENT_MISSING_SESSION_REASON,
+  CLOUD_AGENT_DISPATCH_FAILED_REASON,
+  'suppressed_preference' satisfies DeliveryOutcomeReason,
+] as const;
+
 // Discriminated-union members that carry no payload. A generic parameter keeps
 // each variant's own `kind` literal so `DispatchPushOutcome` stays discriminated.
 function payloadFreeOutcome<
@@ -54,7 +66,7 @@ function payloadFreeOutcome<
 export const sendPushForConversationInputSchema = z.object({
   conversationId: nonEmptyStringSchema,
   sandboxId: nonEmptyStringSchema,
-  senderUserId: z.union([nonEmptyStringSchema, z.null()]),
+  senderUserId: nonEmptyStringSchema.nullable(),
   recipientUserIds: z.array(nonEmptyStringSchema).min(1),
   title: z.string().max(200),
   bodyPreview: z.string().max(200),
@@ -71,7 +83,7 @@ export const perRecipientOutcomeSchema = z.enum([
 export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 
 export const perRecipientResultSchema = z.object({
-  userId: z.string(),
+  userId: nonEmptyStringSchema,
   outcome: perRecipientOutcomeSchema,
   // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
   // populated by the internal dispatch path for `failed` outcomes. Optional:
@@ -196,7 +208,7 @@ export type SendCloudAgentSessionNotificationParams = z.infer<
 
 export const sendCloudAgentSessionNotificationOutputSchema = z.object({
   dispatched: z.boolean(),
-  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_preference']).optional(),
+  reason: z.enum(CLOUD_AGENT_SESSION_REASONS).optional(),
 });
 export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema
@@ -346,6 +358,22 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+/**
+ * The dispatch outcome's discriminator set is the shared delivery vocabulary
+ * plus `delivered`, and nothing else. The builder above catches a reason
+ * renamed in the tuples; this catches one dropped from or added to the union,
+ * so the hand-written member list above cannot drift from that vocabulary.
+ */
+type SameUnion<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type AssertTrue<T extends true> = T;
+export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+  SameUnion<
+    DispatchPushOutcome['kind'],
+    'delivered' | DeliveryOutcomeReason | ChannelDeliveryOutcomeReason | 'suppressed_rate_limit'
+  >
+>;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

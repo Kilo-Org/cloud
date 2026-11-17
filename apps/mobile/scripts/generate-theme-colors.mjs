@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postcss from 'postcss';
+
+import { runIfMain } from '../../../tools/lib/entry-point.mjs';
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS_PATH = join(mobileDir, 'src', 'global.css');
@@ -143,8 +145,10 @@ export function generateThemeColorsSource() {
   ].join('\n');
 }
 
-const scriptPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && resolve(process.argv[1]) === resolve(scriptPath)) {
-  writeFileSync(OUTPUT_PATH, generateThemeColorsSource());
-  console.log(`Wrote ${OUTPUT_PATH}`);
-}
+runIfMain(
+  () => {
+    writeFileSync(OUTPUT_PATH, generateThemeColorsSource());
+    console.log(`Wrote ${OUTPUT_PATH}`);
+  },
+  import.meta.url
+);

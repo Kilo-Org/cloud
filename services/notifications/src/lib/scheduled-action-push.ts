@@ -16,6 +16,7 @@ import {
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
 import type { PushTokenWithLocale } from './instance-lifecycle-push';
+import { truncatePushBody } from './push-body-truncate';
 
 export type {
   ScheduledActionEvent,
@@ -24,13 +25,6 @@ export type {
 } from '@kilocode/notifications';
 
 export const ParamsSchema = sendScheduledActionNoticeInputSchema;
-
-const BODY_MAX_LENGTH = 100;
-
-function truncate(text: string, max = BODY_MAX_LENGTH): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 3)}...`;
-}
 
 function formatScheduledAt(iso: string): string {
   // Expo push body is small; pick a compact server-rendered string.
@@ -97,7 +91,7 @@ function buildBody(locale: string | null, params: SendScheduledActionNoticeParam
   const when = formatScheduledAt(params.scheduledAt);
   switch (params.event) {
     case 'scheduled_restart_notice':
-      return truncate(
+      return truncatePushBody(
         translatePush(
           locale,
           'scheduledAction.restartNotice.body',
@@ -106,7 +100,7 @@ function buildBody(locale: string | null, params: SendScheduledActionNoticeParam
         )
       );
     case 'scheduled_restart_cancelled':
-      return truncate(
+      return truncatePushBody(
         translatePush(
           locale,
           'scheduledAction.restartCancelled.body',
@@ -115,7 +109,7 @@ function buildBody(locale: string | null, params: SendScheduledActionNoticeParam
         )
       );
     case 'scheduled_version_change_notice':
-      return truncate(
+      return truncatePushBody(
         params.targetImageTag
           ? translatePush(
               locale,
@@ -131,7 +125,7 @@ function buildBody(locale: string | null, params: SendScheduledActionNoticeParam
             )
       );
     case 'scheduled_version_change_cancelled':
-      return truncate(
+      return truncatePushBody(
         translatePush(
           locale,
           'scheduledAction.versionChangeCancelled.body',

@@ -1,62 +1,39 @@
 import { translatePush } from './i18n';
+import en from './locales/en.json';
 import { type PushData } from './push-data';
 
-type GenericBodyCopy = { key: string; fallback: string };
+type GenericBodyLeaf = keyof typeof en.generic.body;
 
 // Both session variants show one body: the session_live_update carrier is
 // data-only (the app draws that notification), and neither variant may show the
 // session title.
-const SESSION_UPDATE_BODY: GenericBodyCopy = {
-  key: 'generic.body.cloudAgentSession',
-  fallback: 'Your agent session has an update',
-};
+const SESSION_UPDATE_LEAF: GenericBodyLeaf = 'cloudAgentSession';
 
 // Generic, count-free lock-screen banner copy: the ongoing notification never
 // leaks how many agents are running or which sessions they are.
-const ACTIVE_AGENTS_BODY: GenericBodyCopy = {
-  key: 'generic.body.activeAgentsGlanceable',
-  fallback: 'Active agents have an update',
-};
+const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
 
 /**
- * The one body per `PushData` variant. The map is total over `PushData['type']`,
- * so a new variant fails typecheck here until it has an entry.
+ * The one body per `PushData` variant, named by the leaf its sentence lives
+ * under in `en.generic.body`. The map is total over `PushData['type']`, so a new
+ * variant fails typecheck here until it has an entry, and every value is a key
+ * of that catalog subtree, so a leaf `en.json` does not define is a compile
+ * error. The key and the English fallback both come from this one leaf.
  */
-const GENERIC_BODY_BY_TYPE: Record<PushData['type'], GenericBodyCopy> = {
-  cloud_agent_session: SESSION_UPDATE_BODY,
-  session_live_update: SESSION_UPDATE_BODY,
-  'chat.message': {
-    key: 'generic.body.chatMessage',
-    fallback: 'You have a new message',
-  },
-  'instance-lifecycle': {
-    key: 'generic.body.instanceLifecycle',
-    fallback: 'Your instance has an update',
-  },
-  'scheduled-action': {
-    key: 'generic.body.scheduledAction',
-    fallback: 'A scheduled action has an update',
-  },
-  low_balance: {
-    key: 'generic.body.lowBalance',
-    fallback: 'Your balance needs attention',
-  },
-  spend_alert: {
-    key: 'generic.body.spendAlert',
-    fallback: 'Your spend needs attention',
-  },
-  security_finding: {
-    key: 'generic.body.securityFinding',
-    fallback: 'A security finding needs attention',
-  },
+const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
+  cloud_agent_session: SESSION_UPDATE_LEAF,
+  session_live_update: SESSION_UPDATE_LEAF,
+  'chat.message': 'chatMessage',
+  'instance-lifecycle': 'instanceLifecycle',
+  'scheduled-action': 'scheduledAction',
+  low_balance: 'lowBalance',
+  spend_alert: 'spendAlert',
+  security_finding: 'securityFinding',
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
-  security_lifecycle: {
-    key: 'generic.body.securityUpdate',
-    fallback: 'A security check has an update',
-  },
-  agent_briefing: ACTIVE_AGENTS_BODY,
-  active_agents_glanceable: ACTIVE_AGENTS_BODY,
+  security_lifecycle: 'securityUpdate',
+  agent_briefing: ACTIVE_AGENTS_LEAF,
+  active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };
 
 /**
@@ -74,10 +51,10 @@ export function genericPushContentForPushData(
   locale: string | null | undefined = 'en'
 ): { title: string; body: string } {
   // The one generic title is content-free and identical for every variant, so
-  // only the body's key and fallback differ.
-  const body = GENERIC_BODY_BY_TYPE[data.type];
+  // only the body's leaf differs.
+  const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
-    title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-    body: translatePush(locale, body.key, undefined, body.fallback),
+    title: translatePush(locale, 'generic.title', undefined, en.generic.title),
+    body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
   };
 }

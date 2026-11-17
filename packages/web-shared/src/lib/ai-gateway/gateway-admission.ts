@@ -20,14 +20,36 @@ import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
+  accountFreeModelLimitResponse,
+  anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
+  gatewayAccountRateLimitResponse,
   getOrganizationProviderPrivacy,
   invalidTokenResponse,
+  managedGatewayDisabledResponse,
   modelNotAllowedResponse,
   paidModelAuthRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import {
+  freeModelRateLimitKey,
+  isFreeModelRateLimited,
+  type FreeModelRateLimitSubject,
+} from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
+import {
+  getManagedGatewayFromUrl,
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 type GatewayAuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 
@@ -40,6 +62,95 @@ export type SignedInGatewayCaller = {
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };
 export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | RejectedGatewayCaller;
+
+/**
+ * Caps one account's inference request rate across every source address. Routes
+ * call this before authentication: the key comes from the signed token, so a
+ * flooded request costs no database query. See `isGatewayAccountRateLimited`.
+ */
+export async function gatewayAccountRateLimitRejection(
+  request: NextRequest,
+  ipAddress: string | undefined
+): Promise<NextResponse | null> {
+  const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
+  if (!(await isGatewayAccountRateLimited(request, accountKey))) return null;
+  console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+  return gatewayAccountRateLimitResponse();
+}
+
+/**
+ * The anti-abuse limit for free models. Signed-in callers count per account,
+ * anonymous callers per IP. Takes the resolved caller rather than the token's
+ * claims, so a revoked token cannot spend its account's allowance.
+ */
+export async function freeModelRateLimitRejection(params: {
+  request: NextRequest;
+  caller: SignedInGatewayCaller | AnonymousGatewayCaller;
+  model: string;
+  feature: string | null;
+}): Promise<NextResponse | null> {
+  const { caller } = params;
+  const subject: FreeModelRateLimitSubject =
+    caller.kind === 'signed-in'
+      ? { kind: 'account', kiloUserId: caller.user.id }
+      : { kind: 'ip', ipAddress: caller.user.ipAddress };
+
+  // The default internal benchmark user is exempt: a run sends every case of
+  // every free model it measures, and the anti-abuse limit would otherwise
+  // throttle the measurement itself. A benchmark user override is not exempt.
+  const isExempt = subject.kind === 'account' && subject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
+  if (isExempt || !(await isFreeModelRateLimited(params.request, subject))) return null;
+  console.warn(
+    `Model rate limit exceeded, ${freeModelRateLimitKey(subject)}, model: ${params.model}, feature: ${params.feature ?? 'none'}`
+  );
+  return subject.kind === 'account'
+    ? accountFreeModelLimitResponse()
+    : anonymousFreeModelLimitResponse();
+}
+
+/**
+ * Null when the route may use the provider, or the response for a provider
+ * that is, or whose upstream URL points at, a gateway the organization disabled.
+ */
+export function managedGatewayRejection(
+  settings: OrganizationGatewaySettings,
+  providerType: Provider['type'],
+  apiUrl: string
+): NextResponse | null {
+  if (isManagedGatewayDisabled(settings, providerType)) {
+    return managedGatewayDisabledResponse(providerType);
+  }
+  const gatewayByDomain = getManagedGatewayFromUrl(apiUrl);
+  if (gatewayByDomain && isManagedGatewayDisabled(settings, gatewayByDomain)) {
+    return managedGatewayDisabledResponse(gatewayByDomain);
+  }
+  return null;
+}
+
+/**
+ * The organization gateway settings for a request with a single provider route:
+ * rejected when that route uses a disabled gateway, otherwise the data region
+ * to pin Vercel AI Gateway inference to.
+ */
+export async function organizationGatewayPolicy(params: {
+  organizationId: string | undefined;
+  settings: OrganizationSettings | undefined;
+  provider: Pick<Provider, 'type' | 'apiUrl'>;
+}): Promise<
+  | { kind: 'rejected'; response: NextResponse }
+  | { kind: 'allowed'; dataRegion: OrganizationGatewaySettings['dataRegion'] }
+> {
+  const { organizationId, settings, provider } = params;
+  if (!organizationId || !settings) return { kind: 'allowed', dataRegion: null };
+  const gatewaySettings = getOrganizationGatewaySettings(
+    await getRuntimeOrganizationFeatures(),
+    organizationId,
+    settings
+  );
+  const rejection = managedGatewayRejection(gatewaySettings, provider.type, provider.apiUrl);
+  if (rejection) return { kind: 'rejected', response: rejection };
+  return { kind: 'allowed', dataRegion: gatewaySettings.dataRegion };
+}
 
 /**
  * Who an inference request runs as. A presented credential that failed

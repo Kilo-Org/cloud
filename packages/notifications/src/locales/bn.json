@@ -34,17 +34,17 @@
       "title": "ব্যয় সতর্কতা",
       "body": "{{scopeName}}-এর ব্যয় ${{amountUsd}} ছাড়িয়ে গেছে"
     },
-    "securityFindingNew": {
-      "title": "নতুন নিরাপত্তা সমস্যা ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}}-এ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "নতুন নিরাপত্তা সমস্যা ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA সতর্কতা",
-      "body": "{{repoFullName}}-এ {{findingTitle}}"
+      "title": "SLA সতর্কতা"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA লঙ্ঘন",
-      "body": "{{repoFullName}}-এ {{findingTitle}}"
+      "title": "SLA লঙ্ঘন"
     },
     "securityLifecycle": {
       "title": "Kilo",

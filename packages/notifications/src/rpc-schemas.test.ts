@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   internalDispatchRequestSchema,
   internalDispatchSpendAlertRequestSchema,
+  perRecipientResultSchema,
   refreshGlanceableSessionsInputSchema,
   sendCloudAgentSessionNotificationInputSchema,
+  sendPushForConversationInputSchema,
 } from './rpc-schemas';
 
 describe('agent briefing dispatch', () => {
@@ -89,6 +91,33 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     expect(
       internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, dedupeKey: '' }).success
     ).toBe(false);
+  });
+});
+
+describe('sendPushForConversationInputSchema', () => {
+  const payload = {
+    conversationId: 'conv-1',
+    sandboxId: 'sb-1',
+    senderUserId: 'user-1',
+    recipientUserIds: ['user-2'],
+    title: 'Hello',
+    bodyPreview: 'Hello there',
+    messageId: 'msg-1',
+  };
+
+  it('accepts a known sender and a null sender for a system message', () => {
+    expect(sendPushForConversationInputSchema.parse(payload)).toEqual(payload);
+    const system = { ...payload, senderUserId: null };
+    expect(sendPushForConversationInputSchema.parse(system)).toEqual(system);
+  });
+
+  it('rejects an empty or missing sender', () => {
+    expect(
+      sendPushForConversationInputSchema.safeParse({ ...payload, senderUserId: '' }).success
+    ).toBe(false);
+    const withoutSender: Record<string, unknown> = { ...payload };
+    delete withoutSender.senderUserId;
+    expect(sendPushForConversationInputSchema.safeParse(withoutSender).success).toBe(false);
   });
 });
 
@@ -187,5 +216,17 @@ describe('refreshGlanceableSessionsInputSchema', () => {
       refreshGlanceableSessionsInputSchema.parse({ userId: 'usr_1', cliSessionIds: ['ses_1'] })
         .approvalChangedSessionIds
     ).toBeUndefined();
+  });
+});
+
+describe('perRecipientResultSchema', () => {
+  const result = { userId: 'user-1', outcome: 'delivered' } as const;
+
+  it('accepts a result for a recipient id', () => {
+    expect(perRecipientResultSchema.parse(result)).toEqual(result);
+  });
+
+  it('rejects an empty recipient id two recipients would collapse onto', () => {
+    expect(perRecipientResultSchema.safeParse({ ...result, userId: '' }).success).toBe(false);
   });
 });

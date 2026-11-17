@@ -34,17 +34,17 @@
       "title": "Xərc xəbərdarlığı",
       "body": "{{scopeName}} xərci ${{amountUsd}} həddini keçdi"
     },
-    "securityFindingNew": {
-      "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} içində {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA xəbərdarlığı",
-      "body": "{{repoFullName}} içində {{findingTitle}}"
+      "title": "SLA xəbərdarlığı"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pozuntusu",
-      "body": "{{repoFullName}} içində {{findingTitle}}"
+      "title": "SLA pozuntusu"
     },
     "securityLifecycle": {
       "title": "Kilo",

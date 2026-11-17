@@ -34,17 +34,17 @@
       "title": "Faɗakarwar kashewa",
       "body": "Kashewar {{scopeName}} ta wuce ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Sabon binciken tsaro ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} a cikin {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Sabon binciken tsaro ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Faɗakarwar SLA",
-      "body": "{{findingTitle}} a cikin {{repoFullName}}"
+      "title": "Faɗakarwar SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Ƙetare SLA",
-      "body": "{{findingTitle}} a cikin {{repoFullName}}"
+      "title": "Ƙetare SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

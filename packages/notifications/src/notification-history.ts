@@ -29,21 +29,35 @@ export const NOTIFICATION_HISTORY_RETENTION_MS =
 /** Rows per page of the history query. */
 export const NOTIFICATION_HISTORY_DEFAULT_PAGE_SIZE = 30;
 
+/** Marks a push kind that never becomes a history row. */
+const NOT_RECORDED = Symbol('notificationHistory.notRecorded');
+
+/** Resolve the settings category that gates one push kind. */
+type PushHistoryRule = (data: PushData) => NotificationHistoryCategory | null;
+
+/** A rule for a recorded kind, or the sentinel for a kind that is not recorded. */
+type PushHistoryDecision = PushHistoryRule | typeof NOT_RECORDED;
+
+/** One decision per push kind, keyed by kind. */
+type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
+
 /**
- * Push kinds that become history rows, keyed by kind, with the settings
- * category that gates each one. A kind is recorded only when the push carries
- * something the user can reopen from a list, and every recorded kind has one
- * settings category except briefings, which have none.
+ * One history decision per push kind. A kind is recorded only when the push
+ * carries something the user can reopen from a list, and every recorded kind
+ * has one settings category except briefings, which have none.
  *
  * Every other kind is an OS-only surface (glanceable aggregate, Live Activity,
- * followed-session update, widget data) with no message to read back, so it is
- * never recorded.
+ * followed-session update, widget data) with no message to read back, so it
+ * carries the `NOT_RECORDED` decision.
  *
- * This map is the only place a recorded kind is declared: the exported list and
- * the resolver both derive from it, so adding a kind here is the whole change
- * and a kind cannot be listed without a category rule.
+ * The table is total over `PushData['type']`, so a new variant fails typecheck
+ * here until it has a history decision, as `GENERIC_BODY_BY_TYPE` in
+ * `push-copy.ts` does for the generic preview body.
+ *
+ * This map is the only place a decision is declared: the exported list and the
+ * resolver both derive from it, so adding a kind here is the whole change.
  */
-const RECORDED_PUSH_HISTORY_RULES = {
+const PUSH_HISTORY_DECISIONS = {
   'chat.message': () => 'chatMessages',
   // A needs-input raise is gated by `agentAttention`; a status/ready push by
   // `sessionStatus`, and an omitted tag is a status push (the rolling-deploy
@@ -58,15 +72,36 @@ const RECORDED_PUSH_HISTORY_RULES = {
   security_lifecycle: () => 'securityFindings',
   // Briefings have no settings category; they appear under All only.
   agent_briefing: () => null,
-} satisfies Partial<
-  Record<PushData['type'], (data: PushData) => NotificationHistoryCategory | null>
->;
+  'instance-lifecycle': NOT_RECORDED,
+  'scheduled-action': NOT_RECORDED,
+  active_agents_glanceable: NOT_RECORDED,
+  session_live_update: NOT_RECORDED,
+} satisfies PushHistoryDecisions;
 
-export type RecordedNotificationPushType = keyof typeof RECORDED_PUSH_HISTORY_RULES;
+/** The kind when its decision is a rule, never otherwise. */
+type RecordedPushKind<Kind extends PushData['type']> =
+  (typeof PUSH_HISTORY_DECISIONS)[Kind] extends typeof NOT_RECORDED ? never : Kind;
 
-export const RECORDED_NOTIFICATION_PUSH_TYPES = Object.keys(
-  RECORDED_PUSH_HISTORY_RULES
-) as readonly RecordedNotificationPushType[];
+/** The kinds whose decision is a rule: exactly the kinds that become a row. */
+export type RecordedNotificationPushType = {
+  [Kind in PushData['type']]: RecordedPushKind<Kind>;
+}[PushData['type']];
+
+/**
+ * True for the push kinds that become a history row.
+ *
+ * The map is total over `PushData['type']`, but a payload reaches the worker
+ * unparsed, so a kind outside the union must answer "not recorded" instead of
+ * falling through to a rule call that does not exist.
+ */
+function isRecordedNotificationPush(type: PushData['type']): type is RecordedNotificationPushType {
+  return typeof PUSH_HISTORY_DECISIONS[type] === 'function';
+}
+
+export const RECORDED_NOTIFICATION_PUSH_TYPES: readonly RecordedNotificationPushType[] =
+  // `Object.keys` is typed `string[]`; the total record above proves the keys
+  // are exactly `PushData['type']`. The guard then drops the sentinel keys.
+  (Object.keys(PUSH_HISTORY_DECISIONS) as PushData['type'][]).filter(isRecordedNotificationPush);
 
 /** One history row's content, derived from the push it came from. */
 export type NotificationHistoryEntry = {
@@ -74,11 +109,6 @@ export type NotificationHistoryEntry = {
   /** Settings key the push belongs to; null for briefings, which have none. */
   category: NotificationHistoryCategory | null;
 };
-
-/** True for the push kinds that become a history row. */
-function isRecordedNotificationPush(type: PushData['type']): type is RecordedNotificationPushType {
-  return Object.hasOwn(RECORDED_PUSH_HISTORY_RULES, type);
-}
 
 /**
  * Resolve the history entry for a push, or `null` when the kind is not recorded.
@@ -92,6 +122,6 @@ export function notificationHistoryEntryForPushData(
   if (!isRecordedNotificationPush(data.type)) return null;
   return {
     pushType: data.type,
-    category: RECORDED_PUSH_HISTORY_RULES[data.type](data),
+    category: PUSH_HISTORY_DECISIONS[data.type](data),
   };
 }

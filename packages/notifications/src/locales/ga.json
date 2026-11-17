@@ -34,17 +34,17 @@
       "title": "Foláireamh caiteachais",
       "body": "Sháraigh caiteachas {{scopeName}} ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Tátal slándála nua ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Tátal slándála nua ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Rabhadh SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Rabhadh SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Sárú SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Sárú SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

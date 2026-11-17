@@ -210,18 +210,22 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     // OpenRouter may add a model after a custom LLM claimed its id, and
     // routing serves the custom LLM.
     !customLlmsById.has(modelId.toLowerCase()) && !unavailableModelIds.has(modelId);
+  const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
+  const listedModels = models.filter(
+    model =>
+      (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
+      isListableGatewayModelId(model.id) &&
+      !model.id.endsWith(':batch')
+  );
   const [vercelOnlyCatalogModels, summaries] = await Promise.all([
-    getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
+    getVercelOnlyCatalogModels({
+      openRouterModels: models,
+      listedOpenRouterModels: listedModels,
+      openRouterMetadata: endpointsMetadata,
+    }),
     getTerminalBenchSummaries(),
   ]);
-  const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
-  const catalogModels = models
-    .filter(
-      model =>
-        (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        isListableGatewayModelId(model.id) &&
-        !model.id.endsWith(':batch')
-    )
+  const catalogModels = listedModels
     .map((model): OpenRouterModel => {
       const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);

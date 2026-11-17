@@ -34,17 +34,17 @@
       "title": "Peringatan pengeluaran",
       "body": "Pengeluaran {{scopeName}} melewati ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Temuan keamanan baru ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Temuan keamanan baru ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Peringatan SLA",
-      "body": "{{findingTitle}} di {{repoFullName}}"
+      "title": "Peringatan SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Pelanggaran SLA",
-      "body": "{{findingTitle}} di {{repoFullName}}"
+      "title": "Pelanggaran SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

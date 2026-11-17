@@ -1,55 +1,25 @@
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
-import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
   invalidRequestResponse,
+  makeErrorReadable,
   malformedJsonResponse,
   modelDoesNotExistResponse,
-  wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPreferencesSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import {
-  gatewayUsageContextBase,
-  organizationProviderPreferences,
-  paidUsageRejection,
-  readGatewayBalance,
-  resolveGatewayCaller,
-} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
-import {
-  bareIpLiteral,
-  bouncerDecideTier,
-  rawClientIp,
-} from '@kilocode/web-shared/lib/bouncer/inference';
-import {
-  anonymousBouncerRequest,
-  signedInBouncerRequest,
-} from '@kilocode/web-shared/lib/bouncer/request';
-import {
-  emitApiMetricsForResponse,
-  emitGatewayApiMetrics,
-} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+  responseUsageContext,
+  rewriteBilledResponse_UsageEndpoint,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
@@ -57,205 +27,66 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type {
-  OrganizationPlan,
-  OrganizationSettings,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  handleUsageEndpointRequest,
+  type UsageEndpoint,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/usage-endpoint-pipeline';
 
-async function embeddingProxyRequest(params: {
-  body: Record<string, unknown>;
-  provider: Provider;
-  signal?: AbortSignal;
-}) {
-  const { body, provider, signal } = params;
-  const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
-  headers.set('Authorization', `Bearer ${provider.apiKey}`);
+const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
+  apiKind: 'embeddings',
+  spanPrefix: 'embedding',
+  path: '/embeddings',
+  durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+  defaultFeature: 'embeddings',
+  allowAnonymousFreeModels: true,
 
-  // OpenRouter needs these identification headers (same as upstreamRequest)
-  if (provider.type === 'openrouter' || provider.type === 'vercel') {
-    for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
-      headers.set(key, value);
+  // The body is parsed before auth: whether the model is free decides anonymous access.
+  async parse(request) {
+    const requestBodyText = await request.text();
+    debugSaveProxyRequest(requestBodyText);
+    let body: EmbeddingProxyRequest;
+    try {
+      body = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
+    } catch (e) {
+      return { kind: 'rejected', response: malformedJsonResponse(e) };
     }
-  }
 
-  const targetUrl = `${provider.apiUrl}/embeddings`;
+    if (typeof body.model !== 'string' || body.model.trim().length === 0) {
+      return { kind: 'rejected', response: modelDoesNotExistResponse() };
+    }
 
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+    if (body.input == null) {
+      return { kind: 'rejected', response: invalidRequestResponse() };
+    }
 
-  return await fetch(targetUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal: combinedSignal,
-  });
-}
+    const requestPrivacy = providerPreferencesSchema.optional().safeParse(body.provider);
+    if (!requestPrivacy.success) return { kind: 'rejected', response: invalidRequestResponse() };
 
-export async function handleEmbeddingsRequest(
-  request: NextRequest
-): Promise<NextResponseType<unknown>> {
-  const requestStartedAt = performance.now();
-  const requestStartedAtMs = Date.now();
+    return {
+      kind: 'parsed',
+      body,
+      model: body.model.trim(),
+      requestProvider: requestPrivacy.data,
+      promptInfo: extractEmbeddingPromptInfo(body),
+    };
+  },
 
-  // Parse body first to check model before auth (needed for anonymous access)
-  const requestBodyText = await request.text();
-  debugSaveProxyRequest(requestBodyText);
-  let requestBodyParsed: EmbeddingProxyRequest;
-  try {
-    requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
-  } catch (e) {
-    return malformedJsonResponse(e);
-  }
-
-  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
-    return modelDoesNotExistResponse();
-  }
-
-  if (requestBodyParsed.input == null) {
-    return invalidRequestResponse();
-  }
-
-  const requestPrivacy = providerPreferencesSchema.optional().safeParse(requestBodyParsed.provider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
-
-  const requestedModel = requestBodyParsed.model.trim();
-  const requestedModelLowerCased = requestedModel.toLowerCase();
-
-  const ipAddress = rawClientIp(request);
-  if (!ipAddress) {
-    return NextResponse.json(
-      {
-        error: 'Unable to determine client IP',
-        error_type: ProxyErrorType.missing_client_ip,
-      },
-      { status: 400 }
-    );
-  }
-
-  const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const caller = resolveGatewayCaller(
-    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
-    { allowAnonymous: isFreeModel(requestedModelLowerCased), ipAddress }
-  );
-  authSpan.end();
-  if (caller.kind === 'rejected') return caller.response;
-  const { user } = caller;
-  const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
-
-  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
-  if (await isCustomLlm(requestedModelLowerCased)) {
-    return modelDoesNotExistResponse();
-  }
-
-  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
-
-  const organizationDecision =
-    !isAnonymousContext(user) && organizationId
-      ? (
-          await resolveOrganizationMemberModelDecision({
-            organizationId,
-            kiloUserId: user.id,
-            modelId: requestedModelLowerCased,
-            fromDb: readDb,
-          })
-        ).decision
-      : undefined;
-
-  const { provider, userByok, isFree } = await getEmbeddingProvider(
-    requestedModelLowerCased,
-    user,
-    organizationId,
-    organizationDecision?.eligibleProviderRoutes
-  );
-
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
-
-  const bouncerIp = bareIpLiteral(ipAddress);
-  const ja4Digest = usageBase.context.fraudHeaders.http_x_vercel_ja4_digest;
-  const bouncer = isAnonymousContext(user)
-    ? anonymousBouncerRequest({ ip: bouncerIp, ja4Digest })
-    : signedInBouncerRequest({
-        ip: bouncerIp,
-        ja4Digest,
-        userId: user.id,
-        organizationId,
-        feature,
-      });
-
-  // Build usage context
-  const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
-
-  const bouncerUsageFields = {
-    occurredAt: new Date(requestStartedAtMs),
-    clientAttributed: usageBase.clientAttributed,
-    requestedLogprobs: false,
-    samples: null,
-    // Embedding input is not read by any bouncer rule, so no hash is computed.
-    promptSimHash: null,
-  };
-  const usageContext: MicrodollarUsageContext = {
-    ...usageBase.context,
-    api_kind: 'embeddings',
-    provider: provider.type,
-    requested_model: requestedModelLowerCased,
-    is_free: isFree,
-    promptInfo,
-    isStreaming: false,
-    user_byok: !!userByok,
-    has_tools: false,
-    feature,
-  };
-
-  setTag('ui.ai_model', requestBodyParsed.model);
-
-  let organizationDataCollection: OrganizationSettings['data_collection'];
-  let accountBalance = 0;
-  let accountPlan: OrganizationPlan | undefined;
-  let accountPayer: BalancePayer | undefined;
-
-  // Skip balance/org checks for anonymous users — they can only use free models
-  if (!isAnonymousContext(user)) {
-    const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
-    const { balance, settings, plan, payer } = account;
-    accountBalance = balance;
-    accountPlan = plan;
-    accountPayer = payer;
-    organizationDataCollection = settings?.data_collection;
-
-    const creditsBlocked = paidUsageRejection({
+  // The provider depends on the routes the organization member may use, so the decision is
+  // resolved first.
+  async resolveProvider({ requestedModelLowerCased, user, organizationId, organizationDecision }) {
+    const decision = await organizationDecision();
+    return await getEmbeddingProvider(
+      requestedModelLowerCased,
       user,
       organizationId,
-      account,
-      exempt: usageContext.is_free || !!userByok,
-    });
-    if (creditsBlocked) return await creditsBlocked();
+      decision?.eligibleProviderRoutes
+    );
+  },
 
-    const preferences = organizationProviderPreferences({
-      decision: organizationDecision,
-      settings,
-      requestProvider: requestPrivacy.data,
-    });
-    if (preferences.kind === 'rejected') return preferences.response;
-    if (preferences.provider) requestBodyParsed.provider = preferences.provider;
-  }
-
-  // The usage row reports the payer the balance check resolved: the root organization for an
-  // organization member.
-  usageContext.bouncer = await (bouncer.kind === 'signed-in'
-    ? bouncer.usage(bouncerUsageFields, accountPayer)
-    : bouncer.usage(bouncerUsageFields));
-
-  sentryRootSpan()?.setAttribute(
-    'embedding.time_to_request_start_ms',
-    performance.now() - requestStartedAt
-  );
-
-  const dimensionError = validateEmbeddingDimensions(requestBodyParsed, requestedModelLowerCased);
-  if (dimensionError) {
+  validate(body, requestedModelLowerCased) {
+    const dimensionError = validateEmbeddingDimensions(body, requestedModelLowerCased);
+    if (!dimensionError) return null;
     return NextResponse.json(
       {
         error: {
@@ -267,48 +98,35 @@ export async function handleEmbeddingsRequest(
       },
       { status: 400 }
     );
-  }
+  },
 
-  // The one decide for this request, awaited just before the upstream call within its 500 ms
-  // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise =
-    bouncer.kind === 'signed-in'
-      ? bouncer.decide({
-          tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
-          payer: accountPayer,
-        })
-      : bouncer.decide();
+  async buildUpstreamBody(input) {
+    const { body, provider, userByok, dataRegion } = input;
+    if (input.organizationProvider) body.provider = input.organizationProvider;
+    body.safety_identifier = input.safetyIdentifier;
 
-  const embeddingRequestSpan = startInactiveSpan({
-    name: 'embedding-request-start',
-    op: 'http.client',
-  });
+    // BYOK: for Vercel gateway, pass the user's key via providerOptions (same as chat completions).
+    const isVercelByok = !!userByok && userByok.length > 0 && provider.type === 'vercel';
+    if (isVercelByok) {
+      body.model = await mapModelIdToVercel(body.model);
+    }
 
-  // Always set the hashed identifier for upstream abuse attribution / safety scoping
-  requestBodyParsed.safety_identifier = generateProviderSpecificHash(user.id, provider);
+    const effectivePrivacy = getEffectiveProviderPrivacy(
+      input.requestProvider,
+      input.organizationSettings?.data_collection
+    );
+    const upstreamBody = buildUpstreamBody(
+      {
+        ...body,
+        ...(Object.keys(effectivePrivacy).length > 0 && {
+          provider: { ...body.provider, ...effectivePrivacy },
+        }),
+      },
+      input.requestedModelLowerCased
+    );
 
-  // BYOK: for Vercel gateway, pass the user's key via providerOptions (same as chat completions).
-  const effectiveProvider = provider;
+    if (!isVercelByok) return { body: upstreamBody };
 
-  if (userByok && userByok.length > 0 && provider.type === 'vercel') {
-    requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
-  }
-
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
-    organizationDataCollection
-  );
-  const upstreamBody = buildUpstreamBody(
-    {
-      ...requestBodyParsed,
-      ...(Object.keys(effectivePrivacy).length > 0 && {
-        provider: { ...requestBodyParsed.provider, ...effectivePrivacy },
-      }),
-    },
-    requestedModelLowerCased
-  );
-
-  if (userByok && userByok.length > 0 && provider.type === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};
     for (const byokEntry of userByok) {
       const [key, list] = getVercelInferenceProviderConfigForUserByok(byokEntry);
@@ -320,62 +138,53 @@ export async function handleEmbeddingsRequest(
         byok: byokProviders,
         zeroDataRetention: effectivePrivacy.zdr,
         disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
+        // Vercel fails the request instead of leaving the region, as on chat.
+        ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
       },
     };
-  }
+    return { body: upstreamBody, inferenceRegion: dataRegion };
+  },
 
-  const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
-  if (bouncerRejection) return bouncerRejection;
+  accountAndRespond: async upstream => {
+    const { response, usageContext, provider, userByok } = upstream;
+    // makeErrorReadable reads a clone, which must be taken before the accounting reads the body.
+    const errorResponse = response.status >= 400 ? response.clone() : null;
+    const accounting = countAndStoreEmbeddingUsage(
+      response,
+      usageContext,
+      upstream.requestSpan,
+      provider
+    );
+    emitApiMetricsForResponse(
+      upstream.metricsParams,
+      accounting.statsPromise,
+      upstream.requestStartedAt
+    );
 
-  const response = await embeddingProxyRequest({
-    body: upstreamBody,
-    provider: effectiveProvider,
-    signal: request.signal,
-  });
+    if (errorResponse) {
+      const readableError = await makeErrorReadable({
+        provider: provider.type,
+        requestedModel: upstream.requestedModelLowerCased,
+        request: null,
+        response: errorResponse,
+        userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+      });
+      if (readableError) return readableError;
+    }
 
-  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
+    // The accounting reads the body once; the response reports the cost the ledger row bills.
+    return await rewriteBilledResponse_UsageEndpoint({
+      response,
+      body: accounting.bodyPromise,
+      billed: accounting.pricedStatsPromise,
+      usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),
+      vercelRequestId: upstream.vercelRequestId,
+    });
+  },
+};
 
-  const metricsParams = {
-    kiloUserId: user.id,
-    organizationId,
-    isAnonymous: isAnonymousContext(user),
-    isStreaming: false,
-    userByok: !!userByok,
-    provider: provider.type,
-    requestedModel: requestedModelLowerCased,
-    resolvedModel: normalizeModelId(requestedModelLowerCased),
-    toolsAvailable: [],
-    toolsUsed: [],
-    ttfbMs,
-    statusCode: response.status,
-  };
-
-  usageContext.status_code = response.status;
-
-  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
-    response,
-    providerId: provider.type,
-    isUserByok: !!userByok,
-    user,
-    request: upstreamBody,
-    organizationId,
-    model: requestedModelLowerCased,
-  });
-  if (upstreamErrorResponse) {
-    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
-    return upstreamErrorResponse;
-  }
-
-  const clonedResponse = response.clone();
-  const accounting = countAndStoreEmbeddingUsage(
-    clonedResponse,
-    usageContext,
-    embeddingRequestSpan,
-    effectiveProvider
-  );
-  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
-
-  return wrapInSafeNextResponse(response);
+export async function handleEmbeddingsRequest(
+  request: NextRequest
+): Promise<NextResponseType<unknown>> {
+  return await handleUsageEndpointRequest(request, embeddingsEndpoint);
 }

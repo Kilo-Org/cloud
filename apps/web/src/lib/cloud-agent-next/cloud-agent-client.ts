@@ -1087,10 +1087,11 @@ export class CloudAgentNextClient {
     );
   }
 
-  async getBackgroundActivity(cloudAgentSessionId: string): Promise<BackgroundActivityInventory> {
-    return backgroundActivityInventorySchema.parse(
-      await this.client.getBackgroundActivity.query({ cloudAgentSessionId })
-    );
+  async getBackgroundActivity(
+    cloudAgentSessionId: string
+  ): Promise<BackgroundActivityInventory | null> {
+    const result = await this.client.getBackgroundActivity.query({ cloudAgentSessionId });
+    return result === null ? null : backgroundActivityInventorySchema.parse(result);
   }
 
   async getSessionToolPartDetail(

@@ -8,7 +8,10 @@ const noticeSchema = z.object({
   type: z.literal('synthetic'),
   text: z.string(),
   description: z.string(),
-  metadata: z.object({ source: z.string().min(1) }),
+  metadata: z.union([
+    z.object({ source: z.string().min(1) }),
+    z.object({ instruction: z.object({ paths: z.array(z.string().min(1)).min(1) }) }),
+  ]),
 });
 
 export function projectKilo2Notification(message: Kilo2Message): Kilo2Message {
@@ -19,7 +22,10 @@ export function projectKilo2Notification(message: Kilo2Message): Kilo2Message {
   const notice = noticeSchema.safeParse(message);
   if (
     !notice.success ||
-    ['callback', 'review', 'wakeup', 'queued', 'optimistic'].includes(notice.data.metadata.source)
+    ('source' in notice.data.metadata &&
+      ['callback', 'review', 'wakeup', 'queued', 'optimistic'].includes(
+        notice.data.metadata.source
+      ))
   )
     return message;
   return projectBackgroundResult(message, {

@@ -26,3 +26,18 @@ export const INSET_MIN_WIDTH_SHARE = 0.6;
  * usually) adding a hole under the header, as Profile's 31 dp did.
  */
 export const LEADING_GAP_MAX_DP = 24;
+/**
+ * The page gutter: the start-side inset every screen's content begins at — the
+ * header title, section labels, cards, row groups and a flat list row's content.
+ * Tailwind's spacing step is 3.5 dp (a 14 dp rem over four steps), so the
+ * contract's `px-4` lands exactly here.
+ */
+export const SCREEN_GUTTER_DP = 14;
+/**
+ * How far a measured start edge may sit from the gutter. Frames land within
+ * half a dp of their layout value (a safe-area inset is fractional, 47.5 on a
+ * landscape phone), and the nearest wrong inset is a half spacing step away —
+ * 10.5 or 17.5 — so 0.75 accepts sub-pixel rounding without admitting an
+ * off-grid inset such as 13 or 15.
+ */
+export const GUTTER_TOLERANCE_DP = 0.75;

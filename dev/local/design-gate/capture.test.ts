@@ -73,7 +73,7 @@ function dumpWith(
       {
         parent: 0,
         tag: 'Paragraph',
-        rect: [10, options.y ?? 50, 50, 20],
+        rect: [14, options.y ?? 50, 50, 20],
         text: options.text ?? 'Title',
         style: { opacity: options.opacity ?? 1, display: options.display ?? 'flex' },
       },

@@ -681,8 +681,8 @@ describe('tab debugger helpers', () => {
     const executeTool = (tool: unknown, args: unknown): Promise<string> => {
       expect(tool).toMatchObject({ name: 'double' });
       // Chromium 158 requires executeTool's second parameter to be an object;
-      // the injected function parses the JSON arguments text before the call.
-      expect(args).toEqual({ value: 21 });
+      // The injected function parses the JSON arguments text before the call.
+      expect(args).toStrictEqual({ value: 21 });
       return resolved('{"doubled":42}');
     };
     setModelContext({

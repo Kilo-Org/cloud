@@ -1112,18 +1112,18 @@ const runInjectedWebMcpExecute = async (
     }
 
     // `executeTool` takes the tool arguments as an object. Chromium 145
-    // accepted a JSON string and re-parsed it; Chromium 158 rejects a string
-    // with `parameter 2 is not of type 'object'`. Parse inline: only the
-    // function source reaches the MAIN world, so a module-scope helper would
-    // be undefined there. JSON.parse can yield a non-object (null, array,
-    // number), so fall back to an object wrapper instead of the raw value;
-    // a non-JSON string body is passed through verbatim.
-    let args: unknown;
+    // Accepted a JSON string there; Chromium 158 rejects it with `parameter 2
+    // Is not of type 'object'`. Parse inline because only the function source
+    // Reaches the MAIN world, so a module-scope helper would be undefined.
+    // JSON.parse can yield a non-object (null, array, number): wrap such a
+    // Result as { value: parsed } so the browser receives an object. A
+    // Non-JSON string body passes through verbatim.
+    let args: unknown = argumentsText;
     try {
       const parsed: unknown = JSON.parse(argumentsText);
       args = isPlainObject(parsed) ? parsed : { value: parsed };
     } catch {
-      args = argumentsText;
+      // Non-JSON arguments text stays verbatim.
     }
     return { ok: true, value: await modelContext.executeTool(tool, args) };
   } catch (error) {

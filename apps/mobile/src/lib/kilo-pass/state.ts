@@ -291,13 +291,18 @@ function joinKiloPassCardSentences(parts: readonly string[]): string {
   // by optional spaces (`. `, `। `, `۔ `, `。`), so its first non-space
   // character is the exact stop the join already writes between sentences.
   const terminator = joiner.trimStart().charAt(0);
+  // A terminatorless joiner would join parts with nothing, which no catalog
+  // declares; the empty-set guard keeps the code provably terminating.
+  if (terminator === '') {
+    return parts.join(joiner);
+  }
   const sentences = parts.map(part => part.trimEnd()).filter(part => part.length > 0);
 
   return sentences
     .map((sentence, index) => {
       let text = sentence;
       let closed = false;
-      while (terminator !== '' && text.endsWith(terminator)) {
+      while (text.endsWith(terminator)) {
         closed = true;
         text = text.slice(0, -1).trimEnd();
       }

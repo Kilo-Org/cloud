@@ -8,12 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
-import { DestinationOptionRow } from '@/components/destination-option-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -68,9 +70,7 @@ function SkeletonRows() {
   return (
     <View>
       {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-        <View key={i} className="py-1.5">
-          <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-        </View>
+        <RowSkeleton key={i} variant="session" subtitle last={i === SKELETON_COUNT - 1} />
       ))}
     </View>
   );
@@ -78,7 +78,7 @@ function SkeletonRows() {
 
 function EmptyMessage({ message }: { message: string }) {
   return (
-    <View className="items-center px-6 pt-8">
+    <View className="items-center px-4 pt-3">
       <Text className="text-center text-sm text-muted-foreground">{message}</Text>
     </View>
   );
@@ -96,6 +96,7 @@ function CliInstanceRows({
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 }) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   return (
     <View>
       <SessionListSectionHeader
@@ -107,20 +108,29 @@ function CliInstanceRows({
           displayCount: formatNumber(instances.length, i18n.language),
         })}
       />
-      {instances.map(row => (
-        <DestinationOptionRow
-          key={row.connectionId}
-          icon={Terminal}
-          title={row.name}
-          subtitle={row.projectName}
-          accessibilityLabel={t('share.newSessionOn', { name: row.name })}
-          disabled={instanceRowsDisabled}
-          busy={spawningConnectionId === row.connectionId}
-          onPress={() => {
-            onSpawnInstance(row);
-          }}
-        />
-      ))}
+      <View className="px-4 pt-3">
+        <RowGroup leadingTile>
+          {instances.map(row => (
+            <ConfigureRow
+              key={row.connectionId}
+              icon={Terminal}
+              title={row.name}
+              subtitle={row.projectName}
+              variant="action"
+              disabled={instanceRowsDisabled}
+              accessibilityLabel={t('share.newSessionOn', { name: row.name })}
+              trailing={
+                spawningConnectionId === row.connectionId ? (
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                ) : undefined
+              }
+              onPress={() => {
+                onSpawnInstance(row);
+              }}
+            />
+          ))}
+        </RowGroup>
+      </View>
     </View>
   );
 }
@@ -215,7 +225,7 @@ export function ShareDestinationList({
     );
   } else if (state.kind === 'non-retryable-classification') {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
       </CenteredState>
     );
@@ -226,7 +236,7 @@ export function ShareDestinationList({
     (state.kind === 'empty' || (state.kind === 'happy' && filtered.length === 0))
   ) {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">
           {state.kind === 'empty' ? state.message : t('share.noMatchingSessions')}
         </Text>

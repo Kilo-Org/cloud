@@ -95,7 +95,7 @@ export function RecommendedRow({
           <Text>{t('common.details')}</Text>
         </Button>
       )}
-    </View>
+    </Card>
   );
 }
 

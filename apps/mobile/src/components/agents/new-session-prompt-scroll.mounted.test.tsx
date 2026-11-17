@@ -20,6 +20,18 @@ import { resolveComposerTopFadeHeight } from '@/components/agents/new-session-pr
  */
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'android' | 'ios' }));
 
+/**
+ * The keyboard's motion progress. The field grows from its keyboard-closed
+ * floor to its keyboard-open floor with it, so a case that needs the field
+ * closed sets it to zero. The setup's mock is a fixed zero; this suite reads
+ * and sets the value.
+ */
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
+
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionProgress: () => keyboardMotion,
+}));
+
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 
 /**
@@ -170,11 +182,11 @@ function findPromptInput(renderer: ReactTestRenderer) {
   );
 }
 
-async function mountPrompt(): Promise<ReactTestRenderer> {
+async function mountPrompt(overrides: Partial<PromptProps> = {}): Promise<ReactTestRenderer> {
   const holder: { current?: ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
-    holder.current = TestRenderer.create(createElement(NewSessionPrompt, makeProps()));
+    holder.current = TestRenderer.create(createElement(NewSessionPrompt, makeProps(overrides)));
   });
   if (!holder.current) {
     throw new Error('prompt did not mount');
@@ -218,6 +230,43 @@ describe('NewSessionPrompt input scroll gate', () => {
 
     reportContentHeight(renderer, PROMPT_HEIGHT);
     expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('scrolls an Android draft taller than the keyboard-closed field', async () => {
+    platform.OS = 'android';
+    // A short window keeps the keyboard-closed field at one line while the open
+    // field reserves three lines.
+    keyboardMotion.value = 0;
+    const closedHeight = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1);
+    const renderer = await mountPrompt({
+      frameHeight: 640,
+      keyboardClosedFrameHeight: 640,
+      keyboardClosedLineCount: 1,
+      lineCount: 3,
+    });
+
+    // The field renders at its closed height while the keyboard is down.
+    const [, heightStyle] = findPromptInput(renderer).props.style as [
+      Record<string, unknown>,
+      { height: number },
+    ];
+    expect(heightStyle.height).toBe(closedHeight);
+    expect(findPromptInput(renderer).props.scrollEnabled).toBe(false);
+
+    // A two-line draft overflows the closed field, so a drag over it scrolls the
+    // draft; gating on the three-line open height left the second line
+    // unreachable until the keyboard landed.
+    reportContentHeight(
+      renderer,
+      resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 2)
+    );
+    expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
+
+    // The draft fits the closed field again: the field goes back to its top.
+    reportContentHeight(renderer, closedHeight - 1);
+    expect(findPromptInput(renderer).props.scrollEnabled).toBe(false);
 
     renderer.unmount();
   });

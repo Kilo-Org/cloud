@@ -198,7 +198,7 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   {
     area: 'providersAndModels',
     icon: Cpu,
-    href: '/(app)/(tabs)/(3_profile)/organization/providers-and-models',
+    href: () => '/(app)/(tabs)/(3_profile)/organization/providers-and-models',
     visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
   },
   // Guardrails: owner/admin and the organization's Kilo Encrypt setting, which
@@ -206,7 +206,7 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   {
     area: 'guardrails',
     icon: Shield,
-    href: '/(app)/(tabs)/(3_profile)/organization/guardrails',
+    href: () => '/(app)/(tabs)/(3_profile)/organization/guardrails',
     visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled === true,
   },
   // BYOK: the sidebar's billing-role gate, and the app's own provider-keys

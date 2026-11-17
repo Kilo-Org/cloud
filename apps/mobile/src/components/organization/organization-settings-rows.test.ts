@@ -155,6 +155,7 @@ describe('visibleInAppSettingsRows', () => {
         'auditLogs',
         'providersAndModels',
         'guardrails',
+        'byok',
       ]);
     }
   });

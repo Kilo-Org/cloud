@@ -73,6 +73,13 @@ const UNFENCED_SELECTION_CONTEXT: ModelPickerSelectionScopeContextValue = {
 
 const ModelPickerSelectionScopeContext = createContext(UNFENCED_SELECTION_CONTEXT);
 
+/**
+ * The selection check's own square, and therefore the width every row reserves
+ * for it. The column and the glyph read the same number, so a row that gains a
+ * check never moves the model name or the favourite control beside it.
+ */
+const CHECK_COLUMN_DP = 18;
+
 export function ModelPickerSelectionScopeProvider({
   children,
   selectionScope,
@@ -169,14 +176,16 @@ export function ModelSelector({
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
         {/* The bar stands in for the label line and takes that line's own box:
-            `text-sm` sets 17.5 dp of height, and the default model's label
-            measured 75.81 dp on the composer, so the pill is the size it will
-            have once that model arrives. `bg-muted-soft` for the reason recorded
-            on the repository loading row: the default `bg-skeleton-fill` equals
-            this pill's `bg-secondary` in the light palette and would paint
-            nothing. The wrapper keeps the busy label for assistive tech without a
-            text node that reads as a resolved value. */}
-        <Skeleton className="h-[17.5px] w-[75.5px] bg-muted-soft" />
+            `text-sm` sets one 17.5 dp line, which is the scale's `h-5`, so the
+            pill is the height it will have once the model arrives. Its width is
+            the nearest spacing step rather than the arriving label's measured
+            width: that width belongs to the label, and a pinned bar would be a
+            pixel value the contract does not allow. `bg-muted-soft` for the
+            reason recorded on the repository loading row: the default
+            `bg-skeleton-fill` equals this pill's `bg-secondary` in the light
+            palette and would paint nothing. The wrapper keeps the busy label for
+            assistive tech without a text node that reads as a resolved value. */}
+        <Skeleton className="h-5 w-20 bg-muted-soft" />
         <View className="opacity-50">
           <ChevronDown size={14} color={colors.mutedForeground} />
         </View>
@@ -420,8 +429,13 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={selectionCheckColor(colors, option.unavailable)} /> : null}
+        <View
+          className="items-center justify-center"
+          style={{ width: CHECK_COLUMN_DP }}
+        >
+          {selected ? (
+            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
+          ) : null}
         </View>
         <Pressable
           onPress={() => {

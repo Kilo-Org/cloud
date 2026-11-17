@@ -192,7 +192,7 @@ export function ChatComposerInputRow({
         <View
           className={cn(
             COMPOSER_CONTROL_GAP_CLASS,
-            'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            'flex-1 overflow-hidden rounded-xl border border-border bg-card',
             !inputEditable && 'opacity-50'
           )}
           onLayout={onInputLayout}

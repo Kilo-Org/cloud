@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
-import { resolveHeaderEyebrow, ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -74,7 +74,12 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   // only when the session had a git URL. The line is reserved while the read can
   // still answer with one and dropped when it settled without, so a session with
   // no repository centres its title alone.
-  const eyebrow = resolveHeaderEyebrow(repoLabel, query.isPending);
+  let eyebrow: HeaderEyebrow = { kind: 'none' };
+  if (repoLabel !== null) {
+    eyebrow = { kind: 'ready', text: repoLabel };
+  } else if (query.isPending) {
+    eyebrow = { kind: 'loading' };
+  }
 
   let body: ReactNode = null;
   if (query.isError) {

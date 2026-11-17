@@ -270,21 +270,6 @@ export type HeaderEyebrow =
   | { readonly kind: 'none' };
 
 /**
- * Resolve a read-driven eyebrow from the label the read has and whether it can
- * still answer: a label fills the line, a read still pending reserves it, and a
- * read that settled without a label drops it.
- */
-export function resolveHeaderEyebrow(
-  text: string | null | undefined,
-  pending: boolean
-): HeaderEyebrow {
-  if (text) {
-    return { kind: 'ready', text };
-  }
-  return pending ? { kind: 'loading' } : { kind: 'none' };
-}
-
-/**
  * Height of the reserved title box for `reserveTitleSpace`, one title line
  * height per line the title can paint: the default 18px title's Tailwind line
  * height is `1.75rem`, the large 30px variant's is 36px. Class names must be

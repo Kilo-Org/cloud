@@ -1,5 +1,5 @@
 import { fetchNativeSnapshot, projectNativeSnapshot } from './native-sync-snapshot';
-import { readKilo2Messages, kilo2ToolFileId } from './kilo2-source-messages';
+import { readKilo2Messages, kilo2ToolFileId, kilo2AssetKey } from './kilo2-source-messages';
 import {
   kilo2MessageSchema,
   kilo2PartId,
@@ -108,6 +108,93 @@ function conflict(path: string): Step {
     status: 409,
     body: { error: { code: 'revision_changed', message: 'Restart the read' } },
   };
+}
+
+type BlobFetch = jest.Mock<Promise<{ body: unknown; ok: boolean; code?: string }>, [string]>;
+
+/**
+ * A fetch double for a single-page snapshot with blob-backed entities. Each
+ * distinct blob stays gated on its own release, so tests observe in-flight
+ * counts and resume reads one at a time. Behavior is read-only.
+ */
+function gatedBlobFetch(options: {
+  blobs: { hash: string; body?: unknown; failWith?: { code: string; message: string } }[];
+  onBlobAsked?: (path: string) => void;
+  entities?: unknown[];
+}) {
+  const waiting = new Map<string, () => void>();
+  const asked = new Set<string>();
+  const inFlight = new Set<string>();
+  let peak = 0;
+  // The first ask of each blob waits for its release so the test can observe
+  // the in-flight window. A repeat ask resolves without waiting: bodies are
+  // content addressed, so a refetched revision read answers at once (a failed
+  // blob succeeds there, as the fresh revision's replacement body would).
+  const fetch: BlobFetch = jest.fn(async (path: string) => {
+    const blob = options.blobs.find(entry => path === `${sessionPath}/blobs/${entry.hash}`);
+    if (!blob) {
+      if (path === sessionPath) return { body: state(), ok: true };
+      return { body: page(options.entities ?? defaultBlobEntities(options.blobs)), ok: true };
+    }
+    options.onBlobAsked?.(path);
+    if (asked.has(path)) {
+      return { body: blob.body ?? null, ok: true };
+    }
+    asked.add(path);
+    inFlight.add(path);
+    peak = Math.max(peak, inFlight.size);
+    return new Promise<{ body: unknown; ok: boolean; code?: string }>(resolve => {
+      waiting.set(path, () => {
+        inFlight.delete(path);
+        resolve(
+          blob.failWith
+            ? { body: null, ok: false, code: blob.failWith.code }
+            : { body: blob.body ?? null, ok: true }
+        );
+      });
+    });
+  });
+  const request = async <T>(path: string): Promise<T> => {
+    const response = await fetch(path);
+    if (!response.ok) {
+      throw Object.assign(new Error('Gated blob failure'), { code: response.code });
+    }
+    return response.body as T;
+  };
+  return {
+    request,
+    fetch,
+    release: (hash: string) => waiting.get(`${sessionPath}/blobs/${hash}`)?.(),
+    releaseAll: () => [...waiting.values()].forEach(release => release()),
+    // Release every wave as soon as it asks, until all blob reads resolve.
+    drainAll: async (): Promise<void> => {
+      while (asked.size < options.blobs.length || inFlight.size > 0) {
+        for (const release of [...waiting.values()]) release();
+        await until(() => waiting.size > 0 || asked.size >= options.blobs.length);
+      }
+    },
+    inFlight: () => inFlight.size,
+    peak: () => peak,
+  };
+}
+
+function defaultBlobEntities(blobs: { hash: string; bytes?: number }[]) {
+  return blobs.map((entry, index) => ({
+    kind: 'instruction-blob',
+    id: `instruction-${index}`,
+    revision: 4,
+    blob: { hash: entry.hash, bytes: entry.bytes ?? 8 },
+  }));
+}
+
+function hashOf(index: number): string {
+  // Blob hashes must be lowercase hex per the wire schema.
+  return (index % 16).toString(16).repeat(64);
+}
+
+/** Yield microtasks until `done()` holds or the effort bound is reached. */
+async function until(done: () => boolean): Promise<void> {
+  for (let ticks = 0; ticks < 500 && !done(); ticks++) await Promise.resolve();
 }
 
 describe('fetchNativeSnapshot', () => {
@@ -543,6 +630,109 @@ describe('fetchNativeSnapshot', () => {
     ]);
     await expect(fetchNativeSnapshot(request, sessionID)).rejects.toThrow('cursor did not advance');
     expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('reads distinct entity blobs concurrently within the bounded window', async () => {
+    const blobs = Array.from({ length: 10 }, (_, index) => ({
+      hash: hashOf(index),
+      body: { text: `blob-${index}` },
+    }));
+    const gated = gatedBlobFetch({ blobs });
+    const pending = fetchNativeSnapshot(gated.request, sessionID);
+    // The read races ahead in 4-wide windows; the gate refills as each wave
+    // resolves. Every window saturates the bound, so the request order stays
+    // first-appearance order without serializing.
+    const saturated = until(() => gated.inFlight() === 4);
+    await saturated;
+    await gated.drainAll();
+    const result = await pending;
+    expect(gated.peak()).toBe(4);
+    expect(result.messages).toEqual([]);
+    // Each distinct blob fetched exactly once, in first-appearance order.
+    const blobCalls = gated.fetch.mock.calls.filter(([path]) =>
+      path.startsWith(`${sessionPath}/blobs/`)
+    );
+    expect(blobCalls).toHaveLength(10);
+    expect(blobCalls.map(([path]) => path)).toEqual(
+      blobs.map(entry => `${sessionPath}/blobs/${entry.hash}`)
+    );
+  });
+
+  it('reuses settled entity blob reads across a revision restart', async () => {
+    const kept = { hash: hashOf(0), body: { text: 'kept' } };
+    const reclaimed = {
+      hash: hashOf(1),
+      failWith: { code: 'blob_not_found', message: 'Superseded' },
+    };
+    const gated = gatedBlobFetch({ blobs: [kept, reclaimed] });
+    const pending = fetchNativeSnapshot(gated.request, sessionID);
+    // Drain the window once: kept resolves, reclaimed fails its read.
+    await until(() => gated.inFlight() === 2);
+    gated.release(hashOf(0));
+    await until(() => gated.inFlight() === 1);
+    gated.release(hashOf(1));
+    const result = await pending;
+    // Restart refetched state, page, and only the reclaimed blob.
+    expect(gated.fetch.mock.calls.filter(([path]) => path === sessionPath)).toHaveLength(2);
+    const keptCalls = gated.fetch.mock.calls.filter(
+      ([path]) => path === `${sessionPath}/blobs/${kept.hash}`
+    );
+    expect(keptCalls).toHaveLength(1);
+    expect(gated.peak()).toBeGreaterThan(1);
+    expect(result.messages).toEqual([]);
+  });
+
+  it('reuses settled attachment blob reads across an asset restart', async () => {
+    const keptHash = hashOf(0);
+    const failingHash = hashOf(1);
+    const message = native('msg_blob_race', 'user', {
+      files: [
+        { mime: 'image/png', uri: `media:${keptHash}`, source: { type: 'inline' } },
+        { mime: 'image/png', uri: `media:${failingHash}`, source: { type: 'inline' } },
+      ],
+    });
+    const entities = [
+      entity('message', message.id, { seq: 0, message }),
+      entity('asset', 'race-asset-kept', {
+        entity: { kind: 'message', id: message.id },
+        pointer: '/message/files/0',
+        reference: `media:${keptHash}`,
+        mime: 'image/png',
+        blob: { hash: keptHash, bytes: 3 },
+      }),
+      entity('asset', 'race-asset-reclaimed', {
+        entity: { kind: 'message', id: message.id },
+        pointer: '/message/files/1',
+        reference: `media:${failingHash}`,
+        mime: 'image/png',
+        blob: { hash: failingHash, bytes: 3 },
+      }),
+    ];
+    const { request, fetch } = fakeFetch([
+      { path: sessionPath, body: state() },
+      { path: pagePath(), body: page(entities) },
+      { path: sessionPath, body: state(5, 21) },
+      { path: pagePath(5), body: page(entities, null, 5, 21) },
+    ]);
+    const readAsset = jest.fn(
+      async (path: string, _advertisedBytes: number, _init?: RequestInit) => {
+        if (path === `${sessionPath}/blobs/${failingHash}` && readAsset.mock.calls.length === 2) {
+          throw Object.assign(new Error('Reclaimed'), { code: 'blob_not_found' });
+        }
+        return new Uint8Array([1, 2, 3]).buffer;
+      }
+    );
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    const keptKey = kilo2AssetKey(kilo2PartId(message.id, 1), `media:${keptHash}`, 'image/png');
+    const failingKey = kilo2AssetKey(kilo2PartId(message.id, 2), `media:${failingHash}`, 'image/png');
+    expect(snapshot.assetURLs?.[keptKey]).toBe('data:image/png;base64,AQID');
+    expect(snapshot.assetURLs?.[failingKey]).toBe('data:image/png;base64,AQID');
+    // The settled kept read in attempt 1 was not repeated after the restart.
+    const keptCalls = readAsset.mock.calls.filter(
+      ([path]) => path === `${sessionPath}/blobs/${keptHash}`
+    );
+    expect(keptCalls).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(4);
   });
 });
 

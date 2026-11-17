@@ -216,6 +216,72 @@ test('an empty SNOWFLAKE_ACCOUNT_HOST above an existing section is rewired', asy
   }
 });
 
+test('the last host definition outside the section decides, both orders', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    // dotenv keeps the last definition of a duplicated key. A real host above
+    // an emptied placeholder is unset for the app: wiring proceeds, the
+    // section is not removed.
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      'SNOWFLAKE_ACCOUNT_HOST=real.example:443\nSNOWFLAKE_ACCOUNT_HOST=\n'
+    );
+    assert.deepEqual(await fixture.wire(), { status: 'inserted' });
+    let content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.includes(SECTION_START));
+    assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:\d+$/m);
+
+    // The reversed order: the placeholder comes first and the real host keeps
+    // it after — the last definition is the app's warehouse. The wire inserts
+    // its section below the last definition (dotenv keeps the last, so the
+    // section's entry must not shadow it), and the guard still sees the real
+    // host outside the section on later wires: the file keeps the real host
+    // and the section, because `wireEnvLocal` re-inserts under it every time.
+    fixture.restore();
+    const second = wireEnvLocalFixture(undefined);
+    try {
+      fs.writeFileSync(second.envLocalPath, 'SNOWFLAKE_ACCOUNT_HOST=real.example:443\n');
+      await second.wire();
+      const existing = fs.readFileSync(second.envLocalPath, 'utf8');
+      fs.writeFileSync(
+        second.envLocalPath,
+        `SNOWFLAKE_ACCOUNT_HOST=\n${existing}SNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
+      );
+      assert.deepEqual(await second.wire(), {
+        status: 'keptRealWarehouse',
+        removedSection: true,
+      });
+      const content = fs.readFileSync(second.envLocalPath, 'utf8');
+      assert.equal(content.includes(SECTION_START), false);
+      assert.match(content, /SNOWFLAKE_ACCOUNT_HOST=real\.example:443/);
+    } finally {
+      second.restore();
+    }
+
+    // A commented value (`KEY= # comment`) strips to empty: the same
+    // unset-after-real case.
+    fixture.restore();
+    const third = wireEnvLocalFixture(undefined);
+    try {
+      fs.writeFileSync(
+        third.envLocalPath,
+        'SNOWFLAKE_ACCOUNT_HOST=real.example:443\nSNOWFLAKE_ACCOUNT_HOST= # unset\n'
+      );
+      assert.deepEqual(await third.wire(), { status: 'inserted' });
+      content = fs.readFileSync(third.envLocalPath, 'utf8');
+      assert.ok(content.includes(SECTION_START));
+    } finally {
+      third.restore();
+    }
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
 test('the bundle carries the mock certificate and a CA the file already trusted', async () => {
   const fixture = wireEnvLocalFixture(undefined);
   const ambient = process.env.NODE_EXTRA_CA_CERTS;
@@ -474,8 +540,10 @@ test('removal restores the value the last wire displaced, rotation included', as
 
     // Wire 1 displaced ca-a (the line sits above where the section goes);
     // wire 2 displaced the bundle line with ca-b; wire 3 displaced ca-b with
-    // ca-a again. The newest record is exactly ca-a — the last value this
-    // line displaced — not the first one it ever displaced, and not ca-b.
+    // ca-a again — the section stays in place, so the third wire rewrote it
+    // and mergeCaSources had to move the re-folded ca-a record to the end.
+    // The newest record is exactly ca-a — the last value this line displaced —
+    // not the first one it ever displaced, and not ca-b.
     fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caAPath}\n`);
     await fixture.wire();
     const content1 = fs.readFileSync(fixture.envLocalPath, 'utf8');
@@ -484,11 +552,14 @@ test('removal restores the value the last wire displaced, rotation included', as
       `NODE_EXTRA_CA_CERTS=${caBPath}\n${content1.slice(content1.indexOf(SECTION_START))}`
     );
     await fixture.wire();
-    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caAPath}\n`);
+    // Wire 3: swap the line's value in place, above the section wire 2 kept.
     const content2 = fs.readFileSync(fixture.envLocalPath, 'utf8');
     fs.writeFileSync(
       fixture.envLocalPath,
-      `NODE_EXTRA_CA_CERTS=${caAPath}\n${content2.slice(content2.indexOf(SECTION_START))}`
+      content2.replace(
+        `NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}`,
+        `NODE_EXTRA_CA_CERTS=${caAPath}`
+      )
     );
     await fixture.wire();
     assert.ok(
@@ -779,6 +850,9 @@ test('a wire replaces the section after a developer line the legacy writer left'
 for (const [separatorNote, separator] of [
   ['a heading comment', '\n# my real warehouse\n'],
   ['nothing at all', '\n'],
+  // Two blanks in a row inside the legacy run: a blank carries no key, so it
+  // must not end the owned range (a second blank used to trip the dedup).
+  ['a second blank line', '\n\n'],
 ] as const) {
   test(`a legacy section keeps a real warehouse block appended after it (${separatorNote})`, async () => {
     const fixture = wireEnvLocalFixture(
@@ -801,12 +875,13 @@ for (const [separatorNote, separator] of [
       });
 
       // The legacy block goes, the real one stays, and the file keeps the shape
-      // it had around them.
+      // it had around them (the separator's lines are the developer's).
+      const separatorLines = separator.split('\n').filter(line => line !== '');
       assert.equal(
         fs.readFileSync(fixture.envLocalPath, 'utf8'),
         [
           'NEXTAUTH_SECRET=dev',
-          ...(separator === '\n' ? [] : ['# my real warehouse']),
+          ...separatorLines,
           'SNOWFLAKE_ACCOUNT_HOST=real.example:443',
           'SNOWFLAKE_USERNAME=fred',
           '',

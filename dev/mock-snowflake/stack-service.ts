@@ -112,7 +112,13 @@ function findManagedSection(lines: string[]): LineRange | undefined {
   let end = start + 1;
   while (end < lines.length) {
     const line = lines[end] ?? '';
-    if (line.trim() === '' || line.startsWith(CA_SOURCE_PREFIX) || line.startsWith(`${CA_KEY}=`)) {
+    if (line.trim() === '') {
+      // A blank carries no key: it must not join the dedup set, or a second
+      // blank would end the owned range and leave a writer line outside it.
+      end++;
+      continue;
+    }
+    if (line.startsWith(CA_SOURCE_PREFIX) || line.startsWith(`${CA_KEY}=`)) {
       const key = keyOf(line);
       if (keys.has(key)) break;
       keys.add(key);
@@ -372,10 +378,16 @@ export function wireEnvLocal(): WireResult {
 
   // An empty value is no warehouse: `getMissingSnowflakeEnvKeys` in the app
   // filters on falsy, so `SNOWFLAKE_ACCOUNT_HOST=` reports the key as missing
-  // exactly like an absent one. Kept only when something real is set.
-  const outsideHost = parseEnvEntries(outsideSection.join('\n')).find(
-    entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST' && entry.value !== ''
-  );
+  // exactly like an absent one. The definition that counts is the last one
+  // outside the section — dotenv keeps the last definition of a duplicated
+  // key — so a real host above an emptied placeholder is unset for the app
+  // too, and a placeholder above a real host still wins as a warehouse.
+  const outsideEntries = parseEnvEntries(outsideSection.join('\n'));
+  const lastOutsideHost = [...outsideEntries]
+    .reverse()
+    .find(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST');
+  const outsideHost =
+    lastOutsideHost !== undefined && lastOutsideHost.value !== '' ? lastOutsideHost : undefined;
   if (outsideHost !== undefined) {
     // The bundle still gets written: `serviceCommand` prefixes the nextjs
     // command with `NODE_EXTRA_CA_CERTS=<bundle>` whenever the mock is in the

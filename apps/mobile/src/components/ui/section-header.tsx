@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
-import { Skeleton } from '@/components/ui/skeleton';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import {
   SECTION_ACTION_BOX_CLASS,
@@ -17,12 +16,7 @@ import { cn } from '@/lib/utils';
  * action box, so every section header has one height and keeps one gap to the
  * block above it.
  */
-const LABEL_AIR_CLASS = 'min-h-[28px]';
-
-/** The label's line, held by the loading twin so the swap to the real label cannot move the block. */
-const SKELETON_LABEL_BAR_CLASS = 'h-3.5 w-16 max-w-full shrink rounded bg-muted-soft';
-/** The action's box, at the frame the text action itself renders. */
-const SKELETON_ACTION_BAR_CLASS = 'w-12 shrink-0 rounded bg-muted-soft';
+export const SECTION_LABEL_AIR_CLASS = 'min-h-[28px]';
 
 type SectionHeaderProps = {
   label: string;
@@ -62,7 +56,7 @@ type SectionHeaderProps = {
    */
   notice?: ReactNode;
   /**
-   * Puts the label at the bottom of {@link LABEL_AIR_CLASS} and renders the
+   * Puts the label at the bottom of {@link SECTION_LABEL_AIR_CLASS} and renders the
    * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
    * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
    * slop. A row with an action and a row without one then have the same height,
@@ -136,7 +130,7 @@ export function SectionHeader({
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       {reserveLabelAir ? (
-        <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
+        <View className={cn('flex-col justify-end', !notice && 'grow', SECTION_LABEL_AIR_CLASS)}>
           {labelNode}
         </View>
       ) : (
@@ -206,56 +200,6 @@ export function SectionHeader({
           </Text>
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-type SectionHeaderSkeletonProps = {
-  /**
-   * Reserve the trailing action's box, so a section that loads its action later
-   * does not grow by the action's frame when the real header paints.
-   */
-  action?: boolean;
-  /** Mirror a header that reserves its label air (`reserveLabelAir`). */
-  reserveLabelAir?: boolean;
-  /** Mirror a header that draws the page gutter (`inset`). */
-  inset?: boolean;
-};
-
-/**
- * The loading shape of a section header: the label's line, and the action's box
- * when the header will carry one. It renders on the header's own row classes,
- * so it holds exactly the height the real header takes with or without an
- * action and the swap cannot move the block below it.
- */
-export function SectionHeaderSkeleton({
-  action = false,
-  reserveLabelAir = false,
-  inset = false,
-}: Readonly<SectionHeaderSkeletonProps>) {
-  const labelBar = <Skeleton className={SKELETON_LABEL_BAR_CLASS} />;
-  const actionBar = action ? (
-    <Skeleton
-      className={cn(
-        reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
-        SKELETON_ACTION_BAR_CLASS
-      )}
-    />
-  ) : null;
-  return (
-    <View
-      className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2',
-        inset && SCREEN_GUTTER_CLASS,
-        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
-      )}
-    >
-      {reserveLabelAir ? (
-        <View className={cn('grow flex-col justify-end', LABEL_AIR_CLASS)}>{labelBar}</View>
-      ) : (
-        <View className="min-w-0 grow">{labelBar}</View>
-      )}
-      {actionBar}
     </View>
   );
 }

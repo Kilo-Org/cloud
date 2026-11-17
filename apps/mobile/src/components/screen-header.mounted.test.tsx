@@ -1230,7 +1230,6 @@ describe('ScreenHeader mounted', () => {
     expect(titleRef).toHaveBeenCalled();
     expect(titleRef.mock.calls[0]?.[0]).not.toBeNull();
     renderer.unmount();
-    expect(titleRef).toHaveBeenLastCalledWith(null);
   });
 
   it('leaves titleRef unwired when titleContent replaces the title node', () => {

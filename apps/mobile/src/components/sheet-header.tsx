@@ -1,8 +1,7 @@
 import { type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInstance, View } from 'react-native';
+import { ActivityIndicator, Pressable, type TextInstance, View } from 'react-native';
 
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Share, X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form-sheet';
@@ -108,9 +107,13 @@ export function SheetHeader({
         }
       : undefined;
   // The busy mark takes the accent the label it replaces carried, so the frame
-  // reads as the same control still working.
+  // reads as the same control still working. It is the platform indicator rather
+  // than the animated wrapper: the wrapper loads Reanimated and the motion
+  // policy, and every sheet that paints a header would pay for that import to
+  // show a mark. The control announces `busy` itself, so the reduced-motion
+  // reading does not depend on the spinner.
   const doneMark = doneBusy ? (
-    <ActivityIndicator accessible={false} size="small" color={colors.primary} />
+    <ActivityIndicator size="small" color={colors.primary} />
   ) : closeOnly ? (
     <X size={20} color={doneUnavailable ? colors.mutedForeground : colors.foreground} />
   ) : (

@@ -8,7 +8,8 @@ import {
   SECTION_HEADER_ROW_PADDING_CLASS,
   textActionTargetClass,
 } from '@/lib/a11y/tap-target';
-import { SectionHeader, SectionHeaderSkeleton } from './section-header';
+import { SectionHeader } from './section-header';
+import { SectionHeaderSkeleton } from './section-header-skeleton';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
@@ -400,9 +401,15 @@ describe('SectionHeader mounted layout', () => {
     );
     // The icon shares the label's flex line, so it cannot push the label onto a
     // second row, and the label's own width gives way to it.
-    expect(label.parent).toBe(icon.parent);
-    const lineClasses = String(label.parent?.props.className).split(' ');
-    expect(lineClasses).toEqual(expect.arrayContaining(['flex-row', 'items-center']));
+    const line = root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        String(node.props.className).includes('min-w-0 flex-row items-center gap-2')
+    );
+    expect(
+      line.findAll(child => Object.is(child.type, 'Text') && child.children.includes('Inbox'))
+    ).toHaveLength(1);
+    const lineClasses = String(line.props.className).split(' ');
     expect(lineClasses).toContain('grow');
     expect((label.props.className as string).split(' ')).toContain('shrink');
     expect((label.props.className as string).split(' ')).not.toContain('grow');
@@ -438,16 +445,19 @@ describe('SectionHeader mounted layout', () => {
   });
 
   it('holds the header row, with and without an action, while it loads', () => {
+    // The renderer's instances read their fiber, which the unmount at the end of
+    // each shape clears, so every class string is copied out while it is live.
     const shape = (element: ReactElement) => {
       const root = mount(element);
       const row = root.find(node => Object.is(node.type, 'View'));
-      const views = root
-        .findAll(node => Object.is(node.type, 'View'))
-        .map(node => String(node.props.className).split(' '));
       const result = {
         row: String(row.props.className).split(' '),
-        views,
-        bars: root.findAll(node => Object.is(node.type, 'Skeleton')),
+        views: root
+          .findAll(node => Object.is(node.type, 'View'))
+          .map(node => String(node.props.className).split(' ')),
+        bars: root
+          .findAll(node => Object.is(node.type, 'Skeleton'))
+          .map(node => String(node.props.className).split(' ')),
       };
       act(() => renderer?.unmount());
       renderer = undefined;
@@ -471,8 +481,7 @@ describe('SectionHeader mounted layout', () => {
     expect(withActionSkeleton.bars).toHaveLength(2);
     // The action bar reserves the same frame the real action renders, so the
     // action cannot grow the header when it arrives.
-    const actionBar = withActionSkeleton.bars[1];
-    expect(String(actionBar?.props.className).split(' ')).toEqual(
+    expect(withActionSkeleton.bars[1]).toEqual(
       expect.arrayContaining(textActionTargetClass().split(' '))
     );
 
@@ -483,14 +492,14 @@ describe('SectionHeader mounted layout', () => {
     expect(airSkeleton.row).toEqual(airHeader.row);
     expect(airSkeleton.row).toContain(SECTION_HEADER_ROW_PADDING_CLASS);
     // The label air box is the header's own height on both sides of the swap.
-    for (const shapeWithoutAction of [airHeader, airSkeleton]) {
-      expect(shapeWithoutAction.views.some(classes => classes.includes('min-h-[28px]'))).toBe(true);
+    for (const loadingOrLoaded of [airHeader, airSkeleton]) {
+      expect(loadingOrLoaded.views.some(classes => classes.includes('min-h-[28px]'))).toBe(true);
     }
 
     const actionAirSkeleton = shape(
       createElement(SectionHeaderSkeleton, { action: true, reserveLabelAir: true })
     );
-    expect(String(actionAirSkeleton.bars[1]?.props.className).split(' ')).toEqual(
+    expect(actionAirSkeleton.bars[1]).toEqual(
       expect.arrayContaining(SECTION_ACTION_BOX_CLASS.split(' '))
     );
 

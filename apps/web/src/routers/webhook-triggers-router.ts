@@ -1,5 +1,9 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
-import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
@@ -14,6 +18,7 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
+import pLimit from 'p-limit';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
@@ -60,6 +65,10 @@ import {
 } from '@/lib/webhook-agent/webhook-agent-client';
 
 const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
+
+// `list` reads the worker once per row to answer editability. The cap keeps a
+// large organization's list from turning one query into an unbounded burst.
+const TRIGGER_EDITABILITY_CONCURRENCY = 4;
 
 export const WebhookTriggerCreateInput = z
   .object({
@@ -352,6 +361,28 @@ function triggerEditability(
   return { canEdit, canEditReason: canEdit ? null : creatorRunLock ? 'creator_run' : 'role' };
 }
 
+/**
+ * The viewer's role for a trigger surface: the write role they hold when they
+ * hold one, otherwise their highest-priority role for read access. `list` must
+ * resolve this exactly as `get` does, or a row's write control disagrees with
+ * the screen it opens — a child-org member who also inherits a parent-org
+ * billing manager role resolves to `billing_manager` unfiltered, which no
+ * trigger write accepts.
+ */
+async function resolveTriggerViewerRole(
+  ctx: TRPCContext,
+  organizationId: string
+): Promise<OrganizationRole> {
+  try {
+    return await ensureOrganizationAccess(ctx, organizationId, TRIGGER_WRITE_ROLES);
+  } catch (error) {
+    if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
+      throw error;
+    }
+    return ensureOrganizationAccess(ctx, organizationId);
+  }
+}
+
 async function getOrganizationTriggerExecutionUserId(
   organizationId: string,
   triggerId: string,
@@ -553,7 +584,9 @@ export const webhookTriggersRouter = createTRPCRouter({
    * `withEditability` also answers, per organization row, whether this viewer
    * may write it — the question `get` answers for one trigger. That answer
    * depends on the execution identity the worker holds for a run-as-creator
-   * trigger, so it costs one worker read per row; a surface that renders a
+   * trigger, so it costs one worker read per row, capped and isolated per row:
+   * a worker failure leaves that row at what the viewer's role alone allows
+   * rather than failing a list the database can serve. A surface that renders a
    * write control per row asks for it and the web list, which does not, keeps
    * its single database read. Without the flag an organization row reports
    * `canEdit: null` (unknown), never a guessed `false`.
@@ -573,7 +606,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       // Verify org membership if organizationId provided
       let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Query PostgreSQL with ownership + optional target type filter
@@ -627,23 +660,35 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       const organizationId = input.organizationId;
       const readsEditability = organizationId !== undefined && input.withEditability === true;
+      const limit = pLimit(TRIGGER_EDITABILITY_CONCURRENCY);
       return Promise.all(
-        rows.map(async row => {
-          if (organizationId === undefined) {
-            return projectRow(row, true, null);
-          }
-          if (!readsEditability) {
-            return projectRow(row, null, null);
-          }
-          const workerResult = await getWorkerTrigger(undefined, organizationId, row.triggerId);
-          // A worker failure or a missing configuration does not prove a
-          // restriction — the write reports the real answer — so that row keeps
-          // what its role alone allows instead of hiding a control that works.
-          const executionUserId =
-            workerResult.found === true ? (workerResult.config.executionUserId ?? null) : null;
-          const editability = triggerEditability(actorRole, executionUserId, userId);
-          return projectRow(row, editability.canEdit, editability.canEditReason);
-        })
+        rows.map(row =>
+          limit(async () => {
+            if (organizationId === undefined) {
+              return projectRow(row, true, null);
+            }
+            if (!readsEditability) {
+              return projectRow(row, null, null);
+            }
+            // The worker client throws on a transient error. That is one row's
+            // unknown execution identity, not a reason to fail a list the
+            // database can serve, so it degrades exactly like `found: 'error'`
+            // and keeps what the viewer's role alone allows.
+            let executionUserId: string | null = null;
+            try {
+              const workerResult = await getWorkerTrigger(undefined, organizationId, row.triggerId);
+              executionUserId =
+                workerResult.found === true ? (workerResult.config.executionUserId ?? null) : null;
+            } catch (error) {
+              console.error('Worker request failed while reading list editability', {
+                triggerId: row.triggerId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+            const editability = triggerEditability(actorRole, executionUserId, userId);
+            return projectRow(row, editability.canEdit, editability.canEditReason);
+          })
+        )
       );
     }),
 
@@ -663,18 +708,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        try {
-          actorRole = await ensureOrganizationAccess(
-            ctx,
-            input.organizationId,
-            TRIGGER_WRITE_ROLES
-          );
-        } catch (error) {
-          if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
-            throw error;
-          }
-          actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
-        }
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Verify ownership via PostgreSQL

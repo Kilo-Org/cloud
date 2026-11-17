@@ -1880,11 +1880,30 @@ describe('webhook trigger list editability', () => {
   });
 
   it('refuses every row for a role outside the write roles', async () => {
-    mockEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockEnsureOrganizationAccess
+      .mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }))
+      .mockResolvedValueOnce('billing_manager');
 
     const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
 
     expect(rows[0]).toMatchObject({ canEdit: false, canEditReason: 'role' });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+      undefined,
+    ]);
+  });
+
+  it('keeps child members writable when they also inherit a billing manager role', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) =>
+      roles?.includes('member') ? 'member' : 'billing_manager'
+    );
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+    ]);
   });
 
   it('keeps a role-permitted row writable when the worker cannot answer', async () => {
@@ -1893,5 +1912,22 @@ describe('webhook trigger list editability', () => {
     const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
 
     expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+  });
+
+  it("keeps the rest of the list when one row's worker read rejects", async () => {
+    mockSelectWhere.mockResolvedValue([
+      listRow,
+      { ...listRow, id: '00000000-0000-4000-8000-000000000004', triggerId: 'other-trigger' },
+    ]);
+    mockGetWorkerTrigger.mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValueOnce({
+      found: true,
+      config: { ...triggerConfig, executionUserId: 'another-user' },
+    });
+
+    const rows = await createCaller({ user }).list({ organizationId, withEditability: true });
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ canEdit: true, canEditReason: null });
+    expect(rows[1]).toMatchObject({ canEdit: false, canEditReason: 'creator_run' });
   });
 });

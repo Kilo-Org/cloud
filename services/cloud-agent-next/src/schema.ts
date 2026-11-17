@@ -1,9 +1,18 @@
 import { SETUP_SCRIPT_LIMITS } from '@kilocode/cloud-agent-profile/setup-script';
+import { z } from 'zod';
 import type { MCPServerConfig } from './persistence/types.js';
 
 export * from './shared/agent-modes.js';
 import { type AgentMode } from './shared/agent-modes.js';
 import { RuntimeProfileLimits } from './shared/runtime-profile.js';
+
+/**
+ * Thinking-effort variant for a model. Variants are model- and agent-specific
+ * keys — the catalog's `opencode.variants`, or a stored profile agent's
+ * `config.variant` — so the stored length bound is the only rule here: the
+ * catalog, not this schema, decides which keys exist.
+ */
+export const AgentVariantSchema = z.string().min(1).max(50);
 
 // === Limits ===
 export const Limits = {

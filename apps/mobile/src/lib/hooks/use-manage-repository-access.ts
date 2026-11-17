@@ -2,19 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
-import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import {
   type AuthorizationWait,
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { trpcClient } from '@/lib/trpc';
 
 import { isPersonal } from './use-code-reviewer';
-import { isInstallStateRefusal } from '@/components/security-agent/scope-entry-render';
 
 /**
  * The longest the control draws its own busy state. The install state is one
@@ -32,7 +28,7 @@ const HANDOFF_WATCHDOG_MS = 20_000;
  * tap itself owes.
  */
 export type ManageRepositoryAccess = {
-  /** Mints an install state and hands the user to the provider's settings page. */
+  /** Mints a hand-off token and hands the user to the provider's settings page. */
   handlePress: () => void;
   /**
    * True from the tap until the browser wait settles. The control draws its
@@ -45,13 +41,6 @@ export type ManageRepositoryAccess = {
 type ManageRepositoryAccessHandlers = {
   /** A launch is starting, before the install state is minted. */
   onOpen?: () => void;
-  /**
-   * The server refused the organization's install-state mint for this reader's
-   * role. A caller that passes this handler presents the refusal itself, so
-   * nothing opens and no page is offered that the role cannot act on; a caller
-   * without it keeps the settings-page fallback below.
-   */
-  onRoleRefused?: () => void;
   /**
    * The browser wait settled. `opened` is false when the mint or the launch
    * failed, so a caller that explains a fix in place can keep that explanation
@@ -101,7 +90,7 @@ export function useManageRepositoryAccess(
   // The attempt ids grow monotonically, so a settled attempt is recognised by id.
   const attempts = useRef(0);
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onOpen, onReturn, onRoleRefused } = handlers;
+  const { onOpen, onReturn } = handlers;
 
   const move = useCallback((next: HandoffPhase) => {
     phaseRef.current = next;
@@ -117,9 +106,7 @@ export function useManageRepositoryAccess(
     []
   );
 
-  type OpenResult = { kind: 'opened'; opened: boolean } | { kind: 'refused' };
-
-  const open = useCallback(async (): Promise<OpenResult> => {
+  const open = useCallback(async (): Promise<boolean> => {
     const label = t('codeReviewer.repos.repositoryAccess');
     const couldNotOpen = () => {
       toast.error(t('common.couldNotOpen', { label }));
@@ -134,54 +121,44 @@ export function useManageRepositoryAccess(
         return undefined;
       }
     };
-    const openSettings = async (url: string): Promise<OpenResult> => {
+    const openSettings = async (url: string): Promise<boolean> => {
       const wait = await launch(url);
       if (!wait) {
-        return { kind: 'opened', opened: false };
+        return false;
       }
       // A foreground return can settle the wait before the browser reports. A
       // launch that failed after that point never reached the catch above.
       reportLateLaunchFailure(wait, { onFailure: couldNotOpen });
-      return { kind: 'opened', opened: true };
+      return true;
     };
 
     if (platform === 'github') {
       try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: orgScope ?? undefined,
-          returnTo: '/cloud/sessions',
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgScope ? { organizationId: orgScope } : {}),
         });
-        const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token));
-        return opened;
-      } catch (error) {
-        // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
-        // with `UNAUTHORIZED`; a non-multi-installation organization that
-        // already has an active GitHub App connection is refused with
-        // `FORBIDDEN`. A caller that presents refusals itself takes the role's
-        // answer — the one answer no page can act on — and opens nothing. Every
-        // other organization failure keeps the page fallback: the page mints its
-        // own state for the signed-in user, so a toast there would leave the
-        // control inert in exactly the state that still has a route to it.
-        if (orgScope && onRoleRefused && isInstallStateRefusal(error)) {
-          // Returning the answer instead of publishing it here lets the caller
-          // decide with its own attempt guard: a mint that was superseded by a
-          // newer tap must not answer for the control that tap now owns.
-          return { kind: 'refused' };
-        }
-        if (orgScope) {
-          const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
-          return opened;
-        }
+        return await openSettings(url);
+      } catch {
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return false;
       }
-      return { kind: 'opened', opened: false };
     }
     if (platform === 'gitlab') {
-      const opened = await openSettings(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope));
-      return opened;
+      try {
+        const url = await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(orgScope ? { organizationId: orgScope } : {}),
+        });
+        return await openSettings(url);
+      } catch {
+        couldNotOpen();
+        return false;
+      }
     }
-    return { kind: 'opened', opened: false };
-  }, [orgScope, onRoleRefused, platform, t]);
+    return false;
+  }, [orgScope, platform, t]);
 
   const handlePress = useCallback(() => {
     if (phaseRef.current.kind === 'busy') {
@@ -216,27 +193,15 @@ export function useManageRepositoryAccess(
     }, HANDOFF_WATCHDOG_MS);
     void (async () => {
       let opened = false;
-      let refused = false;
       try {
-        const result = await open();
-        if (result.kind === 'refused') {
-          refused = true;
-        } else {
-          opened = result.opened;
-        }
+        opened = await open();
       } finally {
         if (settle()) {
-          // The refusal publishes only when this attempt still owns the control:
-          // a mint answered after a newer tap superseded it must not retire the
-          // control that tap now owns.
-          if (refused) {
-            onRoleRefused?.();
-          }
           onReturn?.(opened);
         }
       }
     })();
-  }, [move, onOpen, onReturn, onRoleRefused, open]);
+  }, [move, onOpen, onReturn, open]);
 
   return platform === 'bitbucket' ? undefined : { handlePress, pending: phase.kind === 'busy' };
 }

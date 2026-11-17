@@ -26,15 +26,16 @@ export function defaultScheduledAt(): string {
  * v1 channel set — what the schedule dialogs render as checkboxes and
  * what `scheduleAction` accepts in `noticeChannels`. The 'agent' channel
  * is intentionally excluded (the v1 dispatcher 501s; surfacing it in
- * the picker would mislead admins).
+ * the picker would mislead admins). 'mobile_push' is retired for new
+ * schedules — KiloClaw no longer pushes to the mobile app — so it is
+ * not offered, but the backend still accepts the value.
  */
-export const NOTICE_CHANNELS = ['email', 'webapp', 'mobile_push'] as const;
+export const NOTICE_CHANNELS = ['email', 'webapp'] as const;
 export type NoticeChannel = (typeof NOTICE_CHANNELS)[number];
 
 export const NOTICE_CHANNEL_LABELS: Record<NoticeChannel, string> = {
   email: 'Email',
   webapp: 'In-app banner',
-  mobile_push: 'Mobile push',
 };
 
 /** Default form state for the notification block, matching backend defaults. */

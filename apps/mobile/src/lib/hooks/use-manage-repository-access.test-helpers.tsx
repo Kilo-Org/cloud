@@ -1,6 +1,6 @@
 // The picker's Manage access control is the only way to widen what the
 // repository list may show, so a tap that produces nothing is the whole defect:
-// it has to draw a busy state while the install state is minted, never start a
+// it has to draw a busy state while the hand-off token is minted, never start a
 // second launch from a repeated tap, and report a launch that failed — including
 // one that failed after the app's own return edge ended the wait.
 
@@ -17,11 +17,14 @@ import {
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
-  mintInstallState: vi.fn((_input: unknown): Promise<{ token: string }> =>
-    Promise.resolve({ token: 'install-token' })
+  handoffUrl: vi.fn((_target: unknown): Promise<string> =>
+    Promise.resolve('https://app.example.com/app-shell/handoff?token=handoff-token')
   ),
   launch: vi.fn<(url: string) => Promise<unknown>>(),
 }));
+
+/** The URL the hand-off mock mints for every target. */
+export const HANDOFF_URL = 'https://app.example.com/app-shell/handoff?token=handoff-token';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -33,21 +36,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
 }));
 
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
-
-vi.mock('@/lib/agent-github-integration', () => ({
-  getGitHubIntegrationUrl: (base: string, orgId: string | undefined, token?: string) =>
-    `${base}/${orgId ?? 'personal'}${token ? `?state=${token}` : ''}`,
-}));
-
-vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: (base: string, orgId: string | undefined) =>
-    `${base}/${orgId ?? 'personal'}/gitlab`,
-}));
-
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mocks.mintInstallState } } },
-}));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: mocks.handoffUrl }));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
@@ -76,11 +65,7 @@ export function accessMocks() {
 
 export type HookResult = ManageRepositoryAccess | undefined;
 
-export type Handlers = {
-  onOpen?: () => void;
-  onReturn?: (opened: boolean) => void;
-  onRoleRefused?: () => void;
-};
+export type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
 
 function Harness({
   scope,
@@ -120,7 +105,9 @@ export function requireHook(resultRef: { current: HookResult }): ManageRepositor
 /** Reset the mocks to a successful mint and a reporting launch. */
 export function resetAccessMocks(): void {
   vi.clearAllMocks();
-  mocks.mintInstallState.mockImplementation(() => Promise.resolve({ token: 'install-token' }));
+  mocks.handoffUrl.mockImplementation(() =>
+    Promise.resolve('https://app.example.com/app-shell/handoff?token=handoff-token')
+  );
   mocks.launch.mockImplementation(() =>
     Promise.resolve({ reported: Promise.resolve({ type: 'dismiss' }), settledByLaunch: true })
   );

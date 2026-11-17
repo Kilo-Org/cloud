@@ -1,10 +1,6 @@
 import { z } from 'zod';
 
-import {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  securityLifecyclePayloadShape,
-} from './notification-events';
+import { securityLifecyclePayloadShape } from './notification-events';
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
@@ -61,19 +57,7 @@ function payloadFreeOutcome<
   return z.object({ kind: z.literal(kind) });
 }
 
-// ── sendPushForConversation ─────────────────────────────────────────
-
-export const sendPushForConversationInputSchema = z.object({
-  conversationId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  senderUserId: z.union([nonEmptyStringSchema, z.null()]),
-  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
-  title: z.string().max(200),
-  bodyPreview: z.string().max(200),
-  messageId: nonEmptyStringSchema,
-  ...i18nCopyFields,
-});
-export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
+// ── per-recipient delivery result ────────────────────────────────────
 
 export const perRecipientOutcomeSchema = z.enum([
   'delivered',
@@ -83,7 +67,7 @@ export const perRecipientOutcomeSchema = z.enum([
 export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 
 export const perRecipientResultSchema = z.object({
-  userId: z.string(),
+  userId: nonEmptyStringSchema,
   outcome: perRecipientOutcomeSchema,
   // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
   // populated by the internal dispatch path for `failed` outcomes. Optional:
@@ -92,10 +76,11 @@ export const perRecipientResultSchema = z.object({
 });
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
 
-export const sendPushForConversationOutputSchema = z.object({
+/** The internal `/internal/v1/dispatch` endpoint's per-recipient breakdown. */
+export const internalDispatchResponseSchema = z.object({
   perRecipient: z.array(perRecipientResultSchema),
 });
-export type SendPushForConversationOutput = z.infer<typeof sendPushForConversationOutputSchema>;
+export type InternalDispatchResponse = z.infer<typeof internalDispatchResponseSchema>;
 
 // ── badge HTTP routes ───────────────────────────────────────────────
 
@@ -131,56 +116,6 @@ export type ClearBadgeBucketForUserInput = z.infer<typeof clearBadgeBucketForUse
 
 export const clearBadgeBucketForUserOutputSchema = markBadgeReadResponseSchema;
 export type ClearBadgeBucketForUserOutput = z.infer<typeof clearBadgeBucketForUserOutputSchema>;
-
-// ── sendInstanceLifecycleNotification ───────────────────────────────
-
-export const sendInstanceLifecycleNotificationInputSchema = z.object({
-  userId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  event: instanceLifecycleEventSchema,
-  instanceName: z.string().nullable(),
-  errorMessage: z.string().optional(),
-});
-export type SendInstanceLifecycleNotificationParams = z.infer<
-  typeof sendInstanceLifecycleNotificationInputSchema
->;
-
-// Per-token delivery counters. Both send RPCs report the same tally, so it is
-// declared once here and each result adds only the field that RPC owns.
-const sendCountersSchema = z.object({
-  tokenCount: z.number().int().nonnegative(),
-  sent: z.number().int().nonnegative(),
-  staleTokens: z.number().int().nonnegative(),
-  receiptCount: z.number().int().nonnegative(),
-  suppressedByPreference: z.boolean().optional(),
-});
-
-export const sendInstanceLifecycleNotificationOutputSchema = sendCountersSchema.extend({
-  ticketErrors: z.object({
-    total: z.number().int().nonnegative(),
-    retryable: z.number().int().nonnegative(),
-    terminal: z.number().int().nonnegative(),
-  }),
-});
-export type SendInstanceLifecycleNotificationResult = z.infer<
-  typeof sendInstanceLifecycleNotificationOutputSchema
->;
-
-// ── sendScheduledActionNotice ─────────────────────────────────────────
-
-export const sendScheduledActionNoticeInputSchema = z.object({
-  userId: nonEmptyStringSchema,
-  instanceId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  event: scheduledActionEventSchema,
-  instanceName: z.string().nullable(),
-  scheduledAt: z.string(),
-  targetImageTag: z.string().nullable().optional(),
-});
-export type SendScheduledActionNoticeParams = z.infer<typeof sendScheduledActionNoticeInputSchema>;
-
-export const sendScheduledActionNoticeOutputSchema = sendCountersSchema;
-export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
 // ── sendCloudAgentSessionNotification ───────────────────────────────
 
@@ -358,6 +293,22 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+/**
+ * The dispatch outcome's discriminator set is the shared delivery vocabulary
+ * plus `delivered`, and nothing else. The builder above catches a reason
+ * renamed in the tuples; this catches one dropped from or added to the union,
+ * so the hand-written member list above cannot drift from that vocabulary.
+ */
+type SameUnion<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type AssertTrue<T extends true> = T;
+export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+  SameUnion<
+    DispatchPushOutcome['kind'],
+    'delivered' | DeliveryOutcomeReason | ChannelDeliveryOutcomeReason | 'suppressed_rate_limit'
+  >
+>;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

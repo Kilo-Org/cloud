@@ -33,20 +33,13 @@ import { computeEngineIdentity } from './run';
 const CONFIG: BenchmarkConfig = {
   router: 'efficient',
   accuracyNoiseBand: 0.05,
-  frontierMinAccuracyDelta: 0,
   classifierModels: ['typesafe/jev-1.13'],
   deciderModels: [{ id: 'vendor/platform' }],
   minAccuracy: 0.7,
-  switchCostFactor: 3,
-  bestAccuracySwitchThreshold: 0.05,
   productionTokenProfile: null,
   switchHorizonTurns: null,
-  lowConfidenceThreshold: null,
   benchmarkUserId: null,
   benchmarkOrgId: null,
-  classifierRepetitions: 1,
-  deciderRepetitions: 2,
-  classifierMaxP95LatencyMs: 1000,
   updatedAt: null,
   updatedBy: null,
 };
@@ -130,26 +123,26 @@ describe('client eval (real SQLite)', () => {
     };
   });
 
-  it('plans every variant, case and repetition until uploaded, then only what is missing', async () => {
+  it('plans every variant and case once, then only what is missing', async () => {
+    const otherCase = DECIDER_CASES.find(benchCase => benchCase.id !== exactCase.id);
+    if (!otherCase) throw new Error('dataset needs a second case');
     const fresh = await planClientEval(db, CONFIG, context, deps.source);
     expect(fresh).toMatchObject({
       baseRouter: 'efficient',
       engineIdentity: ENGINE,
-      repetitions: 2,
+      repetitions: 1,
     });
-    expect(fresh.items).toHaveLength(2 * 2 * DECIDER_CASES.length);
+    expect(fresh.items).toHaveLength(2 * DECIDER_CASES.length);
 
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
-    await gradeClientEvalResult(db, CONFIG, upload({ rep: 1 }), deps);
     await gradeClientEvalResult(db, CONFIG, upload({ variant: 'high' }), deps);
 
     const resumed = await planClientEval(db, CONFIG, context, deps.source);
-    expect(resumed.items).toHaveLength(fresh.items.length - 3);
+    expect(resumed.items).toHaveLength(fresh.items.length - 2);
     const planned = new Set(resumed.items.map(i => JSON.stringify([i.variant, i.caseId, i.rep])));
     expect(planned.has(JSON.stringify(['low', exactCase.id, 0]))).toBe(false);
-    expect(planned.has(JSON.stringify(['low', exactCase.id, 1]))).toBe(false);
     expect(planned.has(JSON.stringify(['high', exactCase.id, 0]))).toBe(false);
-    expect(planned.has(JSON.stringify(['high', exactCase.id, 1]))).toBe(true);
+    expect(planned.has(JSON.stringify(['low', otherCase.id, 0]))).toBe(true);
     expect(resumed.staleEntries).toEqual([]);
   });
 
@@ -193,7 +186,7 @@ describe('client eval (real SQLite)', () => {
     sqlite.exec(`UPDATE client_profiles SET engine_identity = 'efficient:v0:old'`);
 
     const plan = await planClientEval(db, CONFIG, context, deps.source);
-    expect(plan.items).toHaveLength(2 * 2 * DECIDER_CASES.length);
+    expect(plan.items).toHaveLength(2 * DECIDER_CASES.length);
     expect(plan.staleEntries).toEqual([
       { entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' }, variant: 'low' },
     ]);
@@ -202,16 +195,29 @@ describe('client eval (real SQLite)', () => {
   it('keeps client measurements scoped to their owner', async () => {
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
     const other = await planClientEval(db, CONFIG, { ...context, ownerId: 'org-2' }, deps.source);
-    expect(other.items).toHaveLength(2 * 2 * DECIDER_CASES.length);
+    expect(other.items).toHaveLength(2 * DECIDER_CASES.length);
   });
 
   it('grades mechanically, rolls up the profile, and returns the stored score on retry', async () => {
+    const siblingCase = DECIDER_CASES.find(
+      benchCase =>
+        benchCase.id !== exactCase.id &&
+        benchCase.taskType === exactCase.taskType &&
+        benchCase.subtaskType === exactCase.subtaskType &&
+        benchCase.check.kind === 'exact'
+    );
+    if (!siblingCase) throw new Error('dataset needs a sibling exact case on the same route');
     expect(await gradeClientEvalResult(db, CONFIG, upload(), deps)).toEqual({ score: 1 });
     expect(
       await gradeClientEvalResult(
         db,
         CONFIG,
-        upload({ rep: 1, output: 'wrong answer', durationMs: 3000, costUsd: 0.002 }),
+        upload({
+          caseId: siblingCase.id,
+          output: 'wrong answer',
+          durationMs: 3000,
+          costUsd: 0.002,
+        }),
         deps
       )
     ).toEqual({ score: 0 });
@@ -226,7 +232,7 @@ describe('client eval (real SQLite)', () => {
       accuracy: 0.5,
       avg_cost_usd: 0.001,
       engine_identity: ENGINE,
-      repetitions: 2,
+      repetitions: 1,
     });
     expect(profile?.route_summaries).toEqual([
       expect.objectContaining({
@@ -517,7 +523,7 @@ describe('client eval (real SQLite)', () => {
         return typeof value === 'function' ? value.bind(target) : value;
       },
     });
-    const planned = 2 * 2 * DECIDER_CASES.length;
+    const planned = 2 * DECIDER_CASES.length;
 
     await refreshClientProfileRollup(racing, profile, planned, '2099-01-02T00:00:00.000Z');
     expect(raced).toBe(true);

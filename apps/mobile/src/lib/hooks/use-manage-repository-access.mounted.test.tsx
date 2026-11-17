@@ -1,7 +1,6 @@
 // The Manage-access control's busy state, its mint failures, and the return edge
 // its caller resyncs from. Mocks and mounting live in the helpers module, whose
 // import MUST stay first: it registers the module mocks while it is evaluated.
-/* eslint-disable max-lines -- one native fixture suite for the shared control; splitting it would duplicate the mocks */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +8,7 @@ import { act } from '@/test/renderer';
 
 import {
   accessMocks,
+  HANDOFF_URL,
   mountHook,
   requireHook,
   resetAccessMocks,
@@ -42,10 +42,9 @@ describe('useManageRepositoryAccess', () => {
     // so the tap is never inert.
     expect(onOpen).toHaveBeenCalledOnce();
     expect(onReturn).not.toHaveBeenCalled();
-    expect(mocks.mintInstallState).toHaveBeenCalledTimes(1);
-    expect(mocks.launch).toHaveBeenCalledWith(
-      'https://app.example.com/personal?state=install-token'
-    );
+    expect(mocks.handoffUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
 
     await act(async () => {
       pendingLaunch.resolve({
@@ -110,7 +109,7 @@ describe('useManageRepositoryAccess', () => {
         requireHook(resultRef).handlePress();
         await Promise.resolve();
       });
-      expect(mocks.mintInstallState).toHaveBeenCalledTimes(2);
+      expect(mocks.handoffUrl).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
@@ -169,7 +168,7 @@ describe('useManageRepositoryAccess', () => {
       await Promise.resolve();
     });
 
-    expect(mocks.mintInstallState).toHaveBeenCalledTimes(1);
+    expect(mocks.handoffUrl).toHaveBeenCalledTimes(1);
     expect(mocks.launch).toHaveBeenCalledTimes(1);
   });
 
@@ -209,7 +208,7 @@ describe('useManageRepositoryAccess', () => {
   });
 
   it('reports a failed mint instead of leaving the tap unanswered', async () => {
-    mocks.mintInstallState.mockRejectedValue(new Error('mint failed'));
+    mocks.handoffUrl.mockRejectedValue(new Error('mint failed'));
     const resultRef = mountHook('personal', 'github');
 
     await act(() => {
@@ -223,155 +222,7 @@ describe('useManageRepositoryAccess', () => {
     expect(requireHook(resultRef).pending).toBe(false);
   });
 
-  // An organization's mint is narrower than the screens that offer this
-  // control: a member is refused with UNAUTHORIZED, and an installation that
-  // cannot take another one with FORBIDDEN. Neither can mint a token, and the
-  // page works without one — so the tap opens it rather than answering nothing
-  // in the one state that needs a route to it.
-  for (const code of ['UNAUTHORIZED', 'FORBIDDEN']) {
-    it(`opens the settings page without a token when the organization's mint is refused with ${code}`, async () => {
-      mocks.mintInstallState.mockRejectedValue({ data: { code } });
-      const onReturn = vi.fn<(opened: boolean) => void>();
-      const resultRef = mountHook('org_123', 'github', { onReturn });
-
-      await act(() => {
-        requireHook(resultRef).handlePress();
-      });
-
-      await vi.waitFor(() => {
-        expect(onReturn).toHaveBeenCalledWith(true);
-      });
-      expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
-      expect(mocks.toastError).not.toHaveBeenCalled();
-    });
-  }
-
-  // A caller that can present refusals itself takes the role's answer instead of
-  // the page: nothing opens, the list is not resynced, and no error is toasted —
-  // the caller renders the refusal in the control's place.
-  it('hands a role refusal to the caller and opens nothing', async () => {
-    mocks.mintInstallState.mockRejectedValue(
-      Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
-    );
-    const onRoleRefused = vi.fn<() => void>();
-    const onReturn = vi.fn<(opened: boolean) => void>();
-    const resultRef = mountHook('org_123', 'github', { onReturn, onRoleRefused });
-
-    await act(() => {
-      requireHook(resultRef).handlePress();
-    });
-
-    await vi.waitFor(() => {
-      expect(onRoleRefused).toHaveBeenCalledTimes(1);
-    });
-    expect(onReturn).toHaveBeenCalledWith(false);
-    expect(mocks.launch).not.toHaveBeenCalled();
-    expect(mocks.toastError).not.toHaveBeenCalled();
-    expect(requireHook(resultRef).pending).toBe(false);
-  });
-
-  // A mint answered after a newer tap superseded its attempt must not answer for
-  // the control that tap now owns: the refusal publishes only while the attempt
-  // still owns the phase.
-  it('keeps a superseded refusal from retiring the newer attempt', async () => {
-    vi.useFakeTimers();
-    try {
-      const pendingFirstMint = Promise.withResolvers<{ token: string }>();
-      mocks.mintInstallState.mockReturnValueOnce(pendingFirstMint.promise);
-      const onRoleRefused = vi.fn<() => void>();
-      const resultRef = mountHook('org_123', 'github', { onRoleRefused });
-
-      await act(async () => {
-        requireHook(resultRef).handlePress();
-        await Promise.resolve();
-      });
-
-      // The watchdog releases the control while the first mint is still open,
-      // and a newer tap starts the attempt that owns the phase now. Its own
-      // mint stays open on a second deferred answer.
-      const pendingSecondMint = Promise.withResolvers<{ token: string }>();
-      mocks.mintInstallState.mockReturnValueOnce(pendingSecondMint.promise);
-      await act(() => {
-        vi.advanceTimersByTime(20_000);
-      });
-      expect(requireHook(resultRef).pending).toBe(false);
-      await act(async () => {
-        requireHook(resultRef).handlePress();
-        await Promise.resolve();
-      });
-      expect(requireHook(resultRef).pending).toBe(true);
-
-      // The superseded mint then answers with the role refusal.
-      await act(async () => {
-        pendingFirstMint.reject(
-          Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
-        );
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(onRoleRefused).not.toHaveBeenCalled();
-
-      // The newer attempt still owns the phase; give it its own answer, which
-      // settles it normally (token → launch → return edge) and does not publish
-      // the superseded refusal.
-      await act(async () => {
-        pendingSecondMint.resolve({ token: 'install-token' });
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      await vi.waitFor(() => {
-        expect(requireHook(resultRef).pending).toBe(false);
-      });
-      expect(onRoleRefused).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  // The single-installation guard and a lost session are not the role answer:
-  // the plain settings page mints its own state for the signed-in user, so the
-  // caller that presents refusals still hands the reader to it for these.
-  for (const failure of [
-    {
-      name: 'an organization that already holds an installation',
-      error: { data: { code: 'FORBIDDEN' } },
-    },
-    {
-      name: 'a missing or invalid session',
-      error: Object.assign(new Error('session expired'), {
-        data: { code: 'UNAUTHORIZED', authRequired: true },
-      }),
-    },
-    {
-      name: 'a failure that never reached the server',
-      error: new TypeError('Network request failed'),
-    },
-  ]) {
-    it(`keeps the settings-page fallback for ${failure.name}`, async () => {
-      mocks.mintInstallState.mockRejectedValue(failure.error);
-      const onRoleRefused = vi.fn<() => void>();
-      const onReturn = vi.fn<(opened: boolean) => void>();
-      const resultRef = mountHook('org_123', 'github', { onReturn, onRoleRefused });
-
-      await act(() => {
-        requireHook(resultRef).handlePress();
-      });
-
-      await vi.waitFor(() => {
-        expect(onReturn).toHaveBeenCalledWith(true);
-      });
-      expect(onRoleRefused).not.toHaveBeenCalled();
-      expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
-      expect(mocks.toastError).not.toHaveBeenCalled();
-    });
-  }
-
-  // A caller without the handler keeps the page fallback for a role refusal:
-  // nothing there names the refusal, and the page is the route the control has.
-  it('keeps the settings-page fallback for a role refusal without the handler', async () => {
-    mocks.mintInstallState.mockRejectedValue(
-      Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
-    );
+  it('names the organization on the GitHub hand-off target', async () => {
     const onReturn = vi.fn<(opened: boolean) => void>();
     const resultRef = mountHook('org_123', 'github', { onReturn });
 
@@ -382,24 +233,42 @@ describe('useManageRepositoryAccess', () => {
     await vi.waitFor(() => {
       expect(onReturn).toHaveBeenCalledWith(true);
     });
-    expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
-    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({
+      page: 'github-app',
+      organizationId: 'org_123',
+    });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
   });
 
-  // A personal scope has no page-level fallback to reach: the page mints its
-  // own state for a signed-in user, and a personal mint failure still has to be
-  // reported.
-  it('still reports a refused personal mint', async () => {
-    mocks.mintInstallState.mockRejectedValue({ data: { code: 'UNAUTHORIZED' } });
-    const resultRef = mountHook('personal', 'github');
+  it('hands off to the GitLab integration shell page for a personal scope', async () => {
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('personal', 'gitlab', { onReturn });
 
     await act(() => {
       requireHook(resultRef).handlePress();
     });
 
     await vi.waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith('prReview.couldNotOpenGitHubAppSettings');
+      expect(onReturn).toHaveBeenCalledWith(true);
     });
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({ page: 'integration', platform: 'gitlab' });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed GitLab mint instead of leaving the tap unanswered', async () => {
+    mocks.handoffUrl.mockRejectedValue(new Error('mint failed'));
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('personal', 'gitlab', { onReturn });
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('common.couldNotOpen');
+    });
+    expect(onReturn).toHaveBeenCalledWith(false);
     expect(mocks.launch).not.toHaveBeenCalled();
   });
 });

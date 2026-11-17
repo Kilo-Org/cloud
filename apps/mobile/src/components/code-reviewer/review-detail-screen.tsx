@@ -41,7 +41,7 @@ import { i18n } from '@/i18n';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -365,7 +365,7 @@ export function ReviewDetailScreen({
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
                 label={t('common.cost')}
-                value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
+                value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (

@@ -208,6 +208,25 @@ describe('BranchPickerScreen', () => {
 
     const shell = renderer.root.findByType('PickerSheet' as never);
     expect(shell.props.expired).toBe(true);
+    expect(typeof shell.props.onCancel).toBe('function');
     expect(texts(renderer)).not.toContain('main');
+  });
+
+  it('dismisses the expired shell from the header Cancel without reporting a pick', () => {
+    const onSelect = vi.fn(() => undefined);
+    setBridge({ onSelect });
+    slot.bridge = undefined;
+    const renderer = mount();
+
+    const shell = renderer.root.findByType('PickerSheet' as never);
+    expect(shell.props.expired).toBe(true);
+    const cancel = shell.props.onCancel as () => void;
+
+    act(() => {
+      cancel();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,12 @@ import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
+// The account row opens the shared picker through the press-burst guard, and
+// these assertions read the router mock, so the guarded push is that function.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
+
 describe('ProfileScreen Organization section', () => {
   beforeEach(() => {
     vi.useRealTimers();

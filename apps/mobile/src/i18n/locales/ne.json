@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
     "creditHistory": "क्रेडिट इतिहास",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "खरिद, रसिद र क्रेडिट गतिविधि",
     "invoicesSubtitle": "तपाईंका खरिदहरूका इनभ्वाइस डाउनलोड गर्नुहोस्",
-    "manageBilling": "kilo.ai मा बिलिङ व्यवस्थापन गर्नुहोस्",
-    "manageBillingIosNote": "भुक्तानी विधि, स्वतः टप-अप र बिलिङ विवरणहरू kilo.ai मा व्यवस्थापन गरिन्छन्।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
     "reviews": "समीक्षाहरू",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "प्रदायक कुञ्जीहरू",
       "rowSubtitle": "आफ्नै प्रदायक बिलिङ प्रयोग गर्नुहोस्",
-      "manageOnWebReason": "यी प्रदायकहरूलाई संरचित प्रमाणपत्रहरू चाहिन्छ।",
+      "orgDescription": "यी कुञ्जीहरू संगठनका सबैसँग साझा गरिन्छन् र तिनको बिल संगठनको प्रदायक खाताहरूमा लाग्छ।",
+      "viewOnly": "संगठनको मालिक, प्रशासक वा बिलिङ प्रबन्धकले मात्र यसका कुञ्जीहरू परिवर्तन गर्न सक्छन्।",
       "description": "यी कुञ्जीहरूमार्फत गरिएका अनुरोधहरूको बिल तपाईंको Kilo मौज्दातको सट्टा तपाईंको प्रदायक खातामा लाग्छ।",
       "managedByPlan": "तपाईंको कोडिङ योजनाद्वारा व्यवस्थित",
       "enableKey": "{{provider}} कुञ्जी सक्षम गर्नुहोस्",
@@ -374,6 +371,7 @@
       "removeMessage": "यो कुञ्जी प्रयोग गर्ने अनुरोधहरूले तपाईंको प्रदायक बिलिङ प्रयोग गर्न छाड्नेछन्।",
       "add": "कुञ्जी थप्नुहोस्",
       "added": "कुञ्जी थपियो",
+      "updated": "कुञ्जी अद्यावधिक गरियो",
       "emptyTitle": "कुनै प्रदायक कुञ्जी छैन",
       "emptyDescription": "सुरु गर्न कुञ्जी थप्नुहोस्।",
       "chooseProvider": "प्रदायक छान्नुहोस्",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "त्यो खोजसँग कुनै प्रदायक मेल खाँदैन।",
       "newKeyTitle": "नयाँ कुञ्जी",
       "newKeyDescription": "कुञ्जी इन्क्रिप्ट गरेर भण्डारण गरिन्छ र फेरि देखाउन सकिँदैन।",
+      "edit": "कुञ्जी सम्पादन गर्नुहोस्",
+      "editKeyTitle": "कुञ्जी बदल्नुहोस्",
+      "editKeyDescription": "भण्डारण गरिएको मान देखाउन सकिँदैन। यसलाई बदल्न नयाँ मान प्रविष्ट गर्नुहोस्।",
+      "editKeyMappingsWarning": "कुञ्जी बदल्दा भण्डारण गरिएका मोडेल म्यापिङहरू पनि बदलिन्छन्: तपाईंलाई अझै आवश्यक पर्ने प्रत्येक म्यापिङ पुनः प्रविष्ट गर्नुहोस्।",
+      "saveFailed": "कुञ्जी सुरक्षित गर्न सकिएन।",
+      "invalidCredentials": "प्रमाणपत्रहरू जाँच गरेर फेरि प्रयास गर्नुहोस्।",
+      "fieldRequired": "{{field}} आवश्यक छ।",
+      "incompleteMapping": "म्यापिङ {{number}} मा गेटवे मोडेल slug र डिप्लोयमेन्ट नाम दुवै आवश्यक छन्।",
       "apiKeyLabel": "API कुञ्जी",
       "apiKeyPlaceholder": "कुञ्जी टाँस्नुहोस्",
-      "apiKeyRequired": "कुञ्जी प्रविष्ट गर्नुहोस्।"
+      "apiKeyRequired": "कुञ्जी प्रविष्ट गर्नुहोस्।",
+      "authMethod": "प्रमाणीकरण विधि",
+      "authMethodAccessKeys": "पहुँच कुञ्जीहरू",
+      "resourceName": "Azure स्रोतको नाम",
+      "region": "AWS क्षेत्र",
+      "accessKeyId": "पहुँच कुञ्जी ID",
+      "secretAccessKey": "गोप्य पहुँच कुञ्जी",
+      "project": "Google Cloud परियोजना",
+      "location": "Vertex स्थान",
+      "clientEmail": "सेवा खाता इमेल",
+      "privateKey": "सेवा खाताको निजी कुञ्जी",
+      "modelMappings": "मोडेल म्यापिङहरू",
+      "modelMappingsDescription": "गेटवे मोडेललाई अनुकूल डिप्लोयमेन्ट नाममा पठाउनुहोस्।",
+      "mappingTitle": "म्यापिङ {{number}}",
+      "mappingGatewayModel": "गेटवे मोडेल slug",
+      "mappingCustomModel": "डिप्लोयमेन्ट नाम",
+      "addMapping": "म्यापिङ थप्नुहोस्",
+      "removeMapping": "म्यापिङ {{number}} हटाउनुहोस्"
     },
     "dataExport": {
       "title": "तपाईंको डेटा",
@@ -407,7 +430,7 @@
       "codeRequired": "इमेलमा आएको कोड प्रविष्ट गर्नुहोस्।",
       "download": "फाइल डाउनलोड गर्नुहोस्",
       "downloadFailed": "निर्यात डाउनलोड गर्न सकिएन। आफ्नो जडान जाँचेर पुनः प्रयास गर्नुहोस्।",
-      "unavailableTitle": "तपाईंको डेटा अझै उपलब्ध छैन",
+      "unavailableTitle": "डेटा निर्यात अझै उपलब्ध छैन",
       "unavailableDescription": "डेटा निर्यात क्रमिक रूपमा उपलब्ध गराइँदैछ। केही समयपछि फेरि हेर्नुहोस्।"
     },
     "blockedPeople": {
@@ -457,7 +480,8 @@
       "nextStepFinal": "पुनरावेदनको निर्णय अन्तिम हो। अब थप पुनरावेदन पेश गर्न सकिँदैन।",
       "viewReceipt": "रसिद हेर्नुहोस्"
     },
-    "changelog": "नयाँ कुराहरू"
+    "changelog": "नयाँ कुराहरू",
+    "changelogVersionPending": "यस संस्करणका नोटहरू अर्को एप अपडेटसँगै आउनेछन्।"
   },
   "preferences": {
     "general": "सामान्य",
@@ -1170,8 +1194,6 @@
       "clearMessage": "खाली फिल्ड सुरक्षित गर्दा यस समीक्षकका लागि भण्डारण गरिएका आफ्नै निर्देशनहरू मेटिइन्छन्।"
     },
     "repos": {
-      "unavailable": "रिपोजिटरीहरू उपलब्ध छैनन् — kilo.ai मा Bitbucket को सेटअप पूरा गर्नुहोस्।",
-      "finishSetup": "सेटअप पूरा गर्नुहोस्",
       "manageAccess": "पहुँच व्यवस्थापन गर्नुहोस्",
       "bitbucketNoRepositoriesDescription": "यो Bitbucket वर्कस्पेसमा कुनै रिपोजिटरी उपलब्ध छैन।",
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "REVIEW.md का निर्देशन पालना गर्नुहोस्",
     "followReviewMdSubtitle": "हरेक रिपोजिटरीको REVIEW.md फाइलमा भएका निर्देशन पालना गर्नुहोस्",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
-      "setupIncomplete": "सेटअप पूरा भएको छैन — kilo.ai मा सेटिङहरू मिलाएर पूरा गर्नुहोस्।",
-      "setup": "Bitbucket सेटअप"
+      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "यो संस्थाको Bitbucket जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
       "description": "आवश्यक अनुमतिसहित वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
       "scopes": "खाता: पढ्ने · रिपोजिटरीहरू: पढ्ने/लेख्ने · पुल रिक्वेस्टहरू: पढ्ने · वेबहुकहरू: पढ्ने/लेख्ने",
       "tokenPlaceholder": "वर्कस्पेसको पहुँच टोकन"
@@ -1345,7 +1366,8 @@
       "noReviews": "अहिलेसम्म कुनै समीक्षा छैन",
       "noReviewsDescription": "कोड समीक्षकले पुल रिक्वेस्टको समीक्षा गरेपछि समीक्षाहरू यहाँ देखिनेछन्।",
       "startManualReview": "म्यानुअल समीक्षा सुरु गर्नुहोस्",
-      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्"
+      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्",
+      "connectOwnerOnly": "प्रदायक जडान गर्न संस्थाको मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।"
     },
     "platformList": {
       "checking": "जाँच गर्दै…",
@@ -1358,8 +1380,7 @@
       "githubError": "GitHub सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
       "gitlabAccount": "GitLab खाता",
       "gitlabError": "GitLab सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
-      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।",
-      "bitbucketError": "Bitbucket सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।"
+      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।"
     },
     "overview": {
       "allAreas": "सबै क्षेत्रहरू",
@@ -1847,6 +1868,7 @@
     },
     "repositories": {
       "couldNotLoad": "रिपोजिटरीका सेटिङहरू लोड गर्न सकिएन।",
+      "githubAppSettings": "GitHub एपका सेटिङहरू",
       "manageAccess": "GitHub एपको पहुँच व्यवस्थापन गर्नुहोस्",
       "noRepositories": "कुनै रिपोजिटरी छैन",
       "noRepositoriesDescription": "Kilo GitHub एपलाई रिपोजिटरीहरूमा पहुँच दिनुहोस्।",
@@ -2007,7 +2029,6 @@
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
       "couldNotRefresh": "रिफ्रेस गर्न सकिएन",
       "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्।",
-      "viewHistory": "सत्रहरूको इतिहास",
       "noMatches": "मिल्ने कुनै सत्र छैन",
       "tryDifferentSearch": "अर्को शब्द राखेर खोज्नुहोस्।",
       "tryAdjustFilters": "फिल्टरहरू बदल्ने वा हटाउने प्रयास गर्नुहोस्।",
@@ -2015,6 +2036,9 @@
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "पुराना सत्रहरू छैनन्",
       "pastSessions": "पुराना सत्रहरू",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} सत्र",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रहरू",
+      "sectionAccessibility": "{{title}}: {{displayCount}} सत्रहरू",
       "live": "प्रत्यक्ष",
       "updating": "अद्यावधिक हुँदै"
     },
@@ -2149,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपोजिटरीहरू लोड गर्न सकिएन।",
       "connectGithubDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitHub रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "connectGitlabDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि GitLab रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectBitbucketDescription": "आफ्नो ब्राउजरबाट साइन इन गर्नुहोस्। त्यसपछि Bitbucket रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "openGitlab": "GitLab खोल्नुहोस्",
-      "openBitbucket": "Bitbucket खोल्नुहोस्",
       "refreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्नुहोस्",
       "githubConnected": "GitHub जडान भएको",
       "gitlabConnected": "GitLab जडान भएको",
@@ -2186,7 +2208,10 @@
       "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
       "enterPromptToStart": "सुरु गर्नको लागि प्रोम्प्ट थप्नुहोस्।",
       "enterPromptOrFileToStart": "सुरु गर्नको लागि प्रोम्प्ट वा फाइल थप्नुहोस्।",
-      "connectProviderToStart": "रिपोजिटरीहरू जडान भएको GitHub, GitLab वा Bitbucket खाताबाट आउँछन्।",
+      "profileLoadingToStart": "प्रोफाइल अझै लोड हुँदै छ। एकछिन पर्खनुहोस् र फेरि प्रयास गर्नुहोस्।",
+      "attachmentUploadingToStart": "एउटा संलग्न फाइल अझै अपलोड हुँदै छ। त्यो बिना सुरु गर्न यसलाई हटाउनुहोस्।",
+      "modelMissingToStart": "सुरु गर्नको लागि मोडेल छान्नुहोस्।",
+      "staleRepositoryToStart": "छानिएको रिपोजिटरी अब उपलब्ध छैन। सुरु गर्नको लागि फेरि रिपोजिटरी छान्नुहोस्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",
@@ -2741,7 +2766,7 @@
     },
     "composer": {
       "addAttachment": "संलग्न फाइल थप्नुहोस्",
-      "removeOrRetryFailed": "पहिले अपलोड हुन नसकेका संलग्न फाइलहरू हटाउनुहोस् वा फेरि अपलोड गर्ने प्रयास गर्नुहोस्।",
+      "removeFailedAttachments": "अपलोड हुन नसकेका संलग्न फाइलहरू हटाउनुहोस्।",
       "attachmentsWithSlashCommands": "स्ल्यास कमाण्डहरूसँग संलग्न फाइलहरू पठाउन मिल्दैन।",
       "photoMetadataNotRemoved": "संलग्न फाइलबाट फोटोको मेटाडेटा हटाउन सकिएन।",
       "waitForUploads": "संलग्न फाइलहरू अपलोड भइसक्दासम्म पर्खनुहोस्।",
@@ -2943,12 +2968,13 @@
     "noSessions": "कुनै सक्रिय सत्र छैन",
     "noSessionsDescription": "अर्को यन्त्रमा Kilo एपबाट साइन इन गर्नुहोस्। त्यसपछि त्यो यन्त्र यहाँ देखिनेछ।",
     "signedIn": "साइन इन: {{signedIn}} · अन्तिम पटक देखिएको: {{lastSeen}}",
-    "signInScopeNote": "यहाँ Kilo एप र Kilo CLI का साइन-इनहरू देखिन्छन्। एडिटरका साइन-इनहरू सूचीबद्ध छैनन्।",
+    "signInScopeNote": "यहाँ Kilo एप, Kilo CLI र वेब ब्राउजरका साइन-इनहरू देखिन्छन्। एडिटरका साइन-इनहरू सूचीबद्ध छैनन्।",
     "thisDevice": "यो यन्त्र",
     "viewProfile": "प्रोफाइल हेर्नुहोस्",
     "signOutThisDevice": "यो यन्त्रबाट साइन आउट गर्नुहोस्",
     "signOutSessionLabel": "{{device}} बाट साइन आउट गर्नुहोस्, साइन इन: {{signedIn}}, अन्तिम पटक देखिएको: {{lastSeen}}",
     "sessionSignedOut": "सत्रबाट साइन आउट गरियो।",
+    "sessionSignOutFailed": "यो सत्रबाट साइन आउट गर्न सकिएन, फेरि प्रयास गर्नुहोस्।",
     "signOutThisDeviceTitle": "यो यन्त्रबाट साइन आउट गर्ने?",
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
     "signOutThisSessionMessage": "{{device}} बाट साइन आउट गरिनेछ। अन्तिम पटक देखिएको: {{lastSeen}}। त्यसपछि पनि यो यन्त्रसँग एक घण्टासम्म API पहुँच रहन सक्छ।",
@@ -3049,6 +3075,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "हालैका सत्रहरूको खोजी",
     "connectedCli": "जडान भएको CLI मा",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} इन्स्ट्यान्स",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} इन्स्ट्यान्सहरू",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} इन्स्ट्यान्सहरू",
     "newSessionOn": "{{name}} मा नयाँ सत्र",
     "noMatchingSessions": "मिल्ने कुनै सत्र छैन।",
     "onlyFirstFilesAttached": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।",
@@ -3069,15 +3098,14 @@
     "manage": {
       "billingHistory": "बिलिङ इतिहास",
       "billingHistoryEmpty": "अहिलेसम्म कुनै बिलिङ इतिहास छैन।",
+      "billingHistoryError": "बिलिङ इतिहास लोड गर्न सकिएन",
       "cancel": "सदस्यता रद्द गर्नुहोस्",
       "cancelDescription": "तपाईंको Kilo Pass बिलिङ अवधिको अन्त्यसम्म सक्रिय रहन्छ र नवीकरण हुने छैन।",
       "cancelScheduled": "{{date}} मा रद्द हुन्छ",
       "cancelScheduledChange": "तय गरिएको परिवर्तन रद्द गर्नुहोस्",
       "cancelled": "सदस्यता रद्द गरियो",
-      "changePlan": "kilo.ai मा योजना परिवर्तन गर्नुहोस्",
-      "changePlanIosNote": "सशुल्क योजना परिवर्तन kilo.ai मा उपलब्ध छन्।",
       "creditHistoryEmpty": "अहिलेसम्म कुनै Kilo Pass क्रेडिट छैन।",
-      "manageInStore": "{{store}} मा व्यवस्थापन गर्नुहोस्",
+      "creditHistoryError": "क्रेडिट इतिहास लोड गर्न सकिएन",
       "resume": "सदस्यता पुनः सुरु गर्नुहोस्",
       "resumeCancelledDescription": "तपाईंको Kilo Pass फेरि स्वतः नवीकरण हुन थाल्छ।",
       "resumePausedDescription": "तपाईंको Kilo Pass तय गरिएको पुनः सुरु मितिभन्दा पहिले, अहिले नै पुनः सुरु हुन्छ।",
@@ -3114,9 +3142,6 @@
     "bonusFree": "नि:शुल्क बोनस",
     "bonusReferral": "रेफरल बोनस",
     "bonusAvailable": "उपलब्ध नि:शुल्क बोनस",
-    "kiloPassManagement": "Kilo Pass व्यवस्थापन",
-    "kiloPassSetup": "Kilo Pass सेटअप",
-    "opensManagementOnWeb": "वेबमा Kilo Pass व्यवस्थापन गर्ने पृष्ठ खोल्छ।",
     "loadFailedRetry": "तपाईंको जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "legalTermsOfUse": "प्रयोगका सर्तहरू (EULA)",
     "purchaseDifferentAccount": "यो App Store खरिद तपाईंको Kilo खातासँग जोडिएको छैन। खरिद गर्दा प्रयोग गरेको Apple Account मा साइन इन गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
@@ -3293,15 +3318,15 @@
       "stateRenewsOn": "{{date}} मा नवीकरण हुन्छ",
       "seatsDropTo": "{{date}} मा {{seats}} सिटमा घट्छ",
       "seats": "सिटहरू",
+      "seatsInUse": "प्रयोगमा",
       "autoTopUp": "स्वतः टप-अप",
       "autoTopUpAmount": "टप-अप रकम",
       "autoTopUpThreshold": "मौज्दात यसभन्दा कम हुँदा",
-      "manageOnWeb": "परिवर्तनहरू वेबमा गरिन्छन्",
+      "manageOnWeb": "वेबमा बिलिङ सेटिङहरू",
       "changePlan": "प्लान बदल्नुहोस्",
       "buySeats": "सिटहरू किन्नुहोस्",
       "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
       "manageAutoTopUp": "स्वतः टप-अप व्यवस्थापन गर्नुहोस्",
-      "webAddress": "वेब ठेगाना {{url}}",
       "opensOnWeb": "वेबमा खुल्छ"
     },
     "boundary": {
@@ -3317,7 +3342,7 @@
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
       "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
-      "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
+      "accessDeniedDescription": "तपाईंलाई पहुँच दिन कुनै संस्थाको मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।"
     },
     "create": {
       "title": "संस्था बनाउनुहोस्",
@@ -3437,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "वेबमा संस्थाका सेटिङहरू",
-      "integrations": "वेबमा एकीकरणहरू",
       "usageDetails": "प्रयोग विवरण",
       "providersAndModels": "प्रदायक र मोडेलहरू",
       "groups": "समूहहरू",
       "guardrails": "गार्डरेलहरू",
       "byok": "आफ्नै की प्रयोग गर्नुहोस्",
       "ssoAndDomain": "SSO र डोमेन",
-      "emailPreferences": "इमेल प्राथमिकताहरू",
       "dataCollection": "डेटा सङ्कलन",
       "auditLogs": "अडिट लगहरू",
-      "requestLogs": "अनुरोध लगहरू",
-      "subOrganizations": "उप-संस्थाहरू",
-      "distributeFunds": "रकम बाँड्नुहोस्"
+      "requestLogs": "अनुरोध लगहरू"
+    },
+    "requestLogs": {
+      "hint": "विन्डो सकिनुअघिको एक घण्टाका अनुरोधहरू, नयाँ पहिले।",
+      "older": "अघिल्लो घण्टा",
+      "newer": "पछिल्लो घण्टा",
+      "truncated": "यो घण्टामा सूचीमा देखाइएभन्दा धेरै अनुरोधहरू छन्।",
+      "emptyTitle": "कुनै अनुरोध छैन",
+      "emptyDescription": "यो घण्टामा कुनै गेटवे अनुरोध छैन।",
+      "loadError": "अनुरोध लगहरू लोड गर्न सकिएन।",
+      "permissionDenied": "संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको अनुरोध लगहरू पढ्न सक्नुहुन्छ।",
+      "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",
       "orgLast30Days": "सबै सदस्यहरू · पछिल्ला 30 दिन",
       "outputTokens": "आउटपुट टोकनहरू",
       "requests": "अनुरोधहरू"
+    },
+    "modes": {
+      "create": "नयाँ मोड",
+      "deleteAction": "मोड मेट्नुहोस्",
+      "deleteMessage": "यो मोड यस संस्थाका सबैका लागि हटाइन्छ। बिल्ट-इन मोडलाई प्रतिस्थापन गर्ने मोड बिल्ट-इन सेटिङमा फर्कन्छ।",
+      "deleteTitle": "यो मोड मेट्ने हो?",
+      "descriptionLabel": "मोडको विवरण",
+      "emptyDescription": "यहाँ थपिएका मोडहरू यस संस्थाका सबैका लागि उपलब्ध हुन्छन्।",
+      "emptyTitle": "अझै आफूले बनाएका मोडहरू छैनन्।",
+      "identifierHint": "साना अक्षर, अंक र हाइफन।",
+      "identifierInvalid": "केवल साना अक्षर, अंक र हाइफन प्रयोग गर्नुहोस्।",
+      "identifierLabel": "पहिचानक",
+      "identifierRequired": "पहिचानक प्रविष्ट गर्नुहोस्।",
+      "identifierTaken": "अर्को मोडले यो पहिचानक पहिले नै प्रयोग गरिरहेको छ।",
+      "nameLabel": "मोडको नाम",
+      "nameRequired": "मोडको नाम प्रविष्ट गर्नुहोस्।",
+      "notFound": "यो मोड अब अवस्थित छैन।",
+      "restrictionHint": "यो ढाँचासँग मिल्ने फाइलहरू मात्र सम्पादन गर्न सकिन्छ। सबै फाइललाई अनुमति दिन यसलाई खाली छोड्नुहोस्।",
+      "restrictionInvalid": "मान्य ढाँचा प्रविष्ट गर्नुहोस्।",
+      "restrictionLabel": "प्रतिबन्धको लेबल",
+      "restrictionPattern": "फाइल ढाँचा",
+      "roleLabel": "भूमिकाको परिभाषा",
+      "roleRequired": "यो मोडले के गर्छ त्यसको वर्णन गर्नुहोस्।",
+      "tool": {
+        "browser": "ब्राउजर प्रयोग गर्नुहोस्",
+        "command": "कमाण्डहरू चलाउनुहोस्",
+        "edit": "फाइलहरू सम्पादन गर्नुहोस्",
+        "mcp": "MCP प्रयोग गर्नुहोस्",
+        "read": "फाइलहरू पढ्नुहोस्"
+      },
+      "whenToUseLabel": "यो मोड कहिले प्रयोग गर्ने"
+    },
+    "groups": {
+      "create": "नयाँ समूह",
+      "deleteAction": "समूह मेट्नुहोस्",
+      "deleteMessage": "समूह, यसका नीतिहरू र सदस्य असाइनमेन्टहरू हटाइन्छन्।",
+      "deleteTitle": "यो समूह मेट्ने हो?",
+      "descriptionLabel": "समूहको विवरण",
+      "emptyDescription": "समूहले सदस्यहरूलाई एकत्र गर्छ ताकि एउटै नीति सबैमा लागू हुन सकोस्।",
+      "emptyTitle": "अझै समूहहरू छैनन्।",
+      "enterpriseOnly": "समूहहरू एन्टरप्राइज योजनामा उपलब्ध छन्।",
+      "memberCount": "{{displayCount}} सदस्य",
+      "memberCount_one": "{{displayCount}} सदस्य",
+      "memberCount_other": "{{displayCount}} सदस्यहरू",
+      "memberViewEmpty": "तपाईं यस संस्थाको कुनै पनि समूहमा हुनुहुन्न।",
+      "memberViewTitle": "तपाईंका समूहहरू",
+      "membersEmpty": "तपाईंको खोजसँग मिल्ने कुनै पनि सक्रिय सदस्य छैन।",
+      "membersLabel": "समूहका सदस्यहरू",
+      "nameLabel": "समूहको नाम",
+      "nameRequired": "समूहको नाम प्रविष्ट गर्नुहोस्।",
+      "nameTooLong": "नाम 80 अक्षर वा कममा राख्नुहोस्।",
+      "notFound": "यो समूह अब अवस्थित छैन।",
+      "permissionDenied": "संस्थाको मालिक वा प्रशासकले मात्र यसका समूहहरू परिवर्तन गर्न सक्छन्।",
+      "searchMembers": "सदस्यहरू खोज्नुहोस्",
+      "selectAllVisible": "देखिएका सबैलाई चयन गर्नुहोस्"
     },
     "hub": {
       "renameTitle": "संस्थाको नाम बदल्नुहोस्",
@@ -3485,8 +3573,7 @@
       "paymentPending": "भुक्तानी पर्खाइमा",
       "processingBlocked": "प्रशोधन रोकिएको",
       "processingNeedsReview": "प्रशोधनको समीक्षा आवश्यक",
-      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।",
-      "setupHint": "वेबमा Kilo Pass सेटअप खोल्छ।"
+      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।"
     }
   },
   "authErrors": {
@@ -4011,6 +4098,7 @@
     "commandAtLimit": "आदेश {{max}} अक्षरहरूमा सीमित छ",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",
+    "commandLimitReached": "प्रोफाइलमा बढीमा {{max}} सेटअप आदेशहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
     "moveCommandUp": "आदेश {{position}} माथि सार्नुहोस्",
     "moveCommandDown": "आदेश {{position}} तल सार्नुहोस्",
     "skillsTitle": "सीपहरू",
@@ -4097,6 +4185,7 @@
       "deleteMessage": "यो प्रोफाइल प्रयोग गर्ने नयाँ सत्रहरूले अब यो सर्भरका उपकरणहरूमा पहुँच गर्न सक्दैनन्। यो पूर्ववत गर्न सकिँदैन।",
       "deleteConfirm": "MCP सर्भर मेट्नुहोस्",
       "saveFailed": "MCP सर्भर सुरक्षित गर्न सकिएन",
+      "limitReached": "प्रोफाइलमा बढीमा {{max}} MCP सर्भरहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
       "deleteFailed": "MCP सर्भर मेटाउन सकिएन",
       "updateFailed": "MCP सर्भर अपडेट गर्न सकिएन"
     },
@@ -4129,6 +4218,7 @@
       "modeSubagent": "केवल उप-एजेन्ट",
       "modeAll": "सबै मोड",
       "saveFailed": "एजेन्ट सुरक्षित गर्न सकिएन",
+      "limitReached": "प्रोफाइलमा बढीमा {{max}} एजेन्टहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
       "deleteFailed": "एजेन्ट मेटाउन सकिएन",
       "nameRequired": "एजेन्टको नाम प्रविष्ट गर्नुहोस्",
       "slugRequired": "एजेन्ट स्लग प्रविष्ट गर्नुहोस्",
@@ -4159,6 +4249,7 @@
       "moveUp": "स्ल्याश आदेश {{name}} माथि सार्नुहोस्",
       "moveDown": "स्ल्याश आदेश {{name}} तल सार्नुहोस्",
       "saveFailed": "आदेश सुरक्षित गर्न सकिएन",
+      "limitReached": "प्रोफाइलमा बढीमा {{max}} स्ल्याश आदेशहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
       "deleteFailed": "आदेश मेटाउन सकिएन",
       "nameRequired": "आदेश नाम प्रविष्ट गर्नुहोस्",
       "nameInvalid": "नाम सानो अक्षरबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुपर्छ",
@@ -4239,7 +4330,7 @@
       },
       "purchaseFallback": "क्रेडिट खरिद",
       "receipt": "रसिद",
-      "receiptA11y": "{{description}} को रसिद खोल्नुहोस्",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} को रसिद खोल्नुहोस्",
       "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।"
     },
     "title": "क्रेडिट किन्नुहोस्",
@@ -4445,6 +4536,8 @@
     "topModels": "शीर्ष मोडेलहरू",
     "topFeatures": "शीर्ष सुविधाहरू",
     "emptyTitle": "यस अवधिमा कुनै प्रयोग छैन",
+    "unavailableTitle": "प्रयोग उपलब्ध छैन",
+    "unavailableDescription": "यो वर्कस्पेसले प्रयोगको जानकारी दिँदैन। फेरि प्रयास गर्नुले मद्दत गर्दैन।",
     "orgSelfNotice": "तपाईं यस संगठनमा आफ्नै प्रयोग हेर्दै हुनुहुन्छ।",
     "viewDetails": "प्रयोग विवरण हेर्नुहोस्"
   },
@@ -4493,7 +4586,78 @@
     },
     "triggers": {
       "title": "ट्रिगर र वेबहुकहरू",
-      "subtitle": "वेबमा वेबहुक र निर्धारित ट्रिगरहरू व्यवस्थापन गर्नुहोस्।"
+      "subtitle": "वेबहुक कल वा अनुसूचीबाट Cloud Agent रनहरू स्वचालित गर्नुहोस्।",
+      "new": "नयाँ ट्रिगर",
+      "emptyTitle": "अहिलेसम्म कुनै ट्रिगर छैन",
+      "emptyDescription": "वेबहुक कलबाट वा अनुसूचीमा Cloud Agent रन सुरु गर्न ट्रिगर बनाउनुहोस्।",
+      "loadFailedTitle": "ट्रिगरहरू लोड गर्न सकिएन",
+      "loadFailedDescription": "जडान भएपछि फेरि प्रयास गर्नुहोस्।",
+      "detailLoadFailedTitle": "यो ट्रिगर लोड गर्न सकिएन",
+      "detailNotFoundTitle": "ट्रिगर भेटिएन",
+      "cannotEditCreator": "यो ट्रिगर यसको सिर्जनाकर्ताको रूपमा चल्ने भएकाले सिर्जनाकर्ताले मात्र यसलाई परिवर्तन गर्न सक्छ।",
+      "permissionDenied": "तपाईंको भूमिकाले यी ट्रिगरहरू व्यवस्थापन गर्न सक्दैन।",
+      "webhookUrl": "वेबहुक यूआरएल",
+      "urlCopied": "वेबहुक यूआरएल प्रतिलिपि गरियो",
+      "deliveries": "डेलिभरीहरू",
+      "deliveriesEmptyTitle": "अहिलेसम्म कुनै डेलिभरी छैन",
+      "deliveriesEmptyDescription": "वेबहुक कल वा अनुसूचित रन आइपुगेपछि यहाँ देखा पर्छ।",
+      "deliveriesLoadFailedTitle": "डेलिभरीहरू लोड गर्न सकिएन",
+      "openSession": "सत्र हेर्नुहोस्",
+      "activationWebhook": "वेबहुक कल",
+      "fieldName": "ट्रिगरको नाम",
+      "fieldActivation": "चल्ने आधार",
+      "fieldCron": "क्रोन अभिव्यक्ति",
+      "fieldCronHelp": "पाँच फिल्ड: मिनेट, घण्टा, दिन, महिना र हप्ताको दिन। सबैभन्दा छोटो अन्तराल एक मिनेट हो।",
+      "fieldTimezone": "समय क्षेत्र",
+      "nameLocked": "ट्रिगर सिर्जना गरेपछि नाम परिवर्तन गर्न सकिँदैन।",
+      "repositoryLocked": "ट्रिगर सिर्जना गरेपछि रिपोजिटरी परिवर्तन गर्न सकिँदैन।",
+      "environmentAutomatic": "रिपोजिटरी अनुसार स्वचालित",
+      "notSelected": "चयन गरिएको छैन",
+      "profileDefaults": "पूर्वनिर्धारितहरू प्रयोग गर्नुहोस्",
+      "profileHelp": "ट्रिगर चल्दा प्रोफाइलका सेटिङहरू लागू हुन्छन्। यसका गोप्यहरू त्यतिबेला निर्धारण हुन्छन्।",
+      "customAgent": "कस्टम एजेन्ट",
+      "agentHelp": "रिपोजिटरीको .kilo/agent डाइरेक्टरीमा रहेको एजेन्ट, वा अन्तर्निहित मोडहरूमध्ये एक।",
+      "fieldBodySchema": "बडी स्किमा",
+      "bodySchemaHelp": "वैकल्पिक JSON Schema। यससँग नमिल्ने बडी भएको अनुरोध अस्वीकार गरिन्छ।",
+      "authTitle": "गोप्य हेडर",
+      "authDescription": "अनुरोधहरूले साझा गोप्यसहित यो हेडर पठाउनै पर्छ।",
+      "authHeaderLabel": "हेडरको नाम",
+      "authSecretLabel": "साझा गोप्य",
+      "authSecretKeep": "सुरक्षित गरिएको गोप्य कायम राख्न खाली छोड्नुहोस्।",
+      "authSecretSet": "आवश्यक। बलियो अनियमित स्ट्रिङ छान्नुहोस्।",
+      "authSecretCreator": "ट्रिगर यसको सिर्जनाकर्ताको रूपमा चल्दा कम्तीमा 16 वर्ण प्रयोग गर्नुहोस्।",
+      "autoCommit": "रन सकिएपछि परिवर्तनहरू कमिट गर्नुहोस्",
+      "condenseOnComplete": "रन सकिएपछि सन्दर्भ संक्षिप्त गर्नुहोस्",
+      "activeTitle": "ट्रिगर सक्रिय",
+      "activeDescription": "रोकिएका वेबहुकहरूले 404 जवाफ दिन्छन्।",
+      "runAsCreator": "मेरो रूपमा चलाउनुहोस्",
+      "runAsCreatorDescription": "हरेक रनले तपाईंको खाता प्रयोग गर्छ, त्यसैले गोप्य हेडर आवश्यक छ।",
+      "saveFailedTitle": "ट्रिगर सुरक्षित गर्न सकिएन",
+      "deleteTitle": "यो ट्रिगर मेट्ने हो?",
+      "deleteMessage": "{{name}} मा गरिने कलहरू असफल हुनेछन्। यो फिर्ता गर्न सकिँदैन।",
+      "deleteMessageScheduled": "{{name}} का तय भएका रनहरू रोकिन्छन्। यो फिर्ता गर्न सकिँदैन।",
+      "runNow": "अहिले चलाउनुहोस्",
+      "runStarted": "रन सुरु भयो",
+      "created": "ट्रिगर सिर्जना गरियो",
+      "saved": "ट्रिगर सुरक्षित गरियो",
+      "statusArrived": "आइपुग्यो",
+      "problems": {
+        "nameRequired": "नाम प्रविष्ट गर्नुहोस्।",
+        "nameTooShort": "कम्तीमा 8 वर्ण प्रयोग गर्नुहोस्।",
+        "nameTooLong": "64 वर्ण वा कम प्रयोग गर्नुहोस्।",
+        "nameCharacters": "साना अक्षर, अङ्क र हाइफन प्रयोग गर्नुहोस्।",
+        "nameReserved": "यो नाम आरक्षित छ।",
+        "cronRequired": "क्रोन अभिव्यक्ति प्रविष्ट गर्नुहोस्।",
+        "repositoryRequired": "रिपोजिटरी छान्नुहोस्",
+        "agentRequired": "एजेन्ट छान्नुहोस्।",
+        "agentInvalid": "अक्षरबाट सुरु हुने गरी साना अक्षर, अङ्क र हाइफन प्रयोग गर्नुहोस्।",
+        "modelRequired": "मोडेल छान्नुहोस्",
+        "promptRequired": "प्रम्प्ट प्रविष्ट गर्नुहोस्।",
+        "bodySchemaInvalid": "जेसन वस्तु प्रविष्ट गर्नुहोस्, वा यो खाली छोड्नुहोस्।",
+        "authHeaderRequired": "हेडरको नाम प्रविष्ट गर्नुहोस्।",
+        "authSecretRequired": "साझा गोप्य प्रविष्ट गर्नुहोस्।",
+        "authSecretTooShort": "कम्तीमा 16 वर्ण प्रयोग गर्नुहोस्।"
+      }
     }
   },
   "sessionShare": {
@@ -4511,8 +4675,9 @@
     "create": "लिङ्क बनाउनुहोस्",
     "createFailed": "लिङ्क बनाउन सकिएन।",
     "existingTitle": "विद्यमान लिङ्क",
-    "existingDescription": "यो सत्रको सेयर लिङ्क पहिले नै छ। नयाँ लिङ्क बनाउँदा यसलाई प्रतिस्थापन गर्छ र पुरानो लिङ्कले काम गर्न छोड्छ।",
+    "existingDescription": "यो सत्रको सेयर लिङ्क पहिले नै छ। यी सेटिङहरूसँग नयाँ लिङ्क बनाउँदा यसलाई प्रतिस्थापन गर्छ र पुरानो लिङ्कले काम गर्न छोड्छ।",
     "rotate": "नयाँ लिङ्क बनाउनुहोस्",
+    "replacementSettings": "यी सेटिङहरू नयाँ लिङ्कमा लागू हुन्छन्।",
     "revoke": "लिङ्क हटाउनुहोस्",
     "revokeTitle": "लिङ्क रद्द गर्ने?",
     "revokeMessage": "हालको लिङ्कले तुरुन्तै काम गर्न छोड्छ।",
@@ -4531,5 +4696,175 @@
     "unavailableDescription": "यो सेयर लिङ्कको म्याद सकिएको छ वा रद्द गरिएको छ।",
     "transcriptUnavailableTitle": "यो ट्रान्सक्रिप्ट लोड गर्न सकिएन",
     "transcriptUnavailableDescription": "लिङ्कले अझै काम गर्छ। केही बेरपछि फेरि प्रयास गर्नुहोस्।"
+  },
+  "organizationGuardrails": {
+    "title": "कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू",
+    "permissionDenied": "केवल संस्थाका मालिक र प्रशासकहरूले कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू व्यवस्थापन गर्न सक्छन्।",
+    "unavailable": "यो संस्थाका लागि कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू उपलब्ध छैनन्।",
+    "loadError": "कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू लोड गर्न सकिएन",
+    "statusSaving": "सङ्ग्रह गर्दै…",
+    "statusSaved": "सङ्ग्रह भयो",
+    "statusFailed": "सङ्ग्रह गर्न सकिएन।",
+    "inputTitle": "इनपुट सुरक्षा सीमाहरू",
+    "inputDescription": "प्रत्येक इनपुटलाई Enkrypt AI मार्फत स्क्यान गर्छ, उपकरणका नतिजाहरूसमेत। Enkrypt उपलब्ध नहुँदा अवरोध गर्ने डिटेक्टरले अनुरोध अस्वीकार गर्छ।",
+    "outputTitle": "आउटपुट सुरक्षा सीमाहरू",
+    "outputDescription": "सदस्यहरूले ती प्राप्त गर्नुअघि Enkrypt AI मार्फत प्रतिक्रियाहरू स्क्यान गर्छ। तपाईंले सक्रिय नगरेसम्म बन्द रहन्छ।",
+    "detectorsHint": "अवरोधले चिन्ह लगाइएको अनुरोध अस्वीकार गर्छ। अभिलेख मात्रले अनुरोधमा ढिलाइ नगरी यसलाई अभिलेख गर्छ।",
+    "detectorsHintOutput": "अवरोधले चिन्ह लगाइएको प्रतिक्रिया असफल बनाउँछ। अभिलेख मात्रले प्रतिक्रियामा ढिलाइ नगरी यसलाई अभिलेख गर्छ।",
+    "choiceLog": "अभिलेख मात्र",
+    "applyTo": "लागू गर्ने",
+    "applyToAllMembers": "सबै सदस्यहरू",
+    "applyKiloDefault": "Kilo पूर्वनिर्धारित लागू गर्नुहोस्",
+    "invalidSavedTitle": "सङ्ग्रहित इनपुट डिटेक्टर सेटिङहरू पढ्न सकिएन",
+    "invalidSavedBody": "इनपुट डिटेक्टरहरू फेरि सङ्ग्रह नगरेसम्म अनुरोधहरू अवरोधित रहन्छन्। तलका डिटेक्टरहरू Kilo पूर्वनिर्धारितबाट सुरु हुन्छन्।",
+    "invalidSavedOutputTitle": "सङ्ग्रहित आउटपुट डिटेक्टर सेटिङहरू पढ्न सकिएन",
+    "invalidSavedOutputBody": "आउटपुट डिटेक्टरहरू फेरि सङ्ग्रह नगरेसम्म प्रतिक्रियाहरू रोकिन्छन्। तल आउटपुट डिटेक्टरहरू छान्नुहोस्।",
+    "blockingOutputNote": "अवरोध गर्ने आउटपुट डिटेक्टरले Enkrypt ले सबै जाँच नगरेसम्म प्रतिक्रिया रोक्छ। ढिलाइबाट बच्न अभिलेख मात्र प्रयोग गर्नुहोस्।",
+    "inputDetectorRequired": "कम्तीमा एक इनपुट डिटेक्टर सक्रिय गर्नुहोस्।",
+    "outputDetectorRequired": "कम्तीमा एक आउटपुट डिटेक्टर सक्रिय गर्नुहोस्।",
+    "rulesTooMany": "{{max}} सम्म नियमहरू थप्नुहोस्।",
+    "ruleIdRequired": "नियम आईडी प्रविष्ट गर्नुहोस्।",
+    "ruleIdInvalid": "नियम आईडीमा अक्षर, अंक, बिन्दु, ड्यास र अन्डरस्कोर मात्र प्रयोग गर्न सकिन्छ।",
+    "ruleTextRequired": "नियमले के मनाही वा आवश्यक गर्छ भन्ने वर्णन गर्नुहोस्।",
+    "keywordTooLong": "प्रत्येक मुख्य शब्द {{max}} वर्णसम्म हुन सक्छ।",
+    "topicTooLong": "प्रत्येक विषय {{max}} वर्णसम्म हुन सक्छ।",
+    "keywordsTooMany": "{{max}} सम्म मुख्य शब्दहरू थप्नुहोस्।",
+    "topicsTooMany": "{{max}} सम्म विषयहरू थप्नुहोस्।",
+    "piiEntityRequired": "पहिचान गर्न कम्तीमा एक प्रकारको डेटा चयन गर्नुहोस्।",
+    "keywordRequired": "कम्तीमा एक मुख्य शब्द थप्नुहोस्।",
+    "topicRequired": "कम्तीमा एक विषय थप्नुहोस्।",
+    "policyTextRequired": "नीति पाठ प्रविष्ट गर्नुहोस्।",
+    "ruleRequired": "कम्तीमा एक नियम थप्नुहोस्।",
+    "ruleIdDuplicate": "प्रत्येक नियमको आफ्नै नियम ID हुनुपर्छ।",
+    "piiEntities": "पहिचान गर्नुपर्ने डेटा",
+    "keywordsLabel": "मुख्य शब्दहरू",
+    "keywordsHint": "प्रति पङ्क्ति एक मुख्य शब्द।",
+    "topicsHint": "प्रति पङ्क्ति एक विषय।",
+    "policyFormat": "नीति ढाँचा",
+    "policyFormatRules": "संरचित नियमहरू",
+    "policyFormatRulesDescription": "प्रत्येक आवश्यकताका लागि एक नियम, वर्ग र गम्भीरतासहित। सिफारिस गरिएको।",
+    "policyFormatText": "नीति पाठ",
+    "policyFormatTextDescription": "अवस्थित नीति सादा पाठका रूपमा टाँस्नुहोस्।",
+    "rulesEmpty": "अझै कुनै नियम छैनन्। प्रत्येक नियमले इनपुटमा समावेश हुन वा सोधिन नहुने एक कुरा वर्णन गर्छ।",
+    "addRule": "नियम थप्नुहोस्",
+    "ruleNumber": "नियम {{number}}",
+    "ruleRemove": "नियम {{number}} हटाउनुहोस्",
+    "ruleIdLabel": "नियम आईडी",
+    "ruleNameLabel": "नाम (वैकल्पिक)",
+    "ruleTextLabel": "नियम",
+    "ruleRiskCategory": "जोखिम वर्ग",
+    "ruleApplicability": "दायरा",
+    "ruleFrameworks": "फ्रेमवर्कहरू",
+    "detector": {
+      "promptInjection": {
+        "label": "प्रम्प्ट इन्जेक्सन",
+        "description": "निर्देशहरूलाई बेवास्ता गर्ने वा मोडेल जेलब्रेक गर्ने प्रयास पत्ता लगाउँछ।"
+      },
+      "policyViolation": {
+        "label": "नीति उल्लङ्घन",
+        "description": "तपाईंको संस्थाको नीति उल्लङ्घन गर्ने इनपुटहरूलाई चिन्ह लगाउँछ, जुन पाठ वा नियमका रूपमा लेखिएको हुन्छ।",
+        "descriptionOutput": "तपाईंको संस्थाको नीति उल्लङ्घन गर्ने प्रतिक्रियाहरूलाई चिन्ह लगाउँछ, जुन पाठ वा नियमका रूपमा लेखिएको हुन्छ।"
+      },
+      "pii": {
+        "label": "PII र गोप्य जानकारी",
+        "description": "व्यक्तिगत डेटा, प्रमाणहरू, आईपी ठेगानाहरू र URLहरू पत्ता लगाउँछ।"
+      },
+      "keywords": {
+        "label": "निषेधित मुख्य शब्दहरू",
+        "descriptionOutput": "तपाईंले सूचीबद्ध गर्नुभएको कुनै पनि मुख्य शब्द समावेश भएका प्रतिक्रियाहरू पत्ता लगाउँछ।"
+      },
+      "topics": {
+        "label": "विषयहरू",
+        "descriptionOutput": "तपाईंले सूचीबद्ध गर्नुभएको कुनै पनि विषयसँग सम्बन्धित प्रतिक्रियाहरूलाई चिन्ह लगाउँछ।"
+      },
+      "toxicity": {
+        "label": "विषाक्तता",
+        "description": "विषाक्त, अपमानजनक, धम्कीपूर्ण वा घृणित भाषा पत्ता लगाउँछ।"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "यौन वा अन्यथा कार्यस्थलका लागि असुरक्षित सामग्री पत्ता लगाउँछ।"
+      },
+      "bias": {
+        "label": "पूर्वाग्रह",
+        "description": "पूर्वाग्रही वा भेदभावपूर्ण भाषा पत्ता लगाउँछ।"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "व्यक्तिगत डेटा",
+        "description": "नामहरू, इमेल ठेगानाहरू, फोन नम्बरहरू।"
+      },
+      "secrets": {
+        "label": "गोप्य जानकारी",
+        "description": "API कुञ्जीहरू, टोकनहरू, पासवर्डहरू।"
+      },
+      "ipAddress": {
+        "label": "आईपी ठेगानाहरू",
+        "description": "IPv4 र IPv6 ठेगानाहरू।"
+      },
+      "url": {
+        "label": "URLहरू",
+        "description": "वेब ठेगानाहरू।"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "सुरक्षा र ठगी",
+      "safetyHarm": "सुरक्षितता र हानि",
+      "privacyDataProtection": "गोपनीयता र डेटा संरक्षण",
+      "brandReputationTrust": "ब्रान्ड र प्रतिष्ठा",
+      "biasFairnessEthical": "पूर्वाग्रह र निष्पक्षता",
+      "legalIpLiability": "कानुनी र बौद्धिक सम्पत्ति दायित्व",
+      "productMisuse": "उत्पादनको दुरुपयोग",
+      "performanceQuality": "प्रदर्शन र गुणस्तर"
+    },
+    "applicability": {
+      "user": "प्रयोगकर्ता इनपुट",
+      "userAssistant": "प्रयोगकर्ता इनपुट र प्रतिक्रियाहरू"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM शीर्ष १० (२०२५)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI ऐन",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "उद्यम सुविधा",
+    "enterpriseOnly": "यो उद्यमका लागि मात्र सुविधा हो।",
+    "readOnly": "केवल संस्थाका मालिक र प्रशासकहरूले यी सेटिङहरू परिवर्तन गर्न सक्छन्।",
+    "loadError": "प्रदायकहरू र मोडेलहरू लोड गर्न सकिएन",
+    "tabModels": "मोडेलहरू",
+    "tabProviders": "प्रदायकहरू",
+    "tabGateways": "गेटवेहरू",
+    "modelsDescription": "प्रत्येक सदस्यका लागि अवरोध गर्न मोडेल बन्द गर्नुहोस्। अनुमति दिइएका प्रदायकहरूका मोडेलहरू सुरुमा सक्रिय हुन्छन्।",
+    "modelsDeniedOnly": "अस्वीकृत मात्र",
+    "modelsEmpty": "यो खोजसँग कुनै मोडेल मेल खाँदैन।",
+    "providersDescription": "यो संस्थाका लागि Kilo ले त्यसमार्फत रुटिङ गर्न रोक्न प्रदायक बन्द गर्नुहोस्।",
+    "providersNeedCatalog": "पूर्ण मोडेल क्याटलग लोड नभएसम्म प्रदायक स्विचहरू पढ्न मात्र मिल्ने रहन्छन्। तिनलाई सम्पादन गर्न माथिको फेरि प्रयास गर्नुहोस् मा ट्याप गर्नुहोस्।",
+    "providersEmpty": "यो खोजसँग कुनै प्रदायक मेल खाँदैन।",
+    "allowAllShown": "देखाइएका सबैलाई अनुमति दिनुहोस्",
+    "denyAllShown": "देखाइएका सबैलाई अस्वीकार गर्नुहोस्",
+    "gatewaysDescription": "Kilo ले मोडेल अनुरोधहरू Vercel AI Gateway वा OpenRouter मार्फत रुट गर्छ। अक्षम गरिएको गेटवेले ती अनुरोधहरू असफल बनाउँछ।",
+    "emptyProviderList": "कम्तीमा एउटा प्रदायकलाई अनुमति दिनुहोस्। खाली सूचीले Kilo का सबै मोडेल रुटहरू रोक्छ।",
+    "gatewaysUnavailable": "यो संस्थाका लागि गेटवे सेटिङहरू उपलब्ध छैनन्।",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter का अनुरोधहरू कुनै क्षेत्रमा पिन गरिएका हुँदैनन्।",
+    "inferenceRegion": "अनुमान क्षेत्र",
+    "inferenceRegionDescription": "Vercel AI Gateway का अनुरोधहरूलाई यो क्षेत्रमा पिन गर्छ। त्यहाँ उपलब्ध नभएको मोडेल असफल हुन्छ।",
+    "disableOpenrouterNote": "OpenRouter अक्षम गर्दा यस मार्फत अनुरोध रुट गर्ने BYOK कुञ्जीहरू पनि अवरोध हुन्छन्।",
+    "emptyModelList": "कम्तीमा एउटा मोडेल सक्रिय राख्नुहोस्। सबै मोडेल अस्वीकार गर्दा सदस्यहरूसँग प्रयोग गर्ने केही पनि रहँदैन।",
+    "catalogUnavailable": "पूर्ण मोडेल क्याटलग लोड भएन, त्यसैले तपाईंका सुरक्षित गरिएका सूचीहरू मात्र देखाइएका छन्। सबै मोडेल लोड गर्न फेरि प्रयास गर्नुहोस्।",
+    "region": {
+      "global": "विश्वव्यापी",
+      "us": "संयुक्त राज्य अमेरिका",
+      "eu": "युरोपेली संघ",
+      "au": "अस्ट्रेलिया",
+      "jp": "जापान"
+    }
   }
 }

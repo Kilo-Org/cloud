@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "ستاسو د اجنټ غونډه تازه شوې ده",
-      "chatMessage": "تاسو یو نوی پیغام لرئ",
-      "instanceLifecycle": "ستاسو نمونه تازه شوې ده",
-      "scheduledAction": "یو ټاکلی عمل تازه شوی دی",
       "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
       "spendAlert": "ستاسو لګښت ته پاملرنه اړینه ده",
       "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · پرته له سرلیک",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -34,54 +24,23 @@
       "title": "د لګښت خبرتیا",
       "body": "د {{scopeName}} لګښت ${{amountUsd}} واوښت"
     },
-    "securityFindingNew": {
-      "title": "نوې امنیتي موندنه ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} په {{repoFullName}} کې"
+    },
+    "securityFindingNew": {
+      "title": "نوې امنیتي موندنه ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "د SLA خبرداری",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
+      "title": "د SLA خبرداری"
     },
     "securityFindingSlaBreach": {
-      "title": "د SLA سرغړونه",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "یوه امنیتي کتنه تازه معلومات لري"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} چمتو دی",
-      "body": "د خبرو پیل لپاره ټایپ کړئ."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} نه شو پیل کېدلای",
-      "body": "پیل ناکام شو."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} به ژر بیا پیل شي",
-      "body": "د {{when}} په وخت کې د بیا پیل ټاکل شوی."
-    },
-    "restartCancelled": {
-      "title": "د {{instanceName}} بیا پیل لغوه شو",
-      "body": "مخکې ټاکل شوی بیا پیل لغوه شوی دی."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} به ژر تازه شي",
-      "bodyWithTag": "د {{when}} په وخت کې {{targetImageTag}} ته تازه کړئ.",
-      "bodyWithoutTag": "د {{when}} په وخت کې ټاکل شوی تازه کول."
-    },
-    "versionChangeCancelled": {
-      "title": "د {{instanceName}} تازه کول لغوه شو",
-      "body": "مخکې ټاکل شوی تازه کول لغوه شوی دی."
+      "title": "د SLA سرغړونه"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "ستاسو Kilo غونډه چمتو ده چې له خپل تلیفون څخه یې کنټرول کړئ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

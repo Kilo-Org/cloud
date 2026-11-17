@@ -8,7 +8,7 @@ import {
   passkey_management_authorizations,
 } from '@kilocode/db/schema';
 import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
-import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 
 /** The one passkey-management action a grant authorizes. */
 export type PasskeyManagementOperation = 'enroll' | 'rename' | 'remove';
@@ -29,6 +29,27 @@ const AUTHORIZATION_TOKEN_BYTES = 32;
  */
 function hashAuthorizationToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * The one definition of a grant token: the bytes, their encoding, the digest
+ * the row stores, and the lifetime. Both minting paths build a grant through
+ * it, so a grant they issue always carries the digest redemption looks for.
+ */
+function createPasskeyManagementGrantToken(): {
+  token: string;
+  tokenHash: string;
+  expiresAt: string;
+  expiresIn: number;
+} {
+  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+
+  return {
+    token,
+    tokenHash: hashAuthorizationToken(token),
+    expiresAt: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+  };
 }
 
 /**
@@ -101,18 +122,18 @@ export async function mintPasskeyManagementAuthorization(params: {
   deviceSessionId: string;
   operation: PasskeyManagementOperation;
 }): Promise<MintedPasskeyManagementAuthorization> {
-  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+  const grant = createPasskeyManagementGrantToken();
 
   const [row] = await db
     .insert(passkey_management_authorizations)
     .values({
-      token_hash: hashAuthorizationToken(token),
+      token_hash: grant.tokenHash,
       kilo_user_id: params.userId,
       device_session_id: params.deviceSessionId,
       operation: params.operation,
       state: 'issued',
       web_session_pepper: accountWebSessionPepper(params.userId),
-      expires_at: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+      expires_at: grant.expiresAt,
     })
     .returning({ id: passkey_management_authorizations.id });
 
@@ -122,9 +143,9 @@ export async function mintPasskeyManagementAuthorization(params: {
 
   return {
     id: row.id,
-    token,
+    token: grant.token,
     operation: params.operation,
-    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+    expiresIn: grant.expiresIn,
   };
 }
 
@@ -284,7 +305,7 @@ export async function collectPasskeyManagementSsoGrant(params: {
   userId: string;
   deviceSessionId: string;
 }): Promise<CollectedPasskeyManagementGrant | null> {
-  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+  const grant = createPasskeyManagementGrantToken();
 
   const collected = await db.transaction(async tx => {
     const [session] = await tx
@@ -307,8 +328,8 @@ export async function collectPasskeyManagementSsoGrant(params: {
       .update(passkey_management_authorizations)
       .set({
         state: 'issued',
-        token_hash: hashAuthorizationToken(token),
-        expires_at: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+        token_hash: grant.tokenHash,
+        expires_at: grant.expiresAt,
       })
       .where(
         and(
@@ -330,9 +351,9 @@ export async function collectPasskeyManagementSsoGrant(params: {
   }
 
   return {
-    token,
+    token: grant.token,
     operation: collected.operation,
-    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+    expiresIn: grant.expiresIn,
   };
 }
 

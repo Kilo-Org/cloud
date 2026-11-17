@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the ended-page cases share the screen's one mock harness with the active-state cases. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -194,28 +195,79 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('names the plan and the day a lapsed pass ended', async () => {
+  it('prints the plan and both ledgers of a lapsed pass', async () => {
     mocks.state.data = {
-      subscription: subscription({
+      subscription: stripeSubscription({
         status: 'canceled',
         endedAt: '2026-11-08T04:05:06.000Z',
       }),
       isEligibleForFirstMonthPromo: false,
     };
     const renderer = await renderScreen();
-    // The screen's centered state, so a lapsed pass reads as a finished surface
-    // rather than a line floating in an empty body.
-    const emptyState = nodesOfType(renderer, 'EmptyState');
-    expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props).toMatchObject({
-      icon: 'Crown',
-      title: 'Pro · Monthly',
-      description: 'Ended Nov 8, 2026',
-    });
-    // The ended surface reports state only: no manage, cancel, or buy action.
-    expect(emptyState[0]?.props.action).toBeUndefined();
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+
+    const text = allText(renderer);
+    expect(text).toContain('Pro · Monthly');
+    expect(text).toContain('Ended Nov 8, 2026');
+
+    const creditSections = nodesOfType(renderer, 'KiloPassCreditHistorySection');
+    const billingSections = nodesOfType(renderer, 'KiloPassBillingHistorySection');
+    expect(creditSections).toHaveLength(1);
+    expect(billingSections).toHaveLength(1);
+    // A block that read its own ledger would fetch a second time and settle
+    // after the page printed.
+    expect(creditSections[0]?.props.history).toBe(mocks.ledgers.credit);
+    expect(billingSections[0]?.props.history).toBe(mocks.ledgers.billing);
+    renderer.unmount();
+  });
+
+  it('leaves out the invoices of a lapsed pass a store sold', async () => {
+    mocks.state.data = {
+      subscription: {
+        ...subscription({ status: 'canceled', endedAt: '2026-11-08T04:05:06.000Z' }),
+        paymentProvider: 'google_play',
+      },
+      isEligibleForFirstMonthPromo: false,
+    };
+    const renderer = await renderScreen();
+
+    expect(nodesOfType(renderer, 'KiloPassCreditHistorySection')).toHaveLength(1);
+    // A store-sold pass has no Stripe invoices, and the read rejects one, so
+    // the screen disables it and renders no section.
+    expect(nodesOfType(renderer, 'KiloPassBillingHistorySection')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('holds a lapsed page until its ledgers have their first page', async () => {
+    mocks.state.data = {
+      subscription: stripeSubscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    mocks.ledgers.credit.query.isPending = true;
+    const renderer = await renderScreen();
+
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KiloPassCreditHistorySection')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('offers no action or detail rows on a lapsed page', async () => {
+    mocks.state.data = {
+      subscription: stripeSubscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    const renderer = await renderScreen();
+
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
     expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    // Manage, cancel and buy live in the management block, and a lapsed page
+    // does not render it at all.
+    expect(nodesOfType(renderer, 'KiloPassManagementSections')).toHaveLength(0);
     renderer.unmount();
   });
 

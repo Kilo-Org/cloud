@@ -292,6 +292,9 @@ export function readSessionMessagesPage(input: {
     .limit(limit + 1)
     .all();
   let consumed: HistoryCursor | undefined;
+  let turnBoundary:
+    | { messageCount: number; cursor: HistoryCursor; omittedItemCount: number }
+    | undefined;
   let hasMore = candidates.length > limit;
   for (const candidate of candidates.slice(0, limit)) {
     const key: HistoryCursor = {
@@ -448,6 +451,18 @@ export function readSessionMessagesPage(input: {
     }
     page.messages.push(message);
     bytes += messageSize + 1;
+    if (preview && info.role === 'user') {
+      turnBoundary = {
+        messageCount: page.messages.length,
+        cursor: key,
+        omittedItemCount: page.omittedItemCount,
+      };
+    }
+  }
+  if (hasMore && turnBoundary) {
+    page.messages.length = turnBoundary.messageCount;
+    consumed = turnBoundary.cursor;
+    page.omittedItemCount = turnBoundary.omittedItemCount;
   }
   if (hasMore && consumed !== undefined) page.nextCursor = encodeCursor(consumed);
   page.messages.reverse();

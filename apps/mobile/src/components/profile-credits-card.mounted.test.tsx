@@ -115,6 +115,11 @@ const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
+// The credits row opens its route through the press-burst guard; the assertions
+// below read the router mock, so the guarded push is that same function.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
 
 // The mounted OrganizationProvider reads the shared memberships from this
 // list. The payload is driveable per test: a stored selection missing from

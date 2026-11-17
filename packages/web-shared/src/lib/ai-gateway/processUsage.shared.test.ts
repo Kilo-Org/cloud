@@ -12,7 +12,10 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
+
+jest.mock('@kilocode/web-shared/lib/getRootSpan', () => ({ sentryRootSpan: jest.fn() }));
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -34,23 +37,29 @@ afterEach(() => {
 });
 
 describe('drainSseStream', () => {
-  test('times SSE events and ignores keep-alive comments', async () => {
+  test('times from the first generated output until the final event', async () => {
     const events: string[] = [];
 
     const result = await drainSseStream(
       bodyArrivingAt([
         [100, ': OPENROUTER PROCESSING\n\n'],
+        [150, 'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'],
         [250, 'data: {"choices":[{"delta":{"content":"Hel'],
         [300, 'lo"}}]}\n\n'],
         [800, 'data: {"choices":[],"usage":{}}\n\n'],
         [900, 'data: [DONE]\n\n'],
       ]),
-      event => events.push(event.data),
+      event => {
+        events.push(event.data);
+        return event.data.includes('Hello');
+      },
       span,
-      20
+      20,
+      'test.time_to_first_token_ms'
     );
 
     expect(events).toEqual([
+      '{"choices":[{"delta":{"role":"assistant"}}]}',
       '{"choices":[{"delta":{"content":"Hello"}}]}',
       '{"choices":[],"usage":{}}',
       '[DONE]',
@@ -62,19 +71,35 @@ describe('drainSseStream', () => {
     });
   });
 
-  test('times a body without SSE events by its chunks', async () => {
+  test('reports no timing without generated output', async () => {
+    const result = await drainSseStream(
+      bodyArrivingAt([
+        [100, 'data: {"type":"response.created"}\n\n'],
+        [400, 'data: {"type":"response.completed"}\n\n'],
+      ]),
+      () => false,
+      span,
+      0,
+      'test.time_to_first_token_ms'
+    );
+
+    expect(result.timing).toEqual({ latency: null, generation_time: null });
+  });
+
+  test('reports no timing for a body without SSE events', async () => {
     const result = await drainSseStream(
       bodyArrivingAt([
         [100, '\n'],
         [400, '{"error":{"code":502,'],
         [450, '"message":"Bad gateway"}}'],
       ]),
-      () => {},
+      () => true,
       span,
-      0
+      0,
+      'test.time_to_first_token_ms'
     );
 
-    expect(result.timing).toEqual({ latency: 400, generation_time: 50 });
+    expect(result.timing).toEqual({ latency: null, generation_time: null });
   });
 
   test('reports no latency without a request start', async () => {
@@ -83,12 +108,32 @@ describe('drainSseStream', () => {
         [100, 'data: {}\n\n'],
         [150, 'data: [DONE]\n\n'],
       ]),
-      () => {},
+      () => true,
       span,
-      undefined
+      undefined,
+      'test.time_to_first_token_ms'
     );
 
     expect(result.timing).toEqual({ latency: null, generation_time: 50 });
+  });
+
+  test('reports time to first token on the root span from the request start', async () => {
+    const setAttribute = jest.fn();
+    jest.mocked(sentryRootSpan).mockReturnValueOnce({ setAttribute } as unknown as Span);
+
+    await drainSseStream(
+      bodyArrivingAt([
+        [100, 'data: lifecycle\n\n'],
+        [700, 'data: token\n\n'],
+        [800, 'data: token\n\n'],
+      ]),
+      event => event.data === 'token',
+      span,
+      50,
+      'test.time_to_first_token_ms'
+    );
+
+    expect(setAttribute.mock.calls).toEqual([['test.time_to_first_token_ms', 650]]);
   });
 
   test('counts callback failures, parses later events, and reports only ids', async () => {
@@ -111,13 +156,19 @@ describe('drainSseStream', () => {
       event => {
         if (event.data !== 'valid event') throw new Error(`Invalid event: ${event.data}`);
         events.push(event.data);
+        return true;
       },
       { end: endSpan } as Span,
       0,
+      'test.time_to_first_token_ms',
       () => ({ usageId: 'usage-id', messageId: 'message-id' })
     );
 
-    expect(result).toMatchObject({ wasAborted: false, malformedEventCount: 2 });
+    expect(result).toEqual({
+      wasAborted: false,
+      malformedEventCount: 2,
+      timing: { latency: 300, generation_time: 0 },
+    });
     expect(events).toEqual(['valid event']);
     expect(cancel).not.toHaveBeenCalled();
     expect(releaseLock).toHaveBeenCalledTimes(1);
@@ -158,13 +209,14 @@ describe('drainSseStream', () => {
       },
       { end: endSpan } as Span,
       0,
+      'test.time_to_first_token_ms',
       () => ({ usageId: 'usage-id', messageId: 'message-id' })
     );
 
     expect(result).toEqual({
       wasAborted: true,
       malformedEventCount: 1,
-      timing: { latency: 100, generation_time: 0 },
+      timing: { latency: null, generation_time: null },
     });
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(releaseLock).toHaveBeenCalledTimes(1);
@@ -199,9 +251,10 @@ describe('drainSseStream', () => {
 
       const result = await drainSseStream(
         bodyArrivingAt([[100, 'data: {}\n\n']], error),
-        () => undefined,
+        () => true,
         { end: jest.fn() } as unknown as Span,
-        0
+        0,
+        'test.time_to_first_token_ms'
       );
 
       expect(result.wasAborted).toBe(true);

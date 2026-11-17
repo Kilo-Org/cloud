@@ -16,7 +16,9 @@
  */
 export function isRepositoryRegionSettled(input: {
   /**
-   * Every provider query finished its first load. `isLoading` is false for a
+   * Every provider query finished its first load, or outlived the settle bound
+   * (`PROVIDER_QUERY_SETTLE_BOUND_MS`) while still loading, so a list that may
+   * never land no longer withholds the form's rows. `isLoading` is false for a
    * paused or disabled query, so an offline screen still settles.
    */
   providerQueriesResolved: boolean;

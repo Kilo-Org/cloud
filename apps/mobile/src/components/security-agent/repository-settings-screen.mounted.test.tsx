@@ -35,22 +35,12 @@ const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
-// The screen mounts the shared Manage-access hook (`useManageRepositoryAccess`);
-// its own classification suite covers the mint's answers, so this suite stubs
-// the hook and drives the handlers the screen wired.
-const access = vi.hoisted(() => ({
-  handlePress: vi.fn(),
-  pending: false,
-  handlers: null as null | {
-    onRoleRefused?: () => void;
-    onReturn?: (opened: boolean) => void;
-  },
+const manageAccess = vi.hoisted(() => ({
+  openAppShellHandoff: vi.fn<(target: unknown, options?: unknown) => Promise<void>>(),
 }));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
-  // The shared refusal notice reads the theme's ink for its icon.
-  useColorScheme: () => 'light',
   View: 'View',
   Pressable: 'Pressable',
 }));
@@ -112,16 +102,8 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
-vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
-  useManageRepositoryAccess: (
-    _scope: string,
-    _platform: 'github',
-    handlers: NonNullable<typeof access.handlers>
-  ) => {
-    access.handlers = handlers;
-    return { handlePress: access.handlePress, pending: access.pending };
-  },
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: manageAccess.openAppShellHandoff,
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
@@ -141,13 +123,7 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-// The stub mounts the screen's own `action` element under the named host, so a
-// state handed over there (the Manage access button, or the refusal notice that
-// replaces it) actually renders and its copy is observable.
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { action?: ReactNode; placement?: string }) =>
-    createElement('EmptyState', props, props.action),
-}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
@@ -155,7 +131,7 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement(Fragment, null, props.headerRight),
 }));
-vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2', Info: 'Info' }));
+vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
@@ -237,12 +213,13 @@ function emptyStateActionVariant(renderer: TestRenderer.ReactTestRenderer): unkn
   return props.variant;
 }
 
-// Presses the action; the wired handler is the stubbed `handlePress`, so no
-// async chain has to settle.
-function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
+// Presses the action and lets the mint → launch → refetch chain settle.
+async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   const onPress = emptyStateAction(renderer);
   act(onPress);
-  expect(access.handlePress).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => {
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalled();
+  });
 }
 
 beforeEach(() => {
@@ -265,9 +242,8 @@ beforeEach(() => {
   saveButton.onSave = null;
   repositories.refetch.mockReset();
   repositories.refetch.mockResolvedValue(undefined);
-  access.handlePress.mockReset();
-  access.pending = false;
-  access.handlers = null;
+  manageAccess.openAppShellHandoff.mockReset();
+  manageAccess.openAppShellHandoff.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -410,81 +386,28 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = [];
     const { renderer } = await mount();
 
-    pressEmptyStateAction(renderer);
+    await pressEmptyStateAction(renderer);
 
-    act(() => {
-      access.handlers?.onReturn?.(true);
-    });
-    expect(repositories.refetch).toHaveBeenCalledTimes(1);
-  });
-
-  // The list is read again on the return edge only when a page the reader could
-  // have changed actually opened; a launch that failed offers no change to catch.
-  it('does not read the repositories when no settings page was opened', async () => {
-    repositories.data = [];
-    const { renderer } = await mount();
-
-    pressEmptyStateAction(renderer);
-
-    act(() => {
-      access.handlers?.onReturn?.(false);
-    });
-    expect(repositories.refetch).not.toHaveBeenCalled();
-  });
-
-  // The server decides whether this reader may start an installation, and its
-  // answer stands where the control was: nothing opens, and the list is not
-  // read again.
-  it('shows the role notice in place of the action when the server answers for the role', async () => {
-    repositories.data = [];
-    const { renderer } = await mount('org_123');
-
-    pressEmptyStateAction(renderer);
-    act(() => {
-      access.handlers?.onRoleRefused?.();
-    });
-
-    const notice = i18n.t('securityAgent.scopeEntry.connectOwnerOnly', {
-      platform: i18n.t('common.github'),
-    });
-    expect(textContents(renderer)).toContain(notice);
-    const action = renderer.root.find(node => String(node.type) === 'EmptyState').props.action as {
-      type: unknown;
-      props: Record<string, unknown>;
-    };
-    expect(action.type).not.toBe('Button');
-    expect(action.props).not.toHaveProperty('onPress');
-    expect(repositories.refetch).not.toHaveBeenCalled();
-  });
-
-  // The answer is tied to the scope it was given for: a refusal recorded for one
-  // scope must not answer for another if the router reuses this component
-  // instance.
-  it('restores the action when the scope changes after a refusal', async () => {
-    repositories.data = [];
-    const { renderer } = await mount('org_123');
-
-    pressEmptyStateAction(renderer);
-    act(() => {
-      access.handlers?.onRoleRefused?.();
-    });
-    expect(textContents(renderer)).toContain(
-      i18n.t('securityAgent.scopeEntry.connectOwnerOnly', { platform: i18n.t('common.github') })
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledTimes(1);
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app' },
+      expect.any(Object)
     );
-
-    act(() => {
-      renderer.update(createElement(RepositorySettingsScreen, { scope: 'org_456' }));
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
     });
+  });
 
-    const action = renderer.root.find(node => String(node.type) === 'EmptyState').props.action as {
-      type: unknown;
-      props: { onPress?: unknown };
-    };
-    expect(action.type).toBe('Button');
-    expect(typeof action.props.onPress).toBe('function');
-    // The new scope wired its own handlers, so a refusal there is recorded for
-    // that scope.
-    expect(access.handlers).not.toBeNull();
+  it('names the organization on the hand-off target', async () => {
+    repositories.data = [];
+    const { renderer } = await mount('org_123');
+
+    await pressEmptyStateAction(renderer);
+
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app', organizationId: 'org_123' },
+      expect.any(Object)
+    );
   });
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {

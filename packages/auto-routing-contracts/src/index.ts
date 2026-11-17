@@ -6,7 +6,7 @@ import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
-  customRouterCandidateModel,
+  refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
@@ -47,9 +47,7 @@ export const RoutingConstraintsSchema = z.object({
 });
 export type RoutingConstraints = z.infer<typeof RoutingConstraintsSchema>;
 
-export function isVirtualAutoModelId(model: string): boolean {
-  return model.trim().toLowerCase().startsWith('kilo-auto/');
-}
+export { isVirtualAutoModelId } from './virtual-auto-model';
 
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
@@ -153,9 +151,7 @@ export const AutoRoutingDecisionSchema = z
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
-    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
     if (
       decision.fallback !== true &&
       (decision.taskType === null ||

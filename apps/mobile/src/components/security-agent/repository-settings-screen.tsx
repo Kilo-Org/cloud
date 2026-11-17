@@ -1,4 +1,7 @@
-import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
+import {
+  getSettingsDirtyState,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
@@ -8,8 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { RoleRefusalNotice } from '@/components/security-agent/role-refusal-notice';
-import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -25,6 +26,7 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -78,27 +80,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  // The scope whose mint the server refused for this reader's role. Stored by
-  // scope rather than as a bare flag: a refusal recorded for one scope must not
-  // answer for another if the router reuses this component instance.
-  const [refusedScope, setRefusedScope] = useState<string | null>(null);
-  const manageAccess = useManageRepositoryAccess(scope, 'github', {
-    // A refused role is the answer this screen presents itself: the notice below
-    // stands in the control's place, no page opens, and the list is not read
-    // again — nothing the reader could have changed changed.
-    onRoleRefused: () => {
-      setRefusedScope(scope);
-    },
-    // The GitHub settings page is where installation access is widened, and
-    // reading the repository list again once the browser settles is what makes
-    // a widened grant appear here.
-    onReturn: opened => {
-      if (opened) {
-        void repositories.refetch();
-      }
-    },
-  });
-  const accessRefused = refusedScope === scope;
   // The saved baseline the draft is compared against. State rather than a ref:
   // a successful save must re-render, so `dirty` (and the back guard that
   // reads it) reflects the saved values by the time the header action leaves.
@@ -225,6 +206,23 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // cached `[]` under a failed read cannot render a label with no control.
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
+  // The GitHub settings page is where installation access is widened on the
+  // web, and `openAppShellHandoff` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch or mint it could
+  // not complete is toasted by that helper and still resolves). Reading the
+  // repository list again on that return edge is what makes a grant show up
+  // here: without it the cached empty answer stays fresh for the whole stale
+  // window, and the disabled agent's enable rule counts exactly these
+  // repositories.
+  const manageAccess = async () => {
+    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    await openAppShellHandoff(
+      { page: 'github-app', ...(orgId ? { organizationId: orgId } : {}) },
+      { label: t('securityAgent.repositories.githubAppSettings') }
+    );
+    await repositories.refetch();
+  };
+
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
   // the rendered order and paddings are unchanged from the ScrollView version.
@@ -289,31 +287,20 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
-                // The server decides who may start an installation, so its
-                // answer is presented where the control was rather than as a
-                // page the reader cannot act on.
-                accessRefused ? (
-                  <RoleRefusalNotice
-                    message={t('securityAgent.scopeEntry.connectOwnerOnly', {
-                      platform: t('common.github'),
-                    })}
-                  />
-                ) : (
-                  <Button
-                    className={STATE_ACTION_CLASS}
-                    // Widening the grant is the only way out of this state, and
-                    // the header's Save is quiet while the screen has nothing to
-                    // save. The action therefore carries the filled primary
-                    // style instead of an outlined one that recedes into the
-                    // page beside it.
-                    variant="default"
-                    onPress={() => {
-                      manageAccess?.handlePress();
-                    }}
-                  >
-                    <Text>{t('securityAgent.repositories.manageAccess')}</Text>
-                  </Button>
-                )
+                <Button
+                  className={STATE_ACTION_CLASS}
+                  // Widening the grant is the only way out of this state, and
+                  // the header's Save is quiet while the screen has nothing to
+                  // save. The action therefore carries the filled primary
+                  // style instead of an outlined one that recedes into the
+                  // page beside it.
+                  variant="default"
+                  onPress={() => {
+                    void manageAccess();
+                  }}
+                >
+                  <Text>{t('securityAgent.repositories.manageAccess')}</Text>
+                </Button>
               }
             />
           ) : null}

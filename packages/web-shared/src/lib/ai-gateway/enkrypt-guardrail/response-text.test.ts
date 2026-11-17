@@ -1096,3 +1096,60 @@ describe('extractResponseText messages unknown deltas', () => {
     );
   });
 });
+
+describe('extractResponseText fim_completions json', () => {
+  it('extracts the completion text of every choice and ignores metadata', () => {
+    const body = JSON.stringify({
+      id: 'cmpl-1',
+      object: 'text_completion',
+      model: 'test/fim',
+      usage: { prompt_tokens: 3, completion_tokens: 8 },
+      choices: [
+        { index: 0, text: 'def add(a, b):', finish_reason: 'stop', logprobs: null },
+        { index: 1, text: 'return a + b', finish_reason: 'stop' },
+      ],
+    });
+
+    expect(extractResponseText('fim_completions', 'json', body)).toBe(
+      'def add(a, b):\n\nreturn a + b'
+    );
+  });
+});
+
+describe('extractResponseText fim_completions sse', () => {
+  it('joins interleaved delta content per choice index in arrival order', () => {
+    const body = chatStream([
+      { choices: [{ index: 0, delta: { role: 'assistant', content: '' } }] },
+      { choices: [{ index: 0, delta: { content: 'def ' } }] },
+      { choices: [{ index: 1, delta: { content: 'return ' } }] },
+      { choices: [{ index: 0, delta: { content: 'add(a, b):' } }] },
+      { choices: [{ index: 1, delta: { content: 'a + b' } }] },
+      { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 3, completion_tokens: 8 } },
+    ]);
+
+    expect(extractResponseText('fim_completions', 'sse', body)).toBe(
+      'def add(a, b):\n\nreturn a + b'
+    );
+  });
+});
+
+describe('extractResponseText edit_completions json', () => {
+  it('extracts the chat completion body the edit route returns', () => {
+    const body = JSON.stringify({
+      id: 'chatcmpl-1',
+      object: 'chat.completion',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop',
+          message: { role: 'assistant', content: 'const sum = (a, b) => a + b;' },
+        },
+      ],
+    });
+
+    expect(extractResponseText('edit_completions', 'json', body)).toBe(
+      'const sum = (a, b) => a + b;'
+    );
+  });
+});

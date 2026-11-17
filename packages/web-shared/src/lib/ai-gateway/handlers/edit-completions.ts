@@ -45,6 +45,9 @@ import {
   fetchUpstream,
   UPSTREAM_DURATION_BUDGET_MS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { admitCompletionRouteGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/completion-route';
+import { guardEnkryptOutput } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
+import { promptScanParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -206,7 +209,23 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     hasByok: !!userByokEntry,
   });
   if (accessResult.rejection) return accessResult.rejection;
-  const { balance, plan, payer } = accessResult.access;
+  const { balance, plan, payer, settings } = accessResult.access;
+
+  // Order: the guardrail admission (including the organization-credits gate) and the input scan
+  // start here, the blocking verdict is awaited just before the upstream call below, and the
+  // response is scanned before it is released at the bottom.
+  const guardrail = await admitCompletionRouteGuardrail({
+    caller,
+    account: { settings, payer },
+    organizationId,
+    kiloUserId: user.id,
+    apiKind: 'edit_completions',
+    sessionId: usageContext.session_id,
+    clientRequestId: extractHeaderAndLimitLength(request, 'x-kilo-request'),
+    parts: promptScanParts([{ header: 'user', body: requestBody.messages[0].content }]),
+    signal: request.signal,
+  });
+  if (guardrail.kind === 'rejected') return guardrail.response;
 
   // The usage row reports the payer the balance check resolved: the root organization for an
   // organization member.
@@ -239,6 +258,11 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
+
+  // The input guardrail's blocking verdict is awaited here, so a blocked prompt never reaches
+  // the upstream provider.
+  const blocked = await guardrail.rejectIfBlocked();
+  if (blocked) return blocked;
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',
@@ -313,5 +337,15 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const accounting = countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
-  return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
+  return (
+    upstreamErrorResponse ??
+    (await guardEnkryptOutput({
+      response: proxyRes,
+      scan: guardrail.outputScan,
+      kind: 'edit_completions',
+      stream: false,
+      signal: request.signal,
+      release: async response => wrapInSafeNextResponse(response),
+    }))
+  );
 }

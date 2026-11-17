@@ -179,6 +179,8 @@ export async function handleLlmProxyRequest(
   // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
   // awaited just before the upstream call; log-only detectors are never awaited. Parts are
   // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
+  // Edit and FIM completions enforce the same guardrail from `handlers/edit-completions.ts` and
+  // `handlers/fim-completions.ts`.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
       inputGuardrail =>

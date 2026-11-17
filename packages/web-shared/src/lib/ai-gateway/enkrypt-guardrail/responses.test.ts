@@ -45,6 +45,20 @@ describe('enkryptGuardrailRejectionResponse', () => {
     });
   });
 
+  it.each(['edit_completions', 'fim_completions'] as const)(
+    'returns the completion route error for a block on %s',
+    async kind => {
+      const response = enkryptGuardrailRejectionResponse(kind, block);
+
+      expect(response?.status).toBe(400);
+      expect(response?.headers.get('x-should-retry')).toBe('false');
+      expect(await response?.json()).toEqual({
+        error: blockWithRevertGuidance,
+        error_type: 'guardrail_blocked',
+      });
+    }
+  );
+
   it.each([
     [
       'chat_completions',
@@ -100,6 +114,21 @@ describe('enkryptGuardrailRejectionResponse', () => {
       });
     }
   );
+
+  it('returns a completion route error when failing closed on the edit route', async () => {
+    const response = enkryptGuardrailRejectionResponse('edit_completions', {
+      action: 'unavailable',
+      reason: 'failed',
+    });
+
+    expect(response?.status).toBe(503);
+    expect(response?.headers.get('x-should-retry')).toBe('false');
+    expect(await response?.json()).toEqual({
+      error:
+        "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Try again later.",
+      error_type: 'guardrail_unavailable',
+    });
+  });
 });
 
 describe('enkryptOutputGuardrailRejectionResponse', () => {
@@ -122,11 +151,14 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
     error: { type: 'invalid_request_error', message: outputBlock.message },
     error_type: 'guardrail_blocked',
   };
+  const completionBlocked = { error: outputBlock.message, error_type: 'guardrail_blocked' };
 
   it.each([
     ['chat_completions', openAiBlocked],
     ['messages', anthropicBlocked],
     ['responses', openAiBlocked],
+    ['edit_completions', completionBlocked],
+    ['fim_completions', completionBlocked],
   ] as const)('returns a native JSON error for a non-streamed %s block', async (kind, body) => {
     const response = enkryptOutputGuardrailRejectionResponse(kind, outputBlock, false);
 
@@ -139,6 +171,7 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
   it.each([
     ['chat_completions', `data: ${JSON.stringify(openAiBlocked)}\n\n`],
     ['messages', `event: error\ndata: ${JSON.stringify(anthropicBlocked)}\n\n`],
+    ['fim_completions', `data: ${JSON.stringify(completionBlocked)}\n\n`],
     [
       'responses',
       `event: error\ndata: ${JSON.stringify({

@@ -68,7 +68,7 @@ describe('checkDirectProviderAccess', () => {
       kiloUserId: 'user-1',
       modelId: 'vendor/model',
     });
-    expect(result).toEqual({ access: { balance: 10, plan: 'teams', payer } });
+    expect(result).toEqual({ access: { balance: 10, plan: 'teams', payer, settings: undefined } });
   });
 
   it('omits usage funding for free models', async () => {
@@ -95,7 +95,9 @@ describe('checkDirectProviderAccess', () => {
   ])('allows insufficient balance for %s', async (_label, overrides) => {
     mockedGetBalance.mockResolvedValue({ balance: 0, settings: undefined });
     const result = await checkDirectProviderAccess(params(overrides));
-    expect(result).toEqual({ access: { balance: 0, plan: undefined, payer: undefined } });
+    expect(result).toEqual({
+      access: { balance: 0, plan: undefined, payer: undefined, settings: undefined },
+    });
   });
 
   it('skips the model decision without an organization', async () => {

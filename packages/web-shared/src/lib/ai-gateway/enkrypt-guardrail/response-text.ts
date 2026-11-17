@@ -1,6 +1,6 @@
 import { createParser } from 'eventsource-parser';
 import * as z from 'zod';
-import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { EnkryptGuardrailApiKind } from '@kilocode/db/schema-types';
 
 export type ResponseBodyFormat = 'sse' | 'json';
 
@@ -267,6 +267,33 @@ const addChatChunk: AddJson = (groups, json) => {
   return true;
 };
 
+/** FIM delta fields read below, and the role, which is not model output. */
+const FIM_DELTA_FIELDS = new Set(['role', 'content']);
+
+const fimChoiceSchema = z.object({
+  index: z.number().optional(),
+  /** A non-streamed response carries its text here, and some streaming providers do too. */
+  text,
+  /** A stream event carries its text here. */
+  delta: z.looseObject({ role: text, content: text }).nullish(),
+});
+
+/**
+ * FIM completions return `choices[].text` and stream `choices[].delta.content`, so one extractor
+ * reads both. Each choice's pieces join under its index, so interleaved deltas stay in order.
+ */
+const addFimCompletion: AddJson = (groups, json) => {
+  const parsed = z.object({ choices: z.array(fimChoiceSchema) }).safeParse(json);
+  if (!parsed.success) return false;
+  parsed.data.choices.forEach((choice, position) => {
+    const choiceKey = `choice:${choice.index ?? position}`;
+    groups.add(choiceKey, choice.text);
+    groups.add(choiceKey, choice.delta?.content);
+    addUnknownFields(groups, `${choiceKey}:extra`, choice.delta, FIM_DELTA_FIELDS);
+  });
+  return true;
+};
+
 const anthropicBlockSchema = z.looseObject({
   type: z.string(),
   text,
@@ -435,10 +462,14 @@ const addResponsesEvent: AddJson = (groups, json) => {
   return true;
 };
 
-const EXTRACTORS: Record<GatewayChatApiKind, Record<ResponseBodyFormat, AddJson>> = {
+const EXTRACTORS: Record<EnkryptGuardrailApiKind, Record<ResponseBodyFormat, AddJson>> = {
   chat_completions: { json: addChatCompletion, sse: addChatChunk },
   messages: { json: addMessage, sse: addMessagesEvent },
   responses: { json: addResponse, sse: addResponsesEvent },
+  // The edit route returns chat completion bodies and rejects `stream: true`, so its sse entry
+  // exists only to keep the record exhaustive.
+  edit_completions: { json: addChatCompletion, sse: addChatChunk },
+  fim_completions: { json: addFimCompletion, sse: addFimCompletion },
 };
 
 /** Text that cannot be parsed into the expected shape is scanned whole, so no output escapes. */
@@ -460,7 +491,7 @@ function addJson(groups: TextGroups, data: string, add: AddJson) {
  * not scanned.
  */
 export function extractResponseText(
-  kind: GatewayChatApiKind,
+  kind: EnkryptGuardrailApiKind,
   format: ResponseBodyFormat,
   body: string
 ): string {

@@ -823,3 +823,12 @@ export function extractRequestParts(request: GatewayRequest): RequestScanParts {
     conversation: conversation.flatMap(itemSegments),
   };
 }
+
+/**
+ * The parts of a route that carries one plain member-authored prompt, such as edit and FIM
+ * completions: such a route has no tool definitions and no system prompt, so every segment is
+ * conversation.
+ */
+export function promptScanParts(segments: RequestSegment[]): RequestScanParts {
+  return { tools: [], system: [], conversation: segments };
+}

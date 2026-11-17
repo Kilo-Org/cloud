@@ -421,7 +421,7 @@ function InputGuardrailSection({
   return (
     <GuardrailSection
       title="Input guardrails"
-      description="Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable."
+      description="Check chat, edit completion and FIM completion requests with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable. Embedding and transcription requests are not checked."
       enabled={draft.enabled}
       onEnabledChange={enabled => onChange(current => ({ ...current, enabled }))}
     >
@@ -528,7 +528,7 @@ function OutputGuardrailSection({
   return (
     <GuardrailSection
       title="Output guardrails"
-      description="Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails."
+      description="Check model responses to chat, edit completion and FIM completion requests with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails. Embedding and transcription responses are not checked."
       enabled={output.enabled}
       onEnabledChange={enabled =>
         onChange(current => ({ ...current, output: { ...current.output, enabled } }))

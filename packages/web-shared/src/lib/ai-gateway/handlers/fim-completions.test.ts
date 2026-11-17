@@ -4,7 +4,17 @@ import type { User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
+import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
+import type { OrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  createEmptyEnkryptOutputDetectors,
+  createKiloDefaultEnkryptInputDetectors,
+  storableEnkryptInputDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type {
@@ -37,6 +47,7 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
   MISTRAL_API_KEY: 'system-mistral-key',
+  ENKRYPT_API_KEY: 'system-enkrypt-key',
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
@@ -77,6 +88,19 @@ jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage'
+  ),
+  recordEnkryptUsage: jest.fn(async () => undefined),
+}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({ groupIds: [] }),
+  })
+);
+jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight');
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -108,6 +132,11 @@ const mockedDecide = jest.mocked(decide);
 const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
+const mockedRecordEnkryptUsage = jest.mocked(recordEnkryptUsage);
+const mockedGetOrganizationGroupPolicyContext = jest.mocked(
+  getOrganizationGroupPolicyContext
+);
+const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 
 function makeRequest(
   model = 'inception/mercury-edit-2',
@@ -131,12 +160,22 @@ function makeRequest(
   });
 }
 
+function payerWithBalance(balance: number): BalancePayer {
+  return {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    totalMicrodollarsAcquired: 1_000_000_000,
+    microdollarsUsed: 1_000_000_000 - Math.max(0, balance) * 1_000_000,
+  };
+}
+
 function setOrganizationAuth({
   balance = 1000,
   settings,
+  groupIds = [],
 }: {
   balance?: number;
   settings?: OrganizationSettings;
+  groupIds?: readonly string[];
 } = {}) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: {
@@ -151,9 +190,35 @@ function setOrganizationAuth({
     balance,
     settings,
     plan: 'teams',
+    payer: payerWithBalance(balance),
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
   mockedGetBYOKforUser.mockResolvedValue(null);
+  mockedGetOrganizationGroupPolicyContext.mockResolvedValue({
+    groupIds,
+  } as unknown as OrganizationGroupPolicyContext);
+}
+
+/** A personal BYOK request: no organization, so no guardrail applies. */
+function setByokUserAuth() {
+  mockedGetUserFromAuth.mockResolvedValue({
+    user: {
+      id: 'user-byok',
+      google_user_email: 'byok@example.com',
+      microdollars_used: 0,
+    } as User,
+    authFailedResponse: null,
+    organizationId: undefined,
+  });
+  mockedGetBalanceAndOrgSettings.mockResolvedValue({
+    balance: 1000,
+    settings: undefined,
+    plan: 'teams',
+  });
+  mockedGetBYOKforOrganization.mockResolvedValue(null);
+  mockedGetBYOKforUser.mockResolvedValue([
+    { providerId: 'inception', decryptedAPIKey: 'user-supplied-key' },
+  ] as never);
 }
 
 function makeUpstreamResponse() {
@@ -761,6 +826,275 @@ describe('POST /api/fim/completions', () => {
       await flushAfter();
       expect(mockedLogMicrodollarUsage.mock.calls[0]?.[1].bouncer?.spendWatch).toBe(false);
       expect(mockedReleaseDecideLease).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Enkrypt guardrail', () => {
+    // The outer beforeEach resets all mocks, so re-arm the usage record's implementation here.
+    beforeEach(() => {
+      mockedRecordEnkryptUsage.mockImplementation(async () => undefined);
+    });
+
+    const enkryptDetectUrl = 'https://api.enkryptai.com/guardrails/detect';
+    const fullScanText = '[prompt]\nconst value =\n\n[suffix]\n;';
+    const blockingDetectors = storableEnkryptInputDetectors({
+      ...createKiloDefaultEnkryptInputDetectors(),
+      injection_attack: { enabled: true, action: 'block' },
+    });
+    const injection = {
+      summary: { injection_attack: 1, pii: 0 },
+      result_message: 'Potential prompt injection detected.',
+    };
+    const allowed = { summary: { injection_attack: 0, pii: 0 }, result_message: null };
+
+    // Enkrypt calls authenticate with an `apikey` header; no other request this route
+    // sends carries one.
+    function isEnkryptCall(init: RequestInit | undefined): boolean {
+      return new Headers(init?.headers).get('apikey') === 'system-enkrypt-key';
+    }
+
+    function enkryptAnswers(body: unknown, status = 200) {
+      mockedFetch.mockImplementation(async (_url, init) =>
+        isEnkryptCall(init)
+          ? Response.json(body, { status, headers: { 'x-enkrypt-credits-cost': '2' } })
+          : makeUpstreamResponse()
+      );
+    }
+
+    function enkryptRequestBodies() {
+      return mockedFetch.mock.calls
+        .filter(([, init]) => isEnkryptCall(init))
+        .map(([, init]) => JSON.parse(init?.body as string) as { text: string });
+    }
+
+    /** Settings with the kilo_encrypt grant a guarded organization has, merged first. */
+    function guardedSettings(section: Record<string, unknown>): OrganizationSettings {
+      return { kilo_encrypt: true, enkrypt: section } as unknown as OrganizationSettings;
+    }
+
+    it('makes no Enkrypt call and forwards upstream when the organization has no guardrail', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({ input_guardrail: { enabled: false } }),
+        groupIds: [],
+      });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ id: 'fim-test' });
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0][0]).toBe('https://api.inceptionlabs.ai/v1/fim/completions');
+      await flushAfter();
+      expect(mockedRecordEnkryptUsage).not.toHaveBeenCalled();
+    });
+
+    it('makes no Enkrypt call for a request without an organization', async () => {
+      setByokUserAuth();
+      enkryptAnswers(injection);
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch.mock.calls.filter(([, init]) => isEnkryptCall(init))).toEqual([]);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a blocked prompt with a 400 naming prompt and suffix before upstream', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({
+          input_guardrail: { enabled: true, detectors: blockingDetectors },
+        }),
+        groupIds: [],
+      });
+      enkryptAnswers(injection);
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: expect.stringContaining('injection_attack'),
+        error_type: 'guardrail_blocked',
+      });
+      expect(enkryptRequestBodies()).toEqual([expect.objectContaining({ text: fullScanText })]);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0][0]).toBe(enkryptDetectUrl);
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+      expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+    });
+
+    it('answers 503 when the Enkrypt scan is unavailable', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({
+          input_guardrail: { enabled: true, detectors: blockingDetectors },
+        }),
+        groupIds: [],
+      });
+      mockedFetch.mockImplementation(async (_url, init) =>
+        isEnkryptCall(init)
+          ? new Response(JSON.stringify({ detail: 'internal error' }), {
+              status: 500,
+              headers: { 'x-enkrypt-credits-cost': '2' },
+            })
+          : makeUpstreamResponse()
+      );
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: expect.stringContaining('could not check this request'),
+        error_type: 'guardrail_unavailable',
+      });
+      expect(mockedFetch.mock.calls.filter(([, init]) => !isEnkryptCall(init))).toEqual([]);
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    });
+
+    it('asks for organization credits before any Enkrypt call when the guarded organization has none', async () => {
+      setOrganizationAuth({
+        balance: 0,
+        settings: guardedSettings({
+          input_guardrail: { enabled: true, detectors: blockingDetectors },
+        }),
+        groupIds: [],
+      });
+      mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+      enkryptAnswers(injection);
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(402);
+      expect(await response.json()).toMatchObject({
+        error: { message: 'Insufficient credits' },
+        error_type: 'insufficient_credits',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordEnkryptUsage).not.toHaveBeenCalled();
+    });
+
+    it('withholds a blocked response and answers 400 guardrail_blocked', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({
+          output_guardrail: {
+            enabled: true,
+            detectors: {
+              ...createEmptyEnkryptOutputDetectors(),
+              pii: { enabled: true, action: 'block', entities: ['secrets'] },
+            },
+          },
+        }),
+        groupIds: [],
+      });
+      mockedFetch.mockImplementation(async (_url, init) =>
+        isEnkryptCall(init)
+          ? Response.json({ summary: { pii: 1 }, result_message: null }, {
+              headers: { 'x-enkrypt-credits-cost': '2' },
+            })
+          : makeUpstreamResponse()
+      );
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      const responseText = await response.text();
+      expect(responseText).not.toContain('sk-live-4f9a2c');
+      const body = JSON.parse(responseText) as { error: string; error_type: string };
+      expect(body.error).toContain("blocked the model's response");
+      expect(body).toEqual({ error: body.error, error_type: 'guardrail_blocked' });
+      expect(enkryptRequestBodies()).toEqual([expect.objectContaining({ text: 'completion' })]);
+      expect(mockedFetch.mock.calls.filter(([, init]) => !isEnkryptCall(init))).toHaveLength(1);
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(emitApiMetricsForResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it('replaces a blocked streamed response with a well-formed error stream', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({
+          output_guardrail: {
+            enabled: true,
+            detectors: {
+              ...createEmptyEnkryptOutputDetectors(),
+              pii: { enabled: true, action: 'block', entities: ['secrets'] },
+            },
+          },
+        }),
+        groupIds: [],
+      });
+      const chunk = (fields: object) =>
+        `data: ${JSON.stringify({ id: 'cmpl-1', model: 'mercury-edit-2', created: 1, ...fields })}\n\n`;
+      mockedFetch.mockImplementation(async (_url, init) =>
+        isEnkryptCall(init)
+          ? Response.json({ summary: { pii: 1 }, result_message: null }, {
+              headers: { 'x-enkrypt-credits-cost': '2' },
+            })
+          : new Response(
+              chunk({ choices: [{ index: 0, text: 'contain ', role: 'assistant' }] }) +
+                chunk({ choices: [{ index: 0, text: 'sk-live-4f9a2c', role: 'assistant' }] }) +
+                chunk({ choices: [{ index: 0, text: '', finish_reason: 'stop' }] }) +
+                'data: [DONE]\n\n',
+              { status: 200, headers: { 'content-type': 'text/event-stream' } }
+            )
+      );
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest(undefined, true) as never);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/event-stream');
+      let text = await response.text();
+      // The stream starts with keep-alive comment(s) while the scan runs; the first may
+      // still be the only content before the decided rejection on this fast mock.
+      text = text.replace(/^(?:: KILO PROCESSING\n\n)+/, '');
+      const events = text
+        .split('\n\n')
+        .filter(block => block.trim() !== '')
+        .map(block => {
+          const lines = block.split('\n');
+          const event = lines.find(line => line.startsWith('event: '))?.slice('event: '.length);
+          const data = lines.find(line => line.startsWith('data: '))?.slice('data: '.length);
+          expect(event).toBeUndefined(); // FIM streams carry one data block, no event name
+          return JSON.parse(data ?? 'null') as Record<string, unknown>;
+        });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        error: expect.stringContaining("blocked the model's response"),
+        error_type: 'guardrail_blocked',
+      });
+      expect(text).not.toContain('sk-live-4f9a2c');
+    });
+
+    it('writes a usage record with the fim_completions api kind', async () => {
+      setOrganizationAuth({
+        settings: guardedSettings({
+          input_guardrail: { enabled: true, detectors: blockingDetectors },
+        }),
+        groupIds: [],
+      });
+      enkryptAnswers(allowed);
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      await flushAfter();
+      expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+        [
+          expect.objectContaining({
+            organizationId: 'org-123',
+            kiloUserId: 'user-123',
+            apiKind: 'fim_completions',
+            decision: 'allowed',
+            creditsCost: 2,
+          }),
+        ],
+      ]);
     });
   });
 });

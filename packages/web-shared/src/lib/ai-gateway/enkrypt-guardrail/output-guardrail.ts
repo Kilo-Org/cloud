@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { after, NextResponse } from 'next/server';
-import type { OrganizationSettings } from '@kilocode/db/schema-types';
+import type { EnkryptGuardrailApiKind, OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
@@ -33,7 +33,6 @@ import type {
   EnkryptGuardrailCall,
   EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
-import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -250,14 +249,14 @@ type GuardEnkryptOutputParams = {
   response: Response;
   /** Null when the organization has no output guardrail. */
   scan: EnkryptOutputScan | null;
-  kind: GatewayChatApiKind;
+  kind: EnkryptGuardrailApiKind;
   /** Whether the client asked for a stream, which decides the shape of a rejection. */
   stream: boolean;
   signal: AbortSignal;
   /** Turns the upstream response, or its scanned replay, into the client's response. */
   release: (response: Response) => Promise<NextResponse>;
-  /** Called before a rejection replaces the response. */
-  onReject: (rejection: NextResponse, verdict: EnkryptGuardrailVerdict) => Promise<void>;
+  /** Called before a rejection replaces the response, when the route logs responses. */
+  onReject?: (rejection: NextResponse, verdict: EnkryptGuardrailVerdict) => Promise<void>;
   /** Receives the guardrail's report, to read after the response like `after()` work. */
   captureReport?: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
   captureRequestLogs?: (logs: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>) => void;
@@ -337,7 +336,7 @@ export async function guardEnkryptOutput({
   };
   const finish = async (decision: OutputDecision): Promise<NextResponse> => {
     if (decision.action === 'release') return release(decision.response);
-    await onReject(decision.response, decision.verdict);
+    await onReject?.(decision.response, decision.verdict);
     return decision.response;
   };
   const decide = (verdict: EnkryptGuardrailVerdict, allowed: Response): OutputDecision => {

@@ -32,11 +32,17 @@ const ENKRYPT_DETECTOR_IDS = [
  * only scans LLM text calls, so the write accepts only these kinds and every new kind stays
  * rejected by default. The shared enum type-checks this allow-list, so a rename or removal
  * of a listed kind fails here instead of silently changing the accepted set.
+ *
+ * The `edit_completions` and `fim_completions` routes are listed because they carry
+ * member-authored prompt text in the request and model text in the response, and the
+ * organization guardrail scans both, so their usage records are written like a chat call's.
  */
 const EnkryptApiKindSchema = GatewayApiKindSchema.extract([
   'chat_completions',
   'messages',
   'responses',
+  'edit_completions',
+  'fim_completions',
 ]);
 
 /**

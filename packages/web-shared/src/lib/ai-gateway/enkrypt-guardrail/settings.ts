@@ -142,8 +142,10 @@ function resolveGuardrailSettings(
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
  * detector. Organizations that never saved detectors get Kilo Default.
  * Only the configurable detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input
- * is checked, including tool results. It applies only to members of `enkryptInputGuardrailGroupId`,
- * when that is set.
+ * is checked, including tool results. It covers the chat completion family
+ * (`/v1/chat/completions`, `/v1/messages`, `/v1/responses`), edit completions and FIM
+ * completions. Request kinds whose text it does not scan, embeddings and audio transcription, are
+ * outside it. It applies only to members of `enkryptInputGuardrailGroupId`, when that is set.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -197,7 +199,10 @@ export function enkryptInputGuardrailAppliesTo(
  * The organization's output guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
  * detector. Unlike the input guardrail it has no default, so an organization that never saved
- * output detectors scans no response.
+ * output detectors scans no response. It covers the responses of the chat completion family
+ * (`/v1/chat/completions`, `/v1/messages`, `/v1/responses`), edit completions and FIM
+ * completions. Request kinds whose text it does not scan, embeddings and audio transcription, are
+ * outside it.
  */
 export function resolveEnkryptOutputGuardrail(
   organizationId: string,

@@ -2684,7 +2684,12 @@ export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVer
 
 export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 
-export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
+export type EnkryptGuardrailApiKind =
+  | 'chat_completions'
+  | 'messages'
+  | 'responses'
+  | 'edit_completions'
+  | 'fim_completions';
 
 export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
 

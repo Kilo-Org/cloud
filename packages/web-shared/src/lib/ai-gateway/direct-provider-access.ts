@@ -14,7 +14,11 @@ export type DirectProviderAccessResult =
   | { rejection: NextResponse; access?: never }
   | {
       rejection?: never;
-      access: Pick<BalanceAndOrgSettings, 'balance' | 'plan' | 'payer'>;
+      /**
+       * The account this call already read. `settings` rides along so a caller can resolve a
+       * guardrail that the organization's settings switch on without a second balance read.
+       */
+      access: Pick<BalanceAndOrgSettings, 'balance' | 'plan' | 'payer' | 'settings'>;
     };
 
 export async function checkDirectProviderAccess(params: {
@@ -27,7 +31,7 @@ export async function checkDirectProviderAccess(params: {
 }): Promise<DirectProviderAccessResult> {
   const { user, organizationId, model, provider } = params;
   const account = await readGatewayBalance(user, organizationId, model);
-  const { balance, plan, payer } = account;
+  const { balance, plan, payer, settings } = account;
 
   // Answered without the full credits response, which reads payment and top-up
   // state, to keep this high-volume autocomplete path cheap.
@@ -65,5 +69,5 @@ export async function checkDirectProviderAccess(params: {
     }
   }
 
-  return { access: { balance, plan, payer } };
+  return { access: { balance, plan, payer, settings } };
 }

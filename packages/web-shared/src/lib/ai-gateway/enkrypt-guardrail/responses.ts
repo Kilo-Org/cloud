@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
+import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDirection,
+} from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { EnkryptUnavailableReason } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
@@ -91,15 +93,19 @@ function guardrailRejection(
 
 /**
  * Error bodies in each API's native shape, so the OpenAI, OpenRouter, and Anthropic SDKs used by
- * Kilo clients read `error.message` as the displayed reason.
+ * Kilo clients read `error.message` as the displayed reason. Edit and FIM completions return their
+ * own errors as a message string, so the guardrail rejection uses that shape for them.
  */
-function apiErrorBody(kind: GatewayChatApiKind, error: GuardrailError) {
+function apiErrorBody(kind: EnkryptGuardrailApiKind, error: GuardrailError) {
   if (kind === 'messages') {
     return {
       type: 'error',
       error: { type: error.anthropicType, message: error.message },
       error_type: error.errorType,
     };
+  }
+  if (kind === 'edit_completions' || kind === 'fim_completions') {
+    return { error: error.message, error_type: error.errorType };
   }
   return {
     error: {
@@ -114,11 +120,13 @@ function apiErrorBody(kind: GatewayChatApiKind, error: GuardrailError) {
 
 /**
  * The stream error event each API's SDKs raise as an error: an error chunk for chat completions,
- * and an `error` event for messages and responses. The responses event carries the error both at
- * the top level, as the OpenAI API sends it, and nested, as the gateway's other stream errors do.
+ * and for FIM completions, which stream chat-style chunks, and an `error` event for messages and
+ * responses. The responses event carries the error both at the top level, as the OpenAI API sends
+ * it, and nested, as the gateway's other stream errors do. The edit route rejects `stream: true`,
+ * so its entry keeps the record exhaustive.
  */
-function streamErrorEvent(kind: GatewayChatApiKind, error: GuardrailError): string {
-  if (kind === 'chat_completions') {
+function streamErrorEvent(kind: EnkryptGuardrailApiKind, error: GuardrailError): string {
+  if (kind === 'chat_completions' || kind === 'edit_completions' || kind === 'fim_completions') {
     return `data: ${JSON.stringify(apiErrorBody(kind, error))}\n\n`;
   }
   if (kind === 'messages') {
@@ -136,7 +144,7 @@ function streamErrorEvent(kind: GatewayChatApiKind, error: GuardrailError): stri
   return `event: error\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
-function rejectionJson(kind: GatewayChatApiKind, rejection: GuardrailRejection): NextResponse {
+function rejectionJson(kind: EnkryptGuardrailApiKind, rejection: GuardrailRejection): NextResponse {
   return NextResponse.json(apiErrorBody(kind, rejection.error), {
     status: rejection.status,
     headers: rejection.headers,
@@ -168,7 +176,7 @@ export function enkryptOrganizationCreditsRequiredResponse(
 
 /** Maps an input guardrail verdict to the gateway's rejection, or null to send the request upstream. */
 export function enkryptGuardrailRejectionResponse(
-  kind: GatewayChatApiKind,
+  kind: EnkryptGuardrailApiKind,
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
   if (verdict.action === 'skip' || verdict.action === 'allow') return null;
@@ -181,7 +189,7 @@ export function enkryptGuardrailRejectionResponse(
  * well-formed stream with one error event.
  */
 export function enkryptOutputGuardrailRejectionResponse(
-  kind: GatewayChatApiKind,
+  kind: EnkryptGuardrailApiKind,
   verdict: EnkryptRejectingVerdict,
   stream: boolean
 ): NextResponse {

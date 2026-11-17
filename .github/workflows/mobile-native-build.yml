@@ -105,7 +105,10 @@ jobs:
       # hash, a failure or cancellation leaves the claim untrusted, and a
       # hung run ages out after NATIVE_CLAIM_MAX_AGE_MS in
       # dev/local/mobile-remote-native.ts.
+      # The claim is advisory: a failed upload must not fail the gate and
+      # skip the builds it exists to spare, so the run just loses the skip.
       - name: Claim the iOS build
+        continue-on-error: true
         if: steps.decide.outputs.need_ios == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -116,6 +119,7 @@ jobs:
           if-no-files-found: error
 
       - name: Claim the Android build
+        continue-on-error: true
         if: steps.decide.outputs.need_android == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

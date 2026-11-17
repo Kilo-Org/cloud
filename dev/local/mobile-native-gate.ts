@@ -121,12 +121,15 @@ function lookupArtifact(repository: string, name: string): boolean {
 // Claims fail open like artifact lookups: an unreadable claim means the
 // platform builds, which costs a duplicate build, never a missing
 // artifact. The caller's own run is excluded so a re-run rebuilds instead
-// of skipping on its own claim.
+// of skipping on its own claim, and the claim must come from this run's
+// own event type, so a dispatch that skips still has its own run
+// producing the artifact its watcher waits for.
 function lookupClaimArtifact(repository: string, name: string): boolean {
   const runId = Number(process.env.GITHUB_RUN_ID ?? '');
   return (
     findNativeClaims(name, repository, process.env.GITHUB_SHA ?? '', pullRequestValidationScope(), {
       excludeRunId: Number.isSafeInteger(runId) && runId > 0 ? runId : undefined,
+      consumerEvent: process.env.GITHUB_EVENT_NAME ?? '',
     }).length > 0
   );
 }

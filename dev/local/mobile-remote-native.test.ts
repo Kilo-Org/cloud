@@ -1336,14 +1336,21 @@ function activeRun(overrides: Record<string, unknown> = {}): Record<string, unkn
 
 test('claim lookup returns a fresh, active push claim from another run', () => {
   withOfflineArtifacts([claimArtifact()], { 301: activeRun() }, invoke => {
-    assert.deepEqual(JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)), [
-      {
-        id: 501,
-        name: nativeName,
-        created_at: '2026-10-28T00:00:00Z',
-        expires_at: '2027-01-25T00:00:00Z',
-      },
-    ]);
+    assert.deepEqual(
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ),
+      [
+        {
+          id: 501,
+          name: nativeName,
+          created_at: '2026-10-28T00:00:00Z',
+          expires_at: '2027-01-25T00:00:00Z',
+        },
+      ]
+    );
   });
 });
 
@@ -1351,7 +1358,7 @@ test('claim lookup ignores a completed successful run that the artifact lookup a
   withOfflineArtifacts([claimArtifact()], { 301: trustedRun() }, invoke => {
     const [artifacts, claims] = JSON.parse(
       invoke(
-        `[native.findNativeArtifacts(${JSON.stringify(nativeName)}), native.findNativeClaims(${JSON.stringify(nativeName)})]`
+        `[native.findNativeArtifacts(${JSON.stringify(nativeName)}), native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})]`
       )
     );
     assert.deepEqual(claims, []);
@@ -1364,7 +1371,11 @@ test('claim lookup ignores a completed failed run', () => {
   const run = { ...trustedRun(), conclusion: 'failure' };
   withOfflineArtifacts([claimArtifact()], { 301: run }, invoke => {
     assert.deepEqual(
-      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ),
       []
     );
   });
@@ -1374,15 +1385,19 @@ test('claim lookup rejects a claim older than the maximum claim age', () => {
   const stale = claimArtifact(501, 301, { created_at: '2026-10-27T00:00:00Z' });
   withOfflineArtifacts([stale], { 301: activeRun() }, invoke => {
     assert.deepEqual(
-      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ),
       []
     );
   });
   withOfflineArtifacts([claimArtifact()], { 301: activeRun() }, invoke => {
     const now = Date.parse('2026-10-28T00:00:00Z');
-    const fresh = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now}})`;
-    const atLimit = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now + NATIVE_CLAIM_MAX_AGE_MS}})`;
-    const past = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now + NATIVE_CLAIM_MAX_AGE_MS + 1}})`;
+    const fresh = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push', now: ${now}})`;
+    const atLimit = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push', now: ${now + NATIVE_CLAIM_MAX_AGE_MS}})`;
+    const past = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push', now: ${now + NATIVE_CLAIM_MAX_AGE_MS + 1}})`;
     assert.equal(JSON.parse(invoke(fresh)).length, 1);
     assert.equal(JSON.parse(invoke(atLimit)).length, 1);
     assert.equal(JSON.parse(invoke(past)).length, 0);
@@ -1394,7 +1409,7 @@ test('claim lookup ignores the excluded run so a re-run rebuilds', () => {
     assert.equal(
       JSON.parse(
         invoke(
-          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 301})`
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 301, consumerEvent: 'push'})`
         )
       ).length,
       0
@@ -1402,7 +1417,7 @@ test('claim lookup ignores the excluded run so a re-run rebuilds', () => {
     assert.equal(
       JSON.parse(
         invoke(
-          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 302})`
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 302, consumerEvent: 'push'})`
         )
       ).length,
       1
@@ -1418,13 +1433,21 @@ test('claim lookup rejects a fork claim and a foreign workflow run', () => {
   };
   withOfflineArtifacts([fork], { 301: activeRun({ head_repository: { id: 999 } }) }, invoke => {
     assert.deepEqual(
-      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ),
       []
     );
   });
   withOfflineArtifacts([claimArtifact()], { 301: activeRun({ workflow_id: 999 }) }, invoke => {
     assert.deepEqual(
-      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ),
       []
     );
   });
@@ -1441,7 +1464,11 @@ test('claim lookup scopes a pull-request claim to its pull request and source re
     assert.equal(JSON.parse(invoke(scope(6116, 101))).length, 0);
     assert.equal(JSON.parse(invoke(scope(6115, 999))).length, 0);
     assert.equal(
-      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)).length,
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {consumerEvent: 'push'})`
+        )
+      ).length,
       0
     );
   });

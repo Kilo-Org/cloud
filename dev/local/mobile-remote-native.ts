@@ -158,6 +158,7 @@ type NativeLookupContext = {
   workflowPath: string;
   expectedHeadSha: string | undefined;
   validationScope?: { pullRequestNumber: number; headRepositoryId: number };
+  consumerEvent?: string;
 };
 
 // Metadata every trusted artifact or claim entry must carry. The
@@ -174,7 +175,8 @@ type NativeListingEntry = {
 function nativeLookupContext(
   repository: string,
   expectedHeadSha: string | undefined,
-  validationScope?: { pullRequestNumber: number; headRepositoryId: number }
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number },
+  consumerEvent?: string
 ): NativeLookupContext {
   const verified = verifiedNativeSource(repository);
   return {
@@ -184,6 +186,7 @@ function nativeLookupContext(
     workflowPath: verified.workflowPath,
     expectedHeadSha,
     validationScope,
+    consumerEvent,
   };
 }
 
@@ -253,7 +256,12 @@ function listNativeEntries(context: NativeLookupContext, name: string): NativeLi
 // consumer may install count as evidence — a same-repository push to the
 // default branch, a manual dispatch of the exact consumer commit, or the
 // caller's own pull request. Artifact lookups additionally require a
-// completed successful run; claim lookups require an active one.
+// completed successful run; claim lookups require an active one and,
+// unlike artifacts, a producer of the consumer's own event: a claim only
+// promises an artifact, so a dispatch that skips on a push claim — or a
+// push that skips on a dispatch claim — would leave its own trigger with
+// no run producing its artifact, where the same-skip published path is
+// safe because the artifact already exists.
 function nativeRunTrusted(
   run: RunMetadata | null,
   entry: NativeListingEntry,
@@ -290,6 +298,23 @@ function nativeRunTrusted(
     )
   ) {
     return false;
+  }
+  // A claim must come from the consumer's own event, except a push claim
+  // may cover a pull_request consumer: the push publishes the durable
+  // installable name the PR reuses, and no host watches a PR run's
+  // artifacts the way a dispatch watcher does. A dispatch claim never
+  // covers a push run — a push that skipped could leave main without a
+  // durable artifact — and a pull_request claim only covers its own PR,
+  // which the validation-scope rule above already pins.
+  if (!requireCompleted) {
+    const consumerEvent =
+      context.validationScope !== undefined ? 'pull_request' : (context.consumerEvent ?? '');
+    if (
+      run.event !== consumerEvent &&
+      !(run.event === 'push' && consumerEvent === 'pull_request')
+    ) {
+      return false;
+    }
   }
   return true;
 }
@@ -332,9 +357,14 @@ export function findNativeClaims(
   repository = '{owner}/{repo}',
   expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD']),
   validationScope?: { pullRequestNumber: number; headRepositoryId: number },
-  options: { excludeRunId?: number; now?: number } = {}
+  options: { excludeRunId?: number; now?: number; consumerEvent?: string } = {}
 ): NativeArtifact[] {
-  const context = nativeLookupContext(repository, expectedHeadSha, validationScope);
+  const context = nativeLookupContext(
+    repository,
+    expectedHeadSha,
+    validationScope,
+    options.consumerEvent
+  );
   const now = options.now ?? Date.now();
   const trusted: NativeArtifact[] = [];
   for (const entry of listNativeEntries(context, name)) {

@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.",
-      "emailPlaceholder": "மின்னஞ்சல் முகவரி",
+      "emailPlaceholder": "பெயர்@company.com",
       "permissionDenied": "உறுப்பினர்களை அழைக்க உங்களுக்கு அனுமதி இல்லை.",
       "roleMember": "பொறுப்பு: உறுப்பினர்.",
       "sendInvite": "அழைப்பை அனுப்பவும்",

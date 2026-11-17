@@ -3373,7 +3373,7 @@
     },
     "inviteMember": {
       "emailError": "मान्य ईमेल पता दर्ज करें।",
-      "emailPlaceholder": "आपका ईमेल पता",
+      "emailPlaceholder": "नाम@company.com",
       "permissionDenied": "आपको सदस्यों को आमंत्रित करने की अनुमति नहीं है।",
       "roleMember": "भूमिका: सदस्य",
       "sendInvite": "आमंत्रण भेजें",

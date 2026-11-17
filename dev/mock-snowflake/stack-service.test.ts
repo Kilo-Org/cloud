@@ -166,6 +166,56 @@ for (const [spelling, envLocal] of [
   });
 }
 
+for (const [spelling, envLocal] of [
+  ['a bare empty value', 'SNOWFLAKE_ACCOUNT_HOST=\n'],
+  ['an empty quoted value', 'SNOWFLAKE_ACCOUNT_HOST=""\n'],
+  ['an empty exported value', 'export SNOWFLAKE_ACCOUNT_HOST=\n'],
+] as const) {
+  test(`an empty SNOWFLAKE_ACCOUNT_HOST (${spelling}) is no real warehouse`, async () => {
+    // The app treats an empty host as missing (`getMissingSnowflakeEnvKeys`
+    // filters on falsy), and the mock is the stand-in for exactly that state:
+    // wiring proceeds so the section gives the app a working warehouse.
+    const fixture = wireEnvLocalFixture(envLocal);
+    try {
+      assert.deepEqual(await fixture.wire(), { status: 'inserted' });
+
+      const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+      assert.ok(content.startsWith(envLocal));
+      // The developer's line keeps its position above the section, so dotenv's
+      // last definition still picks the section's own host up.
+      assert.ok(content.indexOf('SNOWFLAKE_ACCOUNT_HOST') < content.indexOf(SECTION_START));
+      assert.equal(
+        content.split('\n').filter(line => line.includes('SNOWFLAKE_ACCOUNT_HOST')).length,
+        2
+      );
+      assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:\d+$/m);
+    } finally {
+      fixture.restore();
+    }
+  });
+}
+
+test('an empty SNOWFLAKE_ACCOUNT_HOST above an existing section is rewired', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  try {
+    // A section the stack wrote earlier, and a placeholder the developer wrote
+    // while unsetting the mock above it. The line stays the file's own: the
+    // section remains owned and is kept current, not removed.
+    fs.writeFileSync(fixture.envLocalPath, 'SNOWFLAKE_ACCOUNT_HOST=""\n');
+    assert.deepEqual(await fixture.wire(), { status: 'inserted' });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.startsWith('SNOWFLAKE_ACCOUNT_HOST=""\n'));
+    assert.ok(content.includes(SECTION_START));
+    // The developer's placeholder above the section, and the section's own
+    // definition below it: two distinct lines with the same key.
+    assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=""$/m);
+    assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:\d+$/m);
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('the bundle carries the mock certificate and a CA the file already trusted', async () => {
   const fixture = wireEnvLocalFixture(undefined);
   const ambient = process.env.NODE_EXTRA_CA_CERTS;

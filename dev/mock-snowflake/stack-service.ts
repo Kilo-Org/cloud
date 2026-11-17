@@ -321,9 +321,13 @@ export function wireEnvLocal(): WireResult {
   const recordedCaSources = readRecordedCaSources(lines, section);
   const bundlePath = caBundlePath();
 
-  if (
-    parseEnvEntries(outsideSection.join('\n')).some(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST')
-  ) {
+  // An empty value is no warehouse: `getMissingSnowflakeEnvKeys` in the app
+  // filters on falsy, so `SNOWFLAKE_ACCOUNT_HOST=` reports the key as missing
+  // exactly like an absent one. Kept only when something real is set.
+  const outsideHost = parseEnvEntries(outsideSection.join('\n')).find(
+    entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST' && entry.value !== ''
+  );
+  if (outsideHost !== undefined) {
     if (!section) return { status: 'keptRealWarehouse', removedSection: false };
     writeEnvLines(
       envLocalPath,

@@ -1,3 +1,4 @@
+/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import { buildExtensionHello } from './envelope';
 import type { LocalAgentCapabilities, LocalAgentExtensionHello } from './envelope';
 

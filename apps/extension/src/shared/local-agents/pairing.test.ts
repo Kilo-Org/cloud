@@ -1,3 +1,4 @@
+/* eslint-disable eslint/id-length -- fragment keys are the wire names `k` and `v` */
 import { describe, expect, it } from 'vitest';
 import { isUsablePairingEndpoint, parseLoopbackSocketUrl, parsePairingUrl } from './pairing';
 

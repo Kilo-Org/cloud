@@ -1,3 +1,4 @@
+/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import type { LocalAgentConnectedAgent } from '@/src/shared/local-agents/registry';
 import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
 

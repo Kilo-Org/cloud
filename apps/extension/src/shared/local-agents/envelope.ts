@@ -1,3 +1,4 @@
+/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import { z } from 'zod';
 import { parseJsonRpcMessage } from './jsonrpc';
 import type { JsonRpcMessage, JsonRpcWireMessage } from './jsonrpc';

@@ -38,6 +38,8 @@ export default defineConfig({
       'http://localhost/*',
     ],
     name: 'Kilo Code',
+    // Optional permissions never disable installs; Chrome prompts when the switch turns on.
+    optional_permissions: ['nativeMessaging'],
     permissions:
       browser === 'firefox'
         ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']

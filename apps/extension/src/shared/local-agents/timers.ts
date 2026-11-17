@@ -1,3 +1,4 @@
+/* eslint-disable promise/prefer-await-to-callbacks -- timer callbacks are synchronous by contract */
 import type { LocalAgentTimers } from './transport-types';
 
 /*

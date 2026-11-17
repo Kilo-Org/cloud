@@ -337,7 +337,8 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
         } else {
           try {
             display = readKilo2Messages(native.source.session, [parsed.data])[0];
-          } catch {
+          } catch (error) {
+            console.error(`[ConversationSource] Native message ${parsed.data.id} omitted:`, error);
             display = undefined;
           }
         }

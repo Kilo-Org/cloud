@@ -60,7 +60,7 @@ function run(repo, args) {
 test('the notes paths cover every package the store build bundles', () => {
   const config = readFileSync(CONFIG, 'utf8');
   const bundled = [...config.matchAll(/'packages\/([^/']+)\/src\/\*\*'/g)].map(
-    match => `packages/${match[1]}/`
+    match => `packages/${match[1]}/src/`
   );
   assert.ok(bundled.length > 0, 'the sources allowlist names at least one package');
   assert.deepEqual(NOTES_PATHS.filter(path => path.startsWith('packages/')).sort(), bundled.sort());
@@ -110,17 +110,36 @@ test('body links the pull requests the store build shipped', () => {
       { 'apps/web/src/page.ts': 'export const page = 1;\n' },
       'feat(web): unrelated change (#16)'
     );
+    commitFiles(
+      repo,
+      { 'apps/extension/tests/e2e/side-panel.spec.ts': 'export const spec = 1;\n' },
+      'test(extension): cover the side panel (#17)'
+    );
+    commitFiles(
+      repo,
+      { 'apps/extension/AGENTS.md': '# Extension\n' },
+      'docs(extension): describe the store build (#18)'
+    );
+    commitFiles(
+      repo,
+      { 'packages/cloud-agent-sdk/src/x.test.ts': 'export const test = 1;\n' },
+      'test(cloud-agent-sdk): cover a dropped stream (#19)'
+    );
 
     const result = run(repo, ['body', '--from', 'kilo-extension-release/1.0.0']);
     assert.equal(result.status, 0, result.stderr);
     // The direct commit has no pull request, the bump PR carries no product
     // change, the changelog commit is excluded from the path list, and the
-    // unrelated path is outside the extension.
+    // unrelated path is outside the extension. A test-only, docs-only or
+    // test-file-only commit ships nothing either, so it never reaches the notes.
     assert.equal(
       result.stdout,
       '- feat(extension): add side panel button ([#12](https://github.com/Kilo-Org/cloud/pull/12))\n' +
         '- fix(cloud-agent-sdk): retry a dropped stream ([#13](https://github.com/Kilo-Org/cloud/pull/13))\n'
     );
+    for (const unshipped of ['(#17)', '(#18)', '(#19)']) {
+      assert.ok(!result.stdout.includes(unshipped), `${unshipped} ships nothing`);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -161,6 +180,24 @@ test('body reports no pull request when only direct commits shipped', () => {
     const unknown = run(repo, ['body', '--from', 'kilo-extension-release/0.0.0']);
     assert.equal(unknown.status, 2);
     assert.match(unknown.stderr, /--from ref does not resolve/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('body rejects --to without --from and an unresolvable --to', () => {
+  const { root, repo } = scratchRepo();
+  try {
+    commitFiles(repo, { 'apps/extension/src/main.ts': 'export const version = 1;\n' }, 'init');
+
+    // A range needs both ends: --to alone has no release to start from.
+    const noFrom = run(repo, ['body', '--to', 'HEAD']);
+    assert.equal(noFrom.status, 2, noFrom.stderr);
+    assert.match(noFrom.stderr, /changelog: --to needs --from/);
+
+    const unknown = run(repo, ['body', '--from', 'HEAD', '--to', 'no-such-ref']);
+    assert.equal(unknown.status, 2, unknown.stderr);
+    assert.match(unknown.stderr, /changelog: --to ref does not resolve: no-such-ref/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

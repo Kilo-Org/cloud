@@ -81,7 +81,7 @@ jobs:
               TAGGED=$(git ls-remote origin "refs/tags/$TAG" | awk '{print $1}')
             fi
             if [ -n "$TAGGED" ] && [ "$TAGGED" != "$HEAD_SHA" ]; then
-              echo "::error::Version $CURRENT is already released at $TAGGED, and this run is at $HEAD_SHA. Merge the version-bump PR so the next dispatch builds a higher version."
+              echo "::error::Version $CURRENT is already released at $TAGGED, and this run is at $HEAD_SHA. Merge the open version-bump PR if one exists; otherwise re-run the failed jobs of the run that built $TAGGED (gh run rerun <run-id> --failed), which publishes the release and opens the bump PR."
               exit 1
             fi
           fi

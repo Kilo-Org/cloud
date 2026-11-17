@@ -36,15 +36,17 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
-interface ModuleRecord {
+// eslint-disable-next-line typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type
+type ModuleRecord = {
   id: string;
   bytes: number;
-}
+};
 
-interface AssetRecord {
+// eslint-disable-next-line typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type
+type AssetRecord = {
   file: string;
   bytes: number;
-}
+};
 
 /** The plugin, or `false` when the build was not asked to record its module graph. */
 export function sbomModulesPlugin(): Plugin | false {

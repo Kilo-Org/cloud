@@ -160,6 +160,11 @@ function validate(workflow) {
     /notes<<NOTES_EOF/,
     'the notes must reach the changelog job as a heredoc output'
   );
+  assert.equal(
+    notes.env?.KILO_CHANGELOG_API_KEY,
+    '${{ secrets.KILO_CHANGELOG_API_KEY }}',
+    'the notes step must receive the release-notes gateway key'
+  );
 
   const cap = step(workflow, 'check-changes', 'cap');
   assert.ok(cap, 'check-changes: the cap step (id cap) is missing');
@@ -753,9 +758,11 @@ test('the changelog land step reports the verified head and refuses an unverifie
   const branch = 'kilo-app-version-bump-1.0.13';
   const land = step(readWorkflow(), 'changelog', 'land');
   // The step runs the script from the checkout root, so each fixture repo needs
-  // the real script copied in at the same path.
+  // the real script and the area map it reads copied in at the same paths.
   const scriptSource = new URL('../scripts/kilo-app-release-notes.mjs', import.meta.url);
   const scriptPath = 'scripts/kilo-app-release-notes.mjs';
+  const areaSource = new URL('../apps/mobile/src/components/changelog-areas.json', import.meta.url);
+  const areaPath = 'apps/mobile/src/components/changelog-areas.json';
   const outputs = {
     'check-changes': { version: '1.0.13' },
     'build-and-submit': { ios_build: '43', android_build: '43' },
@@ -778,8 +785,10 @@ test('the changelog land step reports the verified head and refuses an unverifie
     git(repo, ['config', 'user.email', 'release@example.invalid']);
     git(repo, ['config', 'commit.gpgsign', 'false']);
     mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    mkdirSync(join(repo, 'apps/mobile/src/components'), { recursive: true });
     mkdirSync(join(repo, 'scripts'), { recursive: true });
     copyFileSync(scriptSource, join(repo, scriptPath));
+    copyFileSync(areaSource, join(repo, areaPath));
     writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Kilo App Changelog\n\nprose\n');
     writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.12',\n");
     git(repo, ['add', '-A']);

@@ -32,12 +32,13 @@ describe('changelogSections', () => {
       {
         version: '1.0.16',
         newNotes: ['Open the changelog natively'],
+        changeNotes: [],
         fixesAreas: [],
         hasFixes: false,
       },
       // Both 1.0.15 builds are one release. Its repairs name one area — `auth`
       // maps to Sign-in — and the `bot`/`perf` bullets add none.
-      { version: '1.0.15', newNotes: [], fixesAreas: ['signIn'], hasFixes: true },
+      { version: '1.0.15', newNotes: [], changeNotes: [], fixesAreas: ['signIn'], hasFixes: true },
     ]);
   });
 
@@ -81,6 +82,7 @@ describe('changelogSections', () => {
     expect(sections[1]).toEqual({
       version: '1.0.14',
       newNotes: [],
+      changeNotes: [],
       fixesAreas: ['signIn'],
       hasFixes: true,
     });
@@ -100,6 +102,7 @@ describe('changelogSections', () => {
       {
         version: '1.0.15',
         newNotes: [],
+        changeNotes: [],
         // Every area has one fix, so the map's order breaks the tie.
         fixesAreas: ['chat', 'cloudAgent', 'securityAgent'],
         hasFixes: true,
@@ -156,6 +159,7 @@ describe('changelogSections', () => {
       {
         version: '1.0.15',
         newNotes: ['Keep the composer visible'],
+        changeNotes: [],
         fixesAreas: [],
         hasFixes: false,
       },
@@ -173,6 +177,7 @@ describe('changelogSections', () => {
       {
         version: '1.0.15',
         newNotes: ['Keep the composer visible'],
+        changeNotes: [],
         // The credits removal still counts for the area its scope names.
         fixesAreas: ['profileOrganizations'],
         hasFixes: true,
@@ -209,6 +214,7 @@ describe('changelogSections', () => {
       {
         version: '1.0.15',
         newNotes: ['Keep the composer visible'],
+        changeNotes: [],
         fixesAreas: [],
         hasFixes: false,
       },
@@ -223,6 +229,11 @@ describe('changelogSections', () => {
 - Open the changelog natively
 - Keep the composer visible
 
+### Changes
+
+- In-app Kilo Pass sales have ended; manage your plan on the web
+- Paid credits now expire a year after purchase
+
 ### Fixes
 
 - areas: chat, signIn
@@ -231,15 +242,65 @@ describe('changelogSections', () => {
       {
         version: '1.0.16',
         newNotes: ['Open the changelog natively', 'Keep the composer visible'],
+        changeNotes: [
+          'In-app Kilo Pass sales have ended; manage your plan on the web',
+          'Paid credits now expire a year after purchase',
+        ],
         fixesAreas: ['chat', 'signIn'],
         hasFixes: true,
       },
     ]);
   });
 
+  it('reads a section that carries only policy changes', () => {
+    const changesOnly = `## 1.0.19 (build 760 iOS, 761 Android)
+
+### Changes
+
+- Paid credits now expire a year after purchase
+`;
+    expect(changelogSections(changesOnly)).toEqual([
+      {
+        version: '1.0.19',
+        newNotes: [],
+        changeNotes: ['Paid credits now expire a year after purchase'],
+        fixesAreas: [],
+        hasFixes: false,
+      },
+    ]);
+  });
+
+  it('ignores the history rewrite pointer under an older build of a version', () => {
+    const merged = `## 1.0.15 (build 710 iOS, 711 Android)
+
+### New
+
+- Sign in once and stay signed in
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+_Its notes are on the newest 1.0.15 section above._
+`;
+    expect(changelogSections(merged)).toEqual([
+      {
+        version: '1.0.15',
+        newNotes: ['Sign in once and stay signed in'],
+        changeNotes: [],
+        fixesAreas: [],
+        hasFixes: false,
+      },
+    ]);
+  });
+
   it('keeps a heading that names no version as its own title', () => {
     expect(changelogSections(`## Unreleased\n\n- feat(chat): one\n`)).toEqual([
-      { version: 'Unreleased', newNotes: ['One'], fixesAreas: [], hasFixes: false },
+      {
+        version: 'Unreleased',
+        newNotes: ['One'],
+        changeNotes: [],
+        fixesAreas: [],
+        hasFixes: false,
+      },
     ]);
   });
 

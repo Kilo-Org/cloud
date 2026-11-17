@@ -22,11 +22,11 @@ import {
  * The release notes the app ships with, as a reader sees them. `CHANGELOG.md` is
  * inlined into the bundle as a string by babel-plugin-inline-import, and
  * `changelogSections` drops the file's maintainer parts, keeps the newest
- * features as sentences, and turns the fixes into the product areas they
- * touched. The newest section here is the release before this build: the
- * Release workflow writes a build's section after its submission lands, so the
- * bytes this build compiled cannot carry their own entry (it arrives in the
- * next build's bundle).
+ * features and policy changes as sentences, and turns the fixes into the
+ * product areas they touched. The newest section here is the release before
+ * this build: the Release workflow writes a build's section after its
+ * submission lands, so the bytes this build compiled cannot carry their own
+ * entry (it arrives in the next build's bundle).
  */
 const CHANGELOG_SECTIONS = changelogSections(changelog);
 
@@ -81,9 +81,9 @@ function NoteRow({ text }: Readonly<{ text: string }>) {
 }
 
 /**
- * One version: its heading, the New group, and the line that names the areas
- * the fixes touched. Bullets sit one 8 dp gap apart, the two groups 16 dp, and
- * the next version starts 24 dp down.
+ * One version: its heading, the New group, the policy changes, and the line
+ * that names the areas the fixes touched. Bullets sit one 8 dp gap apart, the
+ * groups 16 dp, and the next version starts 24 dp down.
  */
 function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
   const { t, i18n } = useTranslation();
@@ -96,6 +96,7 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
     section.newNotes.length === 0
       ? 'text-sm text-muted-foreground'
       : 'pt-4 text-sm text-muted-foreground';
+  const changesClass = section.newNotes.length === 0 ? 'gap-2' : 'gap-2 pt-4';
   return (
     <View className="pb-6">
       <Text variant="h4" className="pb-2">
@@ -107,6 +108,16 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
             {t('profile.changelogGroupNew')}
           </Text>
           {section.newNotes.map((note, position) => (
+            <NoteRow key={`${note}-${position}`} text={note} />
+          ))}
+        </View>
+      )}
+      {section.changeNotes.length === 0 ? null : (
+        <View className={changesClass}>
+          <Text variant="small" className={groupLabelClass}>
+            {t('common.changes')}
+          </Text>
+          {section.changeNotes.map((note, position) => (
             <NoteRow key={`${note}-${position}`} text={note} />
           ))}
         </View>

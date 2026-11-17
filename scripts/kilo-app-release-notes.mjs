@@ -4,9 +4,16 @@
  *
  * The kilo-app Release workflow writes the section after a successful store
  * submission. `body` lists the merged pull requests that shipped between two
- * refs and links each one, `identity` reads the store build identity from the
+ * refs, keeps the ones a reader can see, and asks the Kilo gateway to rewrite
+ * them as user outcomes; `identity` reads the store build identity from the
  * built IPA, and `write` inserts the section above the newest one and (with
  * --land) pushes it onto a branch.
+ *
+ * The rewrite is optional. `KILO_CHANGELOG_API_KEY` carries the gateway
+ * credential, and without it - or when the call fails or its answer does not
+ * pass `validateCuratedNotes` - `body` prints the deterministic block and warns
+ * on stderr. A release never fails because its notes could not be rewritten.
+ * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` exist for tests.
  *
  * Usage:
  *   node scripts/kilo-app-release-notes.mjs body [--from <ref>] [--to <ref>]
@@ -130,6 +137,29 @@ const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const MAX_LAND_RETRIES = 3;
 
+// Where a version's notes are rewritten. The Kilo gateway serves the
+// OpenAI-compatible chat completions shape under `/api/gateway/v1`, and both
+// the base URL and the model are the ones the harness SDK's live runs use:
+// `packages/harness-sdk/e2e/setup.ts` points at `https://app.kilo.ai` and lists
+// `anthropic/claude-haiku-4.5` first among the cheap models it sweeps.
+const NOTES_BASE_URL_DEFAULT = 'https://app.kilo.ai';
+const NOTES_PATH = '/api/gateway/v1/chat/completions';
+const NOTES_MODEL = 'anthropic/claude-haiku-4.5';
+
+// Notes are never worth a delayed release: a call that does not answer within
+// this window is abandoned and the deterministic block is written instead.
+const NOTES_TIMEOUT_DEFAULT_MS = 20_000;
+
+// The caps a validated answer has to meet, the same shape the deterministic
+// composer and the bundled screen write and read.
+const CURATED_NEW_LIMIT = NEW_SUBJECT_LIMIT;
+const CURATED_CHANGES_LIMIT = 6;
+const CURATED_AREA_LIMIT = 3;
+const CURATED_LINE_LIMIT = 160;
+
+// The areas the model may name, from the shared map: `chat`, `cloudAgent`, ...
+const CURATED_AREAS = Object.keys(AREA_MAP.areas);
+
 // The version-bump branch is deleted the moment a human merges its PR (auto
 // delete), which can happen while the section is still being composed. A land
 // that finds no branch is not a failed build: the composed section is pushed
@@ -227,10 +257,21 @@ function orderedAreas(seen) {
 }
 
 /**
+ * True for the two markers a build with nothing to show writes instead of
+ * notes. They are file text, not shipped subjects, and neither is news.
+ */
+export function isNoChangeMarker(text) {
+  return text === INITIAL_MARKER.slice(2) || text === NO_CHANGES_MARKER.slice(2);
+}
+
+/**
  * One shipped subject as the notes carry it: its linked sentence and the block
  * it belongs to, or null when a reader cannot see the change in it.
  */
 export function readerFacingSubject(subject) {
+  if (isNoChangeMarker(subject)) {
+    return null;
+  }
   const conventional = CONVENTIONAL_SUBJECT.exec(subject);
   const type = conventional ? conventional[1] : null;
   if (type !== null && INTERNAL_SUBJECT_TYPES.includes(type)) {
@@ -303,6 +344,314 @@ export function changelogBodyLines(subjects) {
     );
   }
   return lines;
+}
+
+/** `subject` without the pull request reference a changelog line ends in. */
+export function plainSubject(subject) {
+  return subject
+    .replace(/\s*\(\[#\d+\]\([^)]*\)\)$/, '')
+    .replace(/\s*\(#\d+\)$/, '')
+    .trim();
+}
+
+/**
+ * One shipped subject as the rewrite sees it: the block the shared table puts
+ * it in, the area its scope names, and its plain sentence. This is the same
+ * filter the deterministic block applies, so the model never rewrites work the
+ * table already dropped.
+ */
+export function rewriteCandidates(subjects) {
+  const candidates = [];
+  for (const subject of subjects) {
+    const note = readerFacingSubject(subject);
+    if (note === null) {
+      continue;
+    }
+    candidates.push({
+      kind: note.kind,
+      area: note.scope === undefined ? AREA_MAP.generic : areaOfScope(note.scope),
+      text: plainSubject(subject),
+    });
+  }
+  return candidates;
+}
+
+const NOTES_PROMPT = [
+  'You write the release notes for the Kilo mobile app. The reader is a Kilo app user, not a developer.',
+  '',
+  'Reply with one JSON object and nothing else:',
+  '{"new":["..."],"changes":["..."],"areas":["..."]}',
+  '',
+  'new: at most 6 lines. Each line names one outcome the reader can now see or do,',
+  'in plain language, starting with a capital letter. Order newest first. Never',
+  'mention code, files, endpoints, pull requests, tests, refactors or backend',
+  'internals. Use [] when the build shipped nothing a reader can see.',
+  '',
+  'changes: at most 6 lines for policy or behaviour changes the reader must know',
+  'about: a removed sale, expiring credits, a discontinued benefit or a new',
+  'restriction. Word each one neutrally, without praise or apology. Use [] when',
+  'there are none.',
+  '',
+  `areas: at most 3 product areas the fixes touched, as exact keys from this list:`,
+  `${CURATED_AREAS.join(', ')}. Use [] when the build shipped no fixes.`,
+  '',
+  'No line may contain a URL, a pull request reference such as (#123), backticks,',
+  'an identifier (snake_case, camelCase or a file name), a commit type prefix such',
+  'as "fix(mobile):", or markdown.',
+].join('\n');
+
+/** The user message: every candidate, oldest first, as `kind | area | subject`. */
+export function notesPrompt(candidates) {
+  return [
+    'The next app build ships these changes, oldest first (kind | area | subject):',
+    '',
+    ...candidates.map(candidate => `${candidate.kind} | ${candidate.area} | ${candidate.text}`),
+  ].join('\n');
+}
+
+/**
+ * The answer shape, read by hand. This file imports nothing outside Node's
+ * built-ins: the release workflow test runs a copy of it from a scratch
+ * directory with no node_modules, and the release job must be able to run it
+ * from anywhere in the checkout.
+ */
+function readAnswer(payload) {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: 'it was not a JSON object' };
+  }
+  const fields = Object.keys(payload).sort();
+  if (fields.join(',') !== 'areas,changes,new') {
+    return { error: 'it did not carry exactly new, changes and areas' };
+  }
+  for (const field of ['new', 'changes', 'areas']) {
+    const value = payload[field];
+    if (!Array.isArray(value) || !value.every(line => typeof line === 'string')) {
+      return { error: `its ${field} was not a list of lines` };
+    }
+  }
+  for (const area of payload.areas) {
+    if (!CURATED_AREAS.includes(area)) {
+      return { error: `it named an unknown area: ${area}` };
+    }
+  }
+  return { answer: { new: payload.new, changes: payload.changes, areas: payload.areas } };
+}
+
+/** The message content of a chat completion, or null when it carries none. */
+function readCompletion(payload) {
+  if (payload === null || typeof payload !== 'object') {
+    return null;
+  }
+  const choices = payload.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
+  const message = choices[0] && choices[0].message;
+  if (message === null || typeof message !== 'object') {
+    return null;
+  }
+  return typeof message.content === 'string' ? message.content : null;
+}
+
+// A line that names code rather than an outcome: a code span, snake_case,
+// camelCase (a two-letter lowercase run keeps iPhone and iPad out of it, and the
+// lowercase after the hump keeps macOS and watchOS out), a source file name, a
+// call, or a conventional-commit prefix.
+const CODE_IN_LINE = [
+  /`/,
+  /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/,
+  /\b[a-z]{2,}[A-Z][a-z]+[A-Za-z0-9]*\b/,
+  /\b[\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|sql|ya?ml|toml)\b/i,
+  /\b\w+\(\)/,
+  /^(?:feat|fix|perf|chore|docs|test|build|ci|refactor|style|revert)(?:\([^)]*\))?!?:/i,
+];
+const URL_IN_LINE = /https?:\/\/|www\./i;
+const PULL_REQUEST_IN_LINE = /(?:^|\s)\(#\d+\)|\[#\d+\]|\bpull\/\d+\b|#\d+/;
+
+/** The reason `line` cannot be printed as a note, or null when it can. */
+export function noteLineProblem(line) {
+  if (line.length === 0) {
+    return 'an empty line';
+  }
+  if (line.length > CURATED_LINE_LIMIT) {
+    return `a line longer than ${CURATED_LINE_LIMIT} characters`;
+  }
+  if (URL_IN_LINE.test(line)) {
+    return 'a URL';
+  }
+  if (PULL_REQUEST_IN_LINE.test(line)) {
+    return 'a pull request reference';
+  }
+  if (CODE_IN_LINE.some(pattern => pattern.test(line))) {
+    return 'a code identifier';
+  }
+  return null;
+}
+
+/** One note line as the reader gets it: no list marker, one sentence, capitalised. */
+function cleanNoteLine(line) {
+  const text = line
+    .replace(/^\s*[-*•]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.charAt(0).toLocaleUpperCase('en') + text.slice(1);
+}
+
+/**
+ * Check one answer against the caps, the line rules and the fixes this build
+ * actually shipped. `{ notes }` when every line may be printed, `{ error }` when
+ * the answer has to be discarded for the deterministic block.
+ */
+export function validateCuratedNotes(payload, candidates) {
+  const read = readAnswer(payload);
+  if (read.error) {
+    return { error: `the answer did not have the expected shape: ${read.error}` };
+  }
+  const { new: news, changes, areas } = read.answer;
+  if (news.length > CURATED_NEW_LIMIT) {
+    return { error: `the answer named ${news.length} new lines, more than ${CURATED_NEW_LIMIT}` };
+  }
+  if (changes.length > CURATED_CHANGES_LIMIT) {
+    return {
+      error: `the answer named ${changes.length} changes, more than ${CURATED_CHANGES_LIMIT}`,
+    };
+  }
+  if (areas.length > CURATED_AREA_LIMIT) {
+    return { error: `the answer named ${areas.length} areas, more than ${CURATED_AREA_LIMIT}` };
+  }
+  const lines = [...news, ...changes].map(cleanNoteLine);
+  for (const line of lines) {
+    const problem = noteLineProblem(line);
+    if (problem !== null) {
+      return { error: `the answer contained ${problem}: ${line}` };
+    }
+  }
+  if (lines.length === 0 && areas.length === 0) {
+    return { error: 'the answer named no new line, no change and no area' };
+  }
+  // A build with fixes names the areas those fixes touched, and a build without
+  // them names none: the fixes line is what the answer replaces, so a wrong
+  // count would tell the reader the release did something it did not.
+  const hasFixes = candidates.some(candidate => candidate.kind === 'fix');
+  if (hasFixes !== areas.length > 0) {
+    return {
+      error: hasFixes
+        ? 'the answer named no area for a build that shipped fixes'
+        : 'the answer named an area for a build that shipped no fixes',
+    };
+  }
+  return {
+    notes: {
+      new: news.map(cleanNoteLine),
+      changes: changes.map(cleanNoteLine),
+      areas: orderedAreas(new Set(areas)),
+    },
+  };
+}
+
+/** The block a curated version writes: New, then Changes, then the fixes areas. */
+export function curatedBodyLines(notes) {
+  const lines = [];
+  if (notes.new.length > 0) {
+    lines.push('### New', '', ...notes.new.map(note => `- ${note}`));
+  }
+  if (notes.changes.length > 0) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    lines.push('### Changes', '', ...notes.changes.map(change => `- ${change}`));
+  }
+  if (notes.areas.length > 0) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    lines.push('### Fixes', '', `- areas: ${notes.areas.join(', ')}`);
+  }
+  return lines;
+}
+
+/** The JSON object in a model answer, with an optional markdown fence around it. */
+function parseAnswerJson(content) {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
+  return JSON.parse((fenced ? fenced[1] : content).trim());
+}
+
+/**
+ * Ask the gateway to rewrite one version's candidates. `{ lines }` when the
+ * answer passed every check, `{ error }` otherwise: the caller writes the
+ * deterministic block and warns, so a model failure never fails a release.
+ *
+ * `KILO_CHANGELOG_API_KEY` carries the credential, `KILO_CHANGELOG_BASE_URL`
+ * points at another gateway (a local fake in tests), and
+ * `KILO_CHANGELOG_TIMEOUT_MS` shortens the wait. The key is read here and sent
+ * only as the bearer token; nothing logs it.
+ */
+export async function requestCuratedNotes(candidates, options = {}) {
+  const apiKey = options.apiKey ?? process.env.KILO_CHANGELOG_API_KEY;
+  if (!apiKey) {
+    return { error: 'KILO_CHANGELOG_API_KEY is not set' };
+  }
+  const baseUrl = (
+    options.baseUrl ??
+    process.env.KILO_CHANGELOG_BASE_URL ??
+    NOTES_BASE_URL_DEFAULT
+  ).replace(/\/+$/, '');
+  const configuredTimeout = Number(options.timeoutMs ?? process.env.KILO_CHANGELOG_TIMEOUT_MS);
+  const timeoutMs =
+    Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : NOTES_TIMEOUT_DEFAULT_MS;
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  let response;
+  try {
+    response = await fetchImpl(`${baseUrl}${NOTES_PATH}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: NOTES_MODEL,
+        temperature: 0,
+        max_tokens: 900,
+        messages: [
+          { role: 'system', content: NOTES_PROMPT },
+          { role: 'user', content: notesPrompt(candidates) },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      return { error: `the notes model did not answer within ${timeoutMs}ms` };
+    }
+    return { error: `the notes model could not be reached (${reasonOf(error)})` };
+  }
+  if (!response.ok) {
+    return { error: `the notes model answered HTTP ${response.status}` };
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    return { error: 'the notes model returned a body that is not JSON' };
+  }
+  const content = readCompletion(payload);
+  if (content === null) {
+    return { error: 'the notes model returned no message content' };
+  }
+  let answer;
+  try {
+    answer = parseAnswerJson(content);
+  } catch {
+    return { error: 'the notes model returned invalid JSON' };
+  }
+  const validated = validateCuratedNotes(answer, candidates);
+  if (validated.error) {
+    return validated;
+  }
+  return { lines: curatedBodyLines(validated.notes) };
 }
 
 /**
@@ -563,7 +912,7 @@ function usage(message) {
   return 2;
 }
 
-function runBody(args) {
+async function runBody(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -583,10 +932,18 @@ function runBody(args) {
     return usage(`--from ref does not resolve: ${options.from}`);
   }
   const subjects = shippedSubjects(options.from, options.to ?? 'HEAD');
-  const lines = changelogBodyLines(subjects);
-  if (lines.length === 0) {
+  const deterministic = changelogBodyLines(subjects);
+  if (deterministic.length === 0) {
     console.log(NO_CHANGES_MARKER);
     return 0;
+  }
+  // The rewrite is an improvement, never a gate: a missing key, a slow call or
+  // an answer that fails validation leaves the release on the deterministic
+  // block, with the reason on stderr for the run's log.
+  const curated = await requestCuratedNotes(rewriteCandidates(subjects));
+  const lines = curated.lines ?? deterministic;
+  if (curated.error) {
+    console.error(`changelog: ${curated.error}; writing the release notes without the model`);
   }
   for (const line of lines) {
     console.log(line);
@@ -1180,5 +1537,5 @@ function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(main());
+  process.exit(await main());
 }

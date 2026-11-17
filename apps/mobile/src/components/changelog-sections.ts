@@ -1,21 +1,23 @@
 /**
  * The bundled changelog as a reader wants it: one item per version, a short
- * "New" list of what shipped, and one line naming the areas the fixes touched.
+ * "New" list of what shipped, the policy changes a reader must know about, and
+ * one line naming the areas the fixes touched.
  *
  * `CHANGELOG.md` is written by the Release workflow for maintainers, not for
  * the screen. Its title and preamble say how the file is maintained, one
  * section is composed per store build — so one version arrives as several — and
  * every bullet is a commit subject (`fix(mobile): ...`) or, in sections written
- * after this screen existed, a curated line under a `### New` or `### Fixes`
- * heading.
+ * after this screen existed, a curated line under a `### New`, `### Changes` or
+ * `### Fixes` heading.
  *
  * The file is generated output whose shipped sections are already part of the
  * record, so the reader-facing shape is derived here instead of by rewriting
- * it. Both shapes land on the same two blocks: the newest features as
- * sentences, and the fixes as the product areas they touch — the scope table
- * that names those areas lives in `changelog-areas.json`, which the Release
- * workflow applies when it composes a section
- * (`scripts/kilo-app-release-notes.mjs`).
+ * it. Both shapes land on the same blocks: the newest features as sentences,
+ * the policy changes as neutral statements, and the fixes as the product areas
+ * they touch — the scope table that names those areas lives in
+ * `changelog-areas.json`, which the Release workflow applies when it composes a
+ * section (`scripts/kilo-app-release-notes.mjs`). A version without headings
+ * keeps the derived shape.
  */
 
 import areas from './changelog-areas.json';
@@ -25,14 +27,17 @@ export type ChangelogArea = keyof typeof areas.areas;
 
 /**
  * One version's notes. They are what the reader is shown, not the file:
- * `newNotes` is capped at the newest few features, and `fixesAreas` is empty
- * when the fixes touched no named area (`hasFixes` still marks them).
+ * `newNotes` is capped at the newest few features, `changeNotes` at the few
+ * policy changes, and `fixesAreas` is empty when the fixes touched no named
+ * area (`hasFixes` still marks them).
  */
 export type ChangelogSection = Readonly<{
   /** `1.0.16`, or the heading's own words when it names no version. */
   version: string;
   /** The newest features, newest first: a sentence each, no prefix, no link. */
   newNotes: readonly string[];
+  /** The policy changes a reader must know about, in the order they were written. */
+  changeNotes: readonly string[];
   /** The areas the fixes touched, in the map's own order. */
   fixesAreas: readonly ChangelogArea[];
   /** Whether the version shipped fix work at all. */
@@ -41,6 +46,9 @@ export type ChangelogSection = Readonly<{
 
 /** How many features one version lists; the rest ship their note in the areas line. */
 const NEW_NOTE_LIMIT = 6;
+
+/** How many policy changes one version lists; the workflow caps them the same way. */
+const CHANGE_NOTE_LIMIT = 6;
 
 const RELEASE_HEADING = /^## (.+)$/;
 const GROUP_HEADING = /^### (.+)$/;
@@ -81,10 +89,13 @@ const INTERNAL_TYPES = {
 /** The feature types: what belongs in the New list. */
 const FEATURE_TYPES = { feat: true } satisfies Readonly<Record<string, true>>;
 
-/** The two blocks a composed section states its notes under. */
-function groupOf(label: string): 'new' | 'fixes' | null {
+/** The three blocks a composed section states its notes under. */
+function groupOf(label: string): 'new' | 'changes' | 'fixes' | null {
   if (label === 'new') {
     return 'new';
+  }
+  if (label === 'changes') {
+    return 'changes';
   }
   return label === 'fixes' ? 'fixes' : null;
 }
@@ -226,16 +237,17 @@ function areasOfLine(line: string): ChangelogArea[] {
 
 /**
  * One version under construction while the file is read: the group it is in,
- * the features it has collected, and the areas its fixes named. A generated
- * section states both blocks itself; a commit-subject section is classified
- * from each bullet's type and scope.
+ * the features it has collected, the policy changes it carries, and the areas
+ * its fixes named. A generated section states its blocks itself; a
+ * commit-subject section is classified from each bullet's type and scope.
  */
 type Draft = {
   version: string;
-  group: 'new' | 'fixes' | null;
+  group: 'new' | 'changes' | 'fixes' | null;
   /** A section the workflow composed: its blocks are already curated and ordered. */
   curated: boolean;
   newNotes: string[];
+  changeNotes: string[];
   /** How many fixes named each area; the line names the busiest few. */
   fixesCounts: Map<ChangelogArea, number>;
   isFix: boolean;
@@ -247,6 +259,7 @@ function emptyDraft(version: string): Draft {
     group: null,
     curated: false,
     newNotes: [],
+    changeNotes: [],
     fixesCounts: new Map(),
     isFix: false,
   };
@@ -259,10 +272,20 @@ function countArea(counts: Map<ChangelogArea, number>, area: ChangelogArea): voi
 
 /**
  * Adds one bullet to the draft. A generated `areas:` line lands as the fixes
- * block; any other bullet lands in the group its heading names, or — in a
- * section with no headings — in the block its commit type names.
+ * block, a `### Changes` bullet lands as a neutral statement, and any other
+ * bullet lands in the group its heading names or — in a section with no
+ * headings — in the block its commit type names.
  */
 function absorb(draft: Draft, bullet: string): void {
+  if (draft.group === 'changes') {
+    const change = withoutPullRequest(bullet).trim();
+    if (change !== '') {
+      // A `### Changes` section is curated already, so the line is the copy
+      // the reader gets; only its first letter is normalised.
+      draft.changeNotes.push(change.charAt(0).toLocaleUpperCase('en') + change.slice(1));
+    }
+    return;
+  }
   if (draft.group === 'fixes') {
     for (const area of areasOfLine(bullet)) {
       countArea(draft.fixesCounts, area);
@@ -305,17 +328,19 @@ function topAreas(counts: ReadonlyMap<ChangelogArea, number>): ChangelogArea[] {
     .slice(0, FIXES_AREA_LIMIT);
 }
 
-/** The draft as the screen gets it: the newest few features, then the areas. */
+/** The draft as the screen gets it: the newest few features, the changes, then the areas. */
 function toSection(draft: Draft): ChangelogSection | null {
   // A composed section already lists its newest features first; a shipped one
   // is a commit log, whose newest entry is the last line of the version.
   const newNotes = draft.newNotes.slice(0, NEW_NOTE_LIMIT);
-  if (newNotes.length === 0 && !draft.isFix) {
+  const changeNotes = draft.changeNotes.slice(0, CHANGE_NOTE_LIMIT);
+  if (newNotes.length === 0 && changeNotes.length === 0 && !draft.isFix) {
     return null;
   }
   return {
     version: draft.version,
     newNotes,
+    changeNotes,
     fixesAreas: topAreas(draft.fixesCounts),
     hasFixes: draft.isFix,
   };

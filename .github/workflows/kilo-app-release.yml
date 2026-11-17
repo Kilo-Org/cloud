@@ -149,6 +149,10 @@ jobs:
       - name: Notes for the changelog
         id: notes
         if: steps.check.outputs.should_build == 'true'
+        env:
+          # The release-notes rewrite. Without the secret the step still runs:
+          # the script falls back to the deterministic block and warns.
+          KILO_CHANGELOG_API_KEY: ${{ secrets.KILO_CHANGELOG_API_KEY }}
         run: |
           if [ -n "$LAST_TAG" ]; then
             NOTES=$(node scripts/kilo-app-release-notes.mjs body --from "$LAST_TAG" --to HEAD)

@@ -27,6 +27,8 @@ export { normalizeUpstreamHostname };
 const UPSTREAM_PIN_TTL_MS = 60 * 1000;
 const UPSTREAM_PIN_MAX_HOSTS = 1000;
 const UPSTREAM_AGENT_MAX_ENTRIES = 64;
+/** Sockets one host's pool may keep open at once. */
+const UPSTREAM_AGENT_CONNECTIONS_PER_HOST = 64;
 
 type UpstreamPin = { addresses: string[]; expiresAt: number };
 
@@ -90,9 +92,18 @@ export function upstreamDispatcherFor(hostname: string, addresses: readonly stri
 
   const normalized = normalizeUpstreamHostname(hostname);
   const cached = upstreamDispatchers.get(normalized);
-  if (cached) return cached;
+  if (cached) {
+    // Re-inserting moves the host to the newest position, so the bound evicts
+    // the pool that has gone unused the longest, matching the pin map.
+    upstreamDispatchers.delete(normalized);
+    upstreamDispatchers.set(normalized, cached);
+    return cached;
+  }
 
-  const agent = new Agent({ connect: { lookup: lookupPinnedUpstreamAddress } });
+  const agent = new Agent({
+    connect: { lookup: lookupPinnedUpstreamAddress },
+    connections: UPSTREAM_AGENT_CONNECTIONS_PER_HOST,
+  });
   upstreamDispatchers.set(normalized, agent);
   while (upstreamDispatchers.size > UPSTREAM_AGENT_MAX_ENTRIES) {
     const oldest = upstreamDispatchers.keys().next();

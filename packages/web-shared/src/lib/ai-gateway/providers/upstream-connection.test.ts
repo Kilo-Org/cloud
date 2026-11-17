@@ -160,6 +160,29 @@ describe('upstreamDispatcherFor', () => {
 
     expect(runLookup('h64.example', { all: false })).toEqual([[null, PUBLIC_IPV4, 4]]);
   });
+
+  it('returns the same agent instance on a repeated call', () => {
+    const first = upstreamDispatcherFor('reuse.example', [PUBLIC_IPV4]);
+    expect(upstreamDispatcherFor('reuse.example', [PUBLIC_IPV4])).toBe(first);
+  });
+
+  it('evicts the pool unused longest when a host passes the bound after reuse', () => {
+    const closeSpy = jest.spyOn(Agent.prototype, 'close');
+
+    const reused = upstreamDispatcherFor('keep.example', [PUBLIC_IPV4]);
+    for (let index = 1; index < 64; index += 1) {
+      upstreamDispatcherFor(`h${index}.example`, [PUBLIC_IPV4]);
+    }
+    // Touch the kept host so its pool becomes the newest entry.
+    expect(upstreamDispatcherFor('keep.example', [PUBLIC_IPV4])).toBe(reused);
+
+    upstreamDispatcherFor('h64.example', [PUBLIC_IPV4]);
+
+    const closed = new Set(closeSpy.mock.contexts);
+    expect(closed.size).toBe(1);
+    expect(closed.has(reused)).toBe(false);
+    expect(runLookup('keep.example', { all: false })).toEqual([[null, PUBLIC_IPV4, 4]]);
+  });
 });
 
 describe('pinned connections and fetch', () => {

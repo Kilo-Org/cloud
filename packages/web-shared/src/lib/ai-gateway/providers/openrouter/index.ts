@@ -53,7 +53,12 @@ import {
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
-import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  getProviderDisplayPricing,
+  getVercelModelForPricing,
+  getVercelPricingMetadata,
+  type VercelPricingMetadata,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
 import {
   assertMinimumCount,
   createCachedMetadataReader,
@@ -150,20 +155,27 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
 export function pickerModelPricing(
   model: OpenRouterModel,
   endpointsMetadata: GatewayModelMap,
-  preferredProviderOrderConfig: PreferredProviderOrderConfig
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  vercel: VercelPricingMetadata
 ): OpenRouterModel['pricing'] {
   const preferredProvider = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     model.id
   ).at(0);
   const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-  const rawPricing = !preferredProvider
-    ? endpoints[0]?.pricing
-    : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+  const endpoint = !preferredProvider
+    ? endpoints[0]
+    : (endpoints.find(e => e.tag === preferredProvider) ??
       endpoints.find(
         e => normalizeInferenceProviderId(e.tag) === normalizeInferenceProviderId(preferredProvider)
-      )?.pricing);
-  return getModelDisplayPricing(rawPricing) ?? model.pricing;
+      ));
+  return (
+    getProviderDisplayPricing(
+      endpoint?.tag,
+      endpoint?.pricing,
+      getVercelModelForPricing(vercel, model.id)
+    ) ?? model.pricing
+  );
 }
 
 /**
@@ -184,6 +196,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     preferredProviderOrderConfig,
     customLlmsById,
     customPricingConfig,
+    vercelPricingMetadata,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
@@ -192,6 +205,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
     getCustomPricingConfig(),
+    getVercelPricingMetadata(),
   ]);
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition) &&
@@ -230,7 +244,12 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
   ]);
   const gatewayModels = listedModels
     .map((model): OpenRouterModel => {
-      const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
+      const pricing = pickerModelPricing(
+        model,
+        endpointsMetadata,
+        preferredProviderOrderConfig,
+        vercelPricingMetadata
+      );
       const terminalBench = terminalBenchFor(summaries, model.id);
       const aliasTarget = model.id.startsWith('~')
         ? endpointsMetadata[model.id]?.alias_target?.slug

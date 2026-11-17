@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   getModelDisplayPricing,
+  maxEndpointPricing,
   undoPricingDiscount,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -61,5 +62,56 @@ describe('getModelDisplayPricing', () => {
 
   it('returns undefined when there is no pricing', () => {
     expect(getModelDisplayPricing(undefined)).toBeUndefined();
+  });
+});
+
+describe('maxEndpointPricing', () => {
+  it('takes the higher of each price', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000002', completion: '0.000003', input_cache_read: '0.0000002' },
+        { prompt: '0.000001', completion: '0.000005', input_cache_read: '0.0000001' }
+      )
+    ).toEqual({ prompt: '0.000002', completion: '0.000005', input_cache_read: '0.0000002' });
+  });
+
+  it('compares prices numerically rather than as strings', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.0000009', completion: '0.00001' },
+        { prompt: '0.000001', completion: '0.000009' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.00001' });
+  });
+
+  it('keeps prices only one side has', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002', request: '0.01' },
+        { prompt: '0.000001', completion: '0.000002', input_cache_write: '0.000003' }
+      )
+    ).toEqual({
+      prompt: '0.000001',
+      completion: '0.000002',
+      request: '0.01',
+      input_cache_write: '0.000003',
+    });
+  });
+
+  it('ignores an unparsable price on the other side', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: 'n/a', completion: '0.000003' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000003' });
+  });
+
+  it('does not modify its arguments', () => {
+    const a = { prompt: '0.000001', completion: '0.000002' };
+    const b = { prompt: '0.000002', completion: '0.000001' };
+    maxEndpointPricing(a, b);
+    expect(a).toEqual({ prompt: '0.000001', completion: '0.000002' });
+    expect(b).toEqual({ prompt: '0.000002', completion: '0.000001' });
   });
 });

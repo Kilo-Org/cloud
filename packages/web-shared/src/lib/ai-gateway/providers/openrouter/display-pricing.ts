@@ -23,3 +23,31 @@ export function getModelDisplayPricing(
   if (!pricing) return undefined;
   return undoPricingDiscount(pricing);
 }
+
+const PRICE_KEYS = [
+  'prompt',
+  'completion',
+  'image',
+  'request',
+  'input_cache_read',
+  'input_cache_write',
+  'web_search',
+  'internal_reasoning',
+] as const satisfies readonly Exclude<keyof EndpointPricing, 'discount'>[];
+
+/**
+ * The higher of each price, so a provider price never shows lower than either gateway charges.
+ * Both prices must already be display prices, without a discount.
+ */
+export function maxEndpointPricing(a: EndpointPricing, b: EndpointPricing): EndpointPricing {
+  const result: EndpointPricing = { ...a };
+  for (const key of PRICE_KEYS) {
+    const price = b[key];
+    if (price === undefined) continue;
+    const current = result[key];
+    if (current === undefined || Number.parseFloat(price) > Number.parseFloat(current)) {
+      result[key] = price;
+    }
+  }
+  return result;
+}

@@ -7,10 +7,7 @@ import {
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
-import {
-  getSnapshotModelVariantId,
-  normalizeModelId,
-} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -41,7 +38,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
-import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -121,7 +117,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   });
 
   const preferredModels = usePreferredModels();
-  const customPricingConfig = useCustomPricingConfig();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -296,17 +291,13 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         byokOnly: provider.byokOnly,
         vercelInferenceRegions: model.endpoint.vercel_inference_regions ?? [],
-        ...getOfferingPricing(
-          customPricingConfig,
-          getSnapshotModelVariantId(model),
-          model.endpoint.pricing
-        ),
+        ...getOfferingPricing(model.endpoint.pricing),
       });
     }
 
     offerings.sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
     return offerings;
-  }, [customPricingConfig, infoModel, openRouterProviders]);
+  }, [infoModel, openRouterProviders]);
 
   const enabledModelCountByProviderSlug = useMemo(() => {
     const map = new Map<string, number>();
@@ -450,11 +441,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        ...getOfferingPricing(
-          customPricingConfig,
-          getSnapshotModelVariantId(model),
-          model.endpoint.pricing
-        ),
+        ...getOfferingPricing(model.endpoint.pricing),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
@@ -463,7 +450,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [customPricingConfig, infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.

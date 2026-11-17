@@ -3,7 +3,6 @@ import { ORGANIZATION_MODEL_AUDIENCES } from '@kilocode/app-shared/organizations
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
-import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getPersonalModelList } from '@kilocode/web-shared/lib/ai-gateway/handlers/models';
 import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
@@ -13,8 +12,6 @@ import { resolveOrganizationAccess } from '@kilocode/web-shared/routers/organiza
 
 export const modelsRouter = createTRPCRouter({
   preferred: baseProcedure.query(() => getPreferredModels()),
-
-  customPricing: baseProcedure.query(() => getCustomPricingConfig()),
 
   list: baseProcedure.query(async ({ ctx }) => {
     const [response, preferredModels] = await Promise.all([

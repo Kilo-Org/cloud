@@ -1,6 +1,13 @@
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { getOpenRouterModelsMetadataFromDatabase } from './providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from './providers/gateway-models-cache';
+import {
+  EMPTY_VERCEL_PRICING_METADATA,
+  getVercelPricingMetadata,
+} from './providers/gateway-endpoint-pricing';
 import { getRawOpenRouterModels, pickerModelPricing } from './providers/openrouter';
 import { getPreferredProviderOrderConfig } from './providers/preferred-provider-order-config';
 import {
@@ -16,6 +23,7 @@ import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/c
 
 jest.mock('./providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 jest.mock('./providers/openrouter', () => ({
   ...jest.requireActual('./providers/openrouter'),
@@ -83,6 +91,7 @@ beforeEach(() => {
   jest.mocked(getRawOpenRouterModels).mockResolvedValue({
     data: [catalogModel(model.id, { prompt: '0.0000001', completion: '0.0000002' })],
   });
+  jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
   jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
   jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
 });
@@ -128,7 +137,12 @@ describe('request cost admission', () => {
     });
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogOnly] });
-    const pickerPrice = pickerModelPricing(catalogOnly, {}, { rules: [] });
+    const pickerPrice = pickerModelPricing(
+      catalogOnly,
+      {},
+      { rules: [] },
+      EMPTY_VERCEL_PRICING_METADATA
+    );
 
     await expect(
       enforceRequestCostLimit('500', catalogOnly.id, body, 2_000_000)
@@ -152,10 +166,64 @@ describe('request cost admission', () => {
       rules: [{ includes: ['test/'], providers: ['preferred-route'] }],
     };
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
-    const pickerPrice = pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder);
+    const pickerPrice = pickerModelPricing(
+      catalogEntry,
+      { [id]: routeModel },
+      preferredOrder,
+      EMPTY_VERCEL_PRICING_METADATA
+    );
     expect(pickerPrice).toEqual(routeModel.endpoints[0]?.pricing);
 
     await expect(enforceRequestCostLimit('500', id, body, 2_000_000)).resolves.toBeNull();
+  });
+  it('prices the preferred route at the higher Vercel price and admits against it', async () => {
+    const id = 'test/preferred';
+    const routeModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Preferred model',
+      endpoints: [
+        { tag: 'novita/fp8', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
+        { tag: 'other-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
+      ],
+    };
+    const vercelModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Preferred model',
+      endpoints: [
+        { provider_name: 'novita', pricing: { prompt: '0.0000003', completion: '0.0000001' } },
+        { provider_name: 'deepinfra', pricing: { prompt: '0.00001', completion: '0.00001' } },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.0000003', completion: '0.0000005' });
+    const preferredOrder = { rules: [{ includes: ['test/'], providers: ['novita'] }] };
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
+
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        preferredOrder,
+        EMPTY_VERCEL_PRICING_METADATA
+      )
+    ).toEqual({ prompt: '0.0000001', completion: '0.0000002' });
+    // The bound is about 220 microdollars at OpenRouter's price and about 630 at Vercel's
+    await expect(enforceRequestCostLimit('400', id, body, 2_000_000)).resolves.toBeNull();
+
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({ [id]: vercelModel });
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        preferredOrder,
+        await getVercelPricingMetadata()
+      )
+    ).toEqual({ prompt: '0.0000003', completion: '0.0000002' });
+    await expect(enforceRequestCostLimit('400', id, body, 2_000_000)).resolves.toMatch(
+      /spend safeguard/
+    );
+    await expect(enforceRequestCostLimit('700', id, body, 2_000_000)).resolves.toBeNull();
   });
   it('refuses a managed provider that cannot enforce the quoted route price', async () => {
     const decision = await enforceRequestCostLimitDecision(

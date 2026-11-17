@@ -27,6 +27,7 @@ jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn().mockResolvedValue({}),
+  getVercelModelsMetadataFromDatabase: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   getUnavailableModelIds: jest.fn().mockResolvedValue(new Set()),

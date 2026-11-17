@@ -221,7 +221,7 @@ export function createSurfaceFeedbackStore<
  */
 export async function settleSaveAttempt<Failure extends SurfaceFailure>(
   attempt: SurfaceAttempt<Failure>,
-  save: () => void | Promise<void>
+  save: () => Promise<void>
 ): Promise<void> {
   try {
     await save();

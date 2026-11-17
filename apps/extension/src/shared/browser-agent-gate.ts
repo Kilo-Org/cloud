@@ -6,7 +6,6 @@ import {
   isUploadTool,
   SENSITIVE_REASON,
   sensitiveReasonForField,
-  stepTokenBindingMatches,
   toBrowserOrigin,
   toolGrantClass,
 } from './browser-agent-checks';
@@ -33,11 +32,11 @@ import type { BrowserToolSession } from './browser-tool-session';
 type GateSession = Pick<BrowserToolPageSession, 'send' | 'resolveTarget'> &
   Pick<BrowserToolSession, 'takeDownloads'>;
 
-export type BrowserSensitiveStep = {
+export interface BrowserSensitiveStep {
   readonly element?: string | undefined;
   readonly origin: string;
   readonly reason: string;
-};
+}
 
 export type AgentPreflight =
   | {
@@ -61,10 +60,12 @@ const describeNodeSchema = z.object({
   node: z.object({ frameId: z.string().optional() }).optional(),
 });
 
-const argumentString = (args: Record<string, unknown>, key: string): string | undefined => {
-  const value = args[key];
+const argumentTextSchema = z.string().min(1);
 
-  return typeof value === 'string' && value !== '' ? value : undefined;
+const argumentString = (args: Record<string, unknown>, key: string): string | undefined => {
+  const parsed = argumentTextSchema.safeParse(args[key]);
+
+  return parsed.success ? parsed.data : undefined;
 };
 
 const targetOfArguments = (args: Record<string, unknown>): string | undefined =>
@@ -130,7 +131,7 @@ const firstReasonOf = (probe: BrowserSensitiveProbe): string | undefined => {
     return SENSITIVE_REASON.cardFormSubmit;
   }
 
-  const field = probe.fields[0];
+  const [field] = probe.fields;
 
   return field === undefined ? undefined : sensitiveReasonForField(field.kind);
 };
@@ -188,7 +189,7 @@ const pageUrlFor = async (
   return main?.url;
 };
 
-export type AgentPreflightInput = {
+export interface AgentPreflightInput {
   readonly args: Record<string, unknown>;
   /** The pairs the CLI already approved for this session. */
   readonly authorized: readonly BrowserGrant[];
@@ -199,7 +200,7 @@ export type AgentPreflightInput = {
   readonly stepTokens: readonly string[];
   readonly tabId: number;
   readonly toolName: string;
-};
+}
 
 /**
  * The pre-action check: the needed class origin is granted, and an act call
@@ -225,19 +226,20 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   }
 
   if (grantClass !== 'act') {
-    return { ok: true, class: grantClass, origin, targetOriginFrame };
+    return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
+  const pageUrl = await pageUrlFor(input.session, targetFrame);
   const sensitive = await sensitiveStepFor({
     args: input.args,
     origin,
-    pageUrl: await pageUrlFor(input.session, targetFrame),
+    pageUrl,
     session: input.session,
     toolName: input.toolName,
   });
 
   if (sensitive === undefined) {
-    return { ok: true, class: grantClass, origin, targetOriginFrame };
+    return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
   const binding: StepTokenBinding = {
@@ -250,7 +252,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const matched = input.stepTokens.find(token => input.consumeStepToken(token, binding));
 
   if (matched !== undefined) {
-    return { ok: true, class: 'act', origin, sensitiveToken: matched, targetOriginFrame };
+    return { class: 'act', ok: true, origin, sensitiveToken: matched, targetOriginFrame };
   }
 
   return {
@@ -285,8 +287,5 @@ export const postAgentNavigate = async (
  * without a sensitive token had it cancelled by the download guard and is
  * refused as a sensitive step.
  */
-export const takeStartedDownloads = async (
-  session: Pick<BrowserToolSession, 'takeDownloads'>
-): Promise<number> => (await session.takeDownloads()).length;
-
-export { stepTokenBindingMatches };
+export const takeStartedDownloads = (session: Pick<BrowserToolSession, 'takeDownloads'>): number =>
+  session.takeDownloads().length;

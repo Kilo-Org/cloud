@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one preflight case per grant, sensitive-step and redirect branch */
 /* eslint-disable require-await -- a fake CDP channel is async by contract */
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,9 +8,18 @@ import {
 } from './browser-agent-checks';
 import type { BrowserGrant, StepTokenStore } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall } from './browser-agent-gate';
+import type { AgentPreflight } from './browser-agent-gate';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
 
-type CdpHandler = (params: Record<string, unknown> | undefined) => unknown;
+type CdpHandler = (
+  params: Record<string, unknown> | undefined
+) => Record<string, unknown> | undefined;
+
+const failureOf = (result: AgentPreflight) => (result.ok ? undefined : result.failure);
+
+const sensitiveOf = (result: AgentPreflight) => (result.ok ? undefined : result.sensitive);
+
+const sensitiveReasonOf = (result: AgentPreflight) => sensitiveOf(result)?.reason;
 
 const MAIN_URL = 'https://app.example.com/dashboard';
 const FRAME_URL = 'https://pay.example.com/widget';
@@ -67,11 +77,7 @@ const createSession = (
         throw new Error(`unexpected CDP method ${method}`);
       }
 
-      const value = handler(params);
-
-      return typeof value === 'object' && value !== null
-        ? (value as Record<string, unknown>)
-        : undefined;
+      return handler(params);
     },
     takeDownloads: () => [],
   };
@@ -117,7 +123,7 @@ describe('origin grants', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.ok === false ? result.failure : undefined).toEqual({
+    expect(failureOf(result)).toStrictEqual({
       items: [{ class: 'read', origin: 'https://app.example.com' }],
       kind: 'needs_permission',
     });
@@ -142,7 +148,7 @@ describe('origin grants', () => {
       toolName: 'browser_click',
     });
 
-    expect(result.ok === false ? result.failure : undefined).toEqual({
+    expect(failureOf(result)).toStrictEqual({
       items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
       kind: 'needs_permission',
     });
@@ -169,7 +175,7 @@ describe('origin grants', () => {
       toolName: 'browser_navigate',
     });
 
-    expect(refused.ok === false ? refused.failure : undefined).toEqual({
+    expect(failureOf(refused)).toStrictEqual({
       items: [{ class: 'navigate', origin: 'https://evil.example.net' }],
       kind: 'needs_permission',
     });
@@ -188,13 +194,12 @@ describe('origin changed after redirects', () => {
   it('reports the origin a navigation landed on', async () => {
     const approved = 'https://other.example.com';
 
-    expect(await postAgentNavigate(createSession({ mainUrl: approved }), approved)).toBeUndefined();
-    expect(
-      await postAgentNavigate(
-        createSession({ mainUrl: 'https://accounts.example.org/login' }),
-        approved
-      )
-    ).toEqual({
+    await expect(
+      postAgentNavigate(createSession({ mainUrl: approved }), approved)
+    ).resolves.toBeUndefined();
+    await expect(
+      postAgentNavigate(createSession({ mainUrl: 'https://accounts.example.org/login' }), approved)
+    ).resolves.toStrictEqual({
       from: approved,
       kind: 'origin_changed',
       to: 'https://accounts.example.org',
@@ -212,7 +217,7 @@ describe('sensitive steps', () => {
       toolName: 'browser_type',
     });
 
-    expect(result.ok === false ? result.failure : undefined).toEqual({
+    expect(failureOf(result)).toStrictEqual({
       items: [
         {
           class: 'sensitive',
@@ -222,7 +227,7 @@ describe('sensitive steps', () => {
       ],
       kind: 'needs_permission',
     });
-    expect(result.ok === false ? result.sensitive : undefined).toEqual({
+    expect(sensitiveOf(result)).toStrictEqual({
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
@@ -287,9 +292,7 @@ describe('sensitive steps', () => {
       toolName: 'browser_click',
     });
 
-    expect(result.ok === false ? result.sensitive?.reason : undefined).toBe(
-      SENSITIVE_REASON.cardFormSubmit
-    );
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.cardFormSubmit);
   });
 
   it('classifies an OAuth consent page as sensitive', async () => {
@@ -304,9 +307,7 @@ describe('sensitive steps', () => {
       toolName: 'browser_click',
     });
 
-    expect(result.ok === false ? result.sensitive?.reason : undefined).toBe(
-      SENSITIVE_REASON.oauthConsent
-    );
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.oauthConsent);
   });
 
   it('classifies a file upload as sensitive', async () => {
@@ -315,9 +316,7 @@ describe('sensitive steps', () => {
       toolName: 'browser_file_upload',
     });
 
-    expect(result.ok === false ? result.sensitive?.reason : undefined).toBe(
-      SENSITIVE_REASON.fileUpload
-    );
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
   });
 
   it('leaves an ordinary text field alone', async () => {

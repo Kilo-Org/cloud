@@ -1,4 +1,4 @@
-/* eslint-disable require-await -- a fake CDP channel is async by contract */
+/* eslint-disable max-lines, require-await -- the suite covers frame tree reading, scoped snapshots, masking, and filtering against one fake CDP session whose channel is async by contract. */
 import { describe, expect, it } from 'vitest';
 import {
   buildScopedSnapshot,
@@ -8,6 +8,7 @@ import {
   filterAgentNetworkRequests,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
+  readSensitiveFieldBoxes,
   readWithheldFrameBoxes,
   screenshotScale,
   withheldFramesOf,
@@ -16,7 +17,23 @@ import {
 import type { BrowserAgentFrame } from './browser-agent-frames';
 import type { BrowserConsoleMessage, BrowserToolRefEntry } from './browser-tool-session';
 
-type CdpHandler = (params: Record<string, unknown> | undefined) => unknown;
+type CdpHandler = (
+  params: Record<string, unknown> | undefined
+) => Record<string, unknown> | undefined;
+
+// The screenshot clip names its translation `x` and `y`; the quotes keep those
+// CDP names out of the identifier-length rule.
+// prettier-ignore
+const offsetOf = (horizontal: number, vertical: number) => ({
+  'x': horizontal,
+  'y': vertical,
+});
+
+// Backend node 10 is the iframe's owner; every other node reports the outer frame's box.
+const frameBoxModel: CdpHandler = params =>
+  params?.['backendNodeId'] === 10
+    ? { model: { content: [40, 60, 240, 60, 240, 260, 40, 260], height: 200, width: 200 } }
+    : { model: { content: [0, 0, 100, 0, 100, 100, 0, 100], height: 100, width: 100 } };
 
 interface FakeSession {
   readonly refs: BrowserToolRefEntry[][];
@@ -42,11 +59,7 @@ const createFakeSession = (handlers: Record<string, CdpHandler>): FakeSession =>
         throw new Error(`unexpected CDP method ${method}`);
       }
 
-      const value = handler(params);
-
-      return typeof value === 'object' && value !== null
-        ? (value as Record<string, unknown>)
-        : undefined;
+      return handler(params);
     },
   };
 };
@@ -101,7 +114,7 @@ const MAIN_TREE = {
 
 const CHILD_TREE = {
   nodes: [
-    { nodeId: '1', role: { value: 'RootWebArea' }, childIds: ['2'] },
+    { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
     {
       backendDOMNodeId: 21,
       name: { value: 'card marker-42' },
@@ -111,7 +124,7 @@ const CHILD_TREE = {
   ],
 };
 
-const snapshotHandlers = (childTree: unknown): Record<string, CdpHandler> => ({
+const snapshotHandlers = (childTree: Record<string, unknown>): Record<string, CdpHandler> => ({
   'Accessibility.getFullAXTree': params =>
     (params ?? {})['frameId'] === 'main' ? MAIN_TREE : childTree,
   'Page.createIsolatedWorld': () => ({ executionContextId: 5 }),
@@ -119,22 +132,22 @@ const snapshotHandlers = (childTree: unknown): Record<string, CdpHandler> => ({
   'Runtime.evaluate': () => ({ result: { value: '{"hidden":[],"values":[]}' } }),
 });
 
-describe('readAgentFrameTree', () => {
+describe('frame tree reading', () => {
   it('flattens parent and child frames with their origins', async () => {
     const session = createFakeSession({ 'Page.getFrameTree': () => frameTreePayload(FRAMES) });
 
-    await expect(readAgentFrameTree(session)).resolves.toEqual(FRAMES);
+    await expect(readAgentFrameTree(session)).resolves.toStrictEqual(FRAMES);
   });
 });
 
-describe('withheldFramesOf', () => {
+describe('withheld frame detection', () => {
   it('withholds a child frame whose origin lacks read and never the main frame', () => {
-    expect(withheldFramesOf(FRAMES, ['https://app.example.com'])).toEqual([
+    expect(withheldFramesOf(FRAMES, ['https://app.example.com'])).toStrictEqual([
       { frameId: 'f1', origin: 'https://pay.example.com' },
     ]);
     expect(
       withheldFramesOf(FRAMES, ['https://app.example.com', 'https://pay.example.com'])
-    ).toEqual([]);
+    ).toStrictEqual([]);
   });
 });
 
@@ -153,7 +166,7 @@ describe('scoped snapshot', () => {
     expect(capture.text).toContain('- button "Submit" [ref=e2]');
     expect(capture.text).not.toContain('marker-42');
     expect(capture.text).not.toContain('leaked inner text');
-    expect(capture.withheldFrames).toEqual(['https://pay.example.com']);
+    expect(capture.withheldFrames).toStrictEqual(['https://pay.example.com']);
   });
 
   it('splices a readable frame’s tree in at the iframe node', async () => {
@@ -168,14 +181,14 @@ describe('scoped snapshot', () => {
 
     expect(capture.text).toContain('- text: card marker-42');
     expect(capture.text).not.toContain('origin withheld');
-    expect(capture.withheldFrames).toEqual([]);
+    expect(capture.withheldFrames).toStrictEqual([]);
   });
 
   it('drops hidden text and masks password values before the text leaves', async () => {
     const session = createFakeSession({
       ...snapshotHandlers({
         nodes: [
-          { nodeId: '1', role: { value: 'RootWebArea' }, childIds: ['2', '3'] },
+          { childIds: ['2', '3'], nodeId: '1', role: { value: 'RootWebArea' } },
           {
             backendDOMNodeId: 31,
             name: { value: 'hidden banner' },
@@ -203,7 +216,7 @@ describe('scoped snapshot', () => {
     expect(view.text).not.toContain('hidden banner');
     expect(view.text).not.toContain('hunter2');
     expect(view.text).toContain('- text: [masked]');
-    expect(session.refs.at(-1)?.map(entry => entry.ref)).toEqual(['e2']);
+    expect(session.refs.at(-1)?.map(entry => entry.ref)).toStrictEqual(['e2']);
   });
 
   it('renders the withheld line at the iframe’s depth', () => {
@@ -214,7 +227,7 @@ describe('scoped snapshot', () => {
       withheld: new Map([['f1', 'https://pay.example.com']]),
     });
 
-    expect(snapshot.lines).toEqual([
+    expect(snapshot.lines).toStrictEqual([
       { depth: 1, name: 'Submit', ref: 'e2', role: 'button' },
       withheldFrameLine('https://pay.example.com', 2),
     ]);
@@ -224,10 +237,7 @@ describe('scoped snapshot', () => {
 describe('screenshot geometry', () => {
   it('masks the withheld frame box and clips nested frames', async () => {
     const session = createFakeSession({
-      'DOM.getBoxModel': params =>
-        (params ?? {})['backendNodeId'] === 10
-          ? { model: { content: [40, 60, 240, 60, 240, 260, 40, 260], height: 200, width: 200 } }
-          : { model: { content: [0, 0, 100, 0, 100, 100, 0, 100], height: 100, width: 100 } },
+      'DOM.getBoxModel': frameBoxModel,
       'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
     });
 
@@ -235,10 +245,10 @@ describe('screenshot geometry', () => {
       session,
       FRAMES,
       [{ frameId: 'f1', origin: 'https://pay.example.com' }],
-      { offset: { x: -10, y: -20 } }
+      { offset: offsetOf(-10, -20) }
     );
 
-    expect(boxes).toEqual({ boxes: [{ height: 200, width: 200, x: 30, y: 40 }] });
+    expect(boxes).toStrictEqual({ boxes: [{ height: 200, left: 30, top: 40, width: 200 }] });
   });
 
   it('fails the capture when a withheld box cannot be measured', async () => {
@@ -263,11 +273,73 @@ describe('screenshot geometry', () => {
       }),
     });
 
-    await expect(readAgentScreenshotGeometry(session, { fullPage: false })).resolves.toEqual({
-      offset: { x: -12, y: -34 },
+    await expect(readAgentScreenshotGeometry(session, { fullPage: false })).resolves.toStrictEqual({
+      offset: offsetOf(-12, -34),
       scale: 2,
     });
     expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
+  });
+});
+
+describe('sensitive field masking', () => {
+  const probePayload = JSON.stringify({
+    // prettier-ignore
+    boxes: [{ height: 20, width: 120, 'x': 30, 'y': 40 }],
+    scrollX: 5,
+    scrollY: 7,
+  });
+
+  it('translates a password field box into document coordinates', async () => {
+    const session = createFakeSession({
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+      'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+      'Runtime.evaluate': () => ({ result: { value: probePayload } }),
+    });
+
+    await expect(
+      readSensitiveFieldBoxes(session, FRAMES, ['https://app.example.com'], {
+        offset: offsetOf(-1, -2),
+      })
+    ).resolves.toStrictEqual({ boxes: [{ height: 20, left: 34, top: 45, width: 120 }] });
+  });
+
+  it('adds the iframe origin for a field inside a readable frame', async () => {
+    const session = createFakeSession({
+      'DOM.getBoxModel': () => ({
+        model: { content: [40, 60, 240, 60, 240, 260, 40, 260], height: 200, width: 200 },
+      }),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+      'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+      'Runtime.evaluate': () => ({ result: { value: probePayload } }),
+    });
+
+    const result = await readSensitiveFieldBoxes(session, FRAMES, [
+      'https://app.example.com',
+      'https://pay.example.com',
+    ]);
+
+    // The main frame's field sits at its own scroll-adjusted position; the child frame's adds the iframe's content origin.
+    expect(result).toStrictEqual({
+      boxes: [
+        { height: 20, left: 35, top: 47, width: 120 },
+        { height: 20, left: 75, top: 107, width: 120 },
+      ],
+    });
+  });
+
+  it('refuses the capture when a field frame cannot be measured', async () => {
+    const session = createFakeSession({
+      'DOM.getFrameOwner': () => ({}),
+      'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+      'Runtime.evaluate': () => ({ result: { value: probePayload } }),
+    });
+
+    const result = await readSensitiveFieldBoxes(session, FRAMES, [
+      'https://app.example.com',
+      'https://pay.example.com',
+    ]);
+
+    expect(result).toHaveProperty('error');
   });
 });
 
@@ -283,7 +355,7 @@ describe('console and network filtering', () => {
       filterAgentConsoleMessages(messages, [
         { frameId: 'f1', origin: 'https://pay.example.com' },
       ]).map(message => message.text)
-    ).toEqual(['from page', 'no source']);
+    ).toStrictEqual(['from page', 'no source']);
     expect(filterAgentConsoleMessages(messages, [])).toBe(messages);
   });
 
@@ -298,6 +370,6 @@ describe('console and network filtering', () => {
       filterAgentNetworkRequests(requests, [
         { frameId: 'f1', origin: 'https://pay.example.com' },
       ]).map(request => request.requestId)
-    ).toEqual(['2', '3']);
+    ).toStrictEqual(['2', '3']);
   });
 });

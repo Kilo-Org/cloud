@@ -16,7 +16,12 @@ import {
 } from './browser-agent-checks';
 import { sensitiveTargetsOf } from './browser-agent-probes';
 
-describe('toBrowserOrigin', () => {
+const absentUrl: string | undefined = undefined;
+
+const reversedArgumentKeys = (): Record<string, unknown> =>
+  Object.fromEntries(Object.entries({ first: 1, second: [2] }).toReversed());
+
+describe('origin normalisation', () => {
   it('drops the path, query and default port', () => {
     expect(toBrowserOrigin('https://Example.com:443/a?b#c')).toBe('https://example.com');
     expect(toBrowserOrigin('http://localhost:3001/page')).toBe('http://localhost:3001');
@@ -32,7 +37,7 @@ describe('toBrowserOrigin', () => {
     expect(toBrowserOrigin('chrome://settings')).toBeUndefined();
     expect(toBrowserOrigin('chrome-extension://abc/sidepanel.html')).toBeUndefined();
     expect(toBrowserOrigin('about:blank')).toBeUndefined();
-    expect(toBrowserOrigin(undefined)).toBeUndefined();
+    expect(toBrowserOrigin(absentUrl)).toBeUndefined();
   });
 });
 
@@ -77,15 +82,15 @@ describe('grant matching', () => {
   });
 });
 
-describe('hashBrowserToolArguments', () => {
+describe('argument hashing', () => {
   it('ignores key order and names the length', () => {
-    expect(hashBrowserToolArguments({ a: 1, b: [2] })).toBe(
-      hashBrowserToolArguments({ b: [2], a: 1 })
+    expect(hashBrowserToolArguments({ first: 1, second: [2] })).toBe(
+      hashBrowserToolArguments(reversedArgumentKeys())
     );
   });
 
   it('changes with a value', () => {
-    expect(hashBrowserToolArguments({ a: 1 })).not.toBe(hashBrowserToolArguments({ a: 2 }));
+    expect(hashBrowserToolArguments({ first: 1 })).not.toBe(hashBrowserToolArguments({ first: 2 }));
   });
 });
 
@@ -151,12 +156,12 @@ describe('sensitive form fields', () => {
           { name: 'Card', selector: '#cc' },
         ],
       })
-    ).toEqual(['e1', '#cc']);
-    expect(sensitiveTargetsOf('browser_navigate', { element: 'e1' })).toEqual([]);
+    ).toStrictEqual(['e1', '#cc']);
+    expect(sensitiveTargetsOf('browser_navigate', { element: 'e1' })).toStrictEqual([]);
   });
 });
 
-describe('OAuth consent pages', () => {
+describe('oauth consent pages', () => {
   it('matches the listed host and path routes', () => {
     expect(isOAuthConsentUrl('https://accounts.google.com/o/oauth2/v2/auth?x=1')).toBe(true);
     expect(isOAuthConsentUrl('https://accounts.google.com/signin/oauth/consent')).toBe(true);
@@ -170,7 +175,7 @@ describe('OAuth consent pages', () => {
   it('does not match a normal page on the same host', () => {
     expect(isOAuthConsentUrl('https://github.com/Kilo-Org/cloud')).toBe(false);
     expect(isOAuthConsentUrl('https://accounts.google.com/gsi/client')).toBe(false);
-    expect(isOAuthConsentUrl(undefined)).toBe(false);
+    expect(isOAuthConsentUrl(absentUrl)).toBe(false);
   });
 });
 
@@ -196,7 +201,7 @@ describe('hidden text and value masking', () => {
           sensitiveValues: values,
         }
       )
-    ).toEqual({ depth: 0, name: MASKED_VALUE, role: '', textLeaf: true });
+    ).toStrictEqual({ depth: 0, name: MASKED_VALUE, role: '', textLeaf: true });
     expect(
       applyAgentSnapshotLine(
         { depth: 1, name: 'Email', ref: 'e4', role: 'textbox' },
@@ -205,7 +210,7 @@ describe('hidden text and value masking', () => {
           sensitiveValues: values,
         }
       )
-    ).toEqual({ depth: 1, name: 'Email', ref: 'e4', role: 'textbox' });
+    ).toStrictEqual({ depth: 1, name: 'Email', ref: 'e4', role: 'textbox' });
   });
 
   it('masks a value wherever it leaked into text', () => {

@@ -26,6 +26,7 @@ import {
   filterAgentNetworkRequests,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
+  readSensitiveFieldBoxes,
   readWithheldFrameBoxes,
   withheldFramesOf,
 } from './browser-agent-frames';
@@ -567,7 +568,7 @@ const renderFindSnippet = (lines: readonly BrowserAriaSnapshotLine[], index: num
     .join('\n')}`;
 };
 
-const captureScopedSnapshot = async (
+const captureScopedSnapshot = (
   deps: BrowserReadActionDeps,
   options: BrowserSnapshotArguments
 ): Promise<BrowserAriaSnapshotCapture> => {
@@ -603,22 +604,34 @@ const maskAgentScreenshot = async (
 
   const frames = await readAgentFrameTree(deps.session);
   const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
-
-  if (withheld.length === 0) {
-    return { dataUrl: input.dataUrl };
-  }
-
   const geometry = await readAgentScreenshotGeometry(deps.session, { fullPage: input.fullPage });
-  const boxes = await readWithheldFrameBoxes(deps.session, frames, withheld, {
+  const maskedRegions = await readWithheldFrameBoxes(deps.session, frames, withheld, {
     offset: geometry.offset,
   });
 
-  if ('error' in boxes) {
-    return { error: boxes.error };
+  if ('error' in maskedRegions) {
+    return { error: maskedRegions.error };
+  }
+
+  const fields = await readSensitiveFieldBoxes(
+    deps.session,
+    frames,
+    deps.agentScope.readableOrigins,
+    { offset: geometry.offset }
+  );
+
+  if ('error' in fields) {
+    return { error: fields.error };
+  }
+
+  const boxes = [...maskedRegions.boxes, ...fields.boxes];
+
+  if (boxes.length === 0) {
+    return { dataUrl: input.dataUrl };
   }
 
   const masked = await maskScreenshotDataUrl({
-    boxes: boxes.boxes,
+    boxes,
     dataUrl: input.dataUrl,
     mediaType: input.mediaType,
     scale: geometry.scale,

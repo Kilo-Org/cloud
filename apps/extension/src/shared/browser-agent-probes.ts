@@ -1,5 +1,5 @@
+/* eslint-disable max-lines -- The probe expressions are page-side source strings; splitting them from the parsers that read them hurts review. */
 import { z } from 'zod';
-import { classifyFormField } from './browser-agent-checks';
 import type { BrowserSensitiveProbe } from './browser-agent-checks';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 
@@ -47,34 +47,43 @@ const frameExecutionContext = async (
   }
 };
 
-const evaluateProbeJson = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
-  expression: string,
-  frameId?: string
-): Promise<unknown> => {
-  const contextId =
-    frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
+const probeJsonSchema = z.string();
 
-  if (frameId !== undefined && contextId === undefined) {
+/**
+ * Runs one probe expression in a frame's isolated world and decodes the JSON
+ * string it returns with the probe's own schema, so every caller reads a
+ * validated payload and no `unknown` leaves this module.
+ */
+const readProbePayload = async <Parsed>(input: {
+  readonly expression: string;
+  readonly frameId: string;
+  readonly schema: z.ZodType<Parsed>;
+  readonly session: Pick<BrowserToolPageSession, 'send'>;
+}): Promise<Parsed | undefined> => {
+  const contextId = await frameExecutionContext(input.session, input.frameId);
+
+  if (contextId === undefined) {
     return undefined;
   }
 
-  const parsed = runtimeEvaluateSchema.safeParse(
-    await session.send('Runtime.evaluate', {
+  const response = runtimeEvaluateSchema.safeParse(
+    await input.session.send('Runtime.evaluate', {
       awaitPromise: false,
-      expression,
+      contextId,
+      expression: input.expression,
       returnByValue: true,
-      ...(contextId === undefined ? {} : { contextId }),
     })
   );
-  const value = parsed.success ? parsed.data.result?.value : undefined;
+  const raw = probeJsonSchema.safeParse(response.success ? response.data.result?.value : undefined);
 
-  if (typeof value !== 'string') {
+  if (!raw.success) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value);
+    const parsed = input.schema.safeParse(JSON.parse(raw.data));
+
+    return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
   }
@@ -143,13 +152,14 @@ export const readFrameHiddenText = async (
   frameId: string
 ): Promise<ReadonlySet<string>> => {
   try {
-    const payload = hiddenTextPayloadSchema.safeParse(
-      await evaluateProbeJson(session, HIDDEN_TEXT_PROBE_EXPRESSION, frameId)
-    );
+    const payload = await readProbePayload({
+      expression: HIDDEN_TEXT_PROBE_EXPRESSION,
+      frameId,
+      schema: hiddenTextPayloadSchema,
+      session,
+    });
 
-    return new Set(
-      (payload.success ? (payload.data.hidden ?? []) : []).filter(text => text !== '')
-    );
+    return new Set((payload?.hidden ?? []).filter(text => text !== ''));
   } catch {
     return new Set();
   }
@@ -191,11 +201,14 @@ export const readFrameSensitiveValues = async (
   frameId: string
 ): Promise<readonly string[]> => {
   try {
-    const payload = sensitiveValuesPayloadSchema.safeParse(
-      await evaluateProbeJson(session, SENSITIVE_VALUES_PROBE_EXPRESSION, frameId)
-    );
+    const payload = await readProbePayload({
+      expression: SENSITIVE_VALUES_PROBE_EXPRESSION,
+      frameId,
+      schema: sensitiveValuesPayloadSchema,
+      session,
+    });
 
-    return (payload.success ? (payload.data.values ?? []) : []).filter(value => value !== '');
+    return (payload?.values ?? []).filter(value => value !== '');
   } catch {
     return [];
   }
@@ -238,6 +251,10 @@ export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
   return JSON.stringify({ fields: fields, paymentFormSubmit: paymentFormSubmit });
 }`;
 
+const resolveObjectSchema = z.object({
+  object: z.object({ objectId: z.string().optional() }).optional(),
+});
+
 const sensitiveProbePayloadSchema = z.object({
   fields: z.array(z.object({ kind: z.enum(['one-time-code', 'password', 'payment']) })).optional(),
   paymentFormSubmit: z.boolean().optional(),
@@ -263,10 +280,7 @@ export const readSensitiveProbeForTarget = async (
       return { fields: [], paymentFormSubmit: false };
     }
 
-    const resolveSchema = z.object({
-      object: z.object({ objectId: z.string().optional() }).optional(),
-    });
-    const resolvedNode = resolveSchema.safeParse(
+    const resolvedNode = resolveObjectSchema.safeParse(
       await session.send(
         'DOM.resolveNode',
         resolved.kind === 'ref'
@@ -285,15 +299,16 @@ export const readSensitiveProbeForTarget = async (
       objectId,
       returnByValue: true,
     });
-    const value = runtimeEvaluateSchema.safeParse(probe).success
-      ? runtimeEvaluateSchema.parse(probe).result?.value
-      : undefined;
+    const response = runtimeEvaluateSchema.safeParse(probe);
+    const raw = probeJsonSchema.safeParse(
+      response.success ? response.data.result?.value : undefined
+    );
 
-    if (typeof value !== 'string') {
+    if (!raw.success) {
       return { fields: [], paymentFormSubmit: false };
     }
 
-    const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(value));
+    const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(raw.data));
 
     if (!payload.success) {
       return { fields: [], paymentFormSubmit: false };
@@ -308,20 +323,13 @@ export const readSensitiveProbeForTarget = async (
   }
 };
 
-/** The same classification the probe applies, for a tool call that carries field metadata directly. */
-export const classifySensitiveFields = (
-  fields: readonly {
-    readonly autocomplete?: string;
-    readonly name?: string;
-    readonly type?: string;
-  }[]
-): BrowserSensitiveProbe => {
-  const kinds = fields
-    .map(field => classifyFormField(field))
-    .filter((kind): kind is NonNullable<typeof kind> => kind !== undefined);
-
-  return { fields: kinds.map(kind => ({ kind })), paymentFormSubmit: false };
-};
+const argumentTextSchema = z.string().min(1);
+const fillFormFieldsSchema = z.array(
+  z.object({
+    ref: z.string().optional(),
+    selector: z.string().optional(),
+  })
+);
 
 /** The tools whose target element decides whether the step is sensitive. */
 const TARGETED_TOOLS: ReadonlySet<string> = new Set([
@@ -348,29 +356,102 @@ export const sensitiveTargetsOf = (
   const targets: string[] = [];
 
   for (const key of ['element', 'target', 'ref', 'selector']) {
-    const value = args[key];
+    const target = argumentTextSchema.safeParse(args[key]);
 
-    if (typeof value === 'string' && value !== '') {
-      targets.push(value);
+    if (target.success) {
+      targets.push(target.data);
     }
   }
 
-  const fields = args['fields'];
+  const fields = fillFormFieldsSchema.safeParse(args['fields']);
 
-  if (Array.isArray(fields)) {
-    for (const field of fields) {
-      if (typeof field === 'object' && field !== null) {
-        const ref = 'ref' in field ? field.ref : undefined;
-        const selector = 'selector' in field ? field.selector : undefined;
-        const target =
-          typeof ref === 'string' ? ref : typeof selector === 'string' ? selector : undefined;
+  for (const field of fields.success ? fields.data : []) {
+    const target = argumentTextSchema.safeParse(field.ref ?? field.selector);
 
-        if (target !== undefined && target !== '') {
-          targets.push(target);
-        }
-      }
+    if (target.success) {
+      targets.push(target.data);
     }
   }
 
   return targets;
+};
+
+/**
+ * The visible boxes of password, one-time-code and payment fields, in the
+ * frame's viewport coordinates. The read path translates them into the
+ * screenshot's document space and blacks them out, so a credential never
+ * reaches an agent as pixels either.
+ */
+export const SENSITIVE_FIELD_BOXES_PROBE_EXPRESSION = `(() => {
+  var kindOf = function (input) {
+    var type = String(input.type || '').toLowerCase();
+    if (type === 'password') { return 'password'; }
+    var autocomplete = String(input.getAttribute('autocomplete') || '').toLowerCase().split(/\\s+/);
+    for (var index = 0; index < autocomplete.length; index += 1) {
+      var token = autocomplete[index];
+      if (token === 'one-time-code') { return 'one-time-code'; }
+      if (token.indexOf('cc-') === 0) { return 'payment'; }
+    }
+    var name = String(input.getAttribute('name') || '').toLowerCase();
+    if (/(^|[-_])(cc|card)([-_]|$)/.test(name) || name === 'cardnumber') { return 'payment'; }
+    return null;
+  };
+  var boxes = [];
+  var inputs = document.querySelectorAll('input');
+  for (var index = 0; index < inputs.length; index += 1) {
+    var input = inputs[index];
+    if (kindOf(input) === null) { continue; }
+    var rect = input.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) { continue; }
+    boxes.push({ height: rect.height, width: rect.width, x: rect.left, y: rect.top });
+  }
+  return JSON.stringify({ boxes: boxes, scrollX: window.scrollX || 0, scrollY: window.scrollY || 0 });
+})()`;
+
+const sensitiveBoxesPayloadSchema = z.object({
+  boxes: z
+    .array(
+      // eslint-disable-next-line id-length -- a frame box carries x/y, like the CDP box model it comes from
+      z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() })
+    )
+    .optional(),
+  scrollX: z.number().optional(),
+  scrollY: z.number().optional(),
+});
+
+export interface FrameSensitiveBoxes {
+  /** Viewport-relative boxes of the frame's sensitive fields. */
+  readonly boxes: readonly {
+    readonly height: number;
+    readonly width: number;
+    // eslint-disable-next-line id-length -- a frame box carries x/y, like the CDP box model it comes from
+    readonly x: number;
+    // eslint-disable-next-line id-length -- see above
+    readonly y: number;
+  }[];
+  readonly scrollX: number;
+  readonly scrollY: number;
+}
+
+/** The sensitive field boxes of one readable frame; empty when the frame is gone. */
+export const readFrameSensitiveBoxes = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frameId: string
+): Promise<FrameSensitiveBoxes> => {
+  try {
+    const payload = await readProbePayload({
+      expression: SENSITIVE_FIELD_BOXES_PROBE_EXPRESSION,
+      frameId,
+      schema: sensitiveBoxesPayloadSchema,
+      session,
+    });
+
+    return {
+      boxes: payload?.boxes ?? [],
+      scrollX: payload?.scrollX ?? 0,
+      scrollY: payload?.scrollY ?? 0,
+    };
+  } catch {
+    return { boxes: [], scrollX: 0, scrollY: 0 };
+  }
 };

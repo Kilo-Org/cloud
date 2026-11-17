@@ -197,12 +197,11 @@ export const createBrowserTabGroupController = ({
   const adoptEnded = async ({
     sessionHandle,
   }: BrowserSessionRef): Promise<BrowserTabGroupOpenResult> => {
-    const adopted = [...sessions.values()].reduce<SessionState | undefined>(
+    const ended = [...sessions.values()].filter(session => session.ended);
+    const adopted = ended.reduce<SessionState | undefined>(
       (best, session) =>
-        session.ended && (best === undefined || (session.endedAt ?? 0) > (best.endedAt ?? 0))
-          ? session
-          : best,
-      undefined
+        best === undefined || (session.endedAt ?? 0) > (best.endedAt ?? 0) ? session : best,
+      ended[0]
     );
     if (adopted === undefined) {
       ensureSession(sessionHandle);

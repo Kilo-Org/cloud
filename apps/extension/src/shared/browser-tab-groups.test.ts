@@ -33,8 +33,7 @@ describe('browser tab groups', () => {
     ).resolves.toStrictEqual({ groupId: 9 });
 
     expect(group).toHaveBeenCalledWith({ tabIds: [] });
-    expect(update).toHaveBeenCalledWith(9, { title: 'Kilo · Report' });
-    expect(update).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledExactlyOnceWith(9, { title: 'Kilo · Report' });
     expect(controller.listSessions()).toStrictEqual([
       { ended: false, groupId: 9, sessionHandle: 's1', tabs: [], title: 'Report' },
     ]);

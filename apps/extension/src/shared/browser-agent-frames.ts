@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Frame scoping, snapshot splicing and the screenshot mask geometry are one unit: they all key on the same frame tree and owner nodes. */
+/* eslint-disable id-length -- frame boxes and their offsets carry x/y, the names the CDP box model and the screenshot clip use. */
 import { z } from 'zod';
 import {
   applyAgentSnapshotLine,
@@ -6,7 +8,11 @@ import {
   toBrowserOrigin,
 } from './browser-agent-checks';
 import type { AgentSnapshotLine } from './browser-agent-checks';
-import { readFrameHiddenText, readFrameSensitiveValues } from './browser-agent-probes';
+import {
+  readFrameHiddenText,
+  readFrameSensitiveBoxes,
+  readFrameSensitiveValues,
+} from './browser-agent-probes';
 import type {
   BrowserConsoleMessage,
   BrowserNetworkRequest,
@@ -27,14 +33,14 @@ import {
  * are dropped.
  */
 
-export type BrowserAgentFrame = {
+export interface BrowserAgentFrame {
   readonly id: string;
   /** Absent on the tab's main frame. */
   readonly parentId?: string;
   /** `scheme://host[:port]`, `file://`, or the raw origin for a non-web frame. */
   readonly origin: string;
   readonly url: string;
-};
+}
 
 const framePayloadSchema = z.object({
   id: z.string(),
@@ -43,6 +49,11 @@ const framePayloadSchema = z.object({
   url: z.string(),
   urlFragment: z.string().optional(),
 });
+const frameTreeChildSchema = z.object({
+  childFrames: z.array(z.unknown()).optional(),
+  frame: framePayloadSchema,
+});
+
 const frameTreePayloadSchema = z.object({
   frameTree: z.object({
     childFrames: z.array(z.unknown()).optional(),
@@ -93,12 +104,7 @@ export const readAgentFrameTree = async (
     });
 
     for (const child of children) {
-      const nested = z
-        .object({
-          childFrames: z.array(z.unknown()).optional(),
-          frame: framePayloadSchema,
-        })
-        .safeParse(child);
+      const nested = frameTreeChildSchema.safeParse(child);
 
       if (nested.success) {
         visit(nested.data);
@@ -150,10 +156,10 @@ export const readableFrameIds = (
   return readable;
 };
 
-export type WithheldFrame = {
+export interface WithheldFrame {
   readonly frameId: string;
   readonly origin: string;
-};
+}
 
 /**
  * Frames the agent may not read. The main frame is never withheld: the caller's
@@ -242,7 +248,7 @@ export const backendNodeIdOfRef = (ref: string): number | undefined => {
   return match === null ? undefined : Number(match[1]);
 };
 
-export type ScopedSnapshotInput = {
+export interface ScopedSnapshotInput {
   /** The main frame's own accessibility tree. */
   readonly topNodes: readonly AxNode[];
   /** Owner iframe backend node id → frame id, for every child frame. */
@@ -252,13 +258,13 @@ export type ScopedSnapshotInput = {
   /** Withheld frame id → origin. */
   readonly withheld: ReadonlyMap<string, string>;
   readonly depth?: number | undefined;
-};
+}
 
-export type ScopedSnapshot = {
+export interface ScopedSnapshot {
   readonly lines: readonly AgentSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
   readonly truncated: boolean;
-};
+}
 
 /**
  * Renders the main frame's tree with each child frame spliced in: a readable
@@ -385,6 +391,11 @@ const readFrameAxTree = async (
   }
 };
 
+const frameOwnerResultSchema = z.object({
+  backendNodeId: z.number().optional(),
+  nodeId: z.number().optional(),
+});
+
 /**
  * Owner iframe backend node id per child frame (`DOM.getFrameOwner`), the
  * anchor the tree splice and the screenshot mask both key on.
@@ -394,15 +405,13 @@ export const readFrameOwners = async (
   frameIds: readonly string[]
 ): Promise<ReadonlyMap<string, number>> => {
   const owners = new Map<string, number>();
-  const resultSchema = z.object({
-    backendNodeId: z.number().optional(),
-    nodeId: z.number().optional(),
-  });
 
   for (const frameId of frameIds) {
     try {
-      // eslint-disable-next-line no-await-in-loop -- CDP is a sequential request/response channel per frame
-      const parsed = resultSchema.safeParse(await session.send('DOM.getFrameOwner', { frameId }));
+      const parsed = frameOwnerResultSchema.safeParse(
+        // eslint-disable-next-line no-await-in-loop -- CDP is a sequential request/response channel per frame
+        await session.send('DOM.getFrameOwner', { frameId })
+      );
 
       if (parsed.success && parsed.data.backendNodeId !== undefined) {
         owners.set(frameId, parsed.data.backendNodeId);
@@ -415,7 +424,7 @@ export const readFrameOwners = async (
   return owners;
 };
 
-export type AgentSnapshotCapture = {
+export interface AgentSnapshotCapture {
   readonly lines: readonly AgentSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
   readonly text: string;
@@ -423,12 +432,12 @@ export type AgentSnapshotCapture = {
   readonly withheldFrames: readonly string[];
   /** Frames whose content this capture included, for the probes that follow it. */
   readonly readableFrameIds: readonly string[];
-};
+}
 
-export type AgentReadScope = {
+export interface AgentReadScope {
   /** Origins the caller holds `read` for; the main frame is included by the tool gate. */
   readonly readableOrigins: readonly string[];
-};
+}
 
 const renderLine = (line: AgentSnapshotLine): string => {
   const indent = '  '.repeat(line.depth);
@@ -524,10 +533,10 @@ export const captureAgentAriaSnapshot = async (
 
   return {
     lines: snapshot.lines,
+    readableFrameIds: [main.id, ...readableTreeFrames.map(frame => frame.id)],
     refs: snapshot.refs,
     text,
     truncated: snapshot.truncated,
-    readableFrameIds: [main.id, ...readableTreeFrames.map(frame => frame.id)],
     withheldFrames: withheld.map(frame => frame.origin),
   };
 };
@@ -563,9 +572,9 @@ const readFrameContentBox = async (
 
     return {
       height: parsed.success ? (parsed.data.model?.height ?? 0) : 0,
+      left: content[0] ?? 0,
+      top: content[1] ?? 0,
       width: parsed.success ? (parsed.data.model?.width ?? 0) : 0,
-      x: content[0] ?? 0,
-      y: content[1] ?? 0,
     };
   } catch {
     return undefined;
@@ -573,12 +582,12 @@ const readFrameContentBox = async (
 };
 
 const intersectBox = (outer: ScreenshotBox, inner: ScreenshotBox): ScreenshotBox => {
-  const x = Math.max(outer.x, inner.x);
-  const y = Math.max(outer.y, inner.y);
-  const right = Math.min(outer.x + outer.width, inner.x + inner.width);
-  const bottom = Math.min(outer.y + outer.height, inner.y + inner.height);
+  const left = Math.max(outer.left, inner.left);
+  const top = Math.max(outer.top, inner.top);
+  const right = Math.min(outer.left + outer.width, inner.left + inner.width);
+  const bottom = Math.min(outer.top + outer.height, inner.top + inner.height);
 
-  return { height: Math.max(0, bottom - y), width: Math.max(0, right - x), x, y };
+  return { height: Math.max(0, bottom - top), left, top, width: Math.max(0, right - left) };
 };
 
 /**
@@ -586,6 +595,7 @@ const intersectBox = (outer: ScreenshotBox, inner: ScreenshotBox): ScreenshotBox
  * in. A nested frame's box is clipped by each ancestor frame's box, and
  * `offset` translates document coordinates onto a viewport screenshot.
  */
+// eslint-disable-next-line max-params -- the frame tree, the withheld set and the offset are separate boundary inputs
 export const readWithheldFrameBoxes = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   frames: readonly BrowserAgentFrame[],
@@ -618,7 +628,7 @@ export const readWithheldFrameBoxes = async (
       current = parents.get(current);
     }
 
-    let accumulated: ScreenshotBox | undefined;
+    let accumulated: ScreenshotBox | undefined = undefined;
 
     // Outermost frame first: each ancestor clips its own subtree.
     for (const frameId of chain.toReversed()) {
@@ -642,17 +652,15 @@ export const readWithheldFrameBoxes = async (
       accumulated = accumulated === undefined ? box : intersectBox(accumulated, box);
     }
 
-    if (accumulated === undefined || accumulated.width <= 0 || accumulated.height <= 0) {
-      // A zero-area frame covers no pixels; nothing to mask.
-      continue;
+    // A zero-area frame covers no pixels; nothing to mask.
+    if (accumulated !== undefined && accumulated.width > 0 && accumulated.height > 0) {
+      boxes.push({
+        height: accumulated.height,
+        left: accumulated.left + offset.x,
+        top: accumulated.top + offset.y,
+        width: accumulated.width,
+      });
     }
-
-    boxes.push({
-      height: accumulated.height,
-      width: accumulated.width,
-      x: accumulated.x + offset.x,
-      y: accumulated.y + offset.y,
-    });
   }
 
   return { boxes };
@@ -720,10 +728,10 @@ export const filterAgentNetworkRequests = <Request extends Pick<BrowserNetworkRe
   );
 };
 
-export type AgentSnapshotView = AgentSnapshotCapture & {
+export interface AgentSnapshotView extends AgentSnapshotCapture {
   /** True when the caller may not read at least one frame, so the bridge can say so. */
   readonly hasWithheldFrames: boolean;
-};
+}
 
 /**
  * The snapshot an agent caller sees: frame-scoped, with the page's hidden text
@@ -739,7 +747,7 @@ export const captureAgentSnapshotView = async (
   } = {}
 ): Promise<AgentSnapshotView> => {
   const capture = await captureAgentAriaSnapshot(session, scope, {
-    ...(options.depth === undefined ? {} : { depth: options.depth }),
+    depth: options.depth,
   });
   const hiddenText = new Set<string>();
   const sensitiveValues = new Set<string>();
@@ -772,19 +780,22 @@ export const captureAgentSnapshotView = async (
 
   session.registerRefs(capture.refs, { merge: options.mergeRefs === true });
 
-  const body = lines.length === 0 ? '(no accessibility nodes)' : lines.map(renderLine).join('\n');
+  const body =
+    lines.length === 0
+      ? '(no accessibility nodes)'
+      : lines.map(line => renderLine(line)).join('\n');
   const text = capture.truncated
     ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {
+    hasWithheldFrames: capture.withheldFrames.length > 0,
     lines,
     readableFrameIds: capture.readableFrameIds,
     refs: capture.refs,
     text: maskSensitiveValues(text, [...sensitiveValues]),
     truncated: capture.truncated,
     withheldFrames: capture.withheldFrames,
-    hasWithheldFrames: capture.withheldFrames.length > 0,
   };
 };
 
@@ -796,12 +807,12 @@ const layoutMetricsSchema = z.object({
   layoutViewport: z.object({ clientWidth: z.number().optional() }).optional(),
 });
 
-export type AgentScreenshotGeometry = {
+export interface AgentScreenshotGeometry {
   /** Device pixels per CSS pixel, used to scale frame boxes onto the image. */
   readonly scale: number;
   /** Document → viewport translation for a non-full-page capture. */
   readonly offset: { readonly x: number; readonly y: number };
-};
+}
 
 /**
  * The screenshot's pixel geometry: the device scale factor (the layout
@@ -828,4 +839,91 @@ export const readAgentScreenshotGeometry = async (
         : { x: -(visual.pageX ?? 0), y: -(visual.pageY ?? 0) },
     scale,
   };
+};
+
+/**
+ * The document-space boxes of the readable frames' password/payment fields,
+ * added to the screenshot mask so a credential never leaves as pixels. A field
+ * box is its frame's document origin plus the field's own scroll-adjusted
+ * position; a frame whose origin cannot be measured fails the capture rather
+ * than guessing.
+ */
+// eslint-disable-next-line max-params -- the frame tree, the read grants and the offset are separate boundary inputs
+export const readSensitiveFieldBoxes = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frames: readonly BrowserAgentFrame[],
+  readableOrigins: readonly string[],
+  options: { readonly offset?: { readonly x: number; readonly y: number } } = {}
+): Promise<{ readonly boxes: readonly ScreenshotBox[] } | { readonly error: string }> => {
+  const readable = frames.filter(frame =>
+    readableOrigins.some(pattern => originPatternMatches(pattern, frame.origin))
+  );
+
+  if (readable.length === 0) {
+    return { boxes: [] };
+  }
+
+  const parents = new Map<string, string | undefined>();
+
+  for (const frame of frames) {
+    parents.set(frame.id, frame.parentId);
+  }
+
+  const owners = await readFrameOwners(
+    session,
+    frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+  );
+  const offset = options.offset ?? { x: 0, y: 0 };
+  const boxes: ScreenshotBox[] = [];
+
+  for (const frame of readable) {
+    // eslint-disable-next-line no-await-in-loop -- one probe per frame, in document order
+    const probe = await readFrameSensitiveBoxes(session, frame.id);
+
+    const chain: string[] = [];
+    let current: string | undefined = frame.id;
+
+    while (current !== undefined && parents.get(current) !== undefined) {
+      chain.push(current);
+      current = parents.get(current);
+    }
+
+    let frameOriginX = 0;
+    let frameOriginY = 0;
+
+    for (const frameId of chain) {
+      const ownerBackendNodeId = owners.get(frameId);
+
+      if (ownerBackendNodeId === undefined) {
+        return {
+          error: `The region of a ${frame.origin} form field could not be measured, so no screenshot was returned.`,
+        };
+      }
+
+      // eslint-disable-next-line no-await-in-loop -- ancestor chain, one box per level
+      const box = await readFrameContentBox(session, ownerBackendNodeId);
+
+      if (box === undefined) {
+        return {
+          error: `The region of a ${frame.origin} form field could not be measured, so no screenshot was returned.`,
+        };
+      }
+
+      frameOriginX += box.left;
+      frameOriginY += box.top;
+    }
+
+    if (probe.boxes.length > 0) {
+      for (const box of probe.boxes) {
+        boxes.push({
+          height: box.height,
+          left: frameOriginX + box.x + probe.scrollX + offset.x,
+          top: frameOriginY + box.y + probe.scrollY + offset.y,
+          width: box.width,
+        });
+      }
+    }
+  }
+
+  return { boxes };
 };

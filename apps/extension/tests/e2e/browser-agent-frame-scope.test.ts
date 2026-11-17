@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
+import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
 
 /*
@@ -16,22 +17,36 @@ import { launchExtensionContext, startFixtureServer } from './extension-context-
 const MARKER = 'KILO_FRAME_MARKER_42';
 const IFRAME_BOX = { height: 200, left: 40, top: 120, width: 400 };
 
-interface AgentToolResponse {
-  readonly ok?: boolean;
-  readonly permission?: { readonly items?: readonly Record<string, unknown>[] };
-  readonly result?: { readonly error?: string; readonly ok?: boolean; readonly value?: unknown };
-  readonly withheldFrames?: readonly string[];
-}
+const agentToolResponseSchema = z.object({
+  ok: z.boolean().optional(),
+  permission: z.object({ items: z.array(z.record(z.string(), z.unknown())).optional() }).optional(),
+  result: z
+    .object({
+      error: z.string().optional(),
+      ok: z.boolean().optional(),
+      value: z.unknown().optional(),
+    })
+    .optional(),
+  withheldFrames: z.array(z.string()).optional(),
+});
 
-/** The extension API surface this spec drives inside the extension's own page. */
-type ExtensionChrome = {
-  readonly runtime: { readonly sendMessage: (message: unknown) => Promise<unknown> };
-  readonly tabs: {
+type AgentToolResponse = z.infer<typeof agentToolResponseSchema>;
+
+/**
+ * The extension API surface this spec drives inside the extension's own page.
+ * Extension pages expose it on the page global (`chrome`, or `browser` on
+ * Firefox), and the `evaluate` callbacks below run inside such a page.
+ */
+interface ExtensionPageApi {
+  readonly runtime?: {
+    readonly sendMessage: (message: unknown) => Promise<unknown>;
+  };
+  readonly tabs?: {
     readonly query: (
       query: Record<string, unknown>
     ) => Promise<readonly { readonly id?: number; readonly url?: string }[]>;
   };
-};
+}
 
 const originOf = (url: string): string => {
   const parsed = new URL(url);
@@ -49,16 +64,16 @@ const openExtensionPage = async (context: BrowserContext, extensionId: string): 
 
 const findTabId = async (extensionPage: Page, urlPrefix: string): Promise<number> => {
   const tabId = await extensionPage.evaluate(async prefix => {
-    const api = (globalThis as unknown as { readonly chrome: ExtensionChrome }).chrome;
-    const tabs = await api.tabs.query({});
+    const api = (globalThis as typeof globalThis & { chrome?: ExtensionPageApi }).chrome;
+    const tabs = await api?.tabs?.query({});
 
-    return tabs.find(tab => (tab.url ?? '').startsWith(prefix))?.id ?? -1;
+    return tabs?.find(tab => (tab.url ?? '').startsWith(prefix))?.id ?? -1;
   }, urlPrefix);
 
   return tabId;
 };
 
-const callAgentTool = (
+const callAgentTool = async (
   extensionPage: Page,
   input: {
     readonly authorized: readonly {
@@ -69,12 +84,13 @@ const callAgentTool = (
     readonly tabId: number;
     readonly tool: string;
   }
-): Promise<AgentToolResponse> =>
-  extensionPage.evaluate(
-    async request =>
-      (globalThis as unknown as { readonly chrome: ExtensionChrome }).chrome.runtime.sendMessage(
-        request
-      ),
+): Promise<AgentToolResponse> => {
+  const response: unknown = await extensionPage.evaluate(
+    request => {
+      const api = (globalThis as typeof globalThis & { chrome?: ExtensionPageApi }).chrome;
+
+      return api?.runtime?.sendMessage(request);
+    },
     {
       agent: { authorized: [...input.authorized] },
       arguments: input.args,
@@ -83,21 +99,38 @@ const callAgentTool = (
       tool: input.tool,
       type: 'kilo.tabs.browserTool',
     } as const
-  ) as Promise<AgentToolResponse>;
+  );
+  const parsed = agentToolResponseSchema.safeParse(response);
+
+  if (!parsed.success) {
+    throw new Error(`unexpected browser tool response: ${JSON.stringify(response)}`);
+  }
+
+  return parsed.data;
+};
+
+/** A tool result's text, the only shape the snapshot and find assertions read. */
+const resultTextOf = (response: AgentToolResponse): string => {
+  const value = response.result?.value;
+
+  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
+};
+
+const screenshotValueSchema = z.object({ dataUrl: z.string(), mediaType: z.string().optional() });
 
 const screenshotValue = (response: AgentToolResponse): { dataUrl: string; mediaType: string } => {
-  const value = response.result?.value as { dataUrl?: string; mediaType?: string } | undefined;
+  const parsed = screenshotValueSchema.safeParse(response.result?.value);
 
-  if (value?.dataUrl === undefined) {
+  if (!parsed.success) {
     throw new Error(`no screenshot in ${JSON.stringify(response)}`);
   }
 
-  return { dataUrl: value.dataUrl, mediaType: value.mediaType ?? 'image/png' };
+  return { dataUrl: parsed.data.dataUrl, mediaType: parsed.data.mediaType ?? 'image/png' };
 };
 
 const readPixel = (
   extensionPage: Page,
-  input: { readonly dataUrl: string; readonly x: number; readonly y: number }
+  input: { readonly dataUrl: string; readonly pixelX: number; readonly pixelY: number }
 ): Promise<number[]> =>
   extensionPage.evaluate(async target => {
     const image = new Image();
@@ -118,9 +151,9 @@ const readPixel = (
 
     context.drawImage(image, 0, 0);
 
-    const pixel = context.getImageData(target.x, target.y, 1, 1).data;
+    const pixel = context.getImageData(target.pixelX, target.pixelY, 1, 1).data;
 
-    return Array.from(pixel);
+    return [...pixel];
   }, input);
 
 test.describe('agent frame scoping', () => {
@@ -176,8 +209,8 @@ test.describe('agent frame scoping', () => {
       });
 
       expect(scoped.result?.ok).toBe(true);
-      expect(String(scoped.result?.value)).toContain(`[origin withheld: ${innerOrigin}]`);
-      expect(String(scoped.result?.value)).not.toContain(MARKER);
+      expect(resultTextOf(scoped)).toContain(`[origin withheld: ${innerOrigin}]`);
+      expect(resultTextOf(scoped)).not.toContain(MARKER);
       expect(scoped.withheldFrames).toEqual([innerOrigin]);
 
       const found = await callAgentTool(extensionPage, {
@@ -187,7 +220,7 @@ test.describe('agent frame scoping', () => {
         tool: 'browser_find',
       });
 
-      expect(String(found.result?.value)).not.toContain(MARKER);
+      expect(resultTextOf(found)).not.toContain(MARKER);
 
       const shot = screenshotValue(
         await callAgentTool(extensionPage, {
@@ -199,10 +232,14 @@ test.describe('agent frame scoping', () => {
       );
       const insidePixel = await readPixel(extensionPage, {
         dataUrl: shot.dataUrl,
-        x: IFRAME_BOX.left + IFRAME_BOX.width / 2,
-        y: IFRAME_BOX.top + IFRAME_BOX.height / 2,
+        pixelX: IFRAME_BOX.left + IFRAME_BOX.width / 2,
+        pixelY: IFRAME_BOX.top + IFRAME_BOX.height / 2,
       });
-      const outsidePixel = await readPixel(extensionPage, { dataUrl: shot.dataUrl, x: 8, y: 8 });
+      const outsidePixel = await readPixel(extensionPage, {
+        dataUrl: shot.dataUrl,
+        pixelX: 8,
+        pixelY: 8,
+      });
 
       expect(insidePixel.slice(0, 3)).toEqual([0, 0, 0]);
       expect(insidePixel[3]).toBe(255);
@@ -219,7 +256,7 @@ test.describe('agent frame scoping', () => {
         tool: 'browser_snapshot',
       });
 
-      expect(String(granted.result?.value)).toContain(MARKER);
+      expect(resultTextOf(granted)).toContain(MARKER);
       expect(granted.withheldFrames).toEqual([]);
 
       const grantedFind = await callAgentTool(extensionPage, {
@@ -232,7 +269,7 @@ test.describe('agent frame scoping', () => {
         tool: 'browser_find',
       });
 
-      expect(String(grantedFind.result?.value)).toContain(MARKER);
+      expect(resultTextOf(grantedFind)).toContain(MARKER);
     } finally {
       await context.close();
       await inner.close();

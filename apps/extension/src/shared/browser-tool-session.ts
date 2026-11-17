@@ -1215,6 +1215,12 @@ const networkBodySchema = z.object({
   body: z.string(),
 });
 
+const downloadWillBeginSchema = z.object({
+  guid: z.string().optional(),
+  suggestedFilename: z.string().optional(),
+  url: z.string().optional(),
+});
+
 /**
  * CDP methods that back a tool Firefox cannot express, so a handler that still
  * calls the debugger path fails by the tool's name instead of a bare method.
@@ -2007,12 +2013,6 @@ export const createBrowserToolSession = ({
       refs.set(entry.ref, entry);
     }
   };
-
-  const downloadWillBeginSchema = z.object({
-    guid: z.string().optional(),
-    suggestedFilename: z.string().optional(),
-    url: z.string().optional(),
-  });
 
   const handleDownloadWillBegin = (params: Record<string, unknown> | undefined): void => {
     const parsed = downloadWillBeginSchema.safeParse(params ?? {});
@@ -2865,13 +2865,13 @@ export const createBrowserToolSession = ({
     bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey)),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, refs),
     consoleMessages: () => [...consoleBuffer],
-    downloads: () => [...downloadBuffer],
     // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
     dispose: () => {
       refs.clear();
       refsByCaller.delete(callerKey);
       return Promise.resolve();
     },
+    downloads: () => [...downloadBuffer],
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,
@@ -2902,8 +2902,8 @@ export const createBrowserToolSession = ({
     bindCaller: callerKey => createCallerView(callerKey, callerRefs(callerKey)),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     consoleMessages: () => [...consoleBuffer],
-    downloads: () => [...downloadBuffer],
     dispose,
+    downloads: () => [...downloadBuffer],
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,

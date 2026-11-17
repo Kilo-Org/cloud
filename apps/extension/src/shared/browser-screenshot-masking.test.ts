@@ -26,10 +26,10 @@ const createImage = (width: number, height: number): PixelImage => {
 
 const pixelAt = (
   image: PixelImage,
-  x: number,
-  y: number
+  column: number,
+  row: number
 ): { alpha: number; blue: number; green: number; red: number } => {
-  const index = (y * image.width + x) * 4;
+  const index = (row * image.width + column) * 4;
 
   return {
     alpha: image.data[index + 3] ?? -1,
@@ -47,66 +47,85 @@ const UNTOUCHED = {
   red: UNTOUCHED_RED,
 };
 
-describe('blackOutBoxes', () => {
+type Pixel = readonly [column: number, row: number];
+
+const expectPixels = (
+  image: PixelImage,
+  pixels: readonly Pixel[],
+  expected: { alpha: number; blue: number; green: number; red: number }
+): void => {
+  for (const [column, row] of pixels) {
+    expect(pixelAt(image, column, row)).toStrictEqual(expected);
+  }
+};
+
+describe('opaque box painting', () => {
   it('blacks out exactly the covered pixels and leaves their neighbours untouched', () => {
     const image = createImage(4, 4);
 
-    blackOutBoxes(image, [{ height: 2, width: 2, x: 1, y: 1 }], 1);
+    blackOutBoxes(image, [{ height: 2, left: 1, top: 1, width: 2 }], 1);
 
-    for (const [x, y] of [
-      [1, 1],
-      [2, 1],
-      [1, 2],
-      [2, 2],
-    ]) {
-      expect(pixelAt(image, x ?? 0, y ?? 0)).toStrictEqual(BLACK);
-    }
-
-    for (const [x, y] of [
-      [0, 0],
-      [0, 1],
-      [1, 0],
-      [3, 1],
-      [1, 3],
-      [3, 3],
-    ]) {
-      expect(pixelAt(image, x ?? 0, y ?? 0)).toStrictEqual(UNTOUCHED);
-    }
+    expect(pixelAt(image, 1, 1)).toStrictEqual(BLACK);
+    expectPixels(
+      image,
+      [
+        [1, 1],
+        [2, 1],
+        [1, 2],
+        [2, 2],
+      ],
+      BLACK
+    );
+    expectPixels(
+      image,
+      [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [3, 1],
+        [1, 3],
+        [3, 3],
+      ],
+      UNTOUCHED
+    );
   });
 
   it('doubles the covered region at scale 2', () => {
     const image = createImage(4, 4);
 
-    blackOutBoxes(image, [{ height: 1, width: 1, x: 1, y: 1 }], 1);
+    blackOutBoxes(image, [{ height: 1, left: 1, top: 1, width: 1 }], 1);
     expect(pixelAt(image, 1, 1)).toStrictEqual(BLACK);
     expect(pixelAt(image, 2, 2)).toStrictEqual(UNTOUCHED);
 
     const scaledImage = createImage(4, 4);
 
-    blackOutBoxes(scaledImage, [{ height: 1, width: 1, x: 1, y: 1 }], 2);
+    blackOutBoxes(scaledImage, [{ height: 1, left: 1, top: 1, width: 1 }], 2);
 
-    for (const [x, y] of [
-      [2, 2],
-      [3, 2],
-      [2, 3],
-      [3, 3],
-    ]) {
-      expect(pixelAt(scaledImage, x ?? 0, y ?? 0)).toStrictEqual(BLACK);
-    }
-
-    for (const [x, y] of [
-      [1, 1],
-      [1, 2],
-      [0, 0],
-    ]) {
-      expect(pixelAt(scaledImage, x ?? 0, y ?? 0)).toStrictEqual(UNTOUCHED);
-    }
+    expectPixels(
+      scaledImage,
+      [
+        [2, 2],
+        [3, 2],
+        [2, 3],
+        [3, 3],
+      ],
+      BLACK
+    );
+    expectPixels(
+      scaledImage,
+      [
+        [1, 1],
+        [1, 2],
+        [0, 0],
+      ],
+      UNTOUCHED
+    );
   });
 
   it('clamps a box that starts outside the image', () => {
     const image = createImage(4, 4);
 
-    blackOutBoxes(image, [{ height: 3, width: 3, x: -2, y: -2 }], 1);
+    blackOutBoxes(image, [{ height: 3, left: -2, top: -2, width: 3 }], 1);
 
     expect(pixelAt(image, 0, 0)).toStrictEqual(BLACK);
     expect(pixelAt(image, 1, 0)).toStrictEqual(UNTOUCHED);
@@ -118,19 +137,20 @@ describe('blackOutBoxes', () => {
     const image = createImage(4, 4);
     const byteLength = image.data.length;
 
-    blackOutBoxes(image, [{ height: 10, width: 10, x: 2, y: 2 }], 1);
+    blackOutBoxes(image, [{ height: 10, left: 2, top: 2, width: 10 }], 1);
 
-    for (const [x, y] of [
-      [2, 2],
-      [3, 2],
-      [2, 3],
-      [3, 3],
-    ]) {
-      expect(pixelAt(image, x ?? 0, y ?? 0)).toStrictEqual(BLACK);
-    }
-
+    expectPixels(
+      image,
+      [
+        [2, 2],
+        [3, 2],
+        [2, 3],
+        [3, 3],
+      ],
+      BLACK
+    );
     expect(pixelAt(image, 1, 1)).toStrictEqual(UNTOUCHED);
-    expect(image.data.length).toBe(byteLength);
+    expect(image.data).toHaveLength(byteLength);
   });
 
   it('ignores a zero-area box', () => {
@@ -139,17 +159,16 @@ describe('blackOutBoxes', () => {
     blackOutBoxes(
       image,
       [
-        { height: 0, width: 0, x: 1, y: 1 },
-        { height: 2, width: 0, x: 0, y: 0 },
+        { height: 0, left: 1, top: 1, width: 0 },
+        { height: 2, left: 0, top: 0, width: 0 },
       ],
       1
     );
 
-    for (let y = 0; y < 3; y += 1) {
-      for (let x = 0; x < 3; x += 1) {
-        expect(pixelAt(image, x, y)).toStrictEqual(UNTOUCHED);
-      }
-    }
+    const everyPixel = [0, 1, 2].flatMap(column => [0, 1, 2].map((row): Pixel => [column, row]));
+
+    expect(pixelAt(image, 1, 1)).toStrictEqual(UNTOUCHED);
+    expectPixels(image, everyPixel, UNTOUCHED);
   });
 
   it('blacks out the union of overlapping boxes', () => {
@@ -158,41 +177,43 @@ describe('blackOutBoxes', () => {
     blackOutBoxes(
       image,
       [
-        { height: 2, width: 2, x: 0, y: 0 },
-        { height: 2, width: 2, x: 1, y: 1 },
+        { height: 2, left: 0, top: 0, width: 2 },
+        { height: 2, left: 1, top: 1, width: 2 },
       ],
       1
     );
 
-    for (const [x, y] of [
-      [0, 0],
-      [1, 0],
-      [0, 1],
-      [1, 1],
-      [2, 1],
-      [1, 2],
-      [2, 2],
-    ]) {
-      expect(pixelAt(image, x ?? 0, y ?? 0)).toStrictEqual(BLACK);
-    }
-
-    for (const [x, y] of [
-      [2, 0],
-      [0, 2],
-      [3, 3],
-    ]) {
-      expect(pixelAt(image, x ?? 0, y ?? 0)).toStrictEqual(UNTOUCHED);
-    }
+    expect(pixelAt(image, 1, 1)).toStrictEqual(BLACK);
+    expectPixels(
+      image,
+      [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [2, 1],
+        [1, 2],
+        [2, 2],
+      ],
+      BLACK
+    );
+    expectPixels(
+      image,
+      [
+        [2, 0],
+        [0, 2],
+        [3, 3],
+      ],
+      UNTOUCHED
+    );
   });
 });
 
 const DATA_URL = 'data:image/png;base64,AAAA';
 
-describe('maskScreenshotDataUrl', () => {
+describe('masked screenshot data URLs', () => {
   it('returns the input data URL without decoding when there are no boxes', async () => {
-    const decode = vi.fn(async () => {
-      throw new Error('decode must not run');
-    });
+    const decode = vi.fn(() => Promise.reject(new Error('decode must not run')));
 
     const result = await maskScreenshotDataUrl(
       { boxes: [], dataUrl: DATA_URL, mediaType: 'image/png', scale: 2 },
@@ -206,15 +227,13 @@ describe('maskScreenshotDataUrl', () => {
   it('reports a decode failure without returning a data URL', async () => {
     const result = await maskScreenshotDataUrl(
       {
-        boxes: [{ height: 10, width: 10, x: 0, y: 0 }],
+        boxes: [{ height: 10, left: 0, top: 0, width: 10 }],
         dataUrl: DATA_URL,
         mediaType: 'image/png',
         scale: 1,
       },
       {
-        decode: async () => {
-          throw new Error('broken image');
-        },
+        decode: () => Promise.reject(new Error('broken image')),
       }
     );
 
@@ -225,16 +244,14 @@ describe('maskScreenshotDataUrl', () => {
   it('reports an encode failure without returning a data URL', async () => {
     const result = await maskScreenshotDataUrl(
       {
-        boxes: [{ height: 1, width: 1, x: 0, y: 0 }],
+        boxes: [{ height: 1, left: 0, top: 0, width: 1 }],
         dataUrl: DATA_URL,
         mediaType: 'image/png',
         scale: 1,
       },
       {
-        decode: async () => createImage(2, 2),
-        encodePng: async () => {
-          throw new Error('cannot encode');
-        },
+        decode: () => Promise.resolve(createImage(2, 2)),
+        encodePng: () => Promise.reject(new Error('cannot encode')),
       }
     );
 
@@ -244,21 +261,21 @@ describe('maskScreenshotDataUrl', () => {
 
   it('round trips through injected decode and encode with the outside pixel intact', async () => {
     const image = createImage(4, 4);
-    let encoded: PixelImage | undefined;
+    let encoded: PixelImage | null = null;
 
     const result = await maskScreenshotDataUrl(
       {
-        boxes: [{ height: 2, width: 2, x: 1, y: 1 }],
+        boxes: [{ height: 2, left: 1, top: 1, width: 2 }],
         dataUrl: DATA_URL,
         mediaType: 'image/jpeg',
         scale: 1,
       },
       {
-        decode: async () => image,
-        encodePng: async (masked: PixelImage) => {
+        decode: () => Promise.resolve(image),
+        encodePng: (masked: PixelImage) => {
           encoded = masked;
 
-          return 'data:image/png;base64,bWFza2Vk';
+          return Promise.resolve('data:image/png;base64,bWFza2Vk');
         },
       }
     );

@@ -1,14 +1,20 @@
+/* eslint-disable max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
 import {
   createStepTokenStore,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
+  parseToolArguments,
   SENSITIVE_REASON,
 } from './browser-agent-checks';
 import type { BrowserGrant, BrowserPermissionItem, StepTokenStore } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
-import { readAgentFrameTree, withheldFramesOf } from './browser-agent-frames';
+import {
+  enableAgentFrameAutoAttach,
+  readAgentFrameTree,
+  withheldFramesOf,
+} from './browser-agent-frames';
 import type {
   BrowserOpenSessionInput,
   BrowserSessionRef,
@@ -178,6 +184,7 @@ export const createBrowserRuntime = ({
   const disposeTab = async (tabId: number): Promise<void> => {
     chains.delete(tabId);
     inFlight.delete(tabId);
+    autoAttachedTabs.delete(tabId);
     tabGroups?.noteTabRemoved(tabId);
     leases.releaseTab(tabId);
     await disposeBrowserToolSession(sessions, tabId);
@@ -236,6 +243,21 @@ export const createBrowserRuntime = ({
     }
   };
 
+  // Tabs whose flattened frame auto-attach is on, so out-of-process iframes are reachable for scoping.
+  const autoAttachedTabs = new Set<number>();
+
+  const ensureFrameAutoAttach = async (
+    session: BrowserToolSession,
+    tabId: number
+  ): Promise<void> => {
+    if (autoAttachedTabs.has(tabId)) {
+      return;
+    }
+
+    await enableAgentFrameAutoAttach(session);
+    autoAttachedTabs.add(tabId);
+  };
+
   const withheldOriginsFor = async (
     session: BrowserToolSession,
     authorized: readonly BrowserGrant[]
@@ -245,21 +267,6 @@ export const createBrowserRuntime = ({
 
     return withheldFramesOf(frames, readable).map(frame => frame.origin);
   };
-
-  const issueSensitiveToken = (
-    sensitive: BrowserSensitiveStep,
-    toolName: string,
-    args: Record<string, unknown>,
-    tabId: number
-  ): string =>
-    tokens.issue({
-      argumentHash: hashBrowserToolArguments(args),
-      element: sensitive.element,
-      origin: sensitive.origin,
-      reason: sensitive.reason,
-      tabId,
-      toolName,
-    });
 
   const needsPermissionOutcome = (
     items: readonly BrowserPermissionItem[],
@@ -331,12 +338,21 @@ export const createBrowserRuntime = ({
 
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
-        const argsRecord: Record<string, unknown> =
-          typeof toolArguments === 'object' &&
-          toolArguments !== null &&
-          !Array.isArray(toolArguments)
-            ? { ...toolArguments }
-            : {};
+        const argsRecord = parseToolArguments(toolArguments);
+        const issueSensitiveToken = (sensitive: BrowserSensitiveStep): string =>
+          tokens.issue({
+            argumentHash: hashBrowserToolArguments(argsRecord),
+            element: sensitive.element,
+            origin: sensitive.origin,
+            reason: sensitive.reason,
+            tabId,
+            toolName,
+          });
+
+        if (agentContext !== undefined) {
+          await ensureFrameAutoAttach(session, tabId);
+        }
+
         const preflight =
           agentContext === undefined
             ? undefined
@@ -362,9 +378,7 @@ export const createBrowserRuntime = ({
 
           return needsPermissionOutcome(
             preflight.failure.items,
-            preflight.sensitive === undefined
-              ? undefined
-              : issueSensitiveToken(preflight.sensitive, toolName, argsRecord, tabId)
+            preflight.sensitive === undefined ? undefined : issueSensitiveToken(preflight.sensitive)
           );
         }
 
@@ -379,7 +393,7 @@ export const createBrowserRuntime = ({
           await setDownloadBehavior(session, 'deny');
         }
 
-        let result: EvalTabResult | null;
+        let result: EvalTabResult | null = null;
 
         try {
           const call = runKiloBrowserTool({
@@ -430,26 +444,13 @@ export const createBrowserRuntime = ({
           }
         }
 
-        if (guardDownloads && (await takeStartedDownloads(session)) > 0) {
+        if (guardDownloads && takeStartedDownloads(session) > 0) {
+          const origin = preflight?.ok ? preflight.origin : '';
+          const reason = SENSITIVE_REASON.download;
+
           return needsPermissionOutcome(
-            [
-              {
-                class: 'sensitive',
-                origin: preflight?.ok === true ? preflight.origin : '',
-                reason: SENSITIVE_REASON.download,
-              },
-            ],
-            preflight?.ok === true
-              ? issueSensitiveToken(
-                  {
-                    origin: preflight.origin,
-                    reason: SENSITIVE_REASON.download,
-                  },
-                  toolName,
-                  argsRecord,
-                  tabId
-                )
-              : undefined
+            [{ class: 'sensitive', origin, reason }],
+            preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined
           );
         }
 
@@ -502,7 +503,8 @@ export const createBrowserRuntime = ({
   };
 
   return {
-    adoptEnded: async input => (tabGroups === undefined ? {} : tabGroups.adoptEnded(input)),
+    adoptEnded: input =>
+      tabGroups === undefined ? Promise.resolve({}) : tabGroups.adoptEnded(input),
     closeSession: async input => {
       if (tabGroups !== undefined) {
         await tabGroups.closeSession(input);
@@ -511,10 +513,13 @@ export const createBrowserRuntime = ({
     disposeTab,
     evalInTab,
     listSessions: () => (tabGroups === undefined ? [] : tabGroups.listSessions()),
-    openSession: async input => (tabGroups === undefined ? {} : tabGroups.openSession(input)),
+    openSession: input =>
+      tabGroups === undefined ? Promise.resolve({}) : tabGroups.openSession(input),
     releaseCaller,
     runTool,
-    shareActiveTab: async input =>
-      tabGroups === undefined ? { tabId: input.tabId ?? -1 } : tabGroups.shareActiveTab(input),
+    shareActiveTab: input =>
+      tabGroups === undefined
+        ? Promise.resolve({ tabId: input.tabId ?? -1 })
+        : tabGroups.shareActiveTab(input),
   };
 };

@@ -8,21 +8,19 @@
  */
 
 /** A decoded RGBA image: four bytes per pixel, row-major, no padding. */
-export type PixelImage = {
+export interface PixelImage {
   data: Uint8ClampedArray;
   height: number;
   width: number;
-};
+}
 
 /** A region to mask, in CSS pixels in document coordinates. */
-export type ScreenshotBox = {
+export interface ScreenshotBox {
   height: number;
+  left: number;
+  top: number;
   width: number;
-  // eslint-disable-next-line id-length -- document coordinates are named x and y
-  x: number;
-  // eslint-disable-next-line id-length -- document coordinates are named x and y
-  y: number;
-};
+}
 
 /** Message returned when a screenshot cannot be masked and must not be sent. */
 export const MASK_FAILED_ERROR = 'The screenshot could not be masked for this caller.';
@@ -38,7 +36,7 @@ export interface ScreenshotMaskerDeps {
 }
 
 /** What a masker caller supplies: the captured image plus the regions to hide. */
-export type ScreenshotMaskInput = {
+export interface ScreenshotMaskInput {
   boxes: readonly ScreenshotBox[];
   dataUrl: string;
   /**
@@ -48,7 +46,7 @@ export type ScreenshotMaskInput = {
   mediaType: string;
   /** Device pixel ratio the capture was taken at, so CSS boxes map to pixels. */
   scale: number;
-};
+}
 
 /** A masked data URL, or the reason no data URL may be returned. */
 export type ScreenshotMaskResult = { dataUrl: string; ok: true } | { error: string; ok: false };
@@ -59,10 +57,55 @@ const OPAQUE_BLACK_BLUE = 0;
 const OPAQUE_BLACK_ALPHA = 255;
 
 /**
+ * Paints one box. Box coordinates are CSS pixels, multiplied by `scale` to
+ * reach image pixels; a box without a finite span, or with no covered pixel,
+ * paints nothing.
+ */
+const paintBox = (image: PixelImage, box: ScreenshotBox, scale: number): void => {
+  const { data, height, width } = image;
+  const left = box.left * scale;
+  const top = box.top * scale;
+  const right = (box.left + box.width) * scale;
+  const bottom = (box.top + box.height) * scale;
+
+  if (
+    !Number.isFinite(left) ||
+    !Number.isFinite(top) ||
+    !Number.isFinite(right) ||
+    !Number.isFinite(bottom)
+  ) {
+    return;
+  }
+
+  // A pixel is covered when its centre, at pixel + 0.5, lies in [left, right].
+  const startX = Math.max(0, Math.ceil(left - 0.5));
+  const endX = Math.min(width - 1, Math.floor(right - 0.5));
+  const startY = Math.max(0, Math.ceil(top - 0.5));
+  const endY = Math.min(height - 1, Math.floor(bottom - 0.5));
+
+  if (endX < startX || endY < startY) {
+    return;
+  }
+
+  const lastByte = data.length - 4;
+
+  for (let pixelY = startY; pixelY <= endY; pixelY += 1) {
+    const rowStart = (pixelY * width + startX) * 4;
+    const rowEnd = (pixelY * width + endX + 1) * 4;
+
+    for (let index = rowStart; index < rowEnd && index <= lastByte; index += 4) {
+      data[index] = OPAQUE_BLACK_RED;
+      data[index + 1] = OPAQUE_BLACK_GREEN;
+      data[index + 2] = OPAQUE_BLACK_BLUE;
+      data[index + 3] = OPAQUE_BLACK_ALPHA;
+    }
+  }
+};
+
+/**
  * Paints opaque black over every pixel whose centre falls inside one of the
- * boxes. Box coordinates are CSS pixels, multiplied by `scale` to reach image
- * pixels, so a device-pixel-ratio 2 capture masks twice the span. Boxes may be
- * negative or wider than the image, may overlap, and each is clamped to the
+ * boxes, so a device-pixel-ratio 2 capture masks twice the CSS span. Boxes may
+ * be negative or wider than the image, may overlap, and each is clamped to the
  * image; a box with no area paints nothing.
  */
 export const blackOutBoxes = (
@@ -70,81 +113,23 @@ export const blackOutBoxes = (
   boxes: readonly ScreenshotBox[],
   scale: number
 ): void => {
-  const { data, height, width } = image;
+  const { height, width } = image;
 
   if (width <= 0 || height <= 0 || !Number.isFinite(scale) || scale <= 0) {
     return;
   }
 
-  const lastByte = data.length - 4;
-
   for (const box of boxes) {
-    const left = box.x * scale;
-    const top = box.y * scale;
-    const right = (box.x + box.width) * scale;
-    const bottom = (box.y + box.height) * scale;
-
-    if (
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(right) ||
-      !Number.isFinite(bottom)
-    ) {
-      continue;
-    }
-
-    // A pixel is covered when its centre, at pixel + 0.5, lies in [left, right].
-    const startX = Math.max(0, Math.ceil(left - 0.5));
-    const endX = Math.min(width - 1, Math.floor(right - 0.5));
-    const startY = Math.max(0, Math.ceil(top - 0.5));
-    const endY = Math.min(height - 1, Math.floor(bottom - 0.5));
-
-    if (endX < startX || endY < startY) {
-      continue;
-    }
-
-    for (let y = startY; y <= endY; y += 1) {
-      const rowStart = (y * width + startX) * 4;
-      const rowEnd = (y * width + endX + 1) * 4;
-
-      for (let index = rowStart; index < rowEnd && index <= lastByte; index += 4) {
-        data[index] = OPAQUE_BLACK_RED;
-        data[index + 1] = OPAQUE_BLACK_GREEN;
-        data[index + 2] = OPAQUE_BLACK_BLUE;
-        data[index + 3] = OPAQUE_BLACK_ALPHA;
-      }
-    }
+    paintBox(image, box, scale);
   }
-};
-
-const requireOffscreenCanvas = (): typeof OffscreenCanvas => {
-  const { OffscreenCanvas: canvasConstructor } = globalThis;
-
-  if (typeof canvasConstructor !== 'function') {
-    throw new Error('OffscreenCanvas is not available in this context.');
-  }
-
-  return canvasConstructor;
-};
-
-const requireCreateImageBitmap = (): typeof createImageBitmap => {
-  const { createImageBitmap: createBitmap } = globalThis;
-
-  if (typeof createBitmap !== 'function') {
-    throw new Error('createImageBitmap is not available in this context.');
-  }
-
-  return createBitmap;
 };
 
 const decodeScreenshotDataUrl = async (dataUrl: string): Promise<PixelImage> => {
-  const canvasConstructor = requireOffscreenCanvas();
-  const createBitmap = requireCreateImageBitmap();
   const response = await fetch(dataUrl);
-  const bitmap = await createBitmap(await response.blob());
+  const bitmap = await createImageBitmap(await response.blob());
 
   try {
-    const canvas = new canvasConstructor(bitmap.width, bitmap.height);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const context = canvas.getContext('2d');
 
     if (context === null) {
@@ -162,27 +147,19 @@ const decodeScreenshotDataUrl = async (dataUrl: string): Promise<PixelImage> => 
 };
 
 const encodeBase64 = (bytes: Uint8Array): string => {
-  const { btoa } = globalThis;
-
-  if (typeof btoa !== 'function') {
-    throw new Error('btoa is not available in this context.');
-  }
-
-  // Well under the argument-count limit of String.fromCharCode and of the
-  // engine's spread, so a full-screen capture encodes in a few dozen chunks.
-  const chunkSize = 0x8000;
+  // Well under String.fromCodePoint's and the engine's spread argument limits.
+  const chunkSize = 0x80_00;
   const chunks: string[] = [];
 
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize)));
+    chunks.push(String.fromCodePoint(...bytes.subarray(offset, offset + chunkSize)));
   }
 
   return btoa(chunks.join(''));
 };
 
 const encodeScreenshotPng = async (image: PixelImage): Promise<string> => {
-  const canvasConstructor = requireOffscreenCanvas();
-  const canvas = new canvasConstructor(image.width, image.height);
+  const canvas = new OffscreenCanvas(image.width, image.height);
   const context = canvas.getContext('2d');
 
   if (context === null) {
@@ -215,12 +192,9 @@ export const maskScreenshotDataUrl = async (
 
   const decode = deps.decode ?? decodeScreenshotDataUrl;
   const encodePng = deps.encodePng ?? encodeScreenshotPng;
+  const image = await decode(input.dataUrl).catch(() => null);
 
-  let image: PixelImage;
-
-  try {
-    image = await decode(input.dataUrl);
-  } catch {
+  if (image === null) {
     return { error: MASK_FAILED_ERROR, ok: false };
   }
 

@@ -1,5 +1,5 @@
+/* eslint-disable max-lines -- One policy module owns grant classes, origin matching, sensitive classification, tokens and masking helpers. */
 import { z } from 'zod';
-import type { EvalTabResult } from './tab-debugger';
 
 /**
  * What an agent caller may do with an origin. The CLI holds the matching
@@ -9,10 +9,13 @@ import type { EvalTabResult } from './tab-debugger';
  */
 export type BrowserGrantClass = 'read' | 'act' | 'navigate';
 
-export type BrowserGrant = {
+/** A file upload always needs a human-approved step token. */
+export const isUploadTool = (toolName: string): boolean => toolName === 'browser_file_upload';
+
+export interface BrowserGrant {
   readonly class: BrowserGrantClass;
   readonly origin: string;
-};
+}
 
 const grantClassSchema = z.enum(['read', 'act', 'navigate']);
 
@@ -69,10 +72,15 @@ const CLASS_BY_TOOL: ReadonlyMap<string, BrowserGrantClass> = new Map([
 export const toolGrantClass = (toolName: string): BrowserGrantClass =>
   CLASS_BY_TOOL.get(toolName) ?? 'act';
 
-/** Names the class map knows, so a contract change without a class fails a test instead of leaking a default. */
-export const classifiedBrowserToolNames = (): readonly string[] => [...CLASS_BY_TOOL.keys()];
+const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
-const DEFAULT_PORTS: Readonly<Record<string, string>> = { 'http:': '80', 'https:': '443' };
+const parseUrl = (url: string): URL | undefined => {
+  try {
+    return new URL(url);
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * `scheme://host[:port]` for an http(s) or file URL, `undefined` for anything
@@ -88,11 +96,9 @@ export const toBrowserOrigin = (url: string | undefined): string | undefined => 
     return 'file://';
   }
 
-  let parsed: URL;
+  const parsed = parseUrl(url);
 
-  try {
-    parsed = new URL(url);
-  } catch {
+  if (parsed === undefined) {
     return undefined;
   }
 
@@ -134,13 +140,6 @@ export const isOriginGranted = (
     candidate => candidate.class === grantClass && originPatternMatches(candidate.origin, origin)
   );
 
-/** The origins the caller may read, used for frame scoping as well as the tool gate. */
-export const grantedOrigins = (
-  authorized: readonly BrowserGrant[],
-  grantClass: BrowserGrantClass
-): readonly string[] =>
-  authorized.filter(grant => grant.class === grantClass).map(grant => grant.origin);
-
 export interface BrowserPermissionItem {
   readonly class: 'read' | 'act' | 'navigate' | 'sensitive';
   readonly origin: string;
@@ -165,16 +164,6 @@ export interface BrowserOriginChanged {
   readonly to: string;
 }
 
-export type BrowserAgentCheckFailure = BrowserNeedsPermission | BrowserOriginChanged;
-
-export const isBrowserAgentCheckFailure = (value: unknown): value is BrowserAgentCheckFailure => {
-  if (typeof value !== 'object' || value === null || !('kind' in value)) {
-    return false;
-  }
-
-  return value.kind === 'needs_permission' || value.kind === 'origin_changed';
-};
-
 /** The tool error text a refused call carries when the bridge is not in the loop (E2E, panel). */
 export const NEEDS_PERMISSION_ERROR =
   'The browser action needs permission for this origin. Nothing was changed.';
@@ -188,8 +177,8 @@ export const SENSITIVE_REASON = {
   fileUpload: 'uploading a file',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
-  paymentField: 'typing into a payment field',
   password: 'typing a password',
+  paymentField: 'typing into a payment field',
 } as const;
 
 /** The tool families whose act calls can be sensitive; read-only tools never are. */
@@ -233,11 +222,9 @@ export const isOAuthConsentUrl = (url: string | undefined): boolean => {
     return false;
   }
 
-  let parsed: URL;
+  const parsed = parseUrl(url);
 
-  try {
-    parsed = new URL(url);
-  } catch {
+  if (parsed === undefined) {
     return false;
   }
 
@@ -360,24 +347,39 @@ export interface StepTokenStore {
  * sorted, so `{a,b}` and `{b,a}` hash alike. The token binds the model's exact
  * arguments, so a retry with different values needs a fresh approval.
  */
+const canonicalArgumentSchema = z.record(z.string(), z.unknown());
+
+/**
+ * The plain-object form of a `tools.call`'s arguments, the shape the gate's
+ * preflight branches on; anything else (a scalar, an array, absent) is empty.
+ */
+export const parseToolArguments = (args: unknown): Record<string, unknown> => {
+  const parsed = canonicalArgumentSchema.safeParse(args);
+
+  return parsed.success ? parsed.data : {};
+};
+
 export const hashBrowserToolArguments = (args: unknown): string => {
   const canonical = (value: unknown): string => {
-    if (value === null || typeof value !== 'object') {
-      return JSON.stringify(value) ?? 'null';
-    }
-
     if (Array.isArray(value)) {
       return `[${value.map(item => canonical(item)).join(',')}]`;
     }
 
-    const record = value as Record<string, unknown>;
-    const keys = Object.keys(record).sort();
+    const record = canonicalArgumentSchema.safeParse(value);
 
-    return `{${keys.map(key => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
+    if (!record.success) {
+      return JSON.stringify(value) ?? 'null';
+    }
+
+    const keys = Object.keys(record.data).toSorted();
+
+    return `{${keys
+      .map(key => `${JSON.stringify(key)}:${canonical(record.data[key])}`)
+      .join(',')}}`;
   };
   const text = canonical(args);
   // FNV-1a, kept in one 32-bit lane on purpose: the hash guards a local token, not a signature.
-  let hash = 0x81_1c_9d_c5;
+  let hash = 0x81_1C_9D_C5;
 
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.codePointAt(index) ?? 0;
@@ -518,12 +520,3 @@ export const applyAgentSnapshotLine = (
 
   return line;
 };
-
-/** A click that landed on a submit control inside a form holding payment fields. */
-export const isSubmitTool = (toolName: string): boolean =>
-  toolName === 'browser_click' || toolName === 'browser_fill_form' || toolName === 'browser_type';
-
-/** Whether the tool can start a file upload or a download; both need a step token. */
-export const isUploadTool = (toolName: string): boolean => toolName === 'browser_file_upload';
-
-export const isResultOk = (result: EvalTabResult): boolean => result.ok;

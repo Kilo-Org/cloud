@@ -1,9 +1,10 @@
-/* eslint-disable require-await -- fake extension APIs are async by contract */
+/* eslint-disable max-lines, require-await -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
 import { describe, expect, it } from 'vitest';
 import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
+import type { BrowserToolRunOutcome } from './browser-runtime';
 import {
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -15,6 +16,7 @@ import type {
   BrowserTabsApi,
   ChromeDebuggerApi,
   ChromeDebuggerEventListener,
+  EvalTabResult,
 } from './tab-debugger';
 
 const TAB_ID = 7;
@@ -27,7 +29,39 @@ const agent = (sessionHandle = 'session-1'): BrowserCaller => ({
   sessionHandle,
 });
 
-type CdpHandler = (params: Record<string, unknown> | undefined) => unknown;
+type CdpHandler = (
+  params: Record<string, unknown> | undefined
+) => Record<string, unknown> | undefined;
+
+type AgentResult = Extract<EvalTabResult, { readonly ok: true }>;
+
+/**
+ * Asserts the call produced a tool result and hands back the narrowed result, so
+ * the test body never has to branch on the outcome's kind.
+ */
+const expectResult = (
+  outcome: BrowserToolRunOutcome,
+  message = 'expected a tool result'
+): { readonly result: AgentResult; readonly withheldFrames: readonly string[] | undefined } => {
+  if (outcome.kind !== 'result' || !outcome.result.ok) {
+    throw new Error(message);
+  }
+
+  return { result: outcome.result, withheldFrames: outcome.withheldFrames };
+};
+
+/** The step token a refused sensitive call returns, so the retry can carry it. */
+const expectStepToken = (outcome: BrowserToolRunOutcome): string => {
+  if (outcome.kind !== 'needs_permission' || outcome.stepToken === undefined) {
+    throw new Error('expected a step token');
+  }
+
+  return outcome.stepToken;
+};
+
+/** The result a navigate call reports alongside its `origin_changed` kind. */
+const originChangedResultOf = (outcome: BrowserToolRunOutcome): EvalTabResult | undefined =>
+  outcome.kind === 'origin_changed' ? outcome.result : undefined;
 
 interface FakeCdp {
   /** Records the ordered CDP method names. */
@@ -93,7 +127,10 @@ const createFakeCdp = (): FakeCdp => {
   let emitDownloadOnClick = false;
   const handlers: Record<string, CdpHandler> = {};
 
-  const sendMailbox = (method: string, params: Record<string, unknown> | undefined): unknown => {
+  const sendMailbox = (
+    method: string,
+    params: Record<string, unknown> | undefined
+  ): Record<string, unknown> | undefined => {
     const handler = handlers[method];
 
     if (handler !== undefined) {
@@ -102,7 +139,7 @@ const createFakeCdp = (): FakeCdp => {
 
     switch (method) {
       case 'Accessibility.getFullAXTree': {
-        const frameId = (params ?? {})['frameId'];
+        const { frameId } = params ?? {};
 
         return frameId === undefined || frameId === 'main' ? MAIN_TREE : FRAME_TREE;
       }
@@ -156,7 +193,8 @@ const createFakeCdp = (): FakeCdp => {
         return { result: { value: JSON.stringify(probe) } };
       }
       case 'Runtime.evaluate': {
-        const expression = String((params ?? {})['expression'] ?? '');
+        const requested = (params ?? {})['expression'];
+        const expression = typeof requested === 'string' ? requested : '';
 
         if (expression.includes('visibilityState')) {
           return { result: { value: 'visible' } };
@@ -206,7 +244,7 @@ const createFakeCdp = (): FakeCdp => {
         emitDownloadOnClick = false;
         const guid = 'download-1';
 
-        for (const listener of [...eventListeners]) {
+        for (const listener of eventListeners) {
           listener({ tabId: target.tabId }, 'Browser.downloadWillBegin', {
             guid,
             suggestedFilename: 'invoice.pdf',
@@ -215,7 +253,7 @@ const createFakeCdp = (): FakeCdp => {
         }
       }
 
-      return sendMailbox(method, params) as Record<string, unknown> | undefined;
+      return sendMailbox(method, params);
     },
   };
 
@@ -225,7 +263,7 @@ const createFakeCdp = (): FakeCdp => {
     downloadsDenied: () => denied,
     downloadsRestored: () => restored,
     emit: (method, params) => {
-      for (const listener of [...eventListeners]) {
+      for (const listener of eventListeners) {
         listener({ tabId: TAB_ID }, method, params);
       }
     },
@@ -268,8 +306,8 @@ const createGroups = () => {
   const updates: { readonly groupId: number; readonly props: Record<string, unknown> }[] = [];
   const controller = createBrowserTabGroupController({
     api: {
-      group: async () => 42,
       get: async () => ({ id: 42 }),
+      group: async () => 42,
       queryGroup: async () => [{ id: 42 }],
       tabQuery: async () => [{ active: true, id: TAB_ID, windowId: 1 }],
       update: async (groupId, props) => {
@@ -317,15 +355,12 @@ describe('agent browser calls', () => {
 
     expect(outcome.kind).toBe('result');
 
-    if (outcome.kind !== 'result' || !outcome.result.ok) {
-      throw new Error('expected a snapshot result');
-    }
-
-    const text = String(outcome.result.value);
+    const { result, withheldFrames } = expectResult(outcome, 'expected a snapshot result');
+    const text = String(result.value);
 
     expect(text).toContain(`[origin withheld: ${FRAME_ORIGIN}]`);
     expect(text).not.toContain('marker-42');
-    expect(outcome.withheldFrames).toEqual([FRAME_ORIGIN]);
+    expect(withheldFrames).toStrictEqual([FRAME_ORIGIN]);
   });
 
   it('splices the iframe in once its origin is approved and still drops its withheld console entries', async () => {
@@ -340,12 +375,10 @@ describe('agent browser calls', () => {
       toolName: 'browser_snapshot',
     });
 
-    if (outcome.kind !== 'result' || outcome.result.ok !== true) {
-      throw new Error('expected a snapshot result');
-    }
+    const { result, withheldFrames } = expectResult(outcome, 'expected a snapshot result');
 
-    expect(String(outcome.result.value)).toContain('marker-42');
-    expect(outcome.withheldFrames).toEqual([]);
+    expect(String(result.value)).toContain('marker-42');
+    expect(withheldFrames).toStrictEqual([]);
 
     // A console entry sourced from another origin the agent may not read is dropped.
     cdp.emit('Runtime.consoleAPICalled', {
@@ -386,7 +419,7 @@ describe('agent browser calls', () => {
       kind: 'origin_changed',
       to: 'https://accounts.example.org',
     });
-    expect(outcome.kind === 'origin_changed' ? outcome.result : undefined).toBeDefined();
+    expect(originChangedResultOf(outcome)).toBeDefined();
   });
 
   it('needs a step token for a password field and accepts the retry that carries it', async () => {
@@ -409,12 +442,10 @@ describe('agent browser calls', () => {
       result: { error: NEEDS_PERMISSION_ERROR, ok: false },
     });
 
-    if (refused.kind !== 'needs_permission' || refused.stepToken === undefined) {
-      throw new Error('expected a step token');
-    }
+    const stepToken = expectStepToken(refused);
 
     const allowed = await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant], sensitive: [refused.stepToken] },
+      agent: { authorized: [readGrant, actGrant], sensitive: [stepToken] },
       arguments: args,
       caller: agent(),
       tabId: TAB_ID,
@@ -426,7 +457,7 @@ describe('agent browser calls', () => {
 
     // The token is single use: a second call with the same token is refused again.
     const replayed = await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant], sensitive: [refused.stepToken] },
+      agent: { authorized: [readGrant, actGrant], sensitive: [stepToken] },
       arguments: args,
       caller: agent(),
       tabId: TAB_ID,
@@ -469,8 +500,8 @@ describe('agent browser calls', () => {
     expect(cdp.downloadsRestored()).toBe(1);
   });
 
-  it('keeps a session to its own tab group and ends the group as `Kilo · ended`', async () => {
-    const { controller, updates } = createGroups();
+  it('keeps a session to its own tab group', async () => {
+    const { controller } = createGroups();
     const { runtime } = createHarness(controller);
 
     await runtime.openSession({
@@ -490,7 +521,7 @@ describe('agent browser calls', () => {
       })
     ).resolves.toMatchObject({ kind: 'result', result: { ok: false } });
 
-    await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toEqual({
+    await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
       tabId: TAB_ID,
     });
@@ -504,14 +535,26 @@ describe('agent browser calls', () => {
         toolName: 'browser_snapshot',
       })
     ).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
+  });
+
+  it('ends the group as `Kilo · ended` and stops targeting its tabs', async () => {
+    const { controller, updates } = createGroups();
+    const { runtime } = createHarness(controller);
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1' });
 
     await runtime.closeSession({ sessionHandle: 'session-1' });
 
-    expect(updates.at(-1)).toEqual({
+    expect(updates.at(-1)).toStrictEqual({
       groupId: 42,
       props: { collapsed: true, color: 'grey', title: 'Kilo · ended' },
     });
-    expect(runtime.listSessions()).toEqual([
+    expect(runtime.listSessions()).toStrictEqual([
       { ended: true, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
     ]);
 
@@ -564,11 +607,8 @@ describe('agent browser calls', () => {
       toolName: 'browser_console_messages',
     });
 
-    if (outcome.kind !== 'result' || outcome.result.ok !== true) {
-      throw new Error(`expected console output: ${JSON.stringify(outcome)}`);
-    }
-
-    const text = String(outcome.result.value);
+    const { result } = expectResult(outcome, `expected console output: ${JSON.stringify(outcome)}`);
+    const text = String(result.value);
 
     expect(text).toContain('page error');
     expect(text).not.toContain('frame secret');
@@ -593,9 +633,9 @@ describe('agent browser calls', () => {
     const { BROWSER_TOOL_CONTRACT } = await import('./browser-tool-contract');
     const names = BROWSER_TOOL_CONTRACT.map(entry => entry.name);
 
-    expect(names.filter(name => /cookie|storage|localStorage|sessionStorage/u.test(name))).toEqual(
-      []
-    );
+    expect(
+      names.filter(name => /cookie|storage|localStorage|sessionStorage/u.test(name))
+    ).toStrictEqual([]);
   });
 
   it('keeps the panel caller unfiltered: its snapshot includes the iframe content', async () => {
@@ -608,12 +648,10 @@ describe('agent browser calls', () => {
       toolName: 'browser_snapshot',
     });
 
-    if (outcome.kind !== 'result' || outcome.result.ok !== true) {
-      throw new Error('expected a snapshot result');
-    }
+    const { result, withheldFrames } = expectResult(outcome, 'expected a snapshot result');
 
-    expect(String(outcome.result.value)).toContain('leaked frame text');
-    expect(outcome.withheldFrames).toBeUndefined();
+    expect(String(result.value)).toContain('leaked frame text');
+    expect(withheldFrames).toBeUndefined();
     expect(ORIGIN_CHANGED_ERROR).toBeTruthy();
   });
 });

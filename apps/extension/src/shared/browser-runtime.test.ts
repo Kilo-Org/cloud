@@ -86,6 +86,10 @@ const createFakeDebugger = (): FakeDebugger => {
     sendCommand: async (_target, method) => {
       commands.push(method);
 
+      if (method === 'Page.getFrameTree') {
+        return { frameTree: { frame: { id: 'main', url: 'https://example.com/' } } };
+      }
+
       if (method !== 'Runtime.evaluate') {
         return {};
       }
@@ -164,6 +168,8 @@ const createHarness = () => {
 /** One evaluate tool call: the panel-side tool path the models reach. */
 const evaluateToolCall = (runtime: BrowserRuntime, caller: BrowserCaller) =>
   runtime.runTool({
+    // An agent caller is checked against the real origin first (SPEC "Permission flow").
+    agent: { authorized: [{ class: 'act', origin: 'https://example.com' }] },
     arguments: { function: '() => 1' },
     caller,
     tabId: TAB_ID,

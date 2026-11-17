@@ -1,7 +1,6 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
-import * as WebBrowser from 'expo-web-browser';
 import { TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,12 +15,10 @@ import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
 
-vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: vi.fn(),
-}));
+const mockedPush = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: mockedPush, back: vi.fn() }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -55,7 +52,6 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
-  PRIVACY_URL: 'https://kilo.ai/privacy-app',
 }));
 
 const useCurrentUserIdMock = vi.hoisted(() => ({
@@ -339,7 +335,7 @@ describe('ConsentDetails copy', () => {
     );
   });
 
-  it('gives the retention sentence privacy link a full target and opens the policy', async () => {
+  it('gives the retention sentence privacy link a full target and opens the policy natively', async () => {
     const renderer = mount();
     const links = renderer.root.findAll(
       n =>
@@ -367,9 +363,10 @@ describe('ConsentDetails copy', () => {
       await Promise.resolve();
       (link.props as { onPress: () => void }).onPress();
     });
-    expect(vi.mocked(WebBrowser.openBrowserAsync)).toHaveBeenCalledWith(
-      'https://kilo.ai/privacy-app'
-    );
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 });
 

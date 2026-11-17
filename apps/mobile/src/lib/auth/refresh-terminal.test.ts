@@ -87,16 +87,10 @@ describe('refresh terminal classification', () => {
     const second = await performRefresh();
 
     expect(first).toEqual({
-      ok: false,
-      refused: true,
+      kind: 'refused',
       sessionVersion: currentAuthEpoch(),
     });
-    expect(second).toEqual({
-      ok: false,
-      refused: false,
-      unreadable: true,
-      presentKeys: [],
-    });
+    expect(second).toEqual({ kind: 'unreadable' });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
@@ -119,8 +113,7 @@ describe('refresh terminal classification', () => {
     const outcome = await performRefresh();
 
     expect(outcome).toEqual({
-      ok: false,
-      refused: true,
+      kind: 'refused',
       sessionVersion: currentAuthEpoch(),
     });
     // The stored pair is gone, so the next refresh makes no request (it is an
@@ -144,9 +137,50 @@ describe('refresh terminal classification', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: false, retryAfterMs: 9000 });
+    expect(outcome).toEqual({ kind: 'transient', retryAfterMs: 9000 });
     expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+  });
+
+  it('keeps the pair and files nothing when an intermediary answers 403', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>Request blocked</html>', {
+        status: 403,
+        headers: { 'content-type': 'text/html' },
+      })
+    );
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ kind: 'transient', retryAfterMs: undefined });
+    // The 403 never reached the refresh route: it is no defect and no proof
+    // about the pair, so the session stays and the next rotation tries again.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+    expect(events).toEqual([]);
+  });
+
+  it('stops when the refresh route itself refuses with its 403 body', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'SESSION_REVOKED' }, { status: 403 })
+    );
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+    });
+    // Not a 401, so the credential set stays until sign-out clears it.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('error');
   });
 
   it('stops on a 4xx with no retry guidance instead of retrying it', async () => {
@@ -158,8 +192,7 @@ describe('refresh terminal classification', () => {
     const outcome = await performRefresh();
 
     expect(outcome).toEqual({
-      ok: false,
-      refused: true,
+      kind: 'refused',
       sessionVersion: currentAuthEpoch(),
     });
     // A non-401 terminal refusal is not proof the credential is dead, so the
@@ -189,8 +222,7 @@ describe('refresh terminal classification', () => {
     const outcome = await performRefresh();
 
     expect(outcome).toEqual({
-      ok: false,
-      refused: true,
+      kind: 'refused',
       sessionVersion: currentAuthEpoch(),
     });
     expect(events).toHaveLength(1);
@@ -228,8 +260,8 @@ describe('refresh terminal classification', () => {
 
     const outcome = await refresh;
 
-    expect(outcome.ok).toBe(false);
-    if (!outcome.ok && outcome.refused) {
+    expect(outcome.kind).toBe('refused');
+    if (outcome.kind === 'refused') {
       expect(outcome.sessionVersion).toBe(ownedEpoch);
     }
     // The handler's guard reads exactly this: the refusal is stale, so it must

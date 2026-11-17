@@ -105,7 +105,7 @@ function adminMessageSection(noticeBody: string): RawHtml {
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br />');
   return new RawHtml(
-    `<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
+    `<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
   );
 }
 

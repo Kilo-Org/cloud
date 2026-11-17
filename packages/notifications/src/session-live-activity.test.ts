@@ -364,10 +364,7 @@ describe('buildSessionLiveActivityContentState', () => {
     // The shared row type accepts an explicit null where a producer
     // serializes an absent value; the shared reader treats null, absent and
     // unparseable as one outcome, so both shapes build the same card state.
-    const omitted = buildSessionLiveActivityContentState(
-      { id: 's', status: 'scheduled' },
-      options
-    );
+    const omitted = buildSessionLiveActivityContentState({ id: 's', status: 'scheduled' }, options);
     const serialized = buildSessionLiveActivityContentState(
       { id: 's', status: 'scheduled', statusUpdatedAt: null, scheduledAt: null, title: null },
       options

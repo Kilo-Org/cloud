@@ -540,9 +540,7 @@ describe('oldestNeedsInputSince', () => {
     ).toBe(at(300_000));
     // A producer that serializes an absent value reads the same as one that
     // omits it: null, absent and unparseable are one outcome for the reader.
-    expect(
-      oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: null }])
-    ).toBeNull();
+    expect(oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: null }])).toBeNull();
   });
 
   it('returns null when nothing needs input', () => {

@@ -70,7 +70,7 @@ export type ExaUsageRecord = z.infer<typeof ExaUsageRecordSchema>;
  * nothing was recorded and the sender must not send it again.
  */
 export const ExaUsageWriteResponseSchema = z.strictObject({
-status: z.enum(['recorded', 'duplicate', 'rejected']),
+  status: z.enum(['recorded', 'duplicate', 'rejected']),
   usageId: z.uuid(),
 });
 

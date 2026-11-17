@@ -6353,7 +6353,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (snapshotStartFailureIsPermanent(reason) || attempt >= 2) {
         throw this.snapshotStartFailure(input.selection, reason, recordFailure(failure));
       }
-      const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
+      const retryStep = source === 'workspace' ? 'restore' : 'environment_snapshot';
+      const retry = await this.stopForSnapshotRetry(
+        input.createdRef,
+        input.allocationId,
+        retryStep
+      );
       if (retry.result === 'owned') {
         recordFailure({
           ...failure,
@@ -6376,13 +6381,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const previousDeadline = launchDeadline;
       launchDeadline = Date.now() + DEADLINE_MS.repositoryStartup;
-      if (
-        !(await this.startSnapshotRetry(
-          input.allocationId,
-          launchDeadline,
-          source === 'workspace' ? 'restore' : 'environment_snapshot'
-        ))
-      ) {
+      if (!(await this.startSnapshotRetry(input.allocationId, launchDeadline, retryStep))) {
         recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
@@ -6435,17 +6434,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return latest.kind !== 'creating' || latest.allocationId !== allocationId;
   }
 
+  /**
+   * Stops the failed launch before the retry starts the same sandbox again. A
+   * container wedged in a snapshot start can take minutes to destroy, so the
+   * stop repeats with the ladder's pauses until it is confirmed or the next
+   * attempt would end after the retry stop bound. The preparing routes see the
+   * wait, so the session does not sit on a frozen step for minutes.
+   */
   private async stopForSnapshotRetry(
     createdRef: string,
-    allocationId: string
+    allocationId: string,
+    step: 'restore' | 'environment_snapshot'
   ): Promise<
     { result: 'retry' | 'owned' } | { result: 'failed'; errorName: string; cause: string }
   > {
-    if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
-    const stopped = await this.stopRef(createdRef, allocationId);
-    return stopped.confirmed
-      ? { result: 'retry' }
-      : { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+    const timers = this.sandboxTimers();
+    const stopDeadline = Date.now() + timers.snapshotRetryStopMs;
+    const pauses = timers.providerStopLadderMs;
+    for (let stopAttempt = 0; ; stopAttempt += 1) {
+      if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
+      const stopped = await this.stopRef(createdRef, allocationId);
+      if (stopped.confirmed) return { result: 'retry' };
+      const pauseMs = pauses[Math.min(stopAttempt, pauses.length - 1)] ?? 0;
+      if (Date.now() + pauseMs + timers.providerStopAttemptMs > stopDeadline) {
+        return { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+      }
+      if (stopAttempt === 0) {
+        await this.notifySnapshotStartStep(
+          allocationId,
+          step,
+          'Waiting for the failed sandbox to stop'
+        );
+      }
+      await new Promise(resolve => setTimeout(resolve, pauseMs));
+    }
   }
 
   private snapshotStartFailure(
@@ -6473,7 +6495,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     detail: string
   ): Promise<void> {
     await this.recordWorkspaceSnapshotRecovery(allocationId, reason);
-    await this.notifySnapshotStartFailure(allocationId, 'restore', detail);
+    await this.notifySnapshotStartStep(allocationId, 'restore', detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6486,7 +6508,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     allocationId: string,
     block: EnvironmentSnapshotBlock
   ): Promise<void> {
-    await this.notifySnapshotStartFailure(allocationId, 'environment_snapshot', block.detail);
+    await this.notifySnapshotStartStep(allocationId, 'environment_snapshot', block.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6508,7 +6530,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     allocationId: string,
     error: EnvironmentSnapshotUnusableError
   ): Promise<void> {
-    await this.notifySnapshotStartFailure(allocationId, 'sandbox_create', error.detail);
+    await this.notifySnapshotStartStep(allocationId, 'sandbox_create', error.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6531,7 +6553,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<void> {
     if (error.source === 'workspace') {
       await this.recordWorkspaceSnapshotRecovery(allocationId, error.reason);
-      await this.notifySnapshotStartFailure(allocationId, 'restore', error.detail);
+      await this.notifySnapshotStartStep(allocationId, 'restore', error.detail);
       await this.failCreationRoutes(
         allocationId,
         false,
@@ -6546,7 +6568,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       environmentId: '',
       buildId: null,
     };
-    await this.notifySnapshotStartFailure(allocationId, 'environment_snapshot', block.detail);
+    await this.notifySnapshotStartStep(allocationId, 'environment_snapshot', block.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6612,7 +6634,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async notifySnapshotStartFailure(
+  private async notifySnapshotStartStep(
     allocationId: string,
     step: 'restore' | 'environment_snapshot' | 'sandbox_create',
     detail: string

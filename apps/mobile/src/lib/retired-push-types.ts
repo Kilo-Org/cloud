@@ -1,9 +1,10 @@
 /**
- * Push kinds this app has no product for. The shared schema still declares them
- * and the shared catalog still carries their copy until the senders stop, so
- * the foreground handler suppresses their banner and the history list drops the
- * rows a build already recorded: nothing this app would draw for one of them can
- * be opened.
+ * Push kinds this app has no product for. The shared schema no longer declares
+ * them and the shared catalog no longer carries their copy, but a server that
+ * has not stopped sending them still delivers them: a foreground banner would
+ * be drawn from the server-supplied title and body, and its tap would resolve
+ * no route. The foreground handler therefore suppresses their banner and the
+ * history list drops the rows a build already recorded.
  *
  * Kept out of `notification-history` so the notification handler does not pull
  * the push catalogs in just to read this set.

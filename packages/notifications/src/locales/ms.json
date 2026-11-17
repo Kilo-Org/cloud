@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Sesi ejen anda ada kemas kini",
-      "chatMessage": "Anda ada mesej baharu",
-      "instanceLifecycle": "Contoh anda ada kemas kini",
-      "scheduledAction": "Tindakan berjadual ada kemas kini",
       "lowBalance": "Baki anda memerlukan perhatian",
       "spendAlert": "Perbelanjaan anda memerlukan perhatian",
       "securityFinding": "Penemuan keselamatan memerlukan perhatian",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Tanpa Tajuk",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Semakan keselamatan ada kemas kini"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} sudah sedia",
-      "body": "Ketik untuk mula bersembang."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} gagal dimulakan",
-      "body": "Permulaan gagal."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} akan dimulakan semula tidak lama lagi",
-      "body": "Berjadual untuk dimulakan semula pada {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Mulakan semula {{instanceName}} dibatalkan",
-      "body": "Mulakan semula yang dijadualkan sebelum ini telah dibatalkan."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} akan dinaik taraf tidak lama lagi",
-      "bodyWithTag": "Naik taraf ke {{targetImageTag}} pada {{when}}.",
-      "bodyWithoutTag": "Naik taraf berjadual pada {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Naik taraf {{instanceName}} dibatalkan",
-      "body": "Naik taraf yang dijadualkan sebelum ini telah dibatalkan."
     }
   },
   "sessionReady": {

@@ -41,43 +41,55 @@ export function useGitHubConnections(organizationId: string | undefined, enabled
 
 type DisconnectVariables = {
   provider: IntegrationProvider;
-  /** The connection a GitHub organization install removes; unused elsewhere. */
-  githubIntegrationId: string | null;
+  /** The connection the provider's disconnect procedure removes. */
+  integrationId: string | null;
 };
 
-function disconnectIntegration(
+async function disconnectIntegration(
   organizationId: string | undefined,
-  { provider, githubIntegrationId }: DisconnectVariables
-) {
+  { provider, integrationId }: DisconnectVariables
+): Promise<void> {
   const input = organizationId ? { organizationId } : {};
   switch (provider) {
     case 'github': {
       if (!organizationId) {
-        return trpcClient.githubApps.uninstallApp.mutate({});
+        await trpcClient.githubApps.uninstallApp.mutate({});
+        return;
       }
-      if (!githubIntegrationId) {
+      if (!integrationId) {
         throw new Error('A GitHub connection id is required to disconnect an organization install');
       }
-      return trpcClient.githubApps.uninstallApp.mutate({
-        organizationId,
-        integrationId: githubIntegrationId,
-      });
+      await trpcClient.githubApps.uninstallApp.mutate({ organizationId, integrationId });
+      return;
     }
     case 'slack': {
-      return trpcClient.slack.uninstallApp.mutate(input);
+      await trpcClient.slack.uninstallApp.mutate(input);
+      return;
     }
     case 'linear': {
-      return trpcClient.linear.uninstallApp.mutate(input);
+      await trpcClient.linear.uninstallApp.mutate(input);
+      return;
     }
     case 'discord': {
-      return trpcClient.discord.uninstallApp.mutate(input);
+      await trpcClient.discord.uninstallApp.mutate(input);
+      return;
     }
     case 'gitlab': {
-      return trpcClient.gitlab.disconnect.mutate(input);
+      await trpcClient.gitlab.disconnect.mutate(input);
+      return;
     }
     case 'bitbucket': {
-      // Bitbucket's controls live on the web page; its row never offers this.
-      throw new Error('Bitbucket connections are changed on the web');
+      if (!organizationId) {
+        throw new Error('Bitbucket connects an organization, never a personal account');
+      }
+      if (!integrationId) {
+        throw new Error('A Bitbucket integration id is required to disconnect');
+      }
+      await trpcClient.organizations.bitbucket.disconnect.mutate({
+        organizationId,
+        integrationId,
+      });
+      return;
     }
     default: {
       throw new Error(`Unsupported integration: ${String(provider)}`);
@@ -111,6 +123,26 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
         queryClient.invalidateQueries({
           queryKey: trpc.githubApps.listIntegrations.queryKey(input),
         }),
+        // Bitbucket's own reads name the connection and the repositories it
+        // served, and the code reviewer's readiness follows the same change.
+        ...(organizationId
+          ? [
+              queryClient.invalidateQueries({
+                queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
+              }),
+              queryClient.invalidateQueries({
+                queryKey: trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey({
+                  organizationId,
+                }),
+              }),
+              queryClient.invalidateQueries({
+                queryKey: trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+                  organizationId,
+                  forceRefresh: false,
+                }),
+              }),
+            ]
+          : []),
       ]);
     },
     onError: (error, variables) => {
@@ -125,14 +157,16 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
 }
 
 /**
- * The provider's connect URL. OAuth callbacks land on the web, so every
- * provider is connected there; GitHub additionally validates a one-time install
- * state token, which the minted URL carries. An organization whose mint is
+ * The provider's connect URL. OAuth callbacks land on the web, so Slack, Linear
+ * and Discord connect there; GitHub additionally validates a one-time install
+ * state token, which the minted URL carries. GitLab's PAT connect stays on the
+ * web page for now. Bitbucket never reaches this function: its workspace access
+ * token is pasted in the app's own connect sheet. An organization whose mint is
  * refused still gets the page, without the token, because the page mints its
  * own state for the signed-in web user.
  */
 async function connectUrl(
-  provider: IntegrationProvider,
+  provider: WebConnectProvider,
   organizationId: string | undefined
 ): Promise<string> {
   if (provider !== 'github') {
@@ -165,28 +199,35 @@ async function connectUrl(
   }
 }
 
+/** The providers whose connect flow still starts on the web page. */
+type WebConnectProvider = Exclude<IntegrationProvider, 'bitbucket'>;
+
 /**
  * The hub's Connect action: the provider whose launch is in flight, and the tap
- * that starts one.
+ * that starts one. Bitbucket is not among them — its workspace access token is
+ * pasted in the app's own connect sheet, so it never reaches the browser
+ * hand-off.
  */
 export type IntegrationConnect = {
-  pendingProvider: IntegrationProvider | null;
-  connect: (provider: IntegrationProvider) => Promise<void>;
+  pendingProvider: WebConnectProvider | null;
+  connect: (provider: WebConnectProvider) => Promise<void>;
 };
 
 /**
  * Opens the web page that owns a provider's connect flow and waits for the
  * return to the app, then refreshes the caller's reads. The browser session is
  * the app's existing hand-off (`connect-gate-platform`): a launch the app never
- * saw still reaches the caller through `reportLateLaunchFailure`.
+ * saw still reaches the caller through `reportLateLaunchFailure`. The hub calls
+ * it only for the providers that still connect on the web; Bitbucket opens the
+ * app's own connect sheet instead.
  */
 export function useIntegrationConnect(params: {
   organizationId?: string;
   onReturned: () => Promise<void>;
 }): IntegrationConnect {
-  const [pendingProvider, setPendingProvider] = useState<IntegrationProvider | null>(null);
+  const [pendingProvider, setPendingProvider] = useState<WebConnectProvider | null>(null);
 
-  async function connect(provider: IntegrationProvider) {
+  async function connect(provider: WebConnectProvider) {
     setPendingProvider(provider);
     try {
       const url = await connectUrl(provider, params.organizationId);

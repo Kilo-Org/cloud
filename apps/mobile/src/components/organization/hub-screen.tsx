@@ -246,7 +246,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // The in-app destinations the hub opens itself, and the only card rows that
   // need no payload: their gate reads the role and the plan, which the
   // organization row decides before this screen renders.
-  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan });
+  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan }, organizationId);
 
   // The organization dashboard's own settings on the web, one row per area.
   // The group waits for the membership payload because the parent link decides

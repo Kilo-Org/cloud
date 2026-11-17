@@ -62,7 +62,7 @@ class HomeWidgetRefreshWorker(context: Context, params: WorkerParameters) : Work
   }
 
   private fun startTask(context: ReactContext, payload: JSONObject) {
-    if (stopped || !HomeWidgetStore.current(applicationContext, payload.getString("scopeKey"), payload.getInt("accountEpoch"), payload.getString("generation"))) {
+    if (stopped || !HomeWidgetStore.current(applicationContext, payload.getString("scopeKey"), payload.getLong("accountEpoch"), payload.getString("generation"))) {
       finished.countDown()
       return
     }

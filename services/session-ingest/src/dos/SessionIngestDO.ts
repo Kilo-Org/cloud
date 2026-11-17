@@ -229,9 +229,7 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
 type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
 
 /** The excerpt identity the last live persist handed to Postgres, or null when none did. */
-function readBriefingExcerptPersisted(
-  db: DrizzleSqliteDODatabase
-): BriefingExcerptIdentity | null {
+function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExcerptIdentity | null {
   const raw = readIngestMetaValue(db, 'lastBriefingExcerptPersisted');
   if (raw === null) return null;
   let parsed: unknown;

@@ -294,11 +294,16 @@ export function createKilo2Harness(options: {
           .parse(await api.data(`/api/permission/request?${locationQuery(directory)}`, { signal }));
         const request = pending.find(item => item.id === reply.permissionId);
         if (!request) return false;
-        await post(
-          `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
-          { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
-          signal
-        );
+        try {
+          await post(
+            `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
+            { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
+            signal
+          );
+        } catch (error) {
+          if (error instanceof Kilo2HttpError && error.status === 404) return false;
+          throw error;
+        }
       } else {
         const pending = z
           .array(kilo2FormSchema)

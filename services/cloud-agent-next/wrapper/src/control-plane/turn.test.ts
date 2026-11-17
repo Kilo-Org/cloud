@@ -3564,6 +3564,43 @@ describe('automatic permissions', () => {
     }
   );
 
+  it.each(['code-review', 'security-remediation'])(
+    'continues a %s turn when a later automatic rejection is already resolved',
+    async createdOnPlatform => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      let attempts = 0;
+      h.client(spec).setPermissionImpl(async () => {
+        attempts += 1;
+        return attempts === 1;
+      });
+      for (const id of ['p1', 'p2']) {
+        h.manager.observeKiloEvent(kiloEvent('permission.asked', { sessionID: KILO_SESSION, id }));
+        await settle();
+      }
+
+      expect(h.client(spec).permissionAnswers).toMatchObject([
+        { permissionId: 'p1', response: 'reject' },
+        { permissionId: 'p2', response: 'reject' },
+      ]);
+      expect(attempts).toBe(2);
+      expect(h.client(spec).aborts).toEqual([]);
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      expect(h.logs).toContain(
+        `turn: automatic permission already resolved origin=${createdOnPlatform} sessionId=${SESSION_ID} permissionId=p2`
+      );
+
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+      expect(h.client(spec).aborts).toEqual([]);
+    }
+  );
+
   it.each([
     ['code-review', {}, 'Code-review permission rejection failed'],
     ['security-remediation', {}, 'Security-remediation permission rejection failed'],
@@ -3583,6 +3620,7 @@ describe('automatic permissions', () => {
         kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1', metadata })
       );
       await settle();
+      expect(h.client(spec).permissionAnswers).toHaveLength(2);
       expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
       expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason }]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);

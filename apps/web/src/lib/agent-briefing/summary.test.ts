@@ -20,6 +20,7 @@ import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),

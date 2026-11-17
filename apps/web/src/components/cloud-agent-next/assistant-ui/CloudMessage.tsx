@@ -22,6 +22,8 @@ import { getDeliveryBadge } from '../delivery-badge';
 import { isCompactionPart, isFilePart, isTextPart } from '../types';
 import { getVisibleAssistantParts } from '../message-presentation';
 import { parseWorktreeReviewMessage } from '../worktree-review';
+import { parseRuntimeContinuation } from '../runtime-continuation';
+import { RuntimeContinuationCard } from '../RuntimeContinuationCard';
 import { parseChildSessionCallbackPrompt } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import { ChildSessionCallbackCard } from '../ChildSessionCallbackCard';
 import { WorktreeReviewMessageCard } from '../WorktreeReviewMessageCard';
@@ -52,6 +54,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
   const review = isUser ? parseWorktreeReviewMessage(text) : null;
   const callback = isUser ? parseChildSessionCallbackPrompt(text) : null;
+  const continuation = isUser ? parseRuntimeContinuation(parts) : null;
   const userCopyText = callback ? (callback.result ?? callback.errorMessage) : text;
   const files = parts.filter(isFilePart);
   const imageCount = files.filter(part => part.mime.startsWith('image/')).length;
@@ -126,7 +129,9 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
               <div
                 className={cn(
                   'relative max-w-[95%] sm:max-w-[85%] md:max-w-[80%]',
-                  callback ? 'w-full' : 'bg-primary text-primary-foreground rounded-md px-3 py-2'
+                  callback || continuation
+                    ? 'w-full'
+                    : 'bg-primary text-primary-foreground rounded-md px-3 py-2'
                 )}
               >
                 {badge && <DeliveryStatusIcon badge={badge} />}
@@ -134,6 +139,8 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
                   <ChildSessionCallbackCard callback={callback} />
                 ) : review ? (
                   <WorktreeReviewMessageCard review={review} />
+                ) : continuation ? (
+                  <RuntimeContinuationCard continuation={continuation} />
                 ) : (
                   text && (
                     <p className="overflow-wrap-anywhere text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">

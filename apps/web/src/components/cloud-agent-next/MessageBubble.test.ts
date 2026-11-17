@@ -21,6 +21,7 @@ import { CloudReadOnlyThread, CloudThread } from './assistant-ui/CloudThread';
 import { CloudSharedTranscript } from './assistant-ui/CloudSharedTranscript';
 import { useCloudPresentationActions } from './assistant-ui/cloud-presentation-context';
 import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
+import { RUNTIME_CONTINUATION_PROMPTS } from './runtime-continuation';
 
 Object.assign(globalThis, { React });
 
@@ -524,6 +525,46 @@ ${JSON.stringify({
 
     expect(html).not.toContain('Subagent');
     expect(html).toContain('A child Cloud Agent task finished');
+  });
+
+  it.each([
+    ['interrupted', 'The previous response was interrupted.'],
+    ['restarted', 'The server restarted while the agent was working.'],
+    ['output-limit', 'The response reached the output token limit.'],
+  ] as const)(
+    'renders the synthetic %s continuation as a notice instead of a user bubble',
+    (reason, description) => {
+      const prompt = RUNTIME_CONTINUATION_PROMPTS[reason];
+      const messages = readKilo2Messages(
+        { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+        [{ id: 'msg_continuation', type: 'synthetic', text: prompt, time: { created: 2 } }]
+      );
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, { message: messages[0] })
+      );
+      const sharedHtml = renderToStaticMarkup(
+        React.createElement(CloudSharedTranscript, { messages })
+      );
+
+      for (const rendered of [html, sharedHtml]) {
+        expect(rendered).toContain('Continued automatically');
+        expect(rendered).toContain(description);
+        expect(rendered).not.toContain('Continue from where you left off');
+        expect(rendered).not.toContain('Do not apologize, recap, or repeat yourself');
+        expect(rendered).not.toContain('bg-primary text-primary-foreground');
+      }
+    }
+  );
+
+  it('keeps a typed copy of a continuation prompt as an ordinary user bubble', () => {
+    const prompt = RUNTIME_CONTINUATION_PROMPTS.interrupted;
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(prompt) })
+    );
+
+    expect(html).not.toContain('Continued automatically');
+    expect(html).toContain('bg-primary text-primary-foreground');
+    expect(html).toContain('Continue from where you left off');
   });
 });
 

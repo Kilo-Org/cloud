@@ -35,5 +35,11 @@ export default function ProfileSkillsRoute() {
   if (staleScope) {
     return null;
   }
-  return <ProfileSkillsScreen profileId={profileId} organizationId={organizationId} />;
+  return (
+    <ProfileSkillsScreen
+      profileId={profileId}
+      organizationId={organizationId}
+      backFallback={getProfilesPath()}
+    />
+  );
 }

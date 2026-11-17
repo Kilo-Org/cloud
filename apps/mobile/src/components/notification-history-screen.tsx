@@ -33,6 +33,7 @@ import { type HistoryRow, HistoryRowView } from '@/components/notification-histo
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
@@ -235,7 +236,11 @@ export function NotificationHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.history.title')} showBackButton />
+      <ScreenHeader
+        title={t('notifications.history.title')}
+        showBackButton
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-1">
         {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">

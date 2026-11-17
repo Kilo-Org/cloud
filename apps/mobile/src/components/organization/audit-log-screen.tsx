@@ -19,6 +19,7 @@ import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
 import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
 // FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
@@ -104,13 +105,21 @@ export function OrganizationAuditLogScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.auditLog.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.auditLog.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   if (!allowed) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.auditLog.title')} />
+        <ScreenHeader
+          title={t('organization.auditLog.title')}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
       </View>
     );
@@ -196,7 +205,7 @@ export function OrganizationAuditLogScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.auditLog.title')} />
+      <ScreenHeader title={t('organization.auditLog.title')} backFallback={ORGANIZATION_HUB_PATH} />
       {body}
     </View>
   );

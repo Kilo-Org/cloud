@@ -32,7 +32,7 @@ function SummaryCount({
       accessible
       accessibilityLabel={summaryCountLabel({ kind, value, displayCount, label })}
     >
-      <Text variant="figure">{displayCount}</Text>
+      <Text variant="stat">{displayCount}</Text>
       <Text variant="muted" className="text-xs">
         {label}
       </Text>

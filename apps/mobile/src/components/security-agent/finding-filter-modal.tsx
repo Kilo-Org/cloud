@@ -95,12 +95,19 @@ function FilterSection<T>({
           {options.map(option => (
             <ChoiceRow
               key={String(option.value)}
-              label={option.label}
+              // The name is passed explicitly because the one-line label is the
+              // row's own content: a repository full name is a long unbreakable
+              // token that would otherwise wrap and change the row's height.
+              accessibleName={option.label}
               selected={option.value === selected}
               onPress={() => {
                 onSelect(option.value);
               }}
-            />
+            >
+              <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                {option.label}
+              </Text>
+            </ChoiceRow>
           ))}
         </RowGroup>
       </RadioGroup>

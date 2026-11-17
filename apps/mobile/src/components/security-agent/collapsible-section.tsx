@@ -35,10 +35,12 @@ type CollapsibleSectionProps = {
    */
   animateLayout?: boolean;
   /**
-   * The surface inset the section supplies around its header and body. The
-   * header's frame is the row, so it has to carry this inset itself; a caller
-   * that wants a wider card picks a preset here instead of padding the card,
-   * which would leave the row's frame short of the card's edges.
+   * Classes on the section's outer box, for spacing against its siblings. The
+   * header and body own their own insets: the header is a `RowGroup` row (the
+   * card's edge plus the row's 14pt gutter), and a body whose children are
+   * plain copy passes `contentClassName="px-4"` so that copy starts at the
+   * header's text; children that bring a surface (a `RowGroup`, a `Card`)
+   * carry both the surface and its inset themselves.
    */
   className?: string;
   titleClassName?: string;

@@ -9,9 +9,9 @@ import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-overview-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -170,7 +170,7 @@ export function SettingsOverviewScreen({
     ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
     : data.analysisMode;
 
-  // The haptic on toggle belongs to `ToggleRow`, which owns the press for this
+  // The haptic on toggle belongs to `PreferenceRow`, which owns the press for this
   // row — firing one here too would fire it twice for a single tap.
   const handleToggle = (value: boolean) => {
     // When this screen is the PUSHED settings route (reached from the
@@ -244,9 +244,9 @@ export function SettingsOverviewScreen({
         headerRight={auditAction}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-        <RowGroup>
+        <RowGroup leadingTile>
           {capability.canManage ? (
-            <ToggleRow
+            <PreferenceRow
               icon={ShieldCheck}
               title={t('common.securityAgent')}
               value={data.isEnabled}

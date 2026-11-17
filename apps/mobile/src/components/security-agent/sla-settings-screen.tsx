@@ -6,10 +6,10 @@ import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Input } from '@/components/ui/input';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -39,8 +39,8 @@ function SlaSettingsSkeleton() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.sla.title')} />
       <View className={SCREEN_BODY_CLASS}>
-        <RowGroup>
-          <RowSkeleton subtitle />
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
         </RowGroup>
         <RowGroup>
           {SLA_ROWS.map(row => (
@@ -122,7 +122,12 @@ function SlaDayRow({
         accessibilityHint={
           isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
-        className="w-16 rounded-md border border-input bg-background pl-2 pr-2 text-sm text-foreground"
+        className={cn(
+          'w-16 rounded-md border border-input bg-background pl-2 pr-2 text-sm text-foreground',
+          // The field's own read-only cue, as `FormField` paints it: the muted
+          // title above says the row is off, and the box dims with it.
+          disabled && 'opacity-50'
+        )}
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}
@@ -302,8 +307,8 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <RowGroup>
-          <ToggleRow
+        <RowGroup leadingTile>
+          <PreferenceRow
             icon={Clock}
             title={t('securityAgent.sla.enableTracking')}
             subtitle={t('securityAgent.sla.enableTrackingSubtitle')}

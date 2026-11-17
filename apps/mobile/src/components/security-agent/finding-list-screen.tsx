@@ -56,7 +56,9 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <FindingRowSkeleton />;
+    // The footer placeholder stands in for the page's last row, so it draws no
+    // hairline under itself.
+    return <FindingRowSkeleton last />;
   }
   if (error) {
     return (

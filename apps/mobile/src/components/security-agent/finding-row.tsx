@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils';
  * a repository caption, a state line and its own inline action — so it keeps
  * the contract's geometry rather than a card of its own.
  */
-const FINDING_ROW_CLASS = 'flex-row items-start gap-3 px-4 py-3 border-b-[0.5px] border-hair-soft';
+const FINDING_ROW_CLASS = 'gap-1 px-4 py-3 border-b-[0.5px] border-hair-soft';
 
 const SEVERITY_KEYS = {
   critical: 'common.critical',
@@ -247,58 +247,63 @@ export function FindingRow({
   return (
     <View className={cn(FINDING_ROW_CLASS, last && 'border-b-0')}>
       <Pressable
-        className="min-w-0 flex-1 gap-1 active:opacity-70"
+        className="flex-row items-start gap-3 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={() => {
           pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
       >
-        <Eyebrow className={lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? undefined}>
-          {severityLabel}
-        </Eyebrow>
-        <Text className="text-sm font-medium" numberOfLines={2}>
-          {finding.title}
-        </Text>
-        <Text variant="caption" numberOfLines={1}>
-          {finding.repo_full_name}
-        </Text>
-        <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
-          <View className="flex-row items-center gap-1">
-            <SpinningIcon
-              icon={AnalysisIcon}
-              size={13}
-              color={findingToneColor(colors, analysis.tone)}
-              spinning={Boolean(analysis.spinning)}
-            />
-            <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-              {analysisLabel}
-            </Text>
-          </View>
-          {deadline && DeadlineIcon && (
+        <View className="min-w-0 flex-1 gap-1">
+          <Eyebrow className={lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? undefined}>
+            {severityLabel}
+          </Eyebrow>
+          <Text className="text-sm font-medium" numberOfLines={2}>
+            {finding.title}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {finding.repo_full_name}
+          </Text>
+          <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
             <View className="flex-row items-center gap-1">
               <SpinningIcon
-                icon={DeadlineIcon}
+                icon={AnalysisIcon}
                 size={13}
-                color={findingToneColor(colors, deadline.tone)}
-                spinning={Boolean(deadline.spinning)}
+                color={findingToneColor(colors, analysis.tone)}
+                spinning={Boolean(analysis.spinning)}
               />
-              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-                {deadlineLabel}
+              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
+                {analysisLabel}
               </Text>
             </View>
-          )}
+            {deadline && DeadlineIcon && (
+              <View className="flex-row items-center gap-1">
+                <SpinningIcon
+                  icon={DeadlineIcon}
+                  size={13}
+                  color={findingToneColor(colors, deadline.tone)}
+                  spinning={Boolean(deadline.spinning)}
+                />
+                <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
+                  {deadlineLabel}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-        <FindingRowQuickAction
-          finding={finding}
-          scope={scope}
-          prUrl={prUrl}
-          isAnalyzable={isAnalyzable}
-          capacityState={capacityState}
-          nextAction={nextAction}
-        />
+        <RowChevron />
       </Pressable>
-      <RowChevron />
+      {/* The quick action sits beside the row's control, never inside it: a
+          nested button is unreachable for assistive technology and a disabled
+          Analyze would otherwise fall through to the row's own press. */}
+      <FindingRowQuickAction
+        finding={finding}
+        scope={scope}
+        prUrl={prUrl}
+        isAnalyzable={isAnalyzable}
+        capacityState={capacityState}
+        nextAction={nextAction}
+      />
     </View>
   );
 }

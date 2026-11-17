@@ -176,8 +176,8 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: { value: boolean }): null => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: { value: boolean }): null => {
     record.events.push({ kind: 'toggle', value: props.value });
     return null;
   },

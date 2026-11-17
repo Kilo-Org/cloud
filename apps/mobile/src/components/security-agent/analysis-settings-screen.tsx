@@ -17,7 +17,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
-import { SegmentedControl } from '@/components/ui/segmented-control';
+import { SEGMENTED_FRAME_HEIGHT_CLASS, SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -63,14 +63,11 @@ function AnalysisSettingsSkeleton() {
           skeleton's own frames stay out of that check. */}
       <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
         <Section label={t('securityAgent.analysisSettings.depth')}>
-          {/* The loaded `SegmentedControl` frame is 55pt — the group's `p-1`
-              inset around a segment on the 48pt row floor. `h-16` (56pt) is the
-              closest spacing step; the control exports no frame of its own. */}
-          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className={cn('w-full', SEGMENTED_FRAME_HEIGHT_CLASS, 'rounded-lg')} />
         </Section>
-        <RowGroup>
+        <RowGroup leadingTile>
           {Array.from({ length: ROW_COUNT }, (_, index) => (
-            <RowSkeleton key={index} />
+            <RowSkeleton key={index} tile subtitle />
           ))}
         </RowGroup>
       </View>
@@ -225,9 +222,9 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         </Section>
 
         {modelsLoading && (
-          <RowGroup>
+          <RowGroup leadingTile>
             {Array.from({ length: ROW_COUNT }, (_, index) => (
-              <RowSkeleton key={index} />
+              <RowSkeleton key={index} tile subtitle />
             ))}
           </RowGroup>
         )}

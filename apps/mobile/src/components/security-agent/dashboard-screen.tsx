@@ -20,7 +20,7 @@ import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { ScreenHeader } from '@/components/screen-header';
 import {
@@ -105,12 +105,12 @@ const METRIC_TONE_CLASS = {
 const STAT_TILE_CLASS = 'min-w-0 flex-1 basis-2/5';
 
 // One placeholder per tile: the metrics fill four of them with or without SLA
-// deadlines. Each bar is the loaded line's own box at the app's default text
-// size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
-// — so the tile's height comes out the same and the loaded cards replace the
-// placeholders without moving anything below them. The detail bar is the one
-// line the loaded tile may not carry, so it is drawn only for the scope shape
-// that carries it.
+// deadlines. Each bar is the loaded line's own box — the `text-xs` label, the
+// `stat` variant's `text-lg` value (one line tall, which is the `h-7` bar) and
+// the `text-xs` detail — so the tile's height comes out the same and the loaded
+// cards replace the placeholders without moving anything below them. The detail
+// bar is the one line the loaded tile may not carry, so it is drawn only for the
+// scope shape that carries it.
 const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
 const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
 const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
@@ -956,7 +956,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>
-                <Text variant="figure" className={METRIC_TONE_CLASS[metric.tone]}>
+                <Text variant="stat" className={METRIC_TONE_CLASS[metric.tone]}>
                   {metric.value}
                 </Text>
                 {metric.detail ? <Text variant="caption">{metric.detail}</Text> : null}
@@ -982,13 +982,20 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           // settings row primitive, in its own group, so the destination reads
           // with the same anatomy as every other navigation row on the app.
           <RowGroup leadingTile>
-            <ConfigureRow
+            {/* The title wraps: "Manage repositories" is a sentence-length
+                label in several catalogs, and a truncated destination names
+                the wrong screen. */}
+            <RowFrame
               icon={FolderGit2}
-              title={t('securityAgent.dashboard.manageRepositories')}
+              trailing={{ kind: 'chevron' }}
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
-            />
+            >
+              <Text className="text-sm font-medium text-foreground">
+                {t('securityAgent.dashboard.manageRepositories')}
+              </Text>
+            </RowFrame>
           </RowGroup>
         ) : null}
 

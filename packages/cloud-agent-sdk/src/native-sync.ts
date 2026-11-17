@@ -232,16 +232,25 @@ function snapshotCoversLiveGap(
   return true;
 }
 
+/** First snapshot entry per message id, matching the first-match semantics of Array.find. */
+function indexNativeMessages(
+  messages: NativeSnapshotMessage[]
+): Map<string, NativeSnapshotMessage> {
+  const byID = new Map<string, NativeSnapshotMessage>();
+  for (const item of messages) if (!byID.has(item.message.id)) byID.set(item.message.id, item);
+  return byID;
+}
+
 /** Non-content-addressed native files need fresh authorization after their content is replaced. */
 function nativeAssetURLsAfterMessages(
-  previous: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
   messages: NativeSnapshotMessage[],
   assetURLs: Readonly<Record<string, string>> | undefined
 ) {
   if (!assetURLs) return assetURLs;
   let changed: Record<string, string> | undefined;
   for (const item of messages) {
-    const before = previous.find(candidate => candidate.message.id === item.message.id);
+    const before = previousByID.get(item.message.id);
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
@@ -257,6 +266,39 @@ function nativeAssetURLsAfterMessages(
     }
   }
   return changed ?? assetURLs;
+}
+
+/**
+ * Snapshot items whose content the current frame cannot certify, in messages order. A
+ * replaced asset URL set invalidates keys shared by otherwise unchanged messages, so the
+ * caller retries them too.
+ */
+function nativeGapMessages(
+  messages: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  pendingIDs: ReadonlySet<string>,
+  recheckUnchanged: boolean
+): NativeSnapshotMessage[] {
+  const gaps: NativeSnapshotMessage[] = [];
+  for (const item of messages) {
+    const previous = previousByID.get(item.message.id);
+    const missingDependency =
+      item.incomplete &&
+      (!previous?.incomplete || (item !== previous && item.message === previous.message));
+    if (missingDependency) {
+      gaps.push(item);
+      continue;
+    }
+    if (!recheckUnchanged && previous?.message === item.message) continue;
+    if (
+      !item.incomplete &&
+      hasUnresolvedKilo2Assets(item.message, assetURLs) &&
+      !pendingIDs.has(item.message.id)
+    )
+      gaps.push(item);
+  }
+  return gaps;
 }
 
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
@@ -738,6 +780,7 @@ export class NativeSyncClient {
     let integrityError: string | undefined;
     let failureError: string | undefined;
     let integrityGap = false;
+    let quarantined: { seq: number; position: number }[] = [];
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
     const publish = (patch: Partial<NativeSessionState>) => {
@@ -873,7 +916,11 @@ export class NativeSyncClient {
               continue;
             const previous = messages;
             messages = applyNativeEvent(messages, item.frame, session);
-            assetURLs = nativeAssetURLsAfterMessages(previous, messages, assetURLs);
+            assetURLs = nativeAssetURLsAfterMessages(
+              indexNativeMessages(previous),
+              messages,
+              assetURLs
+            );
             session = applyNativeSessionEvent(session, item.frame);
           }
           if (!stale) {
@@ -905,13 +952,15 @@ export class NativeSyncClient {
               epoch.release(item.bytes);
               return false;
             });
+            quarantined = quarantined.filter(entry => entry.position > next.position);
           }
           if (
             state.session &&
             !state.messages.some(
               item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
             ) &&
-            !state.pendingSnapshotMessageIDs?.length
+            !state.pendingSnapshotMessageIDs?.length &&
+            !quarantined.length
           ) {
             if (!integrityGap) {
               integrityError = undefined;
@@ -966,6 +1015,7 @@ export class NativeSyncClient {
             frame.type === 'subscribed' &&
             state.session &&
             !integrityGap &&
+            !quarantined.length &&
             !state.messages.some(message => message.incomplete) &&
             !state.pendingSnapshotMessageIDs?.length
           ) {
@@ -988,91 +1038,111 @@ export class NativeSyncClient {
           return;
         }
         if (frame.channel !== 'events' || (lastSeq !== undefined && frame.seq <= lastSeq)) return;
-        // Validate/project before accepting the relay cursor. A malformed native
-        // value must not acknowledge an event that this client failed to retain.
-        const messages = beyond(frame, snapshotPosition)
-          ? visible(applyNativeEvent(state.messages, frame, state.session))
-          : state.messages;
-        const pending = reduceNativePendingRequests(state.pending, frame);
-        const session = applyNativeSessionEvent(state.session, frame);
-        const assetURLs = nativeAssetURLsAfterMessages(state.messages, messages, state.assetURLs);
-        const newGaps = messages.filter(item => {
-          const previous = state.messages.find(previous => previous.message.id === item.message.id);
-          const missingDependency =
-            item.incomplete &&
-            (!previous?.incomplete || (item !== previous && item.message === previous.message));
-          return (
-            missingDependency ||
-            (!item.incomplete &&
-              hasUnresolvedKilo2Assets(item.message, assetURLs) &&
-              !state.pendingSnapshotMessageIDs?.includes(item.message.id))
+        // A frame this client cannot project is retained as an integrity-gap record
+        // before its cursor advances; the transcript is repaired from a canonical snapshot.
+        const project = () => {
+          const messages = beyond(frame, snapshotPosition)
+            ? visible(applyNativeEvent(state.messages, frame, state.session))
+            : state.messages;
+          const pending = reduceNativePendingRequests(state.pending, frame);
+          const session = applyNativeSessionEvent(state.session, frame);
+          const previousByID = indexNativeMessages(state.messages);
+          const assetURLs = nativeAssetURLsAfterMessages(
+            previousByID,
+            messages,
+            state.assetURLs
           );
-        });
-        let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
-        if (newGaps.length)
-          pendingSnapshotMessageIDs = [
-            ...new Set([
-              ...(pendingSnapshotMessageIDs ?? []),
-              ...newGaps.map(item => item.message.id),
-            ]),
-          ];
-        if (frame.type === 'session.moved') {
-          const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
-          const messageID = `msg_${eventID.slice(4)}`;
-          if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+          const pendingIDs = new Set(state.pendingSnapshotMessageIDs ?? []);
+          const newGaps = nativeGapMessages(
+            messages,
+            previousByID,
+            assetURLs,
+            pendingIDs,
+            assetURLs !== state.assetURLs
+          );
+          let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
+          if (newGaps.length)
             pendingSnapshotMessageIDs = [
-              ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ...new Set([
+                ...(pendingSnapshotMessageIDs ?? []),
+                ...newGaps.map(item => item.message.id),
+              ]),
             ];
-        }
-        if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
-          recoverIncomplete(epoch, true);
-        if (recovery) {
-          if (!epoch.retain(bytes)) {
-            epoch.fail(new NativeSyncError('live_backlog_overflow'));
-            return;
+          if (frame.type === 'session.moved') {
+            const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
+            const messageID = `msg_${eventID.slice(4)}`;
+            if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+              pendingSnapshotMessageIDs = [
+                ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ];
           }
-          recovery.replay.push({ frame, bytes });
-          for (const item of newGaps)
-            recovery.requirements.set(frame.seq, {
-              frame,
-              messageID: item.message.id,
-              revision: state.snapshot?.revision ?? -1,
-              position:
-                typeof body['syncPosition'] === 'number' ? body['syncPosition'] : snapshotPosition,
-              files: readKilo2FileReferences(item.message),
-            });
+          if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
+            recoverIncomplete(epoch, true);
+          if (recovery) {
+            if (!epoch.retain(bytes)) {
+              epoch.fail(new NativeSyncError('live_backlog_overflow'));
+              return;
+            }
+            recovery.replay.push({ frame, bytes });
+            for (const item of newGaps)
+              recovery.requirements.set(frame.seq, {
+                frame,
+                messageID: item.message.id,
+                revision: state.snapshot?.revision ?? -1,
+                position:
+                  typeof body['syncPosition'] === 'number'
+                    ? body['syncPosition']
+                    : snapshotPosition,
+                files: readKilo2FileReferences(item.message),
+              });
+          }
+          if (typeof body['incarnation'] === 'string')
+            identity = {
+              incarnation: body['incarnation'],
+              ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
+            };
+          if (frame.type === 'remote.state') remoteState = frame;
+          const recent =
+            frame.type === 'remote.state'
+              ? []
+              : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
+          const events =
+            frame.type === 'remote.state'
+              ? [frame]
+              : [...(remoteState ? [remoteState] : []), ...recent, frame];
+          publish({
+            events,
+            session,
+            pending,
+            messages,
+            assetURLs,
+            pendingSnapshotMessageIDs,
+          });
+          lastSeq = frame.seq;
+          if (
+            frame.type === 'session.moved' ||
+            (frame.type.startsWith('session.execution.') &&
+              frame.type !== 'session.execution.started') ||
+            newGaps.length ||
+            !session
+          )
+            recoverIncomplete(epoch);
+        };
+        try {
+          project();
+        } catch {
+          quarantined.push({
+            seq: frame.seq,
+            position:
+              typeof body['syncPosition'] === 'number' ? body['syncPosition'] : snapshotPosition + 1,
+          });
+          lastSeq = frame.seq;
+          integrityError =
+            'Native live sync skipped an event it could not read and is restoring the transcript from a canonical snapshot.';
+          publish({});
+          if (!recovery) recoverIncomplete(epoch, true);
+          return;
         }
-        lastSeq = frame.seq;
-        if (typeof body['incarnation'] === 'string')
-          identity = {
-            incarnation: body['incarnation'],
-            ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
-          };
-        if (frame.type === 'remote.state') remoteState = frame;
-        const recent =
-          frame.type === 'remote.state'
-            ? []
-            : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
-        const events =
-          frame.type === 'remote.state'
-            ? [frame]
-            : [...(remoteState ? [remoteState] : []), ...recent, frame];
-        publish({
-          events,
-          session,
-          pending,
-          messages,
-          assetURLs,
-          pendingSnapshotMessageIDs,
-        });
-        if (
-          frame.type === 'session.moved' ||
-          (frame.type.startsWith('session.execution.') &&
-            frame.type !== 'session.execution.started') ||
-          newGaps.length ||
-          !session
-        )
-          recoverIncomplete(epoch);
       },
       (connection, error) => {
         const backlog = error === 'live_backlog_overflow' || error === 'live_frame_too_large';

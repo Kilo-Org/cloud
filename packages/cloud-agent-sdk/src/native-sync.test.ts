@@ -1007,6 +1007,325 @@ test('available relay replay restores unique ordered deltas from the accepted cu
   connection.close();
 });
 
+test('an unprojectable live event quarantines and converges from a covering snapshot without reconnecting', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.renamed',
+    { syncPosition: 2, data: { data: { title: 'first' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.session?.title).toBe('first');
+  expect(state?.error).toBeUndefined();
+  // Missing assistantMessageID: the reducer's schema parse throws, and the frame carries
+  // no syncPosition, so projection runs and fails before the cursor advances.
+  const poison = { data: { data: { id: 'invalid' } } };
+  socket.frame('session.step.started', poison, 5, 'events');
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  expect(socket.readyState).toBe(1);
+  expect(state?.connection).toBe('connected');
+  expect(state?.error).toContain('skipped an event it could not read');
+  expect(state?.messages).toHaveLength(1);
+  const afterQuarantine = snapshot.mock.calls.length;
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot.mock.calls.length - afterQuarantine).toBe(1);
+  expect(state?.error).toContain('skipped an event it could not read');
+  snapshot.mockResolvedValueOnce({ ...complete(5), position: 6, revision: 3 });
+  await jest.advanceTimersByTimeAsync(1000);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'done' }]);
+  socket.frame(
+    'session.renamed',
+    { syncPosition: 6, data: { data: { title: 'kept working' } } },
+    6,
+    'events'
+  );
+  await flush();
+  expect(state?.session?.title).toBe('kept working');
+  expect(state?.error).toBeUndefined();
+  socket.frame('session.step.started', poison, 7, 'events');
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  expect(state?.connection).toBe('connected');
+  expect(state?.error).toContain('skipped an event it could not read');
+  const afterSecond = snapshot.mock.calls.length;
+  await jest.advanceTimersByTimeAsync(800);
+  await flush();
+  expect(snapshot.mock.calls.length - afterSecond).toBe(2);
+  expect(state?.error).toContain('skipped an event it could not read');
+  snapshot.mockResolvedValueOnce({ ...complete(5), position: 8, revision: 4 });
+  await jest.advanceTimersByTimeAsync(1500);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  socket.frame('session.step.started', poison, 5, 'events');
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  expect(state?.error).toBeUndefined();
+  expect(state?.session).toEqual(sessionMetadata);
+  connection.close();
+});
+
+test('per-frame gap detection stays first-match and additive for changed message references', async () => {
+  const canonical: NativeSnapshot = {
+    position: 5,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    messages: [
+      {
+        message: { id: 'msg_first', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'one' }] },
+        seq: 1,
+      },
+      {
+        message: { id: 'msg_second', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'two' }] },
+        seq: 2,
+      },
+    ],
+  };
+  snapshot.mockResolvedValue(canonical);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toBeUndefined();
+  // (a) An ordinal far past the stored content marks the receiving message incomplete, so
+  // the exact expected gap set here is ["msg_first"].
+  socket.frame(
+    'session.text.delta',
+    { data: { data: { assistantMessageID: 'msg_first', ordinal: 5, delta: 'gap' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_first']);
+  // The wrapper item keeps the stored content, with no incomplete marker: the gap list
+  // alone drives the pending id set.
+  expect(state?.messages[0]?.message).toBe(canonical.messages[0]?.message);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'one' }]);
+  // (a) The healing ordinal-zero delta still does not clear the pending id: only a
+  // canonical snapshot read can.
+  const firstMessage = state?.messages[0]?.message;
+  expect(firstMessage).toBeDefined();
+  socket.frame(
+    'session.text.delta',
+    { data: { data: { assistantMessageID: 'msg_first', ordinal: 0, delta: ' live' } } },
+    5,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_first']);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'one live' }]);
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  // The covering canonical read restores the stored part and clears the gap.
+  snapshot.mockResolvedValueOnce({
+    ...canonical,
+    position: 9,
+    revision: 3,
+    messages: [
+      {
+        message: { id: 'msg_first', type: 'assistant', time: { created: 1, completed: 6 }, content: [{ type: 'text', text: 'one' }] },
+        seq: 1,
+      },
+      {
+        message: { id: 'msg_second', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'two' }] },
+        seq: 2,
+      },
+    ],
+  });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  // (c) One delta among two unchanged messages: unstored siblings keep their identity in
+  // state.messages and assetURLs is untouched, so the expected gap set is empty.
+  const beforeFirst = state?.messages[0];
+  socket.frame(
+    'session.text.delta',
+    { syncPosition: 9, data: { data: { assistantMessageID: 'msg_second', ordinal: 0, delta: '!' } } },
+    8,
+    'events'
+  );
+
+  await flush();
+  expect(state?.messages[1]?.message.content).toEqual([{ type: 'text', text: 'two!' }]);
+  expect(state?.messages[0]?.message).toBe(beforeFirst?.message);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  socket.frame(
+    'session.text.delta',
+    { data: { data: { assistantMessageID: 'msg_unknown', ordinal: 0, delta: 'x' } } },
+    9,
+    'events'
+  );
+  await flush();
+  // (b) A delta for a message id absent from the transcript neither appends messages nor
+  // reports a gap.
+  expect(state?.messages).toHaveLength(2);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  connection.close();
+});
+
+test('a replaced native asset re-reports stale references through already covered unchanged messages', async () => {
+  const staleKey = kilo2AssetKey('msg_stale_000000_file_0', 'file:///owned/stale.png', 'image/png');
+  const otherKey = kilo2AssetKey('msg_other_000000_file_0', 'file:///owned/other.png', 'image/png');
+  snapshot.mockResolvedValue({
+    position: 5,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [otherKey]: 'data:image/png;base64,b3RoZXI=' },
+    messages: [
+      {
+        message: {
+          id: 'msg_stale',
+          type: 'assistant',
+          time: { created: 1, completed: 5 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 1 },
+              state: { status: 'completed', input: { path: 'stale.png' }, content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }] },
+            },
+          ],
+        },
+        seq: 1,
+      },
+      {
+        message: {
+          id: 'msg_other',
+          type: 'assistant',
+          time: { created: 1, completed: 5 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 2 },
+              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+            },
+          ],
+        },
+        seq: 2,
+      },
+    ],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toBeUndefined();
+  // (d) Replacing msg_other's resolved content deletes its asset key, and the identity
+  // change re-runs the scan over the untouched msg_stale whose key was never stored.
+  socket.frame(
+    'session.message.content.updated',
+    {
+      syncPosition: 6,
+      data: {
+        data: {
+          sessionID: 'ses_a',
+          messageID: 'msg_other',
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 3 },
+              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+            },
+          ],
+        },
+      },
+    },
+    6,
+    'events'
+  );
+  await flush();
+  expect(state?.assetURLs?.[otherKey]).toBeUndefined();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_stale', 'msg_other']);
+  snapshot.mockResolvedValueOnce({
+    ...complete(6),
+    assetURLs: { [staleKey]: 'data:image/png;base64,c3RhbGU=', [otherKey]: 'data:image/png;base64,b3RoZXI=' },
+    messages: [
+      {
+        message: {
+          id: 'msg_stale',
+          type: 'assistant',
+          time: { created: 1, completed: 6 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 1 },
+              state: { status: 'completed', input: { path: 'stale.png' }, content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }] },
+            },
+          ],
+        },
+        seq: 1,
+      },
+      {
+        message: {
+          id: 'msg_other',
+          type: 'assistant',
+          time: { created: 1, completed: 6 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 3 },
+              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+            },
+          ],
+        },
+        seq: 2,
+      },
+    ],
+  });
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  // The covering read resolves the stale key, but msg_other's pending id survives it: the
+  // recovery filter keeps only ids a live replay still requires.
+  expect(state?.assetURLs?.[staleKey]).toBe('data:image/png;base64,c3RhbGU=');
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_other']);
+  snapshot.mockResolvedValueOnce({ ...complete(6), revision: 4 });
+  await jest.advanceTimersByTimeAsync(800);
+  await flush();
+  // The finished recovery keeps the replaced message's pending id because the relay still
+  // owes its live replay; the same socket stays up the whole time.
+  expect(state?.error).toBeUndefined();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_other']);
+  expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
 test('a reset keeps its integrity error through snapshots, reconnect and subscribed', async () => {
   snapshot.mockResolvedValue(complete(5));
   const { client } = fixture();

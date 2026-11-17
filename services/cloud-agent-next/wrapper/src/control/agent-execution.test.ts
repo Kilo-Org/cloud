@@ -47,6 +47,178 @@ describe('Linux agent credential boundary', () => {
   });
 
   it.skipIf(!linuxRoot)(
+    'creates wrapper directories in agent paths without following agent symlinks',
+    async () => {
+      const directory = await mkdtemp(path.join(os.tmpdir(), 'agent-directories-'));
+      await chmod(directory, 0o755);
+      const outside = path.join(directory, 'outside');
+      const fixture = `
+      import fs from 'node:fs/promises';
+      import { initializeAgentExecution, agentOwns, makeAgentDirectory } from ${JSON.stringify(path.join(import.meta.dir, 'agent-execution.ts'))};
+      import { prepareKiloFilesystem } from ${JSON.stringify(path.join(import.meta.dir, '../control-plane/kilo-runtime.ts'))};
+      import { writeRuntimeInstructions } from ${JSON.stringify(path.join(import.meta.dir, '../runtime-instructions.ts'))};
+      const directory = ${JSON.stringify(directory)};
+      const outside = ${JSON.stringify(outside)};
+      const home = directory + '/home';
+      const workspace = directory + '/workspace';
+      await initializeAgentExecution();
+      await fs.mkdir(outside);
+      await fs.mkdir(home);
+      await fs.mkdir(workspace);
+      await agentOwns(home);
+      await agentOwns(workspace);
+      for (const name of ['.local', '.run', '.kilocode']) await fs.symlink(outside, home + '/' + name);
+      const rejected = [];
+      for (const attempt of [
+        () => prepareKiloFilesystem({ XDG_DATA_HOME: home + '/.local/share', KILO_AUTH_CONTENT: 'synthetic' }, workspace),
+        () => prepareKiloFilesystem({ XDG_RUNTIME_DIR: home + '/.run/kilo' }, workspace),
+        () => writeRuntimeInstructions(home, [], { replaceExisting: true }),
+      ]) {
+        try { await attempt(); rejected.push(null); }
+        catch (error) { rejected.push(error.code); }
+      }
+      await makeAgentDirectory(home + '/created/private', 0o700);
+      const created = await fs.stat(home + '/created');
+      const nested = await fs.stat(home + '/created/private');
+      console.log(JSON.stringify({
+        rejected,
+        outside: await fs.readdir(outside),
+        owners: [created.uid, created.gid, nested.uid, nested.gid],
+        mode: nested.mode & 0o777,
+      }));
+    `;
+      try {
+        const child = Bun.spawn([process.execPath, '--eval', fixture], {
+          env: { PATH: process.env.PATH },
+          stdout: 'pipe',
+          stderr: 'pipe',
+        });
+        const [stdout, stderr, code] = await Promise.all([
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+          child.exited,
+        ]);
+        expect({ code, stderr: code === 0 ? '' : stderr }).toEqual({ code: 0, stderr: '' });
+        const result = JSON.parse(stdout);
+        expect(result.rejected).toEqual(['ENOTDIR', 'ENOTDIR', 'ENOTDIR']);
+        expect(result.outside).toEqual([]);
+        expect(result.owners).toEqual([AGENT_UID, AGENT_GID, AGENT_UID, AGENT_GID]);
+        expect(result.mode).toBe(0o700);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(!linuxRoot)(
+    'restores a downloaded snapshot through agent import, patch and file writes',
+    async () => {
+      const directory = await mkdtemp(path.join(os.tmpdir(), 'agent-restore-'));
+      await chmod(directory, 0o755);
+      const workspace = path.join(directory, 'workspace');
+      const home = path.join(directory, 'home');
+      const bin = path.join(directory, 'bin');
+      await mkdir(path.join(workspace, 'src'), { recursive: true });
+      await mkdir(home);
+      await mkdir(bin);
+      await writeFile(
+        path.join(bin, 'kilo'),
+        '#!/bin/sh\nid -u > import-uid\ncp "$2" import-copy\necho "Imported session: ses_boundary"\n',
+        { mode: 0o755 }
+      );
+      await writeFile(path.join(workspace, 'src', 'index.ts'), 'before\n');
+      for (const args of [
+        ['init', '-q'],
+        ['config', 'user.name', 'Synthetic Agent'],
+        ['config', 'user.email', 'agent@example.test'],
+        ['add', '.'],
+        ['commit', '-q', '-m', 'initial'],
+      ]) {
+        expect(Bun.spawnSync(['git', ...args], { cwd: workspace }).exitCode).toBe(0);
+      }
+      const absoluteFile = path.join(workspace, 'src', 'index.ts');
+      const snapshot = JSON.stringify({
+        info: { id: 'ses_boundary', version: '2' },
+        sessionDiff: [
+          {
+            file: 'src/index.ts',
+            patch: [
+              `Index: ${absoluteFile}`,
+              '===================================================================',
+              `--- ${absoluteFile}`,
+              `+++ ${absoluteFile}`,
+              '@@ -1 +1 @@',
+              '-before',
+              '+after',
+              '',
+            ].join('\n'),
+            status: 'modified',
+          },
+          { file: 'restored/nested/file.txt', after: 'restored content', status: 'added' },
+        ],
+        messages: [{ info: { tokens: { input: -5 } } }],
+      });
+      const fixture = `
+      import fs from 'node:fs/promises';
+      import { initializeAgentExecution, agentOwnsTree } from ${JSON.stringify(path.join(import.meta.dir, 'agent-execution.ts'))};
+      import { restoreSession } from ${JSON.stringify(path.join(import.meta.dir, '../restore-session.ts'))};
+      const workspace = ${JSON.stringify(workspace)};
+      await initializeAgentExecution();
+      await agentOwnsTree(workspace);
+      await agentOwnsTree(${JSON.stringify(home)});
+      const server = Bun.serve({ port: 0, fetch: () => new Response(${JSON.stringify(snapshot)}) });
+      const result = await restoreSession('ses_boundary', workspace, undefined, {
+        env: {
+          PATH: ${JSON.stringify(bin)} + ':' + process.env.PATH,
+          HOME: ${JSON.stringify(home)},
+          KILO_SESSION_INGEST_URL: server.url.origin,
+          KILOCODE_TOKEN: 'synthetic-token',
+        },
+      });
+      await server.stop(true);
+      const restored = workspace + '/restored/nested/file.txt';
+      console.log(JSON.stringify({
+        result,
+        importUid: (await fs.readFile(workspace + '/import-uid', 'utf8')).trim(),
+        imported: JSON.parse(await fs.readFile(workspace + '/import-copy', 'utf8')),
+        patched: await fs.readFile(workspace + '/src/index.ts', 'utf8'),
+        restored: await fs.readFile(restored, 'utf8'),
+        owners: [(await fs.stat(workspace + '/restored/nested')).uid, (await fs.stat(restored)).uid],
+      }));
+    `;
+      try {
+        const child = Bun.spawn([process.execPath, '--eval', fixture], {
+          env: { PATH: process.env.PATH },
+          stdout: 'pipe',
+          stderr: 'pipe',
+        });
+        const [stdout, stderr, code] = await Promise.all([
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+          child.exited,
+        ]);
+        expect({ code, stderr: code === 0 ? '' : stderr }).toEqual({ code: 0, stderr: '' });
+        const result = JSON.parse(stdout);
+        expect(result.result).toEqual({
+          ok: true,
+          downloaded: true,
+          imported: true,
+          diffs: { applied: 2, skipped: 0, total: 2 },
+        });
+        expect(result.importUid).toBe(String(AGENT_UID));
+        expect(result.imported.info.id).toBe('ses_boundary');
+        expect(result.imported.messages[0].info.tokens.input).toBe(0);
+        expect(result.patched).toBe('after\n');
+        expect(result.restored).toBe('restored content');
+        expect(result.owners).toEqual([AGENT_UID, AGENT_UID]);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    },
+    20_000
+  );
+
+  it.skipIf(!linuxRoot)(
     'denies wrapper credentials across all agent spawn paths',
     async () => {
       const directory = await mkdtemp(path.join(os.tmpdir(), 'agent-isolation-'));

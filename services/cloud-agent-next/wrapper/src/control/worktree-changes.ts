@@ -1,5 +1,5 @@
 import { constants } from 'fs';
-import { lstat, mkdir, mkdtemp, open, readlink, realpath, rm } from 'fs/promises';
+import { lstat, mkdtemp, open, readlink, realpath, rm } from 'fs/promises';
 import { agentOwns, writeAgentFile } from './agent-execution.js';
 import { tmpdir } from 'os';
 import { basename, dirname, join } from 'path';
@@ -768,11 +768,9 @@ async function collectSnapshotFiles({
     await agentOwns(directory);
     try {
       const temporaryPath = original ? join(directory, 'b', path) : join(directory, path);
-      await mkdir(dirname(temporaryPath), { recursive: true });
       await writeAgentFile(temporaryPath, bytes, mode);
       if (original) {
         const originalPath = join(directory, 'a', path);
-        await mkdir(dirname(originalPath), { recursive: true });
         await writeAgentFile(originalPath, original.bytes, original.mode);
       }
       const operand = path === '-' ? './-' : path;

@@ -8,7 +8,12 @@ import {
 } from '../../../src/shared/runtime-profile-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { writeRuntimeInstructions } from '../runtime-instructions.js';
-import { agentOwns, agentOwnsTree, renameAgentPath } from '../control/agent-execution.js';
+import {
+  agentOwns,
+  agentOwnsTree,
+  makeAgentDirectory,
+  renameAgentPath,
+} from '../control/agent-execution.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
@@ -218,7 +223,7 @@ async function stageRuntimeProfile(
     const stagedConfig = profileConfigPath(staging);
     const skills = path.join(home, '.kilocode', 'skills');
     const backup = path.join(staging, 'previous-skills');
-    await fs.mkdir(path.dirname(skills), { recursive: true });
+    await makeAgentDirectory(path.dirname(skills));
     options?.signal?.throwIfAborted();
     let hadSkills = false;
     try {
@@ -261,8 +266,7 @@ async function commitRuntimeProfileConfig(
     await fs.rm(file, { force: true });
     return;
   }
-  const created = await fs.mkdir(path.dirname(file), { recursive: true });
-  if (created) await agentOwnsTree(created);
+  await makeAgentDirectory(path.dirname(file));
   await renameAgentPath(stagedConfig, file);
   await agentOwns(file);
 }

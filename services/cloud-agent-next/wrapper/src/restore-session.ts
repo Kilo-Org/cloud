@@ -6,9 +6,10 @@ import { Writable } from 'node:stream';
 import {
   agentCommand,
   agentOwns,
-  agentOwnsTree,
+  makeAgentDirectory,
   openAgentFile,
   renameAgentPath,
+  TRUSTED_EXECUTABLE_PATH,
   writeAgentFile,
 } from './control/agent-execution.js';
 import { inheritedAgentEnvironment } from '../../src/shared/runtime-environment.js';
@@ -78,7 +79,11 @@ const KILO_IMPORT_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000;
 const MAX_SESSION_EXPORT_BYTES = 1024 * 1024 * 1024;
-const JQ_BINARY = process.platform === 'linux' ? '/usr/bin/jq' : 'jq';
+// The wrapper runs jq as root, so a Linux lookup ignores the agent's PATH.
+function jqBinary(): string {
+  if (process.platform !== 'linux') return 'jq';
+  return Bun.which('jq', { PATH: TRUSTED_EXECUTABLE_PATH }) ?? '/usr/bin/jq';
+}
 // Bound the recorded skip list: a pathological snapshot with thousands of
 // skipped diffs must not blow the session-ready ingest frame budget. `skipped`
 // stays the true count; only the named record is capped.
@@ -191,8 +196,7 @@ export async function seedSessionIngestRegistration(
   }
 
   const directory = path.join(dataHome, 'kilo', 'storage', 'session_share');
-  const created = await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
-  if (created) await agentOwnsTree(created);
+  await makeAgentDirectory(directory, 0o700);
   signal?.throwIfAborted();
   const temporaryPath = path.join(directory, `.${kiloSessionId}.${crypto.randomUUID()}.tmp`);
   try {
@@ -566,7 +570,7 @@ async function sanitizeSnapshotWithJq(
   const tempPath = tokenSanitizationTempPath(snapshotPath);
   try {
     signal?.throwIfAborted();
-    const proc = Bun.spawn([JQ_BINARY, '-c', filter, snapshotPath], {
+    const proc = Bun.spawn([jqBinary(), '-c', filter, snapshotPath], {
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
@@ -622,7 +626,7 @@ const JQ_EXTRACT_DIFFS_FILTER =
 /**
  * Extract last-write-wins diffs from a snapshot file. Prefers a jq subprocess
  * (memory-efficient — the parsed snapshot stays in C-native heap) and falls
- * back to bun-native parsing when jq isn't on PATH. The fallback matters for
+ * back to bun-native parsing when jq isn't installed. The fallback matters for
  * the devcontainer flow: the user's image is only required to ship `node` +
  * `bun`, so `jq` may be missing.
  */
@@ -633,7 +637,7 @@ export async function extractDiffs(
 ): Promise<SnapshotDiff[] | null> {
   signal?.throwIfAborted();
   try {
-    const proc = Bun.spawn([JQ_BINARY, '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
+    const proc = Bun.spawn([jqBinary(), '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
       stdout: 'pipe',
       stderr: 'ignore',
       signal,

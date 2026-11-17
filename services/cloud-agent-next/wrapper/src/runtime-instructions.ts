@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { RuntimeInstructionInput } from '../../src/shared/runtime-profile.js';
 import { logToFile } from './utils.js';
-import { writeAgentFile } from './control/agent-execution.js';
+import { makeAgentDirectory, writeAgentFile } from './control/agent-execution.js';
 
 const profileRuleFileSchema = z
   .string()
@@ -37,7 +37,7 @@ export async function writeRuntimeInstructions(
 ): Promise<void> {
   if (!instructions?.length && !options.replaceExisting) return;
   const rulesDir = path.join(home, '.kilocode', 'rules');
-  await fs.mkdir(rulesDir, { recursive: true });
+  await makeAgentDirectory(rulesDir);
   const manifest = path.join(home, '.kilocode', 'profile-instructions.json');
   const previous = await readProfileRuleFiles(manifest);
   const retained = new Set<string>();

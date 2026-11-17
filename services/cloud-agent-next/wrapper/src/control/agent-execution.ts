@@ -15,7 +15,9 @@ import {
 } from '../../../src/shared/runtime-environment.js';
 
 let isolated = false;
-const launcherEnvironment = { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8' };
+/** Root-owned executable directories; root never resolves a command through an agent PATH. */
+export const TRUSTED_EXECUTABLE_PATH = '/usr/local/bin:/usr/bin:/bin';
+const launcherEnvironment = { PATH: TRUSTED_EXECUTABLE_PATH, LANG: 'C.UTF-8' };
 
 export async function initializeAgentExecution(): Promise<void> {
   if (process.platform !== 'linux' || process.getuid?.() !== 0) {
@@ -77,6 +79,15 @@ export async function agentOwns(file: string): Promise<void> {
   }
 }
 
+export async function makeAgentDirectory(directoryPath: string, mode = 0o777): Promise<void> {
+  if (!isolated) {
+    await mkdir(directoryPath, { recursive: true, mode });
+    return;
+  }
+  const directory = await openAgentDirectory(directoryPath, mode);
+  await directory.close();
+}
+
 export async function chmodAgentDirectory(directoryPath: string, mode: number): Promise<void> {
   if (!isolated) return fs.chmod(directoryPath, mode);
   const directory = await openAgentDirectory(directoryPath);
@@ -132,7 +143,7 @@ async function ownHandle(handle: FileHandle, stat: Stats): Promise<void> {
   if (stat.uid !== AGENT_UID || stat.gid !== AGENT_GID) await handle.chown(AGENT_UID, AGENT_GID);
 }
 
-async function openAgentDirectory(directoryPath: string) {
+async function openAgentDirectory(directoryPath: string, mode = 0o777) {
   const parts = path.resolve(directoryPath).split('/').filter(Boolean);
   let directory = await open('/', constants.O_RDONLY | constants.O_DIRECTORY);
   try {
@@ -140,7 +151,7 @@ async function openAgentDirectory(directoryPath: string) {
       const target = `/proc/self/fd/${directory.fd}/${part}`;
       let created = false;
       try {
-        await mkdir(target);
+        await mkdir(target, mode);
         created = true;
       } catch (error) {
         if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;

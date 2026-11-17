@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ExecResult } from '../utils.js';
 import {
-  agentOwnsTree,
   chmodAgentDirectory,
+  makeAgentDirectory,
   renameAgentPath,
   writeAgentFile,
 } from './agent-execution.js';
@@ -133,8 +133,7 @@ function credentialSetRecord(entry: GitCredentialSetEntry): string {
 async function replaceCredentialRecord(home: string, record: string): Promise<void> {
   const recordPath = gitCredentialRecordPath(home);
   const directory = path.dirname(recordPath);
-  const created = await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  if (created) await agentOwnsTree(created);
+  await makeAgentDirectory(directory, 0o700);
   await chmodAgentDirectory(directory, 0o700);
   const temporaryPath = path.join(directory, `git-credentials.${randomUUID()}.tmp`);
   try {

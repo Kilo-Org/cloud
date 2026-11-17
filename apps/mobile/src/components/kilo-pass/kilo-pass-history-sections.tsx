@@ -83,7 +83,12 @@ function SectionError({
         <Text className="min-w-0 flex-1 text-sm text-muted-foreground">{message}</Text>
       </View>
       {onRetry ? (
-        <Button variant="outline" size="action" accessibilityLabel={t('common.retry')} onPress={onRetry}>
+        <Button
+          variant="outline"
+          size="action"
+          accessibilityLabel={t('common.retry')}
+          onPress={onRetry}
+        >
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}

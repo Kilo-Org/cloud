@@ -959,8 +959,8 @@ describe('organizations trpc router', () => {
         .where(
           and(
             eq(organization_audit_logs.organization_id, testOrganization.id),
-            eq(organization_audit_logs.action, 'organization.settings.change'),
-          ),
+            eq(organization_audit_logs.action, 'organization.settings.change')
+          )
         );
 
       await caller.organizations.update({
@@ -974,8 +974,8 @@ describe('organizations trpc router', () => {
         .where(
           and(
             eq(organization_audit_logs.organization_id, testOrganization.id),
-            eq(organization_audit_logs.action, 'organization.settings.change'),
-          ),
+            eq(organization_audit_logs.action, 'organization.settings.change')
+          )
         );
 
       expect(rows).toHaveLength(rowsBefore + 1);
@@ -1002,8 +1002,8 @@ describe('organizations trpc router', () => {
         .where(
           and(
             eq(organization_audit_logs.organization_id, testOrganization.id),
-            eq(organization_audit_logs.action, 'organization.settings.change'),
-          ),
+            eq(organization_audit_logs.action, 'organization.settings.change')
+          )
         );
 
       await caller.organizations.update({
@@ -1017,8 +1017,8 @@ describe('organizations trpc router', () => {
         .where(
           and(
             eq(organization_audit_logs.organization_id, testOrganization.id),
-            eq(organization_audit_logs.action, 'organization.settings.change'),
-          ),
+            eq(organization_audit_logs.action, 'organization.settings.change')
+          )
         );
 
       expect(rowsAfter).toBe(rowsBefore);

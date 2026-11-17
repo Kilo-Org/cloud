@@ -2492,7 +2492,7 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
-  it('records a rejected catch-up read without replaying rows when it settles after a cursor reconnect', async () => {
+  it('records a catch-up read denied by a newer reconnect without replaying rows', async () => {
     jest.useFakeTimers();
     try {
       const stalePage = {

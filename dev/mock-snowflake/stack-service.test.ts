@@ -198,6 +198,125 @@ test('the bundle carries the mock certificate and a CA the file already trusted'
   }
 });
 
+/** Writes one env file under the fixture's repository root. */
+function writeEnvFile(root: string, relativePath: string, content: string): string {
+  const filePath = path.join(root, relativePath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content);
+  return filePath;
+}
+
+for (const envFile of [
+  'apps/web/.env.development.local',
+  'apps/web/.env.local',
+  '.env.development.local',
+] as const) {
+  test(`a CA named only in ${envFile} still reaches the bundle`, async () => {
+    const fixture = wireEnvLocalFixture('OTHER=1\n');
+    const ambient = process.env.NODE_EXTRA_CA_CERTS;
+    delete process.env.NODE_EXTRA_CA_CERTS;
+    try {
+      const earlierCaPath = path.join(fixture.root, 'earlier-ca.pem');
+      fs.writeFileSync(earlierCaPath, 'EARLIER CA\n');
+      const envLocal = `NODE_EXTRA_CA_CERTS=${earlierCaPath}\n`;
+      const envFilePath = writeEnvFile(fixture.root, envFile, envLocal);
+
+      await fixture.wire();
+
+      // `scripts/dev.sh` reads this file before the repo-root `.env.local`, and
+      // the entry writes no file it does not own: the bundle carrying the CA is
+      // what keeps the stack's `next dev` trusting it beside the mock.
+      assert.equal(fs.readFileSync(envFilePath, 'utf8'), envLocal);
+      assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nEARLIER CA\n');
+      assert.deepEqual(await fixture.wire(), { status: 'unchanged' });
+      assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nEARLIER CA\n');
+    } finally {
+      if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+      else process.env.NODE_EXTRA_CA_CERTS = ambient;
+      fixture.restore();
+    }
+  });
+}
+
+test('a symlinked apps/web/.env.local contributes its CA to the bundle once', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const caPath = path.join(fixture.root, 'symlinked-ca.pem');
+    fs.writeFileSync(caPath, 'SYMLINKED CA\n');
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caPath}\n`);
+    // `scripts/dev.sh` symlinks the repo-root files into `apps/web`, so both
+    // names the entry reads reach one CA and its bytes belong in the bundle once.
+    fs.mkdirSync(path.join(fixture.root, 'apps', 'web'), { recursive: true });
+    fs.symlinkSync(fixture.envLocalPath, path.join(fixture.root, 'apps', 'web', '.env.local'));
+
+    await fixture.wire();
+
+    const bundle = fs.readFileSync(fixture.caBundlePath, 'utf8');
+    assert.equal(bundle, 'CERT\nSYMLINKED CA\n');
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.equal(content.split(CA_SOURCE_PREFIX).length - 1, 1);
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a CA two names point at is written to the bundle once', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const caPath = path.join(fixture.root, 'shared-ca.pem');
+    fs.writeFileSync(caPath, 'SHARED CA\n');
+    const caLinkPath = path.join(fixture.root, 'shared-ca-link.pem');
+    fs.symlinkSync(caPath, caLinkPath);
+    // The repo-root line names the link, the earlier file the target: resolving
+    // the paths alone keeps both and trusts the same bytes twice.
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caLinkPath}\n`);
+    writeEnvFile(
+      fixture.root,
+      'apps/web/.env.development.local',
+      `NODE_EXTRA_CA_CERTS=${caPath}\n`
+    );
+
+    await fixture.wire();
+
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nSHARED CA\n');
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a shell-exported CA and an earlier file CA both reach the bundle', async () => {
+  const fixture = wireEnvLocalFixture('OTHER=1\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const earlierCaPath = path.join(fixture.root, 'earlier-ca.pem');
+    const shellCaPath = path.join(fixture.root, 'shell-ca.pem');
+    fs.writeFileSync(earlierCaPath, 'EARLIER CA\n');
+    fs.writeFileSync(shellCaPath, 'SHELL CA\n');
+    writeEnvFile(
+      fixture.root,
+      'apps/web/.env.development.local',
+      `NODE_EXTRA_CA_CERTS=${earlierCaPath}\n`
+    );
+    process.env.NODE_EXTRA_CA_CERTS = shellCaPath;
+
+    await fixture.wire();
+
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nEARLIER CA\nSHELL CA\n');
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
 test('a CA line the developer wrote above the section is rewritten to the bundle', async () => {
   const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
   const ambient = process.env.NODE_EXTRA_CA_CERTS;

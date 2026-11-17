@@ -7,14 +7,18 @@
 // removes its own section when it finds one.
 //
 // Trusting the mock's certificate needs two things, because `scripts/dev.sh`
-// resolves `NODE_EXTRA_CA_CERTS` as `shell value, else the first matching line
-// in .env.local`:
+// resolves `NODE_EXTRA_CA_CERTS` as `shell value, else the first matching line`
+// of the env files it walks:
 //
-// - the file: the first line `dev.sh` would read must name the bundle (this
-//   module owns that, see `pointShadowingCaLineAtBundle`);
 // - the command: `dev/local/services.ts` exports the bundle into the web app's
 //   command, which is the only thing that wins over a value the developer's own
-//   shell exports.
+//   shell exports — so the bundle carries every CA those files and the shell
+//   name (`writeCaBundle`);
+// - the file: a `pnpm dev` run without that export reads the env files itself,
+//   so the first line `dev.sh` would read in the repo-root `.env.local` must
+//   name the bundle (this module owns that, see
+//   `pointShadowingCaLineAtBundle`); a line in an earlier env file still wins
+//   there, because the entry writes no file it does not own.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -33,6 +37,18 @@ const SECTION_START = '# wired by dev/mock-snowflake/stack-service.ts';
 const SECTION_END = '# end of dev/mock-snowflake wiring';
 
 const CA_KEY = 'NODE_EXTRA_CA_CERTS';
+
+// The env files `scripts/dev.sh` reads before the repo-root `.env.local`, in its
+// order: `read_env_value` walks `.env.development.local` and `.env.local` from
+// the directory it runs in (`apps/web`) and then the repo-root copies. The
+// repo-root `.env.local` is missing on purpose: `wireEnvLocal` collects its
+// entries itself, because only the lines outside the managed section are the
+// developer's.
+const EARLIER_ENV_FILES = [
+  path.join('apps', 'web', '.env.development.local'),
+  path.join('apps', 'web', '.env.local'),
+  '.env.development.local',
+] as const;
 
 // A CA line that had to be pointed at the bundle keeps its own path here, so
 // the bundle re-reads that file on every wire and a rotated certificate keeps
@@ -106,6 +122,38 @@ function linesOutsideOf(lines: string[], section: LineRange | undefined): string
 }
 
 /**
+ * The path a candidate CA file has on disk, so two names for one file — a
+ * symlinked env file's copy of a path, a link to the certificate — count once.
+ * A missing path keeps its resolved form: the caller has already skipped it.
+ */
+function caFileIdentity(candidate: string): string {
+  try {
+    return fs.realpathSync(candidate);
+  } catch {
+    return path.resolve(candidate);
+  }
+}
+
+/**
+ * The CA path an env file `scripts/dev.sh` would read, or `undefined` when the
+ * file names none. `read_env_value` takes the first line of a file whose text
+ * before the first `=` is the key and falls through to the next file when that
+ * value is empty, so an empty line is no value at all.
+ */
+function caPathInEnvFile(envFilePath: string): string | undefined {
+  if (!fs.statSync(envFilePath, { throwIfNoEntry: false })?.isFile()) return undefined;
+  let content: string;
+  try {
+    content = fs.readFileSync(envFilePath, 'utf8');
+  } catch {
+    // `dev.sh` only tests for a regular file too; an unreadable one is no source.
+    return undefined;
+  }
+  const value = parseEnvEntries(content).find(entry => entry.key === CA_KEY)?.value;
+  return value === undefined || value === '' ? undefined : value;
+}
+
+/**
  * Writes the CA bundle the managed section names: the mock's own certificate
  * first, then every CA file `existingCaPaths` names that it can read. Trusting
  * the bundle instead of one file keeps a CA the developer already exported —
@@ -115,19 +163,18 @@ function linesOutsideOf(lines: string[], section: LineRange | undefined): string
 function writeCaBundle(existingCaPaths: readonly string[]): string {
   const bundlePath = caBundlePath();
   const certificates = [loadTls().cert.toString('utf8').trimEnd()];
-  const seen = new Set([path.resolve(caCertPath()), path.resolve(bundlePath)]);
+  const seen = new Set([caFileIdentity(caCertPath()), caFileIdentity(bundlePath)]);
 
   for (const candidate of existingCaPaths) {
     if (candidate === '') continue;
-    const resolved = path.resolve(candidate);
     // A bundled CA that is a directory, missing, or unreadable is not one the
     // shell could have loaded either.
-    if (seen.has(resolved) || !fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()) {
-      continue;
-    }
-    seen.add(resolved);
+    if (!fs.statSync(candidate, { throwIfNoEntry: false })?.isFile()) continue;
+    const identity = caFileIdentity(candidate);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
     try {
-      const content = fs.readFileSync(resolved, 'utf8').trimEnd();
+      const content = fs.readFileSync(candidate, 'utf8').trimEnd();
       if (content !== '') certificates.push(content);
     } catch {
       // Unreadable now, so it is not a CA in effect; the mock's own still is.
@@ -152,16 +199,19 @@ function readRecordedCaSources(lines: string[], section: LineRange | undefined):
 }
 
 /**
- * Points the CA line that `scripts/dev.sh` would read first at the bundle.
+ * Points the CA line of the repo-root `.env.local` that `dev.sh` would read
+ * first at the bundle.
  *
- * `dev.sh` takes the value of the first line in `.env.local` that starts with
+ * `dev.sh` takes the value of the first line in a file that starts with
  * `NODE_EXTRA_CA_CERTS=` at column 0 — `export KEY=value` and `KEY = value`
  * never match — so a plain line above the managed section (`/corporate/ca.pem`
  * for a proxy, or an empty placeholder copied from an example) shadows the
  * section's own. Rewriting that one line's value keeps the first match correct
  * without moving anything, and drops nothing: `writeCaBundle` already carries
  * that file's bytes, and the returned path is recorded in the section so the
- * bundle keeps re-reading it.
+ * bundle keeps re-reading it. Only this file is rewritten: an earlier env file
+ * `dev.sh` walks still wins when no stack export sets the value, which is the
+ * case the README's `pnpm dev` paragraph names.
  */
 function pointShadowingCaLineAtBundle(
   lines: string[],
@@ -268,13 +318,22 @@ export function wireEnvLocal(): WireResult {
     return { status: 'keptRealWarehouse', removedSection: true };
   }
 
-  // Everything the developer wrote — the shell's own CA included — has to end
-  // up in the bundle, but the section's own line names the bundle.
+  // Everything the developer wrote — the shell's own CA, the repo-root
+  // `.env.local` line, and whatever an env file only `scripts/dev.sh` reads
+  // names — has to end up in the bundle, but the section's own line names the
+  // bundle. The command prefix replaces those files' values, so a CA only they
+  // named would stop being trusted without this.
+  const earlierCaPaths: string[] = [];
+  for (const envFile of EARLIER_ENV_FILES) {
+    const caPath = caPathInEnvFile(path.join(REPO_ROOT, envFile));
+    if (caPath !== undefined) earlierCaPaths.push(caPath);
+  }
   writeCaBundle([
     ...recordedCaSources,
     ...parseEnvEntries(outsideSection.join('\n'))
       .filter(entry => entry.key === CA_KEY)
       .map(entry => entry.value),
+    ...earlierCaPaths,
     process.env.NODE_EXTRA_CA_CERTS ?? '',
   ]);
 

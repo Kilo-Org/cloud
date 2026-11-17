@@ -37,8 +37,9 @@ Three guarantees about the file:
 - **Your own CA keeps working.** The section names
   `dev/mock-snowflake/fixtures/tls/ca-bundle.pem`, which holds the mock's
   self-signed certificate followed by the contents of every CA file that
-  `NODE_EXTRA_CA_CERTS` already named in `.env.local` (outside the section) or in
-  the shell.
+  `NODE_EXTRA_CA_CERTS` named in the shell, in the repo-root `.env.local`
+  (outside the section, which is this entry's own line), or in any of the other
+  env files `scripts/dev.sh` reads.
 
 ## Where trust comes from
 
@@ -69,11 +70,15 @@ before Next.js loads `.env*` for its own process.
   because that comment would otherwise become part of the value — and records
   the original path in the section as `# mock-snowflake CA: <path>`. The bundle
   re-reads that file on every wire, so a rotated certificate keeps taking effect,
-  and the original value is never dropped: its bytes are in the bundle. A CA
-  line in an earlier file (`apps/web/.env.local`,
-  `.env.development.local`) or a shell export is not rewritten, because this
-  entry only owns the repo-root `.env.local`; the command prefix is what covers
-  those.
+  and the original value is never dropped: its bytes are in the bundle.
+  `dev.sh` takes the first match across the four files it walks, and this entry
+  only rewrites that one line of the repo-root `.env.local`. So a
+  `NODE_EXTRA_CA_CERTS` line in `apps/web/.env.development.local`,
+  `apps/web/.env.local` or the repo-root `.env.development.local` still decides
+  the value here, and the mock's certificate stays untrusted: the entry does not
+  rewrite a file it does not own. The stack export above covers that case, since
+  the bundle carries the CAs those files name as well as the mock's, so on that
+  path every one of them stays trusted.
 
 ## Turning it off
 

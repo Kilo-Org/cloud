@@ -64,9 +64,9 @@ const COMBINING = /^\p{M}$/u;
  *
  * A lone joiner U+200C or U+200D counts as invisible: it shapes the letters
  * around it but draws nothing itself, so a value of only joiners is blank. A
- * combining mark draws only through a character it can attach to, so it counts
- * once an earlier code point has drawn; a mark with nothing to attach to paints
- * nothing.
+ * combining mark draws nothing of its own either, so a value of only marks is
+ * blank; a mark beside a letter changes nothing here, because the letter has
+ * already answered.
  */
 export function hasVisibleGlyph(raw: string): boolean {
   let drawn = false;

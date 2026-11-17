@@ -106,6 +106,11 @@ export function toRequestingClient(payload: RequestingClientPayload): Requesting
 /**
  * The requesting client of a stored row, or null when the row carries none
  * (a caller that names no client, and every row written before this flow).
+ *
+ * The values are the stored ones: the approval posts `clientId` back to confirm
+ * the client it approved, and the server compares it with the stored value, so
+ * this type must not transform it. The approval page renders each value through
+ * `displaySafeText`, which is where display text belongs.
  */
 export function requestingClientOfRow(row: {
   requesting_client_id: string | null;

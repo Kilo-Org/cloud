@@ -227,8 +227,12 @@ describe('ModelAccessForm without the catalog', () => {
     expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
 
     const buttons = root.findAllByType('Button' as never);
+    const retry = buttons[0];
+    if (retry === undefined) {
+      throw new Error('retry button missing');
+    }
     await act(async () => {
-      (buttons[0]?.props.onPress as () => void)();
+      (retry.props.onPress as () => void)();
       await Promise.resolve();
     });
     expect(onRetryCatalog).toHaveBeenCalledTimes(1);

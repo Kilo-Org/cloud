@@ -21,7 +21,7 @@ import { Text } from '@/components/ui/text';
 import {
   CHIP_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP,
+  COMPACT_CONTROL_HIT_SLOP_DP,
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
@@ -429,7 +429,7 @@ export function ModelPickerOptionRow({
             selectionHaptic();
             onToggleFavorite(option);
           }}
-          hitSlop={COMPACT_CONTROL_HIT_SLOP}
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
           className={cn(COMPACT_CONTROL_BOX_CLASS, 'items-center justify-center')}
           accessibilityRole="button"
           accessibilityLabel={

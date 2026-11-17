@@ -4086,7 +4086,7 @@
     "commandLimitReached": "Ka taea e tētahi kōtaha te pupuri tae atu ki te {{max}} whakahau tatūnga. Mukua tētahi kia tāpirihia ai tētahi atu.",
     "moveCommandUp": "Neke whakahau {{position}} ki runga",
     "moveCommandDown": "Neke whakahau {{position}} ki raro",
-    "skillsTitle": "Pukenga",
+    "skillsTitle": "Pūkenga",
     "addSkill": "Tāpiri pūkenga",
     "skillNameLabel": "Ingoa pūkenga",
     "skillMarkdownLabel": "Te ihirangi pūkenga",

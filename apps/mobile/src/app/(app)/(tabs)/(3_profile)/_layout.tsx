@@ -9,7 +9,10 @@ import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 export const unstable_settings = {
-  initialRouteName: 'index',
+  // The anchor a `withAnchor` navigation into this stack starts from: the tab
+  // root. Expo Router loads it beneath a target opened from outside the stack,
+  // so Back pops to the Profile tab root instead of leaving the tab.
+  anchor: 'index',
   // This stack carries `TabStackErrorBoundary`, whose fallback keeps the tab's
   // own header and refetches this tab's reads. Opt out of the authenticated
   // stack's screen boundary, which would otherwise catch a tab screen's throw
@@ -25,7 +28,7 @@ export const unstable_settings = {
  * The list is every tRPC root the stack's screens read: the tab itself (user,
  * organizations, the pass and agent-profile reads) plus the code-reviewer,
  * profile-management (including its GitHub and GitLab repository reads),
- * security-agent and spend-alert screens.
+ * security-agent, spend-alert and Cloud Agent trigger screens.
  */
 const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['user']],
@@ -38,6 +41,8 @@ const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['reviewMemory']],
   [['spendAlerts']],
   [['cloudAgentNext']],
+  [['cloudEnvironments']],
+  [['webhookTriggers']],
 ];
 
 export default function ProfileLayout() {

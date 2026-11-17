@@ -25,10 +25,8 @@ type SessionRecord = {
 
 const ALL_ON: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,

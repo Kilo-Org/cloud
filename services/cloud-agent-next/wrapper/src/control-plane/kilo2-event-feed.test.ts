@@ -1,6 +1,7 @@
 import { expect, it } from 'bun:test';
 import { createKilo2EventFeed, nativeTurnError } from './kilo2-event-feed.js';
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
+import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 
@@ -215,7 +216,17 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
   }
 });
 
-it('closes the turn and keeps the feed open when a native read fails', async () => {
+it.each([
+  [undefined, undefined],
+  [{ type: 'provider.internal', message: 'internal' }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: null }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: 42 }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: false }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: {} }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: [] }, 'provider_unavailable'],
+  [{ type: 'tool.execution', message: 'failed' }, 'unknown'],
+  [{ type: 'unknown', message: 'failed', name: 'ContextOverflowError' }, 'context_limit'],
+] as const)('preserves native error %j when a read fails', async (error, reason) => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
   const events: KiloFeedEvent[] = [];
@@ -263,10 +274,32 @@ it('closes the turn and keeps the feed open when a native read fails', async () 
   }
   try {
     await feed.open();
-    controller?.enqueue(frame('session.execution.succeeded', { sessionID }));
+    const terminalType =
+      error === undefined ? 'session.execution.succeeded' : 'session.execution.failed';
+    controller?.enqueue(frame(terminalType, { sessionID, error }));
     controller?.enqueue(frame('session.renamed', { sessionID }));
     await until(() => events.some(event => event.type === 'session.updated'));
     expect(events.map(event => event.type)).toContain('session.turn.close');
+    expect(
+      events.find(event => event.type === 'conversation.event')?.properties.event
+    ).toMatchObject({
+      type: terminalType,
+      data: error === undefined ? {} : { error },
+    });
+    const turnClose = events.find(event => event.type === 'session.turn.close')?.properties;
+    expect(turnClose).toMatchObject({
+      sessionID,
+      reason: error === undefined ? 'completed' : 'error',
+    });
+    if (reason === undefined) expect(turnClose).not.toHaveProperty('error');
+    else expect(classifyAssistantFailure(turnClose?.error).reason).toBe(reason);
+    expect(
+      events
+        .filter(event =>
+          ['session.status', 'session.turn.close', 'session.idle'].includes(event.type)
+        )
+        .map(event => event.type)
+    ).toEqual(['session.status', 'session.turn.close', 'session.idle']);
     expect(logs.some(message => message.includes('phase=frame_failed'))).toBe(true);
     expect(failures).toBe(0);
   } finally {
@@ -519,15 +552,108 @@ it('contains a throwing failure callback when the native stream ends', async () 
 });
 
 it.each([
-  [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
-  [{ type: 'provider.rate-limit', message: 'Request failed', status: 429 }, 'rate_limited'],
-  [{ type: 'provider.rate-limit', message: 'ThrottlingException' }, 'rate_limited'],
-  [{ type: 'provider.internal', message: 'Request failed', status: 503 }, 'provider_unavailable'],
-  [{ type: 'provider.auth', message: 'Request failed' }, 'provider_authentication'],
-  [{ type: 'unknown', message: 'Request failed' }, 'unknown'],
-] as const)('classifies a native execution error by its status and type', (error, reason) => {
-  expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+  ['provider.quota', 'insufficient_credits', 'user', 'insufficient_credits'],
+  ['provider.rate-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.free-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.budget-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.model-budget-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.go-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.chatgpt-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.internal', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.transport', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.invalid-output', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['tool.result-missing', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['output-limit', 'output_limit', 'provider', 'assistant_output_limit'],
+  ['provider.unknown', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.auth', 'provider_authentication', 'platform', 'managed_provider_authentication'],
+  ['provider.content-filter', 'content_filter', 'user', 'assistant_content_filter'],
+  ['provider.timeout', 'timeout', 'provider', 'request_timeout'],
+  ['provider.invalid-request', 'invalid_request', 'platform', 'assistant_invalid_request'],
+  ['provider.unsupported-operation', 'invalid_request', 'platform', 'assistant_invalid_request'],
+  ['provider.no-route', 'unknown', 'unknown', 'assistant_unknown'],
+  ['permission.rejected', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.execution', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.failed', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.unavailable', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.interrupted', 'unknown', 'unknown', 'assistant_unknown'],
+  ['aborted', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.input-json', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.input-incomplete', 'unknown', 'unknown', 'assistant_unknown'],
+  ['unknown', 'unknown', 'unknown', 'assistant_unknown'],
+  ['provider.future-error', 'unknown', 'unknown', 'assistant_unknown'],
+  ['constructor', 'unknown', 'unknown', 'assistant_unknown'],
+] as const)(
+  'classifies native %s through the shared failure pipeline',
+  (type, assistantReason, responsibility, reason) => {
+    const failure = classifyAssistantFailure(
+      nativeTurnError({ type, message: 'Request failed' }),
+      'managed'
+    );
+    expect(failure.reason).toBe(assistantReason);
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility, reason });
+  }
+);
+
+it.each([
+  [402, 'insufficient_credits'],
+  [429, 'rate_limited'],
+  [401, 'provider_authentication'],
+  [403, 'provider_authentication'],
+  [408, 'timeout'],
+  [504, 'timeout'],
+  [503, 'provider_unavailable'],
+  [400, 'invalid_request'],
+] as const)('preserves native HTTP %s ahead of type, name and message', (status, reason) => {
+  const translated = nativeTurnError({
+    type: 'provider.content-filter',
+    name: 'ContextOverflowError',
+    message: 'Rate limit reached',
+    status,
+  });
+  expect(translated).toMatchObject({ name: 'APIError', data: { statusCode: status } });
+  expect(classifyAssistantFailure(translated).reason).toBe(reason);
 });
+
+it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(
+  'does not replace a native invalid-request identity with %s',
+  message => {
+    for (const status of [undefined, 400, 413]) {
+      for (const prefix of ['', '[BYOK] ']) {
+        const failure = classifyAssistantFailure(
+          nativeTurnError({
+            type: 'provider.invalid-request',
+            message: `${prefix}${message}`,
+            status,
+          }),
+          'managed'
+        );
+        expect(failure.reason).toBe('invalid_request');
+        expect(failure.terminalCode).toBeUndefined();
+        expect(failure.providerOwnership).toBe(prefix ? 'byok' : 'managed');
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          })
+        ).toEqual({
+          responsibility: prefix ? 'user' : 'platform',
+          reason: 'assistant_invalid_request',
+        });
+      }
+    }
+  }
+);
 
 // Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
 const catalogFailure = (detail: string) =>

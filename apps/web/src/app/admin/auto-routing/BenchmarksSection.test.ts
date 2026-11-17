@@ -21,38 +21,34 @@ const baseConfig: BenchmarkConfig = {
 };
 
 describe('platform model selection', () => {
-  it('defaults to efficient and preserves router-specific accuracy settings', () => {
+  it('defaults to efficient and round-trips the router and accuracy noise band', () => {
     expect(formStateToConfig(configToFormState(null), null)).toMatchObject({
       router: 'efficient',
       accuracyNoiseBand: 0.05,
-      frontierMinAccuracyDelta: 0,
     });
     const config: BenchmarkConfig = {
       ...baseConfig,
       router: 'frontier',
       accuracyNoiseBand: 0.02,
-      frontierMinAccuracyDelta: 0.1,
     };
     expect(formStateToConfig(configToFormState(config), config)).toMatchObject({
       router: 'frontier',
       accuracyNoiseBand: 0.02,
-      frontierMinAccuracyDelta: 0.1,
       minAccuracy: config.minAccuracy,
     });
   });
 
-  it('round-trips the token profile, switch horizon, and confidence threshold', () => {
+  it('round-trips the token profile, switch horizon, and min accuracy', () => {
     const config: BenchmarkConfig = {
       ...baseConfig,
       productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
       switchHorizonTurns: 10,
-      lowConfidenceThreshold: 0.8,
     };
     const state = configToFormState(config);
     expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config)).toMatchObject({
+      minAccuracy: 0.9,
       productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
       switchHorizonTurns: 10,
-      lowConfidenceThreshold: 0.8,
     });
   });
 
@@ -61,19 +57,16 @@ describe('platform model selection', () => {
       ...baseConfig,
       productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
       switchHorizonTurns: 10,
-      lowConfidenceThreshold: 0.8,
     };
     const state = {
       ...configToFormState(config),
       uncachedInputTokens: '',
       cachedInputTokens: ' ',
       switchHorizonTurns: '',
-      lowConfidenceThreshold: '',
     };
     expect(formStateToConfig(state, config)).toMatchObject({
       productionTokenProfile: null,
       switchHorizonTurns: null,
-      lowConfidenceThreshold: null,
     });
   });
 

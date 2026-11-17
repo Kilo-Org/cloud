@@ -45,6 +45,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,
@@ -168,7 +169,7 @@ export type { Connection, ConnectionConfig } from './cloud-agent-connection';
 export { createMemoryStorage } from './storage/memory';
 export { createJotaiStorage } from './storage/jotai';
 export type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-export type { SessionStorage, StorageMutation } from './storage/types';
+export type { SessionStorage, SessionSubscriptionKey, StorageMutation } from './storage/types';
 
 export { stripPartContentIfFile, getStepFinishRoutedModel } from './part-utils';
 export type { RoutedModelRef } from './part-utils';

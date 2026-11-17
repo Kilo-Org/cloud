@@ -13,9 +13,37 @@ import { baselineGit, containedProofSource } from './baseline-preflight';
 
 const Sha = z.string().regex(/^[0-9a-f]{40}$/);
 const Id = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
+/**
+ * A default export the diagnostic may render, named from the mobile app root.
+ *
+ * A shared component is the obvious case. A screen file is the necessary one:
+ * when a change only alters the props a route passes to an unchanged component,
+ * the component renders the same on both revisions and a component target
+ * cannot show the difference. Route files carry their group and parameter
+ * segments; the tree below `src/app/` grows whichever screens the revision has,
+ * so a dotted segment is allowed there and still refused below `components/`.
+ */
+const COMPONENT_SOURCE =
+  /^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/;
+const ROUTE_SOURCE =
+  /^apps\/mobile\/src\/app\/(?:[a-zA-Z0-9_()[\]$.-]+\/)*[a-zA-Z0-9_()[\]$.-]+\.tsx$/;
+function isRouteScreen(value: string): boolean {
+  if (!ROUTE_SOURCE.test(value)) return false;
+  const segments = value.slice('apps/mobile/src/app/'.length).split('/');
+  const file = segments.pop();
+  if (file === undefined) return false;
+  // A `.` or `..` segment leaves the app tree, and a hidden segment names no route.
+  if (segments.some(segment => segment.startsWith('.'))) return false;
+  // The router owns its own files: a layout is not a screen, and a `+` file is
+  // reserved for the not-found, HTML and native-intent hooks.
+  return !/^_layout\.tsx$/.test(file) && !file.startsWith('+');
+}
 const SourcePath = z
   .string()
-  .regex(/^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/);
+  .refine(value => COMPONENT_SOURCE.test(value) || isRouteScreen(value), {
+    message:
+      'must name a component below apps/mobile/src/components or a screen below apps/mobile/src/app, not a layout and not a + file',
+  });
 const TargetSchema = z
   .object({
     id: Id,
@@ -37,6 +65,24 @@ const TargetSchema = z
           .regex(/^(?:default|[A-Z][a-zA-Z0-9]*)$/)
           .default('default'),
         props: z.record(z.string(), z.json()).default({}),
+        /**
+         * Where the generated route lives, and how it presents the screen.
+         *
+         * 'card' is a bare route in the auth group: the screen paints straight
+         * onto the window, which is right for a component and for a screen the
+         * app shows that way.
+         *
+         * 'picker-sheet' is a route file in the signed-in shell, registering the
+         * composer picker's own sheet options — the same ones
+         * `apps/mobile/src/app/(app)/_layout.tsx` registers for those routes: a
+         * half detent on Android, the app's own `formSheet` options elsewhere.
+         * The fixture link only opens warm (`!initial`): a cold replay would
+         * present the sheet as its stack's first route at the window top and
+         * race the native re-presentation. A bare auth route is refused while
+         * signed in, and it would measure the sheet header at the window top
+         * instead of inside the sheet.
+         */
+        presentation: z.enum(['card', 'picker-sheet']).default('card'),
       })
       .strict()
       .optional(),
@@ -55,14 +101,18 @@ export const ProofManifestSchema = z
       ids.add(target.id);
       if (target.diagnostic !== undefined) {
         const route = `/design-proof-${target.id}`;
+        const screen =
+          target.diagnostic.presentation === 'picker-sheet'
+            ? `(app)/${route.slice(1)}`
+            : `(auth)/${route.slice(1)}`;
         if (
           target.route !== route ||
-          target.screen !== `(auth)/${route.slice(1)}` ||
+          target.screen !== screen ||
           target.link !== `kiloapp://${route}`
         ) {
           ctx.addIssue({
             code: 'custom',
-            message: `Diagnostic ${target.id} must use kiloapp://${route}, route ${route} and screen (auth)/${route.slice(1)}`,
+            message: `Diagnostic ${target.id} must use kiloapp://${route}, route ${route} and screen ${screen}`,
           });
         }
       }
@@ -94,6 +144,12 @@ export type Revision = 'base' | 'head';
 const INTENT = 'apps/mobile/src/app/+native-intent.tsx';
 const MARKER = '__kiloDesignProofSource';
 const LIMIT = 1024 * 1024;
+// A capture dump walks and serializes the whole screen, so a screen of a couple
+// of thousand nodes writes about 1.3 MB. The document bound above is sized for the
+// manifest and the preparation receipt, and applying it to a dump aborts a run
+// whose measurement is legitimate; the two reads that only ever open a capture
+// dump take their own bound instead.
+const DUMP_LIMIT = 8 * 1024 * 1024;
 
 const digest = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
 function git(repo: string, args: string[]): string {
@@ -104,8 +160,8 @@ function git(repo: string, args: string[]): string {
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   });
 }
-function readJson(file: string): unknown {
-  if (fs.statSync(file).size > LIMIT) throw new Error('Proof JSON exceeds 1 MiB');
+function readJson(file: string, limit = LIMIT): unknown {
+  if (fs.statSync(file).size > limit) throw new Error(`Proof JSON exceeds ${limit} bytes`);
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 export function readProofManifest(file: string): ProofManifest {
@@ -165,22 +221,44 @@ function generatedFiles(
     // The manifest describes data and a product component, never executable source,
     // auth replacement, environment files, or an arbitrary head-to-base copy.
     trackedFile(repo, commit, diagnostic.component);
-    const file = `apps/mobile/src/app/(auth)/design-proof-${target.id}.tsx`;
+    // A picker-sheet diagnostic lives in the signed-in shell: its route file is
+    // a screen of the app's own (app) stack, the stack the real picker routes
+    // are pushed onto, and it registers the composer picker's sheet options on
+    // itself. A route anywhere else paints bare or presents inside a nested
+    // stack that never presents a native sheet.
+    const isSheet = diagnostic.presentation === 'picker-sheet';
+    const file = isSheet
+      ? `apps/mobile/src/app/(app)/design-proof-${target.id}.tsx`
+      : `apps/mobile/src/app/(auth)/design-proof-${target.id}.tsx`;
     if (git(repo, ['ls-tree', commit, '--', file]).trim() !== '') {
       throw new Error(`Diagnostic would overwrite existing product source: ${file}`);
     }
     const componentImport = `@/${diagnostic.component.slice('apps/mobile/src/'.length, -4)}`;
     let binding = 'Component';
     if (diagnostic.exportName !== 'default') binding = `{ ${diagnostic.exportName} as Component }`;
+    // A picker-sheet diagnostic presents the screen the way the app presents the
+    // picker routes: a half detent on Android, its own formSheet options
+    // elsewhere. Without it the screen paints onto the window and its sheet
+    // header is measured at the window top, an overlap the product never paints.
+    const presents = diagnostic.presentation === 'picker-sheet';
+    const imports = presents
+      ? `import React from 'react';\nimport { Redirect, Stack } from 'expo-router';\nimport { Platform } from 'react-native';\nimport { useFormSheetScreenOptions } from '@/lib/form-sheet';\n`
+      : `import React from 'react';\nimport { Redirect } from 'expo-router';\n`;
+    const presentation = presents
+      ? `  const sheetOptions = useFormSheetScreenOptions();\n  const options =\n    Platform.OS === 'android'\n      ? { ...sheetOptions, sheetAllowedDetents: [0.5] }\n      : sheetOptions;\n`
+      : '';
+    const screen = presents
+      ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`
+      : `React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))`;
     files.set(
       file,
-      `// Temporary generated design-proof diagnostic, not product source.\nimport React from 'react';\nimport { Redirect } from 'expo-router';\nimport ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}));\n}\n`.replace(
+      `// Temporary generated design-proof diagnostic, not product source.\n${imports}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(
         'ComponentBinding',
         binding
       )
     );
     branches.push(
-      `  if (__DEV__ && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
+      `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
   const declaration =
@@ -440,7 +518,7 @@ export function targetReadiness(
         );
         continue;
       }
-      const dump = parseDump(readJson(artifactPath(out, screen.dump)));
+      const dump = parseDump(readJson(artifactPath(out, screen.dump), DUMP_LIMIT));
       if (
         cell.screens.filter(candidate => candidate.target === target.id).length !== 1 ||
         screen.link !== target.link
@@ -680,7 +758,7 @@ export async function compareProof(
   const environments = (run: typeof base, dir: string): unknown[] =>
     run.cells.flatMap(cell =>
       cell.screens.map(screen => {
-        const env = parseDump(readJson(artifactPath(dir, screen.dump))).env;
+        const env = parseDump(readJson(artifactPath(dir, screen.dump), DUMP_LIMIT)).env;
         return [
           cell.id,
           screen.target,

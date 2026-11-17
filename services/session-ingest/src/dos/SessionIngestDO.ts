@@ -138,6 +138,7 @@ type IngestMetaKey =
   | 'sessionReadyNotified'
   | 'liveSummaryState'
   | 'lastLiveSummaryPersisted'
+  | 'lastBriefingExcerptPersisted'
   | NumericMetaKey
   | ShareInfoMetaKey;
 
@@ -223,6 +224,58 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
   if (raw === null) return null;
   const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
   return parsed.success ? parsed.data : null;
+}
+
+type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
+
+/** The excerpt identity the last live persist handed to Postgres, or null when none did. */
+function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExcerptIdentity | null {
+  const raw = readIngestMetaValue(db, 'lastBriefingExcerptPersisted');
+  if (raw === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { messageId, completedAt } = parsed as { messageId?: unknown; completedAt?: unknown };
+  if (typeof messageId !== 'string' || messageId.length === 0) return null;
+  if (typeof completedAt !== 'string') return null;
+  return { messageId, completedAt };
+}
+
+/**
+ * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
+ * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
+ * strings, so comparing them as text matches comparing them as timestamps. The SQL guard orders
+ * the ids with `COLLATE "C"`, which is byte order, so the ids are compared as their UTF-8 bytes
+ * rather than by UTF-16 code unit.
+ */
+function briefingExcerptIsNewer(
+  next: BriefingExcerptIdentity,
+  last: BriefingExcerptIdentity | null
+): boolean {
+  if (last === null) return true;
+  if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
+  const left = new TextEncoder().encode(next.messageId);
+  const right = new TextEncoder().encode(last.messageId);
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return left.length > right.length;
+}
+
+/** Records the excerpt the object is sending, so the next identical batch adds no column. */
+function writeBriefingExcerptPersisted(
+  db: DrizzleSqliteDODatabase,
+  identity: BriefingExcerptIdentity
+): void {
+  writeIngestMetaValue(
+    db,
+    'lastBriefingExcerptPersisted',
+    JSON.stringify({ messageId: identity.messageId, completedAt: identity.completedAt })
+  );
 }
 
 function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey): number | null {
@@ -605,6 +658,8 @@ export class SessionIngestDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
   private readonly activeR2Writes = new Set<Promise<unknown>>();
   private cleanupOperation: Promise<void> | undefined;
+  /** The excerpt a scheduled live persist carries, so an identical batch adds no column. */
+  private briefingExcerptInFlight: BriefingExcerptIdentity | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -1143,30 +1198,54 @@ export class SessionIngestDO extends DurableObject<Env> {
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
       const summaryToPersist = columns.liveSummary;
+      // The excerpt gate runs before the write is scheduled: a batch that repeats a response the
+      // object already persisted, or one a scheduled write still carries, adds no excerpt column.
+      // The in-flight identity is memory, so it lapses with the instance and a write that never
+      // runs leaves no trace.
+      let excerptInFlight: BriefingExcerptIdentity | undefined;
+      if (briefingResponseChanged) {
+        try {
+          const excerpt = this.latestBriefingExcerpt(storedItems);
+          const inFlight = this.briefingExcerptInFlight;
+          const alreadyInFlight =
+            inFlight !== null &&
+            inFlight.messageId === excerpt?.messageId &&
+            inFlight.completedAt === excerpt?.completedAt;
+          if (
+            excerpt &&
+            !alreadyInFlight &&
+            briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
+          ) {
+            excerptInFlight = excerpt;
+            this.briefingExcerptInFlight = excerpt;
+            columns.briefingExcerpt = {
+              excerpt,
+              receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
+            };
+          }
+        } catch (error) {
+          console.error('SessionIngestDO failed to read completed briefing response', {
+            kiloUserId,
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       const connectionString = this.env.HYPERDRIVE.connectionString;
       this.ctx.waitUntil(
         (async () => {
           try {
-            if (briefingResponseChanged) {
-              try {
-                const excerpt = this.latestBriefingExcerpt(storedItems);
-                if (excerpt) {
-                  columns.briefingExcerpt = {
-                    excerpt,
-                    receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
-                  };
-                }
-              } catch (error) {
-                console.error('SessionIngestDO failed to read completed briefing response', {
-                  kiloUserId,
-                  sessionId,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-              }
-            }
             if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
+            if (excerptInFlight !== undefined) {
+              // Max-merge, so a slower batch that carried an older excerpt cannot replace the
+              // identity of the newer one already recorded.
+              if (briefingExcerptIsNewer(excerptInFlight, readBriefingExcerptPersisted(this.db))) {
+                writeBriefingExcerptPersisted(this.db, excerptInFlight);
+              }
+              this.releaseBriefingExcerptInFlight(excerptInFlight);
+            }
             if (summaryToPersist !== undefined) {
               const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
               if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
@@ -1228,6 +1307,9 @@ export class SessionIngestDO extends DurableObject<Env> {
               }
             }
           } catch (error) {
+            // Nothing was recorded, because the record is written after the statement. The
+            // in-flight identity still has to go, or the next batch would skip the same excerpt.
+            if (excerptInFlight !== undefined) this.releaseBriefingExcerptInFlight(excerptInFlight);
             console.error('SessionIngestDO failed to persist live session columns', {
               kiloUserId,
               sessionId,
@@ -1338,6 +1420,16 @@ export class SessionIngestDO extends DurableObject<Env> {
    */
   async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
     await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
+  /** Drops the in-flight identity, unless a later batch already replaced it. */
+  private releaseBriefingExcerptInFlight(identity: BriefingExcerptIdentity): void {
+    const inFlight = this.briefingExcerptInFlight;
+    const sameIdentity =
+      inFlight !== null &&
+      inFlight.messageId === identity.messageId &&
+      inFlight.completedAt === identity.completedAt;
+    if (sameIdentity) this.briefingExcerptInFlight = null;
   }
 
   private latestBriefingExcerpt(items: IngestBatch): BriefingExcerpt | undefined {

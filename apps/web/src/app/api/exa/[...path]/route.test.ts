@@ -44,13 +44,11 @@ const PUBLISH_SECRET = 'synthetic-publish-secret';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   EXA_API_KEY: 'test-exa-key',
-  EXA_USAGE_QUEUE_FALLBACK_ENABLED: false,
   USAGE_INGEST_URL: undefined,
   USAGE_INGEST_PUBLISH_SECRET: undefined,
 }));
 
 const config = jest.requireMock<{
-  EXA_USAGE_QUEUE_FALLBACK_ENABLED: boolean;
   USAGE_INGEST_URL: string | undefined;
   USAGE_INGEST_PUBLISH_SECRET: string | undefined;
 }>('@kilocode/web-shared/lib/config.server');
@@ -101,9 +99,8 @@ describe('POST /api/exa/[...path]', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     globalThis.fetch = mockedFetch;
-    config.EXA_USAGE_QUEUE_FALLBACK_ENABLED = false;
-    config.USAGE_INGEST_URL = INGEST_USAGE_URL;
-    config.USAGE_INGEST_PUBLISH_SECRET = PUBLISH_SECRET;
+    config.USAGE_INGEST_URL = undefined;
+    config.USAGE_INGEST_PUBLISH_SECRET = undefined;
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
@@ -725,7 +722,7 @@ describe('POST /api/exa/[...path]', () => {
             type: 'database',
             code: '23505',
           },
-          fallback: 'disabled',
+          fallback: 'not_configured',
         }
       );
       expect(mockedFetch).toHaveBeenCalledTimes(1);
@@ -865,7 +862,8 @@ describe('POST /api/exa/[...path]', () => {
     }
 
     beforeEach(() => {
-      config.EXA_USAGE_QUEUE_FALLBACK_ENABLED = true;
+      config.USAGE_INGEST_URL = INGEST_USAGE_URL;
+      config.USAGE_INGEST_PUBLISH_SECRET = PUBLISH_SECRET;
       ingestStatus = 202;
       consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -885,24 +883,15 @@ describe('POST /api/exa/[...path]', () => {
       jest.restoreAllMocks();
     });
 
-    it('never publishes when the flag is off and logs fallback disabled', async () => {
-      config.EXA_USAGE_QUEUE_FALLBACK_ENABLED = false;
+    it('keeps publishing after a failed direct write when the retired selector is false', async () => {
+      Object.assign(config, { EXA_USAGE_QUEUE_FALLBACK_ENABLED: false });
       mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
 
       await proxySearch();
 
-      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
-      expect(mockedFetch).toHaveBeenCalledTimes(1);
-      expect(failureLine()).toStrictEqual({
-        exa_path: '/search',
-        payer_kind: 'personal',
-        charged_to_balance: false,
-        cost_microdollars: 7000,
-        stage: 'record_write',
-        error: { type: 'unknown' },
-        fallback: 'disabled',
-      });
-      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(failureLine()).toMatchObject({ stage: 'record_write', fallback: 'queued' });
     });
 
     it('never publishes after a successful direct write', async () => {
@@ -972,22 +961,6 @@ describe('POST /api/exa/[...path]', () => {
         fallback: 'queued',
       });
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
-    });
-
-    it('attempts the direct write when the fallback is disabled and only the reserve remains', async () => {
-      config.EXA_USAGE_QUEUE_FALLBACK_ENABLED = false;
-      let elapsed = 0;
-      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
-      mockedRecordExaUsage.mockResolvedValue('recorded');
-      const { POST } = await import('./route');
-
-      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
-      elapsed = 290_000;
-      await flushAfterCallbacks();
-
-      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
-      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
-      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('attempts the direct write when the publisher is unconfigured and only the reserve remains', async () => {

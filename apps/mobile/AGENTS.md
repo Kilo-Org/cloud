@@ -66,7 +66,8 @@ reason.
 
 ## Unified Elements
 
-One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
 
 | Concern | Element | Use instead of |
 |---|---|---|
@@ -74,14 +75,18 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
 | Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
 | Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
 | Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -104,8 +109,10 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
 the property it last applied stays on the native view). The pad never takes more room than the body can spare:
@@ -118,9 +125,13 @@ render a rotation produces, so a frame measured in the previous window is releas
 being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
-pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
-(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard.
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
 

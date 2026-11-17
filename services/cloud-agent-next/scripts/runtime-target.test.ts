@@ -110,6 +110,7 @@ it('renders the published Kilo v2 release for its organization scope', () => {
     RUNTIME_KILO2_ORG_IDS: kilo2.orgIds.join(','),
     RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
   });
+  expect(output.vars).not.toHaveProperty('RUNTIME_KILO2_ALL_SESSION_ORG_IDS');
   expect(
     renderRuntimeTarget({
       config: baseline(),
@@ -133,6 +134,79 @@ it('renders the published Kilo v2 release for its organization scope', () => {
   expect(() =>
     renderRuntimeTarget({
       config: { ...baseline(), vars: { RUNTIME_KILO2_ORG_IDS: kilo2.orgIds[0] } },
+      environment: 'production',
+      startup,
+      release,
+    })
+  ).toThrow('configuration drift');
+});
+it('enables Kilo v2 for all web accounts and every origin for the Kilo organization', () => {
+  const catalog = JSON.parse(
+    readFileSync(new URL('../runtime-targets.json', import.meta.url), 'utf8')
+  );
+  const kilo2 = {
+    orgIds: '*',
+    allSessionOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+  };
+  expect(selectRuntimeTarget(catalog, 'dev').kilo2).toEqual(kilo2);
+  for (const environment of ['production', 'isolated']) {
+    const selected = selectRuntimeTarget(catalog, environment);
+    expect(selected.kilo2).toEqual(kilo2);
+    const output = renderRuntimeTarget({
+      config: baseline(),
+      environment,
+      startup: selected,
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    });
+    const target = environment === 'production' ? output : output.env?.isolated;
+    expect(target).toMatchObject({
+      vars: {
+        RUNTIME_KILO2_ORG_IDS: '*',
+        RUNTIME_KILO2_ALL_SESSION_ORG_IDS: kilo2.allSessionOrgIds.join(','),
+        RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
+      },
+    });
+  }
+});
+it('renders an all-session scope only inside the Kilo v2 organization scope', () => {
+  const orgIds = ['9d278969-5453-4ae3-a51f-a8d2274a7b56', '11111111-1111-4111-8111-111111111111'];
+  const rendered = (allSessionOrgIds: '*' | string[]) =>
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2: { orgIds, allSessionOrgIds } },
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars;
+  expect(rendered([orgIds[0]])).toMatchObject({
+    RUNTIME_KILO2_ALL_SESSION_ORG_IDS: orgIds[0],
+  });
+  for (const allSessionOrgIds of [
+    '*',
+    ['22222222-2222-4222-8222-222222222222'],
+    [orgIds[0], '22222222-2222-4222-8222-222222222222'],
+  ])
+    expect(() =>
+      selectRuntimeTarget(
+        { default: { ...startup, kilo2: { orgIds, allSessionOrgIds } }, targets: {} },
+        'production'
+      )
+    ).toThrow('inside the Kilo v2 organization scope');
+  expect(
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2: { orgIds: '*', allSessionOrgIds: '*' } },
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars
+  ).toMatchObject({ RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '*' });
+});
+it('rejects manual all-session org settings in Wrangler vars', () => {
+  expect(() =>
+    renderRuntimeTarget({
+      config: {
+        ...baseline(),
+        vars: { RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' },
+      },
       environment: 'production',
       startup,
       release,

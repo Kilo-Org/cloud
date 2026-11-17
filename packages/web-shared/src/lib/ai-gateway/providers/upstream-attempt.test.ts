@@ -83,6 +83,7 @@ describe('bounded spending provider enforcement', () => {
     jest.mocked(applyProviderSpecificLogic).mockResolvedValue(undefined);
     jest.mocked(upstreamRequest).mockClear();
     jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+    jest.mocked(isValidVercelModelId).mockResolvedValue(true);
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [model.id]: model });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set([model.id]));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
@@ -293,6 +294,7 @@ describe('upstream model catalog validation', () => {
         expect(result).toEqual({ type: 'unknown-gateway-model' });
         expect(catalogCheck(providerId).mock.calls).toEqual([['qwen/not-in-catalog']]);
         expect(catalogCheck(otherProviderId)).not.toHaveBeenCalled();
+        expect(applyProviderSpecificLogic).not.toHaveBeenCalled();
         expect(upstreamRequest).not.toHaveBeenCalled();
       });
 
@@ -320,6 +322,27 @@ describe('upstream model catalog validation', () => {
       });
     });
   });
+
+  it.each(['openrouter', 'vercel'] as const)(
+    '%s awaits ID validation before transforming the request',
+    async providerId => {
+      const validity = Promise.withResolvers<boolean>();
+      catalogCheck(providerId).mockReturnValueOnce(validity.promise);
+
+      const result = attempt({
+        providerId,
+        requestedModel: 'qwen/qwen3-coder',
+        wireModel: 'alibaba/qwen3-coder',
+      });
+
+      expect(applyProviderSpecificLogic).not.toHaveBeenCalled();
+      validity.resolve(true);
+
+      expect((await result).type).toBe('success');
+      expect(applyProviderSpecificLogic).toHaveBeenCalledTimes(1);
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     ['z-ai/glm-5', 'zai/glm-5'],

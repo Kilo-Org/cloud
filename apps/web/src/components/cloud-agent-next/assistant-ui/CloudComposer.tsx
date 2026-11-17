@@ -154,6 +154,8 @@ type CloudComposerProps = {
    * selected chat, so completion is scoped to this key.
    */
   conversationKey?: string;
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function CloudComposer({
@@ -193,6 +195,7 @@ export function CloudComposer({
   variantPickerDisabled,
   variantPickerTooltip,
   conversationKey,
+  favorites,
 }: CloudComposerProps) {
   const aui = useAui();
   const value = useAuiState(state => state.composer.text);
@@ -868,6 +871,7 @@ export function CloudComposer({
                 variantPickerTooltip={variantPickerTooltip}
                 className="md:hidden"
                 customModeOptions={customModeOptions}
+                favorites={favorites}
               />
               {/* Desktop: individual pickers */}
               <div className="hidden md:contents">
@@ -911,6 +915,7 @@ export function CloudComposer({
                     isLoading={isLoadingModels}
                     disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
+                    favorites={favorites}
                   />
                 )}
                 {variantPickerDisabled

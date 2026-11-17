@@ -62,10 +62,8 @@ export function raiseIdForWaitingRow(row: {
 /** Per-category preference columns, shared with the rest of the notification pipeline. */
 export type UserNotificationPreferences = {
   agentPushEnabled: boolean;
-  chatMessagesEnabled: boolean;
   agentAttentionEnabled: boolean;
   sessionStatusEnabled: boolean;
-  kiloclawActivityEnabled: boolean;
   balanceAlertsEnabled: boolean;
   spendAlertsEnabled: boolean;
   securityFindingsEnabled: boolean;
@@ -74,10 +72,8 @@ export type UserNotificationPreferences = {
 /** Default-on value used when a preference read returns no row. */
 export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,

@@ -13,7 +13,7 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import '@/i18n';
@@ -95,6 +95,8 @@ vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 // `canViewOrgAuditLog` from it, so every icon it names must exist here.
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   Cpu: 'Cpu',
   FileText: 'FileText',
   KeyRound: 'KeyRound',
@@ -161,7 +163,14 @@ vi.mock('@/components/ui/text', async () => {
   };
 });
 
-vi.mock('react-native', () => ({ View: 'View' }));
+// The interactive row paints its disclosure chevron with the palette's muted
+// ink; the real hook reads the color scheme off `react-native`, which the host
+// stub below does not carry.
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#71717a' }),
+}));
+
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 
 function entries(count: number, action = 'organization.settings.change') {
   return Array.from({ length: count }, (_, index) => ({
@@ -173,6 +182,24 @@ function entries(count: number, action = 'organization.settings.change') {
     message: `Audit event ${index}`,
     created_at: '2026-01-01T00:00:00.000Z',
   }));
+}
+
+// A message that runs well past the clamped two lines: the sentence a role
+// change writes, long enough that the collapsed row must clip it.
+const LONG_MESSAGE =
+  'ada@example.com was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month, and the invoice for those seats now bills the organization instead of the personal account it started on';
+
+/** The one audit event whose message needs the row's disclosure. */
+function longEntry() {
+  return {
+    id: 'audit-long',
+    action: 'organization.member.change_role',
+    actor_id: 'user-1',
+    actor_email: 'owner@example.com',
+    actor_name: 'Owner',
+    message: LONG_MESSAGE,
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
 }
 
 function mount() {
@@ -202,6 +229,33 @@ type Handler = () => void;
 function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handler | undefined {
   const handler: unknown = node.props[name];
   return typeof handler === 'function' ? (handler as Handler) : undefined;
+}
+
+/** The row's message line, found by its opening words in either state. */
+function messageLine(renderer: ReactTestRenderer) {
+  return renderer.root
+    .findAllByType('Text')
+    .find(
+      node =>
+        typeof node.props.children === 'string' && node.props.children.includes('billing manager')
+    );
+}
+
+/** The row's disclosure state; the renderer's props carry no type. */
+function disclosureState(node: ReactTestInstance): boolean | undefined {
+  const state = node.props.accessibilityState as { expanded?: boolean } | undefined;
+  return state?.expanded;
+}
+
+/** Presses the row's disclosure and lets the re-render settle. */
+async function pressDisclosure(renderer: ReactTestRenderer): Promise<void> {
+  const [row] = renderer.root.findAllByType('Pressable');
+  if (!row) {
+    throw new Error('audit row disclosure not found');
+  }
+  await act(() => {
+    handlerOf(row, 'onPress')?.();
+  });
 }
 
 describe('OrganizationAuditLogScreen', () => {
@@ -315,6 +369,50 @@ describe('OrganizationAuditLogScreen', () => {
     expect(messages).not.toContain('Organization Acme created');
     expect(texts.some(node => node.props.numberOfLines === 2)).toBe(false);
     expect(messages.some(text => text.includes('organization.created'))).toBe(false);
+    // Nothing to disclose, so the row is a plain view rather than a pressable.
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    unmount();
+  });
+
+  it('clamps a long message to two lines and reveals it on one press', async () => {
+    pageHook.entries = [longEntry()];
+    const { renderer, unmount } = await mount();
+
+    expect(LONG_MESSAGE.length).toBeGreaterThan(200);
+    // The node holds the whole sentence even while the layout clips it: the
+    // bound is a layout prop, not a truncation of the copy.
+    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
+    expect(messageLine(renderer)?.props.numberOfLines).toBe(2);
+
+    await pressDisclosure(renderer);
+    // The same text node stays; the press drops the bound rather than swapping
+    // in a second, fuller copy.
+    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
+    expect(messageLine(renderer)?.props.numberOfLines).not.toBe(2);
+
+    await pressDisclosure(renderer);
+    expect(messageLine(renderer)?.props.numberOfLines).toBe(2);
+    unmount();
+  });
+
+  it('reports the disclosure and the whole message to assistive technology', async () => {
+    pageHook.entries = [longEntry()];
+    const { renderer, unmount } = await mount();
+
+    const pressables = renderer.root.findAllByType('Pressable');
+    expect(pressables.filter(node => disclosureState(node) === false)).toHaveLength(1);
+    const closed = pressables.find(node => disclosureState(node) === false);
+    expect(closed?.props.accessibilityRole).toBe('button');
+    // The clamp is visual only: a reader reaches the whole sentence unopened.
+    expect(closed?.props.accessibilityLabel).toContain(LONG_MESSAGE);
+
+    await pressDisclosure(renderer);
+    const open = renderer.root
+      .findAllByType('Pressable')
+      .find(node => disclosureState(node) === true);
+    expect(open).toBeDefined();
+    expect(open?.props.accessibilityRole).toBe('button');
+    expect(open?.props.accessibilityLabel).toContain(LONG_MESSAGE);
     unmount();
   });
 

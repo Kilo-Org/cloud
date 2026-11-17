@@ -27,12 +27,13 @@ export function captureAlignment(
   screenshot: CaptureAlignment['screenshot'],
   after: TimedTree,
   signature: (dump: ProbeDump) => string,
-  observation: Pick<CaptureAlignment, 'pixels' | 'expectedText'>
+  observation: Pick<CaptureAlignment, 'pixels' | 'expectedText'>,
+  budgetMs = CAPTURE_ALIGNMENT_BUDGET_MS
 ): CaptureAlignment {
   const evidence: CaptureAlignment = {
     status: 'inconclusive',
     reason: 'A bracketing tree read failed; screenshot and tree correspondence is unknown.',
-    budgetMs: CAPTURE_ALIGNMENT_BUDGET_MS,
+    budgetMs,
     before,
     screenshot,
     after,
@@ -56,7 +57,7 @@ export function captureAlignment(
   ];
   if (
     times.some((time, index) => !Number.isFinite(time) || (index > 0 && time < times[index - 1])) ||
-    after.completedMs - before.startedMs > CAPTURE_ALIGNMENT_BUDGET_MS
+    after.completedMs - before.startedMs > budgetMs
   ) {
     evidence.reason = 'Tree/screenshot timing exceeded the bounded alignment window.';
     return evidence;

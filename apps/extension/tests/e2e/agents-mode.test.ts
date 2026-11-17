@@ -794,7 +794,7 @@ test('Agents offline pill waits out the connect grace period', async () => {
     await expect(dueAtMarker).toHaveCount(1, { timeout: 15_000 });
 
     const grace = await sidePanel.evaluate(
-      ([dueAtAttribute, startedAtAttribute]) => {
+      ({ dueAtAttribute, startedAtAttribute }) => {
         const node = document.querySelector(`[${dueAtAttribute}]`);
 
         return {
@@ -803,7 +803,7 @@ test('Agents offline pill waits out the connect grace period', async () => {
           startedAt: Number(node?.getAttribute(startedAtAttribute)),
         };
       },
-      [OFFLINE_PILL_DUE_AT, OFFLINE_PILL_STARTED_AT]
+      { dueAtAttribute: OFFLINE_PILL_DUE_AT, startedAtAttribute: OFFLINE_PILL_STARTED_AT }
     );
 
     // The grace duration itself, from the two instants the view recorded when it armed the timer.

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement, type ReactElement, useState } from 'react';
+import type { HostInstance } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -201,6 +202,27 @@ describe('SheetHeader', () => {
 
     expect(pressablesByLabel(renderer.root, 'Share report.pdf')).toHaveLength(0);
     expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('hands the title node to a titleRef so a sheet can restore focus to it', async () => {
+    const titleRef = { current: null as HostInstance | null };
+
+    const renderer = await mount({
+      title: 'Reactions',
+      onDone: () => undefined,
+      titleRef,
+    });
+
+    expect(titleRef.current).not.toBeNull();
+    const header = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        node.type === 'Text' &&
+        node.props.accessibilityRole === 'header'
+    );
+    expect(header.props.accessibilityLabel).toBe('Reactions');
 
     renderer.unmount();
   });

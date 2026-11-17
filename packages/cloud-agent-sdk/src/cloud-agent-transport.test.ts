@@ -2453,7 +2453,10 @@ describe('CloudAgentTransport snapshot read recovery', () => {
           sessionId: cloudAgentWorkspaceId,
           streamEventType: 'kilocode',
           timestamp: new Date().toISOString(),
-          data: { type: 'session.status', properties: { sessionID: 'ses-1', status: { type: 'busy' } } },
+          data: {
+            type: 'session.status',
+            properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+          },
         })
       );
 
@@ -2473,7 +2476,10 @@ describe('CloudAgentTransport snapshot read recovery', () => {
           sessionId: cloudAgentWorkspaceId,
           streamEventType: 'kilocode',
           timestamp: new Date().toISOString(),
-          data: { type: 'session.status', properties: { sessionID: 'ses-1', status: { type: 'busy' } } },
+          data: {
+            type: 'session.status',
+            properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+          },
         }),
       } as MessageEvent);
       await flushMicrotasks();

@@ -717,8 +717,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (backgroundEnabled) background?.start();
           // The lost page seed applies to workspace sessions too, with the
           // same row-replay best-effort skip (dispatchRetryRead).
-          const usesCursorOnlyReplay =
-            workspaceSession || lastEventId !== null;
+          const usesCursorOnlyReplay = workspaceSession || lastEventId !== null;
           if (usesCursorOnlyReplay) {
             if (hadPendingCatchUp) dispatchRetryRead(expectedGeneration);
             return;

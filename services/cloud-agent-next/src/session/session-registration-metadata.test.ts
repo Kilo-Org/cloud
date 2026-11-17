@@ -80,6 +80,7 @@ describe('session registration repository metadata', () => {
       if (!result.ok) throw new Error(result.error);
       expect(result.metadata.agent?.mode).toBe('foreman');
       expect(result.metadata.profile?.runtimeAgents).toBeUndefined();
+      expect(result.metadata.workspace?.githubAuthorization).toBe('task');
     }
   );
 

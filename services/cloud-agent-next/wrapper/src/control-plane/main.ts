@@ -1,3 +1,4 @@
+import { rememberLogSecrets } from '../log-redaction.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
@@ -382,6 +383,7 @@ async function main(
   sentry: WrapperSentryReporter,
   sentryContext: ControlPlaneSentryContext
 ): Promise<ControlPlaneLifecycle | undefined> {
+  rememberLogSecrets(env);
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
   const projector = createControlDiagnosticProjector({

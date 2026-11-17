@@ -21,6 +21,7 @@ import {
 export const controlPlaneSandboxSelectionSchema = egressPolicySchema
   .safeExtend({
     provider: agentSandboxProviderSchema,
+    githubAuthorization: z.literal('task').optional(),
     allocationName: z.string().min(1).max(256).optional(),
     configuration: sandboxProviderConfigurationSchema.optional(),
     billing: sandboxBillingInputEnvelopeSchema.optional(),

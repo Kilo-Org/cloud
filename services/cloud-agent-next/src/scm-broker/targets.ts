@@ -4,8 +4,8 @@ import { isSafeSandboxId } from '../shared/control-plane-credential.js';
 import {
   BITBUCKET_API_ORIGIN,
   BITBUCKET_GIT_ORIGIN,
-  CURRENT_CAPABILITY_PREFIX,
   GITHUB_CAPABILITY_HOSTS,
+  hasCurrentProviderCapabilityPrefix,
 } from '@kilocode/worker-utils/scm-capability-contract';
 
 const SCM_HOSTS = {
@@ -23,7 +23,8 @@ export function hasManagedScmCapability(grant: SessionCredentialGrant): boolean 
     (grant.repository.type !== 'github' || grant.repository.authentication === 'managed') &&
     scm &&
     scm.nativeToken === undefined &&
-    scm.capability?.credential.startsWith(CURRENT_CAPABILITY_PREFIX[scm.purpose]) &&
+    scm.capability &&
+    hasCurrentProviderCapabilityPrefix(scm.purpose, scm.capability.credential) &&
     grant.outboundContainerId &&
     scm.capability.outboundContainerId === grant.outboundContainerId &&
     alias &&
@@ -96,7 +97,8 @@ function additionalEntryProjectsHosts(
   return Boolean(
     entry.repository.type === scm.purpose &&
     scm.nativeToken === undefined &&
-    scm.capability?.credential.startsWith(CURRENT_CAPABILITY_PREFIX[scm.purpose]) &&
+    scm.capability &&
+    hasCurrentProviderCapabilityPrefix(scm.purpose, scm.capability.credential) &&
     grant.outboundContainerId &&
     scm.capability.outboundContainerId === grant.outboundContainerId &&
     alias &&

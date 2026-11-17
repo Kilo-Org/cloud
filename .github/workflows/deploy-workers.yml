@@ -421,7 +421,13 @@ jobs:
           exit 1
 
   deploy-changed:
-    if: inputs.worker_matrix != '[]' && inputs.worker_matrix != '' && github.repository == 'Kilo-Org/cloud'
+    needs: deploy-git-token-service
+    if: >-
+      !cancelled() &&
+      (needs.deploy-git-token-service.result == 'success' || needs.deploy-git-token-service.result == 'skipped') &&
+      inputs.worker_matrix != '[]' && inputs.worker_matrix != '' &&
+      join(fromJSON(inputs.worker_matrix), ',') != 'services/git-token-service' &&
+      github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
@@ -429,6 +435,8 @@ jobs:
       fail-fast: false
       matrix:
         worker: ${{ fromJson(inputs.worker_matrix) }}
+        exclude:
+          - worker: services/git-token-service
     name: Deploy ${{ matrix.worker }}
     steps:
       - name: Checkout code
@@ -564,6 +572,60 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: pnpm run sentry:sourcemaps
 
+  deploy-git-token-service:
+    # The broker must accept both token versions before Cloud Agent issues task tokens.
+    if: github.repository == 'Kilo-Org/cloud' && inputs.worker_matrix != '' && contains(fromJSON(inputs.worker_matrix), 'services/git-token-service')
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy git-token-service before Cloud Agent
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/git-token-service
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/git-token-service
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/git-token-service
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
   deploy-session-ingest:
     # Guard: this reusable workflow can be invoked from a fork, and the job
     # deploys to the target environment with inherited repo secrets. Only the
@@ -622,13 +684,15 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   deploy-cloud-agent-after-session-ingest:
-    needs: deploy-session-ingest
+    needs: [deploy-session-ingest, deploy-git-token-service]
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
     # deploys after an unsuccessful session-ingest deployment.
     if: >-
+      !cancelled() &&
       github.repository == 'Kilo-Org/cloud' &&
       inputs.deploy_cloud_agent_after_session_ingest == 'true' &&
-      needs.deploy-session-ingest.result == 'success'
+      needs.deploy-session-ingest.result == 'success' &&
+      (needs.deploy-git-token-service.result == 'success' || needs.deploy-git-token-service.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 75
     environment: ${{ inputs.target_environment }}

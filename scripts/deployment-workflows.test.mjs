@@ -793,6 +793,7 @@ test('every Worker deploy job installs only the Worker closure and the root proj
     ['deploy-manual', '${{ inputs.worker }}'],
     ['deploy-changed', '${{ matrix.worker }}'],
     ['deploy-session-ingest', 'services/session-ingest'],
+    ['deploy-git-token-service', 'services/git-token-service'],
     ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
   ]) {
     const installs = workers.jobs[job].steps.filter(step =>
@@ -985,7 +986,7 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
     '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}'
   );
   const changed = workers.jobs['deploy-changed'];
-  assert.equal(changed.needs, undefined);
+  assert.equal(changed.needs, 'deploy-git-token-service');
   assert.equal(changed.strategy.matrix.worker, '${{ fromJson(inputs.worker_matrix) }}');
   assert.match(changed.if, /inputs\.worker_matrix != '\[\]'/);
   assert.match(changed.if, /inputs\.worker_matrix != ''/);
@@ -1274,6 +1275,7 @@ test('every Worker deployment path retries a deploy once', () => {
     ['deploy-manual', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-changed', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-session-ingest', 'Deploy to Cloudflare Workers', 'deploy'],
+    ['deploy-git-token-service', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-cloud-agent-after-session-ingest', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
   ]) {
     const steps = workers.jobs[name].steps;
@@ -1315,7 +1317,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest['timeout-minutes'], 25);
 
   const ordered = workers.jobs['deploy-cloud-agent-after-session-ingest'];
-  assert.deepEqual([ordered.needs].flat(), ['deploy-session-ingest']);
+  assert.deepEqual([ordered.needs].flat(), ['deploy-session-ingest', 'deploy-git-token-service']);
   assert.match(ordered.if, /deploy_cloud_agent_after_session_ingest == 'true'/);
   assert.match(ordered.if, /needs\.deploy-session-ingest\.result == 'success'/);
   assert.equal(ordered.environment, '${{ inputs.target_environment }}');
@@ -1381,4 +1383,43 @@ test('the ordered production path takes both workers out of the parallel matrix'
     ['services/session-ingest', 'services/cloud-agent-next'],
     'every other deployment path keeps both workers in the matrix'
   );
+});
+
+test('GitHub broker deploys before either Cloud Agent path and a failed broker blocks rollout', () => {
+  const broker = workers.jobs['deploy-git-token-service'];
+  assert.match(
+    broker.if,
+    /contains\(fromJSON\(inputs\.worker_matrix\), 'services\/git-token-service'\)/
+  );
+  for (const job of ['deploy-changed', 'deploy-cloud-agent-after-session-ingest']) {
+    assert.ok([workers.jobs[job].needs].flat().includes('deploy-git-token-service'));
+    const expression = workers.jobs[job].if.replace(
+      /needs\.([\w-]+)\.result/g,
+      "needs['$1'].result"
+    );
+    for (const result of ['success', 'skipped', 'failure', 'cancelled']) {
+      assert.equal(
+        runInNewContext(expression, {
+          cancelled: () => false,
+          fromJSON: JSON.parse,
+          join: (items, separator) => items.join(separator),
+          github: { repository: 'Kilo-Org/cloud' },
+          inputs: {
+            worker_matrix: '["services/cloud-agent-next"]',
+            deploy_cloud_agent_after_session_ingest: 'true',
+          },
+          needs: {
+            'deploy-git-token-service': { result },
+            'deploy-session-ingest': { result: 'success' },
+          },
+        }),
+        result === 'success' || result === 'skipped'
+      );
+    }
+  }
+  assert.deepEqual(workers.jobs['deploy-changed'].strategy.matrix.exclude, [
+    { worker: 'services/git-token-service' },
+  ]);
+  const deploy = broker.steps.find(step => step.name === 'Deploy to Cloudflare Workers');
+  assert.equal(deploy.with.workingDirectory, 'services/git-token-service');
 });

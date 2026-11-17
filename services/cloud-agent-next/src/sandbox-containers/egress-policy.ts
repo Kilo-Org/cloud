@@ -10,10 +10,18 @@ export const nativeEgressPolicySchema = z
     allocationRef: z.string().min(1),
     allowlist: nativeEgressAllowlistSchema.optional(),
     egressAudit: z.boolean().optional(),
+    githubAuthorization: z.literal('task').optional(),
   })
-  .refine(policy => policy.allowlist !== undefined || policy.egressAudit === true, {
-    message: 'Container egress policy requires an allowlist or auditing',
-  });
+  .refine(
+    policy =>
+      policy.allowlist !== undefined ||
+      policy.egressAudit === true ||
+      policy.githubAuthorization === 'task',
+    {
+      message:
+        'Container egress policy requires an allowlist, auditing, or task GitHub authorization',
+    }
+  );
 
 export type NativeEgressPolicy = z.infer<typeof nativeEgressPolicySchema>;
 

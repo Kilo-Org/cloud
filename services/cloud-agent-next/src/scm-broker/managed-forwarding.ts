@@ -1,4 +1,13 @@
+import { getGitHubTaskArchive } from '@kilocode/worker-utils/github-task-archive';
+import { getGitHubTaskLfsRoute } from '@kilocode/worker-utils/github-task-lfs';
+import {
+  CURRENT_CAPABILITY_PREFIX,
+  GITHUB_TASK_CAPABILITY_PREFIX,
+} from '@kilocode/worker-utils/scm-capability-contract';
 import { readBoundedRequestBodyBytes } from '../bounded-request-body.js';
+import { forwardGitHubTaskArchive } from '../github-task-archive.js';
+import { forwardGitHubTaskLfs } from '../github-task-lfs.js';
+import { prepareGitHubTaskRequest } from '../github-task-outbound.js';
 import {
   GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
   GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS,
@@ -6,7 +15,7 @@ import {
   resolveGitHubRateLimitRetryDelayMs,
 } from '../github-rate-limit-diagnostics.js';
 import type { GitTokenService } from '../types.js';
-import type { ResolvedScmCapability } from './authorization.js';
+import { classifyScmAuthorization, type ResolvedScmCapability } from './authorization.js';
 import {
   classifyDiagnosticError,
   classifyScmRoute,
@@ -151,6 +160,21 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  const taskAuthorization = capability.capability.startsWith(GITHUB_TASK_CAPABILITY_PREFIX);
+  if (!taskAuthorization && !capability.capability.startsWith(CURRENT_CAPABILITY_PREFIX.github))
+    return new Response('GitHub authorization unavailable', { status: 403 });
+  // The guest presents its own credential. LFS follow-up requests must present it again.
+  const presented = classifyScmAuthorization({
+    authorization: request.headers.get('Authorization'),
+  });
+  const clientCredential =
+    presented.type === 'managed' ? presented.value.capability : capability.capability;
+  const prepared = taskAuthorization
+    ? await prepareGitHubTaskRequest(request)
+    : { request, policyBody: undefined };
+  if (!prepared) return new Response('GitHub request is outside the task policy', { status: 403 });
+  request = prepared.request;
+
   let result: Awaited<ReturnType<GitHubTokenRedemptionBinding['redeemGitHubSessionCapability']>>;
   try {
     result = await tokenService.redeemGitHubSessionCapability({
@@ -158,6 +182,8 @@ async function handleManagedGitHubOutbound(
       outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
+      requestContentType: request.headers.get('content-type') ?? undefined,
+      requestBody: prepared.policyBody,
     });
   } catch (error) {
     logDiagnostic(
@@ -169,6 +195,7 @@ async function handleManagedGitHubOutbound(
       },
       'Managed GitHub outbound redemption failed'
     );
+    await request.body?.cancel().catch(() => undefined);
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
@@ -178,13 +205,26 @@ async function handleManagedGitHubOutbound(
       { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
       'Managed GitHub outbound redemption rejected'
     );
-    return new Response('GitHub authorization unavailable', { status: 502 });
+    await request.body?.cancel().catch(() => undefined);
+    return taskAuthorization
+      ? new Response('GitHub request is outside the task policy', { status: 403 })
+      : new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  // A null authorization forwards the request anonymously.
   const headersToApply = { authorization: result.authorization ?? undefined };
   let response: Response;
   try {
-    if (!isGitHubGitUploadRetryableRequest(request)) {
+    if (taskAuthorization && getGitHubTaskArchive(new URL(request.url))) {
+      response = await forwardGitHubTaskArchive(request, result.authorization);
+    } else if (taskAuthorization && getGitHubTaskLfsRoute(new URL(request.url))) {
+      response = await forwardGitHubTaskLfs({
+        request,
+        policyBody: prepared.policyBody,
+        authorization: result.authorization,
+        capability: clientCredential,
+      });
+    } else if (!isGitHubGitUploadRetryableRequest(request)) {
       response = await forwardRedeemedRequest(request, headersToApply);
     } else if (request.method === 'POST') {
       const bodyBytes = await readBoundedRequestBodyBytes(request, GITHUB_GIT_RETRY_MAX_BODY_BYTES);

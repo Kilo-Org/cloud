@@ -91,6 +91,7 @@ export type ContainersLaunchInput = {
   containment?: boolean;
   egressAllowlist?: string[];
   egressAudit?: boolean;
+  githubAuthorization?: 'task';
   /** Environment snapshot selected for this allocation; absent starts from the image. */
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
@@ -310,6 +311,9 @@ export class SandboxContainers extends DurableObject<Env> {
     input = {
       ...input,
       egressAllowlist: nativeEgressAllowlistSchema.optional().parse(input.egressAllowlist),
+      githubAuthorization: nativeEgressPolicySchema.shape.githubAuthorization.parse(
+        input.githubAuthorization
+      ),
     };
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
@@ -325,7 +329,8 @@ export class SandboxContainers extends DurableObject<Env> {
         if (
           (persistedPolicy !== undefined && persistedPolicy.allocationRef !== ref) ||
           JSON.stringify(persistedPolicy?.allowlist) !== JSON.stringify(input.egressAllowlist) ||
-          (persistedPolicy?.egressAudit === true) !== (input.egressAudit === true)
+          (persistedPolicy?.egressAudit === true) !== (input.egressAudit === true) ||
+          persistedPolicy?.githubAuthorization !== input.githubAuthorization
         ) {
           throw new Error('Container egress policy cannot change within an allocation');
         }
@@ -366,7 +371,11 @@ export class SandboxContainers extends DurableObject<Env> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
     if (stored.state === 'running' && sameRef) {
-      if (input.egressAllowlist !== undefined || input.egressAudit === true) {
+      if (
+        input.egressAllowlist !== undefined ||
+        input.egressAudit === true ||
+        input.githubAuthorization === 'task'
+      ) {
         await this.installOutboundProxy(this.requiredContainer(), input);
       }
       // A pending (or unknown) phase means a bun exec may still be starting; the
@@ -402,19 +411,29 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    if ((input.egressAllowlist !== undefined || input.egressAudit === true) && container.running) {
+    if (
+      (input.egressAllowlist !== undefined ||
+        input.egressAudit === true ||
+        input.githubAuthorization === 'task') &&
+      container.running
+    ) {
       throw new Error('Cannot apply an egress policy to an unowned running container');
     }
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     let record = await this.installLaunchInstance(stored, input.instance);
-    if (input.egressAllowlist !== undefined || input.egressAudit === true) {
+    if (
+      input.egressAllowlist !== undefined ||
+      input.egressAudit === true ||
+      input.githubAuthorization === 'task'
+    ) {
       record = {
         ...record,
         egressPolicy: {
           allocationRef: ref,
           allowlist: input.egressAllowlist,
           ...(input.egressAudit === true ? { egressAudit: true } : {}),
+          ...(input.githubAuthorization ? { githubAuthorization: input.githubAuthorization } : {}),
         },
       };
       await this.writeRecord(record);
@@ -422,7 +441,8 @@ export class SandboxContainers extends DurableObject<Env> {
     if (
       input.containment === true ||
       input.egressAllowlist !== undefined ||
-      input.egressAudit === true
+      input.egressAudit === true ||
+      input.githubAuthorization === 'task'
     ) {
       await this.installOutboundProxy(container, input);
     }
@@ -531,7 +551,10 @@ export class SandboxContainers extends DurableObject<Env> {
     ref: string,
     start: ResolvedStart,
     policy:
-      | Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit' | 'snapshotDiagnostic'>
+      | Pick<
+          ContainersLaunchInput,
+          'egressAllowlist' | 'egressAudit' | 'githubAuthorization' | 'snapshotDiagnostic'
+        >
       | undefined,
     deadlineAt: number | undefined
   ): Promise<ContainersLaunchResult> {
@@ -547,13 +570,18 @@ export class SandboxContainers extends DurableObject<Env> {
       startSource: start.source,
       startImage: start.image,
     };
-    if (policy?.egressAllowlist === undefined && policy?.egressAudit !== true) {
+    if (
+      policy?.egressAllowlist === undefined &&
+      policy?.egressAudit !== true &&
+      policy?.githubAuthorization !== 'task'
+    ) {
       delete launching.egressPolicy;
     } else {
       launching.egressPolicy = {
         allocationRef: ref,
         allowlist: policy.egressAllowlist,
         ...(policy.egressAudit === true ? { egressAudit: true } : {}),
+        ...(policy.githubAuthorization ? { githubAuthorization: policy.githubAuthorization } : {}),
       };
     }
     await this.writeRecord(launching);
@@ -589,6 +617,7 @@ export class SandboxContainers extends DurableObject<Env> {
       | 'containment'
       | 'egressAllowlist'
       | 'egressAudit'
+      | 'githubAuthorization'
       | 'snapshot'
       | 'command'
       | 'nativeImage'
@@ -605,7 +634,8 @@ export class SandboxContainers extends DurableObject<Env> {
         interception:
           input.containment === true ||
           input.egressAllowlist !== undefined ||
-          input.egressAudit === true,
+          input.egressAudit === true ||
+          input.githubAuthorization === 'task',
         ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
         command: input.command,
         ...(input.snapshot === undefined ? {} : { snapshot: input.snapshot }),
@@ -904,7 +934,8 @@ export class SandboxContainers extends DurableObject<Env> {
     const interception =
       input.containment === true ||
       input.egressAllowlist !== undefined ||
-      input.egressAudit === true;
+      input.egressAudit === true ||
+      input.githubAuthorization === 'task';
     if (interception) await this.installOutboundProxy(container, input);
     if (!container.running) {
       const start = await this.resolveStart(
@@ -989,7 +1020,8 @@ export class SandboxContainers extends DurableObject<Env> {
     if (
       input.containment === true ||
       input.egressAllowlist !== undefined ||
-      input.egressAudit === true
+      input.egressAudit === true ||
+      input.githubAuthorization === 'task'
     ) {
       await this.installOutboundProxy(container, input);
     }
@@ -1202,6 +1234,7 @@ export class SandboxContainers extends DurableObject<Env> {
     const worker = outbound({
       props: {
         containerId: this.ctx.id.toString(),
+        ...(input.githubAuthorization ? { githubAuthorization: input.githubAuthorization } : {}),
         ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
         ...(input.egressAudit === true
           ? { egressAudit: true, allocationRef: input.allocationRef }

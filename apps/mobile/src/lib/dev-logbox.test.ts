@@ -31,6 +31,16 @@ describe('applyDevLogBoxFilters', () => {
   it('does not silence every expo-iap log', () => {
     expect(SUPPRESSED_DEV_LOG_SUBSTRINGS).not.toContain('[Expo-IAP]');
   });
+
+  it('matches the Fabric layout-measure warning the design gate hits', () => {
+    const fabricLayoutMeasureWarning =
+      "Can't perform a React state update on a component that hasn't mounted yet. " +
+      'This indicates that you have a side-effect in your render function that asynchronously tries ' +
+      'to update the component. Move this work to useEffect instead.';
+    expect(
+      SUPPRESSED_DEV_LOG_SUBSTRINGS.some(pattern => fabricLayoutMeasureWarning.includes(pattern))
+    ).toBe(true);
+  });
 });
 
 describe('app entry', () => {

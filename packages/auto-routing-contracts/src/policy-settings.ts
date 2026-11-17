@@ -97,6 +97,9 @@ export const POLICY_SETTINGS = {
 
 export type PolicySettingKind = PolicySettingMeta['kind'];
 
+/** Smallest switch cost factor: below 1 a dearer fresh pick could win. */
+export const SWITCH_COST_FACTOR_MIN = 1;
+
 /**
  * The shape each setting's value must take. An override or computed value is
  * accepted only when it matches its own key's schema; it is never coerced.
@@ -107,7 +110,7 @@ export const POLICY_SETTING_VALUE_SCHEMAS = {
   frontierMinAccuracyDelta: z.number().min(0).max(1),
   productionTokenProfile: ProductionTokenProfileSchema,
   switchHorizonTurns: z.number().int().positive(),
-  switchCostFactor: z.number().min(1).max(100),
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN).max(100),
   bestAccuracySwitchThreshold: z.number().min(0).max(1),
   lowConfidenceThreshold: z.number().min(0).max(1),
   classifierRepetitions: z.number().int().min(1).max(5),

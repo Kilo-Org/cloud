@@ -2,10 +2,10 @@
 // (iOS ref pattern) per the repo's iOS rule. Submit calls the
 // (non-optimistic) reply mutation and re-fetches the list on settle.
 
+import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, TextInput, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 
 import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 
@@ -13,7 +13,6 @@ import { ComposerInlineError } from '@/components/pr-review/composer-inline-erro
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -30,10 +29,10 @@ import { trpcClient } from '@/lib/trpc';
 /**
  * Outcome of the UGC Terms gate. `accepted` means the current version is
  * already accepted or the user accepted now (the caller may post).
- * `dismissed` means the user cancelled the gate. `outdated` means the accept
- * was rejected because the version is stale — terminal, the caller must not
- * post. `unknown` means the Terms status could not be read, so acceptance is
- * unconfirmed.
+ * `dismissed` means the gate closed without acceptance: the user cancelled, or
+ * they opened the terms to read them. `outdated` means the accept was rejected
+ * because the version is stale — terminal, the caller must not post. `unknown`
+ * means the Terms status could not be read, so acceptance is unconfirmed.
  */
 export type TermsGateOutcome =
   | { kind: 'accepted' }
@@ -117,8 +116,13 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
           {
             text: i18n.t('prReview.discussion.viewTerms'),
             onPress: () => {
-              void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
-              show();
+              // Tapping any button dismisses the alert, so this arm must settle
+              // the gate itself: the submit that awaited it abandons its attempt
+              // instead of staying pending behind a spinner. Acceptance is still
+              // unconfirmed, so sending again re-enters this gate.
+              resolve({ kind: 'dismissed' });
+              // The terms render in their own native screen, not a browser.
+              router.push({ pathname: '/(app)/legal/[document]', params: { document: 'terms' } });
             },
           },
           {

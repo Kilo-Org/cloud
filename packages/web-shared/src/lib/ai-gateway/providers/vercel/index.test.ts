@@ -292,15 +292,13 @@ describe('convertProviderOptions', () => {
 const unrestrictedRouting = {
   requestedModel: 'anthropic/claude-sonnet-4.5',
   boundedSpending: false,
-  organizationDisabledVercelAiGateway: false,
 };
 
 describe('shouldRouteToVercel', () => {
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
+  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelEnabled: options?.enabled ?? true,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
       })),
     }));
@@ -344,22 +342,12 @@ describe('shouldRouteToVercel', () => {
     );
   });
 
-  it('routes eligible traffic to Vercel without per-user randomization when switched on', async () => {
+  it('routes eligible traffic to Vercel without per-user randomization', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(shouldRouteToVercel(unrestrictedRouting, async () => undefined)).resolves.toBe(
       true
     );
-  });
-
-  it('does not route to Vercel or resolve provider policy when switched off', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel({ enabled: false });
-    const getRoutingProviderConfig = jest.fn(async () => undefined);
-
-    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
-      false
-    );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
   it('does not resolve provider policy for models opted out of Vercel routing', async () => {
@@ -369,19 +357,6 @@ describe('shouldRouteToVercel', () => {
     await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
       false
     );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
-  });
-
-  it('leaves an organization that disabled the Vercel AI Gateway on OpenRouter', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel();
-    const getRoutingProviderConfig = jest.fn(async () => undefined);
-
-    await expect(
-      shouldRouteToVercel(
-        { ...unrestrictedRouting, organizationDisabledVercelAiGateway: true },
-        getRoutingProviderConfig
-      )
-    ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 

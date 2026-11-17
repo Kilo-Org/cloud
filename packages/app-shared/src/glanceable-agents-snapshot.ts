@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { timestampMs } from './utils';
+import { epochMsToIso, timestampMs } from './utils';
 
 /**
  * One durable, privacy-minimal, versioned snapshot for every glanceable
@@ -219,8 +219,7 @@ export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatu
  * `idle` → `idle`, the literal `scheduled` → `scheduled`, everything else →
  * `running` (starting, empty, unknown included). A session is idle only when
  * the agent says so, so a working or unrecognized session can never render
- * idle and a row can never disagree with the widget beside it. Callers pass
- * null only when a row has no status at all.
+ * idle and a row can never disagree with the widget beside it.
  */
 export function glanceableStatusKind(status: string): GlanceableStatusKind {
   if (glanceableNeedsInputKind(status) !== null) {
@@ -327,7 +326,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     session => session.statusUpdatedAt,
     'earliest'
   );
-  return oldest === null ? null : new Date(oldest.at).toISOString();
+  return oldest === null ? null : epochMsToIso(oldest.at);
 }
 
 /**
@@ -343,7 +342,7 @@ export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): s
     session => session.scheduledAt,
     'earliest'
   );
-  return soonest === null ? null : new Date(soonest.at).toISOString();
+  return soonest === null ? null : epochMsToIso(soonest.at);
 }
 
 /**
@@ -365,7 +364,7 @@ export function newestGlanceableResult(
   );
   return newest === null
     ? null
-    : { kind: glanceableStatusKind(newest.session.status), at: new Date(newest.at).toISOString() };
+    : { kind: glanceableStatusKind(newest.session.status), at: epochMsToIso(newest.at) };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
@@ -423,14 +422,14 @@ export function buildGlanceableSnapshot(
   // will wake later, is still something the user wants on the Lock Screen.
   const eligible = isEligibleGlanceableWork(counts);
   const now = input.now;
-  const updatedAt = new Date(now).toISOString();
+  const updatedAt = epochMsToIso(now);
   const newest = newestGlanceableResult(input.sessions);
 
   return {
     schemaVersion: GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
     revision: (input.previousRevision ?? 0) + 1,
     updatedAt,
-    expiresAt: new Date(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
+    expiresAt: epochMsToIso(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS),
     scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId: input.organizationId }),
     ...(input.accountEpoch === undefined ? {} : { accountEpoch: input.accountEpoch }),
     organizationBound: typeof input.organizationId === 'string',
@@ -479,8 +478,8 @@ export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
 
 /**
  * True when `incoming` must be discarded in favour of `current`: a strictly
- * lower revision, or the same revision with an older `updatedAt`. ISO strings
- * from `toISOString()` compare correctly as strings.
+ * lower revision, or the same revision with an older `updatedAt`. ISO 8601
+ * strings from `epochMsToIso` compare correctly as strings.
  */
 export function shouldDiscardGlanceableRevision(
   incoming: GlanceableAgentsSnapshot,

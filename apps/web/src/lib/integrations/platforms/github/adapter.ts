@@ -899,6 +899,7 @@ export async function fetchGitHubRootTextFileAtRef(params: {
       repo,
       path,
       ref,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
 
     if (Array.isArray(data)) return null;
@@ -924,8 +925,28 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
 }): Promise<string> {
   const { token, owner, repo } = params;
   const octokit = new Octokit({ auth: token });
-  const { data } = await octokit.repos.get({ owner, repo });
+  const { data } = await octokit.repos.get({
+    owner,
+    repo,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
   return data.default_branch;
+}
+
+export async function fetchGitHubRepositoryDefaultBranchSha(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const branch = await fetchGitHubRepositoryDefaultBranch(params);
+  const octokit = new Octokit({ auth: params.token });
+  const { data } = await octokit.git.getRef({
+    owner: params.owner,
+    repo: params.repo,
+    ref: `heads/${branch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+  return data.object.sha;
 }
 
 export async function fetchGitHubRepositorySize(params: {

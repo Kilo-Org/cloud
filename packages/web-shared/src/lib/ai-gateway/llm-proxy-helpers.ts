@@ -34,7 +34,6 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
-  VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import {
@@ -48,17 +47,21 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
-  computeVercelCostFields,
   drainSseStream,
-  extractVercelIsByok,
+  parseJson,
   parseUsageWithRecovery,
   providerReportsIsByok,
   readResponseText,
   reportUpstreamStreamError,
+  selectUsageCostFields,
+  type ParsedJson,
+  type ReadResponseBody,
   upstreamStreamErrorSchema,
   usageCostSchema,
   vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -272,7 +275,6 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
 
 const MANAGED_GATEWAY_NAMES = {
   openrouter: 'OpenRouter',
-  vercel: 'the Vercel AI Gateway',
 } as const satisfies Record<ManagedGatewayId, string>;
 
 export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
@@ -410,8 +412,11 @@ function vertexByokModelNotFoundResponse(
   );
 }
 
+const NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX =
+  'No allowed providers are available for the selected model.';
+
 const noAllowedProvidersErrorSchema = z.object({
-  message: z.literal('No allowed providers are available for the selected model.'),
+  message: z.string().startsWith(NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX),
   code: z.literal(404),
   metadata: z.object({
     available_providers: z.array(z.string()),
@@ -420,7 +425,7 @@ const noAllowedProvidersErrorSchema = z.object({
 });
 
 const openRouterErrorResponseSchema = z.object({
-  error: noAllowedProvidersErrorSchema.optional(),
+  error: z.unknown().optional(),
   message: z.string().optional(),
   code: z.number().optional(),
   metadata: z.unknown().optional(),
@@ -439,7 +444,8 @@ async function providerNotAllowedResponse(provider: ProviderType, response: Resp
   const parsedBody = openRouterErrorResponseSchema.safeParse(body);
   if (!parsedBody.success) return undefined;
 
-  const upstreamError = parsedBody.data.error ?? parsedBody.data;
+  const upstreamError =
+    parsedBody.data.error === undefined ? parsedBody.data : parsedBody.data.error;
   if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
 
   const error = 'No eligible provider can serve the selected model.';
@@ -462,7 +468,8 @@ export async function makeErrorReadable({
 }: {
   provider: ProviderType;
   requestedModel: string;
-  request: GatewayRequest;
+  /** Null on the routes that do not send a chat request. */
+  request: GatewayRequest | null;
   response: Response;
   userByokProviderIds: UserByokProviderId[] | null;
 }) {
@@ -580,11 +587,11 @@ export function claudeBillingUnavailableResponse(message: string, retryable = fa
 }
 
 /**
- * Returned when the organization's shared-services Claude connection was linked
- * by a person who is gone. The reconnect action lives on the organization's
- * billing page, so an owner following the message can perform it there. Only an
- * organization owner can reconnect it, so the request fails instead of moving to
- * another billing path, and no retry helps.
+ * Returned when the organization's Claude connection was linked by a person who
+ * is gone. The reconnect action lives on the organization's billing page, so an
+ * owner following the message can perform it there. Only an organization owner
+ * can reconnect it, so the request fails instead of moving to another billing
+ * path, and no retry helps.
  */
 export function claudeBillingReconnectResponse(
   message: string,
@@ -593,7 +600,7 @@ export function claudeBillingReconnectResponse(
   const settings = organizationId
     ? `${APP_URL}/organizations/${organizationId}/byok`
     : `${APP_URL}/byok`;
-  const error = `${message} An organization owner must reconnect Claude billing at ${settings}.`;
+  const error = `${message} An organization owner must link Claude billing again at ${settings}.`;
   return NextResponse.json(
     { error, error_type: ProxyErrorType.byok_error, message: error },
     { status: 400 }
@@ -674,6 +681,17 @@ export function paidModelAuthRequiredResponse() {
 // only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
 // honor this header.
 const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
+
+export function gatewayAccountRateLimitResponse() {
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    },
+    { status: 429 }
+  );
+}
 
 export function anonymousFreeModelLimitResponse() {
   const message =
@@ -1441,6 +1459,7 @@ const embeddingResponseSchema = z.object({
     .extend({ prompt_tokens: z.number(), total_tokens: z.number().optional() })
     .nullish(),
   providerMetadata: vercelProviderMetadataSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
   error: upstreamStreamErrorSchema.nullish(),
 });
 
@@ -1462,17 +1481,13 @@ const transcriptionResponseSchema = z.object({
 // HTML error page from an edge proxy. It still carries no usage, so treat it like
 // a JSON error body. A successful response that is not JSON stays a parse failure.
 function parseUsageResponse(responseText: string, statusCode: number): unknown {
-  try {
-    return JSON.parse(responseText);
-  } catch (error) {
-    if (statusCode >= 400) return {};
-    throw error;
-  }
+  return usageResponseJson(parseJson(responseText), statusCode);
 }
 
-function embeddingVercelCosts(vercelGateway: NonNullable<VercelProviderMetaData['gateway']>) {
-  const is_byok = extractVercelIsByok(vercelGateway);
-  return { ...computeVercelCostFields(vercelGateway, is_byok), is_byok };
+function usageResponseJson(json: ParsedJson, statusCode: number): unknown {
+  if ('value' in json) return json.value;
+  if (statusCode >= 400) return {};
+  throw json.error;
 }
 
 export function parseEmbeddingUsageFromResponse(
@@ -1532,24 +1547,18 @@ function priceEmbeddingUsage(
   json: z.infer<typeof embeddingResponseSchema>,
   provider: ProviderType
 ) {
-  const usage = json.usage;
-  // With BYOK, OpenRouter's `cost` is only its 5% fee; the shared OpenRouter
-  // cost logic bills `cost_details.upstream_inference_cost` instead.
-  const vercelGateway = json.providerMetadata?.gateway;
-  const cost =
-    usage?.cost != null || usage?.is_byok != null
-      ? computeOpenRouterCostFields(
-          usage,
-          stats,
-          'embedding_usage_processing',
-          providerReportsIsByok(provider),
-          provider
-        )
-      : vercelGateway
-        ? embeddingVercelCosts(vercelGateway)
-        : { cost_mUsd: 0, is_byok: null };
-
-  Object.assign(stats, cost);
+  // Vercel reports embedding costs in camelCase `providerMetadata`. The response rewrite also reads
+  // chat's snake_case `provider_metadata`, so the ledger bills from the same metadata.
+  Object.assign(
+    stats,
+    selectUsageCostFields(
+      json.usage,
+      json.provider_metadata ?? json.providerMetadata,
+      stats,
+      'embedding_usage_processing',
+      provider
+    )
+  );
 }
 
 /**
@@ -1636,42 +1645,56 @@ export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo
   };
 }
 
+/**
+ * Reads the upstream response body once, for both the ledger and the response: `bodyPromise`
+ * hands the body to the response and rejects with the read error. `pricedStatsPromise` resolves
+ * to the stats the ledger bills, or null when the body cannot be priced and the ledger falls back
+ * to the generation lookup.
+ */
 export function countAndStoreEmbeddingUsage(
-  clonedResponse: Response,
+  response: Response,
   usageContext: MicrodollarUsageContext,
   requestSpan: Span | undefined,
   servingProvider?: Provider
 ) {
-  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+  debugSaveProxyResponseStream(response, '.log.resp.json');
 
-  const statusCode = clonedResponse.status;
+  const statusCode = response.status;
+  const readPromise = response.body
+    ? readResponseText(response.body, usageContext.requestStartedAt)
+    : Promise.resolve(null);
+  const bodyPromise: Promise<ReadResponseBody | null> = readPromise.then(
+    read => read && { text: read.text, json: parseJson(read.text) }
+  );
   let json: z.infer<typeof embeddingResponseSchema> | undefined;
-  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
-    if (!clonedResponse.body) return null;
-    const parsed = embeddingResponseSchema.parse(
-      parseUsageResponse(await clonedResponse.text(), statusCode)
-    );
+  const usageStatsPromise = parseUsageWithRecovery(response, usageContext, async () => {
+    const [read, body] = await Promise.all([readPromise, bodyPromise]);
+    if (!read || !body) return null;
+    const parsed = embeddingResponseSchema.parse(usageResponseJson(body.json, statusCode));
     const stats = extractEmbeddingUsage(parsed, statusCode);
     json = parsed;
-    return stats;
+    return { ...stats, ...read.timing };
   });
 
-  const usagePromise = usageStatsPromise.then(usageStats => {
+  const pricedStatsPromise = usageStatsPromise.then(async usageStats => {
     requestSpan?.end();
-    if (!json) return processTokenData(usageStats, usageContext, servingProvider);
+    if (!json) return null;
     priceEmbeddingUsage(usageStats, json, usageContext.provider);
 
-    // Preserve the real upstream cost before free-model or BYOK zeroing.
-    usageStats.market_cost = usageStats.cost_mUsd;
-
-    if (usageContext.is_free || usageContext.user_byok) {
-      usageStats.cost_mUsd = 0;
-    }
-
-    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+    // Keeps the real upstream cost as `market_cost`, then applies custom pricing and the free-model
+    // or BYOK zeroing, as chat does.
+    applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
+    return usageStats;
   });
+
+  const usagePromise = Promise.all([usageStatsPromise, pricedStatsPromise]).then(
+    ([usageStats, pricedStats]) =>
+      pricedStats
+        ? logMicrodollarUsageAndReportToBouncer(pricedStats, usageContext)
+        : processTokenData(usageStats, usageContext, servingProvider)
+  );
   after(usagePromise);
-  return { statsPromise: usageStatsPromise, usagePromise };
+  return { statsPromise: usageStatsPromise, usagePromise, bodyPromise, pricedStatsPromise };
 }
 
 export function countAndStoreTranscriptionUsage(

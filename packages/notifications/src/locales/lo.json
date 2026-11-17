@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "ເຊດຊັນຕົວແທນຂອງທ່ານມີການອັບເດດ",
-      "chatMessage": "ທ່ານມີຂໍ້ຄວາມໃໝ່",
-      "instanceLifecycle": "instance ຂອງທ່ານມີການອັບເດດ",
-      "scheduledAction": "ການດຳເນີນການທີ່ກຳນົດໄວ້ມີການອັບເດດ",
       "lowBalance": "ຍອດຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
       "spendAlert": "ລາຍຈ່າຍຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
       "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · ບໍ່ມີຊື່",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "ການແຈ້ງເຕືອນຍອດຕໍ່າ",
@@ -34,50 +25,21 @@
       "title": "ການແຈ້ງເຕືອນລາຍຈ່າຍ",
       "body": "ລາຍຈ່າຍ {{scopeName}} ໄດ້ເກີນ ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ຄຳເຕືອນ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ຄຳເຕືອນ SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ການລະເມີດ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ການລະເມີດ SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "ການກວດສອບຄວາມປອດໄພມີການອັບເດດ"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} ພ້ອມແລ້ວ",
-      "body": "ແຕະເພື່ອເລີ່ມສົນທະນາ."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} ເລີ່ມລົ້ມເຫລວ",
-      "body": "ການເລີ່ມລົ້ມເຫລວ."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} ຈະຣີສະຕາດໄວໆນີ້",
-      "body": "ກຳນົດໃຫ້ຣີສະຕາດໃນເວລາ {{when}}."
-    },
-    "restartCancelled": {
-      "title": "ການຣີສະຕາດ {{instanceName}} ຖືກຍົກເລີກ",
-      "body": "ການຣີສະຕາດທີ່ກຳນົດໄວ້ກ່ອນໜ້າຖືກຍົກເລີກແລ້ວ."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ຈະອັບເກຣດໄວໆນີ້",
-      "bodyWithTag": "ອັບເກຣດເປັນ {{targetImageTag}} ໃນເວລາ {{when}}.",
-      "bodyWithoutTag": "ກຳນົດອັບເກຣດໃນເວລາ {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "ການອັບເກຣດ {{instanceName}} ຖືກຍົກເລີກ",
-      "body": "ການອັບເກຣດທີ່ກຳນົດໄວ້ກ່ອນໜ້າຖືກຍົກເລີກແລ້ວ."
     }
   },
   "sessionReady": {

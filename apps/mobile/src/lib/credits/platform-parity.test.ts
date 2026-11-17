@@ -2,15 +2,15 @@
 //
 // The catalog, the four pack rows, the store sheet, the grant, recovery, the
 // refunds and the error copy are shared JS and must behave identically on iOS
-// and Android. The platforms differ on two capabilities: the store itself —
-// iOS has StoreKit and no Google Play Billing, Android has Play Billing and no
-// App Store, and the backend validates a purchase against the store that made
-// it — and whether an in-app link to an external billing page is allowed, which
-// App Store review forbids and Play permits. `storefront.ts` names the first,
-// `external-billing-link.ts` the second; every other module asks those two
-// instead of branching. The shared `AddCreditsRow` routes its gate through the
-// second. This suite reads the sources in node and holds all of them to that: a
-// per-platform branch anywhere else fails here.
+// and Android. The flow keeps one platform capability: the store itself — iOS
+// has StoreKit and no Google Play Billing, Android has Play Billing and no App
+// Store, and the backend validates a purchase against the store that made it.
+// `storefront.ts` names it, and every other module asks that instead of
+// branching. Whether an external billing page may be linked is no longer a
+// platform fact: it is a storefront-country rule in `lib/billing`, and the
+// shared `AddCreditsRow` asks that rule rather than reading the platform. This
+// suite reads the sources in node and holds the flow to that: a per-platform
+// branch anywhere else fails here.
 
 /* eslint-disable eslint-plugin-import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app */
 import { readdirSync, readFileSync } from 'node:fs';
@@ -28,14 +28,8 @@ const ADD_CREDITS_ROW = fileURLToPath(
 /** The one capability fork the flow keeps: the store the platform actually has. */
 const STOREFRONT_FILE = 'storefront.ts';
 
-/**
- * The other capability fork: whether the platform may link out to a billing
- * page. App Store review forbids it on iOS while Play permits it.
- */
-const EXTERNAL_BILLING_FILE = 'external-billing-link.ts';
-
 /** Every module allowed to read the platform, in the order the suite reports them. */
-const CAPABILITY_FILES = [EXTERNAL_BILLING_FILE, STOREFRONT_FILE];
+const CAPABILITY_FILES = [STOREFRONT_FILE];
 
 /** Every shared (non-test) module of the credit-pack flow, with its source. */
 function flowSources(): { file: string; source: string }[] {
@@ -71,7 +65,7 @@ const PLATFORM_BRANCH =
   /\bPlatform\.(?:OS|select|Version)\b|from '[^']+\.(?:ios|android)'|require\('[^']+\.(?:ios|android)'\)/;
 
 describe('one implementation for both platforms in the credit-pack purchase flow', () => {
-  it('reads the platform only in the two capability modules', () => {
+  it('reads the platform only in the one capability module', () => {
     const sources = flowSources();
     expect(sources.length).toBeGreaterThan(0);
     const forked = sources
@@ -91,16 +85,12 @@ describe('one implementation for both platforms in the credit-pack purchase flow
     expect(prose).toContain('Android ships Play Billing and has no App Store');
   });
 
-  it('routes the row gate through the shared capability, named in its comment', () => {
-    // App Store review forbids an in-app link to an external purchase on iOS, so
-    // `AddCreditsRow` renders only its in-app CTA there and names that in the
-    // comment above the gate. The row asks the shared gate instead of reading
-    // the platform itself, so both platforms keep one implementation.
+  it('routes the row gate through the storefront rule, named in its comment', () => {
+    // `AddCreditsRow` asks the storefront rule instead of reading the platform
+    // itself, and names that rule in the comment above the gate.
     const source = readFileSync(ADD_CREDITS_ROW, 'utf8');
-    expect(source.match(/if \(!onPress && !canOpenExternalBilling\(\)\) \{/g) ?? []).toHaveLength(
-      1
-    );
-    expect(source).toContain('App Store review');
+    expect(source.match(/if \(!onPress && !canLink\) \{/g) ?? []).toHaveLength(1);
+    expect(source).toContain('useCanLinkExternalPurchase');
     expect(source).not.toMatch(PLATFORM_BRANCH);
   });
 });

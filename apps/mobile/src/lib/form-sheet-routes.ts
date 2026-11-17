@@ -21,6 +21,7 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
   ['context-picker'],
   ['todos', 'list-settings'],
   ['share-gate'],
+  ['bitbucket-connect'],
   ['language-picker'],
   ['transcription-model-picker'],
   ['voice-language-picker'],

@@ -1,12 +1,12 @@
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
-import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import {
   buildOverviewRows,
   resolveRowOnPress,
@@ -23,8 +23,6 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -33,7 +31,6 @@ import {
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
-import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 
@@ -50,7 +47,6 @@ export function BitbucketOverview({
   canEdit: boolean;
   permissionLoading: boolean;
 }>) {
-  const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
@@ -105,12 +101,18 @@ export function BitbucketOverview({
   }
 
   if (!isLoading && !connected) {
+    const readinessData = readiness.data;
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
-          {canEdit ? (
-            <BitbucketConnectForm scope={scope} />
+          {canEdit && readinessData ? (
+            <BitbucketSetupRecovery
+              scope={scope}
+              readiness={readinessData}
+              message={t('prReview.connect.bitbucketNotConnectedTitle')}
+              className="w-full"
+            />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
               {t('codeReviewer.bitbucket.notConnectedReadOnly')}
@@ -147,7 +149,7 @@ export function BitbucketOverview({
           models,
           modelsLoading,
           onOpenModelPicker: () => {
-            openModelPicker(router, {
+            openModelPicker(pushOnce, {
               options: models,
               value: data.modelSlug,
               variant: data.thinkingEffort ?? '',
@@ -179,22 +181,11 @@ export function BitbucketOverview({
               className="gap-6"
             >
               {readiness.data?.ready === false && (
-                <View className="items-center gap-2 rounded-lg bg-secondary p-4">
-                  <Text className="text-center text-xs text-muted-foreground">
-                    {t('codeReviewer.bitbucket.setupIncomplete')}
-                  </Text>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => {
-                      void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                        label: t('codeReviewer.bitbucket.setup'),
-                      });
-                    }}
-                  >
-                    <Text>{t('codeReviewer.repos.finishSetup')}</Text>
-                  </Button>
-                </View>
+                <BitbucketSetupRecovery
+                  scope={scope}
+                  readiness={readiness.data}
+                  message={t('common.couldNotLoadRepositories')}
+                />
               )}
 
               <View className="rounded-lg bg-secondary p-4">

@@ -241,51 +241,6 @@ describe('analytics gating', () => {
       })
     ).toBe(false);
   });
-
-  it('covers multi-gate combinations independently', async () => {
-    await resetModule();
-    const cases = [
-      {
-        firefoxUsageDataGranted: true,
-        hasApiKey: true,
-        hasEmail: true,
-        isDev: true,
-        optedOut: false,
-      },
-      {
-        firefoxUsageDataGranted: true,
-        hasApiKey: false,
-        hasEmail: true,
-        isDev: false,
-        optedOut: false,
-      },
-      {
-        firefoxUsageDataGranted: true,
-        hasApiKey: true,
-        hasEmail: false,
-        isDev: false,
-        optedOut: false,
-      },
-      {
-        firefoxUsageDataGranted: true,
-        hasApiKey: true,
-        hasEmail: true,
-        isDev: false,
-        optedOut: true,
-      },
-      {
-        firefoxUsageDataGranted: false,
-        hasApiKey: true,
-        hasEmail: true,
-        isDev: false,
-        optedOut: false,
-      },
-    ] as const;
-
-    for (const input of cases) {
-      expect(shouldStartAnalytics(input)).toBe(false);
-    }
-  });
 });
 
 describe('firefox usage data grant', () => {

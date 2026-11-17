@@ -23,6 +23,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { usePasskeyManagement } from '@/lib/passkeys/use-passkey-management';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** Rows the skeleton reserves so loading→content does not resize the list. */
@@ -285,7 +286,7 @@ export function PasskeysScreen() {
 
   return (
     <View testID="passkeys-screen" className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.passkeysTitle')} />
+      <ScreenHeader title={t('profile.passkeysTitle')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-4 pt-4"

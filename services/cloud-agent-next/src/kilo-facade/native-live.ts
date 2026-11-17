@@ -242,7 +242,11 @@ export async function readNativeLiveOperation(
     };
   }
   if (!result.ok) {
-    if (result.error.code === 'not_ready' || result.error.code === 'not_found') {
+    if (
+      result.error.code === 'not_ready' ||
+      result.error.code === 'not_found' ||
+      result.error.code === 'runtime_offline'
+    ) {
       return { kind: 'not_ready', message: result.error.message };
     }
     if (result.error.code === 'too_large') return { kind: 'too_large' };

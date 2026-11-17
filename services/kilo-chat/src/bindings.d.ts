@@ -3,8 +3,6 @@ import type { chatWebhookRpcSchema, KiloChatEventName, KiloChatEventOf } from '@
 import type {
   ClearBadgeBucketForUserInput,
   ClearBadgeBucketForUserOutput,
-  SendPushForConversationInput,
-  SendPushForConversationOutput,
 } from '@kilocode/notifications';
 
 // Augment the wrangler-generated Env with RPC method signatures for service
@@ -30,9 +28,6 @@ declare global {
       ): Promise<boolean>;
     };
     NOTIFICATIONS: Fetcher & {
-      sendPushForConversation(
-        input: SendPushForConversationInput
-      ): Promise<SendPushForConversationOutput>;
       clearBadgeBucketForUser(
         input: ClearBadgeBucketForUserInput
       ): Promise<ClearBadgeBucketForUserOutput>;

@@ -147,9 +147,13 @@ describe('creditsTopUp template', () => {
     const html = renderTemplate('creditsTopUp', creditsTopUpTemplateVars());
 
     expect(html).toContain('Thanks for your top-up');
-    expect(html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
+    expect(html).toMatch(
+      /<strong class="kc-strong" style="color: #1a1a1a"\s*>Amount:<\/strong\s*>/
+    );
     expect(html).toContain('$15.00 USD');
-    expect(html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
+    expect(html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Credits:</strong> $15.00 USD'
+    );
     expect(html).toContain('January 1, 2026');
     expect(html).toContain('https://app.kilocode.ai/credits');
     expect(html).toContain('https://stripe.test/receipt');
@@ -189,11 +193,19 @@ describe('creditsTopUp template', () => {
       })
     );
 
-    expect(html).toContain('<strong style="color: #1a1a1a">Credits added:</strong>');
+    expect(html).toMatch(
+      /<strong class="kc-strong" style="color: #1a1a1a"\s*>Credits added:<\/strong\s*>/
+    );
     expect(html).toContain('$20.00 USD');
-    expect(html).toContain('<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD');
-    expect(html).toContain('<strong style="color: #1a1a1a">Total paid:</strong> $21.00 USD');
-    expect(html).not.toContain('<strong style="color: #1a1a1a">Credits:</strong>');
+    expect(html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+    );
+    expect(html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Total paid:</strong> $21.00 USD'
+    );
+    expect(html).not.toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Credits:</strong>'
+    );
     expect(html).not.toContain('Credit principal');
     expect(html).not.toContain('Amount:');
   });
@@ -206,7 +218,7 @@ describe('creditsTopUp template', () => {
       })
     );
     expect(expiring).toContain(
-      '<strong style="color: #1a1a1a">Purchased credits expire:</strong> February 28, 2027 at 12:34 PM UTC.'
+      '<strong class="kc-strong" style="color: #1a1a1a">Purchased credits expire:</strong> February 28, 2027 at 12:34 PM UTC.'
     );
 
     const nonexpiring = renderTemplate(
@@ -214,7 +226,7 @@ describe('creditsTopUp template', () => {
       creditsTopUpTemplateVars({ credit_expiry_section: buildCreditsTopUpExpirySection(null) })
     );
     expect(nonexpiring).toContain(
-      '<strong style="color: #1a1a1a">Purchased credits:</strong> No expiration.'
+      '<strong class="kc-strong" style="color: #1a1a1a">Purchased credits:</strong> No expiration.'
     );
 
     const unknown = renderTemplate('creditsTopUp', creditsTopUpTemplateVars());
@@ -748,9 +760,13 @@ describe('sendCreditsTopUpEmail payload', () => {
     const [params] = sendViaMailgunMock.mock.calls[0];
     expect(params.to).toBe('recipient@example.com');
     expect(params.subject).toBe(subjects.creditsTopUp);
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
+    expect(params.html).toMatch(
+      /<strong class="kc-strong" style="color: #1a1a1a"\s*>Amount:<\/strong\s*>/
+    );
     expect(params.html).toContain('$15.00 USD');
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
+    expect(params.html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Credits:</strong> $15.00 USD'
+    );
     expect(params.html).toContain('January 15, 2026');
     expect(params.html).toContain('/credits');
     expect(params.html).toContain('https://pay.stripe.com/receipts/abc');
@@ -773,14 +789,22 @@ describe('sendCreditsTopUpEmail payload', () => {
     });
 
     const [params] = sendViaMailgunMock.mock.calls[0];
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits added:</strong>');
-    expect(params.html).toContain(
-      '<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+    expect(params.html).toMatch(
+      /<strong class="kc-strong" style="color: #1a1a1a"\s*>Credits added:<\/strong\s*>/
     );
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Total paid:</strong> $21.00 USD');
+    expect(params.html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+    );
+    expect(params.html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Total paid:</strong> $21.00 USD'
+    );
     expect(params.html).toContain('$20.00 USD');
-    expect(params.html).not.toContain('<strong style="color: #1a1a1a">Credits:</strong>');
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Date:</strong> January 15, 2026');
+    expect(params.html).not.toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Credits:</strong>'
+    );
+    expect(params.html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Date:</strong> January 15, 2026'
+    );
     expect(params.html).not.toContain('Amount:');
     expect(params.html).not.toContain('Credit principal');
   });
@@ -801,9 +825,13 @@ describe('sendCreditsTopUpEmail payload', () => {
     });
 
     const [params] = sendViaMailgunMock.mock.calls[0];
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
+    expect(params.html).toMatch(
+      /<strong class="kc-strong" style="color: #1a1a1a"\s*>Amount:<\/strong\s*>/
+    );
     expect(params.html).toContain('$15.00 USD');
-    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
+    expect(params.html).toContain(
+      '<strong class="kc-strong" style="color: #1a1a1a">Credits:</strong> $15.00 USD'
+    );
     expect(params.html).not.toContain('Service fee (5%)');
     expect(params.html).not.toContain('Credit principal');
     expect(params.html).not.toContain('Total paid');
@@ -847,7 +875,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).toContain('&quot;');
     expect(params.html).not.toContain('" onclick="alert(1)');
     expect(params.html).toContain(
-      '<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+      '<strong class="kc-strong" style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
     );
   });
 

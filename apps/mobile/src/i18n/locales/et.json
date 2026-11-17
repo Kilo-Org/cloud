@@ -1466,7 +1466,8 @@
       "repositoryLine": "Ülevaatused: {{reviews}} · Leiud: {{findings}}",
       "empty": "Analüütikaga ülevaatusi veel pole",
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
-      "off": "Analüütika on selles organisatsioonis välja lülitatud.",
+      "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
+      "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
       "couldNotLoad": "Analüütikat ei õnnestunud laadida"
     },
     "council": {

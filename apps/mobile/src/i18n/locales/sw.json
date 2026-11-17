@@ -1466,7 +1466,8 @@
       "repositoryLine": "Ukaguzi: {{reviews}} · Matatizo: {{findings}}",
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
-      "off": "Takwimu zimezimwa kwa shirika hili.",
+      "offTitle": "Takwimu zimezimwa kwa {{platform}}",
+      "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu"
     },
     "council": {

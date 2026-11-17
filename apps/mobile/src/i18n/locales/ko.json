@@ -923,7 +923,8 @@
       "repositoryLine": "리뷰: {{reviews}} · 문제: {{findings}}",
       "empty": "아직 분석 데이터가 있는 리뷰가 없습니다",
       "emptyDescription": "분석은 조직에서 이 기능이 켜져 있는 동안 완료된 리뷰를 기록합니다.",
-      "off": "이 조직에서는 분석이 꺼져 있습니다.",
+      "offTitle": "{{platform}}의 분석이 꺼져 있습니다",
+      "offDescription": "완료된 리뷰를 기록하려면 웹의 조직 설정에서 분석을 활성화하세요.",
       "couldNotLoad": "분석을 불러오지 못했습니다"
     },
     "council": {

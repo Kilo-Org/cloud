@@ -1466,7 +1466,8 @@
       "repositoryLine": "Yoxlamalar: {{reviews}} · Tapıntılar: {{findings}}",
       "empty": "Analitikası olan yoxlama hələ yoxdur",
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
-      "off": "Bu təşkilat üçün analitika deaktivdir.",
+      "offTitle": "{{platform}} üçün analitika deaktivdir",
+      "offDescription": "Tamamlanmış yoxlamaları qeydə almaq üçün analitikanı vebdə təşkilat ayarlarında aktivləşdir.",
       "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
     },
     "council": {

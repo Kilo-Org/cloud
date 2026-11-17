@@ -1466,7 +1466,8 @@
       "repositoryLine": "Gennemgange: {{reviews}} · Fund: {{findings}}",
       "empty": "Ingen gennemgange med analysedata endnu",
       "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
-      "off": "Analyse er slået fra for denne organisation.",
+      "offTitle": "Analyse er slået fra for {{platform}}",
+      "offDescription": "Slå den til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
       "couldNotLoad": "Kunne ikke indlæse analysedata"
     },
     "council": {

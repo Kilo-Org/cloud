@@ -1466,7 +1466,8 @@
       "repositoryLine": "Gjennomganger: {{reviews}} · Funn: {{findings}}",
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
-      "off": "Statistikken er slått av for denne organisasjonen.",
+      "offTitle": "Statistikken er slått av for {{platform}}",
+      "offDescription": "Aktiver den i organisasjonsinnstillingene på nettet for å registrere fullførte gjennomganger.",
       "couldNotLoad": "Kunne ikke laste statistikken"
     },
     "council": {

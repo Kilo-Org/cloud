@@ -1490,7 +1490,8 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi završene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uključi je u postavkama organizacije na webu da bilježi završene preglede.",
       "couldNotLoad": "Učitavanje analitike nije uspjelo"
     },
     "council": {

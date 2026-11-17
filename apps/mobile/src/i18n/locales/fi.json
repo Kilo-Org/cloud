@@ -1466,7 +1466,8 @@
       "repositoryLine": "Katselmoinnit: {{reviews}} · Havainnot: {{findings}}",
       "empty": "Ei vielä analytiikkaa sisältäviä katselmointeja",
       "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
-      "off": "Analytiikka ei ole käytössä tässä organisaatiossa.",
+      "offTitle": "Analytiikka ei ole käytössä alustalla {{platform}}",
+      "offDescription": "Ota se käyttöön organisaation asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
       "couldNotLoad": "Analytiikan lataaminen epäonnistui"
     },
     "council": {

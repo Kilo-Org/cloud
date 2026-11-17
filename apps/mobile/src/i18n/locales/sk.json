@@ -1514,7 +1514,8 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
-      "off": "Analytika je pre túto organizáciu vypnutá.",
+      "offTitle": "Analytika je pre {{platform}} vypnutá",
+      "offDescription": "Zapnite ju v nastaveniach organizácie na webe, aby zaznamenávala dokončené kontroly.",
       "couldNotLoad": "Analytiku sa nepodarilo načítať"
     },
     "council": {

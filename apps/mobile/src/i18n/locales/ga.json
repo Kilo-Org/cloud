@@ -1538,7 +1538,8 @@
       "repositoryLine": "Athbhreithnithe: {{reviews}} · Torthaí: {{findings}}",
       "empty": "Níl aon athbhreithniú le hanailísíocht fós",
       "emptyDescription": "Taifeadann an anailísíocht athbhreithnithe críochnaithe fad atá sí cumasaithe don eagraíocht.",
-      "off": "Tá an anailísíocht múchta don eagraíocht seo.",
+      "offTitle": "Tá an anailísíocht múchta do {{platform}}",
+      "offDescription": "Cumasaigh í i socruithe eagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
       "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil"
     },
     "council": {

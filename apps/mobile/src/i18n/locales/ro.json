@@ -1490,7 +1490,8 @@
       "repositoryLine": "Revizuiri: {{reviews}} · Constatări: {{findings}}",
       "empty": "Nicio revizuire cu statistici deocamdată",
       "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
-      "off": "Statisticile sunt dezactivate pentru această organizație.",
+      "offTitle": "Statisticile sunt dezactivate pentru {{platform}}",
+      "offDescription": "Activează statisticile în setările organizației pe web pentru a înregistra revizuirile finalizate.",
       "couldNotLoad": "Statisticile nu au putut fi încărcate"
     },
     "council": {

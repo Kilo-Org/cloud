@@ -1466,7 +1466,8 @@
       "repositoryLine": "Hersienings: {{reviews}} · Bevindings: {{findings}}",
       "empty": "Nog geen hersienings met ontleding nie",
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
-      "off": "Ontleding is af vir hierdie organisasie.",
+      "offTitle": "Ontleding is af vir {{platform}}",
+      "offDescription": "Skakel dit aan in die organisasie-instellings op die web om voltooide hersienings aan te teken.",
       "couldNotLoad": "Kon nie ontleding laai nie"
     },
     "council": {

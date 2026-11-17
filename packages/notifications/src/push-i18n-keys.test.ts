@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { translatePush } from './i18n';
 import en from './locales/en.json';
-import { GENERIC_BODY_LEAF_BY_TYPE, genericPushContentForPushData } from './push-copy';
+import { genericPushContentForPushData } from './push-copy';
 import type { PushData } from './push-data';
 import {
   GENERIC_PUSH_TITLE_KEY,
@@ -87,12 +87,7 @@ describe('shared push copy', () => {
 
   it('points the security lifecycle push at the product name and the generic update', () => {
     expect(pushTitleCatalogKey(LIFECYCLE_KEY)).toBe(GENERIC_PUSH_TITLE_KEY);
-    // The lifecycle notice shows the content-free preview copy, so its body key
-    // must be the leaf the preview table renders for its type. Reading the leaf
-    // from that table keeps the fact in one place.
-    expect(pushBodyCatalogKey(LIFECYCLE_KEY)).toBe(
-      `generic.body.${GENERIC_BODY_LEAF_BY_TYPE.security_lifecycle}`
-    );
+    expect(pushBodyCatalogKey(LIFECYCLE_KEY)).toBe('generic.body.securityUpdate');
   });
 
   it('keeps an ordinary kind under its own title entry', () => {
@@ -111,6 +106,10 @@ describe('shared push copy', () => {
     }
   });
 
+  // This comparison is the tie between the key mapping and the preview's own
+  // leaf table: re-point `GENERIC_BODY_LEAF_BY_TYPE.security_lifecycle` and the
+  // two lines stop matching here. It is conclusive because no two generic body
+  // leaves hold the same English string, which the catalog audit enforces.
   it('renders the lifecycle push as the copy the generic preview shows', () => {
     for (const locale of ['en', 'es']) {
       const preview = genericPushContentForPushData(LIFECYCLE_PAYLOAD, locale);

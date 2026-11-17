@@ -20,11 +20,8 @@ const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
  * variant fails typecheck here until it has an entry, and every value is a key
  * of that catalog subtree, so a leaf `en.json` does not define is a compile
  * error. The key and the English fallback both come from this one leaf.
- *
- * It is exported so the push key mapping can name the same leaf: a kind that
- * shows the generic preview copy must resolve the key this table renders.
  */
-export const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
+const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   cloud_agent_session: SESSION_UPDATE_LEAF,
   session_live_update: SESSION_UPDATE_LEAF,
   low_balance: 'lowBalance',

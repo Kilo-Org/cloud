@@ -765,16 +765,11 @@ test.skip('Agents session transcript opens pinned to the bottom', async () => {
 });
 
 /*
- * `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx. The pill's grace is a page timer, so the
- * test drives that timer with the page clock: hidden one tick before it fires, visible after.
+ * The pill's grace is `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx and is a page timer, so
+ * the test drives it with the page clock and advances to the deadline that component records when
+ * it schedules the timer: nothing here assumes when the effect starts.
  */
-const OFFLINE_PILL_GRACE_MS = 5000;
-/*
- * The most fake time the mount flush below can consume from the grace. The effect that schedules
- * the grace timer runs somewhere inside it, so the remaining grace after the flush is in
- * [GRACE_MS - 100, GRACE_MS].
- */
-const MOUNT_FLUSH_MS = 100;
+const OFFLINE_PILL_DUE_AT_ATTRIBUTE = 'data-offline-due-at';
 
 test('Agents offline pill waits out the connect grace period', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
@@ -789,23 +784,42 @@ test('Agents offline pill waits out the connect grace period', async () => {
      */
     await sidePanel.clock.install();
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
-    // Mount effects, and any zero-delay scheduling they do, run in this tick.
-    await sidePanel.clock.runFor(MOUNT_FLUSH_MS);
-    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
-      timeout: 15_000,
-    });
 
-    // The mocked ingest socket never completes the connected handshake.
-    // The pill is due only when the grace timer fires.
-    // One millisecond short of the latest possible firing time it is still hidden.
-    // Whether the timer started early or late in the mount flush, it is not due yet.
+    /*
+     * Wait for the deadline the component recorded when it scheduled the timer. Real async work
+     * can delay that effect indefinitely, and the deadline cannot be wrong by construction; no
+     * flush budget is assumed anywhere.
+     */
+    const dueAtMarker = sidePanel.locator(`[${OFFLINE_PILL_DUE_AT_ATTRIBUTE}]`);
+    await expect(dueAtMarker).toHaveCount(1, { timeout: 15_000 });
+
+    const readDeadline = (): Promise<{ dueAt: number; now: number }> =>
+      sidePanel.evaluate(attribute => {
+        const dueAtText = document.querySelector(`[${attribute}]`)?.getAttribute(attribute);
+
+        return { dueAt: Number(dueAtText), now: Date.now() };
+      }, OFFLINE_PILL_DUE_AT_ATTRIBUTE);
+
+    /*
+     * Jump to `offsetMs` past the deadline with `pauseAt`, which sets the page clock to an exact
+     * instant and fires only the timers due by then. `runFor` is paced by real time and can
+     * overshoot by more than a millisecond, which would break the one-millisecond margin.
+     */
+    const advanceToDeadline = async (offsetMs: number): Promise<void> => {
+      const { dueAt } = await readDeadline();
+
+      await sidePanel.clock.pauseAt(dueAt + offsetMs);
+    };
+
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
-    await sidePanel.clock.runFor(OFFLINE_PILL_GRACE_MS - MOUNT_FLUSH_MS - 1);
+
+    // One millisecond before the recorded deadline the pill must still be absent.
+    await advanceToDeadline(-1);
     await expect(offlinePill).toBeHidden();
 
-    // Past the earliest possible firing time: the timer has fired and the pill is shown.
-    await sidePanel.clock.runFor(MOUNT_FLUSH_MS + 2);
+    // Two milliseconds later the timer has fired and the pill is rendered.
+    await advanceToDeadline(1);
     await expect(offlinePill).toBeVisible();
   } finally {
     await cleanup();

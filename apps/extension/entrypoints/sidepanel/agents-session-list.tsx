@@ -182,6 +182,10 @@ const ActiveSessionsSection = ({
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
   const [showOffline, setShowOffline] = useState(false);
+  // The grace deadline the effect below schedules, exposed for the E2E.
+  // The effect runs after real async work: auth, storage, or the connect attempt.
+  // `Date.now()` is the page clock the test drives, so the deadline is exact in its frame.
+  const [offlineDueAt, setOfflineDueAt] = useState<number | null>(null);
 
   useEffect(() => {
     const unsubscribe = userWebConnection.onConnectionChange((connectedStatus: boolean) => {
@@ -194,8 +198,10 @@ const ActiveSessionsSection = ({
   useEffect(() => {
     if (connected) {
       setShowOffline(false);
+      setOfflineDueAt(null);
       return;
     }
+    setOfflineDueAt(Date.now() + OFFLINE_PILL_GRACE_MS);
     const timer = setTimeout(() => {
       setShowOffline(true);
     }, OFFLINE_PILL_GRACE_MS);
@@ -274,7 +280,10 @@ const ActiveSessionsSection = ({
 
   return (
     <div className={sectionClass}>
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2"
+        data-offline-due-at={offlineDueAt === null ? undefined : String(offlineDueAt)}
+      >
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>
         {showOffline ? (

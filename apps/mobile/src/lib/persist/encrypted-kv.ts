@@ -460,13 +460,14 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
 
 let openPromise: Promise<KVDatabase> | null = null;
 
-// After a busy failure the open retries on the next caller, but not
-// immediately: a cooldown keeps a lock that outlives `BUSY_TIMEOUT_MS` from
-// turning every store call into a full open that blocks the JS thread for
-// the busy timeout and files one Sentry event per call. Inside the window
-// the memoized rejection fails fast; once the window passes, `openDatabase`
-// drops that memo and the next caller reopens. The flag marks a memo that
-// holds a busy rejection, so only that memo is ever dropped.
+// After a busy failure the next caller retries the open at once; a cooldown
+// only gates the retries after that first one. It keeps a lock that outlives
+// `BUSY_TIMEOUT_MS` from turning every store call into a full open that
+// blocks the JS thread for the busy timeout and files one Sentry event per
+// call. Inside the window the memoized rejection fails fast; once the window
+// passes, `openDatabase` drops that memo and the next caller reopens. The
+// flag marks a memo that holds a busy rejection, so only that memo is ever
+// dropped.
 const BUSY_RETRY_COOLDOWN_MS = 10_000;
 let busyRetryNotBefore = 0;
 let busyMemoRejected = false;
@@ -517,9 +518,13 @@ async function openDatabase(): Promise<KVDatabase> {
   // and a busy or locked engine failure, which the same function clears.
   // The busy retry is bounded by a cooldown: inside the window the memoized
   // busy rejection fails fast, and once the window passes the memo is
-  // dropped, so the next caller reopens after the lock cleared.
+  // dropped, so the next caller reopens after the lock cleared. This branch
+  // also claims the retry by clearing the flag, so concurrent callers that
+  // arrive while the reopen is in flight await the same promise instead of
+  // each starting another open.
   if (openPromise && busyMemoRejected && Date.now() >= busyRetryNotBefore) {
     openPromise = null;
+    busyMemoRejected = false;
   }
   openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;

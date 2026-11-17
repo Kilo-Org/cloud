@@ -2228,7 +2228,7 @@
       "descriptionTooLong": "He roa rawa te whakaahuatanga",
       "secretsEncrypted": "Ka whakamunatia nga mea ngaro i mua i te rokiroki.",
       "profileActive": "Kōtaha hohe",
-      "profilesActive": "Ngā kōtaha kua tohua",
+      "profilesActive": "Ngā kōtaha e hohe ana",
       "customConfigActive": "Hohe whirihora ritenga",
       "configNeedsAttention": "Me aro ki te whirihora",
       "repoProfile": "Kōtaha repo",
@@ -2476,7 +2476,7 @@
       "failedToRender": "Kāore i taea te whakaatu i ngā ihirangi."
     },
     "messageFailure": {
-      "deliveryTitle": "Kāore i taea te tuku tēnei karere.",
+      "deliveryTitle": "Kāore i tukuna tēnei karere.",
       "deliveryInterrupted": "I whakamutua e koe tēnei karere.",
       "deliveryExhausted": "Kāore i taea e mātou te tuku i tēnei karere i muri i ētahi whakamātau.",
       "deliveryExecution": "Kāore i taea e te māngai te whakatutuki i ngā tohutohu o tēnei karere.",

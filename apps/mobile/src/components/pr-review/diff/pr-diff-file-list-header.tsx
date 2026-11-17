@@ -80,7 +80,7 @@ export function PrDiffFileListHeader({
   }, [router, navigatorHref]);
 
   return (
-    <View className="border-b border-hair-soft bg-background px-4 py-4">
+    <View className="border-b-[0.5px] border-hair-soft bg-background px-4 py-4">
       <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
         <Pressable
           onPress={handleOpenNavigator}
@@ -104,7 +104,7 @@ export function PrDiffFileListHeader({
           {isTruncated ? (
             <Text
               variant="muted"
-              className="text-[10px]"
+              className="text-xs"
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
               style={{ color: colors.mutedForeground }}
             >
@@ -134,7 +134,7 @@ function ViewModeToggle({
       </Text>
       <RadioGroup
         label={t('prReview.fileList.layout')}
-        className="flex-row overflow-hidden rounded-md border border-border bg-card"
+        className="flex-row overflow-hidden rounded-md border border-border bg-secondary"
       >
         <ViewModeButton
           active={viewMode === 'unified'}

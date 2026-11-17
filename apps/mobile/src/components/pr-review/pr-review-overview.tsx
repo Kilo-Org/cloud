@@ -11,6 +11,7 @@ import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { Card } from '@/components/ui/card';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
@@ -273,10 +274,7 @@ export function PrReviewOverview({
     >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
-        <Text
-          className="text-[22px] font-semibold leading-[1.75rem] text-foreground"
-          numberOfLines={3}
-        >
+        <Text className="text-lg font-semibold text-foreground" numberOfLines={3}>
           {data.title}
         </Text>
         <PrAuthorRow author={data.author} />
@@ -294,9 +292,9 @@ export function PrReviewOverview({
       <View className="gap-2">
         <PrReviewSectionLabel label={t('prReview.description')} />
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
-          <View className="rounded-lg bg-card p-4">
+          <Card>
             <MarkdownText value={data.bodyMarkdown} variant="assistant" />
-          </View>
+          </Card>
         ) : (
           <Text variant="muted" className="text-sm italic">
             {t('prReview.noDescriptionProvided')}

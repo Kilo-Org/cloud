@@ -6,6 +6,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
@@ -70,7 +71,7 @@ export function ProviderConnectCard<T>({
   };
 
   return (
-    <View className="items-center gap-3 rounded-lg bg-secondary p-6">
+    <Card className="items-center">
       <Icon size={28} color={colors.secondaryForeground} />
       <Text className="text-center text-sm text-muted-foreground">
         {t('codeReviewer.providerConnect.description', { label: t(label) })}
@@ -85,6 +86,6 @@ export function ProviderConnectCard<T>({
         {connecting ? <ActivityIndicator size="small" /> : null}
         <Text>{t(buttonLabel)}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

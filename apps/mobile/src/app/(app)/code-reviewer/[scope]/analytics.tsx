@@ -10,13 +10,18 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Card } from '@/components/ui/card';
 import { FileText, GitPullRequest, LineChart, type LucideIcon } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -51,32 +56,49 @@ function MetricCard({
 }: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
   const colors = useThemeColors();
   return (
-    <View className="min-w-0 flex-1 justify-center gap-1 rounded-lg bg-secondary p-4">
+    <Card className="min-w-0 flex-1 justify-center gap-1">
       <View className="flex-row items-center gap-2">
         <Icon size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
           {label}
         </Text>
       </View>
-      <Text className="text-lg font-semibold">{value}</Text>
-    </View>
+      <Text variant="figure">{value}</Text>
+    </Card>
   );
 }
 
 function AnalyticsSkeleton() {
   return (
-    <View className="gap-3 px-6 pt-4">
-      <Skeleton className="h-10 w-full rounded-lg" />
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
+    <View className="gap-6">
+      <Skeleton className="h-10 w-full rounded-md bg-muted-soft" />
+      <View className="gap-3">
+        <View className="flex-row gap-3">
+          <Card className="flex-1">
+            <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+          </Card>
+          <Card className="flex-1">
+            <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+          </Card>
+        </View>
+        <View className="flex-row gap-3">
+          <Card className="flex-1">
+            <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+          </Card>
+          <Card className="flex-1">
+            <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+          </Card>
+        </View>
       </View>
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-      </View>
-      <Skeleton className="h-12 w-full rounded-lg" />
-      <Skeleton className="h-12 w-full rounded-lg" />
+      <RowGroup leadingTile>
+        {Array.from({ length: 2 }, (_, index) => (
+          <RowSkeleton key={index} tile subtitle />
+        ))}
+      </RowGroup>
     </View>
   );
 }
@@ -169,7 +191,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   } else {
     const { summary, repositories, settings } = dashboard.data;
     body = (
-      <View className="gap-6 px-6 pt-4">
+      <View className="gap-6">
         {!settings.enabled ? (
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.analytics.off')}
@@ -214,11 +236,8 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             }
           />
         ) : (
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.repositories')}
-            </Text>
-            <View>
+          <Section label={t('common.repositories')}>
+            <RowGroup leadingTile>
               {repositories.map(repository => (
                 <ConfigureRow
                   key={repository.repository}
@@ -234,8 +253,8 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
                   })}
                 />
               ))}
-            </View>
-          </View>
+            </RowGroup>
+          </Section>
         )}
       </View>
     );
@@ -252,7 +271,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         titleNumberOfLines={1}
         eyebrow={t('codeReviewer.analytics.title')}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <View className="gap-2">
           <SegmentedControl
             options={PLATFORM_OPTIONS}

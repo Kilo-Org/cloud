@@ -20,7 +20,7 @@ import {
 } from '@/components/code-reviewer/repository-selection-mode';
 import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -258,8 +258,8 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
       {rowsBody && reposLoading && (
         <View className="gap-3 pt-2">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <Skeleton className="h-12 w-full rounded-lg" />
+          <RowSkeleton subtitle />
+          <RowSkeleton subtitle />
         </View>
       )}
 

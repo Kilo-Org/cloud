@@ -22,19 +22,18 @@ import {
   selectPrInboxView,
 } from '@/components/pr-review/pr-review-inbox-view';
 import { Button } from '@/components/ui/button';
-import { Clock, Inbox } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import {
   providerPrRefLabel,
   providerPrRoutePath,
   providerPrTermKey,
 } from '@/lib/pr-review/provider-pr-ref';
 import { type ProviderInboxRow, useProviderInbox } from '@/lib/pr-review/use-provider-inbox';
-import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 type InboxItem = ProviderInboxRow;
@@ -45,17 +44,13 @@ type InboxItem = ProviderInboxRow;
  * The INBOX header follows the paste block (and its own reserved link-error
  * line) and the RECENT header follows the inbox body; the two breaks are the
  * same section-to-section relation, so they share one token instead of each
- * picking its own. A header is closer to its own content than to the section
- * above it — otherwise the gap under a body reads as its spacing and the
- * eyebrow looks like the last line of the block it follows. `spacing.8`
- * separates sections and `spacing.4` pairs a header with what it labels, the
- * ladder DESIGN.md reserves for exactly this relation. At this app's inline
- * 14-point rem they land on 28 dp and 14 dp; the RECENT section they replace
- * had 21 dp above its header and 21 dp below it, so neither gap read as the
- * section break.
+ * picking its own: the layout contract's 21pt section gap. A header is closer
+ * to its own content than to the section above it (`gap-3`, 10.5pt) — otherwise
+ * the gap under a body reads as its spacing and the eyebrow looks like the last
+ * line of the block it follows.
  */
-const PR_REVIEW_SECTION_BREAK = { padding: 'pt-8' } as const;
-const PR_REVIEW_SECTION_LABEL_GAP = 'gap-4';
+const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
+const PR_REVIEW_SECTION_LABEL_GAP = 'gap-3';
 
 type PrReviewInboxListProps = {
   /**
@@ -103,9 +98,9 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   const showLoadMoreRetry =
     view.showLoadMoreRetry || (view.kind === 'reconnect' && inbox.laterPageError);
 
-  // Landscape: side insets keep inbox rows and the px-6 header/footer
-  // content clear of the sensor housing; portrait insets are zero, so the
-  // style carries explicit zeros and nothing else changes.
+  // Landscape: the side insets keep the rows and the header content clear of
+  // the sensor housing; portrait insets are zero. The page gutter itself is
+  // drawn by the rows and the header block, not by the content container.
   const insets = useSafeAreaInsets();
   const contentContainerStyle = useMemo<ViewStyle>(
     () => ({ paddingLeft: insets.left, paddingRight: insets.right }),
@@ -118,7 +113,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       keyExtractor={item => item.key}
       renderItem={({ item }) => <InboxRow item={item} />}
       ListHeaderComponent={
-        <View className="px-6 pt-4">
+        <View className="px-4 pt-3">
           {header}
           <View className={PR_REVIEW_SECTION_BREAK.padding}>
             <InboxEyebrow />
@@ -143,7 +138,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         // settles. Left out, nothing below the skeletons can move, and the
         // section appears at the height the settled body leaves it.
         view.kind === 'loading' ? null : (
-          <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
+          <View className={`gap-6 px-4 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
             {inbox.githubNeedsReconnect &&
             view.kind !== 'reconnect' &&
             !isOrganizationAccessView(view) ? (
@@ -171,34 +166,17 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
 }
 
 function InboxEyebrow() {
-  const colors = useThemeColors();
   const { t } = useTranslation();
-  return (
-    <View className="flex-row items-center gap-2">
-      <Inbox size={16} color={colors.mutedForeground} />
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.inbox.title')}
-      </Text>
-    </View>
-  );
+  return <SectionHeader label={t('prReview.inbox.title')} />;
 }
 
 function RecentEyebrow() {
-  const colors = useThemeColors();
   const { t } = useTranslation();
-  return (
-    <View className="flex-row items-center gap-2">
-      <Clock size={16} color={colors.mutedForeground} />
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('common.recent')}
-      </Text>
-    </View>
-  );
+  return <SectionHeader label={t('common.recent')} />;
 }
 
 function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
   const router = useRouter();
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const now = useRelativeTimeNow();
   const updatedLabel = timeAgo(parseTimestamp(item.updatedAt), undefined, now);
@@ -213,7 +191,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
       }}
       accessibilityRole="button"
       accessibilityLabel={rowLabel}
-      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
     >
       <View className="flex-1 gap-1">
         <Text className="text-sm font-medium" numberOfLines={1}>
@@ -236,7 +214,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.isDraft ? <InboxChip label={t('common.draft')} /> : null}
         </View>
       </View>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }
@@ -245,7 +223,7 @@ function InboxChip({ label }: Readonly<{ label: string }>) {
   // shrink-0 keeps the chip at its label width while the row's text truncates.
   return (
     <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
-      <Text variant="muted" className="text-[10px] font-medium">
+      <Text variant="muted" className="text-xs font-medium">
         {label}
       </Text>
     </View>

@@ -80,6 +80,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
@@ -485,7 +486,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           <PrReviewReconnectNotice />
         </CenteredState>
         {dialog}

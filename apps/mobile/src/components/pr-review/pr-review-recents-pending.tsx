@@ -7,15 +7,16 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function PrReviewRecentsPending() {
   const { t } = useTranslation();
   return (
-    <View
-      className="rounded-xl border border-border bg-card p-3"
+    <Card
       accessibilityRole="progressbar"
       accessibilityLabel={t('common.loading')}
+      className="gap-0"
     >
       <View className="flex-row items-center gap-3">
         <View className="min-w-0 flex-1 gap-1">
@@ -25,6 +26,6 @@ export function PrReviewRecentsPending() {
         </View>
         <Skeleton className="h-4 w-4 rounded-md" />
       </View>
-    </View>
+    </Card>
   );
 }

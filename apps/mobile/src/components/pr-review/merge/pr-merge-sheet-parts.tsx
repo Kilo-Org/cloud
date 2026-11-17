@@ -7,11 +7,13 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -116,8 +118,8 @@ function DeleteBranchToggle({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
-      <Text className="flex-1 pr-3 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
+    <View className="flex-row items-center justify-between gap-3 border-t-[0.5px] border-hair-soft px-4 py-3">
+      <Text className="flex-1 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
       <Switch
         accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
         value={value}
@@ -144,7 +146,7 @@ export function MergeSheetFormSkeleton(props: {
 }): ReactNode {
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
+      <View className={SCREEN_BODY_CLASS}>
         <View className="gap-1.5">
           <Skeleton className="h-5 w-16" />
           {props.methodOptions.length === 0 ? (
@@ -168,14 +170,14 @@ export function MergeSheetFormSkeleton(props: {
           <Skeleton className="h-24" />
         </View>
         {props.showDeleteBranchToggle ? (
-          <View className="rounded-lg bg-secondary px-4 py-3">
-            <Skeleton className="h-[44px]" />
+          <View className="px-4 py-3">
+            <Skeleton className="h-12" />
           </View>
         ) : null}
       </View>
       <PrFormSheetFooter>
-        <Skeleton className="h-[44px]" />
-        <Skeleton className="mt-2 h-[44px]" />
+        <Skeleton className="h-12" />
+        <Skeleton className="mt-2 h-12" />
       </PrFormSheetFooter>
     </>
   );
@@ -236,15 +238,15 @@ export function MergeSheetFormBody(props: {
 
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
+      <View className={SCREEN_BODY_CLASS}>
         {noMethodsAllowed ? (
-          <View className="rounded-md border border-border bg-secondary p-3">
+          <Card className="gap-2">
             <AccessibleStatus
               message={t('prReview.merge.noEnabledMethods')}
               tone="status"
               className="text-sm"
             />
-          </View>
+          </Card>
         ) : (
           <MethodPicker
             methodOptions={methodOptions}

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
@@ -28,7 +29,7 @@ export function ReviewMemoryToggleCard({
 }>) {
   const { t } = useTranslation();
   return (
-    <View className="rounded-lg bg-secondary p-4">
+    <Card>
       <View className="flex-row items-center justify-between gap-3">
         <Pressable
           className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 justify-center active:opacity-70')}
@@ -55,10 +56,10 @@ export function ReviewMemoryToggleCard({
         />
       </View>
       {readOnly ? (
-        <Text variant="muted" className="mt-2 text-xs">
+        <Text variant="muted" className="text-xs">
           {t('codeReviewer.reviewMemory.readOnlyDescription')}
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }

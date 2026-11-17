@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -109,9 +110,7 @@ function CapabilityReviewEventChips(props: {
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.eventChips.label')}
-      </Text>
+      <Text variant="eyebrow">{t('prReview.eventChips.label')}</Text>
       <RadioGroup label={t('prReview.eventChips.label')} className="flex-row flex-wrap gap-2">
         {props.events.map(providerEvent => {
           const event = (Object.keys(EVENT_TO_PROVIDER) as ReviewEvent[]).find(
@@ -452,7 +451,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           {reviewEvents ? (
             <CapabilityReviewEventChips
               events={reviewEvents}

@@ -51,7 +51,7 @@ export function PrReviewTabSelector({
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
-    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
+    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-md bg-secondary p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
         const disabled = disabledTabs.includes(tab.id);
@@ -96,9 +96,7 @@ export function PrReviewTabSelector({
                 // `muted` equals the row's `secondary` in both palettes, so the
                 // badge fills with `muted-soft` to read as a pill at all.
                 <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] font-medium text-foreground">
-                    {badge}
-                  </Text>
+                  <Text className="text-center text-xs font-medium text-foreground">{badge}</Text>
                 </View>
               ) : null}
             </View>

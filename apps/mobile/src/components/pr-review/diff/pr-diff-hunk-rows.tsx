@@ -27,11 +27,11 @@ export function HunkHeaderRow({ header }: { header: string }) {
   const { t } = useTranslation();
   return (
     <View
-      className="border-b border-hair-soft bg-secondary px-4 py-1"
+      className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-1"
       accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header })}
     >
       <Text
-        className="font-mono-medium text-[11px]"
+        className="font-mono-medium text-xs"
         // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
         style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
@@ -59,7 +59,7 @@ export function ExpandSeparatorRow({
 
   if (item.state === 'unavailable') {
     return (
-      <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+      <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
         <X size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
           {t('prReview.hunkRows.contextUnavailable')}
@@ -76,7 +76,7 @@ export function ExpandSeparatorRow({
         }}
         className={cn(
           STATE_ACTION_CLASS,
-          'flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
+          'flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
         )}
         accessibilityRole="button"
         accessibilityLabel={t('prReview.hunkRows.retryLoadingContext')}
@@ -90,7 +90,7 @@ export function ExpandSeparatorRow({
 
   if (item.state === 'loading') {
     return (
-      <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+      <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
         <GitCommit size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
           {isUnknownEnd
@@ -141,7 +141,7 @@ export function ExpandSeparatorRow({
         });
 
   return (
-    <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+    <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
       <Pressable
         onPress={() => {
           onLoad(DEFAULT_EXPAND_WINDOW);

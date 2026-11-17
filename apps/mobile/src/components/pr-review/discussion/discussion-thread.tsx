@@ -35,6 +35,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
+import { Card } from '@/components/ui/card';
 import { ResolveToggle } from '@/components/pr-review/discussion/discussion-thread-resolve-toggle';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
@@ -149,10 +150,7 @@ export function DiscussionThread({
     }
   };
 
-  const cardClassName = cn(
-    'gap-3 rounded-xl border border-border bg-card p-3.5',
-    thread.isResolved && 'bg-secondary'
-  );
+  const cardClassName = 'gap-3';
   const headerCommonProps = {
     anchorLabel,
     resolved: thread.isResolved,
@@ -178,7 +176,7 @@ export function DiscussionThread({
           }
         : undefined;
     return (
-      <View
+      <Card
         accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
         className={cardClassName}
       >
@@ -233,7 +231,7 @@ export function DiscussionThread({
             onInputFocus={onReplyFocus}
           />
         ) : null}
-      </View>
+      </Card>
     );
   }
 
@@ -243,9 +241,11 @@ export function DiscussionThread({
       accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
       accessibilityState={{ expanded: false }}
       onPress={onToggleExpand}
-      className={cn(cardClassName, 'active:opacity-70')}
+      className="active:opacity-70"
     >
-      <ThreadHeader {...headerCommonProps} />
+      <Card className={cardClassName}>
+        <ThreadHeader {...headerCommonProps} />
+      </Card>
     </Pressable>
   );
 }
@@ -305,7 +305,7 @@ function ThreadHeader({
           ) : (
             <ChevronDown size={16} color={colors.mutedForeground} />
           )}
-          <Text className="flex-1 font-mono-medium text-[12px] text-foreground" numberOfLines={1}>
+          <Text className="flex-1 font-mono-medium text-sm text-foreground" numberOfLines={1}>
             {anchorLabel}
           </Text>
         </LabelRow>
@@ -317,7 +317,7 @@ function ThreadHeader({
         {resolved ? (
           <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
             <CheckCheck size={10} color={colors.good} />
-            <Text className="text-[10px] font-medium uppercase tracking-wide">
+            <Text className="text-xs font-medium text-good">
               {t('prReview.discussion.resolved')}
             </Text>
           </View>

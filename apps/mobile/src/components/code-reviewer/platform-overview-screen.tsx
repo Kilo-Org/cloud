@@ -20,15 +20,19 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { Bot, ScrollText } from '@/components/ui/icons';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { canConnectProvider } from '@/lib/code-reviewer-status';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
@@ -157,7 +161,7 @@ export function PlatformOverviewScreen({
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
@@ -225,7 +229,7 @@ export function PlatformOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a
              paused read keeps the skeleton, and a pending read that nothing is
@@ -238,7 +242,7 @@ export function PlatformOverviewScreen({
               className="gap-6"
             >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
-                <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
+                <View className="flex-row items-center justify-between rounded-xl bg-warn-tile-bg p-4">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
@@ -276,7 +280,7 @@ export function PlatformOverviewScreen({
                 />
               )}
 
-              <View className="rounded-lg bg-secondary p-4">
+              <Card>
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
@@ -299,7 +303,7 @@ export function PlatformOverviewScreen({
                   />
                 </View>
                 {!hasRepoSelection && (
-                  <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
+                  <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.selectRepository')}
                     </Text>
@@ -315,9 +319,9 @@ export function PlatformOverviewScreen({
                     </Button>
                   </View>
                 )}
-              </View>
+              </Card>
 
-              <View>
+              <RowGroup leadingTile>
                 {rows.map(row => (
                   <ConfigureRow
                     key={row.field}
@@ -327,34 +331,36 @@ export function PlatformOverviewScreen({
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
-              </View>
+              </RowGroup>
 
-              {capabilities.reviewMd && (
-                <ToggleRow
-                  title={t('codeReviewer.followReviewMd')}
-                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
-                  value={!data.disableReviewMd}
-                  disabled={!canEdit || save.isPending}
-                  onValueChange={value => {
-                    save.mutate({ disableReviewMd: !value });
-                  }}
-                />
-              )}
-
-              {/* Bot detection relies on GitHub's authoritative user type, which
-                  GitLab and Bitbucket webhooks do not provide, so this setting
-                  exists on GitHub only (same gate as the web form). */}
-              {capabilities.skipBotPullRequests && (
-                <ToggleRow
-                  title={t('codeReviewer.skipBotPullRequests.title')}
-                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
-                  value={data.skipBotPullRequests}
-                  disabled={!canEdit || save.isPending}
-                  onValueChange={value => {
-                    save.mutate({ skipBotPullRequests: value });
-                  }}
-                />
-              )}
+              {capabilities.reviewMd || capabilities.skipBotPullRequests ? (
+                <RowGroup leadingTile>
+                  {capabilities.reviewMd && (
+                    <PreferenceRow
+                      icon={ScrollText}
+                      title={t('codeReviewer.followReviewMd')}
+                      subtitle={t('codeReviewer.followReviewMdSubtitle')}
+                      value={!data.disableReviewMd}
+                      disabled={!canEdit || save.isPending}
+                      onValueChange={value => {
+                        save.mutate({ disableReviewMd: !value });
+                      }}
+                    />
+                  )}
+                  {capabilities.skipBotPullRequests && (
+                    <PreferenceRow
+                      icon={Bot}
+                      title={t('codeReviewer.skipBotPullRequests.title')}
+                      subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                      value={data.skipBotPullRequests}
+                      disabled={!canEdit || save.isPending}
+                      onValueChange={value => {
+                        save.mutate({ skipBotPullRequests: value });
+                      }}
+                    />
+                  )}
+                </RowGroup>
+              ) : null}
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

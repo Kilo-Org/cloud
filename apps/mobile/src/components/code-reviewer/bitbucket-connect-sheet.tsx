@@ -8,6 +8,7 @@ import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-conne
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -16,6 +17,7 @@ import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -46,51 +48,6 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
 
-  if (isResolving || readiness.isPending || status.isPending) {
-    return (
-      <SheetScrollView
-        className="flex-1 bg-background"
-        contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-      >
-        <Skeleton className="mx-auto h-5 w-40 rounded" />
-        <View className="gap-2">
-          <Skeleton className="h-3.5 w-full rounded" />
-          <Skeleton className="h-3.5 w-4/5 rounded" />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-32 rounded" />
-          <Skeleton className="h-11 rounded-md" />
-        </View>
-        <Skeleton className="h-11 rounded-md" />
-      </SheetScrollView>
-    );
-  }
-
-  if (isError || org == null) {
-    return <OrganizationBoundary organizationIdOverride={scope} />;
-  }
-
-  // An unanswered status read is not "no integration": it is the only read
-  // that can name a Bitbucket OAuth connection, so a failure asks again
-  // instead of offering a token form the server would refuse.
-  if (status.isError && status.data == null) {
-    return (
-      <>
-        <SheetTitle title={t('agentChat.repoPicker.platformBitbucket')} />
-        {isPermissionDeniedError(status.error) ? (
-          <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
-        ) : (
-          <QueryError
-            className="bg-background"
-            variant={trpcErrorVariant(status.error)}
-            onRetry={() => void status.refetch()}
-            isRetrying={status.isFetching}
-          />
-        )}
-      </>
-    );
-  }
-
   const integrationId = readiness.data?.integrationId ?? null;
   const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
   // A workspace connected through Bitbucket OAuth has no token integration to
@@ -106,10 +63,73 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
   }
 
+  // The sheet's own header is the shared one: the title stays pinned above the
+  // scroll body, and Close is the way out. The route is pushed over another
+  // screen, so the sheet settles a detent below the window top and the header
+  // reserves no clearance of its own.
+  const header = (
+    <SheetHeader
+      title={title}
+      onDone={() => {
+        router.back();
+      }}
+      doneLabel={t('common.close')}
+      topInset="never"
+    />
+  );
+
+  if (isResolving || readiness.isPending || status.isPending) {
+    return (
+      <>
+        {header}
+        <SheetScrollView
+          className="flex-1 bg-background"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+        >
+          <Skeleton className="mx-auto h-5 w-40 rounded" />
+          <View className="gap-2">
+            <Skeleton className="h-3.5 w-full rounded" />
+            <Skeleton className="h-3.5 w-4/5 rounded" />
+          </View>
+          <View className="gap-1.5">
+            <Skeleton className="h-3.5 w-32 rounded" />
+            <Skeleton className="h-11 rounded-md" />
+          </View>
+          <Skeleton className="h-11 rounded-md" />
+        </SheetScrollView>
+      </>
+    );
+  }
+
+  if (isError || org == null) {
+    return <OrganizationBoundary organizationIdOverride={scope} />;
+  }
+
+  // An unanswered status read is not "no integration": it is the only read
+  // that can name a Bitbucket OAuth connection, so a failure asks again
+  // instead of offering a token form the server would refuse.
+  if (status.isError && status.data == null) {
+    return (
+      <>
+        {header}
+        {isPermissionDeniedError(status.error) ? (
+          <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
+        ) : (
+          <QueryError
+            className="bg-background"
+            variant={trpcErrorVariant(status.error)}
+            onRetry={() => void status.refetch()}
+            isRetrying={status.isFetching}
+          />
+        )}
+      </>
+    );
+  }
+
   if (readiness.isError && readiness.data == null) {
     return (
       <>
-        <SheetTitle title={title} />
+        {header}
         {isPermissionDeniedError(readiness.error) ? (
           <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
         ) : (
@@ -127,7 +147,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   if (!canManage) {
     return (
       <>
-        <SheetTitle title={title} />
+        {header}
         <PermissionDenied description={deniedDescription} />
       </>
     );
@@ -140,8 +160,8 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   if (managesExisting) {
     return (
       <>
-        <SheetTitle title={title} />
-        <View className="px-6 pt-2 pb-8">
+        {header}
+        <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
             {t('codeReviewer.bitbucketConnect.managedOnWeb')}
           </Text>
@@ -151,30 +171,24 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   }
 
   return (
-    <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <SheetTitle title={title} />
-      <BitbucketConnectForm
-        scope={scope}
-        integrationId={integrationId}
-        onConnected={() => {
-          notificationHaptic(Haptics.NotificationFeedbackType.Success);
-          announcingToast.success(t('common.bitbucketConnected'));
-          router.back();
-        }}
-      />
-    </SheetScrollView>
-  );
-}
-
-function SheetTitle({ title }: Readonly<{ title: string }>) {
-  return (
-    <View collapsable={false} className="bg-background px-6 pt-4">
-      <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
-    </View>
+    <>
+      {header}
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
+        <BitbucketConnectForm
+          scope={scope}
+          integrationId={integrationId}
+          onConnected={() => {
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
+            announcingToast.success(t('common.bitbucketConnected'));
+            router.back();
+          }}
+        />
+      </SheetScrollView>
+    </>
   );
 }

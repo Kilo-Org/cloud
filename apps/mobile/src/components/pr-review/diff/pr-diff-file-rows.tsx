@@ -95,7 +95,7 @@ export function FileHeaderRow({
   const pathLine = isRename ? `${file.previousPath} → ${file.path}` : file.path;
 
   return (
-    <View className="border-b border-hair-soft bg-card px-4 py-3">
+    <View className="border-b-[0.5px] border-hair-soft bg-card px-4 py-3">
       <View className="flex-row items-center gap-2">
         <Pressable
           onPress={hasDiff ? onToggleExpand : undefined}
@@ -160,7 +160,7 @@ export function PatchMissingRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="border-b border-hair-soft bg-secondary px-4 py-3">
+    <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
       <View className="flex-row items-center gap-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">

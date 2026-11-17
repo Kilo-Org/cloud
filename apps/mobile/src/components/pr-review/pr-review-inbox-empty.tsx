@@ -69,7 +69,7 @@ function InboxBody({
       <View>
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
+          <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-4 py-3">
             <Skeleton className="h-3.5 w-2/3" />
             <Skeleton className="h-3 w-1/3" />
           </View>
@@ -140,7 +140,7 @@ function InboxBody({
 
   if (view.kind === 'reconnect') {
     return (
-      <View className="px-6 py-6">
+      <View className="px-4 py-6">
         <PrReviewReconnectNotice
           platform={reconnectPlatform ?? undefined}
           organizationId={organizationId}

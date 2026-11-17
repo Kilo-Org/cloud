@@ -23,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -168,7 +169,7 @@ function InstructionsEditor({
           contentHeightRef.current = event.nativeEvent.contentSize.height;
           alignFirstLineIfOverflowing();
         }}
-        className="min-h-32 max-h-[196px] rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
+        className="min-h-32 max-h-56 rounded-md border border-border bg-card p-3 text-sm text-foreground"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
@@ -318,14 +319,14 @@ function InstructionsScreen({
           // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
           automaticallyAdjustKeyboardInsets
           className="flex-1"
-          contentContainerClassName="px-6 pt-4"
+          contentContainerClassName={SCREEN_BODY_CLASS}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View layout={LinearTransition} className="gap-4">
+          <Animated.View layout={LinearTransition} className="gap-6">
             {configBody.body.status === 'loading' && (
-              <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-                <Skeleton className="h-32 w-full rounded-lg" />
-                <Skeleton className="h-10 w-full rounded-md" />
+              <Animated.View exiting={FadeOut.duration(150)} className="gap-6">
+                <Skeleton className="h-32 w-full rounded-md bg-muted-soft" />
+                <Skeleton className="h-12 w-full rounded-md bg-muted-soft" />
               </Animated.View>
             )}
 

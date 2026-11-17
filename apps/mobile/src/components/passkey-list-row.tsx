@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { KeyRound, Pencil, Trash2 } from '@/components/ui/icons';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { parseTimestamp } from '@/lib/utils';
@@ -42,7 +42,7 @@ export function PasskeyListRow({
     <ConfigureRow
       icon={KeyRound}
       title={name && name.length > 0 ? name : t('profile.passkeyDefaultName')}
-      subtitle={lastUsed === null ? added : `${added} · ${lastUsed}`}
+      subtitle={lastUsed === null ? added : formatList([added, lastUsed], i18n.language)}
       variant="action"
       trailing={
         <View className="flex-row items-center gap-1">

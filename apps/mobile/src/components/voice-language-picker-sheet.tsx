@@ -30,7 +30,6 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
-import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. Rows own the page gutter, so the list adds

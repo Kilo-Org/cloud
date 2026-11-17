@@ -101,7 +101,12 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
     // resizes it.
     expect(logoImages[0]?.props.style).toEqual({ width: 100, height: 100 });
     // The reveal disc is the mark plus its ring.
-    expect(findByType(renderer.root, 'Animated.View')[1]?.props.style[0]).toEqual({
+    const discStyle = (
+      findByType(renderer.root, 'Animated.View')[1]?.props as
+        | { style?: [unknown, unknown] }
+        | undefined
+    )?.style;
+    expect(discStyle?.[0]).toEqual({
       width: 120,
       height: 120,
     });

@@ -36,6 +36,8 @@ type KvRowProps = {
    */
   valueFace?: 'mono' | 'text' | 'numeric';
   className?: string;
+  /** Test handle for the row's own container, for native E2E scripts. */
+  testID?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
@@ -93,6 +95,7 @@ export function KvRow({
   dotTone,
   valueFace = 'mono',
   className,
+  testID,
   selectable,
   valueClassName,
   valueAccessibilityLabel,
@@ -134,6 +137,7 @@ export function KvRow({
   );
   return (
     <View
+      testID={testID}
       className={cn(
         'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3',
         className

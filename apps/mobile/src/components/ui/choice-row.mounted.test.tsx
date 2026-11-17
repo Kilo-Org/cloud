@@ -32,6 +32,7 @@ type RowProps = {
   multi?: boolean;
   disabled?: boolean;
   onPress?: () => void;
+  testID?: string;
   children?: ReactNode;
 };
 
@@ -202,5 +203,13 @@ describe('ChoiceRow touch target', () => {
       expect(String(control.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(control.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('ChoiceRow test handle', () => {
+  it('puts the caller\'s testID on the row control', () => {
+    const control = rowControl(renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' }));
+
+    expect(control.props.testID).toBe('choice-1');
   });
 });

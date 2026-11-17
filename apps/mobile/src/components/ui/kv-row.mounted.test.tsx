@@ -82,6 +82,7 @@ function renderRow(
     | {
         value: string;
         selectable?: boolean;
+        testID?: string;
         valueDirection?: 'ltr';
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
@@ -257,5 +258,15 @@ describe('KvRow value status', () => {
     // The label and the value paragraph, with no status node inside it.
     expect(nodes).toHaveLength(2);
     expect(nodes[1]?.props.children).toContain('Teams');
+  });
+});
+
+describe('KvRow test handle', () => {
+  it('puts the caller\'s testID on the row container', () => {
+    const row = renderRow({ value: '1.2.3', testID: 'kv-1' }).find(
+      node => node.props.testID === 'kv-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

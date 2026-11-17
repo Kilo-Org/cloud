@@ -53,6 +53,7 @@ function renderRow(
     title?: string;
     tone?: 'good' | 'warn' | 'danger';
     disabled?: boolean;
+    testID?: string;
     /** `false` renders the inert row a display-only row is: no Pressable at all. */
     pressable?: boolean;
   } = {}
@@ -65,6 +66,7 @@ function renderRow(
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
+      ...(props.testID === undefined ? {} : { testID: props.testID }),
     });
     if (renderer) {
       renderer.update(element);
@@ -242,5 +244,22 @@ describe('ConfigureRow disabled cue', () => {
     // no state of its own to announce from a node a reader never reaches.
     expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
     expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
+  });
+});
+
+describe('ConfigureRow test handle', () => {
+  it('puts the caller\'s testID on the tappable row', () => {
+    const control = renderRow({ testID: 'configure-1' }).find(node =>
+      Object.is(node.type, 'Pressable')
+    );
+
+    expect(control.props.testID).toBe('configure-1');
+  });
+
+  it('puts it on the inert row, which has no Pressable', () => {
+    const root = renderRow({ testID: 'configure-2', pressable: false });
+    const row = root.find(node => node.props.testID === 'configure-2');
+
+    expect(row.type).toBe('View');
   });
 });

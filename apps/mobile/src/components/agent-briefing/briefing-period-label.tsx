@@ -9,14 +9,14 @@ export function BriefingPeriodLabel({ report }: { readonly report: BriefingRepor
   const { t, i18n } = useTranslation();
   return (
     <View className="gap-1">
-      <Text className="text-xs text-muted-foreground">
+      <Text variant="caption">
         {t('agentBriefing.window', {
           start: formatBriefingTimestamp(report.nightStartAt, i18n.language, report.timezone),
           end: formatBriefingTimestamp(report.cutoffAt, i18n.language, report.timezone),
         })}
       </Text>
-      <Text className="text-xs text-muted-foreground">{report.timezone}</Text>
-      <Text className="text-xs text-muted-foreground">
+      <Text variant="caption">{report.timezone}</Text>
+      <Text variant="caption">
         {t('agentBriefing.capturedAt', {
           time: formatBriefingTimestamp(report.capturedAt, i18n.language, report.timezone),
         })}

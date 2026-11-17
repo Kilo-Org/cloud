@@ -24,6 +24,8 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

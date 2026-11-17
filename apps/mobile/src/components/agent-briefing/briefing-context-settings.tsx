@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -180,15 +181,10 @@ export function BriefingContextSettings({
     );
   };
   return (
-    <View className="gap-4 rounded-2xl border border-border bg-card p-4">
-      <Text className="font-semibold">
-        {t('agentBriefing.scheduledContextSettings', { context: contextName })}
-      </Text>
-      <Text className="text-sm text-muted-foreground">
-        {t('agentBriefing.scheduledContextHint')}
-      </Text>
+    <Card>
+      <Text variant="muted">{t('agentBriefing.scheduledContextHint')}</Text>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.scheduledContextEnabled')}</Text>
+        <Text className="min-w-0 flex-1">{t('agentBriefing.scheduledContextEnabled')}</Text>
         <Switch
           value={preference.enabled}
           disabled={offline || update.isPending}
@@ -260,15 +256,15 @@ export function BriefingContextSettings({
             updateLimits();
           }}
         />
-        <Text className="text-xs text-muted-foreground">
-          {t('agentBriefing.snapshotSafeguards')}
-        </Text>
+        <Text variant="caption">{t('agentBriefing.snapshotSafeguards')}</Text>
       </View>
       {limitQuote.kind === 'invalid' ? (
-        <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
+        <Text variant="muted" className="text-destructive">
+          {t('agentBriefing.invalidSafeguards')}
+        </Text>
       ) : null}
       {limitQuote.kind === 'quoted' && limitQuote.quote?.canGenerate ? (
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t('agentBriefing.estimate', {
             estimate: briefingMoney(limitQuote.quote.estimatedCostMicrodollars, i18n.language),
             maximum: briefingMoney(limitQuote.quote.maximumCostMicrodollars, i18n.language),
@@ -276,7 +272,7 @@ export function BriefingContextSettings({
         </Text>
       ) : null}
       {limitQuote.kind === 'quoted' && !limitQuote.quote?.canGenerate ? (
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t(briefingEstimateUnavailableKey(limitQuote.quote?.unavailableReason))}
         </Text>
       ) : null}
@@ -307,6 +303,6 @@ export function BriefingContextSettings({
       >
         <Text>{t(preference.enabled ? 'common.save' : 'agentBriefing.enable')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

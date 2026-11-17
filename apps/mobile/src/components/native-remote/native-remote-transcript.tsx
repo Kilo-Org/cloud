@@ -39,7 +39,7 @@ export function NativeRemoteTranscript({
       <Text accessibilityRole="header" selectable className="font-mono text-sm">
         {sessionID}
       </Text>
-      <Text accessibilityLiveRegion="polite" className="text-muted-foreground">
+      <Text accessibilityLiveRegion="polite" variant="muted">
         {t('nativeRemote.status', {
           connection: t(connectionKeys[state?.connection ?? 'connecting']),
           runner: state?.runnerConnected ? t('common.online') : t('chat.botStatus.offline'),
@@ -118,7 +118,7 @@ export function NativeRemoteTranscript({
       {state?.events
         .filter(event => event.type === 'command.outcome')
         .map(event => (
-          <Text key={event.seq} selectable className="text-xs text-muted-foreground">
+          <Text key={event.seq} selectable variant="caption">
             {transcriptText(event.body)}
           </Text>
         ))}
@@ -153,7 +153,7 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
         placeholder={t('nativeRemote.prompt')}
         defaultValue=""
         multiline
-        className="min-h-[96px] leading-[1.25rem]"
+        className="min-h-24 leading-tight"
         autoCapitalize="sentences"
         onChangeText={text => {
           prompt.current = text;

@@ -32,7 +32,7 @@ async function mountHeader() {
 describe('TourStepHeader', () => {
   // A `Text` node's element type is the host string the primitive renders, so
   // these are the nodes the platform draws.
-  it('renders the eyebrow, the heading title and the body under the icon tile', async () => {
+  it('renders the eyebrow, the title and the body under the icon', async () => {
     const { renderer, unmount } = await mountHeader();
     const texts = renderer.root.findAllByType('Text');
     expect(texts.map(node => node.props.children)).toEqual([
@@ -41,18 +41,17 @@ describe('TourStepHeader', () => {
       'step body',
     ]);
 
-    // The title is the step's heading: an assistive reader can jump to it at
-    // the third level. The label above it introduces the heading, it is not one.
+    // The title takes a Text variant, not a one-off heading level: the tour has
+    // no screen title for it to rank under, so the step copy carries no role.
     const [eyebrow, title] = texts;
-    expect(title?.props.role).toBe('heading');
-    expect(title?.props['aria-level']).toBe('3');
+    expect(title?.props.role).toBeUndefined();
     expect(eyebrow?.props.role).toBeUndefined();
+    expect(title?.props.className).toContain('text-lg');
 
-    // The first view is the tile, so the icon precedes the copy block, and the
-    // text above is all that block holds.
-    const [tile] = renderer.root.findAllByType('View');
-    expect(tile?.children).toContainEqual('step-icon');
-    expect(tile?.findAllByType('Text')).toHaveLength(0);
+    // The icon precedes the copy block, and the text above is all that block
+    // holds: the step header draws no tile of its own.
+    const views = renderer.root.findAllByType('View');
+    expect(views).toHaveLength(1);
     unmount();
   });
 

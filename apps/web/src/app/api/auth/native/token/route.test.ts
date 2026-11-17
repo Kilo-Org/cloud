@@ -61,6 +61,12 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+  logExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
@@ -87,6 +93,8 @@ import {
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
 import {
   createDeviceSession,
@@ -94,6 +102,7 @@ import {
   createDeviceSessionWithAttestedKey,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
@@ -104,6 +113,32 @@ import {
   resolvePendingLinkForUser,
   summarizePendingLink,
 } from '@/lib/auth/pending-link';
+
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
+
+/**
+ * The admission aggregate flushes on wall-clock window boundaries, so refusal
+ * tests pin the clock and force a flush at a later instant.
+ */
+const now = jest.spyOn(Date, 'now');
+
+/** The aggregate telemetry line the admission module writes once per window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+  intervalMs: number;
+  windowStart: string;
+  at: string;
+};
+
+/** Aggregate lines written to the warn sink so far, in emission order. */
+function aggregateLines(): AggregateLine[] {
+  return mockWarnExceptInTest.mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -156,6 +191,8 @@ describe('POST /api/auth/native/token', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
     mockCreateOrUpdateUser.mockResolvedValue({
       success: true,
       user: fakeUser,
@@ -1509,7 +1546,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       // Code must be released so it remains usable.
       expect(mockReleaseSignInCode).toHaveBeenCalled();
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      // The collision is an expected refusal: it is counted, not reported.
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+      now.mockReturnValue(6_061_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_attested_key_cross_user_collision')
+      ).toHaveLength(1);
+      mockReleaseSignInCode.mockClear();
     });
 
     it('refuses key collision during persistence without burning the sign-in code (email, no supportsRefresh)', async () => {
@@ -1542,7 +1586,16 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
-      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      // The collision is an expected refusal: it is counted, not reported.
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      const collisionLine = aggregateLines().find(
+        line => line.metric === 'native_attested_key_cross_user_collision'
+      );
+      expect(collisionLine).toMatchObject({ count: 1 });
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────

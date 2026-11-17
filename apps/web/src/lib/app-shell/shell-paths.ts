@@ -10,9 +10,6 @@ export const APP_SHELL_PREFIX = '/app-shell';
 /** The shell entry point the native app opens with a one-time hand-off token. */
 export const APP_SHELL_HANDOFF_PATH = `${APP_SHELL_PREFIX}/handoff`;
 
-/** The terminal shell page that closes the in-app browser. */
-export const APP_SHELL_COMPLETE_PATH = `${APP_SHELL_PREFIX}/complete`;
-
 /** The terminal shell page for a missing, used, or expired hand-off. */
 export const APP_SHELL_EXPIRED_PATH = `${APP_SHELL_PREFIX}/expired`;
 

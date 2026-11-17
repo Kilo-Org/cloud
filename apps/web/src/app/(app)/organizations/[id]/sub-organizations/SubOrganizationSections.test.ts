@@ -19,13 +19,24 @@ const overview = {
       name: 'Child organization',
       plan: 'enterprise' as const,
       requireSeats: true,
-      memberCount: 4,
+      memberCount: 6,
       pendingInvitationCount: 0,
       seatCount: { used: 4, total: 10 },
       balanceMicrodollars: 25_000_000,
     },
   ],
 };
+
+/** One child's seats cell out of a rendered table row, so no other cell can satisfy an assertion. */
+function seatsCell(html: string, organizationName: string): string {
+  const row = html.split('</tr>').find(candidate => candidate.includes(organizationName));
+  if (!row) throw new Error(`no table row for ${organizationName}`);
+  const cells = row
+    .split('</td>')
+    .slice(0, -1)
+    .map(cell => cell.slice(cell.lastIndexOf('>') + 1).trim());
+  return cells[3];
+}
 
 describe('PeopleSection direct owners', () => {
   it('distinguishes direct child owners from inherited administrative permissions', () => {
@@ -89,19 +100,24 @@ describe('PeopleSection direct owners', () => {
 });
 
 describe('Sub-organization seats cells', () => {
-  it('prints the fraction only for a seats-enforcing organization that bought some', () => {
-    const html = renderToStaticMarkup(
+  const organizationId = '4ab109e4-2558-4290-84d8-894bd50bbdac';
+
+  function renderOverview(data: typeof overview) {
+    return renderToStaticMarkup(
       React.createElement(OverviewSection, {
-        organizationId: '4ab109e4-2558-4290-84d8-894bd50bbdac',
-        data: overview,
+        organizationId,
+        data,
         spendByOrganization: new Map(),
         usageDataStatus: 'available',
       })
     );
+  }
 
-    expect(html).toContain(
-      '<td class="px-3 py-3 align-middle text-right tabular-nums">4 / 10</td>'
-    );
+  it('prints the fraction in the seats cell for a seats-enforcing organization that bought some', () => {
+    const html = renderOverview(overview);
+
+    expect(seatsCell(html, overview.children[0].name)).toBe('4 / 10');
+    expect(html).not.toContain('Not required');
   });
 
   it('holds a zero-total child at the used count, without a fraction', () => {
@@ -114,17 +130,27 @@ describe('Sub-organization seats cells', () => {
         },
       ],
     };
-    const html = renderToStaticMarkup(
-      React.createElement(OverviewSection, {
-        organizationId: data.children[0].id,
-        data,
-        spendByOrganization: new Map(),
-        usageDataStatus: 'available',
-      })
-    );
+    const html = renderOverview(data);
 
-    expect(html).toContain('<td class="px-3 py-3 align-middle text-right tabular-nums">4</td>');
+    expect(seatsCell(html, data.children[0].name)).toBe('4');
     expect(html).not.toContain('4 / 0');
+  });
+
+  it('keeps the not-required label in the seats cell for an unenforced child', () => {
+    const data = {
+      ...overview,
+      children: [
+        {
+          ...overview.children[0],
+          requireSeats: false,
+          seatCount: { used: 4, total: 10 },
+        },
+      ],
+    };
+    const html = renderOverview(data);
+
+    expect(seatsCell(html, data.children[0].name)).toBe('Not required');
+    expect(html).not.toContain('4 / 10');
   });
 
   it('shows the people table an unenforced child as the used count', () => {
@@ -133,7 +159,7 @@ describe('Sub-organization seats cells', () => {
         {
           id: 'd69f3c69-2fe8-4752-bd91-8a493b8581b3',
           name: 'Owned child',
-          memberCount: 2,
+          memberCount: 3,
           pendingInvitationCount: 0,
           requireSeats: false,
           seatCount: { used: 2, total: 5 },
@@ -146,7 +172,7 @@ describe('Sub-organization seats cells', () => {
     };
     const html = renderToStaticMarkup(React.createElement(PeopleSection, { data }));
 
-    expect(html).toContain('<td class="px-3 py-3 align-middle text-right tabular-nums">2</td>');
+    expect(seatsCell(html, 'Owned child')).toBe('2');
     expect(html).not.toContain('2 / 5');
   });
 });

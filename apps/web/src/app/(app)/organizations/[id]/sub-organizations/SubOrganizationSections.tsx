@@ -166,11 +166,13 @@ export function OverviewSection({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatSeatCell({
-                        seatsEnforced: child.requireSeats,
-                        used: child.seatCount.used,
-                        total: child.seatCount.total,
-                      })}
+                      {child.requireSeats
+                        ? formatSeatCell({
+                            seatsEnforced: true,
+                            used: child.seatCount.used,
+                            total: child.seatCount.total,
+                          })
+                        : 'Not required'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMicrodollars(child.balanceMicrodollars)}

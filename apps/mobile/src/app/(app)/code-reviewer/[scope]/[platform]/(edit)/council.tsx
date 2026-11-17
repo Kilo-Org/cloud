@@ -61,6 +61,20 @@ export default function CouncilRoute() {
   return <CouncilScreen scope={params.scope} platform={params.platform} />;
 }
 
+/**
+ * The unavailable sentence each refused scope reads. A personal account never
+ * carries council, Bitbucket has no council on either client, and a settled
+ * organization refusal names the plan rule it can act on.
+ */
+function unavailableCopyKey(scope: string, platformSupportsCouncil: boolean): string {
+  if (isPersonal(scope)) {
+    return 'codeReviewer.council.unavailablePersonally';
+  }
+  return platformSupportsCouncil
+    ? 'codeReviewer.council.unavailableForOrganization'
+    : 'codeReviewer.council.unavailableOnBitbucket';
+}
+
 function CouncilScreen({
   scope,
   platform,
@@ -122,12 +136,8 @@ function CouncilScreen({
     // account never carries council, an organization's plan can lack it, and
     // Bitbucket has no council on either client. The personal scope offers the
     // one step that changes the answer: creating the organization.
+    const unavailableCopy = unavailableCopyKey(scope, capabilities.council);
     const personal = isPersonal(scope);
-    const unavailableCopy = personal
-      ? 'codeReviewer.council.unavailablePersonally'
-      : capabilities.council
-        ? 'codeReviewer.council.unavailableForOrganization'
-        : 'codeReviewer.council.unavailableOnBitbucket';
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader

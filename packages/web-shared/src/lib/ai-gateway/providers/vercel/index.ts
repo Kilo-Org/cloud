@@ -324,7 +324,7 @@ export function convertProviderOptions(
  * serves the model, the result names the model's providers instead and the caller rejects the
  * request, as `canRouteToVercel` keeps chat off Vercel.
  */
-export async function getUsageEndpointGatewayOptions(params: {
+export async function getNonChatGatewayOptions(params: {
   /** The model id the request sends to Vercel, after `mapModelIdToVercel`. */
   vercelModelId: string;
   userByok: readonly BYOKResult[] | null;

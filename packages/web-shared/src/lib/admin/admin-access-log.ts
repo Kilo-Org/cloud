@@ -410,6 +410,8 @@ export type AdminAuditContext = {
   trpcType?: string;
   /** REST/server-component surface when the caller already knows it. */
   auditSurface?: AdminAccessSurface;
+  /** Route a REST or server-component caller already knows, e.g. from its request headers. */
+  auditRoute?: string;
   /** Actual request method for a REST caller. */
   auditMethod?: string;
   delegatedWorkload?: boolean;
@@ -516,7 +518,6 @@ function emitElevation(
     ...attribution,
     kind: 'kilo_admin_elevation',
     user,
-    wouldBlock: attribution.credential !== 'session',
     membershipRole: params.membershipRole ?? null,
     wouldPassWithoutAdmin: params.wouldPassWithoutAdmin ?? null,
     supportDecision: params.supportDecision,

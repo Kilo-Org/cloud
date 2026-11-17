@@ -4685,5 +4685,175 @@
     "unavailableDescription": "Le linki yokwabelana iphelelwe yisikhathi noma ihoxisiwe.",
     "transcriptUnavailableTitle": "Akukwazekanga ukulayisha lo mbhalo wengxoxo",
     "transcriptUnavailableDescription": "Ilinki isasebenza. Zama futhi kungekudala."
+  },
+  "organizationGuardrails": {
+    "title": "Izivikelo ze-AI",
+    "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI.",
+    "unavailable": "Izivikelo ze-AI azitholakali kule nhlangano.",
+    "loadError": "Izivikelo ze-AI azikwazanga ukulayisha",
+    "statusSaving": "Kuyagcinwa…",
+    "statusSaved": "Kugciniwe",
+    "statusFailed": "Akukwazekanga ukugcina.",
+    "inputTitle": "Izivikelo zokufaka",
+    "inputDescription": "Ihlola konke okufakwayo nge-Enkrypt AI, kuhlanganise nemiphumela yamathuluzi. Umhloli ovimbayo wenqaba isicelo uma i-Enkrypt AI ingatholakali.",
+    "outputTitle": "Izivikelo zokuphuma",
+    "outputDescription": "Ihlola izimpendulo nge-Enkrypt AI ngaphambi kokuba amalungu azithole. Icishiwe ngaphandle uma uyivula.",
+    "detectorsHint": "Ukukhetha Vimba kunqaba isicelo esimakwe. Ukubhala kuphela kubhala isicelo ngaphandle kokusilibazisa.",
+    "detectorsHintOutput": "Ukukhetha Vimba kwenza impendulo emakwe yehluleke. Ukubhala kuphela kubhala impendulo ngaphandle kokuyilibazisa.",
+    "choiceLog": "Bhala kuphela",
+    "applyTo": "Kusebenza ku",
+    "applyToAllMembers": "Wonke amalungu",
+    "applyKiloDefault": "Sebenzisa okumisiwe kwe-Kilo",
+    "invalidSavedTitle": "Izilungiselelo zomhloli wokufaka ezigciniwe azikwazeki ukufundwa",
+    "invalidSavedBody": "Izicelo ziyavinjwa kuze kugcinwe kabusha imihloli yokufaka. Imihloli engezansi iqala kokumisiwe kwe-Kilo.",
+    "invalidSavedOutputTitle": "Izilungiselelo zomhloli wokuphuma ezigciniwe azikwazeki ukufundwa",
+    "invalidSavedOutputBody": "Izimpendulo ziyagcinwa zingakhishwa kuze kugcinwe kabusha imihloli yokuphuma. Khetha imihloli yokuphuma engezansi.",
+    "blockingOutputNote": "Umhloli wokuphuma ovimbayo ubamba impendulo kuze i-Enkrypt AI ihlole yonke. Sebenzisa ukubhala kuphela ukugwema ukulibaziseka.",
+    "inputDetectorRequired": "Vula okungenani umhloli oyedwa wokufaka.",
+    "outputDetectorRequired": "Vula okungenani umhloli oyedwa wokuphuma.",
+    "rulesTooMany": "Engeza imithetho engafika ku-{{max}}.",
+    "ruleIdRequired": "Faka i-ID yomthetho.",
+    "ruleIdInvalid": "I-ID yomthetho ingasebenzisa kuphela izinhlamvu, izinombolo, amachashazi, amadishi namaphansi.",
+    "ruleTextRequired": "Chaza lokho umthetho okwenqabelayo noma okudingayo.",
+    "keywordTooLong": "Igama ngalinye elingukhiye lingaba nezinhlamvu ezingafika ku-{{max}}.",
+    "topicTooLong": "Isihloko ngasinye singaba nezinhlamvu ezingafika ku-{{max}}.",
+    "keywordsTooMany": "Engeza amagama angukhiye angafika ku-{{max}}.",
+    "topicsTooMany": "Engeza izihloko ezingafika ku-{{max}}.",
+    "piiEntityRequired": "Khetha okungenani uhlobo olulodwa lwedatha okufanele itholwe.",
+    "keywordRequired": "Engeza okungenani igama elingukhiye elilodwa.",
+    "topicRequired": "Engeza okungenani isihloko esisodwa.",
+    "policyTextRequired": "Faka umbhalo wenqubomgomo.",
+    "ruleRequired": "Engeza okungenani umthetho owodwa.",
+    "ruleIdDuplicate": "Umthetho ngamunye udinga i-ID yawo yomthetho.",
+    "piiEntities": "Idatha okufanele itholwe",
+    "keywordsLabel": "Amagama angukhiye",
+    "keywordsHint": "Igama elingukhiye elilodwa emugqeni ngamunye.",
+    "topicsHint": "Isihloko esisodwa emugqeni ngamunye.",
+    "policyFormat": "Ifomethi yenqubomgomo",
+    "policyFormatRules": "Imithetho ehlelekile",
+    "policyFormatRulesDescription": "Umthetho owodwa esidingweni ngasinye, onesigaba nobukhulu. Kunconyiwe.",
+    "policyFormatText": "Umbhalo wenqubomgomo",
+    "policyFormatTextDescription": "Namathisela inqubomgomo ekhona njengombhalo ojwayelekile.",
+    "rulesEmpty": "Ayikho imithetho okwamanje. Umthetho ngamunye uchaza into eyodwa okufakwayo okungamele kuyiqukethe noma kuyicele.",
+    "addRule": "Engeza umthetho",
+    "ruleNumber": "Umthetho {{number}}",
+    "ruleRemove": "Susa umthetho {{number}}",
+    "ruleIdLabel": "I-ID yomthetho",
+    "ruleNameLabel": "Igama (okuzikhethela)",
+    "ruleTextLabel": "Umthetho",
+    "ruleRiskCategory": "Isigaba sengcuphe",
+    "ruleApplicability": "Ububanzi",
+    "ruleFrameworks": "Izinhlaka",
+    "detector": {
+      "promptInjection": {
+        "label": "Ukujova komyalezo",
+        "description": "Ithola imizamo yokushitsha imiyalelo noma yokukhulula imodeli."
+      },
+      "policyViolation": {
+        "label": "Ukwephulwa kwenqubomgomo",
+        "description": "Iqhwaya okufakwayo okwephula inqubomgomo yenhlangano yakho, ebhalwe njengombhalo noma imithetho.",
+        "descriptionOutput": "Iqhwaya izimpendulo eziphula inqubomgomo yenhlangano yakho, ebhalwe njengombhalo noma imithetho."
+      },
+      "pii": {
+        "label": "I-PII nezimfihlo",
+        "description": "Ithola idatha yomuntu siqu, imininingwane yokungena, amakheli e-IP kanye nama-URL."
+      },
+      "keywords": {
+        "label": "Amagama angukhiye anqatshiwe",
+        "descriptionOutput": "Ithola izimpendulo eziqukethe noma yiliphi igama elingukhiye okubalile."
+      },
+      "topics": {
+        "label": "Izihloko",
+        "descriptionOutput": "Iqhwaya izimpendulo eziphathelene nanoma isiphi isihloko osibhalile."
+      },
+      "toxicity": {
+        "label": "Ubuthi",
+        "description": "Ithola ulimi olunobuthi, oluhlambalazayo, olusabisa noma olunenzondo."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Ithola okuqukethwe kocansi noma okunye okungaphephile emsebenzini."
+      },
+      "bias": {
+        "label": "Ukuchema",
+        "description": "Ithola ulimi olunokuchema noma olubandlululayo."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Idatha yomuntu siqu",
+        "description": "Amagama, amakheli e-imeyili, izinombolo zocingo."
+      },
+      "secrets": {
+        "label": "Izimfihlo",
+        "description": "Okhiye be-API, amathokheni, amaphasiwedi."
+      },
+      "ipAddress": {
+        "label": "Amakheli e-IP",
+        "description": "Amakheli e-IPv4 ne-IPv6."
+      },
+      "url": {
+        "label": "Ama-URL",
+        "description": "Amakheli ewebhu."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Ukuvikeleka nokukhwabanisa",
+      "safetyHarm": "Ukuphepha nokulimala",
+      "privacyDataProtection": "Ubumfihlo nokuvikelwa kwedatha",
+      "brandReputationTrust": "Uphawu nedumela",
+      "biasFairnessEthical": "Ukuchema nokungakhethi",
+      "legalIpLiability": "Isibopho sezomthetho ne-IP",
+      "productMisuse": "Ukusetshenziswa kabi komkhiqizo",
+      "performanceQuality": "Ukusebenza nekhwalithi"
+    },
+    "applicability": {
+      "user": "Okokufaka komsebenzisi",
+      "userAssistant": "Okokufaka komsebenzisi nezimpendulo"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Eziyishumi Eziphezulu (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Umthetho we-AI wase-EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Isici sebhizinisi elikhulu",
+    "enterpriseOnly": "Lokhu kuyisici esitholakala kuphela emabhizinisini amakhulu.",
+    "readOnly": "Abanikazi benhlangano nabaphathi kuphela abangashintsha lezi zilungiselelo.",
+    "loadError": "Abahlinzeki namamodeli abakwazanga ukulayisha",
+    "tabModels": "Amamodeli",
+    "tabProviders": "Abahlinzeki",
+    "tabGateways": "Amasango",
+    "modelsDescription": "Cisha imodeli ukuze uyivimbe kuwo wonke amalungu. Amamodeli avela kubahlinzeki abavunyelwe aqala evuliwe.",
+    "modelsDeniedOnly": "Okunqatshiwe kuphela",
+    "modelsEmpty": "Awekho amamodeli ahambisana nalokhu kusesha.",
+    "providersDescription": "Cisha umhlinzeki ukuze uvimbe i-Kilo ekudluliseleni izicelo kuwo kule nhlangano.",
+    "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
+    "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
+    "allowAllShown": "Vumela konke okubonisiwe",
+    "denyAllShown": "Nqaba konke okubonisiwe",
+    "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",
+    "emptyProviderList": "Vumela okungenani umhlinzeki oyedwa. Uhlu olungenalutho luvimba zonke izindlela zamamodeli e-Kilo.",
+    "gatewaysUnavailable": "Izilungiselelo zamasango azitholakali kule nhlangano.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Izicelo ze-OpenRouter aziboshelwe esifundeni.",
+    "inferenceRegion": "Isifunda sokucabanga",
+    "inferenceRegionDescription": "Ibophela izicelo ze-Vercel AI Gateway kulesi sifunda. Imodeli engatholakali lapho iyahluleka.",
+    "disableOpenrouterNote": "Ukucisha i-OpenRouter kuvimba futhi okhiye be-BYOK abadlulisa izicelo ngayo.",
+    "emptyModelList": "Shiya okungenani imodeli eyodwa ivuliwe. Ukwenqaba wonke amamodeli kushiya amalungu engenalutho angalusebenzisa.",
+    "catalogUnavailable": "Ikhathalogi ephelele yamamodeli ayilayishekanga, ngakho kuboniswa kuphela izinhlu zakho ezilondoloziwe. Zama futhi ukuze ulayishe wonke amamodeli.",
+    "region": {
+      "global": "Emhlabeni wonke",
+      "us": "IMelika",
+      "eu": "Inyunyana YaseYurophu",
+      "au": "I-Australia",
+      "jp": "I-Japani"
+    }
   }
 }

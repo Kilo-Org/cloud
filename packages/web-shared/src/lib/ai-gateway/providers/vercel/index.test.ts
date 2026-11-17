@@ -1232,7 +1232,7 @@ describe('isVercelRoutingOptOut', () => {
   });
 });
 
-describe('getUsageEndpointGatewayOptions', () => {
+describe('getNonChatGatewayOptions', () => {
   async function loadGetOptions(vercelInferenceProviders: string[] | null) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -1240,7 +1240,7 @@ describe('getUsageEndpointGatewayOptions', () => {
       getVercelModelsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
-      .getUsageEndpointGatewayOptions;
+      .getNonChatGatewayOptions;
   }
 
   it("applies the request's ignore list to Kilo's route", async () => {

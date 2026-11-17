@@ -9,7 +9,10 @@
  * secret strength for a creator run) is the server's, and its message is shown
  * on the form.
  *
- * No React and no React Native imports: unit-tested directly.
+ * No React and no React Native components: the module holds no view code. Its
+ * one outside dependency is the shared i18n instance, which seeds a new draft's
+ * prompt from the catalog, so a test reads that copy in the active language
+ * through `i18n`.
  */
 
 import {

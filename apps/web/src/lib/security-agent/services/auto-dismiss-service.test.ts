@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import type * as securityConfigModule from '@/lib/security-agent/db/security-config';
+import type { SecurityAgentConfig } from '../core/types';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type * as dependabotApiModule from '@/lib/security-agent/github/dependabot-api';
 import type * as posthogModule from '@/lib/security-agent/posthog-tracking';
@@ -55,11 +56,29 @@ jest.mock('@/lib/security-agent/posthog-tracking', () => ({
   trackSecurityAgentAutoDismiss: mockTrackAutoDismiss,
 }));
 
+// With no prebuilt pages the bulk-read chain serves mockBulkFindings. When a
+// test primes mockBulkFindingsPages, each where chain shifts one prebuilt page
+// from the queue, so the service walks the batches exactly as it would with a
+// real keyset cursor and stops on the short tail page.
+const mockBulkFindingsPages: Array<
+  Array<{ id: string; analysis: SecurityFindingAnalysis | null }>
+> = [];
+const mockWhereCallCount = { value: 0 };
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
-        where: jest.fn(() => mockBulkFindings),
+        where: jest.fn(() => {
+          mockWhereCallCount.value += 1;
+          return {
+            orderBy: jest.fn(() => ({
+              limit: jest.fn(
+                (n: number) => mockBulkFindingsPages.shift() ?? mockBulkFindings.slice(0, n)
+              ),
+            })),
+          };
+        }),
       })),
     })),
     transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
@@ -174,6 +193,8 @@ beforeEach(() => {
   mockAuditRows.length = 0;
   mockUpdatedRows.length = 0;
   mockBulkFindings.length = 0;
+  mockBulkFindingsPages.length = 0;
+  mockWhereCallCount.value = 0;
 });
 
 describe('writebackDependabotDismissal', () => {
@@ -627,6 +648,56 @@ describe('maybeAutoDismissAnalysis', () => {
       expect(mockDismissDependabotAlert.mock.calls.every(call => call[0] === 'inst-123')).toBe(
         true
       );
+    });
+
+    it('dismisses every finding across multiple read pages', async () => {
+      // Mirrors the service's AUTO_DISMISS_BATCH_SIZE: queue two full pages and
+      // a short tail so the service must loop until the short page appears and
+      // aggregate totals across all three pages.
+      const batchSize = 100;
+      const eligibleAnalysis: SecurityFindingAnalysis = {
+        triage: {
+          suggestedAction: 'dismiss',
+          confidence: 'high',
+          needsSandboxAnalysis: false,
+          needsSandboxReasoning: 'No runtime path',
+          triageAt: '2026-06-16T10:00:00.000Z',
+        },
+        analyzedAt: '2026-06-16T10:00:00.000Z',
+      };
+      const makeRows = (start: number, count: number) =>
+        Array.from({ length: count }, (_, offset) => ({
+          id: `finding-${String(start + offset).padStart(4, '0')}`,
+          analysis: eligibleAnalysis,
+        }));
+      const page1 = makeRows(0, batchSize);
+      const page2 = makeRows(batchSize, batchSize);
+      const tailPage = makeRows(batchSize * 2, 3);
+      const total = page1.length + page2.length + tailPage.length;
+      mockBulkFindingsPages.push(page1, page2, tailPage);
+      mockGetSecurityAgentConfig.mockResolvedValue({
+        auto_dismiss_enabled: true,
+        auto_dismiss_confidence_threshold: 'high',
+      } as SecurityAgentConfig);
+      mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+      mockDismissDependabotAlert.mockResolvedValue(undefined);
+
+      const result = await autoDismissEligibleFindings(
+        { userId: 'user-1' },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: 'user-1',
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      );
+
+      expect(result).toEqual({ dismissed: total, skipped: 0, errors: 0 });
+      expect(mockUpdatedRows).toHaveLength(total);
+      // Two full pages keep the cursor advancing; the three-row tail page stops
+      // the loop, so the bulk read runs exactly three times.
+      expect(mockWhereCallCount.value).toBe(3);
+      expect(mockDismissDependabotAlert).toHaveBeenCalledTimes(total);
     });
   });
 });

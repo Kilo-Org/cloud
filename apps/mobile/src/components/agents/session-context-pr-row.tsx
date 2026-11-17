@@ -55,13 +55,14 @@ export function SessionContextPrRow({
   return (
     // The badge is the row's value, so it takes the value slot: the label stays
     // left at the row rhythm and the pill keeps its own press target. The pill
-    // itself is ~18pt, so the row hands its full height to it (`items-stretch`
-    // plus the badge's `self-stretch justify-center`): the whole row answers the
-    // tap instead of the short pill alone, and a `hitSlop` would be clipped by
-    // the row's own bounds on Android.
+    // itself is ~18pt, so the row hands the whole frame to it: `py-0` drops the
+    // frame's vertical padding (which left the content box 27pt) and
+    // `items-stretch` lets the badge's `self-stretch justify-center` fill the
+    // 48pt frame, so the tap target is the row's own height. A `hitSlop` cannot
+    // do this: Android clips it at the parent's bounds.
     <KvRow
       label={t('common.pullRequest')}
-      className="items-stretch"
+      className="items-stretch py-0"
       value=""
       valueFace="text"
       testID="session-context-pr-row"

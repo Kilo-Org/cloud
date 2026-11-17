@@ -259,7 +259,7 @@ export function AdvancedConfigPanel({
 
   return (
     <View
-      className="mt-4"
+      testID="advanced-config-panel"
       onLayout={event => {
         contentOffsetRef.current = event.nativeEvent.layout.y;
       }}

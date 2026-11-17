@@ -52,9 +52,15 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
   const [first, second, third] = shapeFor(sessionId ?? '');
   return (
     <View className="flex-1 justify-end overflow-hidden px-4 pb-2">
-      <Skeleton className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm ${first}`} />
-      <Skeleton className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm ${second}`} />
-      <Skeleton className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm ${third}`} />
+      <Skeleton
+        className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${first}`}
+      />
+      <Skeleton
+        className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm bg-muted-soft ${second}`}
+      />
+      <Skeleton
+        className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${third}`}
+      />
     </View>
   );
 }
@@ -97,9 +103,10 @@ const COMPOSER_FIELD_BORDER = 2;
  * resolve and shoves the transcript up by its own height.
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
- * `p-2.5 px-3`, the field's own box at `rounded-[20px]` and the two trailing
- * controls on the 48 pt voice toggle's target box — `ms-3` is the row's
- * COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module owns it.
+ * `p-2.5 px-3`, the field's own box at the input frame's `rounded-md` radius
+ * (`INPUT_FRAME_CLASS`) and the two trailing controls on the 48 pt voice
+ * toggle's target box — `ms-3` is the row's COMPOSER_CONTROL_GAP_CLASS,
+ * repeated here because the row module owns it.
  *
  * Sizes are written in points, not scale steps: this app's rem is 14 pt, so
  * `h-11` paints 38.5 pt and would leave the slot 6 pt short of the composer that
@@ -126,7 +133,7 @@ export function SessionComposerSkeleton() {
                 COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
             }}
           >
-            <Skeleton className="h-full w-full rounded-3xl" />
+            <Skeleton className="h-full w-full rounded-md" />
           </View>
           <Skeleton className={cn('ms-3 rounded-full', control)} />
           <Skeleton className={cn('ms-3 rounded-full', control)} />

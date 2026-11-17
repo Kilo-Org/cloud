@@ -8,13 +8,12 @@ import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type SessionChangesDraft,
   type SessionChangesReviewBlock,
 } from '@/lib/session-changes-review';
-import { cn } from '@/lib/utils';
 
 function CommentRow({
   path,
@@ -44,8 +43,12 @@ function CommentRow({
           onPress={onRemove}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.sessionChanges.removeComment')}
-          className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
-          hitSlop={6}
+          // A text action is as wide as its label, not a square: the 32pt
+          // square squeezed "Remove" against its own edges. It keeps the
+          // compact height on the spacing scale and takes `px-2` for the label,
+          // and the slop lifts the 28pt box to the 44pt touch floor.
+          className="h-8 items-center justify-center px-2 active:opacity-70"
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
           testID="session-changes-review-remove-comment"
         >
           <Text variant="caption" className="text-destructive">

@@ -95,6 +95,7 @@ vi.mock('@/components/ui/directional-icons', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
 }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link-confirm', () => ({
@@ -245,7 +246,7 @@ describe('MarkdownHtml details', () => {
 
     expect(row.props.accessibilityRole).toBe('button');
     expect(row.props.accessibilityState).toEqual({ expanded: false });
-    expect(renderer.root.findAllByType('DirectionalChevronRight' as never)).toHaveLength(1);
+    expect(renderer.root.findAllByType('ChevronDown' as never)).toHaveLength(1);
     expect(allText(renderer)).toContain('More info');
     expect(allText(renderer)).not.toContain('Hidden body');
 
@@ -257,7 +258,7 @@ describe('MarkdownHtml details', () => {
     expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
       expanded: true,
     });
-    expect(renderer.root.findAllByType('ChevronDown' as never)).toHaveLength(1);
+    expect(renderer.root.findAllByType('ChevronUp' as never)).toHaveLength(1);
     expect(allText(renderer)).toContain('Hidden body');
   });
 

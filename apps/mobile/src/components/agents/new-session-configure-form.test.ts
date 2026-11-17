@@ -9,11 +9,12 @@ import {
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import { i18n as appI18n } from '@/i18n';
@@ -957,9 +958,9 @@ describe('NewSessionConfigureForm', () => {
   it('keeps the environment row at reserved height with skeletons while loading', () => {
     const element = renderRow({ isProfileLoading: true });
 
-    // The label stays mounted and skeletons hold the row's height, so the
-    // rows below never move when the query settles.
-    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    // The label stays mounted (as the shared field label) and skeletons hold
+    // the row's height, so the rows below never move when the query settles.
+    expect(findElementByComponent(element, FormFieldLabel)?.label).toBe('Environment');
     expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
@@ -988,22 +989,25 @@ describe('NewSessionConfigureForm', () => {
     expect(slots[0]?.accessibilityElementsHidden).toBe(true);
   });
 
-  it('renders every Environment row state inside the same card', () => {
-    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
-
+  it('renders every Environment row state with the same field frame and label', () => {
     for (const row of [
       renderRow({ isProfileLoading: true }),
       renderRow({ isProfileError: true }),
       renderRow({ profile: PROFILE }),
       renderRow(),
     ]) {
-      const cards = [
+      // The label and the trigger frame are the row's fixed anatomy: every
+      // state paints on the same frame, so the state swap cannot move the rows
+      // below it.
+      expect(findElementByComponent(row, FormFieldLabel)?.label).toBe('Environment');
+      const frames = [
         ...collectElementsByType(row, 'View'),
         ...collectElementsByType(row, 'Pressable'),
-      ]
-        .map(element => element.className)
-        .filter(className => typeof className === 'string' && className.includes(chrome));
-      expect(cards).toEqual([expect.stringContaining(chrome)]);
+      ].filter(
+        element =>
+          typeof element.className === 'string' && element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
+      );
+      expect(frames).toHaveLength(1);
     }
   });
 
@@ -1034,7 +1038,7 @@ describe('NewSessionConfigureForm', () => {
     const row = findElementByComponent(element, NewSessionProfileRow);
     expect(row?.isProfileLoading).toBe(true);
     const loadingRow = renderRow({ isProfileLoading: true });
-    expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
+    expect(findElementByComponent(loadingRow, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
     expect(findElementByType(loadingRow, 'Skeleton')).not.toBeNull();

@@ -44,6 +44,10 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+// The shared row's selection tick reaches `expo-haptics`, whose entry loads the
+// Expo async-require runtime (`__DEV__`) that this plain Node project cannot
+// evaluate. Haptics are decoration; the stub keeps the press behavior.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primary: '#0a84ff' }),
 }));

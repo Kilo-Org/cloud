@@ -127,10 +127,10 @@ describe('SessionComposerSkeleton', () => {
       const bars = skeletonBars(platformOs);
       expect(bars).toHaveLength(3);
       const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
-      // The field's own 20 pt corner is painted by the composer; the slot stands
-      // in with the nearest step on the shared radius scale (21 pt), so the two
-      // boxes read as the same rounded field.
-      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-3xl']));
+      // The field stands in on the composer's own control radius: the skeleton
+      // paints the `INPUT_FRAME_CLASS` corner the live composer field carries,
+      // so the two boxes read as the same rounded field.
+      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-md']));
       for (const trailing of [voice, send]) {
         expect(trailing).toEqual(expect.arrayContaining(['h-[48px]', 'w-[48px]']));
         expect(trailing).toContain('ms-3');

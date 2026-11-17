@@ -3266,7 +3266,7 @@ export function SessionDetailContent({
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
 
         {isReadOnlyContinueVisible ? (
-          <View className="border-t border-border bg-secondary">
+          <View className="border-t-[0.5px] border-hair-soft bg-secondary">
             <View style={sideInsetStyle}>
               <View className="gap-3 px-4 py-3">
                 <Text className="text-center text-sm text-muted-foreground">

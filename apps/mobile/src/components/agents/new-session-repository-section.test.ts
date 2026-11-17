@@ -5,6 +5,7 @@ import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
   branchSelectorProps,
   githubRow,
@@ -382,12 +383,18 @@ describe('NewSessionRepositorySection connect card layout stability', () => {
       groups: [group('github', 'repos'), group('gitlab', 'connect')],
     });
 
-    const card = renderer.root.find(
-      node =>
-        node.type === ('Animated.View' as never) &&
-        String(node.props.className).includes('rounded-lg bg-secondary')
+    // The section opts out of the layout transition at its own disclosure; the
+    // shared section owns the surface, so the caller only passes the flag.
+    const sections = renderer.root.findAll(
+      node => node.type === CollapsibleSection && node.props.animateLayout === false
     );
-    expect(card.props.layout).toBeUndefined();
+    expect(sections).toHaveLength(1);
+
+    const transitionViews = renderer.root.findAll(node => node.type === ('Animated.View' as never));
+    expect(transitionViews.length).toBeGreaterThan(0);
+    for (const view of transitionViews) {
+      expect(view.props.layout).toBeUndefined();
+    }
 
     const content = renderer.root.find(
       node => node.type === ('Animated.View' as never) && node.props.entering !== undefined
@@ -422,7 +429,9 @@ describe('NewSessionRepositorySection connect button label', () => {
       labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props.className
     );
 
-    expect(className).toContain('me-[24px]');
+    // The offset is a logical inline-end margin on the spacing scale, not a
+    // physical one: it must mirror with the row.
+    expect(className).toMatch(/(?:^|\s)me-\d/);
     expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
   });
 });

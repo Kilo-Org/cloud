@@ -209,7 +209,7 @@ export function ChildSessionSheet({
             onRetry={describedHydrationError?.retryable ? onRetry : undefined}
             isRetrying={hydrationState.status === 'loading'}
             placement="top"
-            className="gap-3 border-b border-border py-3"
+            className="gap-3 border-b-[0.5px] border-hair-soft py-3"
           />
         ) : null}
         <SessionMessageList
@@ -260,7 +260,7 @@ export function ChildSessionSheet({
         // when the session switches). Mirror the parent terminal error: the
         // runtime copy with its untranslated original behind Copy, and no CTA.
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <QueryError
               placement="top"
               className="px-0 pt-0"
@@ -299,7 +299,7 @@ export function ChildSessionSheet({
     <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss} dismissible>
       <SheetHeader title={title} onDone={onClose} topInset="ios-page-sheet" />
       {modelLabel ? (
-        <View className="border-b border-border px-4 py-2">
+        <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
           <ChildSessionModelLabel modelLabel={modelLabel} />
         </View>
       ) : null}

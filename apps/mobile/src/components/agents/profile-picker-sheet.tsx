@@ -1,4 +1,4 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -11,16 +11,15 @@ import {
 } from '@/components/profiles/profile-owner-heading';
 import { profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { Button } from '@/components/ui/button';
-import { Check, Settings2 } from '@/components/ui/icons';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Settings2 } from '@/components/ui/icons';
+import { RadioGroup } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
-import { selectionCheckColor } from '@/lib/selection-check-color';
-import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 4;
 
@@ -97,7 +96,6 @@ export function ProfilePickerSheet({
   onClose,
 }: Readonly<ProfilePickerSheetProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const ownerLabel = useProfileOwnerLabel();
   // The same split and order the profile manager renders: an organization
   // group, then a personal one, and a single untitled list in a personal
@@ -133,12 +131,12 @@ export function ProfilePickerSheet({
         scrollable={false}
         topInset={SHEET_TOP_INSET}
       >
-        <View className="bg-background">
-          {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <View key={index} className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3')}>
-              <Skeleton className="h-5 w-2/3 rounded-md" />
-            </View>
-          ))}
+        <View className="px-4 pt-3">
+          <RowGroup>
+            {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+              <RowSkeleton key={index} subtitle />
+            ))}
+          </RowGroup>
         </View>
       </PickerSheet>
     );
@@ -209,76 +207,60 @@ export function ProfilePickerSheet({
           {t('agentChat.newSession.configNeedsAttention')}
         </Text>
       ) : null}
-      <RadioGroup label={title} className="py-1">
-        <Pressable
-          className={cn(
-            ROW_TARGET_CLASS,
-            'flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary'
-          )}
-          onPress={() => {
-            onSelect(null);
-          }}
-          {...radioItemA11y({
-            label: noOverrideAccessibilityLabel,
-            checked: selectedOverrideProfileId === null && !needsAttention,
-          })}
-        >
-          <View className="min-w-0 flex-1">
-            <Text className="text-base text-foreground" numberOfLines={1}>
-              {noOverrideLabel}
-            </Text>
-            {resolvedDefaultName === null ? null : (
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {t('agentChat.newSession.defaultProfileResolvesTo', { name: resolvedDefaultName })}
+      <RadioGroup label={title} className="gap-4 px-4 pt-3">
+        <RowGroup>
+          <ChoiceRow
+            accessibleName={noOverrideAccessibilityLabel}
+            selected={selectedOverrideProfileId === null && !needsAttention}
+            onPress={() => {
+              onSelect(null);
+            }}
+          >
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                {noOverrideLabel}
               </Text>
-            )}
-          </View>
-          {selectedOverrideProfileId === null && !needsAttention ? (
-            <Check size={18} color={selectionCheckColor(colors)} />
-          ) : null}
-        </Pressable>
+              {resolvedDefaultName === null ? null : (
+                <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={1}>
+                  {t('agentChat.newSession.defaultProfileResolvesTo', { name: resolvedDefaultName })}
+                </Text>
+              )}
+            </View>
+          </ChoiceRow>
+        </RowGroup>
 
         {sections.map(section => (
-          <View key={section.key}>
-            {section.titleKey ? (
-              <View className="px-4 pb-1 pt-3">
-                <ProfileOwnerHeading owner={section.key} />
-              </View>
-            ) : null}
-            {section.profiles.map(candidate => {
-              const selected = candidate.id === selectedOverrideProfileId;
-              const counts = formatProfileCountItems(t, profileCountItems(candidate)).join(' · ');
-              return (
-                <Pressable
-                  key={candidate.id}
-                  className={cn(
-                    ROW_TARGET_CLASS,
-                    'flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary'
-                  )}
-                  onPress={() => {
-                    onSelect(candidate.id === selectedOverrideProfileId ? null : candidate.id);
-                  }}
-                  // The owner heading is a text node beside the radios, so the
-                  // name has to carry the owner for TalkBack as well.
-                  {...radioItemA11y({
-                    label: `${candidate.name}, ${ownerLabel(section.key)}`,
-                    checked: selected,
-                  })}
-                >
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-base text-foreground" numberOfLines={1}>
-                      {candidate.name}
-                    </Text>
-                    {counts ? (
-                      <Text className="text-sm text-muted-foreground" numberOfLines={2}>
-                        {counts}
+          <View key={section.key} className="gap-2">
+            {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
+            <RowGroup>
+              {section.profiles.map(candidate => {
+                const selected = candidate.id === selectedOverrideProfileId;
+                const counts = formatProfileCountItems(t, profileCountItems(candidate)).join(' · ');
+                return (
+                  <ChoiceRow
+                    key={candidate.id}
+                    // The owner heading is a text node beside the radios, so the
+                    // name has to carry the owner for TalkBack as well.
+                    accessibleName={`${candidate.name}, ${ownerLabel(section.key)}`}
+                    selected={selected}
+                    onPress={() => {
+                      onSelect(candidate.id === selectedOverrideProfileId ? null : candidate.id);
+                    }}
+                  >
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                        {candidate.name}
                       </Text>
-                    ) : null}
-                  </View>
-                  {selected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
-                </Pressable>
-              );
-            })}
+                      {counts ? (
+                        <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={2}>
+                          {counts}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </ChoiceRow>
+                );
+              })}
+            </RowGroup>
           </View>
         ))}
       </RadioGroup>

@@ -168,8 +168,11 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'bash tool, completed',
     });
     const completedIcon = findHost(completed.root, 'Eye')[0];
-    expect(completedIcon?.props.size).toBe(slot?.props.style.width);
-    expect(slot?.props.style.height).toBe(slot?.props.style.width);
+    // `style` is an untyped prop bag in the test tree, so it is narrowed once
+    // at the read instead of dereferencing it any-typed.
+    const slotStyle = slot?.props.style as { width?: number; height?: number } | undefined;
+    expect(completedIcon?.props.size).toBe(slotStyle?.width);
+    expect(slotStyle?.height).toBe(slotStyle?.width);
   });
 
   it('renders the completed icon when status is completed and an icon is provided', async () => {

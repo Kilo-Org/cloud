@@ -303,14 +303,14 @@ export function NewSessionConfigureForm({
       </View>
 
       {/* The block under the card: the Account section when the entry point
-          renders one, then the Run on row and its refresh control. */}
-      <View>
+          renders one, then the Run on row and its refresh control. The body's
+          own section gap spaces the block's children, so none of them carries a
+          margin of its own (a margin here doubled the gap). */}
+      <View className="gap-6">
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? (
-          <OrganizationPlanRefusal message={planRefusal} className="mt-5" />
-        ) : null}
+        {planRefusal !== null ? <OrganizationPlanRefusal message={planRefusal} /> : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}
@@ -342,12 +342,12 @@ export function NewSessionConfigureForm({
           nothing. A refused spawn resets the target and raises the
           disconnected note, which owns that copy. */}
       {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
-        <Text className="mt-2 text-sm text-muted-foreground">
+        <Text className="text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
 
-      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
+      {runOnNote ? <Text className="text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
@@ -376,7 +376,7 @@ export function NewSessionConfigureForm({
         (and the rest of the form) down after it has settled.
       */}
       {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
-        <View className="mt-5">
+        <View>
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('common.changes')}
           </Text>

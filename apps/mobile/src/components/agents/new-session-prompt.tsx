@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import {
   type ComposerSelection,
@@ -434,7 +435,7 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <InputFrame className="overflow-hidden">
       <View
         className="pb-2"
         onLayout={event => {
@@ -615,6 +616,6 @@ export function NewSessionPrompt({
           </NewSessionPromptControls>
         </View>
       </View>
-    </View>
+    </InputFrame>
   );
 }

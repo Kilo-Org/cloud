@@ -72,9 +72,9 @@ function FindingsListFooter({
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
 // `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
-// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp, the column the header's
-// back glyph lands on and the inset the skeleton and footer paint (24/16 is the
-// web rem and leaves every row 3 dp inside that column). FlashList v2 positions
+// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp, which is the gutter the
+// `px-6` header above the list paints, as on every Security Agent screen (24/16
+// is the web rem and leaves every row 3 dp inside that gutter). FlashList v2 positions
 // every cell absolutely and has no `gap` handling (2.3.2 ships zero `gap`
 // references), so the 12px inter-row gap rides on the measured item separator
 // instead of `contentContainerStyle.gap`. The old container `gap` also sat between the
@@ -186,6 +186,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.findings')}
         // One 48dp icon target from IconButton; declaring its width keeps the
         // one-line title's readable minimum when the row is narrow.

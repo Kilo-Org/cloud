@@ -15,6 +15,7 @@ export const RULE_IDS = [
   'rtl-mirror',
   'safe-area',
   'leading-gap',
+  'gutter',
   'unsettled',
   'loading-placeholder',
   'capture-alignment',

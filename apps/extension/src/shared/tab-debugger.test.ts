@@ -678,9 +678,11 @@ describe('tab debugger helpers', () => {
   });
 
   it('executes a tool and returns its JSON string result', async () => {
-    const executeTool = (tool: unknown, argumentsText: string): Promise<string> => {
+    const executeTool = (tool: unknown, args: unknown): Promise<string> => {
       expect(tool).toMatchObject({ name: 'double' });
-      expect(argumentsText).toBe('{"value":21}');
+      // Chromium 158 requires executeTool's second parameter to be an object;
+      // the injected function parses the JSON arguments text before the call.
+      expect(args).toEqual({ value: 21 });
       return resolved('{"doubled":42}');
     };
     setModelContext({

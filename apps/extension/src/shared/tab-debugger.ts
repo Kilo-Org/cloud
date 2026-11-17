@@ -1111,7 +1111,18 @@ const runInjectedWebMcpExecute = async (
       throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
     }
 
-    return { ok: true, value: await modelContext.executeTool(tool, argumentsText) };
+    // `executeTool` takes the tool arguments as an object. Chromium 145
+    // accepted a JSON string and re-parsed it; Chromium 158 rejects a string
+    // with `parameter 2 is not of type 'object'`. Parse inline: only the
+    // function source reaches the MAIN world, so a module-scope helper would
+    // be undefined there. Pass the raw string through when it is not JSON.
+    let args;
+    try {
+      args = JSON.parse(argumentsText);
+    } catch {
+      args = argumentsText;
+    }
+    return { ok: true, value: await modelContext.executeTool(tool, args) };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'The page failed to run the WebMCP tool.',

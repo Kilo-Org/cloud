@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Shkelje SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Një kontroll sigurie ka një përditësim"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Seanca juaj Kilo është gati për ta kontrolluar nga telefoni juaj"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

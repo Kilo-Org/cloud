@@ -1203,6 +1203,56 @@ describe('countAndStoreFimUsage', () => {
       });
     });
 
+    it('times a streamed response from its first generated token', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          2_000,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"completion"}}]}\n\n',
+        ],
+        [
+          2_100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: 2_000, generation_time: 100 });
+    });
+
+    it('reports no timing for a streamed response without generated tokens', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          300,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":0,"total_tokens":1000}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: null, generation_time: null });
+    });
+
     it('records an interrupted stream as an error', async () => {
       const body = clock.bodyArrivingAt(
         [

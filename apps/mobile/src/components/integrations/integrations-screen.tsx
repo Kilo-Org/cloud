@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -25,6 +24,7 @@ import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
@@ -49,7 +49,7 @@ type IntegrationsScreenProps = Readonly<{
  */
 export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const scope = integrationScope(organizationId);
   const boundary = useOrgBoundary(organizationId);
   // The link's organization becomes the selection once it resolves to a
@@ -166,7 +166,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   const connectProvider = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
       if (organizationId) {
-        router.push(bitbucketConnectHref(organizationId));
+        pushOnce(bitbucketConnectHref(organizationId));
       }
       return;
     }

@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import {
@@ -22,6 +21,7 @@ import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import {
@@ -110,7 +110,7 @@ export function useNewSessionRepos({
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
 
   const githubQuery = useQuery(
     organizationId
@@ -407,8 +407,8 @@ export function useNewSessionRepos({
     }
     // The sheet owns the token form and invalidates this hook's repository read
     // when the connection lands, so there is nothing to wait for here.
-    router.push(bitbucketConnectHref(organizationId));
-  }, [organizationId, router]);
+    pushOnce(bitbucketConnectHref(organizationId));
+  }, [organizationId, pushOnce]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {

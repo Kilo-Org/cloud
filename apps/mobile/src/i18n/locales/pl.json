@@ -903,7 +903,7 @@
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
       "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego. Wymaga organizacji Enterprise.",
       "unavailablePersonallyAction": "Utwórz organizację",
-      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Plan tej organizacji go nie obejmuje.",
+      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
       "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",

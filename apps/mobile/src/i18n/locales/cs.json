@@ -1492,7 +1492,7 @@
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
       "unavailablePersonally": "Kontrola radou není součástí osobního účtu. Vyžaduje organizaci Enterprise.",
       "unavailablePersonallyAction": "Vytvořit organizaci",
-      "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Plán této organizace jej nezahrnuje.",
+      "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Tato organizace jej nyní nemá.",
       "unavailableOnBitbucket": "Kontrola radou není dostupná pro repozitáře Bitbucket.",
       "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
       "specialists": "Specialisté",

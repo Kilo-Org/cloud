@@ -1444,7 +1444,7 @@
       "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
       "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto. Den kräver en Enterprise-organisation.",
       "unavailablePersonallyAction": "Skapa organisation",
-      "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Denna organisations plan omfattar den inte.",
+      "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Den här organisationen har det inte just nu.",
       "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",
       "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
       "specialists": "Experter",

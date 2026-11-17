@@ -901,7 +901,7 @@
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
       "unavailablePersonally": "合議レビューは個人アカウントには含まれません。エンタープライズ組織が必要です。",
       "unavailablePersonallyAction": "組織を作成",
-      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織のプランには含まれていません。",
+      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
       "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",

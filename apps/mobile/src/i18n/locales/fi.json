@@ -1444,7 +1444,7 @@
       "subtitle": "Useampi asiantuntija katselmoi jokaisen vetopyynnön, ja heidän äänensä yhdistetään yhdeksi päätökseksi.",
       "unavailablePersonally": "Neuvostokatselmointi ei sisälly henkilökohtaiseen tiliin. Se vaatii Enterprise-organisaation.",
       "unavailablePersonallyAction": "Luo organisaatio",
-      "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tämän organisaation tilaus ei sisällä sitä.",
+      "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tällä organisaatiolla ei ole sitä juuri nyt.",
       "unavailableOnBitbucket": "Neuvostokatselmointi ei ole käytettävissä Bitbucket-koodivarastoille.",
       "noRepositories": "Koodivarastoja ei ole vielä valittu. Valitse ensin koodivarastot koodivarastoasetuksista.",
       "specialists": "Asiantuntijat",

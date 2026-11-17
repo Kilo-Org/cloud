@@ -902,7 +902,7 @@
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
       "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי. היא דורשת ארגון Enterprise.",
       "unavailablePersonallyAction": "יצירת ארגון",
-      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. התוכנית של הארגון הזה אינה כוללת אותה.",
+      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. אין לארגון הזה אותה כרגע.",
       "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",
       "noRepositories": "עדיין לא נבחרו מאגרים. בחר קודם מאגרים בהגדרות המאגרים.",
       "specialists": "מומחים",

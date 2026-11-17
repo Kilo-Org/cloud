@@ -1444,7 +1444,7 @@
       "subtitle": "Nokkrir sérfræðingar fara yfir hverja samrunabeiðni og atkvæði þeirra sameinast í eina ákvörðun.",
       "unavailablePersonally": "Ráðsyfirferð er ekki hluti af persónulegum reikningi. Hún þarf Enterprise-félag.",
       "unavailablePersonallyAction": "Stofna félag",
-      "unavailableForOrganization": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða virku próftímabili. Áætlun þessa félags inniheldur hana ekki.",
+      "unavailableForOrganization": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða virku próftímabili. Þetta félag hefur hana ekki núna.",
       "unavailableOnBitbucket": "Ráðsyfirferð er ekki í boði fyrir Bitbucket-geymslur.",
       "noRepositories": "Engar geymslur valdar ennþá. Veldu geymslur í stillingum geymslna fyrst.",
       "specialists": "Sérfræðingar",

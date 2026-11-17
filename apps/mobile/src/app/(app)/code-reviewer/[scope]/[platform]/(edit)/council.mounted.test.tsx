@@ -239,7 +239,7 @@ describe('council route gate', () => {
       'Council review is not part of a personal account. It needs an Enterprise organization.'
     );
     expect(texts).not.toContain(
-      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now."
     );
     expect(texts).not.toContain('Council review is not available for Bitbucket repositories.');
     const action = renderer.root
@@ -263,7 +263,7 @@ describe('council route gate', () => {
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain(
-      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now."
     );
     expect(texts).not.toContain(
       'Council review is not part of a personal account. It needs an Enterprise organization.'
@@ -279,7 +279,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     expect(renderedTexts(renderer)).not.toContain(
-      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now."
     );
     expect(state.configEnabled).toContain(true);
 
@@ -295,7 +295,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     expect(renderedTexts(renderer)).not.toContain(
-      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now."
     );
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
       0

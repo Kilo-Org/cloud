@@ -901,7 +901,7 @@
       "subtitle": "Nhiều chuyên gia rà soát từng yêu cầu hợp nhất và phiếu của họ được tổng hợp thành một quyết định.",
       "unavailablePersonally": "Rà soát hội đồng không thuộc tài khoản cá nhân. Nó cần một tổ chức Enterprise.",
       "unavailablePersonallyAction": "Tạo tổ chức",
-      "unavailableForOrganization": "Rà soát hội đồng cần gói Enterprise có gói đăng ký hoặc bản dùng thử đang hoạt động. Gói của tổ chức này không bao gồm tính năng này.",
+      "unavailableForOrganization": "Rà soát hội đồng cần gói Enterprise có gói đăng ký hoặc bản dùng thử đang hoạt động. Tổ chức này hiện không có tính năng này.",
       "unavailableOnBitbucket": "Rà soát hội đồng không khả dụng cho kho lưu trữ Bitbucket.",
       "noRepositories": "Chưa chọn kho lưu trữ nào. Hãy chọn kho lưu trữ trong cài đặt kho lưu trữ trước.",
       "specialists": "Chuyên gia",

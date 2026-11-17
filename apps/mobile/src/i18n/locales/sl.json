@@ -1492,7 +1492,7 @@
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
       "unavailablePersonally": "Kolegijski pregled ni del osebnega računa. Potrebuje Enterprise organizacijo.",
       "unavailablePersonallyAction": "Ustvari organizacijo",
-      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Paket te organizacije ga ne vključuje.",
+      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Ta organizacija ga trenutno nima.",
       "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",
       "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
       "specialists": "Strokovnjaki",

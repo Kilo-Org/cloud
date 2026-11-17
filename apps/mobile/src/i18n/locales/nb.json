@@ -1444,7 +1444,7 @@
       "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
       "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto. Den krever en Enterprise-organisasjon.",
       "unavailablePersonallyAction": "Opprett organisasjon",
-      "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonens plan omfatter det ikke.",
+      "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
       "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",
       "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
       "specialists": "Spesialister",

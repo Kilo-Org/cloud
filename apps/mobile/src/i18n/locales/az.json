@@ -1444,7 +1444,7 @@
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
       "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil. Ona Enterprise təşkilatı lazımdır.",
       "unavailablePersonallyAction": "Təşkilat yarat",
-      "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatın planı onu əhatə etmir.",
+      "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatda hazırda bu yoxdur.",
       "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",
       "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
       "specialists": "Mütəxəssislər",

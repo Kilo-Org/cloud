@@ -1468,7 +1468,7 @@
       "subtitle": "Diversos especialistes revisen cada pull request i els seus vots es combinen en una sola decisió.",
       "unavailablePersonally": "La revisió en consell no forma part d'un compte d'ús personal. Necessita una organització Enterprise.",
       "unavailablePersonallyAction": "Crea una organització",
-      "unavailableForOrganization": "La revisió en consell necessita el pla Enterprise amb una subscripció o un període de prova actiu. El pla d'aquesta organització no la inclou.",
+      "unavailableForOrganization": "La revisió en consell necessita el pla Enterprise amb una subscripció o un període de prova actiu. Aquesta organització no en disposa ara mateix.",
       "unavailableOnBitbucket": "La revisió en consell no està disponible per als repositoris de Bitbucket.",
       "noRepositories": "Encara no hi ha cap repositori seleccionat. Primer tria'n a la configuració de repositoris.",
       "specialists": "Especialistes",

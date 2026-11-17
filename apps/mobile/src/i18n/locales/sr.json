@@ -1468,7 +1468,7 @@
       "subtitle": "Nekoliko stručnjaka pregleda svaki pull request, a njihovi glasovi se spajaju u jednu odluku.",
       "unavailablePersonally": "Pregled veća nije deo ličnog naloga. Potrebno je Enterprise organizacija.",
       "unavailablePersonallyAction": "Napravi organizaciju",
-      "unavailableForOrganization": "Pregled veća zahteva Enterprise plan sa aktivnom pretplatom ili probnim periodom. Plan ove organizacije ga ne obuhvata.",
+      "unavailableForOrganization": "Pregled veća zahteva Enterprise plan sa aktivnom pretplatom ili probnim periodom. Ova organizacija ga trenutno ne poseduje.",
       "unavailableOnBitbucket": "Pregled veća nije dostupan za Bitbucket repozitorijume.",
       "noRepositories": "Još nije izabran nijedan repozitorijum. Najpre izaberi repozitorijume u podešavanjima repozitorijuma.",
       "specialists": "Stručnjaci",

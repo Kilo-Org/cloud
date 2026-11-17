@@ -1492,7 +1492,7 @@
       "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
       "unavailablePersonally": "Tarybos peržiūra neįeina į asmeninę paskyrą. Jai reikia Enterprise organizacijos.",
       "unavailablePersonallyAction": "Sukurti organizaciją",
-      "unavailableForOrganization": "Tarybos peržiūrai reikia Enterprise plano su aktyviu prenumerata ar bandomuoju laikotarpiu. Šios organizacijos planas jo neapima.",
+      "unavailableForOrganization": "Tarybos peržiūrai reikia Enterprise plano su aktyviu prenumerata ar bandomuoju laikotarpiu. Ši organizacija jo šiuo metu neturi.",
       "unavailableOnBitbucket": "Tarybos peržiūra nepasiekiama Bitbucket saugykloms.",
       "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
       "specialists": "Specialistai",

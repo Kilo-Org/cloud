@@ -1468,7 +1468,7 @@
       "subtitle": "Više specijalista pregleda svaki zahtjev za spajanje, a njihovi glasovi se objedinjuju u jednu odluku.",
       "unavailablePersonally": "Pregled vijeća nije dio ličnog računa. Potrebna je Enterprise organizacija.",
       "unavailablePersonallyAction": "Kreiraj organizaciju",
-      "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan koji ima aktivnu pretplatu ili probni period. Plan ove organizacije ga ne uključuje.",
+      "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan koji ima aktivnu pretplatu ili probni period. Ova organizacija ga trenutno nema.",
       "unavailableOnBitbucket": "Pregled vijeća nije dostupan za Bitbucket repozitorije.",
       "noRepositories": "Još nije odabran nijedan repozitorij. Prvo odaberi repozitorije u postavkama repozitorija.",
       "specialists": "Specijalisti",

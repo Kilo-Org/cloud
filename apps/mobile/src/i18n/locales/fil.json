@@ -1444,7 +1444,7 @@
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
       "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho. Kailangan nito ang isang Enterprise na organisasyon.",
       "unavailablePersonallyAction": "Gumawa ng organisasyon",
-      "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Hindi ito kasama sa plan ng organisasyong ito.",
+      "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Wala ito sa organisasyong ito sa ngayon.",
       "unavailableOnBitbucket": "Hindi available ang pagsusuri ng konseho para sa mga Bitbucket repositoryo.",
       "noRepositories": "Wala pang napiling repositoryo. Pumili muna ng mga repositoryo sa mga setting ng repositoryo.",
       "specialists": "Mga espesyalista",

@@ -905,7 +905,7 @@
       "subtitle": "يراجع عدة متخصصين كل طلب دمج، وتُجمع أصواتهم في قرار واحد.",
       "unavailablePersonally": "مراجعة المجلس ليست جزءًا من الحساب الشخصي. إنها تحتاج إلى مؤسسة Enterprise.",
       "unavailablePersonallyAction": "إنشاء مؤسسة",
-      "unavailableForOrganization": "تحتاج مراجعة المجلس إلى خطة Enterprise مع اشتراك نشط أو فترة تجريبية. خطة هذه المؤسسة لا تتضمنها.",
+      "unavailableForOrganization": "تحتاج مراجعة المجلس إلى خطة Enterprise مع اشتراك نشط أو فترة تجريبية. هذه المؤسسة لا تمتلكها الآن.",
       "unavailableOnBitbucket": "مراجعة المجلس غير متاحة لمستودعات Bitbucket.",
       "noRepositories": "لم تُحدَّد أي مستودعات بعد. اختر المستودعات من إعدادات المستودعات أولًا.",
       "specialists": "المتخصصون",

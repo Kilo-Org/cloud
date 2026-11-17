@@ -1468,7 +1468,7 @@
       "subtitle": "Katru izmaiņu pieprasījumu pārskata vairāki speciālisti, un viņu balsis apvienojas vienā lēmumā.",
       "unavailablePersonally": "Padomes pārskatīšana nav daļa no personīga konta. Tai ir nepieciešama Enterprise organizācija.",
       "unavailablePersonallyAction": "Izveidot organizāciju",
-      "unavailableForOrganization": "Padomes pārskatīšanai ir nepieciešams Enterprise plāns ar aktīvu abonementu vai izmēģinājuma periodu. Šīs organizācijas plāns to neietver.",
+      "unavailableForOrganization": "Padomes pārskatīšanai ir nepieciešams Enterprise plāns ar aktīvu abonementu vai izmēģinājuma periodu. Šai organizācijai tas šobrīd nav pieejams.",
       "unavailableOnBitbucket": "Padomes pārskatīšana nav pieejama Bitbucket repozitorijiem.",
       "noRepositories": "Vēl nav izvēlēts neviens repozitorijs. Vispirms izvēlies repozitorijus repozitoriju iestatījumos.",
       "specialists": "Speciālisti",

@@ -1444,7 +1444,7 @@
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
       "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaunan peribadi. Ia memerlukan organisasi Enterprise.",
       "unavailablePersonallyAction": "Cipta organisasi",
-      "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Pelan organisasi ini tidak merangkuminya.",
+      "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Organisasi ini tidak memilikinya sekarang.",
       "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
       "specialists": "Pakar",

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate, formatMoneyFromCents, formatPrefixedMoney } from '@/lib/format';
 import {
   type KiloPassBillingHistory,
@@ -14,7 +15,7 @@ import {
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { isRetryableTrpcError } from '@/lib/trpc-error';
-import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
@@ -82,7 +83,9 @@ function SectionError({
   }
   return (
     <Pressable
-      className="flex-row items-center gap-2 active:opacity-70"
+      // A failed page's way out is a state action, so its own node carries the
+      // shared state-action floor instead of shrinking to its one text line.
+      className={cn('flex-row items-center gap-2 active:opacity-70', STATE_ACTION_CLASS)}
       accessibilityRole="button"
       accessibilityLabel={t('common.retry')}
       onPress={onRetry}

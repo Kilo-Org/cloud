@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { applyDeviceLanguage, applyLanguagePreference } from './apply-language';
+import {
+  applyDeviceLanguage,
+  applyLanguagePreference,
+  restorePickedLanguage,
+} from './apply-language';
 
 const mocks = vi.hoisted(() => ({
   reloadAppAsync: vi.fn(),
@@ -9,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   syncRtl: vi.fn(),
   prewarmIntl: vi.fn(),
   setLanguagePreferenceAsync: vi.fn(),
+  preference: 'device' as 'device' | 'es' | 'ar',
+  getLanguagePreference: vi.fn(),
   writeLanguageReturnTarget: vi.fn(),
   writeDirectionAttemptAsync: vi.fn(),
   readDirectionAttemptAsync: vi.fn(),
@@ -31,6 +37,7 @@ vi.mock('@/i18n/direction-attempt', () => ({
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   setLanguagePreferenceAsync: mocks.setLanguagePreferenceAsync,
+  getLanguagePreference: mocks.getLanguagePreference,
 }));
 vi.mock('@/lib/intl-cache', () => ({ prewarmIntl: mocks.prewarmIntl }));
 vi.mock('@/lib/notifications', () => ({
@@ -65,6 +72,8 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.readDirectionAttemptAsync.mockReset().mockResolvedValue(null);
     mocks.syncRtl.mockReset().mockReturnValue(false);
     mocks.i18nManager.isRTL = false;
+    mocks.preference = 'device';
+    mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
     mocks.i18nManager.forceRTL.mockReset();
     await i18n.changeLanguage('en');
   });
@@ -114,7 +123,7 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     expect(mocks.renameAndroidNotificationChannels).not.toHaveBeenCalled();
   });
 
-  it('skips the relaunch when the attempt record cannot be written', async () => {
+  it('skips the relaunch when the attempt-record write fails', async () => {
     mocks.syncRtl.mockReturnValue(true);
     mocks.writeDirectionAttemptAsync.mockResolvedValue(false);
 
@@ -128,12 +137,12 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
   });
 
-  it('skips the relaunch the running app already attempted for this language', async () => {
+  it('leaves the relaunch guarded when the running app already attempted it', async () => {
     mocks.syncRtl.mockReturnValue(true);
     mocks.readDirectionAttemptAsync.mockResolvedValue('ar');
 
     await expect(applyDeviceLanguage('ar')).resolves.toEqual({
-      kind: 'restart-skipped',
+      kind: 'restart-guarded',
     });
 
     // The record names the language the last launch relaunched for: forcing it
@@ -202,6 +211,65 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     });
 
     expect(mocks.registerNeedsInputCategories).not.toHaveBeenCalled();
+    changeLanguageSpy.mockRestore();
+    hasBundleSpy.mockRestore();
+  });
+});
+
+describe('restorePickedLanguage', () => {
+  beforeEach(async () => {
+    mocks.renameAndroidNotificationChannels.mockReset().mockResolvedValue(undefined);
+    mocks.registerNeedsInputCategories.mockReset().mockResolvedValue(undefined);
+    mocks.i18nManager.isRTL = false;
+    mocks.preference = 'device';
+    mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
+    await i18n.changeLanguage('en');
+  });
+
+  it('restores the pick the follow lost the race to', async () => {
+    // The follow landed the device language (`fr`) while the person's pick
+    // (`es`) had already been persisted: the catalog must go back to the pick.
+    await i18n.changeLanguage('fr');
+    mocks.preference = 'es';
+
+    await expect(restorePickedLanguage()).resolves.toEqual({ kind: 'applied-ltr' });
+
+    expect(i18n.resolvedLanguage).toBe('es');
+    expect(mocks.renameAndroidNotificationChannels).toHaveBeenCalledTimes(1);
+    expect(mocks.registerNeedsInputCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores nothing while the preference is the device language', async () => {
+    mocks.preference = 'device';
+    await i18n.changeLanguage('fr');
+
+    await expect(restorePickedLanguage()).resolves.toBeNull();
+
+    expect(i18n.resolvedLanguage).toBe('fr');
+  });
+
+  it('restores nothing for a pick that changes the direction', async () => {
+    // An RTL pick persists and reloads by itself; swapping the catalog in place
+    // would paint it into the old LTR direction.
+    mocks.i18nManager.isRTL = false;
+    mocks.preference = 'ar';
+    await i18n.changeLanguage('fr');
+
+    await expect(restorePickedLanguage()).resolves.toBeNull();
+
+    expect(i18n.resolvedLanguage).toBe('fr');
+  });
+
+  it('reports a pick whose catalog failed', async () => {
+    await i18n.changeLanguage('fr');
+    mocks.preference = 'es';
+    const changeLanguageSpy = vi
+      .spyOn(i18n, 'changeLanguage')
+      .mockResolvedValueOnce(undefined as never);
+    const hasBundleSpy = vi.spyOn(i18n, 'hasResourceBundle').mockReturnValueOnce(false);
+
+    await expect(restorePickedLanguage()).resolves.toEqual({ kind: 'catalog-failed' });
+
     changeLanguageSpy.mockRestore();
     hasBundleSpy.mockRestore();
   });

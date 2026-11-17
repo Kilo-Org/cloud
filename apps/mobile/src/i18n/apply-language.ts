@@ -7,6 +7,7 @@ import { type SupportedLanguage } from '@/i18n/languages';
 import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import { type LanguageReturnTarget, writeLanguageReturnTarget } from '@/i18n/return-target';
 import {
+  getLanguagePreference,
   type LanguagePreference,
   setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
@@ -17,6 +18,7 @@ import { prewarmIntl } from '@/lib/intl-cache';
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
   | { kind: 'restarting-rtl' }
+  | { kind: 'restart-guarded' }
   | { kind: 'restart-skipped' }
   | { kind: 'reload-failed' }
   | { kind: 'persist-failed' }
@@ -59,13 +61,17 @@ function refreshLocalizedNotifications(): void {
  * once and a second reload would repeat with no user input. A manual pick
  * never reads the record: the person asking again is exactly the input the
  * guard protects, and the retry path re-runs the apply itself.
+ *
+ * `restart-guarded` means the guard held: the running app already recorded a
+ * relaunch for this language, so this call returns without one. `restart-skipped`
+ * means the attempt record could not be written, so no relaunch may run.
  */
 async function restartForDirection(
   language: SupportedLanguage,
   respectAttemptRecord: boolean
 ): Promise<ApplyLanguageOutcome> {
   if (respectAttemptRecord && (await readDirectionAttemptAsync()) === language) {
-    return { kind: 'restart-skipped' };
+    return { kind: 'restart-guarded' };
   }
   // Record the relaunch so a cold start that comes back with the previous
   // direction does not relaunch again for it; the cold start then shows the
@@ -159,6 +165,35 @@ export async function applyDeviceLanguage(
     return { kind: 'catalog-failed' };
   }
 
+  refreshLocalizedNotifications();
+  return { kind: 'applied-ltr' };
+}
+
+/**
+ * Re-apply the language the person picked after the automatic follow lost the
+ * race to it. The follow switches the catalog before it re-reads the
+ * preference, so a superseded follow can leave the device language active
+ * while the stored preference names the pick; restoring it is what makes "a
+ * pick made while the apply runs wins" hold while the app runs.
+ *
+ * Only a same-direction pick is restored: a pick that changes the layout
+ * direction writes its preference and reloads the app itself, and switching
+ * the catalog in place would paint the new language into the old direction.
+ * Returns null when nothing had to be restored, or the catalog failure that
+ * kept the pick from loading.
+ */
+export async function restorePickedLanguage(): Promise<ApplyLanguageOutcome | null> {
+  const preference = getLanguagePreference();
+  if (
+    preference === 'device' ||
+    preference === i18n.resolvedLanguage ||
+    I18nManager.isRTL !== isRtlLanguage(preference)
+  ) {
+    return null;
+  }
+  if (!(await changeLanguageInPlace(preference))) {
+    return { kind: 'catalog-failed' };
+  }
   refreshLocalizedNotifications();
   return { kind: 'applied-ltr' };
 }

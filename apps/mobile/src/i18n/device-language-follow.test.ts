@@ -5,13 +5,17 @@ import { requestDeviceLanguageFollow } from './device-language-follow';
 
 const mocks = vi.hoisted(() => ({
   applyDeviceLanguage: vi.fn(),
+  restorePickedLanguage: vi.fn(),
   captureException: vi.fn(),
   preference: 'device' as 'device' | 'es',
   writeInFlight: false,
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
-vi.mock('@/i18n/apply-language', () => ({ applyDeviceLanguage: mocks.applyDeviceLanguage }));
+vi.mock('@/i18n/apply-language', () => ({
+  applyDeviceLanguage: mocks.applyDeviceLanguage,
+  restorePickedLanguage: mocks.restorePickedLanguage,
+}));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => mocks.preference,
   hasLanguagePreferenceWriteInFlight: () => mocks.writeInFlight,
@@ -40,6 +44,15 @@ describe('requestDeviceLanguageFollow', () => {
       return { kind: 'applied-ltr' };
     });
     mocks.captureException.mockReset();
+    mocks.restorePickedLanguage.mockReset();
+    // The restore re-applies the stored pick; `device` has nothing to restore.
+    mocks.restorePickedLanguage.mockImplementation(async () => {
+      if (mocks.preference === 'device') {
+        return null;
+      }
+      await i18n.changeLanguage(mocks.preference);
+      return { kind: 'applied-ltr' };
+    });
     await i18n.changeLanguage('en');
   });
 
@@ -165,20 +178,66 @@ describe('requestDeviceLanguageFollow', () => {
     expect(i18n.resolvedLanguage).toBe('es');
   });
 
-  it('admits nothing when the apply lands on a pick made while it ran', async () => {
-    // The apply's own mock lands the language, then the person picks a
+  it('puts the pick back when the apply lands on a pick made while it ran', async () => {
+    // The apply's own mock lands the device language, then the person picks a
     // different one whose preference write has already committed.
     mocks.applyDeviceLanguage.mockImplementation(async (picked: string) => {
       await i18n.changeLanguage(picked);
+      mocks.preference = 'es';
       return { kind: 'applied-ltr' };
     });
 
-    requestDeviceLanguageFollow('es');
+    requestDeviceLanguageFollow('fr');
     await vi.waitFor(() => {
-      expect(mocks.applyDeviceLanguage).toHaveBeenCalledTimes(1);
+      expect(mocks.restorePickedLanguage).toHaveBeenCalledTimes(1);
     });
 
-    expect(mocks.captureException).not.toHaveBeenCalled();
+    // The pick wins over the device language the apply already switched to.
     expect(i18n.resolvedLanguage).toBe('es');
+    expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+
+  it('reports a pick whose catalog failed to restore', async () => {
+    mocks.applyDeviceLanguage.mockImplementation(async (picked: string) => {
+      await i18n.changeLanguage(picked);
+      mocks.preference = 'es';
+      return { kind: 'applied-ltr' };
+    });
+    mocks.restorePickedLanguage.mockResolvedValueOnce({ kind: 'catalog-failed' });
+
+    requestDeviceLanguageFollow('fr');
+    await vi.waitFor(() => {
+      expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    const [reported, options] = mocks.captureException.mock.calls[0] ?? [];
+    expect(reported).toBeInstanceOf(Error);
+    expect(options).toEqual({
+      tags: { 'error.subsystem': 'startup', 'error.operation': 'language_follow' },
+    });
+    // The restore failed, so the device language the apply landed stays.
+    expect(i18n.resolvedLanguage).toBe('fr');
+  });
+
+  it('does not report the loop guard as a failure', async () => {
+    mocks.applyDeviceLanguage.mockResolvedValueOnce({ kind: 'restart-guarded' });
+
+    requestDeviceLanguageFollow('es');
+    await drainFollowQueue();
+
+    expect(mocks.applyDeviceLanguage).toHaveBeenCalledWith('es');
+    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.restorePickedLanguage).not.toHaveBeenCalled();
+  });
+
+  it('reports a skipped restart as a failed follow', async () => {
+    mocks.applyDeviceLanguage.mockResolvedValueOnce({ kind: 'restart-skipped' });
+
+    requestDeviceLanguageFollow('es');
+    await vi.waitFor(() => {
+      expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.restorePickedLanguage).not.toHaveBeenCalled();
   });
 });

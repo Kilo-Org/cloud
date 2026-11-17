@@ -29682,53 +29682,6 @@
     ],
     "searchBlob": "organizations.settings.updateAllowLists Set which model providers are allowed and which models are blocked for an organization. Use to restrict model access for enterprise plans. organizations settings updateallowlists organizationid provider_allow_list model_deny_list organizationId provider_allow_list model_deny_list"
   },
-  "organizations.settings.updateBrowserControl": {
-    "path": "organizations.settings.updateBrowserControl",
-    "kind": "mutation",
-    "summary": "Change an organization's browser-control policy, turning agent browser access on or off and setting which websites are allowed. Use this to restrict or permit the sites a browser can visit for the org.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "browserControl": {
-          "type": "string",
-          "enum": [
-            "allow",
-            "playwright_only",
-            "off"
-          ]
-        },
-        "browserAllowedOrigins": {
-          "maxItems": 200,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2048
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "browserControl",
-        "browserAllowedOrigins"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "settings",
-      "updatebrowsercontrol",
-      "organizationid",
-      "browsercontrol",
-      "browserallowedorigins"
-    ],
-    "searchBlob": "organizations.settings.updateBrowserControl Change an organization's browser-control policy, turning agent browser access on or off and setting which websites are allowed. Use this to restrict or permit the sites a browser can visit for the org. organizations settings updatebrowsercontrol organizationid browsercontrol browserallowedorigins organizationId browserControl browserAllowedOrigins"
-  },
   "organizations.settings.updateDataCollection": {
     "path": "organizations.settings.updateDataCollection",
     "kind": "mutation",
@@ -36379,14 +36332,6 @@
             "maxLength": 256
           }
         },
-        "autoModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36435,14 +36380,6 @@
             "maxLength": 256
           }
         },
-        "excludedAutoModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36484,7 +36421,6 @@
             "user",
             "provider",
             "project",
-            "autoModel",
             "organization"
           ]
         },
@@ -36524,14 +36460,12 @@
       "viewas",
       "features",
       "models",
-      "automodels",
       "modes",
       "userids",
       "providers",
       "projects",
       "excludedfeatures",
       "excludedmodels",
-      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
@@ -36540,7 +36474,7 @@
       "metric",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedProjects dimension metric limit"
+    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects dimension metric limit"
   },
   "usageAnalytics.getScopeOrganizations": {
     "path": "usageAnalytics.getScopeOrganizations",
@@ -36648,14 +36582,6 @@
             "maxLength": 256
           }
         },
-        "autoModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36697,14 +36623,6 @@
           }
         },
         "excludedModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
-        "excludedAutoModels": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36764,20 +36682,18 @@
       "viewas",
       "features",
       "models",
-      "automodels",
       "modes",
       "userids",
       "providers",
       "projects",
       "excludedfeatures",
       "excludedmodels",
-      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
       "excludedprojects"
     ],
-    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedProjects"
+    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects"
   },
   "usageAnalytics.getTable": {
     "path": "usageAnalytics.getTable",
@@ -36860,14 +36776,6 @@
             "maxLength": 256
           }
         },
-        "autoModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36909,14 +36817,6 @@
           }
         },
         "excludedModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
-        "excludedAutoModels": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36967,8 +36867,7 @@
               "mode",
               "user",
               "provider",
-              "project",
-              "autoModel"
+              "project"
             ]
           }
         },
@@ -36999,14 +36898,12 @@
       "viewas",
       "features",
       "models",
-      "automodels",
       "modes",
       "userids",
       "providers",
       "projects",
       "excludedfeatures",
       "excludedmodels",
-      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
@@ -37014,7 +36911,7 @@
       "groupby",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedProjects groupBy limit"
+    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects groupBy limit"
   },
   "usageAnalytics.getTimeseries": {
     "path": "usageAnalytics.getTimeseries",
@@ -37097,14 +36994,6 @@
             "maxLength": 256
           }
         },
-        "autoModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -37146,14 +37035,6 @@
           }
         },
         "excludedModels": {
-          "maxItems": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
-        "excludedAutoModels": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -37218,8 +37099,7 @@
             "mode",
             "user",
             "provider",
-            "project",
-            "autoModel"
+            "project"
           ]
         }
       },
@@ -37243,14 +37123,12 @@
       "viewas",
       "features",
       "models",
-      "automodels",
       "modes",
       "userids",
       "providers",
       "projects",
       "excludedfeatures",
       "excludedmodels",
-      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
@@ -37258,7 +37136,7 @@
       "metric",
       "splitby"
     ],
-    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedProjects metric splitBy"
+    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects metric splitBy"
   },
   "usageAnalytics.resolveOrgUsers": {
     "path": "usageAnalytics.resolveOrgUsers",

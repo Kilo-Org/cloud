@@ -29,6 +29,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -107,6 +108,38 @@ function pressableProps(node: Node): Record<string, unknown> | undefined {
   return undefined;
 }
 
+/** The props of the first node under `node` that `match` accepts. */
+function findProps(
+  node: Node,
+  match: (props: Record<string, unknown>, type: unknown) => boolean
+): Record<string, unknown> | undefined {
+  if (node === null || typeof node !== 'object') {
+    return undefined;
+  }
+  const props = node.props;
+  if (props && match(props, node.type)) {
+    return props;
+  }
+  const children = props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findProps(child as Node, match);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+/** The props of the first node of `type` under `node`. */
+function propsOfType(node: Node, type: string): Record<string, unknown> | undefined {
+  return findProps(node, (_props, nodeType) => nodeType === type);
+}
+
+function classList(props: Record<string, unknown> | undefined): string[] {
+  const className = props?.className;
+  return typeof className === 'string' ? className.split(/\s+/) : [];
+}
+
 const INSTANCE = {
   connectionId: 'conn-abc',
   name: 'laptop',
@@ -126,16 +159,13 @@ function baseProps() {
 }
 
 describe('InstanceSelector closed label', () => {
-  it.each([
-    ['cloud default', baseProps(), 'Cloud Agent'],
-    ['loading', { ...baseProps(), isLoading: true }, 'Loading…'],
-  ])('labels the %s', async (_name, props, expected) => {
+  it('labels the Cloud Agent default', async () => {
     const { InstanceSelector } = await import('./instance-selector');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = InstanceSelector(props) as Node;
+    const element = InstanceSelector(baseProps()) as Node;
 
-    expect(textValues(element)).toContain(expected);
+    expect(textValues(element)).toContain('Cloud Agent');
   });
 
   it('labels the unbound computer target instead of the Cloud Agent default', async () => {
@@ -185,14 +215,11 @@ describe('InstanceSelector closed label ink', () => {
     expect(className).not.toContain('text-muted-foreground');
   });
 
-  it.each([
-    ['the loading copy', { ...baseProps(), isLoading: true }],
-    ['the unbound computer', { ...baseProps(), pendingComputer: true }],
-  ])('keeps placeholder ink while it shows %s', async (_name, props) => {
+  it('keeps placeholder ink on the unbound computer', async () => {
     const { InstanceSelector } = await import('./instance-selector');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = InstanceSelector(props) as Node;
+    const element = InstanceSelector({ ...baseProps(), pendingComputer: true }) as Node;
 
     expect(valueClassName(element) ?? '').toContain('text-muted-foreground');
   });
@@ -202,7 +229,6 @@ describe('InstanceSelector closed label truncation', () => {
   it.each([
     ['a selected target', () => ({ ...baseProps(), value: INSTANCE })],
     ['the Cloud Agent default', baseProps],
-    ['the loading copy', () => ({ ...baseProps(), isLoading: true })],
     ['the unbound computer', () => ({ ...baseProps(), pendingComputer: true })],
   ])('cuts %s at the tail', async (_name, buildProps) => {
     const { InstanceSelector } = await import('./instance-selector');
@@ -213,5 +239,58 @@ describe('InstanceSelector closed label truncation', () => {
     // Every state shows a name or copy read from its start, so the tail cut is
     // the only one that never hides the words the line begins with.
     expect(valueProps(element)?.ellipsizeMode).toBe('tail');
+  });
+});
+
+describe('InstanceSelector loading field', () => {
+  it('paints the loading bar in the field frame, never a copy line', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector({ ...baseProps(), isLoading: true }) as Node;
+
+    // `bg-muted-soft`, not the default `bg-skeleton-fill`: in the light palette
+    // that fill equals this frame's `bg-secondary`, where the bar paints nothing.
+    const bar = propsOfType(element, 'Skeleton');
+    expect(classList(bar)).toEqual(expect.arrayContaining(['h-4', 'w-1/3', 'bg-muted-soft']));
+    expect(classList(bar)).not.toContain('bg-skeleton-fill');
+
+    expect(propsOfType(element, 'ChevronDown')).toBeDefined();
+    expect(textValues(element)).not.toContain('Loading…');
+  });
+
+  it('names the field and its busy state instead of offering a button', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector({ ...baseProps(), isLoading: true }) as Node;
+
+    const loading = findProps(
+      element,
+      props => (props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    );
+    expect(loading?.accessibilityLabel).toBe('Run on: Loading…');
+    expect(loading?.accessibilityState).toEqual({ busy: true });
+
+    // The field frame with no dim: a skeleton is an honest wait, not a refusal.
+    expect(classList(loading)).toEqual(
+      expect.arrayContaining(['rounded-lg', 'border-border', 'bg-secondary', 'px-3'])
+    );
+    expect(classList(loading)).not.toContain('opacity-50');
+
+    expect(loading?.accessibilityRole).toBeUndefined();
+    expect(loading?.onPress).toBeUndefined();
+    expect(propsOfType(element, 'Pressable')).toBeUndefined();
+  });
+
+  it('keeps the bound target on screen while the list refetches', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector({ ...baseProps(), value: INSTANCE, isLoading: true }) as Node;
+
+    expect(textValues(element)).toEqual(['laptop']);
+    expect(propsOfType(element, 'Skeleton')).toBeUndefined();
+    expect(pressableProps(element)?.accessibilityLabel).toBe('Run on: laptop · kilo');
   });
 });

@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Zaman wakilin naka yana da sabuntawa",
-      "chatMessage": "Kana da sabon saƙo",
-      "instanceLifecycle": "Misalin naka yana da sabuntawa",
-      "scheduledAction": "Wani aiki da aka tsara yana da sabuntawa",
       "lowBalance": "Ma'auninka yana buƙatar kulawa",
       "spendAlert": "Kashewar ku na buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Babu Suna",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Wani duban tsaro yana da sabuntawa"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} a shirye",
-      "body": "Danna don fara tattaunawa."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} ya gaza farawa",
-      "body": "Farkawa ta gaza."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} za a sake kunna shi ba da daɗewa ba",
-      "body": "An tsara sake kunnawa a {{when}}."
-    },
-    "restartCancelled": {
-      "title": "An soke sake kunnawa na {{instanceName}}",
-      "body": "An soke sake kunnawar da aka tsara a baya."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} za a haɓaka shi ba da daɗewa ba",
-      "bodyWithTag": "Haɓaka zuwa {{targetImageTag}} a {{when}}.",
-      "bodyWithoutTag": "Haɓakawa da aka tsara a {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "An soke haɓakawar {{instanceName}}",
-      "body": "An soke haɓakawar da aka tsara a baya."
     }
   },
   "sessionReady": {

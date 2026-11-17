@@ -43,17 +43,16 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
 }
 
 function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
-  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }).map(
+  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }, 'org_1').map(
     row => row.area
   );
 }
 
 describe('visibleOrgSettingsRows', () => {
-  it('lists every area for an owner of an enterprise organization', () => {
+  it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
       'providersAndModels',
       'guardrails',
-      'byok',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -72,7 +71,6 @@ describe('visibleOrgSettingsRows', () => {
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
       'guardrails',
-      'byok',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -130,6 +128,7 @@ describe('visibleOrgSettingsRows', () => {
         expect(rows).not.toContain('usageDetails');
         expect(rows).not.toContain('customModes');
         expect(rows).not.toContain('groups');
+        expect(rows).not.toContain('byok');
       }
     }
   });
@@ -138,26 +137,37 @@ describe('visibleOrgSettingsRows', () => {
 describe('visibleInAppSettingsRows', () => {
   it('returns every in-app area to a billing role on enterprise', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['customModes', 'groups', 'usageDetails', 'auditLogs']);
+      expect(inAppAreas({ role })).toEqual([
+        'customModes',
+        'groups',
+        'usageDetails',
+        'auditLogs',
+        'byok',
+      ]);
     }
   });
 
   it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
     expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
     expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
   });
 
-  it('keeps custom modes and usage on the teams plan', () => {
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails']);
+  it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails', 'byok']);
   });
 
   it('opens the native screen that owns each setting', () => {
-    const rows = visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise' });
+    const rows = visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise' }, 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
     expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
     expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('byok')?.href).toEqual({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org_1' },
+    });
   });
 });
 

@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramèt òganizasyon an sou entènèt",
-      "integrations": "Entegrasyon sou entènèt",
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO ak domèn",
       "dataCollection": "Koleksyon done",
       "auditLogs": "Jounal odit",
-      "requestLogs": "Jounal demann",
-      "subOrganizations": "Sou-òganizasyon",
-      "distributeFunds": "Distribye lajan"
+      "requestLogs": "Jounal demann"
+    },
+    "requestLogs": {
+      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
+      "older": "Èdtan anvan",
+      "newer": "Èdtan apre",
+      "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
+      "emptyTitle": "Pa gen demann",
+      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
+      "loadError": "Nou pa t ka chaje jounal demann yo.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
+      "tokens": "{{input}} antre · {{output}} soti",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
@@ -4527,6 +4536,8 @@
     "topModels": "Modèl ki pi itilize",
     "topFeatures": "Fonksyon ki pi itilize",
     "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "unavailableTitle": "Itilizasyon pa disponib",
+    "unavailableDescription": "Espas travay sa a pa rapòte itilizasyon. Repare pa pral ede.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
     "viewDetails": "Wè detay itilizasyon"
   },

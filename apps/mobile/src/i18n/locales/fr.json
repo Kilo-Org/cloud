@@ -3524,7 +3524,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramètres de l'organisation sur le web",
-      "integrations": "Intégrations sur le web",
       "usageDetails": "Détails d'utilisation",
       "providersAndModels": "Fournisseurs et modèles",
       "groups": "Groupes",
@@ -3533,9 +3532,19 @@
       "ssoAndDomain": "SSO et domaine",
       "dataCollection": "Collecte de données",
       "auditLogs": "Journaux d'audit",
-      "requestLogs": "Journaux des requêtes",
-      "subOrganizations": "Sous-organisations",
-      "distributeFunds": "Répartir les fonds"
+      "requestLogs": "Journaux des requêtes"
+    },
+    "requestLogs": {
+      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
+      "older": "Heure précédente",
+      "newer": "Heure suivante",
+      "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
+      "emptyTitle": "Aucune requête",
+      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
+      "loadError": "Impossible de charger les journaux des requêtes.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
+      "tokens": "{{input}} en entrée · {{output}} en sortie",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
@@ -4597,6 +4606,8 @@
     "topModels": "Principaux modèles",
     "topFeatures": "Principales fonctionnalités",
     "emptyTitle": "Aucune utilisation sur cette période",
+    "unavailableTitle": "Utilisation indisponible",
+    "unavailableDescription": "Cet espace de travail ne signale aucune utilisation. Réessayer ne servira à rien.",
     "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
     "viewDetails": "Voir les détails d'utilisation"
   },

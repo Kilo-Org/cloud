@@ -3519,7 +3519,6 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
-      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -3528,9 +3527,19 @@
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
-      "requestLogs": "Pieprasījumu žurnāli",
-      "subOrganizations": "Apakšorganizācijas",
-      "distributeFunds": "Sadalīt līdzekļus"
+      "requestLogs": "Pieprasījumu žurnāli"
+    },
+    "requestLogs": {
+      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
+      "older": "Iepriekšējā stunda",
+      "newer": "Nākamā stunda",
+      "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
+      "emptyTitle": "Nav pieprasījumu",
+      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
+      "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "tokens": "{{input}} ievade · {{output}} izvade",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
@@ -4597,6 +4606,8 @@
     "topModels": "Populārākie modeļi",
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
+    "unavailableTitle": "Lietojums nav pieejams",
+    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },

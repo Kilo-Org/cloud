@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
-      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO eta domeinua",
       "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
-      "requestLogs": "Eskaeren erregistroak",
-      "subOrganizations": "Azpierakundeak",
-      "distributeFunds": "Banatu funtsak"
+      "requestLogs": "Eskaeren erregistroak"
+    },
+    "requestLogs": {
+      "hint": "Leihoa amaitu aurreko orduko eskaerak, berrienak lehenik.",
+      "older": "Aurreko ordua",
+      "newer": "Hurrengo ordua",
+      "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
+      "emptyTitle": "Ez dago eskaerarik",
+      "emptyDescription": "Ordu honetan ez dago atebideko eskaerarik.",
+      "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "tokens": "{{input}} sarrera · {{output}} irteera",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
@@ -4527,6 +4536,8 @@
     "topModels": "Eredu erabilienak",
     "topFeatures": "Funtzio erabilienak",
     "emptyTitle": "Ez dago erabilerarik aldi honetan",
+    "unavailableTitle": "Erabilera ez dago erabilgarri",
+    "unavailableDescription": "Lan-eremu honek ez du erabilerarik jakinarazten. Berriro saiatzeak ez du lagunduko.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak"
   },

@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "网页版组织设置",
-      "integrations": "网页版集成",
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO 和域名",
       "dataCollection": "数据收集",
       "auditLogs": "审计日志",
-      "requestLogs": "请求日志",
-      "subOrganizations": "子组织",
-      "distributeFunds": "分配资金"
+      "requestLogs": "请求日志"
+    },
+    "requestLogs": {
+      "hint": "显示时段结束前一小时内的请求，最新的在前。",
+      "older": "上一小时",
+      "newer": "下一小时",
+      "truncated": "该小时的请求数超出列表可显示的数量。",
+      "emptyTitle": "暂无请求",
+      "emptyDescription": "该小时内没有网关请求。",
+      "loadError": "无法加载请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "tokens": "输入 {{input}} · 输出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "输入词元",
@@ -4527,6 +4536,8 @@
     "topModels": "常用模型",
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
+    "unavailableTitle": "用量不可用",
+    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },

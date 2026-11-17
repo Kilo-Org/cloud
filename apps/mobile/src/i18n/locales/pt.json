@@ -3525,7 +3525,6 @@
     },
     "settingsOnWeb": {
       "title": "Definições da organização na Web",
-      "integrations": "Integrações na Web",
       "usageDetails": "Detalhes de utilização",
       "providersAndModels": "Fornecedores e modelos",
       "groups": "Grupos",
@@ -3534,9 +3533,19 @@
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Recolha de dados",
       "auditLogs": "Registos de auditoria",
-      "requestLogs": "Registos de pedidos",
-      "subOrganizations": "Suborganizações",
-      "distributeFunds": "Distribuir fundos"
+      "requestLogs": "Registos de pedidos"
+    },
+    "requestLogs": {
+      "hint": "Pedidos da hora anterior ao fim do intervalo, mais recentes primeiro.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora tem mais pedidos do que os apresentados na lista.",
+      "emptyTitle": "Sem pedidos",
+      "emptyDescription": "Não há pedidos ao gateway nesta hora.",
+      "loadError": "Não foi possível carregar os registos de pedidos.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -4603,6 +4612,8 @@
     "topModels": "Modelos mais usados",
     "topFeatures": "Funcionalidades mais usadas",
     "emptyTitle": "Sem utilização neste período",
+    "unavailableTitle": "Utilização indisponível",
+    "unavailableDescription": "Esta área de trabalho não está a comunicar utilização. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
     "viewDetails": "Ver detalhes de utilização"
   },

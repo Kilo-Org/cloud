@@ -3576,7 +3576,6 @@
     },
     "settingsOnWeb": {
       "title": "Organizacijos nustatymai žiniatinklyje",
-      "integrations": "Integracijos žiniatinklyje",
       "usageDetails": "Naudojimo informacija",
       "providersAndModels": "Teikėjai ir modeliai",
       "groups": "Grupės",
@@ -3585,9 +3584,19 @@
       "ssoAndDomain": "SSO ir domenas",
       "dataCollection": "Duomenų rinkimas",
       "auditLogs": "Audito žurnalai",
-      "requestLogs": "Užklausų žurnalai",
-      "subOrganizations": "Antrinės organizacijos",
-      "distributeFunds": "Paskirstyti lėšas"
+      "requestLogs": "Užklausų žurnalai"
+    },
+    "requestLogs": {
+      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
+      "older": "Ankstesnė valanda",
+      "newer": "Vėlesnė valanda",
+      "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
+      "emptyTitle": "Užklausų nėra",
+      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
+      "loadError": "Nepavyko įkelti užklausų žurnalų.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "tokens": "Įvestis {{input}} · išvestis {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
@@ -4667,6 +4676,8 @@
     "topModels": "Populiariausi modeliai",
     "topFeatures": "Populiariausios funkcijos",
     "emptyTitle": "Šiuo laikotarpiu naudojimo nėra",
+    "unavailableTitle": "Naudojimas nepasiekiamas",
+    "unavailableDescription": "Ši darbo sritis nepraneša apie naudojimą. Bandyti dar kartą nepadės.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
     "viewDetails": "Peržiūrėti naudojimo informaciją"
   },

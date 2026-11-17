@@ -267,9 +267,7 @@ export function ProfileMcpScreen({
           isSaving={createMcp.isPending || updateMcp.isPending}
           saveFailure={form.notes}
           onClose={handleClose}
-          onSave={payload => {
-            void saveServer(form.editing, payload);
-          }}
+          onSave={payload => saveServer(form.editing, payload)}
         />
       ) : null}
 

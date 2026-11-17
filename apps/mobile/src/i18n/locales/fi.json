@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
-      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO ja verkkotunnus",
       "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
-      "requestLogs": "Pyyntölokit",
-      "subOrganizations": "Alaorganisaatiot",
-      "distributeFunds": "Jaa varoja"
+      "requestLogs": "Pyyntölokit"
+    },
+    "requestLogs": {
+      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
+      "older": "Edellinen tunti",
+      "newer": "Seuraava tunti",
+      "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
+      "emptyTitle": "Ei pyyntöjä",
+      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
+      "loadError": "Pyyntölokien lataaminen epäonnistui.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "tokens": "{{input}} sisään · {{output}} ulos",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -4527,6 +4536,8 @@
     "topModels": "Käytetyimmät mallit",
     "topFeatures": "Käytetyimmät ominaisuudet",
     "emptyTitle": "Ei käyttöä tällä aikavälillä",
+    "unavailableTitle": "Käyttö ei ole saatavilla",
+    "unavailableDescription": "Tämä työtila ei raportoi käyttöä. Uudelleen yrittäminen ei auta.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
     "viewDetails": "Näytä käytön tiedot"
   },

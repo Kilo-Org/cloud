@@ -280,43 +280,45 @@ export function WorkspaceArtifactsView({
                   return (
                     <li
                       key={entry.relativePath}
-                      className="hover:bg-secondary/60 flex min-w-0 items-center gap-2 rounded-sm px-2 py-1.5"
+                      className="hover:bg-secondary/60 flex h-11 min-w-0 items-center gap-2 rounded-sm px-2 sm:h-7"
                     >
                       <FileText
                         aria-hidden="true"
                         className="text-muted-foreground size-3.5 shrink-0"
                       />
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className="min-w-0 truncate font-mono text-xs"
-                          title={entry.relativePath}
+                      <span
+                        className="min-w-0 flex-1 truncate font-mono text-xs"
+                        title={entry.relativePath}
+                      >
+                        {workspaceArtifactFileName(entry)}
+                        <span className="sr-only"> {entry.relativePath}</span>
+                      </span>
+                      <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                        {formatWorkspaceArtifactSize(entry.sizeBytes)}
+                      </span>
+                      <span className="text-muted-foreground hidden shrink-0 font-mono text-xs tabular-nums sm:inline">
+                        Synced{' '}
+                        <time
+                          dateTime={new Date(entry.updatedAt).toISOString()}
+                          title={new Date(entry.updatedAt).toLocaleString()}
                         >
-                          {workspaceArtifactFileName(entry)}
-                          <span className="sr-only"> {entry.relativePath}</span>
-                        </p>
-                        <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                          <span>{formatWorkspaceArtifactSize(entry.sizeBytes)}</span>
-                          <span className="sm:border-border sm:border-l sm:pl-2">
-                            Synced{' '}
-                            <time dateTime={new Date(entry.updatedAt).toISOString()}>
-                              {formatDistanceToNow(new Date(entry.updatedAt), {
-                                addSuffix: true,
-                              })}
-                            </time>
-                          </span>
-                          <span className="sm:border-border sm:border-l sm:pl-2">
-                            Expires{' '}
-                            <time dateTime={new Date(expiresAt).toISOString()}>
-                              {formatDistanceToNow(new Date(expiresAt), { addSuffix: true })}
-                            </time>
-                          </span>
-                        </div>
-                      </div>
+                          {formatDistanceToNow(new Date(entry.updatedAt), { addSuffix: true })}
+                        </time>
+                      </span>
+                      <span className="text-muted-foreground hidden shrink-0 font-mono text-xs tabular-nums lg:inline">
+                        Expires{' '}
+                        <time
+                          dateTime={new Date(expiresAt).toISOString()}
+                          title={new Date(expiresAt).toLocaleString()}
+                        >
+                          {formatDistanceToNow(new Date(expiresAt), { addSuffix: true })}
+                        </time>
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+                        className="h-11 w-11 shrink-0 sm:h-7 sm:w-7"
                         aria-label={`Download ${entry.relativePath}`}
                         title={`Download ${entry.relativePath}`}
                         disabled={download.isPending}
@@ -329,7 +331,7 @@ export function WorkspaceArtifactsView({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="text-muted-foreground hover:text-destructive h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+                          className="text-muted-foreground hover:text-destructive h-11 w-11 shrink-0 sm:h-7 sm:w-7"
                           aria-label={`Delete ${entry.relativePath}`}
                           title={`Delete ${entry.relativePath}`}
                           onClick={() => {

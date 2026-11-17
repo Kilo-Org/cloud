@@ -224,17 +224,12 @@ function generatedFiles(
     const file = isSheet
       ? `apps/mobile/src/app/(app)/design-proof-${target.id}.tsx`
       : `apps/mobile/src/app/(auth)/design-proof-${target.id}.tsx`;
+    if (git(repo, ['ls-tree', commit, '--', file]).trim() !== '') {
+      throw new Error(`Diagnostic would overwrite existing product source: ${file}`);
+    }
     const componentImport = `@/${diagnostic.component.slice('apps/mobile/src/'.length, -4)}`;
     let binding = 'Component';
     if (diagnostic.exportName !== 'default') binding = `{ ${diagnostic.exportName} as Component }`;
-    // A picker-sheet diagnostic presents the screen the way the app presents the
-    // picker routes: a half detent on Android, its own formSheet options
-    // elsewhere. The presentation is registered by the generated group layout
-    // BEFORE the screen mounts, so the native screen never re-presents: an
-    // options update after the first mount remounts the sheet fragment, which
-    // tears the stack down on a later route change. Without the presentation the
-    // screen paints onto the window and its sheet header is measured at the
-    // window top, an overlap the product never paints.
     // A picker-sheet diagnostic presents the screen the way the app presents the
     // picker routes: a half detent on Android, its own formSheet options
     // elsewhere. Without it the screen paints onto the window and its sheet

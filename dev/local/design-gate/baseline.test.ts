@@ -184,6 +184,36 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
   );
 });
 
+test('preparation refuses a tracked product file at a generated picker-sheet route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const tracked = path.join(fixture.repo, 'apps/mobile/src/app/(app)/design-proof-card.tsx');
+  fs.mkdirSync(path.dirname(tracked), { recursive: true });
+  fs.writeFileSync(tracked, 'export default function Real() { return "product"; }\n');
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'tracked product file at the generated route');
+  await assert.rejects(
+    () =>
+      prepareProof({
+        ...fixture,
+        head: fixture.git('rev-parse', 'HEAD'),
+      }),
+    /would overwrite existing product source/
+  );
+  assert.equal(fs.existsSync(path.join(fixture.out, 'preparation.json')), false);
+});
+
 test('a picker-sheet diagnostic presents the screen the way the app presents that route', async t => {
   const fixture = syntheticRepo(
     t,

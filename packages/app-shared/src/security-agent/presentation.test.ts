@@ -294,6 +294,14 @@ describe('getSecurityDeadlinePresentation', () => {
     expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({ label: 'Dismissed' });
   });
 
+  it('renders the dismissed detail with an Invalid Date label for an unparseable timestamp', () => {
+    const dismissed = makeFinding({ status: 'ignored', updated_at: '' });
+    expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({
+      label: 'Dismissed',
+      detail: 'Dismissed Invalid Date',
+    });
+  });
+
   it('reports no deadline set when sla_due_at is null', () => {
     const finding = makeFinding({ status: 'open', sla_due_at: null });
     expect(getSecurityDeadlinePresentation(finding, now)).toMatchObject({

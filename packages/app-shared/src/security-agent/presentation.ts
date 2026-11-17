@@ -292,6 +292,12 @@ let findingDateZoneCheckedAt = 0;
 const FINDING_DATE_ZONE_CHECK_MS = 1000;
 
 function formatFindingDate(date: Date): string {
+  // toLocaleDateString's spec path renders an invalid Date as its "Invalid
+  // Date" string instead of throwing; a row whose timestamp does not parse
+  // keeps that behavior here rather than aborting its render.
+  if (Number.isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
   // One Intl read per second, matching the mobile intl-cache convention
   // (dropDateFormattersForNewDeviceZone) so a row render cannot re-probe Intl
   // on every keystroke. A clock that stepped backwards reads as a stale check

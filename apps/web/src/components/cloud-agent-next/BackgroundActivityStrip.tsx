@@ -47,7 +47,7 @@ function ActivityEntry({
         {label}
       </span>
       {item.descendant && (
-        <span className="text-muted-foreground hidden max-w-28 truncate sm:inline">
+        <span className="text-muted-foreground sr-only max-w-28 sm:not-sr-only sm:truncate">
           From {item.parentLabel}
         </span>
       )}
@@ -64,7 +64,6 @@ function ActivityEntry({
       {item.kind === 'subagent' ? (
         <button
           type="button"
-          aria-label={`Open transcript: ${label}`}
           className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
           onClick={() =>
             onOpenChildSession({
@@ -74,6 +73,7 @@ function ActivityEntry({
             })
           }
         >
+          <span className="sr-only">Open transcript: </span>
           {row}
         </button>
       ) : (

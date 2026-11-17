@@ -609,7 +609,7 @@ describe('verifyAdmissionAsync', () => {
   // Refusal tests force flushes at fixed 6.x million-ms instants, so each test
   // pins the clock itself; the aggregate refresh spy would otherwise be wiped
   // by restoreAllMocks in sibling describes.
-  let now: jest.Spied;
+  let now: jest.Spied<() => number>;
 
   beforeEach(() => {
     jest.clearAllMocks();

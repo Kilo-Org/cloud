@@ -225,7 +225,7 @@ describe('ReportReceiptScreen', () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
     const root = await mount();
 
-    expect(texts(root)).toContain('Appeal in review');
+    expect(texts(root)).toContain('Under review');
     expect(appealButton(root)).toBeUndefined();
   });
 

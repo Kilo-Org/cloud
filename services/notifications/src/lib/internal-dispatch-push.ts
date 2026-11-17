@@ -1,8 +1,11 @@
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  InternalDispatchRequest,
-  PerRecipientResult,
+import {
+  genericPushContentForPushData,
+  SECURITY_FINDING_PUSH_TITLE_KEYS,
+  SECURITY_LIFECYCLE_I18N_KEY,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type InternalDispatchRequest,
+  type PerRecipientResult,
 } from '@kilocode/notifications';
 
 import {
@@ -38,19 +41,6 @@ function securityFindingTitle(
   }
 }
 
-function securityFindingI18nKey(
-  notificationKind: 'new_finding' | 'sla_warning' | 'sla_breach'
-): string {
-  switch (notificationKind) {
-    case 'new_finding':
-      return 'internal.securityFindingNew';
-    case 'sla_warning':
-      return 'internal.securityFindingSlaWarning';
-    case 'sla_breach':
-      return 'internal.securityFindingSlaBreach';
-  }
-}
-
 function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
   switch (input.kind) {
     case 'agent_briefing':
@@ -61,8 +51,13 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         agentBriefing: { localDate: input.localDate, expiresAt: input.expiresAt },
         badge: null,
         push: {
-          title: 'Kilo',
-          body: 'Active agents have an update',
+          // The catalog-backed generic copy for this data type. The channel DO
+          // replaces both fields for `agent_briefing`, so this only has to agree
+          // with `push-copy.ts`, which it does by reading the same source.
+          ...genericPushContentForPushData(
+            { type: 'agent_briefing', url: '/agent-briefing' },
+            'en'
+          ),
           data: { type: 'agent_briefing', url: '/agent-briefing' },
           sound: 'default',
           priority: 'default',
@@ -136,7 +131,7 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title,
           body: `${input.title} in ${input.repoFullName}`,
-          i18nKey: securityFindingI18nKey(input.notificationKind),
+          i18nKey: SECURITY_FINDING_PUSH_TITLE_KEYS[input.notificationKind],
           i18nParams: {
             severity: input.severity,
             findingTitle: input.title,
@@ -164,7 +159,9 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title: 'Kilo',
           body: 'A security check has an update',
-          i18nKey: 'internal.securityLifecycle',
+          // The catalog mapping reads this key, so the payload and the shared
+          // copy entries cannot drift apart.
+          i18nKey: SECURITY_LIFECYCLE_I18N_KEY,
           data: {
             type: 'security_lifecycle',
             event: input.event,

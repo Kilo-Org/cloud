@@ -30,7 +30,15 @@ export type Granularity = z.infer<typeof GranularitySchema>;
 export const CostSourceSchema = z.enum(['cost', 'market']);
 export type CostSource = z.infer<typeof CostSourceSchema>;
 
-export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
+export const DimensionSchema = z.enum([
+  'feature',
+  'model',
+  'mode',
+  'user',
+  'provider',
+  'project',
+  'autoModel',
+]);
 export type Dimension = z.infer<typeof DimensionSchema>;
 
 export const BreakdownDimensionSchema = z.enum([...DimensionSchema.options, 'organization']);
@@ -75,12 +83,14 @@ const FiltersShape = {
   viewAs: z.enum(['self', 'org-wide']).default('self'),
   features: FilterValuesSchema,
   models: FilterValuesSchema,
+  autoModels: FilterValuesSchema,
   modes: FilterValuesSchema,
   userIds: FilterValuesSchema,
   providers: FilterValuesSchema,
   projects: FilterValuesSchema,
   excludedFeatures: FilterValuesSchema,
   excludedModels: FilterValuesSchema,
+  excludedAutoModels: FilterValuesSchema,
   excludedModes: FilterValuesSchema,
   excludedUserIds: FilterValuesSchema,
   excludedProviders: FilterValuesSchema,

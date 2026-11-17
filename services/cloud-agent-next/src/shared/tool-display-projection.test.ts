@@ -136,8 +136,8 @@ describe('projectToolPartForDisplay', () => {
 
 describe('projectKilo2MessageForDisplay', () => {
   it('shares the output budget across text entries and marks the tool entry', () => {
-    const first = 'a'.repeat(3000);
-    const second = 'b'.repeat(3000);
+    const first = 'a'.repeat(TOOL_OUTPUT_PREVIEW_BYTES - 100);
+    const second = 'b'.repeat(TOOL_OUTPUT_PREVIEW_BYTES);
     const message = {
       id: 'msg_1',
       type: 'assistant',
@@ -175,7 +175,7 @@ describe('projectKilo2MessageForDisplay', () => {
     };
     expect(tool.state.content[0]?.text).toBe(first);
     expect(tool.state.content[1]).toBe(message.content[1]?.state?.content?.[1]);
-    expect(bytes(tool.state.content[2]?.text)).toBe(TOOL_OUTPUT_PREVIEW_BYTES - 3000);
+    expect(bytes(tool.state.content[2]?.text)).toBe(100);
     expect(markerOf(tool)).toMatchObject({ revision: 9, omitted: ['content.2.text'] });
   });
 
@@ -252,5 +252,21 @@ describe('tool display payload budget', () => {
     expect(patches?.preview).toBeLessThan(
       10 * (TOOL_OUTPUT_PREVIEW_BYTES + TOOL_FIELD_PREVIEW_BYTES + 1536)
     );
+  });
+
+  it('loads five times as many large tool messages with less payload than twenty complete calls', () => {
+    const parts = Array.from({ length: 100 }, (_, index) =>
+      toolPart({
+        id: `prt_${index}`,
+        tool: 'read',
+        toolInput: { filePath: `/repo/file-${index}.ts` },
+        output: 'synthetic output line\n'.repeat(2500),
+      })
+    );
+    const messages = (items: unknown[]) =>
+      items.map((part, index) => ({ info: { id: `msg_${index}` }, parts: [part] }));
+    const previewBytes = bytes({ messages: messages(project(parts)) });
+    const fullBytes = bytes({ messages: messages(parts.slice(0, 20)) });
+    expect(previewBytes).toBeLessThan(fullBytes / 5);
   });
 });

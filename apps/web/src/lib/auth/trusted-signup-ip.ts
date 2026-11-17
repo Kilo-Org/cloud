@@ -1,5 +1,6 @@
 import 'server-only';
 import { isIP } from 'node:net';
+import { firstForwardedHop } from '@kilocode/web-shared/lib/http/forwarded-hop';
 
 export function getTrustedSignupClientIp(headers: Headers): string | undefined {
   const localHeaders = process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV;
@@ -9,6 +10,6 @@ export function getTrustedSignupClientIp(headers: Headers): string | undefined {
       ? 'x-forwarded-for'
       : undefined;
   if (!header) return undefined;
-  const address = headers.get(header)?.split(',')[0]?.trim();
-  return address && isIP(address) ? address : undefined;
+  const address = firstForwardedHop(headers.get(header));
+  return address !== null && isIP(address) ? address : undefined;
 }

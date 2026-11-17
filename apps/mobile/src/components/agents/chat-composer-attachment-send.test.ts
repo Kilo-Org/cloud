@@ -456,7 +456,7 @@ describe('ChatComposer attachment-only send', () => {
 
     // A strip-fail chip is a terminal error: the send is blocked with the
     // remove-or-retry copy, and onSend never fires.
-    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
     expect(onSendMock).not.toHaveBeenCalled();
   });
 
@@ -469,7 +469,7 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     // A retryable error chip also blocks send until it is retried or removed.
-    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
     expect(onSendMock).not.toHaveBeenCalled();
   });
 

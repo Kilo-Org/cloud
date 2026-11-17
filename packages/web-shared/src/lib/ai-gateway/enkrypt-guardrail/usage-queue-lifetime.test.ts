@@ -18,7 +18,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-  ENKRYPT_USAGE_QUEUE_ENABLED: true,
   USAGE_INGEST_URL: 'https://ingest.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-usage-ingest-secret',
 }));

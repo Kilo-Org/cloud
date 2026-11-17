@@ -307,13 +307,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   if (!statusesError && !isConnected('github') && !isConnected('gitlab')) {
     // The only way out of this state is installing the provider's app for the
-    // scope, which the server restricts to an organization-manage role
-    // (`githubApps.mintInstallState` takes `ORGANIZATION_MANAGE_ROLES`). A
-    // narrower role gets the same read-only notice the provider overview shows
-    // instead of a button whose destination refuses them with no action of its
-    // own. An unresolved permission keeps the button — `review-memory-screen`
-    // treats an unsettled permission the same way, and the provider procedures
-    // stay server-authorized.
+    // scope, which the shell page's install start restricts to an
+    // organization-manage role (`beginGitHubAppInstall` takes
+    // `ORGANIZATION_MANAGE_ROLES`). A narrower role gets the same read-only
+    // notice the provider overview shows instead of a button whose destination
+    // refuses them with no action of its own. An unresolved permission keeps the
+    // button — `review-memory-screen` treats an unsettled permission the same
+    // way, and the provider procedures stay server-authorized.
     const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">

@@ -28,6 +28,12 @@ import { AFTER_IDLE_FALLBACK_MS } from '@/lib/hooks/use-after-idle';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
+// The tour row pushes through the press-burst guard, and these assertions read
+// the router mock, so the guarded push is that same function.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
+
 describe('ProfileScreen deferred queries', () => {
   beforeEach(() => {
     vi.useRealTimers();

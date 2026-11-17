@@ -10,12 +10,13 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import { i18n } from '@/i18n';
+import { i18n as appI18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -126,6 +127,14 @@ vi.mock('@/components/agents/folder-selector', () => ({
 
 vi.mock('@/components/agents/new-session-start-button', () => ({
   NewSessionStartButton: 'NewSessionStartButton',
+}));
+
+// The lift renders the form's body and pinned footer inside one animated
+// container and reads the keyboard's motion value, which needs the app's
+// KeyboardMotionProvider; the tree assertions only need its position, so the
+// string host keeps them type-exact without the animation stack.
+vi.mock('@/components/keyboard-lift-view', () => ({
+  KeyboardLiftView: 'KeyboardLiftView',
 }));
 
 vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
@@ -405,7 +414,7 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollBody).not.toBeNull();
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
-    const lift = findElement(element, 'KeyboardAvoidingView');
+    const lift = findElement(element, 'KeyboardLiftView');
     expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
 
     // Switching the target to a computer must not surface the stale failure.
@@ -437,9 +446,9 @@ describe('NewSessionConfigureForm', () => {
     });
     // The footer keeps only the start-blocked reason (its own component): the
     // refusal must not take height from the form a second time. The pinned
-    // footer is the KeyboardAvoidingView's second child, after the scroll body,
-    // and it must be found for the negative assertion to mean anything.
-    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    // footer is the lift's second child, after the scroll body, and it must be
+    // found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardLiftView');
     const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
@@ -456,20 +465,74 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: INSTANCE,
       showRunOnSelector: true,
-      planRefusal: i18n.t('common.organizationTrialEndedBilling'),
-      planRefusalAction: { label: i18n.t('organization.hub.manageBilling'), onPress },
+      planRefusal: appI18n.t('common.organizationTrialEndedBilling'),
+      planRefusalAction: { label: appI18n.t('organization.hub.manageBilling'), onPress },
     }) as Node;
 
     // The caller owns the role read, so the block paints exactly the reader it
     // is handed: the copy that offers the step, and the step itself.
     const scrollBody = findElement(element, 'ScrollView');
     expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
-      message: i18n.t('common.organizationTrialEndedBilling'),
-      action: { label: i18n.t('organization.hub.manageBilling'), onPress },
+      message: appI18n.t('common.organizationTrialEndedBilling'),
+      action: { label: appI18n.t('organization.hub.manageBilling'), onPress },
     });
     // The pinned footer still takes no copy of the refusal.
     const lift = findElementByType(element, 'KeyboardAvoidingView');
     expect(findElementByComponent(lift, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The reported build: a repository is resolved, the prompt is typed, the
+    // attachment chip already shows its uploaded file, and the upload flag is
+    // still true. Start stays disabled with a prompt on screen, so the footer
+    // has to say what it waits for.
+    const reason = resolveNewSessionStartBlockedReason({
+      entry: 'new-session',
+      hasRepositories: true,
+      hasConnectableProvider: false,
+      isLoadingRepositories: false,
+      isRemoteTargetSelected: false,
+      selectedRepo: 'org/repo',
+      hasAttachments: true,
+      selectedRepositoryResolved: true,
+      gate: {
+        attachmentsHasFailed: false,
+        attachmentsIsUploading: true,
+        hasPrompt: true,
+        isCreating: false,
+        isRemoteTargetSelected: false,
+        isSubmitting: false,
+        model: 'claude-opus-4-7',
+        isProfileLoading: false,
+      },
+    });
+    expect(reason).toBe('attachment-uploading');
+
+    // The footer names the escape the chip offers — dropping the attachment
+    // starts the session without it — while the composer keeps its own copy for
+    // the send it refuses to make.
+    const copy = appI18n.t('agentChat.newSession.attachmentUploadingToStart');
+    expect(copy).toBe('An attachment is still uploading. Remove it to start without it.');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      selectedRepo: 'org/repo',
+      isStartDisabled: true,
+      startBlockedReason: copy,
+    }) as Node;
+
+    // The reason rides the lift with Start, not the scroll body above it, so
+    // the keyboard cannot hide the explanation and the control together.
+    const lift = findElement(element, 'KeyboardLiftView');
+    expect(findElementByType(lift, 'NewSessionStartButton')).toMatchObject({
+      isStartDisabled: true,
+      startBlockedReason: copy,
+      // These reasons are a wait or a file fix; neither needs a second control.
+      startBlockedAction: null,
+    });
   });
 
   it('keeps the plan refusal actionless for a reader who cannot change the plan', async () => {
@@ -480,14 +543,14 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: INSTANCE,
       showRunOnSelector: true,
-      planRefusal: i18n.t('common.organizationTrialEnded'),
+      planRefusal: appI18n.t('common.organizationTrialEnded'),
     }) as Node;
 
     const block = findElementByComponent(
       findElement(element, 'ScrollView'),
       OrganizationPlanRefusal
     );
-    expect(block).toMatchObject({ message: i18n.t('common.organizationTrialEnded') });
+    expect(block).toMatchObject({ message: appI18n.t('common.organizationTrialEnded') });
     expect(block?.action).toBeUndefined();
   });
 

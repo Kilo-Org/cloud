@@ -56,17 +56,18 @@ function filterMembers<T extends OrgWithMembers>(
 type UseOrganizationMutationsOptions = {
   /**
    * member-limit-sheet renders `updateMember` errors inline (Pattern P2) and
-   * owns that mutation's error feedback for its caller. member-row.tsx's
-   * action-sheet role change has no persistent surface to show an inline
-   * error in, so it keeps the default toast — hence this is per-hook-call
-   * rather than a blanket change to the mutation itself.
+   * owns that mutation's error feedback for its caller. member-row.tsx renders
+   * a refused role change on the row and owns a refused removal through the
+   * members screen's keyed store, so both member mutations stay silent for
+   * that caller — hence per-hook-call rather than a blanket change to the
+   * mutations themselves.
    */
-  silenceUpdateMemberToast?: boolean;
+  silenceMemberToast?: boolean;
 };
 
 export function useOrganizationMutations(
   organizationId: string,
-  { silenceUpdateMemberToast }: UseOrganizationMutationsOptions = {}
+  { silenceMemberToast }: UseOrganizationMutationsOptions = {}
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -213,7 +214,7 @@ export function useOrganizationMutations(
                 }
               : member
           ),
-        { silent: silenceUpdateMemberToast }
+        { silent: silenceMemberToast }
       ),
       scope: { id: `organization:${organizationId}` },
     }),
@@ -222,8 +223,13 @@ export function useOrganizationMutations(
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { memberId: string }) =>
         trpcClient.organizations.members.remove.mutate({ organizationId, ...input }),
-      ...optimistic<{ memberId: string }>((old, input) =>
-        filterMembers(old, member => !(member.status === 'active' && member.id === input.memberId))
+      ...optimistic<{ memberId: string }>(
+        (old, input) =>
+          filterMembers(
+            old,
+            member => !(member.status === 'active' && member.id === input.memberId)
+          ),
+        { silent: silenceMemberToast }
       ),
       scope: { id: `organization:${organizationId}` },
     }),

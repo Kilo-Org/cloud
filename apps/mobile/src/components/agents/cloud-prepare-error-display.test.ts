@@ -156,4 +156,15 @@ describe('cloudPrepareFailureMessage', () => {
       'Something went wrong on our end. Please try again.'
     );
   });
+
+  it.each(['source_digest_changed', 'clone_setup_failed'] as const)(
+    'explains the %s clone rejection with the retry copy',
+    code => {
+      // The copy is the one the clone form already uses for a clone that did
+      // not go through; the rejection is about the copy, not the form.
+      expect(cloudPrepareFailureMessage(makeError('CONFLICT', code))).toBe(
+        "Couldn't clone this session. Try again."
+      );
+    }
+  );
 });

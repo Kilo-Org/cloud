@@ -43,6 +43,10 @@ export default function ModePickerScreen() {
   // "No options available" flash before a later effect populates state.
   const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
+  function close() {
+    router.back();
+  }
+
   function handleSelect(mode: AgentMode) {
     selectionHaptic();
     bridge?.onSelect(mode);
@@ -54,9 +58,8 @@ export default function ModePickerScreen() {
     return (
       <PickerSheet
         title={t('agentChat.modePicker.title')}
-        onDone={() => {
-          router.back();
-        }}
+        onDone={close}
+        onCancel={close}
         scrollable={false}
         topInset="never"
         expired
@@ -107,9 +110,8 @@ export default function ModePickerScreen() {
   return (
     <PickerSheet
       title={t('agentChat.modePicker.title')}
-      onDone={() => {
-        router.back();
-      }}
+      onDone={close}
+      onCancel={close}
       scrollable={false}
       topInset="never"
     >

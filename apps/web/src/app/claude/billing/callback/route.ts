@@ -22,10 +22,7 @@ import {
   CLAUDE_BILLING_CALLBACK_PATH,
   claudeBillingOutcomeParam,
 } from '@/lib/claude-billing/constants';
-import {
-  canManageClaudeBillingOrganization,
-  isClaudeBillingOrganizationMember,
-} from '@/lib/claude-billing/access';
+import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 /**
@@ -53,14 +50,9 @@ function errorOutcome(error: string): string {
 
 /** The person may still complete the connection they started. */
 async function mayComplete(owner: ClaudeBillingOwner, userId: string): Promise<boolean> {
-  if (owner.kind === 'personal') return owner.kiloUserId === userId;
-  if (owner.kind === 'shared_services') {
-    return await canManageClaudeBillingOrganization(userId, owner.organizationId);
-  }
-  return (
-    owner.kiloUserId === userId &&
-    (await isClaudeBillingOrganizationMember(userId, owner.organizationId))
-  );
+  return owner.kind === 'personal'
+    ? owner.kiloUserId === userId
+    : await canManageClaudeBillingOrganization(userId, owner.organizationId);
 }
 
 export async function GET(request: NextRequest) {
@@ -90,7 +82,7 @@ export async function GET(request: NextRequest) {
   if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');
   }
-  // Membership and role can change while the person is on Claude's approval page.
+  // Role can change while the person is on Claude's approval page.
   if (!(await mayComplete(owner, user.id))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');
   }
@@ -123,7 +115,7 @@ export async function GET(request: NextRequest) {
           connected_at: new Date().toISOString(),
           last_refusal_code: null,
           last_refusal_at: null,
-          // The person who linked it last; a shared-services link is gated on them.
+          // The person who linked it last; an organization link is gated on them.
           created_by: user.id,
         })
         .where(
@@ -138,7 +130,7 @@ export async function GET(request: NextRequest) {
       // A personal link replaces the person's stored Anthropic API key: they no
       // longer share one, and Kilo never uses a dormant key it did not need. An
       // organization key stays, because it still serves that organization's
-      // other requests.
+      // requests.
       if (owner.kind === 'personal') {
         await tx
           .delete(byok_api_keys)

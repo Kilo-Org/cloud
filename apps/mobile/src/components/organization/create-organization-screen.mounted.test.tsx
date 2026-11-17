@@ -1,10 +1,11 @@
 // Create-organization screen contract: an empty name is refused before any
 // request, a valid one creates with `autoAddCreator`, the new organization
-// becomes the selection and the stack-safe replace lands on its hub, a create
-// whose screen was left only refreshes the list, a failed refresh reports the
-// organization without moving the selection, a failure shows the server's copy,
-// and the submit control stays disabled until a name is typed. The tRPC client
-// is mocked so no request leaves the test.
+// becomes the selection and the stack lands on its hub — popped over the hub
+// the boundary entered with, pushed past itself from the Profile entry — a
+// create whose screen was left only refreshes the list, a failed refresh
+// reports the organization without moving the selection, a failure shows the
+// server's copy, and the submit control stays disabled until a name is typed.
+// The tRPC client is mocked so no request leaves the test.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,7 +15,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 import '@/i18n';
 import { CreateOrganizationScreen } from './create-organization-screen';
-import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 
 // `vi.mock` factories are hoisted above the statements in this file, so the
 // shared doubles live in `vi.hoisted` and the factories only read them.
@@ -23,6 +24,44 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   setOrganizationId: vi.fn(),
   focused: { current: true },
+}));
+
+// The organization Stack this screen is mounted in. The router doubles below
+// mutate it the way the real one does, so a test reads the end state of a
+// navigation as well as the call that produced it.
+const stack = vi.hoisted((): { routes: { name: string }[]; index: number } => ({
+  routes: [],
+  index: 0,
+}));
+const router = vi.hoisted(() => ({
+  dismissTo: vi.fn<(href: unknown) => void>(),
+  push: vi.fn<(href: unknown) => void>(),
+}));
+
+vi.mock('expo-router', () => ({
+  // `dismissTo` dispatches POP_TO: find the destination at or below the current
+  // index and truncate everything above it. The hub is the `index` route here,
+  // so a matching path pops back to it.
+  useRouter: () => ({
+    dismissTo: (href: unknown) => {
+      router.dismissTo(href);
+      const hub = stack.routes.findLastIndex(route => route.name === ORGANIZATION_HUB_ROUTE_NAME);
+      if (hub === -1) {
+        stack.routes.splice(0, stack.routes.length, { name: String(href) });
+      } else {
+        stack.routes.splice(hub + 1);
+      }
+      stack.index = stack.routes.length - 1;
+    },
+    push: (href: unknown) => {
+      router.push(href);
+      stack.routes.push({ name: String(href) });
+      stack.index = stack.routes.length - 1;
+    },
+  }),
+  useNavigation: () => ({
+    getState: () => ({ index: stack.index, routes: stack.routes }),
+  }),
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -122,12 +161,23 @@ async function type(renderer: ReactTestRenderer, value: string) {
   });
 }
 
+/** Put the screen in a Stack that holds exactly these route names. */
+function setStack(names: string[]) {
+  stack.routes.splice(0, stack.routes.length, ...names.map(name => ({ name })));
+  stack.index = stack.routes.length - 1;
+}
+
 beforeEach(() => {
   mocks.createMutate.mockReset();
   mocks.replace.mockClear();
   mocks.setOrganizationId.mockClear();
   mocks.focused.current = true;
   errorCopy.lookup.mockClear();
+  router.dismissTo.mockClear();
+  router.push.mockClear();
+  // The Profile entry pushes create: it is the only route of the organization
+  // Stack when it mounts.
+  setStack(['create']);
 });
 
 describe('CreateOrganizationScreen', () => {
@@ -169,6 +219,9 @@ describe('CreateOrganizationScreen', () => {
   });
 
   it('creates with the trimmed name, selects the new organization and lands on its hub', async () => {
+    // The Profile entry pushes create over no hub, so the completion still
+    // pushes the hub and retires the create route after its transition.
+    setStack(['create']);
     mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
     const { renderer, queryClient, unmount } = await mount();
     // The refresh the completion waits for has to carry the membership, or the
@@ -183,6 +236,53 @@ describe('CreateOrganizationScreen', () => {
     expect(mocks.createMutate).toHaveBeenCalledWith({ name: 'Acme', autoAddCreator: true });
     expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
     expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('pops back to the hub the boundary entered with instead of pushing a second one', async () => {
+    // The boundary's no-organization state enters create with the hub already
+    // beneath it, so a pushed hub would leave two of them and Back would land on
+    // the stale one instead of leaving the flow.
+    setStack([ORGANIZATION_HUB_ROUTE_NAME, 'create']);
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
+    // One POP_TO over the existing hub: never the push-plus-retire replace, and
+    // never a plain push of the hub.
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.dismissTo).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(stack.routes).toEqual([{ name: ORGANIZATION_HUB_ROUTE_NAME }]);
+    unmount();
+  });
+
+  it('pushes the hub past the create route when the hub is not beneath it', async () => {
+    // A POP_TO with no matching route rewrites the stack in one commit, the
+    // shape the Android native stack crashes on, so the push-based entry keeps
+    // the stack-safe replace.
+    setStack(['create']);
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
+    expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
     unmount();
   });
 

@@ -160,13 +160,20 @@ describe('useOrganizationMutations (generation guard + scope)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
   });
 
-  it('updateMember stays inline (no toast) when silenceUpdateMemberToast is set', async () => {
+  it('updateMember stays inline (no toast) when silenceMemberToast is set', async () => {
     getQueryDataMock.mockReturnValue({ members: [] });
-    useOrganizationMutations(ORG_ID, { silenceUpdateMemberToast: true });
+    useOrganizationMutations(ORG_ID, { silenceMemberToast: true });
     const updateMember = capturedMutations[2];
+    const removeMember = capturedMutations[3];
     const context = await updateMember?.onMutate?.({ memberId: 'm1', role: 'admin' });
 
     updateMember?.onError?.(new Error('boom'), { memberId: 'm1', role: 'admin' }, context);
+    expect(toastErrorMock).not.toHaveBeenCalled();
+
+    // member-row owns the removal's refusal too (the members screen renders
+    // it), so the removal stays silent for the same caller.
+    const removalContext = await removeMember?.onMutate?.({ memberId: 'm1' });
+    removeMember?.onError?.(new Error('boom'), { memberId: 'm1' }, removalContext);
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 

@@ -2,9 +2,8 @@
 // takes a rendered node and returns what its component contract promises; the
 // mocks and the fixtures stay in the test file, because `vi.mock` is hoisted per
 // file and `h` is that file's hoisted state.
-import { type ReactTestInstance } from 'react-test-renderer';
-
 import { i18n } from '@/i18n';
+import { type ReactTestInstance } from '@/test/renderer';
 
 /** Every host element of one type in the rendered tree. */
 export function hosts(root: ReactTestInstance, type: string) {

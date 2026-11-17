@@ -4,7 +4,7 @@ import type * as SharedUtils from '@kilocode/app-shared/utils';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
@@ -39,9 +39,20 @@ const owner = vi.hoisted(() => ({
   reconnectStore: vi.fn(),
   purchase: vi.fn(),
   completingProductId: null as string | null,
+  purchaseWait: null as { productId: string; kind: 'store' | 'pending' } | null,
   errorMessageKey: null as string | null,
   completedPurchaseCount: 0,
   clearError: vi.fn(),
+  buyAgainProductId: null as string | null,
+  hasUnresolvedPurchase: false,
+  purchaseResolution: 'unknown' as
+    | 'unknown'
+    | 'found'
+    | 'not-found'
+    | 'terminal-refusal'
+    | 'credited',
+  reconcilePurchase: vi.fn(),
+  buyAgain: vi.fn(),
 }));
 
 const balance = vi.hoisted(() => ({
@@ -71,10 +82,6 @@ function answerRead(state: 'ok' | 'pending' | 'error', answer: unknown): Promise
 }
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
-
-// The legal links are the only caller of this module on the screen, so the mock
-// is the destination each link opened.
-const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
 
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
@@ -123,14 +130,9 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));
 
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => externalLink);
-vi.mock('@/lib/iap/legal-links', () => ({
-  getStoreLegalLinks: () => [
-    { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
-    { url: 'https://example.com/terms-app', label: 'Terms of Use (EULA)' },
-  ],
-}));
+const legalNavigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: legalNavigation.push }) }));
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   useInlinePurchaseErrorOwnership: vi.fn(),
 }));
@@ -1718,7 +1720,7 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('gives each store legal link a full legal-link target and its own destination', async () => {
+  it('gives each store legal link a full legal-link target and opens it natively', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
@@ -1747,19 +1749,248 @@ describe('CreditPurchaseScreen', () => {
       (privacyLink.props as { onPress: () => void }).onPress();
     });
 
-    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      1,
-      'https://example.com/terms-app',
-      {
-        label: 'Terms of Use (EULA)',
-      }
-    );
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      2,
-      'https://example.com/privacy-app',
-      { label: 'Privacy Policy' }
-    );
+    expect(legalNavigation.push).toHaveBeenCalledTimes(2);
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
     unmount();
   });
 });
+
+describe('CreditPurchaseScreen unresolved purchase card', () => {
+  const cardId = 'credit-unresolved-purchase';
+  const waitCardId = 'credit-purchase-wait-card';
+
+  function byTestId(
+    renderer: TestRenderer.ReactTestRenderer,
+    testID: string
+  ): TestRenderer.ReactTestInstance | undefined {
+    return renderer.root.findAll(
+      candidate => (candidate.props as { testID?: string }).testID === testID
+    )[0];
+  }
+
+  function cards(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+    return renderer.root.findAll(node => {
+      const testID = (node.props as { testID?: string }).testID;
+      return testID === cardId || testID === waitCardId || testID === 'credit-pack-placeholder';
+    });
+  }
+
+  /** Each pack row's index among its parent's children, in render order. */
+  function rowPlacement(renderer: TestRenderer.ReactTestRenderer): number[] {
+    return packRows(renderer).map(rowInstance => {
+      const parent = rowInstance.parent;
+      if (parent === null) {
+        throw new Error('expected a mounted pack row');
+      }
+      return parent.children.indexOf(rowInstance);
+    });
+  }
+
+  async function press(instance: TestRenderer.ReactTestInstance | undefined): Promise<void> {
+    if (!instance) {
+      throw new Error('expected a control to press');
+    }
+    const control = instance.props as { onPress?: () => void };
+    await act(async () => {
+      control.onPress?.();
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseResolution = 'unknown';
+    owner.buyAgainProductId = null;
+    owner.purchaseWait = null;
+    owner.reconcilePurchase.mockReset();
+    owner.buyAgain.mockReset();
+  });
+
+  it('shows the unresolved notice as the one card, with both actions working', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(cards(renderer)).toHaveLength(1);
+    expect(textWithinCard(card)).toContain(i18n.t('credits.unresolvedPurchaseFound'));
+
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    await press(actions.find(node => labelOf(node).startsWith('Try again')));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    await press(actions.find(node => labelOf(node).startsWith('Buy again')));
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('tells the person to pick a pack and leaves the rows enabled without a target', async () => {
+    owner.hasUnresolvedPurchase = true;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(textWithinCard(card)).toContain(i18n.t('credits.pickPackToBuyAgain'));
+    expect(card.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
+    ).toBe(true);
+    unmount();
+  });
+
+  it('says the store has not answered on the waiting row and in the card', async () => {
+    owner.completingProductId = null;
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const waiting = i18n.t('credits.waitingForStore');
+    const waitingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(waiting)
+    );
+    expect(waitingRowNode).toBeDefined();
+    expect(allText(renderer)).not.toContain(i18n.t('credits.storeTimedOut'));
+    const card = byTestId(renderer, waitCardId);
+    if (!card) {
+      throw new Error('expected the waiting card');
+    }
+    expect(textWithinCard(card)).toContain(waiting);
+    expect(cards(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('says the payment is pending on the row and in the card', async () => {
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'pending' };
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const pending = i18n.t('credits.purchasePending');
+    const pendingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(pending)
+    );
+    expect(pendingRowNode).toBeDefined();
+    // The card in the slot carries the pending copy, and its actions stay
+    // enabled because no purchase is in flight.
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved card');
+    }
+    expect(textWithinCard(card)).toContain(pending);
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    expect(
+      actions.every(
+        node =>
+          (node.props as { disabled?: boolean }).disabled !== true &&
+          (node.props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+            ?.disabled !== true
+      )
+    ).toBe(true);
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
+    ).toBe(true);
+    unmount();
+  });
+
+  it('shows one card at most, with and without an error set', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    expect(cards(renderer)).toHaveLength(1);
+
+    // The purchase error is the floating region, not a card in the slot.
+    owner.errorMessageKey = 'credits.storeTimedOut';
+    const { unmount: unmountSecond, renderer: withError } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(withError).length === 4);
+    expect(cards(withError)).toHaveLength(1);
+    expect(allText(withError)).toContain(i18n.t('credits.storeTimedOut'));
+    unmount();
+    unmountSecond();
+  });
+
+  it('leaves every pack row where it is when the purchase card appears, changes and goes', async () => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseWait = null;
+    const absent = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(absent.renderer).length === 4);
+    const placement = rowPlacement(absent.renderer);
+
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+    const waiting = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(waiting.renderer).length === 4);
+    expect(byTestId(waiting.renderer, waitCardId)).toBeDefined();
+
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.purchaseWait = null;
+    const notice = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(notice.renderer).length === 4);
+    const card = byTestId(notice.renderer, cardId);
+    if (!card) {
+      throw new Error('expected the purchase card');
+    }
+    const packArea = packRows(notice.renderer)[0]?.parent?.parent;
+    const parent = card.parent;
+    if (!packArea || !parent) {
+      throw new Error('expected a mounted pack area and card');
+    }
+    expect(parent.children.indexOf(card)).toBeGreaterThan(parent.children.indexOf(packArea));
+
+    owner.hasUnresolvedPurchase = false;
+    const gone = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(gone.renderer).length === 4);
+
+    for (const step of [waiting.renderer, notice.renderer, gone.renderer]) {
+      expect(rowPlacement(step)).toEqual(placement);
+    }
+    expect(byTestId(gone.renderer, cardId)).toBeUndefined();
+    expect(byTestId(gone.renderer, waitCardId)).toBeUndefined();
+    absent.unmount();
+    waiting.unmount();
+    notice.unmount();
+    gone.unmount();
+  });
+});
+
+function textWithinCard(card: TestRenderer.ReactTestInstance): string {
+  const texts: string[] = [];
+  const walk = (instance: TestRenderer.ReactTestInstance): void => {
+    for (const child of instance.children) {
+      if (typeof child === 'string') {
+        texts.push(child);
+      } else if (typeof child === 'number') {
+        texts.push(String(child));
+      } else {
+        walk(child);
+      }
+    }
+  };
+  walk(card);
+  return texts.join(' ');
+}

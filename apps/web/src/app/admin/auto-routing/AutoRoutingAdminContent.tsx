@@ -29,6 +29,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { useTRPC } from '@/lib/trpc/utils';
 import { pinnedModelFor, RouterBenchmarksSection } from './BenchmarksSection';
 import { parseAdminResponse } from './admin-fetch';
 import { useSystemOneModelOptions } from './system-one-models';
@@ -588,6 +589,7 @@ function ClassifierTab({
 export function AutoRoutingAdminContent() {
   const [period, setPeriod] = useState<AutoRoutingAnalyticsPeriod>('24h');
   const queryClient = useQueryClient();
+  const trpc = useTRPC();
 
   const classifierModelQuery = useQuery({
     queryKey: ['auto-routing', 'classifier-model'],
@@ -618,9 +620,13 @@ export function AutoRoutingAdminContent() {
             void classifierModelQuery.refetch();
             void analyticsQuery.refetch();
             void systemOneModelsQuery.refetch();
-            // Invalidate the shared selector catalog the benchmark pickers read
-            // from (query key prefix ['openrouter-models']).
+            // Invalidate the shared selector catalogs the benchmark pickers read:
+            // the REST list (query key prefix ['openrouter-models']) and the tRPC
+            // model selector list the app shell and the newer pickers use.
             void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
+            void queryClient.invalidateQueries({
+              queryKey: trpc.models.selectorList.queryKey(),
+            });
           }}
           disabled={isRefreshing}
           className="w-fit"

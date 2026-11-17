@@ -79,26 +79,45 @@ type ReplacementProps = Readonly<{
   busy: boolean;
   creating: boolean;
   revoking: boolean;
+  /**
+   * Whether this panel needs a note naming what the settings configure. The
+   * existing-link panel already says so in its description; the superseded
+   * panel says only that the link is gone, so the note belongs there.
+   */
+  scopeNote?: boolean;
   onCreate: () => void;
   onRevoke: () => void;
 }>;
 
 /**
  * Replacing the live link: the configuration it is created with, the create
- * action that rotates it, and revoke for the link that exists now.
+ * action that rotates it, and revoke for the link that exists now. When the
+ * panel passes `scopeNote`, the note sits inside the configuration's own group,
+ * so it reads as that block's caption instead of as another paragraph.
  */
 function ReplacementActions({
   choice,
   busy,
   creating,
   revoking,
+  scopeNote = false,
   onCreate,
   onRevoke,
 }: ReplacementProps) {
   const { t } = useTranslation();
+  const configuration = <ShareConfiguration choice={choice} busy={busy} />;
   return (
     <>
-      <ShareConfiguration choice={choice} busy={busy} />
+      {scopeNote ? (
+        <View className="gap-2">
+          <Text variant="muted" className="text-xs">
+            {t('sessionShare.replacementSettings')}
+          </Text>
+          {configuration}
+        </View>
+      ) : (
+        configuration
+      )}
       <Button
         variant="outline"
         className="w-full"
@@ -182,7 +201,7 @@ function SupersededPanel(props: ReplacementProps) {
       <Text variant="muted" className="text-xs" testID="session-share-superseded">
         {t('sessionShare.superseded')}
       </Text>
-      <ReplacementActions {...props} />
+      <ReplacementActions {...props} scopeNote />
     </View>
   );
 }

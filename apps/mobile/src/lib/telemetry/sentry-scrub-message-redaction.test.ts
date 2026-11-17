@@ -63,6 +63,31 @@ describe('scrubEvent message redaction', () => {
     expect(result.contexts.network.statusText).toBe('Upstream rejected [redacted]');
   });
 
+  it('keeps the failing field paths a validation failure names and redacts a token-shaped one', () => {
+    const event = {
+      contexts: {
+        'network.body': {
+          code: 'BAD_REQUEST',
+          httpStatus: 400,
+          path: 'organizations.cloudAgentNext.getSession',
+          invalidFields: `cloudAgentSessionId,payload.token=${OPAQUE_RUN}`,
+          formErrorCount: 1,
+          message: 'Invalid input: expected string, received undefined',
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts['network.body']).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'cloudAgentSessionId,payload.token=[redacted]',
+      formErrorCount: 1,
+    });
+  });
+
   it('applies the declared context policies together', () => {
     const event = {
       exception: {

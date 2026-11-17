@@ -71,6 +71,18 @@ function LowBalanceAlertForm({
       (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
   );
 
+  // The field's own rule runs on blur, and on change only once it has
+  // something to say. Save follows every keystroke, so an amount pasted above
+  // the ceiling would otherwise sit under a disabled Save with nothing under the
+  // field explaining it. Seeding the same rule on change keeps the sentence with
+  // the draft; an empty field still waits for blur, so a form that opens empty
+  // does not greet the reader with a required error.
+  const fieldThresholdError = (value: string) =>
+    value.trim() === '' ? null : thresholdError(value);
+  const [draftThresholdError, setDraftThresholdError] = useState(() =>
+    fieldThresholdError(thresholdRef.current)
+  );
+
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
     setCanSave(
       !nextEnabled || (thresholdError(thresholdValue) == null && emailsError(emailsValue) == null)
@@ -127,6 +139,7 @@ function LowBalanceAlertForm({
           onValueChange={value => {
             selectionHaptic();
             setEnabled(value);
+            setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
             revalidate(value, thresholdRef.current, emailsRef.current);
             clearSaveError();
           }}
@@ -142,8 +155,10 @@ function LowBalanceAlertForm({
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
+              setDraftThresholdError(fieldThresholdError(value));
               revalidate(enabled, value, emailsRef.current);
               clearSaveError();
             }}

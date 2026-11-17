@@ -41,6 +41,7 @@ export default function BranchPickerScreen() {
       <PickerSheet
         title={t('agentChat.newSession.branchPickerTitle')}
         onDone={close}
+        onCancel={close}
         scrollable={false}
         expired
       />

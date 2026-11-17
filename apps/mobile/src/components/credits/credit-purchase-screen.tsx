@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The Buy credits screen composes the store banner, loading, empty, error, and pack-row surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +20,6 @@ import {
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
   getStoreCreditExpiryMessageKey,
@@ -28,17 +28,17 @@ import {
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { getStoreLegalLinks } from '@/lib/iap/legal-links';
+import { type LegalDocument } from '@/lib/legal-document';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { useCreditNativeIap } from './credit-native-iap-owner';
+import { type CreditPurchaseWait, useCreditNativeIap } from './credit-native-iap-owner';
+import { CreditUnresolvedPurchaseNotice } from './credit-unresolved-purchase-notice';
 import { CreditExpiryNote } from './credit-expiry-note';
 
 /**
@@ -98,6 +98,12 @@ function expiryCaptionFloor(fontScale: number): number {
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
+/** The row and the pending card say the same thing about a waiting request. */
+const WAIT_COPY_KEYS = {
+  store: 'credits.waitingForStore',
+  pending: 'credits.purchasePending',
+} as const satisfies Record<CreditPurchaseWait['kind'], string>;
+
 /**
  * The pack-height constants, at the default font scale.
  *
@@ -148,6 +154,12 @@ export function CreditPurchaseScreen() {
     purchase,
     reconnectStore,
     completingProductId,
+    purchaseWait,
+    reconcilePurchase,
+    buyAgain,
+    buyAgainProductId,
+    hasUnresolvedPurchase,
+    purchaseResolution,
     errorMessageKey: purchaseErrorMessageKey,
     completedPurchaseCount,
     clearError,
@@ -187,7 +199,12 @@ export function CreditPurchaseScreen() {
   const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
   const hideBalanceAmount = hideBalance || !hideBalanceLoaded;
 
-  const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
+  const router = useRouter();
+  // The two legal documents open in their own native screens: a store purchase
+  // surface must not hand the reader a browser that can reach web pricing.
+  const openLegalDocument = (document: LegalDocument) => {
+    router.push({ pathname: '/(app)/legal/[document]', params: { document } });
+  };
 
   // A granted purchase bumps the owner's counter; a cancelled one releases the
   // request with no error key, so the counter is the only success signal.
@@ -202,6 +219,7 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
+  const waitCopy = purchaseWait ? t(WAIT_COPY_KEYS[purchaseWait.kind]) : null;
   // Only a catalog the backend answered as empty is the empty state: a store
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
@@ -222,6 +240,43 @@ export function CreditPurchaseScreen() {
   // the two lines.
   const storeUnavailableCopy = getStoreUnavailableCopyKeys(storefront);
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
+
+  // The consent target is the pack the owner selected from the current
+  // catalog, never the earlier request's own id: a retired SKU has no row to
+  // name and no price to show, while the replacement the person picked is the
+  // exact charge a second tap would start.
+  const buyAgainTarget =
+    buyAgainProductId === null
+      ? null
+      : (products.find(pack => pack.storeProductId === buyAgainProductId) ?? null);
+  // Buy again names one exact charge only once the store priced that pack.
+  const buyAgainAvailable = buyAgainTarget !== null && buyAgainTarget.displayPrice !== null;
+  // The card's retry is a store query and its consent is a row tap: neither
+  // needs the store connection the rows do, so only a purchase in flight
+  // disables them.
+  const statusActionsDisabled = purchasing;
+
+  // One label source for the row and the card: the pack amount reads the same
+  // on both, so consent names the same pack the list sells.
+  const formatPackLabel = (pack: StoreCreditProduct) =>
+    t('credits.packLabel', {
+      amount: isolateLtrBidiText(formatPrefixedMoney(pack.backend.amountUsd, i18n.language)),
+    });
+
+  const handleReconcilePress = () => {
+    selectionHaptic();
+    clearError();
+    void reconcilePurchase();
+  };
+
+  const handleBuyAgainPress = () => {
+    if (buyAgainTarget === null) {
+      return;
+    }
+    selectionHaptic();
+    clearError();
+    void buyAgain(buyAgainTarget);
+  };
 
   const handlePackPress = (pack: StoreCreditProduct) => {
     selectionHaptic();
@@ -401,7 +456,7 @@ export function CreditPurchaseScreen() {
               </View>
             )}
 
-            {packsEmpty && (
+            {packsEmpty && !hasUnresolvedPurchase && (
               <View className="rounded-xl border border-border bg-card p-5">
                 <Text className="text-sm text-muted-foreground">{t('credits.empty')}</Text>
               </View>
@@ -449,7 +504,13 @@ export function CreditPurchaseScreen() {
                 // The row's state copy takes its one fixed-height line under the
                 // title, in place of the expiry note, and keeps the full row
                 // width instead of squeezing the title.
-                const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
+                const rowWaiting = purchaseWait?.productId === pack.storeProductId;
+                let completingLabel: string | null = null;
+                if (rowWaiting) {
+                  completingLabel = waitCopy;
+                } else if (rowCompleting) {
+                  completingLabel = t('kiloPass.completingPurchase');
+                }
                 // A status phrase takes the same line, so the title keeps one
                 // line at the compact width and the row keeps the height of its
                 // priced neighbours. The store-unavailable card above already
@@ -529,6 +590,39 @@ export function CreditPurchaseScreen() {
               })}
           </View>
 
+          {/* The purchase state is its own slot after the pack rows: a request
+              the store has not answered yet, or the barrier an unresolved charge
+              leaves. It sits below the rows so its arrival, change or removal
+              never moves one, and the footer copy stays pinned outside the
+              scroller. */}
+          <View className="gap-3">
+            {hasUnresolvedPurchase ? (
+              <CreditUnresolvedPurchaseNotice
+                actionsDisabled={statusActionsDisabled}
+                buyAgainAvailable={buyAgainAvailable}
+                onBuyAgain={handleBuyAgainPress}
+                onReconcile={handleReconcilePress}
+                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                priceLabel={
+                  buyAgainTarget !== null
+                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                    : null
+                }
+                resolution={purchaseResolution}
+                waitCopy={waitCopy}
+              />
+            ) : (
+              waitCopy !== null && (
+                <View
+                  className="rounded-xl border border-border bg-card p-5"
+                  testID="credit-purchase-wait-card"
+                >
+                  <AccessibleStatus className="text-sm" message={waitCopy} />
+                </View>
+              )
+            )}
+          </View>
+
           {/* The room the floating purchase error needs at the end of the
               content, as a child of the content rather than a container style
               (see the scroller's comment). It scales with the text, because the
@@ -594,19 +688,21 @@ export function CreditPurchaseScreen() {
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+                  openLegalDocument('terms');
                 }}
               >
-                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+                <Text className="text-xs text-primary underline">
+                  {t('kiloPass.legalTermsOfUse')}
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+                  openLegalDocument('privacy');
                 }}
               >
-                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+                <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
               </Pressable>
             </View>
           </View>

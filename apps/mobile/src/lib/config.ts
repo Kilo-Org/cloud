@@ -54,16 +54,6 @@ export const SESSION_SYNC_URL: string | undefined = __DEV__
 if (SESSION_SYNC_URL) {
   assertUrlScheme('sessionSyncUrl', SESSION_SYNC_URL, ['https:'], { allowInsecure: true });
 }
-/**
- * True only for a bundle the design-gate runner serves: `EXPO_PUBLIC_DESIGN_GATE=1`
- * is set when starting that Metro, so the flag is baked into exactly the gate's
- * bundle and no other dev session reads it. The gate's capture otherwise
- * measures its own LogBox overlay whenever this timing race fires (see
- * `design-gate-probe.tsx`); ordinary dev builds keep the warning as the live
- * defect signal it is (`setThemePreference` orders its writes around it).
- */
-export const IS_DESIGN_GATE_BUNDLE: boolean =
-  __DEV__ && process.env.EXPO_PUBLIC_DESIGN_GATE === '1';
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(

@@ -81,4 +81,26 @@ describe('applyOpenAiModelSettings tool call ids', () => {
     expect(callIds.slice(4)).toEqual([MAX_LENGTH_ID, MAX_LENGTH_ID]);
     expect(warn).toHaveBeenCalledTimes(1);
   });
+
+  it('leaves missing or null ids unchanged instead of throwing', () => {
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'openai/gpt-6.1-sol',
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            tool_calls: [{ type: 'function', function: { name: 'read', arguments: '{}' } }],
+          },
+          { role: 'tool', tool_call_id: null, content: 'one' },
+        ],
+      },
+    } as unknown as GatewayRequest;
+    const original = structuredClone(request);
+
+    expect(() => applyOpenAiModelSettings(request)).not.toThrow();
+    expect(request).toEqual(original);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });

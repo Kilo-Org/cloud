@@ -18,6 +18,7 @@ export function applyOpenAiModelSettings(requestToMutate: GatewayRequest) {
   // OpenAI rejects tool call ids longer than 64 characters with string_above_max_length
   normalizeToolCallIds(
     requestToMutate,
-    toolCallId => toolCallId.length > OPENAI_MAX_TOOL_CALL_ID_LENGTH
+    toolCallId =>
+      typeof toolCallId === 'string' && toolCallId.length > OPENAI_MAX_TOOL_CALL_ID_LENGTH
   );
 }

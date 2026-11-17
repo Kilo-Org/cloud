@@ -4,6 +4,11 @@ import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import {
+  getOpenRouterAliasTarget,
+  type GatewayModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
 /**
  * Returns the stored custom pricing, or no custom pricing when none is stored.
@@ -20,8 +25,34 @@ export async function readCustomPricingConfig(): Promise<CustomPricingConfig> {
   return CustomPricingConfigSchema.parse(row.config);
 }
 
+/**
+ * Prices every resolvable `~` latest alias as the model it resolves to, so a lookup by requested
+ * model id finds the target's custom pricing. Entries naming an alias never apply; the admin write
+ * path rejects them. An alias that does not resolve gets no custom pricing.
+ */
+export function resolveCustomPricingAliases(
+  config: CustomPricingConfig,
+  models: GatewayModelMap
+): CustomPricingConfig {
+  const entries = config.models.filter(entry => !entry.model.startsWith('~'));
+  const entriesByModel = new Map(entries.map(entry => [entry.model, entry]));
+  const aliasEntries = Object.keys(models).flatMap(modelId => {
+    const target = getOpenRouterAliasTarget(models, modelId);
+    const targetEntry = target === undefined ? undefined : entriesByModel.get(target);
+    return targetEntry ? [{ ...targetEntry, model: modelId }] : [];
+  });
+  return { models: [...entries, ...aliasEntries] };
+}
+
+/** The stored custom pricing with {@link resolveCustomPricingAliases} applied. */
 export const getCustomPricingConfig = createCachedFetch(
-  readCustomPricingConfig,
+  async () => {
+    const [config, models] = await Promise.all([
+      readCustomPricingConfig(),
+      getOpenRouterModelsMetadataFromDatabase(),
+    ]);
+    return resolveCustomPricingAliases(config, models);
+  },
   60_000,
   EMPTY_CUSTOM_PRICING_CONFIG,
   { name: 'customPricingConfig' }

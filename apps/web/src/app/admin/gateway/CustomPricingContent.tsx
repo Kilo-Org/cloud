@@ -7,7 +7,11 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CustomPricingConfigSchema, type CustomPricingConfig } from '@kilocode/db/schema-types';
+import {
+  CustomPricingConfigSchema,
+  CustomPricingConfigWriteSchema,
+  type CustomPricingConfig,
+} from '@kilocode/db/schema-types';
 import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
@@ -27,7 +31,7 @@ function parseConfig(json: string): { config: CustomPricingConfig } | { error: s
   }
   const strict = StrictCustomPricingConfigSchema.safeParse(raw);
   if (!strict.success) return { error: formatZodError(strict.error) };
-  const result = CustomPricingConfigSchema.safeParse(raw);
+  const result = CustomPricingConfigWriteSchema.safeParse(raw);
   if (!result.success) return { error: formatZodError(result.error) };
   return { config: result.data };
 }
@@ -102,7 +106,9 @@ export function CustomPricingContent() {
             is shown in the catalog. A <code>null</code> cache price bills cache tokens at the
             prompt price. <code>discountPercentage</code> only labels the model name.{' '}
             <code>fallbackOnly</code> prices apply only when the upstream reports no cost and are
-            not shown in the catalog. Changes apply within about a minute.
+            not shown in the catalog. Latest aliases (<code>~</code> model IDs) are billed at their
+            target model&apos;s custom pricing and cannot have entries of their own. Changes apply
+            within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

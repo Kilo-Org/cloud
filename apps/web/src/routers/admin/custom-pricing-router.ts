@@ -1,12 +1,15 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import { CustomPricingConfigSchema } from '@kilocode/db/schema-types';
+import {
+  CustomPricingConfigSchema,
+  CustomPricingConfigWriteSchema,
+} from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 
 const SetCustomPricingConfigSchema = z.object({
-  config: CustomPricingConfigSchema.nullable(),
+  config: CustomPricingConfigWriteSchema.nullable(),
 });
 
 export const adminCustomPricingRouter = createTRPCRouter({

@@ -661,7 +661,7 @@ describe('alias pricing', () => {
     });
   });
 
-  it("prefers the alias's own custom price over the target's", async () => {
+  it("shows the target's price over a custom price for the alias itself", async () => {
     jest.mocked(getCustomPricingConfig).mockResolvedValue({
       models: [
         customPricing(target.id, 0.25),
@@ -671,12 +671,27 @@ describe('alias pricing', () => {
 
     const model = await getCatalog();
 
-    expect(model(alias.id)?.name).toBe(`${alias.name} (10% off)`);
-    expect(model(alias.id)?.pricing).toMatchObject({
-      prompt: '0.000000750000',
-      completion: '0.000001500000',
-    });
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toEqual(model(target.id)?.pricing);
     expect(model(target.id)?.pricing).toMatchObject({ prompt: '0.000000250000' });
+  });
+
+  it("applies the target's custom price to an alias whose target is not listed", async () => {
+    // getCustomPricingConfig prices a resolvable alias as its target.
+    jest.mocked(getCustomPricingConfig).mockResolvedValue({
+      models: [
+        customPricing(target.id, 0.25, { discountPercentage: 50 }),
+        customPricing(alias.id, 0.25, { discountPercentage: 50 }),
+      ],
+    });
+
+    const model = await getCatalog([alias]);
+
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
   });
 
   it("ignores the alias's fallback-only custom price, as other catalog entries do", async () => {

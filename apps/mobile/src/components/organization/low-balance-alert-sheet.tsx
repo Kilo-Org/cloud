@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -116,7 +117,10 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">
+        <Text
+          {...HIDDEN_LABEL_PROPS}
+          className="text-sm font-medium"
+        >
           {t('organization.lowBalanceAlert.enableA11y')}
         </Text>
         <Switch

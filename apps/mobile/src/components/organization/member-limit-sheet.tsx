@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
@@ -165,10 +166,10 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     return (
       <SheetScrollView
         className="flex-1 bg-background"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
       >
         <View className="gap-1">
-          <Text className="text-center text-lg font-semibold text-foreground">
+          <Text variant="large" className="text-center">
             {t('organization.memberLimit.title')}
           </Text>
         </View>
@@ -193,8 +194,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   if (loadFailed || !member) {
     return (
       <>
-        <View collapsable={false} className="bg-background px-6 pt-4">
-          <Text className="text-center text-lg font-semibold text-foreground">
+        <View collapsable={false} className="bg-background px-4 pt-3">
+          <Text variant="large" className="text-center">
             {t('organization.memberLimit.title')}
           </Text>
         </View>
@@ -205,8 +206,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
             isRetrying={orgWithMembers.isFetching}
           />
         ) : (
-          <CenteredState className="bg-background" contentContainerClassName="px-6">
-            <Text className="text-center text-sm text-muted-foreground">
+          <CenteredState className="bg-background" contentContainerClassName="px-4">
+            <Text variant="muted" className="text-center">
               {t('organization.memberLimit.memberNotFound')}
             </Text>
           </CenteredState>
@@ -218,15 +219,15 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   return (
     <SheetScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      contentContainerClassName={SCREEN_BODY_CLASS}
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
       <View className="gap-1">
-        <Text className="text-center text-lg font-semibold text-foreground">
+        <Text variant="large" className="text-center">
           {t('organization.memberLimit.title')}
         </Text>
-        <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="text-center" numberOfLines={1}>
           {firstNonEmpty(member.name, member.email)}
         </Text>
       </View>

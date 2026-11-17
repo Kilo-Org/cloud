@@ -13,6 +13,8 @@ import { Settings2 } from '@/components/ui/icons';
 import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import {
   type OrgGatewaySettings,
   useSaveOrgGatewaySettings,
@@ -74,7 +76,7 @@ export function GatewaySettingsSection({
 
   if (settings == null) {
     return (
-      <View className="gap-3 px-4 pt-4">
+      <View className="gap-3 px-4 pt-3">
         <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
       </View>
     );
@@ -96,7 +98,7 @@ export function GatewaySettingsSection({
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="px-4 pt-4 pb-10 gap-3"
+      contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-10')}
       keyboardShouldPersistTaps="handled"
     >
       <SettingsSection
@@ -120,10 +122,10 @@ export function GatewaySettingsSection({
             setRegionPickerOpen(true);
           }}
         />
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t('organizationModelAccess.inferenceRegionDescription')}
         </Text>
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t('organizationModelAccess.disableOpenrouterNote')}
         </Text>
       </SettingsSection>

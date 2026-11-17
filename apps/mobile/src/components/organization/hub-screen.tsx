@@ -45,6 +45,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
@@ -572,7 +574,7 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
     : `${t('kiloPass.title')}. ${state.subtitle}`;
 
   const inner = (
-    <View className="min-h-[48px] flex-row items-center gap-3 px-4 py-3">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
       <IconTile
         tint={tint}
         content={<KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />}

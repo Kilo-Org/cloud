@@ -70,7 +70,7 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <View className="gap-4 px-6 pt-4">
+        <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-11 rounded-lg" />
           <Skeleton className="h-20 rounded-lg" />
         </View>

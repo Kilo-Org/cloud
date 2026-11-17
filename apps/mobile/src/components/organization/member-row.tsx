@@ -19,6 +19,7 @@ import { cn, firstNonEmpty } from '@/lib/utils';
 import { type MemberRemovalFailure, removalRefusalMessage } from './member-removal-feedback';
 import { assignableMemberRoles } from './organization-role-options';
 import { OrganizationPlanRefusal } from './plan-refusal';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
 
 type MemberRowProps = {
@@ -237,7 +238,8 @@ export function MemberRow({
   const inner = (
     <View
       className={cn(
-        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3',
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 px-4 py-3',
         !last && 'border-b-[0.5px] border-hair-soft'
       )}
     >

@@ -5,6 +5,7 @@ import { Pressable, Share, View } from 'react-native';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
@@ -93,7 +94,8 @@ export function InvitedMemberRow({
   const inner = (
     <View
       className={cn(
-        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3',
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 px-4 py-3',
         !last && 'border-b-[0.5px] border-hair-soft'
       )}
     >

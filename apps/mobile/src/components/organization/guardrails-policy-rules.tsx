@@ -90,7 +90,7 @@ export function PolicyRulesEditor({
   return (
     <View className="gap-3">
       {rules.length === 0 ? (
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t('organizationGuardrails.rulesEmpty')}
         </Text>
       ) : (

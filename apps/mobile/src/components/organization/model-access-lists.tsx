@@ -43,7 +43,7 @@ function ListHeader({
 }>) {
   return (
     <View className="gap-3 pb-3">
-      <Text className="text-xs text-muted-foreground">{description}</Text>
+      <Text variant="caption">{description}</Text>
       <Input
         defaultValue={search}
         placeholder={searchPlaceholder}
@@ -83,7 +83,7 @@ export function ProviderAllowList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 16, paddingBottom };
+  const contentContainerStyle = { paddingHorizontal: 14, paddingBottom };
   const shown = providers.filter(provider => matchesSearch([provider], search));
 
   const renderItem = useCallback(
@@ -168,7 +168,7 @@ export function ModelDenyList({
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 16, paddingBottom };
+  const contentContainerStyle = { paddingHorizontal: 14, paddingBottom };
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&

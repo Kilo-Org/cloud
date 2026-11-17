@@ -37,7 +37,7 @@ export function OrganizationModeFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('agentChat.modePicker.customModes')} />
-        <View className="gap-4 px-6 pt-4">
+        <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-11 rounded-lg" />
           <Skeleton className="h-11 rounded-lg" />
           <Skeleton className="h-24 rounded-lg" />

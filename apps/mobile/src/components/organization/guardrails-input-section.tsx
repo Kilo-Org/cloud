@@ -88,7 +88,7 @@ export function InputGuardrailsSection({
           }}
         />
       ) : null}
-      <Text className="text-xs text-muted-foreground">
+      <Text variant="caption">
         {t('organizationGuardrails.detectorsHint')}
       </Text>
       {INPUT_DETECTOR_IDS.map(id => {

@@ -36,6 +36,7 @@ import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organ
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { selectionCheckColor } from '@/lib/selection-check-color';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
@@ -138,7 +139,7 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <SheetScrollView className="flex-1 bg-card" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView className="flex-1 bg-card" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
       </SheetScrollView>
@@ -213,7 +214,7 @@ export function InviteMemberSheet() {
       />
       <SheetScrollView
         className="flex-1 bg-card"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         // The design gate's proof readiness marker for this route.
         testID="organization-invite-sheet"
         automaticallyAdjustKeyboardInsets
@@ -271,7 +272,7 @@ export function InviteMemberSheet() {
             <FormFieldLabel label={t('common.role')} />
             <RadioGroup
               label={t('common.role')}
-              className="overflow-hidden rounded-lg bg-secondary"
+              className="overflow-hidden rounded-xl bg-secondary"
             >
               {roles.map((value, index) => {
                 const selected = selectedRole === value;
@@ -280,15 +281,17 @@ export function InviteMemberSheet() {
                     key={value}
                     className={cn(
                       ROW_TARGET_CLASS,
-                      'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                      index < roles.length - 1 && 'border-b border-border'
+                      'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
+                      index < roles.length - 1 && 'border-b-[0.5px] border-hair-soft'
                     )}
                     onPress={() => {
                       setRole(value);
                     }}
                     {...radioItemA11y({ label: roleLabel(value), checked: selected })}
                   >
-                    <Text className="flex-1 text-sm">{roleLabel(value)}</Text>
+                    <Text className="flex-1 text-sm font-medium text-foreground">
+                      {roleLabel(value)}
+                    </Text>
                     {selected && <Check size={16} color={selectionCheckColor(colors)} />}
                   </Pressable>
                 );

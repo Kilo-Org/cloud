@@ -14,6 +14,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Lock } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -28,6 +29,7 @@ import {
   type OrgGuardrailsConfig,
   toDraft,
 } from '@/lib/organization/guardrails-draft';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { guardrailsIssues } from '@/lib/organization/guardrails-issues';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
 
@@ -72,7 +74,7 @@ export function OrganizationGuardrailsScreen() {
             isRetrying={membership.isFetching}
           />
         ) : (
-          <View className="gap-3 px-6 pt-4">
+          <View className="gap-3 px-4 pt-3">
             <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
             <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
           </View>
@@ -99,7 +101,7 @@ export function OrganizationGuardrailsScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
-        <View className="gap-3 px-6 pt-4">
+        <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
           <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
         </View>
@@ -127,7 +129,7 @@ export function OrganizationGuardrailsScreen() {
       <TabScreenScrollView
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-4 gap-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -226,26 +228,22 @@ function GuardrailsForm({
   });
 
   return (
-    <View className="gap-4">
+    <View className="gap-6">
       {data.invalid_saved_detectors ? (
-        <View className="gap-1 rounded-lg border border-destructive p-3">
+        <Card className="gap-1 border border-destructive">
           <Text className="text-sm font-medium text-foreground">
             {t('organizationGuardrails.invalidSavedTitle')}
           </Text>
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationGuardrails.invalidSavedBody')}
-          </Text>
-        </View>
+          <Text variant="caption">{t('organizationGuardrails.invalidSavedBody')}</Text>
+        </Card>
       ) : null}
       {outputAvailable && data.invalid_saved_output_detectors ? (
-        <View className="gap-1 rounded-lg border border-destructive p-3">
+        <Card className="gap-1 border border-destructive">
           <Text className="text-sm font-medium text-foreground">
             {t('organizationGuardrails.invalidSavedOutputTitle')}
           </Text>
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationGuardrails.invalidSavedOutputBody')}
-          </Text>
-        </View>
+          <Text variant="caption">{t('organizationGuardrails.invalidSavedOutputBody')}</Text>
+        </Card>
       ) : null}
 
       <InputGuardrailsSection

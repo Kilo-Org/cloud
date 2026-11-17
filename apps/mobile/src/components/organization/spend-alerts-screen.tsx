@@ -44,6 +44,7 @@ import { i18n } from '@/i18n';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
@@ -460,7 +461,7 @@ function SpendAlertsForm({
           switch's end inset lives in CardSwitch, so every switch on the screen
           ends level with the label's start. */}
       <RowGroup>
-        <View className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3">
+        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
           <Text className="text-sm font-medium text-foreground">{t('spendAlerts.sendAlerts')}</Text>
           <CardSwitch
             accessibilityLabel={t('spendAlerts.sendAlerts')}
@@ -667,7 +668,7 @@ function RuleCard({
       {children}
 
       <RowGroup>
-        <View className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3">
+        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
           <Text className="text-sm font-medium text-foreground">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
               into the switch label, so the two Email rows stay distinct. */}
@@ -681,18 +682,21 @@ function RuleCard({
           <Pressable
             onPress={onOpenNotifications}
             accessibilityRole="button"
-            className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70"
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+            )}
           >
             <Text className="text-sm font-medium text-foreground">{t('notifications.push')}</Text>
             <View className="min-w-0 shrink flex-row items-center gap-2">
-              <Text variant="caption" className="shrink text-end">
+              <Text variant="caption" className="shrink">
                 {t('spendAlerts.pushOffByCategory')}
               </Text>
               <RowChevron />
             </View>
           </Pressable>
         ) : (
-          <View className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3">
+          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
             <Text className="text-sm font-medium text-foreground">{t('notifications.push')}</Text>
             <CardSwitch
               accessibilityLabel={pushLabel}

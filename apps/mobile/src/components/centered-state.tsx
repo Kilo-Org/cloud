@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   PixelRatio,
@@ -96,6 +96,11 @@ export function CenteredState({
   // yet, or bounds that name no area. A band that cannot be estimated needs this
   // to tell a measurement in flight from one that will never arrive.
   const [unplaceable, setUnplaceable] = useState(false);
+  // Whether any placement has painted at least once. A surface whose node is
+  // briefly detached reports a null frame and the hook maps that to a pending
+  // source; the geometry it had is the geometry it still has, so the placement
+  // already painted stays rather than hiding the body again.
+  const [hasPainted, setHasPainted] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -247,12 +252,21 @@ export function CenteredState({
   // surface can never report is never hidden.
   const surfacePending = surface?.source === 'pending';
   const estimateFits = topInset === 0 && !nativeViewportFillsSurface && !surfacePending;
+  // The hold covers only a surface that has never placed anything: once a
+  // placement has painted, a pending window is a re-measure of the same
+  // geometry, and the painted placement stays (see `hasPainted`).
+  const holdForSurface = surfacePending && !hasPainted;
   const placement = useMemo(() => {
-    if (layout && !surfacePending) {
+    if (layout && !holdForSurface) {
       return layout;
     }
     return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
-  }, [bottomInset, estimateFits, layout, surfacePending, unplaceable]);
+  }, [bottomInset, estimateFits, holdForSurface, layout, unplaceable]);
+  useEffect(() => {
+    if (placement !== null && !hasPainted) {
+      setHasPainted(true);
+    }
+  }, [placement, hasPainted]);
   const contentStyle = useMemo(
     () => (placement ? { flexGrow: 1, ...placement } : undefined),
     [placement]

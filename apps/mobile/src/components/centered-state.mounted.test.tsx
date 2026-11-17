@@ -604,10 +604,11 @@ describe('CenteredState first-frame paint', () => {
     // window bottom minus the bottom inset, so a content box of 188 centers
     // 12 higher than the zero-inset placement would place it. Asserting the
     // inset-carrying value is what proves the first paint is the final one.
+    const layout188: Partial<LayoutChangeEvent> = {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+    };
     act(() => {
-      held.contentNode()?.props.onLayout?.({
-        nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
-      } as LayoutChangeEvent);
+      held.contentNode()?.props.onLayout?.(layout188 as LayoutChangeEvent);
     });
     const placed = held.scroll().contentContainerStyle as {
       paddingTop: number;
@@ -641,10 +642,11 @@ describe('CenteredState first-frame paint', () => {
     native.surface.bottomInset = 24;
     heldLate.rerender();
     heldLate.settle(80, 900 - 80);
+    const layoutLate: Partial<LayoutChangeEvent> = {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+    };
     act(() => {
-      heldLate.contentNode()?.props.onLayout?.({
-        nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
-      } as LayoutChangeEvent);
+      heldLate.contentNode()?.props.onLayout?.(layoutLate as LayoutChangeEvent);
     });
     const placedLate = heldLate.scroll().contentContainerStyle as {
       paddingTop: number;

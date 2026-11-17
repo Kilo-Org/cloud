@@ -3,13 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 import {
   DURATION_LABEL_KEYS,
@@ -53,25 +51,19 @@ function ShareConfiguration({ choice, busy }: Readonly<{ choice: ShareChoice; bu
         />
       </Section>
       <RowGroup>
-        <View className={`${ROW_TARGET_CLASS} flex-row items-center gap-3 px-4 py-3`}>
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t('sessionShare.includeNewMessages')}
-            </Text>
-            <Text variant="caption" className="mt-0.5">
-              {choice.includeNewMessages
-                ? t('sessionShare.includeNewMessagesOn')
-                : t('sessionShare.includeNewMessagesOff')}
-            </Text>
-          </View>
-          <Switch
-            testID="session-share-include-new"
-            accessibilityLabel={t('sessionShare.includeNewMessages')}
-            value={choice.includeNewMessages}
-            disabled={busy}
-            onValueChange={choice.handleIncludeNewMessagesChange}
-          />
-        </View>
+        <PreferenceRow
+          title={t('sessionShare.includeNewMessages')}
+          subtitle={
+            choice.includeNewMessages
+              ? t('sessionShare.includeNewMessagesOn')
+              : t('sessionShare.includeNewMessagesOff')
+          }
+          value={choice.includeNewMessages}
+          disabled={busy}
+          onValueChange={choice.handleIncludeNewMessagesChange}
+          accessibilityLabel={t('sessionShare.includeNewMessages')}
+          testID="session-share-include-new"
+        />
       </RowGroup>
     </View>
   );
@@ -155,7 +147,7 @@ type CreateProps = Readonly<{
 function NoLinkPanel({ choice, busy, creating, onCreate }: CreateProps) {
   const { t } = useTranslation();
   return (
-    <Card>
+    <View className="gap-3">
       <ShareConfiguration choice={choice} busy={busy} />
       <Button
         className="w-full"
@@ -166,7 +158,7 @@ function NoLinkPanel({ choice, busy, creating, onCreate }: CreateProps) {
       >
         {t('sessionShare.create')}
       </Button>
-    </Card>
+    </View>
   );
 }
 
@@ -179,7 +171,7 @@ function NoLinkPanel({ choice, busy, creating, onCreate }: CreateProps) {
 function ExistingLinkPanel(props: ReplacementProps) {
   const { t } = useTranslation();
   return (
-    <Card>
+    <View className="gap-3">
       <Text className="text-sm font-medium text-foreground" testID="session-share-existing">
         {t('sessionShare.existingTitle')}
       </Text>
@@ -187,7 +179,7 @@ function ExistingLinkPanel(props: ReplacementProps) {
         {t('sessionShare.existingDescription')}
       </Text>
       <ReplacementActions {...props} />
-    </Card>
+    </View>
   );
 }
 
@@ -200,12 +192,12 @@ function ExistingLinkPanel(props: ReplacementProps) {
 function SupersededPanel(props: ReplacementProps) {
   const { t } = useTranslation();
   return (
-    <Card>
+    <View className="gap-3">
       <Text variant="muted" className="text-xs" testID="session-share-superseded">
         {t('sessionShare.superseded')}
       </Text>
       <ReplacementActions {...props} scopeNote />
-    </Card>
+    </View>
   );
 }
 
@@ -220,7 +212,7 @@ function ReadFailedPanel({
 }: Readonly<{ retrying: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   return (
-    <Card>
+    <View className="gap-3">
       <Text variant="caption" className="text-destructive" testID="session-share-state-error">
         {t('common.somethingWentWrong')}
       </Text>
@@ -233,7 +225,7 @@ function ReadFailedPanel({
       >
         {t('common.retry')}
       </Button>
-    </Card>
+    </View>
   );
 }
 

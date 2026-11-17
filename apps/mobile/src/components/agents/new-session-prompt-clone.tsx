@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode, type ModeOption } from '@/components/agents/mode-normalize';
 import { QueryError } from '@/components/query-error';
+import { InputFrame } from '@/components/ui/input-frame';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerSelection } from '@/lib/picker-bridge';
@@ -46,31 +47,33 @@ export function NewSessionPromptClone({
   const { t } = useTranslation();
   if (isModelsError && modelOptions.length === 0) {
     return (
-      <QueryError
-        placement="top"
-        variant="server"
-        title={t('agentChat.newSession.couldNotLoadModels')}
-        message={t('organization.boundary.loadErrorMessage')}
-        onRetry={() => {
-          onRefetchModels();
-        }}
-        className="rounded-2xl border border-border bg-card"
-      />
+      <InputFrame className="overflow-hidden">
+        <QueryError
+          placement="top"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+        />
+      </InputFrame>
     );
   }
   return (
-    <ChatToolbar
-      modeControl={{ mode, onModeChange, customOptions }}
-      model={model}
-      variant={variant}
-      modelOptions={modelOptions}
-      onModelSelect={onModelSelect}
-      disabled={isCreating}
-      isLoadingModels={isLoadingModels}
-      modelLocked={modelLocked}
-      modelLockLabel={modelLockLabel}
-      wrap
-      className="rounded-2xl border border-border bg-card px-3 py-3"
-    />
+    <InputFrame>
+      <ChatToolbar
+        modeControl={{ mode, onModeChange, customOptions }}
+        model={model}
+        variant={variant}
+        modelOptions={modelOptions}
+        onModelSelect={onModelSelect}
+        disabled={isCreating}
+        isLoadingModels={isLoadingModels}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
+        wrap
+      />
+    </InputFrame>
   );
 }

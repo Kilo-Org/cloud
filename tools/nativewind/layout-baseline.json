@@ -1,16 +1,4 @@
 {
-  "apps/mobile/src/components/agents/chat-composer-input-row.tsx": {
-    "L4": 1
-  },
-  "apps/mobile/src/components/agents/markdown-html-details.tsx": {
-    "L7": 1
-  },
-  "apps/mobile/src/components/agents/new-session-prompt-clone.tsx": {
-    "L4": 2
-  },
-  "apps/mobile/src/components/agents/new-session-prompt.tsx": {
-    "L4": 1
-  },
   "apps/mobile/src/components/home/adaptive-home-card-frame.tsx": {
     "L1": 2,
     "L4": 1

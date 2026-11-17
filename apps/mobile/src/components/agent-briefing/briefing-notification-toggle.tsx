@@ -115,7 +115,25 @@ export function BriefingNotificationToggle() {
  */
 export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disabled: boolean }>) {
   const { t } = useTranslation();
-  const { value, pending, unavailable, setEnabled } = useBriefingNotificationSwitch();
+  const { preferences, value, pending, unavailable, setEnabled } = useBriefingNotificationSwitch();
+  // The screens that stack this row retry their own query, which is not this
+  // one: a failed brief read must offer its own retry at the row, or the
+  // category is left disabled with no way back short of a screen reload.
+  if (preferences.isError) {
+    return (
+      <ConfigureRow
+        icon={Newspaper}
+        title={t('agentBriefing.title')}
+        subtitle={t('agentBriefing.notificationsHint')}
+        variant="action"
+        onPress={() => {
+          void preferences.refetch();
+        }}
+        accessibilityLabel={`${t('agentBriefing.title')}. ${t('common.retry')}`}
+        trailing={<Text variant="caption" className="text-destructive">{t('common.retry')}</Text>}
+      />
+    );
+  }
   return (
     <PreferenceRow
       icon={Newspaper}

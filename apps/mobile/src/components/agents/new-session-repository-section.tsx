@@ -219,7 +219,11 @@ export function NewSessionRepositorySection({
     return (
       <CollapsibleSection
         className="mt-3"
-        contentClassName="gap-3"
+        // The body is plain copy and buttons, not a surface of its own, so it
+        // takes the section's own gutter: without it the text started at the
+        // page edge while the header's row started at 14pt. The section draws
+        // no surface around the body, so nothing is nested inside its card.
+        contentClassName="gap-3 px-4"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
         // The card stacks under the repository picker in a scrolling column,

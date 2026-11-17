@@ -13,6 +13,7 @@ import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
+import { selectionHaptic } from '@/lib/haptics';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -56,7 +57,13 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      onPress={onPress}
+      // The body is the reason to pick this path, and the card's own text is
+      // grouped into the one control, so the hint is where a reader hears it.
+      accessibilityHint={body}
+      onPress={() => {
+        selectionHaptic();
+        onPress();
+      }}
       className="active:opacity-70"
     >
       <Card>

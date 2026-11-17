@@ -126,7 +126,12 @@ export function BriefingCard({
         <CardControl
           accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 rounded-full bg-secondary')}
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            // `bg-secondary` is the card's own fill, so the control painted
+            // nothing at all; the outline treatment gives it an edge.
+            'shrink-0 rounded-full border border-border bg-card'
+          )}
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
@@ -138,7 +143,7 @@ export function BriefingCard({
     </>
   );
   if (embedded) {
-    return <View className="grow gap-3">{body}</View>;
+    return <View className="grow gap-3 px-4 py-3">{body}</View>;
   }
   return <Card>{body}</Card>;
 }

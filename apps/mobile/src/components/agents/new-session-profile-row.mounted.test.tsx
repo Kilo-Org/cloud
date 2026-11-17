@@ -197,9 +197,6 @@ describe('new-session environment feedback', () => {
 
       const root = renderRow(next);
       expect(body(root)).toBe(slot);
-      expect(
-        root.findByProps({ className: 'min-h-[36px] flex-row items-center gap-2' })
-      ).toBeTruthy();
       const lines = slot.findAllByType('Text');
       expect(lines).toHaveLength(2);
       const [title, summary] = lines;

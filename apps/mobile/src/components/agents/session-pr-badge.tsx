@@ -121,7 +121,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
       accessibilityLabel={descriptor.accessibilityLabel}
       className={cn('active:opacity-70', props.className)}
     >
-      <View className="flex-row items-center gap-1 rounded-full bg-secondary py-0.5 pl-1.5 pr-2">
+      <View className="flex-row items-center gap-1 rounded-full border border-border bg-card py-0.5 pl-1.5 pr-2">
         <Icon size={12} color={colors[ACCENT_COLOR_KEY[descriptor.accent]]} />
         <Text
           className={cn('text-xs font-medium tabular-nums', ACCENT_TEXT_CLASS[descriptor.accent])}

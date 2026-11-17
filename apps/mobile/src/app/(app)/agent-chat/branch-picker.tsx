@@ -74,7 +74,11 @@ export default function BranchPickerScreen() {
               }}
             >
               <View className="min-w-0 flex-1 flex-row items-center gap-2">
-                <Text className="min-w-0 flex-1 text-sm font-medium" numberOfLines={1}>
+                <Text
+                  className="min-w-0 flex-1 text-sm font-medium"
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
                   {branch}
                 </Text>
                 {isDefault ? (

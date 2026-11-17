@@ -215,7 +215,7 @@ describe('the quiet moment of a Working card', () => {
     );
     const schedule = body(NOTIFICATIONS, 'private fun scheduleQuiet(');
     expect(schedule.indexOf('alarmManager.cancel(operation)')).toBeLessThan(
-      schedule.indexOf('setAndAllowWhileIdle')
+      schedule.indexOf('alarmWhileIdle(')
     );
   });
 
@@ -332,6 +332,7 @@ describe('ActiveAgentsActionReceiver', () => {
 
 describe('the Approve presence gate', () => {
   const GATE = kotlin('ApprovalGate.kt');
+  const BUILDERS = kotlin('CardBuilders.kt');
   const ACTIVITY = kotlin('ActiveAgentsApprovalActivity.kt');
   const MANIFEST = readFileSync(join(KOTLIN_DIR, '../../../../AndroidManifest.xml'), 'utf8');
 
@@ -347,8 +348,11 @@ describe('the Approve presence gate', () => {
   });
 
   it('marks the action with the platform authentication requirement where it exists', () => {
-    expect(GATE).toMatch(
-      /if \(Build\.VERSION\.SDK_INT >= 31\) \{\s+builder\.setAuthenticationRequired\(true\)/
+    expect(GATE).toContain(
+      'CardBuilders.action(context, icon, label, pendingIntent, authenticationRequired = true)'
+    );
+    expect(BUILDERS).toMatch(
+      /if \(authenticationRequired && Build\.VERSION\.SDK_INT >= 31\) \{\s+setAuthenticationRequired\(true\)/
     );
     expect(MODULE).toContain('ApprovalGate.action(context, icon, it, approvePendingIntent())');
     expect(NOTIFICATIONS).toContain(

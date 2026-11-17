@@ -41,7 +41,9 @@ describe('InputFrame', () => {
   // A field under an error or a fixed surface overrides one token without
   // re-spelling the rest of the chrome.
   it('lets a caller override one chrome token', () => {
-    const classes = String(frame({ children: 'field', className: 'border-destructive' }).props?.className).split(' ');
+    const classes = String(
+      frame({ children: 'field', className: 'border-destructive' }).props?.className
+    ).split(' ');
 
     expect(classes).toContain('border-destructive');
     expect(classes).not.toContain('border-input');

@@ -29,7 +29,9 @@ describe('Card', () => {
   it('draws a padless surface that clips its full-bleed layers', () => {
     const classes = cardClasses({ children: 'Layers', padding: 'none' });
 
-    expect(classes).toEqual(expect.arrayContaining(['rounded-xl', 'bg-secondary', 'overflow-hidden']));
+    expect(classes).toEqual(
+      expect.arrayContaining(['rounded-xl', 'bg-secondary', 'overflow-hidden'])
+    );
     expect(classes).not.toContain('p-4');
     expect(classes).not.toContain('gap-3');
   });

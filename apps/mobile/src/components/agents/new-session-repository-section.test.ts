@@ -335,7 +335,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
 
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
-    expect(text).toContain(i18n.t('prReview.connect.bitbucketReconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
     expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
@@ -374,7 +374,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     });
 
     const text = renderedText(renderer);
-    expect(text).toContain(i18n.t('prReview.connect.bitbucketReconnectAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
     expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
     // The header agrees with the note rather than announcing a first connect.
     expect(
@@ -398,6 +398,24 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     // note that explains why Bitbucket connects for an organization, exactly as
     // in the first-connect state.
     orgState.role = 'admin';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it('keeps the connect card title for an owner who still cannot select rows', () => {
+    // The reconnect header names a step the reader cannot take, so the
+    // card keeps its first-connect header beside the ask instead.
+    orgState.role = 'owner';
     const renderer = mountSection({
       organizationId: 'org-1',
       groups: [

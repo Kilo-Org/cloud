@@ -231,11 +231,12 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     const offer = connectCardOffer(platform, role, needsReconnect);
-    // The reconnect state's note asks for a reconnect, so the header must agree
-    // with it; the compact row already says "Reconnect Bitbucket".
-    const title = needsReconnect
-      ? t('prReview.connect.reconnectTitleBitbucket')
-      : t(copy.connectTitle);
+    // The reconnect header names a step the reader cannot take, so it shows
+    // only where the card keeps the ask note instead of the action.
+    const title =
+      needsReconnect && !offer.offersAction
+        ? t('prReview.connect.reconnectTitleBitbucket')
+        : t(copy.connectTitle);
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"

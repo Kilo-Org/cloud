@@ -11,6 +11,8 @@ type SectionProps = {
   icon?: ReactNode;
   actionLabel?: string;
   onActionPress?: () => void;
+  /** Test handle for the section's action control. */
+  actionTestID?: string;
   actionHidden?: boolean;
   /** Keeps the action visible and inert, with the disabled read and state. */
   actionDisabled?: boolean;
@@ -28,6 +30,7 @@ export function Section({
   icon,
   actionLabel,
   onActionPress,
+  actionTestID,
   actionHidden,
   actionDisabled,
   notice,
@@ -44,6 +47,7 @@ export function Section({
           icon={icon}
           actionLabel={actionLabel}
           onActionPress={onActionPress}
+          actionTestID={actionTestID}
           actionHidden={actionHidden}
           actionDisabled={actionDisabled}
           notice={notice}

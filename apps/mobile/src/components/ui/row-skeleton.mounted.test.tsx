@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { ROW_FRAME_CLASS, ROW_TILE_CLASS } from './row-frame';
 import { RowSkeleton } from './row-skeleton';
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 // The frame constants are the point of this test; only its module's leaf

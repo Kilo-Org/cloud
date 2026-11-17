@@ -33,7 +33,9 @@ describe('SectionHeader gutter', () => {
       }
       const row = renderer.root.find(node => Object.is(node.type, 'View'));
       const classes = String(row.props.className).split(' ');
-      act(() => renderer.unmount());
+      act(() => {
+        renderer.unmount();
+      });
       return classes;
     };
 

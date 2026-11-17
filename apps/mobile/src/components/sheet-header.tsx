@@ -1,4 +1,4 @@
-import { type Ref } from 'react';
+import { type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, type TextInstance, View } from 'react-native';
 
@@ -112,25 +112,28 @@ export function SheetHeader({
   // policy, and every sheet that paints a header would pay for that import to
   // show a mark. The control announces `busy` itself, so the reduced-motion
   // reading does not depend on the spinner.
-  const doneMark = doneBusy ? (
-    <ActivityIndicator size="small" color={colors.primary} />
-  ) : closeOnly ? (
-    <X size={20} color={doneUnavailable ? colors.mutedForeground : colors.foreground} />
-  ) : (
+  let doneMark: ReactNode = null;
+  if (doneBusy) {
+    doneMark = <ActivityIndicator size="small" color={colors.primary} />;
+  } else if (closeOnly) {
+    doneMark = <X size={20} color={doneUnavailable ? colors.mutedForeground : colors.foreground} />;
+  } else {
     // The muted ink alone is a mid gray; the control's disabled opacity is what
     // makes it read as unavailable. The enabled label keeps the accent at full
     // strength, so the accent is the only state that reads ready.
-    <Text
-      className={cn(
-        'text-center text-base font-semibold',
-        doneUnavailable ? 'text-muted-foreground' : 'text-primary'
-      )}
-      numberOfLines={1}
-      ellipsizeMode="clip"
-    >
-      {resolvedDoneLabel}
-    </Text>
-  );
+    doneMark = (
+      <Text
+        className={cn(
+          'text-center text-base font-semibold',
+          doneUnavailable ? 'text-muted-foreground' : 'text-primary'
+        )}
+        numberOfLines={1}
+        ellipsizeMode="clip"
+      >
+        {resolvedDoneLabel}
+      </Text>
+    );
+  }
   // Native row direction and logical margin keep Cancel/Share leading and Done
   // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
   return (

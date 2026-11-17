@@ -6,6 +6,7 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   Pressable: 'Pressable',

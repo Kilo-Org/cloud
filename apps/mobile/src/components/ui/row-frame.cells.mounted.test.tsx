@@ -18,6 +18,10 @@ vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
 vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The switch's flip ticks the selection haptic; the native module is out of
+// this graph.
+const haptics = vi.hoisted(() => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/haptics', () => haptics);
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#8A8680', foreground: '#111111' }),
 }));
@@ -54,6 +58,7 @@ function textOf(root: TestRenderer.ReactTestInstance, content: string) {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  haptics.selectionHaptic.mockClear();
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -129,6 +134,37 @@ describe('RowFrame trailing cell', () => {
     expect(toggle.props.testID).toBe('notifications-switch');
     expect(toggle.props.accessibilityLabel).toBe('Notifications');
     expect(toggle.props.accessibilityState).toEqual({ disabled: false, checked: true });
+  });
+
+  it('ticks the selection haptic on a flip, and only on the person’s flip', () => {
+    // Every switch row answers the same way, so the tick belongs to the frame
+    // instead of each caller; a programmatic `value` update must stay silent.
+    const seen: boolean[] = [];
+    const root = renderFrame({
+      title: 'Notifications',
+      trailing: {
+        kind: 'switch',
+        value: false,
+        onValueChange: next => {
+          seen.push(next);
+        },
+      },
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    act(() => {
+      (toggle.props.onValueChange as (next: boolean) => void)(true);
+    });
+
+    expect(seen).toEqual([true]);
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(1);
+
+    renderFrame({
+      title: 'Notifications',
+      trailing: { kind: 'switch', value: true, onValueChange: () => undefined },
+    });
+
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(1);
   });
 
   it('paints a value that shrinks and truncates where the caller says', () => {

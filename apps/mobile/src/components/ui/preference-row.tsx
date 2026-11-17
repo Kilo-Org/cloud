@@ -6,6 +6,7 @@ import { type LucideProps } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 type PreferenceRowProps = Readonly<{
@@ -77,6 +78,12 @@ export function PreferenceRow({
   const flip = () => {
     onValueChange(!(resolveValue?.() ?? value));
   };
+  // A tap on the title flips the same value the switch does, so it answers with
+  // the same selection tick; the switch's own flip ticks inside `RowFrame`.
+  const pressRow = () => {
+    selectionHaptic();
+    flip();
+  };
   // The label column keeps 7 dp from the switch, not 10.5. The longest row
   // title ("Keep screen on while on session page") lands within a few pixels
   // of the column width at 360 dp: Android then measures the title against
@@ -144,7 +151,7 @@ export function PreferenceRow({
         accessibilityHint: subtitle,
         accessibilityState: { disabled, busy, checked: value },
       }}
-      onPress={flip}
+      onPress={pressRow}
       disabled={disabled}
     >
       {/* Disabled cue is the muted title, not row opacity — see the same

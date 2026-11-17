@@ -30,6 +30,7 @@ import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
 // The tour row pushes through the press-burst guard, and these assertions read
 // the router mock, so the guarded push is that same function.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-single-push-route', () => ({
   useSinglePushRoute: () => routerPush,
 }));

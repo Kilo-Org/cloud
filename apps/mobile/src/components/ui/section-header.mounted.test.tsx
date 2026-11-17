@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one harness mounts every section header shape, its action states and its loading twin. */
 import { type ComponentProps, createElement, type ReactElement, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -299,6 +300,23 @@ describe('SectionHeader mounted layout', () => {
     expect(root.findAll(node => Object.is(node.type, 'Pressable'))).toHaveLength(0);
   });
 
+  it("puts the caller's testID on the action control", () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'Live now',
+        actionLabel: 'See all',
+        onActionPress: () => undefined,
+        actionTestID: 'live-now-see-all',
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+
+    expect(action.props.testID).toBe('live-now-see-all');
+    // The handle belongs to the control, not to the row: a test taps the link
+    // and must not land on the label's container.
+    expect(root.findAllByProps({ testID: 'live-now-see-all' })).toHaveLength(1);
+  });
+
   it.each([
     ['ios', 'min-h-[44px]', 'min-w-[44px]'],
     ['android', 'min-h-[48px]', 'min-w-[48px]'],
@@ -399,6 +417,7 @@ describe('SectionHeader mounted layout', () => {
     const label = root.find(
       node => Object.is(node.type, 'Text') && node.children.includes('Inbox')
     );
+    expect(icon.props.size).toBe(16);
     // The icon shares the label's flex line, so it cannot push the label onto a
     // second row, and the label's own width gives way to it.
     const line = root.find(

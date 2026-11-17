@@ -9,6 +9,7 @@ import { ConfigureRow } from './configure-row';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',

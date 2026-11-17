@@ -28,6 +28,9 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 // for its other trailing variants, so this suite stubs them out of its graph.
 vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
 vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+// A flip ticks the selection haptic; the native module is out of this graph.
+const haptics = vi.hoisted(() => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/haptics', () => haptics);
 // The real palettes, so the switch-colour assertions below hold the token pairs
 // the screen actually renders rather than values invented for the test. The
 // import has to be dynamic: `vi.mock` factories are hoisted above this file's
@@ -142,6 +145,29 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([false]);
+  });
+
+  it('ticks the selection haptic once per flip on either control, never per store update', () => {
+    haptics.selectionHaptic.mockClear();
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    act(() => {
+      (toggle.props.onValueChange as (next: boolean) => void)(true);
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(1);
+
+    // The switch's own flip ticks inside the row frame; tapping the title is
+    // the same flip and answers the same way.
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
+    act(() => {
+      (label.props.onPress as () => void)();
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
+
+    // A store write re-renders the row with a new value; it is not a flip.
+    renderRow({ value: true, onValueChange: () => undefined });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
   });
 
   it('exposes the row as one switch carrying the title, subtitle and state', () => {

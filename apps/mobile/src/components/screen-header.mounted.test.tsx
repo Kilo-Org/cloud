@@ -1224,7 +1224,7 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('hands the title node to the caller that drives reading order', () => {
-    const titleRef = vi.fn(() => undefined);
+    const titleRef = vi.fn<(node: unknown) => void>();
     const renderer = renderHeader({ title: 'Sessions', titleRef });
 
     expect(titleRef).toHaveBeenCalled();
@@ -1233,7 +1233,7 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('leaves titleRef unwired when titleContent replaces the title node', () => {
-    const titleRef = vi.fn(() => undefined);
+    const titleRef = vi.fn<(node: unknown) => void>();
     const renderer = renderHeader({
       title: 'Sessions',
       titleContent: createElement('Text', null, 'Sessions'),

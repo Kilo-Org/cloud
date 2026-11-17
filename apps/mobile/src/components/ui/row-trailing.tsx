@@ -7,6 +7,7 @@ import { RowValue, type RowValueSpec } from '@/components/ui/row-value';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 /**
@@ -63,9 +64,17 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       // The control's handlers reach the native switch as one props object;
       // listing them as JSX handler props invites the handler-naming rule to
       // read a prop pass-through as a bespoke handler.
+      //
+      // A flip is the person's, and every switch row answers it the same way:
+      // the selection tick lives in the primitive, not in each caller. A
+      // programmatic `value` update never reaches this callback, so a store
+      // refresh stays silent.
       const props = {
         value: trailing.value,
-        onValueChange: trailing.onValueChange,
+        onValueChange: (next: boolean) => {
+          selectionHaptic();
+          trailing.onValueChange(next);
+        },
         disabled: trailing.disabled,
         testID: trailing.testID,
         accessibilityLabel: trailing.accessibilityLabel,

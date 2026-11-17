@@ -25,6 +25,7 @@ const state = vi.hoisted(() => ({
   backends: [] as StoredChatBackend[],
 }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/chat/use-chat', () => ({
   useChatPlace: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   newChat: state.newChat,

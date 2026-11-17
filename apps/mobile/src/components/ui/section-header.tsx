@@ -33,6 +33,11 @@ type SectionHeaderProps = {
   actionLabel?: string;
   onActionPress?: () => void;
   /**
+   * Test handle for the action control itself, for a native E2E script that
+   * taps the section's link.
+   */
+  actionTestID?: string;
+  /**
    * Keeps the action's box but makes it invisible, inert and hidden from
    * screen readers, so hiding it cannot change the header's size. Beside a
    * notice the hidden box is dropped instead: it would hold the notice off the
@@ -76,6 +81,7 @@ export function SectionHeader({
   icon,
   actionLabel,
   onActionPress,
+  actionTestID,
   actionHidden = false,
   actionDisabled = false,
   notice,
@@ -144,6 +150,7 @@ export function SectionHeader({
       {notice && hasAction ? <View className="h-3 w-px self-center bg-border" /> : null}
       {hasAction ? (
         <Pressable
+          testID={actionTestID}
           onPress={onActionPress}
           disabled={actionHidden || actionDisabled}
           accessibilityRole={actionHidden ? undefined : 'button'}

@@ -23,10 +23,7 @@ type Props = Parameters<typeof ScreenFooter>[0];
 
 function renderFooter(props: Partial<Omit<Props, 'children'>> = {}) {
   act(() => {
-    const element = createElement(ScreenFooter, {
-      ...props,
-      children: createElement('View'),
-    });
+    const element = <ScreenFooter {...props}>{createElement('View')}</ScreenFooter>;
     if (renderer) {
       renderer.update(element);
     } else {
@@ -125,7 +122,7 @@ describe('ScreenFooter', () => {
   });
 
   it('hands the bar its own layout to a screen that measures the footer', () => {
-    const onLayout = vi.fn();
+    const onLayout = vi.fn<() => void>();
     const { bar } = renderFooter({ onLayout });
 
     // The measured bar is the one that carries the reserved band and the

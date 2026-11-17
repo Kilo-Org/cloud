@@ -881,7 +881,9 @@ describe('SheetHeader', () => {
     };
     const renderer = await mount({ ...props, doneBusy: true });
     const busyDone = pressablesByLabel(renderer.root, 'Done')[0];
-    const spinners = renderer.root.findAll(node => node.type === 'ActivityIndicator');
+    const spinners = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+    );
 
     // The name stays on the control; the label is the progress mark now.
     expect(busyDone?.props.disabled).toBe(true);
@@ -890,7 +892,12 @@ describe('SheetHeader', () => {
     expect(spinners).toHaveLength(1);
     expect(spinners[0]?.props.color).toBe('#2563eb');
     expect(
-      renderer.root.findAll(node => node.type === 'Text' && node.props.children === 'Done')
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Text' &&
+          node.props.children === 'Done'
+      )
     ).toHaveLength(0);
     // Cancel is the only way out of a saving sheet, so it keeps working.
     expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.props.disabled).toBe(false);
@@ -902,7 +909,11 @@ describe('SheetHeader', () => {
     const settledDone = pressablesByLabel(renderer.root, 'Done')[0];
     expect(settledDone?.props.disabled).toBe(false);
     expect(settledDone?.props.accessibilityState).toEqual({ disabled: false, busy: false });
-    expect(renderer.root.findAll(node => node.type === 'ActivityIndicator')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+      )
+    ).toHaveLength(0);
     expect(renderer.root.findByProps({ children: 'Done' })).toBeDefined();
 
     renderer.unmount();
@@ -962,8 +973,14 @@ describe('SheetHeader', () => {
 
     expect(closes).toHaveLength(1);
     expect(closes[0]?.props.disabled).toBe(false);
-    expect(renderer.root.findAll(node => node.type === 'Pressable')).toHaveLength(1);
-    expect(renderer.root.findAll(node => node.type === 'X')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      )
+    ).toHaveLength(1);
+    expect(
+      renderer.root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'X')
+    ).toHaveLength(1);
     expect(pressablesByLabel(renderer.root, 'Cancel')).toHaveLength(0);
     expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(0);
     expect(renderer.root.findByProps({ accessibilityRole: 'header' }).children).toEqual([
@@ -972,7 +989,7 @@ describe('SheetHeader', () => {
 
     await act(async () => {
       await Promise.resolve();
-      (closes[0]?.props.onPress as () => void)();
+      (closes[0]?.props.onPress as (() => void) | undefined)?.();
     });
     expect(onDone).toHaveBeenCalledTimes(1);
 
@@ -988,7 +1005,9 @@ describe('SheetHeader', () => {
     });
 
     expect(pressablesByLabel(renderer.root, 'Dismiss')).toHaveLength(1);
-    expect(renderer.root.findAll(node => node.type === 'X')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'X')
+    ).toHaveLength(1);
 
     renderer.unmount();
   });

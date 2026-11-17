@@ -120,7 +120,7 @@ describe('getOrgSubscriptionState', () => {
 
   it('reports a trial on its end date', () => {
     const state = getOrgSubscriptionState(withStatus('trialing'));
-    expect(state.tone).toBe('good');
+    expect(state.tone).toBe('default');
     expect(state.label.startsWith('Trial ends on ')).toBe(true);
   });
 
@@ -136,7 +136,7 @@ describe('getOrgSubscriptionState', () => {
       trialStatus: 'trial_active',
       trialEndsAt: '2026-11-24T00:00:00.000Z',
     });
-    expect(state.tone).toBe('good');
+    expect(state.tone).toBe('default');
     expect(state.label.startsWith('Trial ends on ')).toBe(true);
     expect(state.label).toContain('2026');
   });
@@ -147,7 +147,7 @@ describe('getOrgSubscriptionState', () => {
         trialStatus: 'trial_ending_soon',
         trialEndsAt: null,
       })
-    ).toEqual({ label: 'Trial', tone: 'good' });
+    ).toEqual({ label: 'Trial', tone: 'default' });
   });
 
   it('states the bare trial when the end date cannot be read', () => {
@@ -156,7 +156,7 @@ describe('getOrgSubscriptionState', () => {
         trialStatus: 'trial_expires_today',
         trialEndsAt: 'not-a-timestamp',
       })
-    ).toEqual({ label: 'Trial', tone: 'good' });
+    ).toEqual({ label: 'Trial', tone: 'default' });
   });
 
   it('keeps "No subscription" for an expired trial with no subscription', () => {
@@ -232,7 +232,7 @@ describe('getOrgTrialStatusPill', () => {
       trialStatus: 'trial_ending_very_soon',
       trialEndsAt: '2026-11-19T00:00:00.000Z',
     });
-    expect(pill?.tone).toBe('good');
+    expect(pill?.tone).toBe('default');
     expect(pill?.label.startsWith('Trial ends on ')).toBe(true);
   });
 

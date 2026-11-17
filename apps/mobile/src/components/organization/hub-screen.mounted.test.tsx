@@ -453,7 +453,7 @@ describe('Organization hub plan', () => {
     expect(row?.props.valueTone).toBeUndefined();
     expect(row?.props.valueStatus).toMatchObject({
       label: 'Trial ends on 2026-11-24',
-      tone: 'good',
+      tone: 'default',
     });
     // A running trial is not the lapsed state, so nothing above the card
     // explains an ending that has not happened.

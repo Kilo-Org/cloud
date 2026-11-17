@@ -48,7 +48,11 @@ export type OrgTrialState = Readonly<{
   trialEndsAt: string | null | undefined;
 }>;
 
-type BillingStateTone = 'good' | 'warn' | 'danger' | 'muted';
+/**
+ * `default` paints the readout in the row's ordinary ink, for a state that is
+ * a fact rather than a verdict — a running trial that ends, not a success.
+ */
+type BillingStateTone = 'default' | 'good' | 'warn' | 'danger' | 'muted';
 
 export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
 
@@ -116,14 +120,17 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
   }
   const endsAt = trial.trialEndsAt;
   const date = endsAt == null ? null : parseTimestamp(endsAt);
+  // Neutral ink: the end date is a fact the reader schedules around, not a
+  // success badge — the only saturated green value on a screen of facts pulled
+  // the eye off the plan.
   if (date == null || Number.isNaN(date.getTime())) {
-    return { label: i18n.t('organization.billing.stateTrialing'), tone: 'good' };
+    return { label: i18n.t('organization.billing.stateTrialing'), tone: 'default' };
   }
   return {
     label: i18n.t('organization.billing.stateTrialEndsOn', {
       date: formatDate(date, i18n.language, { year: 'numeric', month: 'short', day: 'numeric' }),
     }),
-    tone: 'good',
+    tone: 'default',
   };
 }
 
@@ -177,7 +184,9 @@ export function getOrgSubscriptionState(
       label: periodEnd
         ? i18n.t('organization.billing.stateTrialEndsOn', { date: periodEnd })
         : i18n.t('organization.billing.stateTrialing'),
-      tone: 'good',
+      // Same words as the trial-without-subscription branch above, so the same
+      // neutral ink: one screen must not paint one state two colours.
+      tone: 'default',
     };
   }
   if (status === 'active') {

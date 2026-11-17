@@ -81,9 +81,11 @@ const DOT_TONE = {
  * Value props for a status that trails a value on its own ink — the state of
  * the thing the value names. The label carries its own leading separator in the
  * catalog, so each language keeps its own spacing and the value keeps the row's
- * ordinary colour.
+ * ordinary colour. `default` paints the state in the row's ordinary ink, for a
+ * state that is a fact, not a verdict — a running trial that ends, not a
+ * success badge.
  */
-type KvStatus = Readonly<{ label: string; tone: KvTone }>;
+type KvStatus = Readonly<{ label: string; tone: KvTone | 'default' }>;
 
 /** Label-left / value-right row with hair-soft bottom divider. */
 export function KvRow({

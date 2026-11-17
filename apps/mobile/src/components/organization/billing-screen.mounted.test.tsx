@@ -308,7 +308,7 @@ describe('OrganizationBillingScreen state row', () => {
 
     expect(String(stateReadout(renderer)).startsWith('Trial ends on ')).toBe(true);
     const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
-    expect(row?.props.valueTone).toBe('good');
+    expect(row?.props.valueTone).toBe('default');
     unmount();
   });
 

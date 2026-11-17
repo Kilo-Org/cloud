@@ -213,16 +213,14 @@ describe('DiscussionThread collapsed card', () => {
 });
 
 describe('DiscussionThread expanded card', () => {
-  it('has a plain View root with the thread a11y label', async () => {
+  it('roots the expanded card in the shared surface with the thread a11y label', async () => {
     const thread = makeThread();
     const renderer = await render(
       createElement(DiscussionThread, { ...baseProps, thread, expanded: true })
     );
-    const node = renderer.root.children[0] as TestRenderer.ReactTestInstance;
+    const card = renderer.root.children[0] as TestRenderer.ReactTestInstance;
 
-    expect(typeof node.type).toBe('string');
-    expect(node.type).toBe('View');
-    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
+    expect(card.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
 
     renderer.unmount();
   });

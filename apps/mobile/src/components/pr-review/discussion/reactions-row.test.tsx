@@ -16,6 +16,7 @@ vi.mock('react-native', () => ({
   // direction the same way every sheet does.
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

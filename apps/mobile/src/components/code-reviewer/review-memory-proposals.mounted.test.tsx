@@ -48,6 +48,8 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
+  // The migrated list rows draw their chevron through the directional icon.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -89,7 +91,11 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

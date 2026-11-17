@@ -20,7 +20,11 @@ import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { FIELD_CLEAR_BOX_CLASS, FIELD_TRIGGER_FRAME_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  FIELD_CLEAR_BOX_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+  ICON_TARGET_BOX_CLASS,
+} from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
@@ -167,7 +171,11 @@ export function PrReviewEntryScreen() {
             repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
           });
           return (
-            <View key={recentPrKey(entry)} testID="recent-row" className="border-b-[0.5px] border-hair-soft">
+            <View
+              key={recentPrKey(entry)}
+              testID="recent-row"
+              className="border-b-[0.5px] border-hair-soft"
+            >
               <Pressable
                 onPress={() => {
                   handleRecentPress(entry);

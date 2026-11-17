@@ -214,7 +214,7 @@ describe('recents identity across providers', () => {
 
     // eslint-disable-next-line new-cap -- called as a plain function, like the screen harness
     const card = PrReviewRecentsPending();
-    const frame = find(card, 'View', p => p.accessibilityRole === 'progressbar');
+    const frame = find(card, 'Card', () => true);
     expect(propsOf(frame).accessibilityLabel).toBe('Loading…');
     expect(findAll(frame, 'Skeleton')).toHaveLength(4);
   });

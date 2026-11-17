@@ -365,7 +365,11 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
           </View>
         ) : null}
         {groups.map(group => (
-          <PrReviewChecksStatusRow key={group.status} status={group.status} count={group.runs.length}>
+          <PrReviewChecksStatusRow
+            key={group.status}
+            status={group.status}
+            count={group.runs.length}
+          >
             {group.runs.map((run, runIndex) => (
               <View key={`${run.name}-${runIndex}`}>
                 <CheckRow run={run} />

@@ -102,6 +102,11 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
+  // The migrated rows draw their chevron through the directional icon, which
+  // reads the RTL flag on every render.
+  I18nManager: { isRTL: false },
+  StatusBar: { currentHeight: 24 },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
@@ -175,8 +180,13 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The loading body is compared with the loaded rows, so the row primitive is a
+// host node this suite reads by its own props.
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   FolderGit2: 'FolderGit2',
   GitPullRequest: 'GitPullRequest',
   Search: 'Search',
@@ -562,11 +572,11 @@ describe('repository search', () => {
 
 describe('Recent review bodies', () => {
   it.each([
-    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
-    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
+    { orientation: 'portrait', left: 0, right: 0 },
+    { orientation: 'landscape', left: 47, right: 59 },
   ])(
-    'keeps the $orientation rows inside the side insets on top of the gutter',
-    async ({ left, right, paddingLeft, paddingRight }) => {
+    'keeps the $orientation list inside the side insets, with rows drawing the gutter',
+    async ({ left, right }) => {
       state.insets.left = left;
       state.insets.right = right;
       state.reviews.data = {
@@ -576,11 +586,21 @@ describe('Recent review bodies', () => {
       const { renderer, unmount } = await renderWithProviders(
         createElement(ReviewListScreen, { scope: 'personal' })
       );
+      // The container carries exactly the safe-area side insets, so a landscape
+      // row never starts under the sensor housing; the page gutter and the top
+      // space belong to the row, which every recycled row draws identically.
       expect(firstList(renderer).props.contentContainerStyle).toEqual({
-        paddingTop: 16,
-        paddingLeft,
-        paddingRight,
+        paddingLeft: left,
+        paddingRight: right,
       });
+      const rows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        const pressable = row.find(node => Object.is(node.type, 'Pressable'));
+        const classes = String(pressable.props.className ?? '').split(' ');
+        expect(classes).toContain('px-4');
+        expect(classes).toContain('py-3');
+      }
       unmount();
     }
   );
@@ -705,7 +725,7 @@ describe('Recent review bodies', () => {
     unmount();
   });
 
-  it('shows one footer spinner while the next page loads', async () => {
+  it('shows one footer row skeleton while the next page loads', async () => {
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1')] }],
       pageParams: [0],
@@ -718,9 +738,14 @@ describe('Recent review bodies', () => {
     const footer = firstList(renderer).props.ListFooterComponent as ReactNode;
     unmount();
     const footerRender = await renderWithProviders(createElement('Footer', null, footer));
-    expect(
-      footerRender.renderer.root.findAll(node => String(node.type) === 'Skeleton')
-    ).toHaveLength(1);
+    // The footer's placeholder is the row primitive's own two-line shape, so it
+    // hands over to the next page's rows without moving them.
+    const placeholders = footerRender.renderer.root.findAll(
+      node => String(node.type) === 'RowSkeleton'
+    );
+    expect(placeholders).toHaveLength(1);
+    const [placeholder] = placeholders;
+    expect(placeholder?.props.subtitle).toBe(true);
     footerRender.unmount();
   });
 
@@ -983,8 +1008,29 @@ describe('empty reviews connect action', () => {
     await settled(renderer);
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
+    // The loading body reserves the loaded overview's geometry: the same number
+    // of two-line rows, so swapping in the real data never changes the height.
+    const loadingRows = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+    expect(loadingRows.length).toBeGreaterThan(0);
+    expect(loadingRows.every(row => row.props.subtitle === true)).toBe(true);
     unmount();
+
+    state.permissionOverride = null;
+    state.reviews.data = {
+      pages: [
+        {
+          success: true,
+          reviews: [review('r1'), review('r2'), review('r3')],
+        },
+      ],
+      pageParams: [0],
+    };
+    const loaded = await renderWithProviders(createElement(ReviewListScreen, { scope: SCOPE }));
+    await settled(loaded.renderer);
+    expect(loaded.renderer.root.findAll(node => String(node.type) === 'ReviewRow')).toHaveLength(
+      loadingRows.length
+    );
+    loaded.unmount();
   });
 
   it('keeps the manual-review action for a member once a provider is connected', async () => {

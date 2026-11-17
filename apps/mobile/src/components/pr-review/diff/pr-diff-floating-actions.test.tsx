@@ -308,7 +308,7 @@ describe('PrDiffFloatingActions footer', () => {
     // The bar is a screen footer, so its gutter, its bottom band and the
     // landscape side insets come from the one primitive instead of a style
     // object measured here.
-    const props: { edge?: string; keyboard?: string } = footerElement().props;
+    const props = footerElement().props as { edge?: string; keyboard?: string };
     expect(props.edge).toBe('background');
     expect(props.keyboard).toBe('host');
   });
@@ -318,8 +318,7 @@ describe('PrDiffFloatingActions footer', () => {
     // the FlashList, so a partly-scrolled diff row was clipped at its top
     // edge. As an in-flow footer the list ends above it at every scroll
     // position.
-    const props: { className?: string } = footerElement().props;
+    const props = footerElement().props as { className?: string };
     expect(String(props.className ?? '').split(' ')).not.toContain('absolute');
   });
 });
-

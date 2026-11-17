@@ -145,6 +145,8 @@ vi.mock('react-native', () => ({
     views.rendered.push(props);
     return createElement('View', props);
   },
+  // The migrated list rows draw their chevron through the directional icon.
+  I18nManager: { isRTL: false },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -229,7 +231,11 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+}));
 
 function renderScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };

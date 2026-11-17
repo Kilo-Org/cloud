@@ -10,13 +10,13 @@
 // Phones see the navigator entry only. Tablets see both.
 
 import { type Href, useRouter } from 'expo-router';
-import { Columns2, Rows3 } from '@/components/ui/icons';
+import { Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -24,7 +24,6 @@ import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
-import { cn } from '@/lib/utils';
 
 type PrDiffFileListHeaderProps = {
   readonly owner: string;
@@ -125,73 +124,17 @@ function ViewModeToggle({
   viewMode: DiffViewMode;
   onChange: (mode: DiffViewMode) => void;
 }) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center gap-2">
-      <Text variant="muted" className="text-xs">
-        {t('prReview.fileList.layout')}
-      </Text>
-      <RadioGroup
-        label={t('prReview.fileList.layout')}
-        className="flex-row overflow-hidden rounded-md border border-border bg-muted-soft"
-      >
-        <ViewModeButton
-          active={viewMode === 'unified'}
-          label={t('prReview.fileList.unified')}
-          onPress={() => {
-            onChange('unified');
-          }}
-          testId="diff-mode-unified"
-          colors={colors}
-        />
-        <ViewModeButton
-          active={viewMode === 'side-by-side'}
-          label={t('prReview.fileList.sideBySide')}
-          onPress={() => {
-            onChange('side-by-side');
-          }}
-          testId="diff-mode-side-by-side"
-          colors={colors}
-        />
-      </RadioGroup>
-    </View>
-  );
-}
-
-function ViewModeButton({
-  active,
-  label,
-  onPress,
-  testId,
-  colors,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-  testId: string;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      {...radioItemA11y({ label, checked: active })}
-      testID={testId}
-      className={cn(
-        'min-h-9 flex-row items-center gap-1.5 px-3 active:opacity-70',
-        active && 'bg-background'
-      )}
-    >
-      <Columns2 size={12} color={active ? colors.foreground : colors.mutedForeground} />
-      <Text
-        className={cn(
-          'text-xs',
-          active ? 'font-semibold text-foreground' : 'text-muted-foreground'
-        )}
-      >
-        {label}
-      </Text>
-    </Pressable>
+    <SegmentedControl
+      accessibilityLabel={t('prReview.fileList.layout')}
+      value={viewMode}
+      onChange={onChange}
+      options={[
+        { value: 'unified', label: t('prReview.fileList.unified') },
+        { value: 'side-by-side', label: t('prReview.fileList.sideBySide') },
+      ]}
+    />
   );
 }
 

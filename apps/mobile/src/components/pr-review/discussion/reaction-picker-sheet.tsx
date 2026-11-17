@@ -3,19 +3,19 @@
 // button, and it presents a separate native window so it also stacks above a
 // formSheet route (a JS sheet or a portal overlay would render below it).
 //
-// Focus restore after the sheet closes belongs to the parent, which owns the
-// trigger. Every close path here routes through `onClose` or `onPick`.
+// The header is the shared sheet header, so the picker's title reads like every
+// other sheet's and Close is the way out. Focus restore after the sheet closes
+// belongs to the parent, which owns the trigger. Every close path here routes
+// through `onClose` or `onPick`.
 
-import { X } from '@/components/ui/icons';
-import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInstance, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { requestA11yFocus } from '@/lib/a11y/announce';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
   REVIEW_REACTION_CONTENTS,
@@ -40,52 +40,7 @@ export function ReactionPickerSheet({
   onClose,
   onPick,
 }: Readonly<ReactionPickerSheetProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
-  const titleRef = useRef<TextInstance | null>(null);
-  // Android can deliver layout before attaching the title ref. Retry from the
-  // ref callback when no request was dispatched; this latch is not focus proof.
-  const titleFocusRequestedRef = useRef(false);
-  const titleLaidOutRef = useRef(false);
-  const focusTitle = useCallback(() => {
-    if (titleFocusRequestedRef.current) {
-      return;
-    }
-    if (requestA11yFocus(titleRef)) {
-      titleFocusRequestedRef.current = true;
-    }
-  }, []);
-  const attachTitle = useCallback(
-    (node: TextInstance | null) => {
-      titleRef.current = node;
-      if (node !== null && titleLaidOutRef.current) {
-        focusTitle();
-      }
-    },
-    [focusTitle]
-  );
-  const handleTitleLayout = useCallback(() => {
-    titleLaidOutRef.current = true;
-    focusTitle();
-  }, [focusTitle]);
-
-  // Focus the picker's title once per presentation, when a request can actually
-  // reach it. `Sheet` returns null on the commit that flips `visible`, so the
-  // title mounts a render later; on Android its `onLayout` can even arrive
-  // before the ref is attached. Reaching the title is retried from each real
-  // signal — this effect for a reopen that never unmounted the title,
-  // `handleTitleLayout` and `attachTitle` otherwise — and the guard latches only
-  // on a dispatched request.
-  useEffect(() => {
-    if (!visible) {
-      titleFocusRequestedRef.current = false;
-      titleLaidOutRef.current = false;
-      return;
-    }
-    if (titleRef.current !== null) {
-      focusTitle();
-    }
-  }, [visible, focusTitle]);
 
   const reacted = new Set<string>();
   for (const r of reactions) {
@@ -97,28 +52,15 @@ export function ReactionPickerSheet({
   return (
     // No snap points: the native sheet sizes to the emoji grid.
     <Sheet visible={visible} onClose={onClose}>
-      <View accessibilityViewIsModal className="gap-4 px-4 pb-6 pt-3">
-        <View className="flex-row items-center">
-          <View className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0')} />
-          <Text
-            ref={attachTitle}
-            onLayout={handleTitleLayout}
-            accessibilityRole="header"
-            className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
-          >
-            {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
-                ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
-            {t('common.reactions')}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.closeReactions')}
-            className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 rounded-full active:bg-muted')}
-            onPress={onClose}
-          >
-            <X size={18} color={colors.foreground} />
-          </Pressable>
-        </View>
+      {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+          ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+      <SheetHeader
+        title={t('common.reactions')}
+        onDone={onClose}
+        doneLabel={t('common.close')}
+        topInset="never"
+      />
+      <View accessibilityViewIsModal className={cn(SCREEN_BODY_CLASS, 'pb-6')}>
         <View className="flex-row flex-wrap gap-2">
           {REVIEW_REACTION_CONTENTS.map(content => {
             const isReacted = reacted.has(content);

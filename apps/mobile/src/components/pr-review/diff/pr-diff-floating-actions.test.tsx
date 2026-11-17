@@ -56,6 +56,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
   clearDiffSelection: vi.fn(),

@@ -20,7 +20,7 @@ import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { FIELD_TRIGGER_FRAME_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, FIELD_TRIGGER_FRAME_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
@@ -160,7 +160,7 @@ export function PrReviewEntryScreen() {
     );
   } else {
     recentsBody = (
-      <View className="gap-3">
+      <View>
         {recent.map(entry => {
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
@@ -182,7 +182,7 @@ export function PrReviewEntryScreen() {
                     handleRemoveRecent(entry);
                   }
                 }}
-                className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+                className="flex-row items-center gap-3 py-3 active:opacity-70"
               >
                 <View className="min-w-0 flex-1 gap-1">
                   <Text variant="eyebrow">{rowState.provider}</Text>
@@ -210,7 +210,7 @@ export function PrReviewEntryScreen() {
                 // lines read as a piece of another surface — while its own node
                 // still carries the state-action box, because `hitSlop` widens
                 // the touch region without enlarging the rect an audit reads.
-                <View className="flex-row items-center justify-between gap-3 border-t-[0.5px] border-hair-soft px-4 py-1">
+                <View className="flex-row items-center justify-between gap-3 border-t-[0.5px] border-hair-soft py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
                     {t('common.couldNotOpen', {
                       label: t(providerPrNounKey(entry.platform ?? 'github')),
@@ -248,7 +248,7 @@ export function PrReviewEntryScreen() {
       <View className="gap-4">
         <View className="flex-row items-center gap-2">
           <View
-            className={cn('min-h-14 min-w-0 flex-1', FIELD_TRIGGER_FRAME_CLASS)}
+            className={cn(FIELD_TRIGGER_FRAME_CLASS, 'min-h-14 min-w-0 flex-1 px-0')}
             testID="pr-link-input-row"
             collapsable={false}
           >
@@ -278,15 +278,14 @@ export function PrReviewEntryScreen() {
             />
             {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
             {showClearButton ? (
-              // The clear control is icon-only like the paste control beside it,
-              // so it carries the same shared 48dp target; the 45pt box it used
-              // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
-              // under Android's minimum.
+              // The in-field clear control takes the shared box for one: it
+              // carries the touch target on its own node and cancels its
+              // height against the field's floor, so the field does not grow.
               <Pressable
                 onPress={clearField}
                 accessibilityRole="button"
                 accessibilityLabel={t('prReview.entry.clearLink')}
-                className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
+                className={cn(FIELD_CLEAR_BOX_CLASS, 'active:opacity-70')}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>

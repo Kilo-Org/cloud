@@ -12,6 +12,7 @@ import {
   profileScreenPath,
   profileStackRepair,
   TRIGGER_ROUTE_NAMES,
+  TRIGGERS_LIST_ROUTE_NAME,
   withRebuiltParents,
 } from '@/lib/profile-route-stack';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';

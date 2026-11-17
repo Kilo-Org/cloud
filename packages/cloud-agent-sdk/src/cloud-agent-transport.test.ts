@@ -2393,6 +2393,169 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
+  it('applies a no-cursor reconnect catch-up page and arms a new retry chain after it', async () => {
+    jest.useFakeTimers();
+    try {
+      const initial = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: 'cursor-A',
+        omittedItemCount: 0,
+      };
+      const reconnectPage = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: 'cursor-A',
+        omittedItemCount: 0,
+      };
+      const fetchSnapshotPage = jest
+        .fn()
+        .mockResolvedValueOnce(initial)
+        .mockRejectedValueOnce(new Error('Network failure'))
+        .mockResolvedValueOnce(reconnectPage);
+      const { transport, errors, serviceEvents, onInitialPageLoaded } = createSnapshotTransport({
+        fetchSnapshotPage,
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      await reconnectWithoutCursor();
+
+      expect(errors).toEqual(['Network failure']);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+
+      jest.advanceTimersByTime(500);
+      await flushMicrotasks();
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(3);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(2);
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a rejected initial read from replaying its retry page over a cursor reconnect', async () => {
+    jest.useFakeTimers();
+    try {
+      const retryPage = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+      const fetchSnapshotPage = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Connection lost. Please retry in a moment.'))
+        .mockRejectedValueOnce(new Error('Connection lost. Please retry in a moment.'))
+        .mockResolvedValueOnce(retryPage);
+      const { transport, errors, serviceEvents, onInitialPageLoaded } = createSnapshotTransport({
+        fetchSnapshotPage,
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+
+      expect(errors).toEqual(['Connection lost. Please retry in a moment.']);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+
+      // A wire event with a real id advances the cursor. reconnectWithoutCursor
+      // advances 2000ms, past the first 500ms backoff, so the pre-reconnect
+      // state must not have applied any page yet.
+      sendRaw({ ...sentinel, eventId: 55 });
+      await reconnectWithoutCursor();
+
+      expect(String(webSocketConstructor.mock.calls.at(-1)?.[0])).toContain('fromId=55');
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      // Nothing further may fire: the reconnect cancelled the armed retry
+      // chain, so the retry page never replays over the socket's catch-up,
+      // initialPageRecorded stays false, and no chain keeps retrying.
+      jest.advanceTimersByTime(10000);
+      await flushMicrotasks();
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('drops a rejected catch-up read that settles after a cursor reconnect, but reports the read failure', async () => {
+    jest.useFakeTimers();
+    try {
+      const stalePage = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+      let resolveRetryRead: (outcome: SessionSnapshotPageOutcome | null) => void = () => undefined;
+      const pendingRetryRead = new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+        resolveRetryRead = resolve;
+      });
+      const fetchSnapshotPage = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Connection lost.'))
+        .mockReturnValueOnce(pendingRetryRead);
+      const { transport, errors, serviceEvents, onInitialPageLoaded } = createSnapshotTransport({
+        fetchSnapshotPage,
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+
+      jest.advanceTimersByTime(500);
+      await flushMicrotasks();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      // The retry read is in flight. Reconnect with a replay cursor: the
+      // reconnect's cancel invalidates that read even though it has not
+      // settled.
+      sendRaw({ ...sentinel, eventId: 55 });
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      jest.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      const nextSocket = newestSocket();
+      nextSocket.onopen?.(new Event('open'));
+      nextSocket.onmessage?.({ data: JSON.stringify(sentinel) } as MessageEvent);
+      await flushMicrotasks();
+
+      expect(String(webSocketConstructor.mock.calls.at(-1)?.[0])).toContain('fromId=55');
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      resolveRetryRead(stalePage);
+      await flushMicrotasks();
+
+      // The stale page is dropped: not replayed, not recorded, not re-fetched.
+      // The read failure itself was already reported on the error channel
+      // (reportSnapshotFailure runs before the epoch check drops the result).
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(errors).toEqual(['Connection lost.']);
+
+      jest.advanceTimersByTime(8000);
+      await flushMicrotasks();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries a rejected reconnect catch-up read and replays its page without resetting the older-pages cursor', async () => {
     jest.useFakeTimers();
     try {
@@ -2554,9 +2717,11 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       resolveInitialRetry(page);
       await flushMicrotasks();
 
-      // The late initial retry replays its rows, but the manager already holds
-      // a page for this connect: its older-pages cursor must not move.
-      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(2);
+      // The reconnect invalidated the initial read that was still in flight:
+      // the transport does not apply two catch-up reads. The manager already
+      // holds the reconnect's page, so nothing re-replays and the
+      // older-pages cursor never moves.
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
       expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
 
       transport.destroy();

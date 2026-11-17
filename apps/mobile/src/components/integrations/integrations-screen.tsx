@@ -12,8 +12,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { openExternalUrl } from '@/lib/external-link';
-import { WEB_BASE_URL } from '@/lib/config';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
   useDisconnectIntegration,
   useGitHubConnections,
@@ -25,7 +24,6 @@ import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
   type IntegrationProvider,
@@ -152,15 +150,21 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         })
     );
 
-  // Only a GitHub row whose installations the hub cannot name reaches the web
-  // page; every other provider's action runs in the app.
+  // A GitHub row whose installations the hub cannot name is the only row with a
+  // web management link, and it opens the app-shell integration page through a
+  // one-time hand-off. Bitbucket's controls run in the app's own connect sheet.
   const manageRowOnWeb = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
       return;
     }
-    void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
-      label: t(providerLabelKey(provider)),
-    });
+    void openAppShellHandoff(
+      {
+        page: 'integration',
+        platform: provider,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      { label: t(providerLabelKey(provider)) }
+    );
   };
 
   const connectProvider = (provider: IntegrationProvider) => {

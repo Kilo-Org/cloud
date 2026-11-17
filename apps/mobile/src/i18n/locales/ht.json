@@ -1366,7 +1366,8 @@
       "noReviews": "Poko gen revizyon",
       "noReviewsDescription": "Revizyon yo parèt isit la apre Revizè kòd la analize yon demann fizyon.",
       "startManualReview": "Kòmanse yon revizyon manyèl",
-      "configureProvider": "Konfigire founisè a"
+      "configureProvider": "Konfigire founisè a",
+      "connectOwnerOnly": "Mande yon pwopriyetè òganizasyon an oswa yon administratè pou konekte yon founisè."
     },
     "platformList": {
       "checking": "Ap tcheke…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Dekonekte aparèy sa a",
     "signOutSessionLabel": "Dekonekte {{device}}, konekte {{signedIn}}, dènye aktivite {{lastSeen}}",
     "sessionSignedOut": "Sesyon an dekonekte.",
+    "sessionSignOutFailed": "Pa t ka dekonekte sesyon sa a. Eseye ankò.",
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",
     "signOutThisSessionMessage": "{{device}} ap dekonekte. Dènye aktivite {{lastSeen}}. Li ka kenbe aksè nan API a pou jiska inèdtan.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Istorik faktirasyon",
       "billingHistoryEmpty": "Poko gen istorik faktirasyon.",
+      "billingHistoryError": "Pa t ka chaje istorik faktirasyon",
       "cancel": "Anile abònman",
       "cancelDescription": "Kilo Pass ou a rete aktif jiska fen peryòd faktirasyon an epi li p ap renouvle.",
       "cancelScheduled": "Ap anile {{date}}",
       "cancelScheduledChange": "Anile chanjman ki pwograme a",
       "cancelled": "Abònman anile",
       "creditHistoryEmpty": "Poko gen kredi Kilo Pass.",
+      "creditHistoryError": "Pa t ka chaje istorik kredi",
       "resume": "Rekòmanse abònman",
       "resumeCancelledDescription": "Kilo Pass ou a ap kòmanse renouvle otomatikman ankò.",
       "resumePausedDescription": "Kilo Pass ou a rekòmanse kounye a, anvan dat li te pwograme pou l rekòmanse a.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Chwazi yon òganizasyon",
       "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon lòt nan pwofil ou a pou kontinye.",
       "unavailableSessionsDescription": "Òganizasyon sa a pa disponib ankò. Sezyon yo pa ka chaje.",
-      "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
+      "accessDeniedDescription": "Mande yon pwopriyetè oswa yon administratè òganizasyon pou l ba ou aksè."
     },
     "create": {
       "title": "Kreye òganizasyon",
@@ -3464,6 +3468,8 @@
       "groups": "Gwoup",
       "guardrails": "Baryè sekirite",
       "byok": "Itilize pwòp kle ou",
+      "ssoAndDomain": "SSO ak domèn",
+      "dataCollection": "Koleksyon done",
       "auditLogs": "Jounal odit",
       "requestLogs": "Jounal demann",
       "subOrganizations": "Sou-òganizasyon",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Ekspresyon kron",
       "fieldCronHelp": "Senk chan: minit, è, jou, mwa ak jou semèn. Entèval ki pi kout la se yon minit.",
       "fieldTimezone": "Zòn lè",
-      "nameLocked": "Non an fè pati URL wèbhuk la epi li pa ka chanje.",
+      "nameLocked": "Non an pa ka chanje apre deklanchè a kreye.",
       "repositoryLocked": "Depo a pa ka chanje apre deklanchè a kreye.",
       "environmentAutomatic": "Otomatik selon depo",
       "notSelected": "Pa chwazi",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Nou pa t kapab sove deklanchè a",
       "deleteTitle": "Efase deklanchè sa a?",
       "deleteMessage": "Apèl sou {{name}} ap echwe. Sa pa ka defèt.",
+      "deleteMessageScheduled": "Egzekisyon pwograme pou deklanchè {{name}} sispann. Sa pa ka defèt.",
       "runNow": "Lanse kounye a",
       "runStarted": "Egzekisyon kòmanse",
       "created": "Deklanchè kreye",

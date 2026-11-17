@@ -25,6 +25,14 @@ export type GatewayModelWithEndpoints = GatewayModel & { endpoints: Endpoint[] }
 
 export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
 
+/** The model a `~` latest alias resolves to, or `undefined` for a non-alias or unresolvable id. */
+export function getOpenRouterAliasTarget(
+  models: GatewayModelMap,
+  modelId: string
+): string | undefined {
+  return modelId.startsWith('~') ? models[modelId]?.alias_target?.slug : undefined;
+}
+
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
 const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
 

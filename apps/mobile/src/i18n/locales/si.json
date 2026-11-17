@@ -1366,7 +1366,8 @@
       "noReviews": "තවම සමාලෝචන නොමැත",
       "noReviewsDescription": "කේත සමාලෝචකයා PR එකක් සමාලෝචනය කළ පසු එම සමාලෝචන මෙහි දිස් වේ.",
       "startManualReview": "ඔබම සමාලෝචනයක් ආරම්භ කරන්න",
-      "configureProvider": "සැපයුම්කරුගේ සැකසුම් සකසන්න"
+      "configureProvider": "සැපයුම්කරුගේ සැකසුම් සකසන්න",
+      "connectOwnerOnly": "සැපයුම්කරු සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු හෝ පරිපාලකගෙන් ඉල්ලන්න."
     },
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "මෙම උපාංගයෙන් පිටවන්න",
     "signOutSessionLabel": "{{device}} උපාංගයෙන් පිටවන්න, පුරනය වූයේ {{signedIn}}, අවසන් වරට සක්‍රීය වූයේ {{lastSeen}}",
     "sessionSignedOut": "සැසියෙන් පිටව ඇත.",
+    "sessionSignOutFailed": "මෙම සැසියෙන් පිටවීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} උපාංගයේ ගිණුමෙන් පිටවනු ඇත. අවසන් වරට සක්‍රීය වූයේ {{lastSeen}}. එයට තවත් පැයක් දක්වා API ප්‍රවේශය තිබිය හැක.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "බිල්පත් ඉතිහාසය",
       "billingHistoryEmpty": "තවම බිල්පත් ඉතිහාසයක් නැත.",
+      "billingHistoryError": "බිල්පත් ඉතිහාසය පූරණය කළ නොහැක",
       "cancel": "දායකත්වය අවලංගු කරන්න",
       "cancelDescription": "ඔබේ Kilo Pass බිල්පත් කාලපරිච්ඡේදය අවසන් වන තෙක් සක්‍රියව පවතින අතර නැවත අලුත් නොකෙරේ.",
       "cancelScheduled": "{{date}} දින අවලංගු වේ",
       "cancelScheduledChange": "සැලසුම් කළ වෙනස අවලංගු කරන්න",
       "cancelled": "දායකත්වය අවලංගු කරන ලදී",
       "creditHistoryEmpty": "තවම Kilo Pass ක්‍රෙඩිට් නැත.",
+      "creditHistoryError": "Kilo Pass ක්‍රෙඩිට් ඉතිහාසය පූරණය කළ නොහැක",
       "resume": "දායකත්වය නැවත අරඹන්න",
       "resumeCancelledDescription": "ඔබේ Kilo Pass නැවතත් ස්වයංක්‍රීයව අලුත් වීමට පටන් ගනී.",
       "resumePausedDescription": "ඔබේ Kilo Pass එහි නියමිත නැවත ආරම්භ දිනයට පෙර, දැන්ම නැවත ආරම්භ වේ.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "සංවිධානයක් තෝරන්න",
       "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
       "unavailableSessionsDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. එහි සැසි පූරණය කළ නොහැක.",
-      "accessDeniedDescription": "ඔබට මෙම සංවිධානයට ප්‍රවේශ වීමට අවසර නොමැත."
+      "accessDeniedDescription": "ඔබට ප්‍රවේශය ලබා දෙන ලෙස සංවිධානයේ හිමිකරුවෙකුට හෝ පරිපාලකයෙකුට ඉල්ලා සිටින්න."
     },
     "create": {
       "title": "සංවිධානයක් සාදන්න",
@@ -3464,6 +3468,8 @@
       "groups": "කණ්ඩායම්",
       "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
+      "ssoAndDomain": "SSO සහ වසම",
+      "dataCollection": "දත්ත එකතු කිරීම",
       "auditLogs": "විගණන ලොග",
       "requestLogs": "ඉල්ලීම් ලොග",
       "subOrganizations": "උප සංවිධාන",
@@ -4592,7 +4598,7 @@
       "fieldCron": "ක්‍රොන් ප්‍රකාශනය",
       "fieldCronHelp": "ක්ෂේත්‍ර පහක්: මිනිත්තුව, පැය, දිනය, මාසය සහ සතියේ දිනය෴ කෙටිම කාල පරතරය මිනිත්තුවකි෴",
       "fieldTimezone": "වේලා කලාපය",
-      "nameLocked": "නම වෙබ්හුක් යූආර්එල් හි කොටසක් බැවින් වෙනස් කළ නොහැක෴",
+      "nameLocked": "ට්‍රිගර් සාදන පසු නම වෙනස් කළ නොහැක෴",
       "repositoryLocked": "ට්‍රිගර් සාදන පසු ගබඩාව වෙනස් කළ නොහැක෴",
       "environmentAutomatic": "ගබඩාව අනුව ස්වයංක්‍රීය",
       "notSelected": "තෝරා නැත",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "ට්‍රිගර් සුරැකිය නොහැකි විය",
       "deleteTitle": "මෙම ට්‍රිගර් මකන්නද?",
       "deleteMessage": "{{name}} වෙත කරන ඇමතුම් අසාර්ථක වේ෴ මෙය ආපසු හැරවිය නොහැක෴",
+      "deleteMessageScheduled": "{{name}} ට්‍රිගර් හි නියමිත ධාවනයන් නතර වේ෴ මෙය ආපසු හැරවිය නොහැක෴",
       "runNow": "දැන් ධාවනය කරන්න",
       "runStarted": "ධාවනය ආරම්භ විය",
       "created": "ට්‍රිගර් සාදන ලදි",

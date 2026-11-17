@@ -1366,7 +1366,8 @@
       "noReviews": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସମୀକ୍ଷା ନାହିଁ",
       "noReviewsDescription": "କୋଡ୍ ସମୀକ୍ଷକ ଏକ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟର ସମୀକ୍ଷା କରିବା ପରେ ତାହା ଏଠାରେ ଦେଖାଯାଏ।",
       "startManualReview": "ନିଜେ ଏକ ସମୀକ୍ଷା ଆରମ୍ଭ କରନ୍ତୁ",
-      "configureProvider": "ସେବା ପ୍ରଦାତାଙ୍କ ସେଟଅପ୍ କରନ୍ତୁ"
+      "configureProvider": "ସେବା ପ୍ରଦାତାଙ୍କ ସେଟଅପ୍ କରନ୍ତୁ",
+      "connectOwnerOnly": "ଏକ ସେବା ପ୍ରଦାତା ସଂଯୋଗ କରିବା ପାଇଁ ଜଣେ ସଂଗଠନ ମାଲିକ କିମ୍ବା ପ୍ରଶାସକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।"
     },
     "platformList": {
       "checking": "ଯାଞ୍ଚ କରାଯାଉଛି…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "signOutSessionLabel": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ, ସାଇନ୍ ଇନ୍: {{signedIn}}, ଶେଷ ଥର ସକ୍ରିୟ: {{lastSeen}}",
     "sessionSignedOut": "ସେସନ୍ ସାଇନ୍ ଆଉଟ୍ ହେଲା।",
+    "sessionSignOutFailed": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିପାରିଲୁ ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "signOutThisDeviceTitle": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionTitle": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionMessage": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ ହେବ। ଶେଷ ଥର ସକ୍ରିୟ: {{lastSeen}}। ତଥାପି ଏହା ଏକ ଘଣ୍ଟା ପର୍ଯ୍ୟନ୍ତ API ବ୍ୟବହାର କରିପାରିବ।",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "ବିଲିଂ ଇତିହାସ",
       "billingHistoryEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବିଲିଂ ଇତିହାସ ନାହିଁ।",
+      "billingHistoryError": "ବିଲିଂ ଇତିହାସ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
       "cancel": "ସବସ୍କ୍ରିପସନ୍ ବାତିଲ କରନ୍ତୁ",
       "cancelDescription": "ଆପଣଙ୍କ Kilo Pass ବିଲିଂ ଅବଧି ଶେଷ ହେବା ପର୍ଯ୍ୟନ୍ତ ସକ୍ରିୟ ରହିବ ଏବଂ ନବୀକରଣ ହେବ ନାହିଁ।",
       "cancelScheduled": "{{date}}ରେ ବାତିଲ ହେବ",
       "cancelScheduledChange": "ନିର୍ଧାରିତ ପରିବର୍ତ୍ତନ ବାତିଲ କରନ୍ତୁ",
       "cancelled": "ସବସ୍କ୍ରିପସନ୍ ବାତିଲ ହୋଇଛି",
       "creditHistoryEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି Kilo Pass କ୍ରେଡିଟ୍ ନାହିଁ।",
+      "creditHistoryError": "କ୍ରେଡିଟ୍ ଇତିହାସ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
       "resume": "ସବସ୍କ୍ରିପସନ୍ ପୁନଃଆରମ୍ଭ କରନ୍ତୁ",
       "resumeCancelledDescription": "ଆପଣଙ୍କ Kilo Pass ପୁଣି ସ୍ୱୟଂଚାଳିତ ଭାବେ ନବୀକରଣ ହେବା ଆରମ୍ଭ କରିବ।",
       "resumePausedDescription": "ଆପଣଙ୍କ Kilo Pass ଏହାର ନିର୍ଧାରିତ ପୁନଃଆରମ୍ଭ ତାରିଖ ପୂର୍ବରୁ ଏବେ ପୁନଃଆରମ୍ଭ ହେବ।",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",
       "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଅନ୍ୟ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
       "unavailableSessionsDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଏହାର ସେସନ୍ ଲୋଡ୍ କରାଯାଇପାରିବ ନାହିଁ।",
-      "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
+      "accessDeniedDescription": "ଆପଣଙ୍କୁ ପ୍ରବେଶ ଅନୁମତି ଦେବା ପାଇଁ ଏକ ସଂଗଠନର ମାଲିକ କିମ୍ବା ପ୍ରଶାସକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।"
     },
     "create": {
       "title": "ସଂଗଠନ ତିଆରି କରନ୍ତୁ",
@@ -3464,6 +3468,8 @@
       "groups": "ଗ୍ରୁପ୍",
       "guardrails": "ଗାର୍ଡରେଲ୍",
       "byok": "ନିଜର କି ଆଣନ୍ତୁ",
+      "ssoAndDomain": "SSO ଏବଂ ଡୋମେନ୍",
+      "dataCollection": "ଡାଟା ସଂଗ୍ରହ",
       "auditLogs": "ଅଡିଟ୍ ଲଗ୍",
       "requestLogs": "ଅନୁରୋଧ ଲଗ୍",
       "subOrganizations": "ଉପ-ସଂଗଠନ",
@@ -4592,7 +4598,7 @@
       "fieldCron": "କ୍ରନ୍ ଅଭିବ୍ୟକ୍ତି",
       "fieldCronHelp": "ପାଞ୍ଚଟି କ୍ଷେତ୍ର: ମିନିଟ୍, ଘଣ୍ଟା, ଦିନ, ମାସ ଓ ସପ୍ତାହର ଦିନ। ସର୍ବନିମ୍ନ ଅନ୍ତରାଳ ଏକ ମିନିଟ୍।",
       "fieldTimezone": "ସମୟ ମଣ୍ଡଳ",
-      "nameLocked": "ନାମଟି ୱେବହୁକ୍ URLର ଅଂଶ ଅଟେ ଏବଂ ବଦଳାଯାଇ ପାରିବ ନାହିଁ।",
+      "nameLocked": "ଟ୍ରିଗର୍ ସୃଷ୍ଟି ହେବା ପରେ ନାମଟି ବଦଳାଯାଇ ପାରିବ ନାହିଁ।",
       "repositoryLocked": "ଟ୍ରିଗର୍ ସୃଷ୍ଟି ହେବା ପରେ ରିପୋଜିଟରି ବଦଳାଯାଇ ପାରିବ ନାହିଁ।",
       "environmentAutomatic": "ରିପୋଜିଟରି ଅନୁସାରେ ସ୍ୱୟଂଚାଳିତ",
       "notSelected": "ଚୟନ ହୋଇନାହିଁ",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "ଟ୍ରିଗର୍ ସଞ୍ଚୟ କରାଯାଇପାରିଲା ନାହିଁ",
       "deleteTitle": "ଏହି ଟ୍ରିଗର୍ ଡିଲିଟ୍ କରିବେ?",
       "deleteMessage": "{{name}} କୁ ହେଉଥିବା କଲ୍‌ଗୁଡ଼ିକ ବିଫଳ ହେବ। ଏହା ପୂର୍ବାବସ୍ଥାକୁ ଫେରାଇ ହେବ ନାହିଁ।",
+      "deleteMessageScheduled": "{{name}} ଟ୍ରିଗର୍‌ର ନିର୍ଧାରିତ ରନ୍‌ଗୁଡ଼ିକ ବନ୍ଦ ହେବ। ଏହା ପୂର୍ବାବସ୍ଥାକୁ ଫେରାଇ ହେବ ନାହିଁ।",
       "runNow": "ବର୍ତ୍ତମାନ ଚଲାନ୍ତୁ",
       "runStarted": "ରନ୍ ଆରମ୍ଭ ହୋଇଛି",
       "created": "ଟ୍ରିଗର୍ ସୃଷ୍ଟି ହୋଇଛି",

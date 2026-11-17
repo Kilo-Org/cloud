@@ -1366,7 +1366,8 @@
       "noReviews": "Hali ko'rib chiqishlar yo'q",
       "noReviewsDescription": "Kodni ko'rib chiquvchi PRni tekshirgach, natijalar shu yerda ko'rsatiladi.",
       "startManualReview": "Qo'lda ko'rib chiqishni boshlash",
-      "configureProvider": "Provayderni sozlash"
+      "configureProvider": "Provayderni sozlash",
+      "connectOwnerOnly": "Provayderni ulashni tashkilot Egasi yoki Administratoridan so'rang."
     },
     "platformList": {
       "checking": "Tekshirilmoqda…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
     "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}, oxirgi faollik: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan chiqildi.",
+    "sessionSignOutFailed": "Bu sessiyadan chiqib bo'lmadi. Yana urinib ko'ring.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
     "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Oxirgi faollik: {{lastSeen}}. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "To‘lovlar tarixi",
       "billingHistoryEmpty": "Hozircha to‘lovlar tarixi yo‘q.",
+      "billingHistoryError": "To‘lovlar tarixi yuklanmadi",
       "cancel": "Obunani bekor qilish",
       "cancelDescription": "Kilo Pass to‘lov davri oxirigacha faol qoladi va yangilanmaydi.",
       "cancelScheduled": "{{date}} kuni bekor qilinadi",
       "cancelScheduledChange": "Rejalashtirilgan o‘zgarishni bekor qilish",
       "cancelled": "Obuna bekor qilindi",
       "creditHistoryEmpty": "Hozircha Kilo Pass kreditlari yo‘q.",
+      "creditHistoryError": "Kreditlar tarixi yuklanmadi",
       "resume": "Obunani davom ettirish",
       "resumeCancelledDescription": "Kilo Pass yana avtomatik ravishda yangilana boshlaydi.",
       "resumePausedDescription": "Kilo Pass rejalashtirilgan sanani kutmasdan, hoziroq davom etadi.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
       "unavailableSessionsDescription": "Bu tashkilot endi mavjud emas. Uning sessiyalarini yuklab bo'lmaydi.",
-      "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
+      "accessDeniedDescription": "Tashkilot egasi yoki administratoridan sizga kirish huquqini berishni so'rang."
     },
     "create": {
       "title": "Tashkilot yaratish",
@@ -3464,6 +3468,8 @@
       "groups": "Guruhlar",
       "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
+      "ssoAndDomain": "SSO va domen",
+      "dataCollection": "Ma'lumotlar yig'ish",
       "auditLogs": "Audit jurnallari",
       "requestLogs": "So'rovlar jurnallari",
       "subOrganizations": "Quyi tashkilotlar",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron ifodasi",
       "fieldCronHelp": "Beshta maydon: daqiqa, soat, kun, oy va hafta kuni. Eng qisqa oraliq — bir daqiqa.",
       "fieldTimezone": "Vaqt mintaqasi",
-      "nameLocked": "Nom vebhook URL manzilining bir qismidir va oʻzgartirilmaydi.",
+      "nameLocked": "Ishga tushirgich yaratilgandan soʻng nomni oʻzgartirib boʻlmaydi.",
       "repositoryLocked": "Ishga tushirgich yaratilgandan soʻng repozitoriyni oʻzgartirib boʻlmaydi.",
       "environmentAutomatic": "Repozitoriy boʻyicha avtomatik",
       "notSelected": "Tanlanmagan",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Ishga tushirgichni saqlab boʻlmadi",
       "deleteTitle": "Bu ishga tushirgich oʻchirilsinmi?",
       "deleteMessage": "{{name}} ga qilingan chaqiruvlar muvaffaqiyatsiz boʻladi. Buni ortga qaytarib boʻlmaydi.",
+      "deleteMessageScheduled": "{{name}} ishga tushirgichining rejalashtirilgan ishga tushirishlari toʻxtaydi. Buni ortga qaytarib boʻlmaydi.",
       "runNow": "Hozir ishga tushirish",
       "runStarted": "Ishga tushirish boshlandi",
       "created": "Ishga tushirgich yaratildi",

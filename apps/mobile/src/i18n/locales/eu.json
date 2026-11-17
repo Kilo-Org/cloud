@@ -1366,7 +1366,8 @@
       "noReviews": "Ez dago berrikuspenik oraindik",
       "noReviewsDescription": "Kode-berrikusleak bateratze-eskaera bat berrikusi ondoren agertuko dira berrikuspenak hemen.",
       "startManualReview": "Hasi eskuzko berrikuspena",
-      "configureProvider": "Konfiguratu hornitzailea"
+      "configureProvider": "Konfiguratu hornitzailea",
+      "connectOwnerOnly": "Eskatu erakunde bateko jabeari edo administratzaileari hornitzaile bat konekta dezan."
     },
     "platformList": {
       "checking": "Egiaztatzen…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Itxi saioa gailu honetan",
     "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}, azken jarduera: {{lastSeen}}",
     "sessionSignedOut": "Saioa itxi da.",
+    "sessionSignOutFailed": "Ezin izan da saio hau itxi. Saiatu berriro.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "{{device}} gailuaren saioa itxiko da. Azken jarduera: {{lastSeen}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Fakturazio-historia",
       "billingHistoryEmpty": "Oraindik ez dago fakturazio-historiarik.",
+      "billingHistoryError": "Ezin izan da fakturazio-historia kargatu",
       "cancel": "Ezeztatu harpidetza",
       "cancelDescription": "Zure Kilo Pass-ak aktibo jarraituko du fakturazio-aldia amaitu arte, eta ez da berrituko.",
       "cancelScheduled": "Ezeztatze-data: {{date}}",
       "cancelScheduledChange": "Ezeztatu programatutako aldaketa",
       "cancelled": "Harpidetza ezeztatu da",
       "creditHistoryEmpty": "Oraindik ez dago Kilo Pass krediturik.",
+      "creditHistoryError": "Ezin izan da kreditu-historia kargatu",
       "resume": "Berraktibatu harpidetza",
       "resumeCancelledDescription": "Zure Kilo Pass-a berriro automatikoki berrituko da.",
       "resumePausedDescription": "Zure Kilo Pass-a orain berraktibatuko da, programatutako berrabiatze-data baino lehen.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
       "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
-      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
+      "accessDeniedDescription": "Eskatu erakunde baten jabe edo administratzaile bati zuretzako sarbidea emateko."
     },
     "create": {
       "title": "Sortu erakundea",
@@ -3464,6 +3468,8 @@
       "groups": "Taldeak",
       "guardrails": "Babes-mugak",
       "byok": "Erabili zure gakoa",
+      "ssoAndDomain": "SSO eta domeinua",
+      "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
       "requestLogs": "Eskaeren erregistroak",
       "subOrganizations": "Azpierakundeak",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron adierazpena",
       "fieldCronHelp": "Bost eremu: minutua, ordua, eguna, hilabetea eta asteguna. Tarte laburrena minutu bat da.",
       "fieldTimezone": "Ordu-zona",
-      "nameLocked": "Izena webhook URLaren parte da eta ezin da aldatu.",
+      "nameLocked": "Izena ezin da aldatu abiarazlea sortu ondoren.",
       "repositoryLocked": "Biltegia ezin da aldatu abiarazlea sortu ondoren.",
       "environmentAutomatic": "Automatikoa biltegiaren arabera",
       "notSelected": "Ez dago hautatuta",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Ezin izan da abiarazlea gorde",
       "deleteTitle": "Abiarazle hau ezabatu?",
       "deleteMessage": "{{name}}(e)rako deiak huts egingo dute. Hau ezin da desegin.",
+      "deleteMessageScheduled": "{{name}}(r)en exekuzio programatuak geldituko dira. Hau ezin da desegin.",
       "runNow": "Exekutatu orain",
       "runStarted": "Exekuzioa hasi da",
       "created": "Abiarazlea sortu da",

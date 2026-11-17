@@ -1433,7 +1433,8 @@
       "noReviews": "No reviews yet",
       "noReviewsDescription": "Reviews appear here once the Code Reviewer runs on a pull request.",
       "startManualReview": "Start a manual review",
-      "configureProvider": "Configure provider"
+      "configureProvider": "Configure provider",
+      "connectOwnerOnly": "Ask an organization owner or admin to connect a provider."
     },
     "platformList": {
       "checking": "Checking…",
@@ -3040,6 +3041,7 @@
     "signOutThisDevice": "Sign out this device",
     "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}, last seen {{lastSeen}}",
     "sessionSignedOut": "Session signed out.",
+    "sessionSignOutFailed": "Could not sign out this session. Try again.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
     "signOutThisSessionMessage": "{{device}} will be signed out. Last seen {{lastSeen}}. It can keep API access for up to an hour.",
@@ -3176,12 +3178,14 @@
     "manage": {
       "billingHistory": "Billing history",
       "billingHistoryEmpty": "No billing history yet.",
+      "billingHistoryError": "Couldn't load billing history",
       "cancel": "Cancel subscription",
       "cancelDescription": "Your Kilo Pass stays active until the end of the billing period and will not renew.",
       "cancelScheduled": "Cancels on {{date}}",
       "cancelScheduledChange": "Cancel scheduled change",
       "cancelled": "Cancelled subscription",
       "creditHistoryEmpty": "No Kilo Pass credits yet.",
+      "creditHistoryError": "Couldn't load credit history",
       "resume": "Resume subscription",
       "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
       "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
@@ -3406,7 +3410,7 @@
       "opensOnWeb": "Opens on the web"
     },
     "boundary": {
-      "accessDeniedDescription": "You do not have access to this organization.",
+      "accessDeniedDescription": "Ask an organization owner or admin to grant you access.",
       "backToProfile": "Back to profile",
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
@@ -3544,6 +3548,8 @@
       "groups": "Groups",
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
+      "ssoAndDomain": "SSO and domain",
+      "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
       "requestLogs": "Request logs",
       "subOrganizations": "Sub-organizations",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron expression",
       "fieldCronHelp": "Five fields: minute, hour, day, month and weekday. The shortest interval is one minute.",
       "fieldTimezone": "Time zone",
-      "nameLocked": "The name is part of the webhook URL and cannot change.",
+      "nameLocked": "The name cannot change after the trigger is created.",
       "repositoryLocked": "The repository cannot change after the trigger is created.",
       "environmentAutomatic": "Automatic by repository",
       "notSelected": "Not selected",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Couldn't save the trigger",
       "deleteTitle": "Delete this trigger?",
       "deleteMessage": "Calls to {{name}} will fail. This cannot be undone.",
+      "deleteMessageScheduled": "Scheduled runs of {{name}} stop. This cannot be undone.",
       "runNow": "Run now",
       "runStarted": "Run started",
       "created": "Trigger created",

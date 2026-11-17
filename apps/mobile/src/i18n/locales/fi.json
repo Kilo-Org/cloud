@@ -1366,7 +1366,8 @@
       "noReviews": "Ei vielä katselmointeja",
       "noReviewsDescription": "Katselmoinnit näkyvät tässä, kun koodikatselmoija on katselmoinut muutospyynnön.",
       "startManualReview": "Aloita manuaalinen katselmointi",
-      "configureProvider": "Määritä palveluntarjoaja"
+      "configureProvider": "Määritä palveluntarjoaja",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään palveluntarjoajan."
     },
     "platformList": {
       "checking": "Tarkistetaan…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Kirjaa tämä laite ulos",
     "signOutSessionLabel": "Kirjaa {{device}} ulos, kirjautunut {{signedIn}}, viimeksi käytössä {{lastSeen}}",
     "sessionSignedOut": "Istunto kirjattiin ulos.",
+    "sessionSignOutFailed": "Istuntoa ei voitu kirjata ulos. Yritä uudelleen.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
     "signOutThisSessionMessage": "{{device}} kirjataan ulos. Viimeksi käytössä {{lastSeen}}. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Laskutushistoria",
       "billingHistoryEmpty": "Ei vielä laskutushistoriaa.",
+      "billingHistoryError": "Laskutushistoriaa ei voitu ladata",
       "cancel": "Peru tilaus",
       "cancelDescription": "Kilo Pass pysyy voimassa laskutuskauden loppuun asti, eikä sitä uusita.",
       "cancelScheduled": "Päättyy {{date}}",
       "cancelScheduledChange": "Peru ajoitettu muutos",
       "cancelled": "Tilaus peruttu",
       "creditHistoryEmpty": "Ei vielä Kilo Pass -krediittejä.",
+      "creditHistoryError": "Krediittihistoriaa ei voitu ladata",
       "resume": "Jatka tilausta",
       "resumeCancelledDescription": "Kilo Pass alkaa taas uusiutua automaattisesti.",
       "resumePausedDescription": "Kilo Pass jatkuu nyt, ennen ajoitettua jatkamispäivää.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
-      "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
+      "accessDeniedDescription": "Pyydä organisaation omistajaa tai ylläpitäjää myöntämään sinulle pääsy."
     },
     "create": {
       "title": "Luo organisaatio",
@@ -3464,6 +3468,8 @@
       "groups": "Ryhmät",
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
+      "ssoAndDomain": "SSO ja verkkotunnus",
+      "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit",
       "subOrganizations": "Alaorganisaatiot",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron-lauseke",
       "fieldCronHelp": "Viisi kenttää: minuutti, tunti, päivä, kuukausi ja viikonpäivä. Lyhin väli on yksi minuutti.",
       "fieldTimezone": "Aikavyöhyke",
-      "nameLocked": "Nimi on osa verkkokoukun URL-osoitetta, eikä sitä voi muuttaa.",
+      "nameLocked": "Nimeä ei voi muuttaa, kun liipaisin on luotu.",
       "repositoryLocked": "Tietovarastoa ei voi muuttaa, kun liipaisin on luotu.",
       "environmentAutomatic": "Automaattinen tietovaraston mukaan",
       "notSelected": "Ei valittu",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Liipaisimen tallennus epäonnistui",
       "deleteTitle": "Poistetaanko tämä liipaisin?",
       "deleteMessage": "Kutsut kohteeseen {{name}} epäonnistuvat. Tätä ei voi kumota.",
+      "deleteMessageScheduled": "Liipaisimen {{name}} ajastetut suoritukset pysähtyvät. Tätä ei voi kumota.",
       "runNow": "Suorita nyt",
       "runStarted": "Ajo aloitettu",
       "created": "Liipaisin luotu",

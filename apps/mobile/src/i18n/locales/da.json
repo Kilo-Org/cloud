@@ -1366,7 +1366,8 @@
       "noReviews": "Ingen gennemgange endnu",
       "noReviewsDescription": "Gennemgange vises her, når Code Reviewer har gennemgået en pull request.",
       "startManualReview": "Start en manuel gennemgang",
-      "configureProvider": "Konfigurér udbyder"
+      "configureProvider": "Konfigurér udbyder",
+      "connectOwnerOnly": "Bed en organisationsejer eller administrator om at oprette forbindelsen til en udbyder."
     },
     "platformList": {
       "checking": "Kontrollerer…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Log ud af denne enhed",
     "signOutSessionLabel": "Log ud af {{device}}, logget ind {{signedIn}}, sidst set {{lastSeen}}",
     "sessionSignedOut": "Sessionen er logget ud.",
+    "sessionSignOutFailed": "Kunne ikke logge ud af denne session. Prøv igen.",
     "signOutThisDeviceTitle": "Log ud af denne enhed?",
     "signOutThisSessionTitle": "Log ud af denne session?",
     "signOutThisSessionMessage": "{{device}} bliver logget ud. Sidst set {{lastSeen}}. Enheden kan stadig have API-adgang i op til en time.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Betalingshistorik",
       "billingHistoryEmpty": "Ingen betalingshistorik endnu.",
+      "billingHistoryError": "Kunne ikke indlæse betalingshistorik",
       "cancel": "Opsig abonnement",
       "cancelDescription": "Dit Kilo Pass forbliver aktivt indtil udgangen af betalingsperioden og fornyes ikke.",
       "cancelScheduled": "Opsiges den {{date}}",
       "cancelScheduledChange": "Annuller planlagt ændring",
       "cancelled": "Abonnementet er opsagt",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter endnu.",
+      "creditHistoryError": "Kunne ikke indlæse kredithistorik",
       "resume": "Genoptag abonnement",
       "resumeCancelledDescription": "Dit Kilo Pass begynder igen at blive fornyet automatisk.",
       "resumePausedDescription": "Dit Kilo Pass genoptages nu, før den planlagte genoptagelsesdato.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
       "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
-      "accessDeniedDescription": "Du har ikke adgang til denne organisation."
+      "accessDeniedDescription": "Bed en ejer eller administrator af organisationen om at give dig adgang."
     },
     "create": {
       "title": "Opret organisation",
@@ -3464,6 +3468,8 @@
       "groups": "Grupper",
       "guardrails": "Sikkerhedsgrænser",
       "byok": "Brug din egen nøgle",
+      "ssoAndDomain": "SSO og domæne",
+      "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
       "requestLogs": "Anmodningslogs",
       "subOrganizations": "Underorganisationer",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron-udtryk",
       "fieldCronHelp": "Fem felter: minut, time, dag, måned og ugedag. Det korteste interval er ét minut.",
       "fieldTimezone": "Tidszone",
-      "nameLocked": "Navnet er en del af webhook-adressen og kan ikke ændres.",
+      "nameLocked": "Navnet kan ikke ændres, efter at udløseren er oprettet.",
       "repositoryLocked": "Kodelageret kan ikke ændres, efter at udløseren er oprettet.",
       "environmentAutomatic": "Automatisk ud fra kodelageret",
       "notSelected": "Ikke valgt",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Kunne ikke gemme udløseren",
       "deleteTitle": "Slet denne udløser?",
       "deleteMessage": "Kald til {{name}} vil fejle. Dette kan ikke fortrydes.",
+      "deleteMessageScheduled": "Planlagte kørsler af {{name}} stopper. Dette kan ikke fortrydes.",
       "runNow": "Kør nu",
       "runStarted": "Kørsel startet",
       "created": "Udløser oprettet",

@@ -195,7 +195,7 @@ describe('OrganizationBoundary settled states', () => {
 
     expect(findByType(renderer.root, 'EmptyStateMock')).toHaveLength(1);
     expect(texts).toContain('Access denied');
-    expect(texts).toContain('You do not have access to this organization.');
+    expect(texts).toContain('Ask an organization owner or admin to grant you access.');
     expect(texts).toContain('Back to profile');
     expect(texts).not.toContain('Organization unavailable');
 

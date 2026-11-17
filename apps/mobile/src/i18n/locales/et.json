@@ -1366,7 +1366,8 @@
       "noReviews": "Ülevaatusi pole veel",
       "noReviewsDescription": "Ülevaatused ilmuvad siia pärast seda, kui koodiülevaataja on tõmbetaotluse üle vaadanud.",
       "startManualReview": "Käivita ülevaatus käsitsi",
-      "configureProvider": "Seadista teenusepakkuja"
+      "configureProvider": "Seadista teenusepakkuja",
+      "connectOwnerOnly": "Palu organisatsiooni omanikul või administraatoril teenusepakkuja ühendada."
     },
     "platformList": {
       "checking": "Kontrollimine…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Logi sellest seadmest välja",
     "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}, viimati nähtud {{lastSeen}}",
     "sessionSignedOut": "Seansist on välja logitud.",
+    "sessionSignOutFailed": "Sellest seansist ei saanud välja logida. Proovi uuesti.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. Viimati nähtud {{lastSeen}}. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Arveldusajalugu",
       "billingHistoryEmpty": "Arveldusajalugu veel puudub.",
+      "billingHistoryError": "Arveldusajalugu ei saanud laadida",
       "cancel": "Tühista tellimus",
       "cancelDescription": "Sinu Kilo Pass jääb aktiivseks arveldusperioodi lõpuni ega uuene.",
       "cancelScheduled": "Tühistatakse {{date}}",
       "cancelScheduledChange": "Tühista ajastatud muudatus",
       "cancelled": "Tellimus tühistati",
       "creditHistoryEmpty": "Kilo Passi krediite veel pole.",
+      "creditHistoryError": "Krediitide ajalugu ei saanud laadida",
       "resume": "Jätka tellimust",
       "resumeCancelledDescription": "Sinu Kilo Pass hakkab taas automaatselt uuenema.",
       "resumePausedDescription": "Sinu Kilo Pass jätkub kohe, enne kavandatud jätkamise kuupäeva.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali kontovalijast teine konto.",
       "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
-      "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
+      "accessDeniedDescription": "Palu organisatsiooni omanikul või administraatoril anda sulle juurdepääsu."
     },
     "create": {
       "title": "Loo organisatsioon",
@@ -3464,6 +3468,8 @@
       "groups": "Grupid",
       "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
+      "ssoAndDomain": "SSO ja domeen",
+      "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
       "requestLogs": "Päringulogid",
       "subOrganizations": "Alamorganisatsioonid",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Croni avaldis",
       "fieldCronHelp": "Viis välja: minut, tund, päev, kuu ja nädalapäev. Lühim intervall on üks minut.",
       "fieldTimezone": "Ajavöönd",
-      "nameLocked": "Nimi on osa veebihaagi URL-ist ja seda ei saa muuta.",
+      "nameLocked": "Nime ei saa pärast päästiku loomist muuta.",
       "repositoryLocked": "Hoidlat ei saa pärast päästiku loomist muuta.",
       "environmentAutomatic": "Automaatne hoidla järgi",
       "notSelected": "Pole valitud",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "Päästiku salvestamine ebaõnnestus",
       "deleteTitle": "Kustutada see päästik?",
       "deleteMessage": "Kutsed nimele {{name}} nurjuvad. Seda ei saa tagasi võtta.",
+      "deleteMessageScheduled": "Päästiku nimega {{name}} ajastatud käivitused lõppevad. Seda ei saa tagasi võtta.",
       "runNow": "Käivita kohe",
       "runStarted": "Käivitus alustatud",
       "created": "Päästik loodud",

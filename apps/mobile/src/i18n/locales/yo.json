@@ -1366,7 +1366,8 @@
       "noReviews": "Kò sí àtúnyẹ̀wò síbẹ̀",
       "noReviewsDescription": "Àwọn àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Olùṣàtúnyẹ̀wò kóòdù bá ṣiṣẹ́ lórí ìbéèrè àkópọ̀.",
       "startManualReview": "Bẹ̀rẹ̀ àtúnyẹ̀wò fúnra rẹ",
-      "configureProvider": "Ṣètò olùpèsè"
+      "configureProvider": "Ṣètò olùpèsè",
+      "connectOwnerOnly": "Ẹ bẹ̀ Ẹni tó ni àjọ tàbí Alákòóso kí wọ́n so olùpèsè kan pọ̀."
     },
     "platformList": {
       "checking": "A ń ṣàyẹ̀wò…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Jáde lórí ẹ̀rọ yìí",
     "signOutSessionLabel": "Jáde lórí {{device}}, wọlé {{signedIn}}, a rí i gbẹ̀yìn {{lastSeen}}",
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
+    "sessionSignOutFailed": "A kò lè jáde kúrò nínú ìgbà ìwọlé yìí. Tún gbìyànjú.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
     "signOutThisSessionMessage": "A ó mú {{device}} jáde. A rí i gbẹ̀yìn {{lastSeen}}. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Ìtàn ìsanwó",
       "billingHistoryEmpty": "Kò sí ìtàn ìsanwó síbẹ̀.",
+      "billingHistoryError": "Kò lè mú ìtàn ìsanwó wá",
       "cancel": "Fagilé ìforúkọsílẹ̀",
       "cancelDescription": "Kilo Pass rẹ yóò máa ṣiṣẹ́ títí di òpin àkókò ìsanwó, kò sì ní sọ ara rẹ̀ dọ̀tun.",
       "cancelScheduled": "Yóò parí ní {{date}}",
       "cancelScheduledChange": "Fagilé àyípadà tí a ṣètò",
       "cancelled": "A ti fagilé ìforúkọsílẹ̀",
       "creditHistoryEmpty": "Kò sí kírẹ́dítì Kilo Pass síbẹ̀.",
+      "creditHistoryError": "Kò lè mú ìtàn kírẹ́dítì wá",
       "resume": "Tún ìforúkọsílẹ̀ bẹ̀rẹ̀",
       "resumeCancelledDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ sí í sọ ara rẹ̀ dọ̀tun láìfọwọ́yí.",
       "resumePausedDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ báyìí, ṣáájú ọjọ́ tí a ṣètò fún un láti tún bẹ̀rẹ̀.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Yan àjọ kan",
       "unavailableDescription": "Àjọ yìí kò sí mọ́. Yan ọ̀kan láti prófáìlì rẹ láti tẹ̀síwájú.",
       "unavailableSessionsDescription": "Àjọ yìí kò sí mọ́. Àwọn sẹ́sín rẹ̀ kò lè jẹ́ gbígba wọlé.",
-      "accessDeniedDescription": "O kò ní àṣẹ láti wọ àjọ yìí."
+      "accessDeniedDescription": "Bèèrè lọ́wọ́ ẹni tó ni àjọ tàbí alákòóso pé kí wọ́n fún ọ ní àṣẹ láti wọlé."
     },
     "create": {
       "title": "Ṣẹ̀dá àjọ",
@@ -3464,6 +3468,8 @@
       "groups": "Àwọn ẹgbẹ́",
       "guardrails": "Àwọn ààlà ààbò",
       "byok": "Lo kọ́kọ́rọ́ tìrẹ",
+      "ssoAndDomain": "SSO àti dómèènì",
+      "dataCollection": "Gbígba dátà",
       "auditLogs": "Àwọn àkọsílẹ̀ àyẹ̀wò",
       "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè",
       "subOrganizations": "Àwọn àjọ abẹ́lé",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Ìfọ̀rọ̀ Kírọ́nì",
       "fieldCronHelp": "Àwọn pápá márùn-ún: ìṣẹ́jú, wákàtí, ọjọ́, oṣù àti ọjọ́ ọ̀sẹ̀. Àkókò tí ó kúrú jù ni ìṣẹ́jú kan.",
       "fieldTimezone": "Agbègbè àkókò",
-      "nameLocked": "Orúkọ náà jẹ́ apá kan àdírẹ́sì wẹ́ẹ̀bùhóòkù, kò sì lè yí padà.",
+      "nameLocked": "Orúkọ náà kò lè yí padà lẹ́yìn tí a bá ṣẹ̀dá ìmúṣiṣẹ́.",
       "repositoryLocked": "Àkójọpọ̀ kóòdù kò lè yí padà lẹ́yìn tí a bá ṣẹ̀dá ìmúṣiṣẹ́.",
       "environmentAutomatic": "Ìdáṣe nípasẹ̀ àkójọpọ̀ kóòdù",
       "notSelected": "A kò yàn án",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "A kò lè fi ìmúṣiṣẹ́ pamọ́",
       "deleteTitle": "Yọ ìmúṣiṣẹ́ yìí kúrò?",
       "deleteMessage": "Àwọn ìpè sí {{name}} máa kùnà. A kò lè yí èyí padà.",
+      "deleteMessageScheduled": "Àwọn ìṣiṣẹ́ ti ṣètò fún ìmúṣiṣẹ́ {{name}} máa dúró. A kò lè yí èyí padà.",
       "runNow": "Ṣiṣẹ́ báyìí",
       "runStarted": "Ìṣiṣẹ́ ti bẹ̀rẹ̀",
       "created": "A ti ṣẹ̀dá ìmúṣiṣẹ́",

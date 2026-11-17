@@ -1412,7 +1412,8 @@
       "noReviews": "Še ni pregledov",
       "noReviewsDescription": "Pregledi se prikažejo tukaj, ko pregledovalnik kode pregleda zahtevo za združitev.",
       "startManualReview": "Začni ročni pregled",
-      "configureProvider": "Nastavi ponudnika"
+      "configureProvider": "Nastavi ponudnika",
+      "connectOwnerOnly": "Prosite lastnika organizacije ali skrbnika, da poveže ponudnika."
     },
     "platformList": {
       "checking": "Preverjanje…",
@@ -3083,6 +3084,7 @@
     "signOutThisDevice": "Odjavi to napravo",
     "signOutSessionLabel": "Odjavi napravo {{device}}, prijava: {{signedIn}}, zadnja dejavnost: {{lastSeen}}",
     "sessionSignedOut": "Seja je odjavljena.",
+    "sessionSignOutFailed": "Te seje ni bilo mogoče odjaviti. Poskusi znova.",
     "signOutThisDeviceTitle": "Želiš odjaviti to napravo?",
     "signOutThisSessionTitle": "Želiš odjaviti to sejo?",
     "signOutThisSessionMessage": "Naprava {{device}} bo odjavljena. Zadnja dejavnost: {{lastSeen}}. Dostop do API lahko ohrani še največ eno uro.",
@@ -3210,12 +3212,14 @@
     "manage": {
       "billingHistory": "Zgodovina obračunov",
       "billingHistoryEmpty": "Zgodovine obračunov še ni.",
+      "billingHistoryError": "Ni mogoče naložiti zgodovine obračunov",
       "cancel": "Prekliči naročnino",
       "cancelDescription": "Vaš Kilo Pass ostane aktiven do konca obračunskega obdobja in se ne bo podaljšal.",
       "cancelScheduled": "Preklic dne {{date}}",
       "cancelScheduledChange": "Prekliči načrtovano spremembo",
       "cancelled": "Naročnina je preklicana",
       "creditHistoryEmpty": "Kreditov Kilo Pass še ni.",
+      "creditHistoryError": "Ni mogoče naložiti zgodovine kreditov",
       "resume": "Nadaljuj naročnino",
       "resumeCancelledDescription": "Vaš Kilo Pass se bo znova samodejno podaljševal.",
       "resumePausedDescription": "Vaš Kilo Pass se nadaljuje zdaj, pred načrtovanim datumom nadaljevanja.",
@@ -3452,7 +3456,7 @@
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
       "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
-      "accessDeniedDescription": "Nimaš dostopa do te organizacije."
+      "accessDeniedDescription": "Prosi lastnika ali skrbnika organizacije, naj ti odobri dostop."
     },
     "create": {
       "title": "Ustvari organizacijo",
@@ -3578,6 +3582,8 @@
       "groups": "Skupine",
       "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
+      "ssoAndDomain": "SSO in domena",
+      "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
       "requestLogs": "Dnevniki zahtev",
       "subOrganizations": "Podorganizacije",
@@ -4732,7 +4738,7 @@
       "fieldCron": "Izraz cron",
       "fieldCronHelp": "Pet polj: minuta, ura, dan, mesec in dan v tednu. Najkrajši interval je ena minuta.",
       "fieldTimezone": "Časovni pas",
-      "nameLocked": "Ime je del URL spletnega kavlja in se ne more spremeniti.",
+      "nameLocked": "Ime se po ustvaritvi sprožilca ne more spremeniti.",
       "repositoryLocked": "Repozitorij se po ustvaritvi sprožilca ne more spremeniti.",
       "environmentAutomatic": "Samodejno glede na repozitorij",
       "notSelected": "Ni izbrano",
@@ -4758,6 +4764,7 @@
       "saveFailedTitle": "Sprožilca ni bilo mogoče shraniti",
       "deleteTitle": "Želite izbrisati ta sprožilec?",
       "deleteMessage": "Klici na {{name}} ne bodo uspeli. Tega ni mogoče razveljaviti.",
+      "deleteMessageScheduled": "Načrtovani zagoni sprožilca {{name}} se bodo ustavili. Tega ni mogoče razveljaviti.",
       "runNow": "Zaženi zdaj",
       "runStarted": "Izvajanje se je začelo",
       "created": "Sprožilec je ustvarjen",

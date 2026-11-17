@@ -1366,7 +1366,8 @@
       "noReviews": "ຍັງບໍ່ມີການກວດສອບ",
       "noReviewsDescription": "ຜົນການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ເມື່ອເຄື່ອງມືກວດສອບໂຄ້ດກວດສອບຄຳຂໍລວມໂຄ້ດ.",
       "startManualReview": "ເລີ່ມການກວດສອບດ້ວຍຕົນເອງ",
-      "configureProvider": "ຕັ້ງຄ່າຜູ້ໃຫ້ບໍລິການ"
+      "configureProvider": "ຕັ້ງຄ່າຜູ້ໃຫ້ບໍລິການ",
+      "connectOwnerOnly": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ."
     },
     "platformList": {
       "checking": "ກຳລັງກວດສອບ…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້",
     "signOutSessionLabel": "ອອກຈາກລະບົບໃນ {{device}}, ເຂົ້າສູ່ລະບົບ {{signedIn}}, ໃຊ້ງານຫຼ້າສຸດ {{lastSeen}}",
     "sessionSignedOut": "ອອກຈາກລະບົບໃນເຊສຊັນແລ້ວ.",
+    "sessionSignOutFailed": "ບໍ່ສາມາດອອກຈາກລະບົບໃນເຊສຊັນນີ້ໄດ້. ລອງອີກຄັ້ງ.",
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",
     "signOutThisSessionMessage": "ລະບົບຈະອອກຈາກບັນຊີໃນ {{device}}. ໃຊ້ງານຫຼ້າສຸດເມື່ອ {{lastSeen}}. ອຸປະກອນນີ້ອາດຍັງເຂົ້າເຖິງ API ໄດ້ອີກສູງສຸດໜຶ່ງຊົ່ວໂມງ.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
       "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
+      "billingHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດການຮຽກເກັບເງິນ",
       "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
       "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
       "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
       "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
       "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
       "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
+      "creditHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດເຄຣດິດ",
       "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
       "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
       "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "ເລືອກອົງກອນ",
       "unavailableDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ເລືອກອົງກອນອື່ນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "unavailableSessionsDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງອົງກອນນີ້ໄດ້.",
-      "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
+      "accessDeniedDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບໃຫ້ສິດເຂົ້າເຖິງແກ່ທ່ານ."
     },
     "create": {
       "title": "ສ້າງອົງກອນ",
@@ -3464,6 +3468,8 @@
       "groups": "ກຸ່ມ",
       "guardrails": "ມາດຕະການປ້ອງກັນ",
       "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
+      "ssoAndDomain": "SSO ແລະ ໂດເມນ",
+      "dataCollection": "ການເກັບກຳຂໍ້ມູນ",
       "auditLogs": "ບັນທຶກການກວດສອບ",
       "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
       "subOrganizations": "ອົງກອນຍ່ອຍ",
@@ -4592,7 +4598,7 @@
       "fieldCron": "ນິພານ Cron",
       "fieldCronHelp": "ຫ້າຊ່ອງ: ນາທີ, ຊົ່ວໂມງ, ວັນ, ເດືອນ ແລະ ວັນໃນອາທິດ. ໄລຍະຫ່າງທີ່ສັ້ນທີ່ສຸດແມ່ນໜຶ່ງນາທີ.",
       "fieldTimezone": "ເຂດເວລາ",
-      "nameLocked": "ຊື່ເປັນສ່ວນໜຶ່ງຂອງ URL ເວັບຮຸກ ແລະ ບໍ່ສາມາດປ່ຽນໄດ້.",
+      "nameLocked": "ບໍ່ສາມາດປ່ຽນຊື່ໄດ້ຫຼັງສ້າງຕົວກະຕຸ້ນ.",
       "repositoryLocked": "ບໍ່ສາມາດປ່ຽນຄັງເກັບໄດ້ຫຼັງສ້າງຕົວກະຕຸ້ນ.",
       "environmentAutomatic": "ອັດຕະໂນມັດຕາມຄັງເກັບ",
       "notSelected": "ບໍ່ໄດ້ເລືອກ",
@@ -4618,6 +4624,7 @@
       "saveFailedTitle": "ບັນທຶກຕົວກະຕຸ້ນບໍ່ໄດ້",
       "deleteTitle": "ລຶບຕົວກະຕຸ້ນນີ້ບໍ?",
       "deleteMessage": "ການເອີ້ນຫາ {{name}} ຈະລົ້ມເຫຼວ. ບໍ່ສາມາດຍົກເລີກໄດ້.",
+      "deleteMessageScheduled": "ການຣັນຕາມກຳນົດເວລາຂອງຕົວກະຕຸ້ນ {{name}} ຈະຢຸດ. ບໍ່ສາມາດຍົກເລີກໄດ້.",
       "runNow": "ຣັນຕອນນີ້",
       "runStarted": "ເລີ່ມການຣັນແລ້ວ",
       "created": "ສ້າງຕົວກະຕຸ້ນແລ້ວ",

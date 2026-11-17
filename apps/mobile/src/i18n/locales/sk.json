@@ -1412,7 +1412,8 @@
       "noReviews": "Zatiaľ žiadne kontroly",
       "noReviewsDescription": "Kontroly sa tu zobrazia, keď kontrolór kódu skontroluje PR.",
       "startManualReview": "Spustiť manuálnu kontrolu",
-      "configureProvider": "Nastaviť poskytovateľa"
+      "configureProvider": "Nastaviť poskytovateľa",
+      "connectOwnerOnly": "Požiadajte vlastníka organizácie alebo správcu, aby pripojil poskytovateľa."
     },
     "platformList": {
       "checking": "Kontroluje sa…",
@@ -3083,6 +3084,7 @@
     "signOutThisDevice": "Odhlásiť toto zariadenie",
     "signOutSessionLabel": "Odhlásiť zariadenie {{device}}, prihlásenie: {{signedIn}}, posledná aktivita: {{lastSeen}}",
     "sessionSignedOut": "Relácia bola odhlásená.",
+    "sessionSignOutFailed": "Reláciu nebolo možné odhlásiť. Skúste to znova.",
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "Zariadenie {{device}} sa odhlási. Posledná aktivita: {{lastSeen}}. Prístup k API mu môže zostať ešte hodinu.",
@@ -3210,12 +3212,14 @@
     "manage": {
       "billingHistory": "História fakturácie",
       "billingHistoryEmpty": "Zatiaľ žiadna história fakturácie.",
+      "billingHistoryError": "Nepodarilo sa načítať históriu fakturácie",
       "cancel": "Zrušiť predplatné",
       "cancelDescription": "Váš Kilo Pass zostane aktívny do konca fakturačného obdobia a nebude sa obnovovať.",
       "cancelScheduled": "Zruší sa {{date}}",
       "cancelScheduledChange": "Zrušiť naplánovanú zmenu",
       "cancelled": "Predplatné bolo zrušené",
       "creditHistoryEmpty": "Zatiaľ žiadne kredity z Kilo Pass.",
+      "creditHistoryError": "Nepodarilo sa načítať kredity z Kilo Pass",
       "resume": "Obnoviť predplatné",
       "resumeCancelledDescription": "Váš Kilo Pass sa bude opäť automaticky obnovovať.",
       "resumePausedDescription": "Váš Kilo Pass sa obnoví hneď, ešte pred plánovaným dátumom obnovenia.",
@@ -3452,7 +3456,7 @@
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
       "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
-      "accessDeniedDescription": "Nemáš prístup k tejto organizácii."
+      "accessDeniedDescription": "Požiadaj vlastníka organizácie alebo správcu o udelenie prístupu."
     },
     "create": {
       "title": "Vytvoriť organizáciu",
@@ -3578,6 +3582,8 @@
       "groups": "Skupiny",
       "guardrails": "Ochranné pravidlá",
       "byok": "Vlastný kľúč",
+      "ssoAndDomain": "SSO a doména",
+      "dataCollection": "Zber údajov",
       "auditLogs": "Protokoly auditu",
       "requestLogs": "Protokoly požiadaviek",
       "subOrganizations": "Podorganizácie",
@@ -4732,7 +4738,7 @@
       "fieldCron": "Výraz cron",
       "fieldCronHelp": "Päť polí: minúta, hodina, deň, mesiac a deň v týždni. Najkratší interval je jedna minúta.",
       "fieldTimezone": "Časové pásmo",
-      "nameLocked": "Názov je súčasťou URL webhooku a nemožno ho zmeniť.",
+      "nameLocked": "Názov nemožno po vytvorení spúšťača zmeniť.",
       "repositoryLocked": "Repozitár nemožno po vytvorení spúšťača zmeniť.",
       "environmentAutomatic": "Automaticky podľa repozitára",
       "notSelected": "Nevybraté",
@@ -4758,6 +4764,7 @@
       "saveFailedTitle": "Nepodarilo sa uložiť spúšťač",
       "deleteTitle": "Odstrániť tento spúšťač?",
       "deleteMessage": "Volania na {{name}} zlyhajú. Toto sa nedá vrátiť späť.",
+      "deleteMessageScheduled": "Naplánované spustenia spúšťača {{name}} sa zastavia. Toto sa nedá vrátiť späť.",
       "runNow": "Spustiť teraz",
       "runStarted": "Spustenie začalo",
       "created": "Spúšťač vytvorený",

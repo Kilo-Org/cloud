@@ -202,15 +202,16 @@ function writeCaBundle(existingCaPaths: readonly string[]): string {
 
 /**
  * The CA files earlier wires folded into the bundle, in the order the section
- * recorded them.
+ * recorded them. A record the section holds as the bare prefix stands for the
+ * empty value a wire displaced, and is carried through as `''` so the order of
+ * the records is the order the values were displaced in.
  */
 function readRecordedCaSources(lines: string[], section: LineRange | undefined): string[] {
   if (!section) return [];
   return lines
     .slice(section.start, section.end)
     .filter(line => line.startsWith(CA_SOURCE_PREFIX))
-    .map(line => line.slice(CA_SOURCE_PREFIX.length).trim())
-    .filter(source => source !== '');
+    .map(line => line.slice(CA_SOURCE_PREFIX.length).trim());
 }
 
 /**
@@ -223,10 +224,14 @@ function readRecordedCaSources(lines: string[], section: LineRange | undefined):
  * for a proxy, or an empty placeholder copied from an example) shadows the
  * section's own. Rewriting that one line's value keeps the first match correct
  * without moving anything, and drops nothing: `writeCaBundle` already carries
- * that file's bytes, and the returned path is recorded in the section so the
- * bundle keeps re-reading it. Only this file is rewritten: an earlier env file
- * `dev.sh` walks still wins when no stack export sets the value, which is the
- * case the README's `pnpm dev` paragraph names.
+ * that file's bytes, and the displaced value is recorded in the section so the
+ * bundle keeps re-reading it and removal can put the line back. An empty
+ * placeholder is recorded too, as the bare `CA_SOURCE_PREFIX` line: removing
+ * the section then restores the line to empty, so `.env.local` is left exactly
+ * as the developer had it. Only a value a rewrite displaced is recorded — a
+ * line that already names the bundle displaces nothing. Only this file is
+ * rewritten: an earlier env file `dev.sh` walks still wins when no stack export
+ * sets the value, which is the case the README's `pnpm dev` paragraph names.
  */
 function pointShadowingCaLineAtBundle(
   lines: string[],
@@ -238,22 +243,30 @@ function pointShadowingCaLineAtBundle(
   if (index === -1) return { lines, folded: undefined };
 
   const original = stripEnvValue((lines[index] ?? '').slice(CA_KEY.length + 1));
-  const folded =
-    original === '' || path.resolve(original) === path.resolve(bundlePath) ? undefined : original;
+  const folded = path.resolve(original) === path.resolve(bundlePath) ? undefined : original;
   const rewritten = [...lines];
   rewritten[index] = `${CA_KEY}=${bundlePath}`;
   return { lines: rewritten, folded };
 }
 
 /**
- * The section's CA sources: what it recorded already, plus a path this wire
- * folded in. A source that no longer exists is dropped, so the section does not
- * keep claiming a CA the bundle cannot load.
+ * The section's CA sources: what it recorded already, plus what this wire
+ * folded in (an empty record stands for the empty value it displaced, and is
+ * kept as a record but names no file). A source that no longer exists is
+ * dropped, so the section does not keep claiming a CA the bundle cannot load;
+ * the empty record needs no file, so it always stays.
  */
 function mergeCaSources(recorded: readonly string[], folded: string | undefined): string[] {
   const merged: string[] = [];
   const seen = new Set<string>();
   for (const source of folded === undefined ? recorded : [...recorded, folded]) {
+    if (source === '') {
+      if (!seen.has('')) {
+        seen.add('');
+        merged.push(source);
+      }
+      continue;
+    }
     if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile()) continue;
     const resolved = path.resolve(source);
     if (seen.has(resolved)) continue;
@@ -273,8 +286,15 @@ function writeEnvLines(envLocalPath: string, lines: readonly string[], newline: 
 
 /**
  * Takes this entry's section back out — with the blank line the insert put in
- * front of it — and restores a CA line the section's repointing changed. Every
- * other line stays where the developer left it.
+ * front of it — and restores the CA line the section's repointing displaced.
+ * Every other line stays where the developer left it.
+ *
+ * The restore rule: the newest record is exactly what the wire wrote over, so
+ * removal puts that value back verbatim — an empty record restores the empty
+ * line the developer had. Restoring happens only while the line still names
+ * the bundle: a line the developer has changed since is theirs, not ours. A
+ * line that names the bundle with no record at all (a hand edit naming the
+ * bundle) is left standing for the same reason.
  */
 function removeManagedSection(
   lines: string[],
@@ -286,17 +306,13 @@ function removeManagedSection(
   if (before[before.length - 1] === '') before.pop();
   const remaining = [...before, ...lines.slice(section.end)];
 
-  // Pointing the first CA line `dev.sh` reads at the bundle recorded the path it
-  // named; the newest record is the one that line most likely displaced. Put it
-  // back while the line still names the bundle — a line the developer has
-  // changed since is theirs, not ours.
   const index = remaining.findIndex(line => line.startsWith(`${CA_KEY}=`));
-  const original = recordedCaSources[recordedCaSources.length - 1];
-  if (index === -1 || original === undefined) return remaining;
+  const displaced = recordedCaSources[recordedCaSources.length - 1];
+  if (index === -1 || displaced === undefined) return remaining;
   const value = stripEnvValue((remaining[index] ?? '').slice(CA_KEY.length + 1));
   if (path.resolve(value) !== path.resolve(bundlePath)) return remaining;
   const restored = [...remaining];
-  restored[index] = `${CA_KEY}=${original}`;
+  restored[index] = `${CA_KEY}=${displaced}`;
   return restored;
 }
 

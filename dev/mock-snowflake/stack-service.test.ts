@@ -431,7 +431,19 @@ test('an empty CA placeholder above the section is filled with the bundle', asyn
     const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
     assert.equal(firstValueDevScriptReads(content), fixture.caBundlePath);
     assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\n');
-    assert.equal(content.includes(CA_SOURCE_PREFIX), false);
+    // The displacement is recorded even for an empty value — as the bare
+    // prefix — so removal can put the empty line back exactly.
+    assert.ok(content.includes(CA_SOURCE_PREFIX));
+
+    // A real warehouse takes the section back out: the recorded displacement
+    // is the empty value, so the placeholder line comes back empty instead of
+    // keeping the bundle path while no mock is wired.
+    fs.appendFileSync(fixture.envLocalPath, 'SNOWFLAKE_ACCOUNT_HOST=real.example:443\n');
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
+    const afterRemoval = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(afterRemoval.startsWith('NODE_EXTRA_CA_CERTS=\nOTHER=1\n'));
+    assert.equal(afterRemoval.includes(fixture.caBundlePath), false);
+    assert.equal(afterRemoval.includes(SECTION_START), false);
   } finally {
     if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
     else process.env.NODE_EXTRA_CA_CERTS = ambient;
@@ -446,6 +458,54 @@ test('a real warehouse keeps its own CA line and the file byte-identical', async
     assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: false });
     assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), envLocal);
   } finally {
+    fixture.restore();
+  }
+});
+
+test('removal restores the value the last wire displaced, rotation included', async () => {
+  const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const caAPath = path.join(fixture.root, 'ca-a.pem');
+    const caBPath = path.join(fixture.root, 'ca-b.pem');
+    fs.writeFileSync(caAPath, 'CA A\n');
+    fs.writeFileSync(caBPath, 'CA B\n');
+
+    // Wire 1 displaced ca-a; wire 2 displaced the bundle line with ca-b (a new
+    // recorded source); wire 3 displaced ca-b with the bundle again. The
+    // newest record is exactly ca-b — the last value this line displaced —
+    // not the oldest (ca-a).
+    await fixture.wire();
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caBPath}\n`);
+    await fixture.wire();
+
+    // Wire 3: rebuild the pre-section layout — the line names ca-b, the
+    // section follows.
+    const content3 = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    const sectionLayout = content3.slice(content3.indexOf(SECTION_START));
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caBPath}\n${sectionLayout}`);
+    await fixture.wire();
+    assert.ok(
+      fs
+        .readFileSync(fixture.envLocalPath, 'utf8')
+        .startsWith(`NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`)
+    );
+
+    // A real warehouse: the line's displaced value ca-b comes back, whatever
+    // older records for the same line said.
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `${fs.readFileSync(fixture.envLocalPath, 'utf8')}SNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
+    );
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.startsWith(`NODE_EXTRA_CA_CERTS=${caBPath}\n`));
+    assert.equal(content.includes(fixture.caBundlePath), false);
+    assert.equal(content.includes(SECTION_START), false);
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
     fixture.restore();
   }
 });

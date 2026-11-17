@@ -56,6 +56,7 @@ describe('Linux agent credential boundary', () => {
       const credential = path.join(directory, 'wrapper-credential');
       const privateDirectory = path.join(directory, 'wrapper-private');
       const setuid = path.join(directory, 'setuid-id');
+      const runtime = path.join(directory, 'bun');
       await mkdir(workspace);
       await mkdir(artifacts);
       await mkdir(privateDirectory, { mode: 0o700 });
@@ -63,6 +64,8 @@ describe('Linux agent credential boundary', () => {
       await writeFile(path.join(privateDirectory, 'credential'), 'synthetic-private-credential');
       await copyFile('/usr/bin/id', setuid);
       await chmod(setuid, 0o4755);
+      await copyFile(process.execPath, runtime);
+      await chmod(runtime, 0o755);
 
       const probe = `
       const fs = require('node:fs');
@@ -94,7 +97,7 @@ describe('Linux agent credential boundary', () => {
 
       const fixture = `
       import fs from 'node:fs/promises';
-      import { initializeAgentExecution, agentOwns, agentOwnsTree, writeAgentFile } from ${JSON.stringify(path.join(import.meta.dir, 'agent-execution.ts'))};
+      import { initializeAgentExecution, agentOwns, agentOwnsTree, chmodAgentDirectory, writeAgentFile } from ${JSON.stringify(path.join(import.meta.dir, 'agent-execution.ts'))};
       import { runProcess } from ${JSON.stringify(path.join(import.meta.dir, '../utils.ts'))};
       import { createOwnedProcessScope } from ${JSON.stringify(path.join(import.meta.dir, 'owned-processes.ts'))};
       import { spawnGated, releaseGate } from ${JSON.stringify(path.join(import.meta.dir, 'gated-spawn.ts'))};
@@ -119,6 +122,7 @@ describe('Linux agent credential boundary', () => {
         catch { rejectedPaths++; }
       }
       try { await agentOwnsTree(workspace + '/redirect'); } catch { rejectedPaths++; }
+      try { await chmodAgentDirectory(workspace + '/redirect', 0o700); } catch { rejectedPaths++; }
       const tree = workspace + '/tree';
       await fs.mkdir(tree + '/nested', { recursive: true });
       await fs.writeFile(tree + '/nested/wrapper-file', 'wrapper content');
@@ -146,7 +150,12 @@ describe('Linux agent credential boundary', () => {
       });
       const outputs = [];
       await prepareKiloFilesystem(env, workspace);
+      const credentialsDirectory = env.XDG_DATA_HOME + '/kilo/cloud-agent';
+      await fs.mkdir(credentialsDirectory, { recursive: true });
+      await agentOwns(credentialsDirectory);
+      await fs.chmod(credentialsDirectory, 0o777);
       await writeGitCredentialRecords({ home: workspace, credentials: [{ url: 'https://git.example.test/acme/repo.git', token: 'synthetic-git-alias' }] });
+      const credentialsMode = (await fs.stat(credentialsDirectory)).mode & 0o777;
       const attachment = ${JSON.stringify(path.join(directory, 'attachments', 'session', 'user', 'message', 'diagram.png'))};
       const materialized = await materializeMessageAttachments(
         { id: 'msg_synthetic', prompt: 'Read the attachment', attachments: [{ filename: 'diagram.png', mime: 'image/png', signedUrl: 'https://attachments.example.test/diagram.png', localPath: attachment }] },
@@ -162,7 +171,7 @@ describe('Linux agent credential boundary', () => {
       ]);
       env.PROBE_RESTORED_DIRECTORY = workspace + '/restored/nested';
       const run = async (spawn) => {
-        const result = await runProcess(process.execPath, ['--eval', ${JSON.stringify(probe)}], {
+        const result = await runProcess(${JSON.stringify(runtime)}, ['--eval', ${JSON.stringify(probe)}], {
           cwd: workspace, env, inheritEnv: false, timeoutMs: 5000, ...(spawn ? { spawn } : {}),
         });
         if (result.exitCode !== 0) throw new Error(result.stderr);
@@ -191,7 +200,7 @@ describe('Linux agent credential boundary', () => {
       await fs.writeFile(workspace + '/.git/hooks/pre-commit', '#!/bin/sh\\nid -u > hook-uid\\n', { mode: 0o755 });
       await git(['commit', '--allow-empty', '-m', 'verify unprivileged hook']);
       const hookUid = (await fs.readFile(workspace + '/hook-uid', 'utf8')).trim();
-      console.log(JSON.stringify({ outputs, hookUid, rejectedPaths, treeOwners, artifact: await fs.readFile(artifacts + '/proof', 'utf8') }));
+      console.log(JSON.stringify({ outputs, hookUid, rejectedPaths, credentialsMode, treeOwners, artifact: await fs.readFile(artifacts + '/proof', 'utf8') }));
       await fd.close();
     `;
       try {
@@ -228,7 +237,8 @@ describe('Linux agent credential boundary', () => {
           }
         }
         expect(result.hookUid).toBe(String(AGENT_UID));
-        expect(result.rejectedPaths).toBe(4);
+        expect(result.rejectedPaths).toBe(5);
+        expect(result.credentialsMode).toBe(0o700);
         expect(result.treeOwners).toEqual({
           directory: AGENT_UID,
           file: AGENT_UID,

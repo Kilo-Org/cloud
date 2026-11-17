@@ -2301,14 +2301,16 @@ function discoveryFixture(processes: ProcFixture[], log?: string) {
       return { ok: root !== null, json: async () => root };
     };
     let stdout = '';
-    await runInNewContext(args[4].replace(/^import .*;\n/gm, ''), {
+    const script = args.at(-2);
+    if (!script) throw new Error('Missing Kilo inspection script');
+    await runInNewContext(script.replace(/^import .*;\n/gm, ''), {
       fs,
       path: path.posix,
       fetch,
       URL,
       AbortSignal,
       process: {
-        argv: ['bun', args[5]],
+        argv: ['bun', args.at(-1)],
         stdout: {
           write: (text: string) => {
             stdout += text;

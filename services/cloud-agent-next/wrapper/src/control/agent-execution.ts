@@ -77,6 +77,16 @@ export async function agentOwns(file: string): Promise<void> {
   }
 }
 
+export async function chmodAgentDirectory(directoryPath: string, mode: number): Promise<void> {
+  if (!isolated) return fs.chmod(directoryPath, mode);
+  const directory = await openAgentDirectory(directoryPath);
+  try {
+    await directory.chmod(mode);
+  } finally {
+    await directory.close();
+  }
+}
+
 export async function agentOwnsTree(directory: string): Promise<void> {
   if (!isolated) return;
   const pinned = await openAgentDirectory(directory);

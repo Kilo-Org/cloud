@@ -1,6 +1,8 @@
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 // The module under test keeps key-set state at module scope, so every test
 // loads a fresh instance instead of sharing cache, cooldown, and in-flight
 // refresh state across cases.
@@ -11,12 +13,15 @@ describe('verifyAppleJwtWithJwks', () => {
 
   const jwkForKey = (kid: string) => ({ ...publicJwk, kid, use: 'sig', alg: 'RS256' });
 
+  beforeEach(() => {
+    jest.restoreAllMocks();
+  });
+
   const jwksResponse = (keys: ReturnType<typeof jwkForKey>[]) =>
     new Response(JSON.stringify({ keys }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-
   const signToken = (
     kid: string,
     claims: Record<string, unknown> = {},
@@ -36,10 +41,6 @@ describe('verifyAppleJwtWithJwks', () => {
     // a fresh dynamic import gives each case its own cache and cooldown.
     return import('./apple-jwks');
   };
-
-  beforeEach(() => {
-    jest.restoreAllMocks();
-  });
 
   it('classifies JWT verification failures as client errors', async () => {
     const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
@@ -170,11 +171,14 @@ describe('verifyAppleJwtWithJwks', () => {
     const unknownToken = signToken('rotated-away-key');
     // The first unknown-kid token starts the refresh; its failure falls back
     // to the cached key set, so the rejection names the missing key instead of
-    // surfacing the fetch failure.
+    // surfacing the fetch failure. The swallowed failure is still reported.
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       AppleJwtClientError
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).toHaveBeenCalledTimes(1);
 
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       'No matching Apple public key'
@@ -195,11 +199,17 @@ describe('verifyAppleJwtWithJwks', () => {
       'com.kilocode.kiloapp'
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).toHaveBeenCalledTimes(2);
     now += 31_000;
     await verifyAppleJwtWithJwks(
       signToken('current-key', { sub: 'user-1' }),
       'com.kilocode.kiloapp'
     );
     expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).toHaveBeenCalledTimes(3);
   });
 });

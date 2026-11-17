@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { createPublicKey } from 'node:crypto';
+import { captureException } from '@sentry/nextjs';
 
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 // Local verification runs can serve a fixture key set through this override.
@@ -70,7 +71,10 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
       lastRefreshError = error;
       if (cachedKeys) {
         // Serve the still-present key set; the next attempt stays on the
-        // refresh cooldown while lastRefreshError records the failure.
+        // refresh cooldown while lastRefreshError records the failure. The
+        // error never reaches a caller in this case, so report it here to
+        // keep an Apple JWKS outage visible.
+        captureException(error, { tags: { source: 'apple_jwks_refresh' } });
         return cachedKeys.keys;
       }
       throw error;

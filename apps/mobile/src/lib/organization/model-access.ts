@@ -103,9 +103,10 @@ export function denyListModels(params: {
 
 /**
  * The draft a saved configuration starts from. An absent `provider_allow_list`
- * means every provider is allowed, so it starts from the whole catalog's
- * providers — the same expansion the web page makes; a save then writes the
- * list explicitly.
+ * means every provider is allowed, so it starts from the provider rows the
+ * admin can name. Those rows cannot hold a BYOK-only provider the organization
+ * reads from the web snapshot, so this draft's list is a view of the policy, not
+ * the list a save writes: see `modelAccessSave`.
  */
 export function initialDraft(
   settings: {
@@ -188,6 +189,58 @@ export function draftsEqual(a: ModelAccessDraft, b: ModelAccessDraft): boolean {
     a.providerAllowList.join('\n') === b.providerAllowList.join('\n') &&
     a.modelDenyList.join('\n') === b.modelDenyList.join('\n')
   );
+}
+
+/**
+ * What a save writes. `providerAllowList` is absent when the save leaves the
+ * saved list alone: `updateAllowLists` treats an omitted list as unchanged
+ * (`provider_allow_list !== undefined` in
+ * `apps/web/src/routers/organizations/organization-settings-router.ts`).
+ */
+export type ModelAccessSave =
+  | {
+      kind: 'ready';
+      providerAllowList: readonly string[] | undefined;
+      modelDenyList: readonly string[];
+    }
+  /** The organization would be left with no allowed provider, blocking every route. */
+  | { kind: 'empty-provider-list' };
+
+/**
+ * The two lists a save writes, or the refusal that keeps it from writing them.
+ *
+ * An organization with no saved provider list allows every provider, including
+ * BYOK-only and direct-BYOK providers that no mobile catalog row names
+ * (`getKiloRouteProviders` in
+ * `packages/web-shared/src/lib/ai-gateway/providers/openrouter/models-by-provider-index.server.ts`
+ * leaves them out). Writing the rows as they first render would persist a
+ * narrower list than the policy the phone read, so a save that did not move the
+ * Providers tab omits the list and leaves it unset. The rows behind an edit
+ * include every saved slug (`providerRows`), so an explicit write keeps them.
+ *
+ * An empty list is refused unless the organization's saved list was already
+ * empty: it stops every Kilo route, which no toggle on this form should do by
+ * accident.
+ */
+export function modelAccessSave(params: {
+  savedAllowList: readonly string[] | undefined;
+  baseline: ModelAccessDraft;
+  draft: ModelAccessDraft;
+}): ModelAccessSave {
+  const providersChanged =
+    params.draft.providerAllowList.join('\n') !== params.baseline.providerAllowList.join('\n');
+  const providerAllowList =
+    params.savedAllowList === undefined && !providersChanged
+      ? undefined
+      : [...params.draft.providerAllowList];
+  if (providerAllowList?.length === 0 && params.baseline.providerAllowList.length > 0) {
+    return { kind: 'empty-provider-list' };
+  }
+  return {
+    kind: 'ready',
+    providerAllowList,
+    modelDenyList: [...params.draft.modelDenyList],
+  };
 }
 
 /** Whether any of a row's searchable fields contains the query, case-insensitively. */

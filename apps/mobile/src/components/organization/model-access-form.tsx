@@ -20,6 +20,7 @@ import {
   draftsEqual,
   initialDraft,
   type ModelAccessDraft,
+  modelAccessSave,
   providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
@@ -92,12 +93,25 @@ export function ModelAccessForm({
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
+  const savePayload = modelAccessSave({
+    savedAllowList: providerAllowList,
+    baseline,
+    draft,
+  });
+  const blockingIssue =
+    savePayload.kind === 'empty-provider-list'
+      ? t('organizationModelAccess.emptyProviderList')
+      : null;
+  const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
     setDraft(next);
   };
 
   const onSave = async () => {
+    if (savePayload.kind !== 'ready') {
+      return;
+    }
     const attempt = begin();
     if (attempt === null) {
       return;
@@ -105,8 +119,10 @@ export function ModelAccessForm({
     try {
       await save.mutateAsync({
         organizationId,
-        provider_allow_list: [...draft.providerAllowList],
-        model_deny_list: [...draft.modelDenyList],
+        ...(savePayload.providerAllowList === undefined
+          ? {}
+          : { provider_allow_list: [...savePayload.providerAllowList] }),
+        model_deny_list: [...savePayload.modelDenyList],
       });
       if (!attempt.owns()) {
         return;
@@ -126,7 +142,7 @@ export function ModelAccessForm({
     t,
     feedback,
     draftIsDirty: dirty,
-    blockingIssue: null,
+    blockingIssue,
   });
 
   // The organization's own catalog omits the models it denies, so the rows come
@@ -177,12 +193,7 @@ export function ModelAccessForm({
           >
             <Text>{t('common.cancel')}</Text>
           </Button>
-          <Button
-            size="sm"
-            loading={saving}
-            disabled={!dirty || saving}
-            onPress={() => void onSave()}
-          >
+          <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
             <Text>{t('common.save')}</Text>
           </Button>
         </View>

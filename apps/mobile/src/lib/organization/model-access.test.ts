@@ -7,6 +7,7 @@ import {
   draftsEqual,
   initialDraft,
   matchesSearch,
+  modelAccessSave,
   normalizeModelId,
   providerRows,
   setModelsAllowed,
@@ -157,6 +158,18 @@ describe('draftsEqual', () => {
     expect(draftsEqual(draft, { providerAllowList: ['a', 'b'], modelDenyList: [] })).toBe(true);
     expect(draftsEqual(draft, { providerAllowList: ['b', 'a'], modelDenyList: [] })).toBe(false);
     expect(draftsEqual(draft, { providerAllowList: ['a', 'b'], modelDenyList: ['x'] })).toBe(false);
+  });
+});
+
+describe('modelAccessSave', () => {
+  it('keeps an already empty saved list writable, since the list itself did not change', () => {
+    expect(
+      modelAccessSave({
+        savedAllowList: [],
+        baseline: { providerAllowList: [], modelDenyList: [] },
+        draft: { providerAllowList: [], modelDenyList: ['openai/gpt'] },
+      })
+    ).toEqual({ kind: 'ready', providerAllowList: [], modelDenyList: ['openai/gpt'] });
   });
 });
 

@@ -33,11 +33,11 @@ export function useOrgGroup(
 
 /**
  * The organization's groups. The procedure answers a manager shape (every
- * group, with its members and policies) to the owner or billing manager, the
- * two access levels it treats as billing, and a member shape (the caller's own
- * groups) to everyone else, so the screen renders whichever arrived. An admin
- * gets the member shape here; the form resolves its own record through
- * {@link useOrgGroup} for that reason.
+ * group, with its members and policies) to an owner or admin — the roles the
+ * group writes admit — and the same shape with `canEdit: false` to a billing
+ * manager, so an admin can open every group it may change. Everyone else gets
+ * the member shape (the caller's own groups), and the screen renders whichever
+ * arrived.
  */
 export function useOrgGroups(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();

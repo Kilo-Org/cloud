@@ -188,12 +188,11 @@ export function ProfileOverviewScreen({
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
       // The profile is gone, so there is nothing left to keep: the pop must not
-      // ask about edits to it.
-      metadataGuard.markClean();
-      // Back during the delete already left this profile, and a Back handled
-      // while this dismissal runs is the same leave; a second pop would remove
-      // the profiles list beneath it.
-      popOnce();
+      // ask about edits to it. Back during the delete already left this profile,
+      // and a Back handled while this dismissal runs is the same leave; a second
+      // pop would remove the profiles list beneath it, so the leave goes through
+      // the guard's own once-only exit.
+      metadataGuard.leaveWithoutAsking(popOnce);
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));

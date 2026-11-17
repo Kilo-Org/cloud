@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "nextjs"],
+  "plugins": ["typescript", "nextjs"],
   "jsPlugins": [{ "name": "drizzle", "specifier": "./oxlint-plugin-drizzle.js" }],
   "options": {
     "typeAware": true
@@ -167,7 +167,6 @@
       // result out of the override array order: those packages inherit the
       // rule from the shared override above, and every other service file
       // stays off.
-      // Those services are outside tooling reach, so the assertion-removal check stays off for them.
       "files": ["services/**/*.ts"],
       "excludeFiles": [
         "services/ai-attribution/**/*.ts",

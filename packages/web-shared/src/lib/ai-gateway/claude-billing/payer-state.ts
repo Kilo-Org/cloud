@@ -95,7 +95,8 @@ export async function getAuthoritativeClaudeBillingState(
     AbortSignal.timeout(15_000)
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
-  const reply = responseSchema.safeParse(await response.json().catch(() => null));
+  const body = await response.json();
+  const reply = responseSchema.safeParse(body);
   if (!reply.success) throw new ClaudeBillingPayerStateParseError();
   const { connection } = reply.data;
   if (!connection || !claudeBillingOwnerMatches(connection, owner)) return null;

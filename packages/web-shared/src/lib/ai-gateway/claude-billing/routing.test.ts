@@ -430,7 +430,8 @@ describe('Claude customer-billed routing', () => {
       .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
     expect(await checkClaudeBilling(input())).toEqual({
       kind: 'unavailable',
-      message: 'Your Claude link cannot be checked right now. An owner or admin can link it again.',
+      message:
+        'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });

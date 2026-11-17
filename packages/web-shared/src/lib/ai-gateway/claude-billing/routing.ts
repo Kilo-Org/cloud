@@ -195,7 +195,7 @@ export async function checkClaudeBilling(
         return {
           kind: 'unavailable',
           message:
-            'Your Claude link cannot be checked right now. An owner or admin can link it again.',
+            'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
         };
       }
       return {

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { CenteredState } from '@/components/centered-state';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -95,8 +96,8 @@ export function SecurityAgentSetup<T>({
   };
 
   return (
-    <CenteredState>
-      <View className="items-center gap-3 px-6">
+    <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
+      <View className="items-center gap-3">
         <ShieldCheck size={28} color={colors.mutedForeground} />
         <Text className="text-center text-base font-semibold">{title}</Text>
         <Text className="text-center text-sm text-muted-foreground">{description}</Text>
@@ -110,7 +111,7 @@ export function SecurityAgentSetup<T>({
           // callout at the description's own size and colour: as a bare line in
           // the button's gap it read as a footnote, the faintest text on the
           // screen, leaving the state looking unfinished.
-          <View className="mt-3 w-full min-h-[44px] flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
+          <View className="mt-3 w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
             <Info size={16} color={colors.mutedForeground} />
             {/* The sentence takes `foreground`, not the description's muted
                 token: on the light info tile the composite surface lifts that

@@ -399,7 +399,6 @@ import {
   resetRuntimeIdentity,
   writeRuntimeIdentity,
 } from './runtime-identity.js';
-import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import {
   hasPreviewWorkspaceBinding,
   resolvePreviewTarget,
@@ -410,6 +409,29 @@ import {
   SandboxRuntimeVersionSchema,
   type SandboxStatusSnapshot,
 } from '../../shared/sandbox-status.js';
+import {
+  createSandboxNotificationDispatcher,
+  type SandboxNotification,
+  type WorkspaceArtifactsChanged,
+} from './notifications.js';
+import {
+  createWorkspaceArtifactIndex,
+  type WorkspaceArtifactIndex,
+} from './workspace-artifacts.js';
+import {
+  workspaceArtifactIdentitySchema,
+  WORKSPACE_ARTIFACT_RESERVATION_TTL_MS,
+  type CommitWorkspaceArtifactResult,
+  type DeleteWorkspaceArtifactForUserResult,
+  type DeleteWorkspaceArtifactResult,
+  type ReserveWorkspaceArtifactUploadResult,
+  type WorkspaceArtifactCommitInput,
+  type WorkspaceArtifactDeleteInput,
+  type WorkspaceArtifactEntryLookup,
+  type WorkspaceArtifactIdentity,
+  type WorkspaceArtifactList,
+  type WorkspaceArtifactReserveInput,
+} from '../../shared/workspace-artifacts.js';
 import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
@@ -420,6 +442,7 @@ import {
 import { serveHistoryPage, serveRecentHistory, type HistoryPageSession } from './history-pages.js';
 import { createWorkspaceHistoryReader, readWorkspaceHistorySessions } from './workspace-history.js';
 import { getPgDb } from '../../db/pg.js';
+import { serveTransferGrant } from './transfer-grants.js';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -446,6 +469,8 @@ import {
 
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
+const WORKSPACE_ARTIFACT_ORPHAN_SWEEP_DELAY_MS = 60_000;
+const WORKSPACE_ARTIFACT_ORPHAN_SWEEP_BATCH = 100;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const RUNTIME_HARNESS_KEY = 'runtime_harness';
 const OWNER_KEY = 'control_plane_owner';
@@ -511,6 +536,8 @@ const wrapperSocketAttachmentSchema = z.object({
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
   worktreeGit: z.literal(true).optional(),
+  startCommands: z.literal(true).optional(),
+  transferGrants: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
@@ -686,6 +713,7 @@ export type ControlPlaneSessionPeer = HistoryPageSession & {
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
   /** False when the session no longer reads the worktree, so it is not notified again. */
   onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean>;
+  onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void>;
   /**
    * R1: the Session DO owns the grant and mints the runtime credential proxy
    * handle. The Sandbox DO passes its own allocation fence so the Session DO
@@ -931,6 +959,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
   private readonly initialized: Promise<void>;
+  private readonly workspaceArtifacts: WorkspaceArtifactIndex;
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
@@ -1020,6 +1049,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
     this.db = drizzle(ctx.storage, { logger: false });
+    this.workspaceArtifacts = createWorkspaceArtifactIndex({
+      db: this.db,
+      storage: ctx.storage,
+      sandboxId: this.sandboxId,
+      onChanged: revision => {
+        this.ctx.waitUntil(this.notifyWorkspaceArtifactsChanged(revision));
+      },
+    });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -1760,6 +1797,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
 
     if (handoff.plan.action === 'replay') {
+      if (handoff.plan.exclusive) {
+        await this.enqueue(() => this.clearWorkspaceArtifactsForDeletion());
+      }
       return { deleted: true, sessionIds: handoff.plan.journal.sessionIds };
     }
 
@@ -1779,6 +1819,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         await this.revokeWorktreeRoutes(handoff.targetSessionIds);
         this.worktreeChanges.purge(parsed.worktreeId);
+        if (handoff.plan.exclusive) await this.clearWorkspaceArtifactsForDeletion();
         const journal = await finishWorktreeDeletion(
           this.ctx.storage,
           parsed.worktreeId,
@@ -1805,6 +1846,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
       this.worktreeChanges.purge(parsed.worktreeId);
+      if (handoff.plan.exclusive) await this.clearWorkspaceArtifactsForDeletion();
       if (handoff.plan.action === 'stop') {
         // Fence by allocation identity: a sibling prepare may have created a new
         // allocation while the provider stop ran off-queue.
@@ -1932,6 +1974,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
+  private async notifyWorkspaceArtifactsChanged(revision: number): Promise<void> {
+    for (const route of await listRoutes(this.db)) {
+      this.notifications.enqueue(route.sessionId, {
+        kind: 'workspace_artifacts',
+        payload: { revision },
+      });
+    }
+  }
+
   private subscribeToWorktreeChanges(context: WorktreeChangesContext): void {
     const { worktreeId, session } = context;
     if (
@@ -1981,6 +2032,97 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.recovery(input);
+  }
+
+  async reserveWorkspaceArtifactUpload(
+    identity: unknown,
+    input: WorkspaceArtifactReserveInput
+  ): Promise<ReserveWorkspaceArtifactUploadResult> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const parsed = workspaceArtifactIdentitySchema.safeParse(identity);
+      if (!parsed.success) return { status: 'stale' };
+      const state = await this.readAllocation();
+      const fence = this.workspaceArtifactFence(state, parsed.data);
+      if (fence !== 'ok') return { status: fence };
+      const result = this.workspaceArtifacts.reserve(input);
+      if (result.status === 'ok') await this.scheduleWorkspaceArtifactOrphanSweep();
+      return result;
+    });
+  }
+
+  async releaseWorkspaceArtifactReservation(identity: unknown, objectKey: string): Promise<void> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const parsed = workspaceArtifactIdentitySchema.safeParse(identity);
+      if (!parsed.success) return;
+      const state = await this.readAllocation();
+      if (this.workspaceArtifactFence(state, parsed.data) !== 'ok') return;
+      this.workspaceArtifacts.release(objectKey);
+    });
+  }
+
+  async commitWorkspaceArtifact(
+    identity: unknown,
+    input: WorkspaceArtifactCommitInput
+  ): Promise<CommitWorkspaceArtifactResult> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const parsed = workspaceArtifactIdentitySchema.safeParse(identity);
+      if (!parsed.success) return { status: 'stale' };
+      const state = await this.readAllocation();
+      const fence = this.workspaceArtifactFence(state, parsed.data);
+      if (fence !== 'ok') return { status: fence };
+      const result = this.workspaceArtifacts.commit(input);
+      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+      return result;
+    });
+  }
+
+  async deleteWorkspaceArtifact(
+    identity: unknown,
+    input: WorkspaceArtifactDeleteInput
+  ): Promise<DeleteWorkspaceArtifactResult> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const parsed = workspaceArtifactIdentitySchema.safeParse(identity);
+      if (!parsed.success) return { status: 'stale' };
+      const state = await this.readAllocation();
+      const fence = this.workspaceArtifactFence(state, parsed.data);
+      if (fence !== 'ok') return { status: fence };
+      const result = this.workspaceArtifacts.deleteForUser(input);
+      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+      return result;
+    });
+  }
+
+  async deleteWorkspaceArtifactForUser(
+    input: WorkspaceArtifactDeleteInput
+  ): Promise<DeleteWorkspaceArtifactForUserResult> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const result = this.workspaceArtifacts.deleteForUser(input);
+      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+      return result;
+    });
+  }
+
+  async listWorkspaceArtifacts(): Promise<WorkspaceArtifactList> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const result = this.workspaceArtifacts.list();
+      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+      return result;
+    });
+  }
+
+  async getWorkspaceArtifact(relativePath: string): Promise<WorkspaceArtifactEntryLookup | null> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const result = this.workspaceArtifacts.get(relativePath);
+      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+      return result;
+    });
   }
 
   /**
@@ -2880,6 +3022,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       await this.armAlarm(await this.readAllocation());
     });
+    this.ctx.waitUntil(this.sweepWorkspaceArtifactOrphans());
     this.ctx.waitUntil(this.captureIdleWorkspaceSnapshot());
   }
 
@@ -5257,6 +5400,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 );
               }
             });
+          case 'workspace_artifacts':
+            return target.onWorkspaceArtifactsChanged(notification.payload);
         }
       },
       `notification.${notification.kind}`,
@@ -6208,7 +6353,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (snapshotStartFailureIsPermanent(reason) || attempt >= 2) {
         throw this.snapshotStartFailure(input.selection, reason, recordFailure(failure));
       }
-      const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
+      const retryStep = source === 'workspace' ? 'restore' : 'environment_snapshot';
+      const retry = await this.stopForSnapshotRetry(
+        input.createdRef,
+        input.allocationId,
+        retryStep
+      );
       if (retry.result === 'owned') {
         recordFailure({
           ...failure,
@@ -6231,13 +6381,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const previousDeadline = launchDeadline;
       launchDeadline = Date.now() + DEADLINE_MS.repositoryStartup;
-      if (
-        !(await this.startSnapshotRetry(
-          input.allocationId,
-          launchDeadline,
-          source === 'workspace' ? 'restore' : 'environment_snapshot'
-        ))
-      ) {
+      if (!(await this.startSnapshotRetry(input.allocationId, launchDeadline, retryStep))) {
         recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
@@ -6290,17 +6434,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return latest.kind !== 'creating' || latest.allocationId !== allocationId;
   }
 
+  /**
+   * Stops the failed launch before the retry starts the same sandbox again. A
+   * container wedged in a snapshot start can take minutes to destroy, so the
+   * stop repeats with the ladder's pauses until it is confirmed or the next
+   * attempt would end after the retry stop bound. The preparing routes see the
+   * wait, so the session does not sit on a frozen step for minutes.
+   */
   private async stopForSnapshotRetry(
     createdRef: string,
-    allocationId: string
+    allocationId: string,
+    step: 'restore' | 'environment_snapshot'
   ): Promise<
     { result: 'retry' | 'owned' } | { result: 'failed'; errorName: string; cause: string }
   > {
-    if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
-    const stopped = await this.stopRef(createdRef, allocationId);
-    return stopped.confirmed
-      ? { result: 'retry' }
-      : { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+    const timers = this.sandboxTimers();
+    const stopDeadline = Date.now() + timers.snapshotRetryStopMs;
+    const pauses = timers.providerStopLadderMs;
+    for (let stopAttempt = 0; ; stopAttempt += 1) {
+      if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
+      const stopped = await this.stopRef(createdRef, allocationId);
+      if (stopped.confirmed) return { result: 'retry' };
+      const pauseMs = pauses[Math.min(stopAttempt, pauses.length - 1)] ?? 0;
+      if (Date.now() + pauseMs + timers.providerStopAttemptMs > stopDeadline) {
+        return { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+      }
+      if (stopAttempt === 0) {
+        await this.notifySnapshotStartStep(
+          allocationId,
+          step,
+          'Waiting for the failed sandbox to stop'
+        );
+      }
+      await new Promise(resolve => setTimeout(resolve, pauseMs));
+    }
   }
 
   private snapshotStartFailure(
@@ -6328,7 +6495,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     detail: string
   ): Promise<void> {
     await this.recordWorkspaceSnapshotRecovery(allocationId, reason);
-    await this.notifySnapshotStartFailure(allocationId, 'restore', detail);
+    await this.notifySnapshotStartStep(allocationId, 'restore', detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6341,7 +6508,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     allocationId: string,
     block: EnvironmentSnapshotBlock
   ): Promise<void> {
-    await this.notifySnapshotStartFailure(allocationId, 'environment_snapshot', block.detail);
+    await this.notifySnapshotStartStep(allocationId, 'environment_snapshot', block.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6363,7 +6530,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     allocationId: string,
     error: EnvironmentSnapshotUnusableError
   ): Promise<void> {
-    await this.notifySnapshotStartFailure(allocationId, 'sandbox_create', error.detail);
+    await this.notifySnapshotStartStep(allocationId, 'sandbox_create', error.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6386,7 +6553,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<void> {
     if (error.source === 'workspace') {
       await this.recordWorkspaceSnapshotRecovery(allocationId, error.reason);
-      await this.notifySnapshotStartFailure(allocationId, 'restore', error.detail);
+      await this.notifySnapshotStartStep(allocationId, 'restore', error.detail);
       await this.failCreationRoutes(
         allocationId,
         false,
@@ -6401,7 +6568,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       environmentId: '',
       buildId: null,
     };
-    await this.notifySnapshotStartFailure(allocationId, 'environment_snapshot', block.detail);
+    await this.notifySnapshotStartStep(allocationId, 'environment_snapshot', block.detail);
     await this.failCreationRoutes(
       allocationId,
       false,
@@ -6467,7 +6634,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async notifySnapshotStartFailure(
+  private async notifySnapshotStartStep(
     allocationId: string,
     step: 'restore' | 'environment_snapshot' | 'sandbox_create',
     detail: string
@@ -6805,6 +6972,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
         ...(frame.startCommands ? { startCommands: true } : {}),
         ...(frame.worktreeGit ? { worktreeGit: true } : {}),
+        ...(frame.transferGrants ? { transferGrants: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
@@ -7038,6 +7206,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
               readRecent: route => this.workspaceHistoryReader(ws).readRecent(route),
               send: result => this.trySendFrame(ws, result),
             })
+          );
+        return;
+      case 'transfer.grant':
+        if (current && attachment.transferGrants === true)
+          void resolveSecret(this.env.NEXTAUTH_SECRET).then(
+            signingSecret =>
+              serveTransferGrant({
+                frame,
+                sandboxId: this.sandboxId,
+                state: currentState,
+                signingSecret,
+                send: result => this.trySendFrame(ws, result),
+              }),
+            () =>
+              serveTransferGrant({
+                frame,
+                sandboxId: this.sandboxId,
+                state: currentState,
+                signingSecret: null,
+                send: result => this.trySendFrame(ws, result),
+              })
           );
         return;
       case 'history.page':
@@ -7434,6 +7623,69 @@ export class SandboxControlV2 extends DurableObject<Env> {
       .where(eq(allocationTable.id, ALLOCATION_ROW_ID));
   }
 
+  private workspaceArtifactFence(
+    state: AllocationState,
+    identity: WorkspaceArtifactIdentity
+  ): 'ok' | 'stale' | 'not_connected' {
+    if (
+      identity.sandboxId !== this.sandboxId ||
+      state.allocationId !== identity.allocationId ||
+      state.wrapperId !== identity.wrapperInstanceId
+    ) {
+      return 'stale';
+    }
+    if (state.kind === 'connected') return 'ok';
+    // A socket close keeps the allocation and wrapper identity, so a reconnect
+    // with the same identity is transient rather than a replacement.
+    if (state.kind === 'disconnected') return 'not_connected';
+    return 'stale';
+  }
+
+  private nextWorkspaceArtifactOrphanSweepAt(): number | null {
+    if (this.env.WORKSPACE_ARTIFACTS_BUCKET === undefined) return null;
+    const earliest = this.workspaceArtifacts.earliestOrphanAt();
+    if (earliest === null) return null;
+    return Math.max(
+      Date.now() + WORKSPACE_ARTIFACT_ORPHAN_SWEEP_DELAY_MS,
+      earliest + WORKSPACE_ARTIFACT_RESERVATION_TTL_MS
+    );
+  }
+
+  private async scheduleWorkspaceArtifactOrphanSweepIfNeeded(): Promise<void> {
+    if (this.nextWorkspaceArtifactOrphanSweepAt() !== null) {
+      await this.scheduleWorkspaceArtifactOrphanSweep();
+    }
+  }
+
+  private async scheduleWorkspaceArtifactOrphanSweep(): Promise<void> {
+    const at = this.nextWorkspaceArtifactOrphanSweepAt();
+    if (at === null) return;
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  private async clearWorkspaceArtifactsForDeletion(): Promise<void> {
+    const removed = this.workspaceArtifacts.clear();
+    if (removed > 0) await this.scheduleWorkspaceArtifactOrphanSweep();
+  }
+
+  private async sweepWorkspaceArtifactOrphans(): Promise<void> {
+    const bucket = this.env.WORKSPACE_ARTIFACTS_BUCKET;
+    if (bucket === undefined) return;
+    const keys = await this.enqueue(async () =>
+      this.workspaceArtifacts.claimOrphans(WORKSPACE_ARTIFACT_ORPHAN_SWEEP_BATCH, Date.now())
+    );
+    if (keys.length === 0) return;
+    try {
+      await bucket.delete(keys);
+    } catch {
+      await this.scheduleWorkspaceArtifactOrphanSweep();
+      return;
+    }
+    await this.enqueue(async () => this.workspaceArtifacts.removeOrphans(keys));
+    await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
+  }
+
   private async armAlarm(state: AllocationState): Promise<void> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
@@ -7513,6 +7765,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       snapshotAt,
       this.earliestHelloDeadlineAt(),
       this.earliestPendingWorkspaceStopAt(),
+      this.nextWorkspaceArtifactOrphanSweepAt(),
     ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();

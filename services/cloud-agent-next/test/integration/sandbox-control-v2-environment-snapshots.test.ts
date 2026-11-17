@@ -650,6 +650,12 @@ describe('environment snapshot launch', () => {
       stopError: scenario.stopError,
     });
     const { stub, peer } = await setup('sbx__repo_retry_stop_failed', provider);
+    // The repeated stop is covered by unit tests; one attempt keeps this test fast.
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, snapshotRetryStopMs: 0 }),
+      });
+    });
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(1);

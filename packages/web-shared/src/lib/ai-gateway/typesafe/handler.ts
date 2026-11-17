@@ -6,12 +6,12 @@ import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
-  dataCollectionRequiredResponse,
   extractHeaderAndLimitLength,
   makeErrorReadable,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  dataCollectionPolicyRejection,
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
@@ -36,10 +36,7 @@ import {
   fetchUpstream,
   UPSTREAM_DURATION_BUDGET_MS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
-import {
-  hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -52,7 +49,6 @@ import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/ut
 import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
@@ -196,12 +192,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const providerPolicy =
     preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(resolvedModel)) &&
-    isDataCollectionExplicitlyDisallowed(providerPolicy)
-  ) {
-    return dataCollectionRequiredResponse();
-  }
+  const dataCollectionRejected = await dataCollectionPolicyRejection(resolvedModel, providerPolicy);
+  if (dataCollectionRejected) return dataCollectionRejected;
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 

@@ -6,7 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  * The placeholder the request-log window paints while its first hour loads.
  *
  * Each card keeps the loaded row's own geometry — `p-3`, `gap-1`, a `text-sm`
- * line that reserves 20 dp and two `text-xs` lines at 16 dp — so the cards that
+ * line box (`h-5`, 17.5 dp at the native rem of 14) and two `text-xs` line boxes
+ * (`h-4`, 14 dp) — so the cards that
  * arrive land on the lines the placeholders drew instead of growing the list.
  * The first two lines keep the short end-side bar their cost and provider fill,
  * and the third keeps the time and token bars beside it.

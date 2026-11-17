@@ -11,9 +11,25 @@ import {
   readPageTimeOrigin,
   renderBrowserAriaSnapshotLine,
 } from './browser-tool-snapshot';
-import type { BrowserAriaSnapshotLine, BrowserToolPageSession } from './browser-tool-snapshot';
+import type {
+  BrowserAriaSnapshotCapture,
+  BrowserAriaSnapshotLine,
+  BrowserSnapshotArguments,
+  BrowserToolPageSession,
+} from './browser-tool-snapshot';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import type { AgentReadScope, WithheldFrame } from './browser-agent-frames';
+import {
+  captureAgentSnapshotView,
+  filterAgentConsoleMessages,
+  filterAgentNetworkRequests,
+  readAgentFrameTree,
+  readAgentScreenshotGeometry,
+  readWithheldFrameBoxes,
+  withheldFramesOf,
+} from './browser-agent-frames';
+import { maskScreenshotDataUrl } from './browser-screenshot-masking';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -49,6 +65,12 @@ export const isReadBrowserToolName = (name: string): name is ReadBrowserToolName
 
 /** Clock, pause and timeout overrides so `browser_wait_for` is testable without real waits. */
 export interface BrowserReadToolOptions {
+  /**
+   * Present only for a CLI agent caller: the reads are frame-scoped to these
+   * `read` origins, hidden text is stripped and sensitive values are masked.
+   * A panel or workflow caller has no scope and keeps today's behaviour.
+   */
+  readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
   readonly pollIntervalMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
@@ -545,6 +567,66 @@ const renderFindSnippet = (lines: readonly BrowserAriaSnapshotLine[], index: num
     .join('\n')}`;
 };
 
+const captureScopedSnapshot = async (
+  deps: BrowserReadActionDeps,
+  options: BrowserSnapshotArguments
+): Promise<BrowserAriaSnapshotCapture> => {
+  if (deps.agentScope === undefined) {
+    return captureBrowserAriaSnapshot(deps.session, options);
+  }
+
+  return captureAgentSnapshotView(deps.session, deps.agentScope, {
+    ...(options.depth === undefined ? {} : { depth: options.depth }),
+    mergeRefs: options.target !== undefined && options.target !== '',
+  });
+};
+
+const withheldFramesFor = async (
+  deps: BrowserReadActionDeps
+): Promise<readonly WithheldFrame[]> => {
+  if (deps.agentScope === undefined) {
+    return [];
+  }
+
+  const frames = await readAgentFrameTree(deps.session);
+
+  return withheldFramesOf(frames, deps.agentScope.readableOrigins);
+};
+
+const maskAgentScreenshot = async (
+  deps: BrowserReadActionDeps,
+  input: { readonly dataUrl: string; readonly fullPage: boolean; readonly mediaType: string }
+): Promise<{ readonly dataUrl: string } | { readonly error: string }> => {
+  if (deps.agentScope === undefined) {
+    return { dataUrl: input.dataUrl };
+  }
+
+  const frames = await readAgentFrameTree(deps.session);
+  const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
+
+  if (withheld.length === 0) {
+    return { dataUrl: input.dataUrl };
+  }
+
+  const geometry = await readAgentScreenshotGeometry(deps.session, { fullPage: input.fullPage });
+  const boxes = await readWithheldFrameBoxes(deps.session, frames, withheld, {
+    offset: geometry.offset,
+  });
+
+  if ('error' in boxes) {
+    return { error: boxes.error };
+  }
+
+  const masked = await maskScreenshotDataUrl({
+    boxes: boxes.boxes,
+    dataUrl: input.dataUrl,
+    mediaType: input.mediaType,
+    scale: geometry.scale,
+  });
+
+  return masked.ok ? { dataUrl: masked.dataUrl } : { error: masked.error };
+};
+
 const browserSnapshotHandler: BrowserReadActionHandler = async (arguments_, deps) => {
   const parsed = browserSnapshotArgumentsSchema.safeParse(arguments_);
 
@@ -552,7 +634,7 @@ const browserSnapshotHandler: BrowserReadActionHandler = async (arguments_, deps
     return invalidArguments('browser_snapshot', parsed.error);
   }
 
-  const capture = await captureBrowserAriaSnapshot(deps.session, parsed.data);
+  const capture = await captureScopedSnapshot(deps, parsed.data);
 
   return done(boundBrowserToolText(`${capture.text}${filenameNote(parsed.data.filename)}`));
 };
@@ -582,7 +664,7 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  const capture = await captureBrowserAriaSnapshot(deps.session, {});
+  const capture = await captureScopedSnapshot(deps, {});
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {
@@ -697,6 +779,16 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   }
 
   const mediaType = screenshotMediaType(type);
+  const masked = await maskAgentScreenshot(deps, {
+    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
+    fullPage: fullPage === true,
+    mediaType,
+  });
+
+  if ('error' in masked) {
+    return fail(masked.error);
+  }
+
   const viewportScope = fullPage === true ? 'full page' : 'viewport';
   const scope = clip === undefined ? viewportScope : `element ${String(target)}`;
   const text = boundBrowserToolText(
@@ -704,7 +796,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   );
 
   const value: BrowserToolScreenshotValue = {
-    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
+    dataUrl: masked.dataUrl,
     mediaType,
     text,
   };
@@ -786,10 +878,13 @@ const browserConsoleMessagesHandler: BrowserReadActionHandler = async (arguments
     return invalidArguments('browser_console_messages', parsed.error);
   }
 
-  const messages = await filterConsoleMessages(deps.session, deps.session.consoleMessages(), {
-    all: parsed.data.all === true,
-    level: parsed.data.level ?? 'info',
-  });
+  const messages = filterAgentConsoleMessages(
+    await filterConsoleMessages(deps.session, deps.session.consoleMessages(), {
+      all: parsed.data.all === true,
+      level: parsed.data.level ?? 'info',
+    }),
+    await withheldFramesFor(deps)
+  );
 
   if (messages.length === 0) {
     return done(`No console messages.${filenameNote(parsed.data.filename)}`);
@@ -824,7 +919,10 @@ const browserNetworkRequestsHandler: BrowserReadActionHandler = async (arguments
 
   // The session bounds the list at the current page load (the last main-frame Document request).
   // Every request keeps its position in that full list, so the number printed here resolves in browser_network_request whichever filter was used.
-  const requests = deps.session.networkRequestsSinceLoad();
+  const requests = filterAgentNetworkRequests(
+    deps.session.networkRequestsSinceLoad(),
+    await withheldFramesFor(deps)
+  );
   const shown = requests.filter(request => {
     if (
       parsed.data.static !== true &&
@@ -858,7 +956,10 @@ const browserNetworkRequestHandler: BrowserReadActionHandler = async (arguments_
   }
 
   // Numbers match browser_network_requests: both index the full since-load list, so a static request is reachable too.
-  const requests = deps.session.networkRequestsSinceLoad();
+  const requests = filterAgentNetworkRequests(
+    deps.session.networkRequestsSinceLoad(),
+    await withheldFramesFor(deps)
+  );
   const { index, number, part, requestId } = parsed.data;
   const position = index ?? number;
 

@@ -346,6 +346,7 @@ export const handleTabDebuggerRequest = async ({
 
       const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
       const outcome = await runtime.runTool({
+        ...(request.agent === undefined ? {} : { agent: request.agent }),
         arguments: request.arguments,
         caller: request.caller,
         options: webMcpDispatchOptions(scriptingApi),
@@ -353,6 +354,27 @@ export const handleTabDebuggerRequest = async ({
         ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),
         toolName: request.tool,
       });
+
+      if (outcome.kind === 'needs_permission') {
+        return {
+          ok: true,
+          permission: {
+            items: outcome.items.map(item => ({ ...item })),
+            ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
+          },
+          result: outcome.result,
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
+
+      if (outcome.kind === 'origin_changed') {
+        return {
+          ok: true,
+          originChanged: { from: outcome.from, to: outcome.to },
+          result: outcome.result,
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
 
       if (outcome.kind === 'needs_take_over') {
         return {
@@ -366,7 +388,12 @@ export const handleTabDebuggerRequest = async ({
         };
       }
 
-      return { ok: true, result: outcome.result, type: BROWSER_TOOL_MESSAGE };
+      return {
+        ok: true,
+        result: outcome.result,
+        type: BROWSER_TOOL_MESSAGE,
+        ...(outcome.withheldFrames === undefined ? {} : { withheldFrames: outcome.withheldFrames }),
+      };
     }
 
     // Every schema-valid request type is handled above; this keeps the chain total for future message types.

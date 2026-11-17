@@ -150,6 +150,18 @@ export interface BrowserNetworkRequest {
   readonly url: string;
 }
 
+/**
+ * One download the tab started (`Browser.downloadWillBegin`). The agent's
+ * check module cancels a download that began without a step token, so the
+ * buffer keeps only what a caller needs to name it.
+ */
+export interface BrowserToolDownload {
+  readonly guid?: string;
+  readonly startedAt?: number;
+  readonly suggestedFilename?: string;
+  readonly url?: string;
+}
+
 export interface BrowserToolDialog {
   readonly defaultValue?: string;
   readonly message: string;
@@ -264,6 +276,8 @@ export interface BrowserToolSession {
    * result.
    */
   readonly getToolUnavailableError: (tool: string) => string | undefined;
+  /** Every download the session has seen, oldest first. */
+  readonly downloads: () => readonly BrowserToolDownload[];
   readonly isAttached: () => boolean;
   /** Every request the session has seen, including earlier documents. */
   readonly networkRequests: () => BrowserNetworkRequest[];
@@ -289,6 +303,8 @@ export interface BrowserToolSession {
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /** Returns the downloads seen since the last call and clears them. */
+  readonly takeDownloads: () => readonly BrowserToolDownload[];
   /** The tab's viewport identity, shared with every caller view of this tab. */
   readonly viewportState: BrowserToolViewportState;
 }
@@ -1326,6 +1342,7 @@ export const createBrowserToolSession = ({
   const target: ChromeDebuggerTarget = { tabId };
   const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
+  const downloadBuffer: BrowserToolDownload[] = [];
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -1643,6 +1660,11 @@ export const createBrowserToolSession = ({
 
     if (method === 'Page.javascriptDialogClosed') {
       dialog = undefined;
+      return;
+    }
+
+    if (method === 'Browser.downloadWillBegin' || method === 'Page.downloadWillBegin') {
+      handleDownloadWillBegin(params);
       return;
     }
 
@@ -1984,6 +2006,41 @@ export const createBrowserToolSession = ({
     for (const entry of entries) {
       refs.set(entry.ref, entry);
     }
+  };
+
+  const downloadWillBeginSchema = z.object({
+    guid: z.string().optional(),
+    suggestedFilename: z.string().optional(),
+    url: z.string().optional(),
+  });
+
+  const handleDownloadWillBegin = (params: Record<string, unknown> | undefined): void => {
+    const parsed = downloadWillBeginSchema.safeParse(params ?? {});
+
+    if (!parsed.success) {
+      return;
+    }
+
+    downloadBuffer.push({
+      ...(parsed.data.guid === undefined ? {} : { guid: parsed.data.guid }),
+      ...(parsed.data.suggestedFilename === undefined
+        ? {}
+        : { suggestedFilename: parsed.data.suggestedFilename }),
+      ...(parsed.data.url === undefined ? {} : { url: parsed.data.url }),
+      startedAt: Date.now(),
+    });
+
+    if (downloadBuffer.length > MAX_BROWSER_TOOL_CONSOLE_MESSAGES) {
+      downloadBuffer.shift();
+    }
+  };
+
+  const takeDownloads = (): readonly BrowserToolDownload[] => {
+    const seen = [...downloadBuffer];
+
+    downloadBuffer.length = 0;
+
+    return seen;
   };
 
   const takeDialog = (): BrowserToolDialog | undefined => {
@@ -2808,6 +2865,7 @@ export const createBrowserToolSession = ({
     bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey)),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, refs),
     consoleMessages: () => [...consoleBuffer],
+    downloads: () => [...downloadBuffer],
     // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
     dispose: () => {
       refs.clear();
@@ -2829,6 +2887,7 @@ export const createBrowserToolSession = ({
     resolveTarget: targetText => resolveTarget(targetText, refs),
     send,
     takeDialog,
+    takeDownloads,
     viewportState,
   });
 
@@ -2843,6 +2902,7 @@ export const createBrowserToolSession = ({
     bindCaller: callerKey => createCallerView(callerKey, callerRefs(callerKey)),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     consoleMessages: () => [...consoleBuffer],
+    downloads: () => [...downloadBuffer],
     dispose,
     evaluateInTab,
     getToolUnavailableError,
@@ -2859,6 +2919,7 @@ export const createBrowserToolSession = ({
     resolveTarget: targetText => resolveTarget(targetText, defaultRefs),
     send,
     takeDialog,
+    takeDownloads,
     viewportState,
   };
 };

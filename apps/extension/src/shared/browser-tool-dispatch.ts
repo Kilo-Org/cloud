@@ -13,6 +13,7 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
+import type { AgentReadScope } from './browser-agent-frames';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolSession } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -39,6 +40,8 @@ export type BrowserToolDispatchSession = BrowserToolPageSession &
  * clock override, and the WebMCP runtime hooks for the two WebMCP tools.
  */
 export interface BrowserToolDispatchOptions {
+  /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
+  readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
   readonly tabId?: number;
   readonly tabsApi?: BrowserToolPageTabsApi;
@@ -62,8 +65,10 @@ const dispatchArgumentsSchema = z.record(z.string(), z.unknown());
 const toUpstreamToolName = (name: string): string =>
   name.startsWith(KILO_BROWSER_TOOL_PREFIX) ? name.slice(KILO_BROWSER_TOOL_PREFIX.length) : name;
 
-const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions =>
-  options.now === undefined ? {} : { now: options.now };
+const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions => ({
+  ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
+  ...(options.now === undefined ? {} : { now: options.now }),
+});
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
   ...(options.now === undefined ? {} : { now: options.now }),

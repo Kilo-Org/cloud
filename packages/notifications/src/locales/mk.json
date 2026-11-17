@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Вашата сесија на агент има ажурирање",
-      "chatMessage": "Имате нова порака",
-      "instanceLifecycle": "Вашата инстанца има ажурирање",
-      "scheduledAction": "Закажана акција има ажурирање",
       "lowBalance": "Вашата состојба бара внимание",
       "spendAlert": "Вашата потрошувачка бара внимание",
       "securityFinding": "Безбедносно наоѓање бара внимание",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Без наслов",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Безбедносна проверка има ажурирање"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} е подготвена",
-      "body": "Допрете за да започнете разговор."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} не успеа да стартува",
-      "body": "Стартувањето не успеа."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} наскоро ќе се рестартира",
-      "body": "Закажано да се рестартира во {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Рестартирањето на {{instanceName}} е откажано",
-      "body": "Претходно закажаното рестартирање е откажано."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} наскоро ќе се надгради",
-      "bodyWithTag": "Надградба на {{targetImageTag}} во {{when}}.",
-      "bodyWithoutTag": "Закажана надградба во {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Надградбата на {{instanceName}} е откажана",
-      "body": "Претходно закажаната надградба е откажана."
     }
   },
   "sessionReady": {

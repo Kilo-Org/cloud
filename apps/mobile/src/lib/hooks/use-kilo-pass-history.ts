@@ -16,6 +16,8 @@ type KiloPassLedgerQuery = {
   readonly isError: boolean;
   readonly isFetchingNextPage: boolean;
   readonly isFetchNextPageError: boolean;
+  /** The failure the ledger's error state reports; read to tell a terminal one. */
+  readonly error: unknown;
   readonly refetch: () => void;
   readonly fetchNextPage: () => void;
 };

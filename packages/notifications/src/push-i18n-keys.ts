@@ -17,7 +17,12 @@ export const SECURITY_FINDING_PUSH_TITLE_KEYS = {
 /** The one catalog entry the three security-finding kinds read their body from. */
 export const SECURITY_FINDING_PUSH_BODY_KEY = 'internal.securityFinding.body';
 
-const SHARED_BODY_I18N_KEYS: ReadonlySet<string> = new Set(
+/**
+ * The title-key values of `SECURITY_FINDING_PUSH_TITLE_KEYS`. Membership means
+ * the push's body line comes from `SECURITY_FINDING_PUSH_BODY_KEY`, not from
+ * `<i18nKey>.body`.
+ */
+const SECURITY_FINDING_TITLE_I18N_KEYS: ReadonlySet<string> = new Set(
   Object.values(SECURITY_FINDING_PUSH_TITLE_KEYS)
 );
 
@@ -27,5 +32,7 @@ const SHARED_BODY_I18N_KEYS: ReadonlySet<string> = new Set(
  * under `<i18nKey>.body` and the security-finding kinds read the shared entry.
  */
 export function pushBodyCatalogKey(i18nKey: string): string {
-  return SHARED_BODY_I18N_KEYS.has(i18nKey) ? SECURITY_FINDING_PUSH_BODY_KEY : `${i18nKey}.body`;
+  return SECURITY_FINDING_TITLE_I18N_KEYS.has(i18nKey)
+    ? SECURITY_FINDING_PUSH_BODY_KEY
+    : `${i18nKey}.body`;
 }

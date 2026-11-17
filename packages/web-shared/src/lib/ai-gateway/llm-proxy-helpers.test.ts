@@ -1203,6 +1203,56 @@ describe('countAndStoreFimUsage', () => {
       });
     });
 
+    it('times a streamed response from its first generated token', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          2_000,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"completion"}}]}\n\n',
+        ],
+        [
+          2_100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: 2_000, generation_time: 100 });
+    });
+
+    it('reports no timing for a streamed response without generated tokens', async () => {
+      const body = clock.bodyArrivingAt([
+        [
+          100,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+        ],
+        [
+          300,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":0,"total_tokens":1000}}\n\n',
+        ],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: null, generation_time: null });
+    });
+
     it('records an interrupted stream as an error', async () => {
       const body = clock.bodyArrivingAt(
         [
@@ -2092,6 +2142,173 @@ describe('captureProxyError', () => {
     });
     expect(JSON.stringify(data)).not.toContain('secret');
   });
+
+  async function captureResponsesError(
+    request: unknown,
+    response = Response.json({ error: {} }, { status: 400 })
+  ) {
+    await captureProxyError({
+      errorMessage: 'openai-chatgpt returned error 400',
+      user: { id: 'synthetic-user' },
+      request,
+      response,
+      organizationId: undefined,
+      model: 'openai/gpt-6.1-sol',
+      trackInSentry: false,
+    });
+    return capturedErrorData();
+  }
+
+  it('logs Responses item types, sorted field unions, and message content types without values', async () => {
+    const data = await captureResponsesError({
+      model: 'openai/gpt-6.1-sol',
+      input: [
+        'private string',
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            { type: 'input_text', text: 'private prompt' },
+            { type: 'input_image', image_url: 'private image' },
+            { type: 'input_text', text: 'private prompt' },
+          ],
+        },
+        { role: 'assistant', content: [{ type: 'output_text', text: 'private output' }] },
+        { type: 'message', role: 'assistant', status: 'completed', content: 'private output' },
+        { type: 'reasoning', id: 'private-id', encrypted_content: 'private encrypted content' },
+        {
+          type: 'function_call',
+          name: 'private-tool',
+          call_id: 'private-id',
+          arguments: 'private arguments',
+        },
+        { type: 'future_item', content: [{ type: 'not_a_message_part' }] },
+      ],
+    });
+
+    expect(data).toMatchObject({
+      requestFields: 'input,model',
+      inputItemTypes: 'function_call,future_item,message,reasoning,string',
+      inputItemFields:
+        'function_call:arguments,call_id,name,type;future_item:content,type;message:content,role,status,type;reasoning:encrypted_content,id,type;string:',
+      inputContentPartTypes: 'input_image,input_text,output_text',
+    });
+    expect(JSON.stringify(data)).not.toContain('private');
+    expect(data).not.toHaveProperty('messageFields');
+  });
+
+  it('bounds shape diagnostics to 512 characters and the item-type list to 12 entries', async () => {
+    const key = 'synthetic_field_'.repeat(40);
+    const data = await captureResponsesError({
+      [key]: 'private value',
+      messages: [{ [key]: 'private value' }],
+      input: [
+        ...Array.from({ length: 20 }, (_, index) => ({
+          type: `item_${index}`,
+          [key]: 'private value',
+        })),
+        {
+          type: 'message',
+          content: [{ type: 'synthetic_content_type_'.repeat(40), text: 'private prompt' }],
+        },
+      ],
+    });
+
+    for (const field of [
+      'requestFields',
+      'messageFields',
+      'inputItemTypes',
+      'inputItemFields',
+      'inputContentPartTypes',
+    ]) {
+      expect(typeof data[field]).toBe('string');
+      expect(String(data[field]).length).toBeLessThanOrEqual(512);
+    }
+    expect(String(data.inputItemTypes).split(',')).toHaveLength(12);
+    expect(JSON.stringify(data)).not.toContain('private');
+  });
+
+  it.each([null, 42, [], true, { type: null }, { type: 42 }])(
+    'handles malformed input items without logging their values: %j',
+    async item => {
+      const data = await captureResponsesError({
+        input: [item, { type: 'message', content: [null, 42, { type: null }] }],
+      });
+
+      expect(data.inputItemTypes).toBe('message,unknown');
+      expect(data.inputContentPartTypes).toBe('');
+    }
+  );
+
+  it('does not describe a plain Responses input string', async () => {
+    const data = await captureResponsesError({ input: 'private prompt' });
+
+    expect(data).not.toHaveProperty('inputItemTypes');
+    expect(data).not.toHaveProperty('inputItemFields');
+    expect(data).not.toHaveProperty('inputContentPartTypes');
+    expect(JSON.stringify(data)).not.toContain('private');
+  });
+
+  it('extracts upstream error.param and error.code from the same response read', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message: 'rejected',
+          param: 'input[3].call_id',
+          code: 'string_above_max_length',
+        },
+      },
+      { status: 400 }
+    );
+    const data = await captureResponsesError({ input: [] }, response);
+
+    expect(data).toMatchObject({
+      upstreamErrorParam: 'input[3].call_id',
+      upstreamErrorCode: 'string_above_max_length',
+    });
+    expect(response.bodyUsed).toBe(false);
+    expect(await response.json()).toMatchObject({ error: { param: 'input[3].call_id' } });
+  });
+
+  it('extracts error fields after the first 4k and bounds them to 512 characters', async () => {
+    const data = await captureResponsesError(
+      {},
+      Response.json(
+        {
+          padding: 'x'.repeat(4096),
+          error: { param: 'a'.repeat(600), code: 'b'.repeat(600) },
+        },
+        { status: 400 }
+      )
+    );
+
+    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.upstreamErrorParam).toBe('a'.repeat(512));
+    expect(data.upstreamErrorCode).toBe('b'.repeat(512));
+  });
+
+  it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
+    const response = Response.json(
+      { padding: 'x'.repeat(16 * 1024), error: { param: 'input', code: 'unknown_parameter' } },
+      { status: 400 }
+    );
+    const data = await captureResponsesError({}, response);
+
+    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data).not.toHaveProperty('upstreamErrorParam');
+    expect(data).not.toHaveProperty('upstreamErrorCode');
+    expect(await response.json()).toMatchObject({ error: { param: 'input' } });
+  });
+
+  it.each(['not JSON', 'null', '[]', '{"error":null}', '{"error":{"param":null,"code":{}}}'])(
+    'does not extract malformed error fields from %s',
+    async body => {
+      const data = await captureResponsesError({}, new Response(body, { status: 400 }));
+
+      expect(data).not.toHaveProperty('upstreamErrorParam');
+      expect(data).not.toHaveProperty('upstreamErrorCode');
+    }
+  );
 
   it('omits optional fields that add no information', async () => {
     await captureProxyError({

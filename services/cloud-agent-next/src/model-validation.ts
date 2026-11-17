@@ -22,7 +22,13 @@ type ModelValidationEnv = Pick<
   PersistenceEnv,
   'KILOCODE_BACKEND_BASE_URL' | 'KILO_OPENROUTER_BASE' | 'KILOCODE_ORG_ID_OVERRIDE'
 > &
-  Partial<Pick<PersistenceEnv, 'NEXTAUTH_SECRET'>>;
+  Partial<Pick<PersistenceEnv, 'NEXTAUTH_SECRET'>> & {
+    /**
+     * E2E only: the fake Worker serves the catalogue that stands in for the
+     * official backend. Absent in production; rendered into the e2e Worker.
+     */
+    E2E_MODEL_VALIDATION_BASE_URL?: string;
+  };
 
 type EffectiveCatalogContext = {
   token?: string;
@@ -144,11 +150,27 @@ function anonymousCatalogContext(feature: string): EffectiveCatalogContext {
   return { feature };
 }
 
+/**
+ * The e2e catalogue base, honoured only when it has the same origin as
+ * `KILO_OPENROUTER_BASE`. This keeps a session bearer and an attestation proof
+ * on the origin that already receives the model traffic.
+ */
+function e2eValidationBaseUrl(env: ModelValidationEnv): string | undefined {
+  const value = env.E2E_MODEL_VALIDATION_BASE_URL;
+  if (!value || !env.KILO_OPENROUTER_BASE) return undefined;
+  try {
+    return new URL(value).origin === new URL(env.KILO_OPENROUTER_BASE).origin ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function officialValidationUrl(
   env: ModelValidationEnv,
   organizationId: string | undefined
 ): string {
-  const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+  const configured = e2eValidationBaseUrl(env) ?? env.KILOCODE_BACKEND_BASE_URL;
+  const backendUrl = (configured ?? DEFAULT_BACKEND_URL).replace(/\/+$/, '');
   return organizationId
     ? `${backendUrl}/api/organizations/${encodeURIComponent(organizationId)}/models/validate`
     : `${backendUrl}/api/openrouter/models/validate`;

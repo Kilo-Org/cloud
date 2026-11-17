@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "La teva sessió d'agent té una actualització",
-      "chatMessage": "Tens un missatge nou",
-      "instanceLifecycle": "La teva instància té una actualització",
-      "scheduledAction": "Una acció programada té una actualització",
       "lowBalance": "El teu saldo necessita atenció",
       "spendAlert": "La teva despesa necessita atenció",
       "securityFinding": "Una troballa de seguretat necessita atenció",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Sense títol",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Una comprovació de seguretat té una actualització"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} està a punt",
-      "body": "Toqueu per començar a xatejar."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} no ha pogut iniciar-se",
-      "body": "L'inici ha fallat."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} es reiniciarà aviat",
-      "body": "Programat per reiniciar-se a les {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Reinici de {{instanceName}} cancel·lat",
-      "body": "El reinici programat anteriorment s'ha cancel·lat."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} s'actualitzarà aviat",
-      "bodyWithTag": "Actualització a {{targetImageTag}} a les {{when}}.",
-      "bodyWithoutTag": "Actualització programada a les {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Actualització de {{instanceName}} cancel·lada",
-      "body": "L'actualització programada anteriorment s'ha cancel·lat."
     }
   },
   "sessionReady": {

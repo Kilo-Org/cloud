@@ -17,7 +17,6 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
-  Mail: 'Mail',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
   Server: 'Server',
@@ -26,6 +25,10 @@ vi.mock('@/components/ui/icons', () => ({
   Users: 'Users',
   Wallet: 'Wallet',
 }));
+
+// Every row is an absolute web URL, so the suite needs the base the app bakes
+// in. The shared setup mocks this module with no value at all.
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
 
 function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
@@ -42,22 +45,17 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
 }
 
 function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
-  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }).map(
+  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }, 'org_1').map(
     row => row.area
   );
 }
 
 describe('visibleOrgSettingsRows', () => {
-  it('lists every area for an owner of an enterprise organization', () => {
+  it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
-      'usageDetails',
       'providersAndModels',
-      'customModes',
-      'groups',
       'guardrails',
-      'byok',
       'ssoAndDomain',
-      'emailPreferences',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -66,31 +64,19 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual([
-      'usageDetails',
-      'customModes',
-      'groups',
-      'ssoAndDomain',
-      'integrations',
-    ]);
+    // The SSO card is the shell's own page, so it carries no billing gate.
+    expect(areas({ role: 'member' })).toEqual(['ssoAndDomain', 'integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'usageDetails',
-      'customModes',
-      'dataCollection',
-      'integrations',
-    ]);
+    // Data collection is the teams dashboard card the shell hosts, so a member
+    // sees it where an enterprise member sees providers and models.
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['dataCollection', 'integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'usageDetails',
-      'customModes',
       'guardrails',
-      'byok',
-      'emailPreferences',
       'dataCollection',
       'requestLogs',
       'integrations',
@@ -113,54 +99,84 @@ describe('visibleOrgSettingsRows', () => {
   it('drops the owner-only rows for a billing manager', () => {
     const rows = areas({ role: 'billing_manager' });
     expect(rows).not.toContain('guardrails');
-    expect(rows).not.toContain('emailPreferences');
     expect(rows).toContain('providersAndModels');
   });
 
   it('opens the web page that owns each setting', () => {
     const rows = visibleOrgSettingsRows(gate(), 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
+    const webUrl = (area: 'subOrganizations' | 'distributeFunds') => {
+      const target = byArea.get(area)?.target;
+      return target?.kind === 'web' ? target.url : undefined;
+    };
+    expect(webUrl('subOrganizations')?.endsWith('/organizations/org_1/sub-organizations')).toBe(
+      true
+    );
     expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
+      webUrl('distributeFunds')?.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
     ).toBe(true);
-    expect(
-      byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
-    ).toBe(true);
-    expect(
-      byArea
-        .get('distributeFunds')
-        ?.url.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
-    ).toBe(true);
-    // A dashboard card rather than a page of its own.
-    expect(byArea.get('ssoAndDomain')?.url.endsWith('/organizations/org_1')).toBe(true);
+    // The two dashboard cards the app shell owns hand off to their shell pages.
+    expect(byArea.get('ssoAndDomain')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-sso', organizationId: 'org_1' },
+    });
     // Data collection is the teams dashboard's card, in place of providers and
     // models, so it appears on that plan only.
     const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
-    expect(
-      teams.find(row => row.area === 'dataCollection')?.url.endsWith('/organizations/org_1')
-    ).toBe(true);
+    expect(teams.find(row => row.area === 'dataCollection')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-data-collection', organizationId: 'org_1' },
+    });
   });
 
   it('keeps every in-app area out of the web group', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        expect(areas({ role, plan })).not.toContain('auditLogs');
+        const rows = areas({ role, plan });
+        expect(rows).not.toContain('auditLogs');
+        expect(rows).not.toContain('usageDetails');
+        expect(rows).not.toContain('customModes');
+        expect(rows).not.toContain('groups');
+        expect(rows).not.toContain('byok');
       }
     }
   });
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns the audit log to every billing role on the enterprise plan', () => {
+  it('returns every in-app area to a billing role on enterprise', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['auditLogs']);
+      expect(inAppAreas({ role })).toEqual([
+        'customModes',
+        'groups',
+        'usageDetails',
+        'auditLogs',
+        'byok',
+      ]);
     }
   });
 
-  it('returns nothing to a member, an unknown role or a teams plan', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual([]);
-    expect(inAppAreas({ role: undefined })).toEqual([]);
-    expect(inAppAreas({ plan: 'teams' })).toEqual([]);
+  it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
+  });
+
+  it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails', 'byok']);
+  });
+
+  it('opens the native screen that owns each setting', () => {
+    const rows = visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise' }, 'org_1');
+    const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
+    expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
+    expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
+    expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('byok')?.href).toEqual({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org_1' },
+    });
   });
 });
 

@@ -39,7 +39,14 @@ internal object CardBuilders {
     context: Context,
     icon: Int,
     label: String,
-    intent: PendingIntent
+    intent: PendingIntent,
+    authenticationRequired: Boolean = false
   ): Notification.Action =
-    Notification.Action.Builder(Icon.createWithResource(context, icon), label, intent).build()
+    Notification.Action.Builder(Icon.createWithResource(context, icon), label, intent)
+      .apply {
+        if (authenticationRequired && Build.VERSION.SDK_INT >= 31) {
+          setAuthenticationRequired(true)
+        }
+      }
+      .build()
 }

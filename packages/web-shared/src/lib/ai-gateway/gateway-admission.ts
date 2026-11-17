@@ -13,20 +13,31 @@ import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  isDataCollectionExplicitlyDisallowed,
+  type OpenRouterProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   accountFreeModelLimitResponse,
   anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
+  dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   gatewayAccountRateLimitResponse,
   getOrganizationProviderPrivacy,
+  inferenceRegionRefusedResponse,
   invalidTokenResponse,
   managedGatewayDisabledResponse,
   modelNotAllowedResponse,
@@ -43,13 +54,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 import {
-  getManagedGatewayFromUrl,
+  getGatewaySettingsRefusal,
   getOrganizationGatewaySettings,
-  isManagedGatewayDisabled,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  type GatewayPolicyRoute,
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 type GatewayAuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 
@@ -67,6 +78,7 @@ export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | Rej
  * Caps one account's inference request rate across every source address. Routes
  * call this before authentication: the key comes from the signed token, so a
  * flooded request costs no database query. See `isGatewayAccountRateLimited`.
+ * Autocomplete routes skip it; see `packages/web-shared/AGENTS.md`.
  */
 export async function gatewayAccountRateLimitRejection(
   request: NextRequest,
@@ -109,47 +121,36 @@ export async function freeModelRateLimitRejection(params: {
 }
 
 /**
- * Null when the route may use the provider, or the response for a provider
- * that is, or whose upstream URL points at, a gateway the organization disabled.
+ * Null when the organization's gateway settings admit the route, otherwise the response that
+ * explains which setting refuses it. See `getGatewaySettingsRefusal`.
  */
-export function managedGatewayRejection(
+export function gatewaySettingsRejection(
   settings: OrganizationGatewaySettings,
-  providerType: Provider['type'],
-  apiUrl: string
+  route: GatewayPolicyRoute
 ): NextResponse | null {
-  if (isManagedGatewayDisabled(settings, providerType)) {
-    return managedGatewayDisabledResponse(providerType);
-  }
-  const gatewayByDomain = getManagedGatewayFromUrl(apiUrl);
-  if (gatewayByDomain && isManagedGatewayDisabled(settings, gatewayByDomain)) {
-    return managedGatewayDisabledResponse(gatewayByDomain);
-  }
-  return null;
+  const refusal = getGatewaySettingsRefusal(settings, route);
+  if (!refusal) return null;
+  return refusal.kind === 'inference-region'
+    ? inferenceRegionRefusedResponse(refusal.region)
+    : managedGatewayDisabledResponse(refusal.kind);
 }
 
 /**
- * The organization gateway settings for a request with a single provider route:
- * rejected when that route uses a disabled gateway, otherwise the data region
- * to pin Vercel AI Gateway inference to.
+ * The gateway settings that apply to a request: the organization's, when its plan and the
+ * organization feature let them take effect, and none outside an organization.
  */
-export async function organizationGatewayPolicy(params: {
+export async function resolveOrganizationGatewaySettings(params: {
   organizationId: string | undefined;
+  plan: OrganizationPlan | undefined;
   settings: OrganizationSettings | undefined;
-  provider: Pick<Provider, 'type' | 'apiUrl'>;
-}): Promise<
-  | { kind: 'rejected'; response: NextResponse }
-  | { kind: 'allowed'; dataRegion: OrganizationGatewaySettings['dataRegion'] }
-> {
-  const { organizationId, settings, provider } = params;
-  if (!organizationId || !settings) return { kind: 'allowed', dataRegion: null };
-  const gatewaySettings = getOrganizationGatewaySettings(
-    await getRuntimeOrganizationFeatures(),
-    organizationId,
-    settings
-  );
-  const rejection = managedGatewayRejection(gatewaySettings, provider.type, provider.apiUrl);
-  if (rejection) return { kind: 'rejected', response: rejection };
-  return { kind: 'allowed', dataRegion: gatewaySettings.dataRegion };
+}): Promise<OrganizationGatewaySettings> {
+  const { organizationId, plan, settings } = params;
+  if (!organizationId || !settings) return NO_ORGANIZATION_GATEWAY_SETTINGS;
+  return getOrganizationGatewaySettings(await getRuntimeOrganizationFeatures(), {
+    id: organizationId,
+    plan,
+    settings,
+  });
 }
 
 /**
@@ -265,6 +266,20 @@ export function organizationProviderPreferences(params: {
       ...(only && { only }),
     },
   };
+}
+
+/** Rejects a model that requires data collection under the effective provider privacy policy. */
+export async function dataCollectionPolicyRejection(
+  model: string,
+  effectiveProviderPolicy: OpenRouterProviderConfig | undefined
+): Promise<NextResponse | null> {
+  if (
+    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
+    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
+  ) {
+    return dataCollectionRequiredResponse();
+  }
+  return null;
 }
 
 /**

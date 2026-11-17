@@ -1,5 +1,7 @@
 import { relative } from 'node:path';
 
+import { matchesKiloPermissionPattern } from '../shared/profile-permission-policy.js';
+
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
 export function bitbucketReviewInputPath(reviewId: string): string {
@@ -411,10 +413,10 @@ export function getCommandGuardPolicy(
 
 export function buildCommandGuardBashPermissions(
   commandGuardPolicy: CommandGuardPolicy
-): Record<string, string> {
+): Record<string, 'allow' | 'deny'> {
   // Denies are inserted after allows so exact duplicates still fail closed;
   // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
-  const bashPermissions: Record<string, string> = {};
+  const bashPermissions: Record<string, 'allow' | 'deny'> = {};
   if (commandGuardPolicy.defaultDeny) {
     bashPermissions['*'] = 'deny';
   }
@@ -443,11 +445,13 @@ export function buildCommandGuardBashPermissions(
   return bashPermissions;
 }
 
+export type CommandGuardPermission = 'allow' | 'deny' | Record<string, 'allow' | 'deny'>;
+
 export function getCommandGuardPermissions(
   policy: CommandGuardPolicy,
   workspacePath: string,
   bitbucketReviewId?: string
-): Record<string, string | Record<string, string>> {
+): Record<string, CommandGuardPermission> {
   const bitbucketReviewPolicy = policy.policyName === 'bitbucket-code-review-read-only';
   return {
     edit:
@@ -469,17 +473,7 @@ export function getCommandGuardPermissions(
   };
 }
 
-function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
-  let escaped = pattern
-    .replaceAll('\\', '/')
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  if (escaped.endsWith(' .*')) {
-    escaped = `${escaped.slice(0, -3)}( .*)?`;
-  }
-  return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
-}
+export { matchesKiloPermissionPattern };
 
 // The runtime classifies a shell call per parsed command node: the CLI collects
 // one pattern for each command in the call and refuses the call when one

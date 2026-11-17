@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ContextPickerScreen from './context-picker';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
+import { isContextPickerPresented } from '@/lib/picker-presentation';
 
 const bridge = vi.hoisted(() => ({
   options: ['Personal', 'Acme'],
@@ -116,6 +117,24 @@ describe('ContextPickerScreen hardware Back', () => {
       renderer.unmount();
     });
     expect(backHandlers.listeners.size).toBe(0);
+  });
+
+  it('marks the picker presented for its own lifetime, so no opener can stack a copy', async () => {
+    expect(isContextPickerPresented()).toBe(false);
+    const renderer = await mount();
+    expect(isContextPickerPresented()).toBe(true);
+
+    // A second copy of the same route in the tree does not close the mark early.
+    const second = await mount();
+    act(() => {
+      second.unmount();
+    });
+    expect(isContextPickerPresented()).toBe(true);
+
+    act(() => {
+      renderer.unmount();
+    });
+    expect(isContextPickerPresented()).toBe(false);
   });
 
   it('ignores hardware Back once the route lost focus', async () => {

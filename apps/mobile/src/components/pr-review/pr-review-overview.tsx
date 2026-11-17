@@ -30,13 +30,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
-import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -113,10 +111,8 @@ export function PrReviewOverview({
   const handleInstallApp = useCallback(() => {
     void (async () => {
       try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          returnTo: '/cloud/sessions',
-        });
-        await WebBrowser.openBrowserAsync(getGitHubIntegrationUrl(WEB_BASE_URL, undefined, token));
+        const url = await appShellHandoffUrl({ page: 'github-app' });
+        await WebBrowser.openBrowserAsync(url);
       } catch {
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
       }

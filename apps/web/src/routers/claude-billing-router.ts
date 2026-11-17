@@ -11,7 +11,6 @@ import {
   claudeBillingOwnerKey,
   describeClaudeBillingSharing,
   getGrantedClaudeBillingConnection,
-  removeClaudeBillingGrant,
   shareClaudeBillingConnection,
   type ClaudeBillingOwner,
   type ClaudeBillingScopeSharing,
@@ -28,7 +27,10 @@ import {
   claudeBillingConnectionState,
   type ClaudeBillingConnectionState,
 } from '@/lib/claude-billing/profile';
-import { retireUnreferencedClaudeBillingPayer } from '@/lib/claude-billing/delete';
+import {
+  retireUnreferencedClaudeBillingPayer,
+  unlinkAndRemoveClaudeBillingGrant,
+} from '@/lib/claude-billing/delete';
 /**
  * The caller's Claude billing connections: their personal one, and the
  * connection of an organization they belong to. A person manages their own
@@ -243,13 +245,30 @@ export const claudeBillingRouter = createTRPCRouter({
           message: 'Only an organization owner or admin can remove the organization link.',
         });
       }
-      const unreferencedPayer = await removeClaudeBillingGrant(owner);
-      if (unreferencedPayer) {
-        await retireUnreferencedClaudeBillingPayer(unreferencedPayer).catch(error => {
-          console.error('[claude-billing] remote profile retirement deferred', {
-            error: error instanceof Error ? error.name : 'unknown',
-          });
+      const removal = await unlinkAndRemoveClaudeBillingGrant(owner);
+      if (removal.unlink.kind === 'retry') {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Anthropic did not confirm the unlink. Try again.',
         });
+      }
+      if (removal.unlink.kind === 'needs_console') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Unlink Kilo under Linked platforms in Claude Console, then remove it here.',
+        });
+      }
+      // `missing` continues here: Anthropic has no such profile, so there is no
+      // link left to end and the row has nothing to bill through.
+      const unreferencedPayer = removal.unreferencedPayer;
+      if (unreferencedPayer) {
+        await retireUnreferencedClaudeBillingPayer(unreferencedPayer, { unlink: false }).catch(
+          error => {
+            console.error('[claude-billing] remote profile retirement deferred', {
+              error: error instanceof Error ? error.name : 'unknown',
+            });
+          }
+        );
       }
       return await buildScopeStatus(userId, owner, canManage);
     }),

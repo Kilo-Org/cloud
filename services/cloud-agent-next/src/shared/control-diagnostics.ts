@@ -18,6 +18,12 @@ export const CONTROL_LOG_MAX_RECORD_BYTES = 4096;
 export const CONTROL_LOG_MAX_ARCHIVE_BYTES = 8 * 1024 * 1024;
 export const CONTROL_LOG_ARCHIVE_NAME = 'files.tar.gz';
 export const CONTROL_LOG_GRANT_SECONDS = 4 * 60 * 60;
+export const CONTROL_LOG_GRANT_AUDIENCE = 'cloud-agent-control-log-upload';
+export const SANDBOX_TRANSFER_GRANT_SECONDS = 4 * 60 * 60;
+export const SANDBOX_TRANSFER_GRANT_AUDIENCE = 'cloud-agent-sandbox-transfer';
+export const sandboxTransferScopes = ['logs', 'workspace_artifacts'] as const;
+export type SandboxTransferScope = (typeof sandboxTransferScopes)[number];
+export const sandboxTransferScopeSchema = z.enum(sandboxTransferScopes);
 export const controlLogUploadResults = [
   'accepted',
   'http_rejection',

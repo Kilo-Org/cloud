@@ -20,6 +20,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { SlashCommandsSkeleton } from '@/components/profiles/slash-commands-skeleton';
 import { ADD_FORM_KEY, useCommandSavePhase } from '@/components/profiles/use-command-save-phase';
 import { Text } from '@/components/ui/text';
@@ -31,6 +32,7 @@ import {
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -183,71 +185,73 @@ export function ProfileKiloCommandsScreen({
     );
   } else {
     content = (
-      <>
-        {rows.map((row, index) => {
-          const source = commands[index];
-          if (source === undefined) {
-            return null;
-          }
-          return (
-            <KiloCommandRowView
-              key={row.id}
-              name={row.name}
-              description={row.description}
-              template={row.template}
-              subtask={row.subtask}
-              agent={row.agent}
-              model={row.model}
-              enabled={row.enabled}
-              isFirst={index === 0}
-              isLast={index === rows.length - 1}
-              onToggle={
-                canManage
-                  ? guardRowPress(enabled => {
-                      setKiloCommandEnabled.mutate(
-                        { profileId, commandId: source.id, enabled },
-                        {
-                          onError: error => {
-                            if (!hasUsableMessage(error)) {
-                              toast.error(t('profiles.slashCommands.saveFailed'));
-                            }
-                          },
-                        }
-                      );
-                    })
-                  : undefined
-              }
-              onMoveUp={
-                canManage
-                  ? guardRowPress(() => {
-                      move(index, -1);
-                    })
-                  : undefined
-              }
-              onMoveDown={
-                canManage
-                  ? guardRowPress(() => {
-                      move(index, 1);
-                    })
-                  : undefined
-              }
-              onEdit={
-                canManage
-                  ? guardRowPress(() => {
-                      startEdit(source);
-                    })
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? guardRowPress(() => {
-                      confirmDelete(source);
-                    })
-                  : undefined
-              }
-            />
-          );
-        })}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {rows.map((row, index) => {
+            const source = commands[index];
+            if (source === undefined) {
+              return null;
+            }
+            return (
+              <KiloCommandRowView
+                key={row.id}
+                name={row.name}
+                description={row.description}
+                template={row.template}
+                subtask={row.subtask}
+                agent={row.agent}
+                model={row.model}
+                enabled={row.enabled}
+                isFirst={index === 0}
+                isLast={index === rows.length - 1}
+                onToggle={
+                  canManage
+                    ? guardRowPress(enabled => {
+                        setKiloCommandEnabled.mutate(
+                          { profileId, commandId: source.id, enabled },
+                          {
+                            onError: error => {
+                              if (!hasUsableMessage(error)) {
+                                toast.error(t('profiles.slashCommands.saveFailed'));
+                              }
+                            },
+                          }
+                        );
+                      })
+                    : undefined
+                }
+                onMoveUp={
+                  canManage
+                    ? guardRowPress(() => {
+                        move(index, -1);
+                      })
+                    : undefined
+                }
+                onMoveDown={
+                  canManage
+                    ? guardRowPress(() => {
+                        move(index, 1);
+                      })
+                    : undefined
+                }
+                onEdit={
+                  canManage
+                    ? guardRowPress(() => {
+                        startEdit(source);
+                      })
+                    : undefined
+                }
+                onDelete={
+                  canManage
+                    ? guardRowPress(() => {
+                        confirmDelete(source);
+                      })
+                    : undefined
+                }
+              />
+            );
+          })}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atCommandCap ? (
             <AccessibleStatus
@@ -260,7 +264,7 @@ export function ProfileKiloCommandsScreen({
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -274,7 +278,7 @@ export function ProfileKiloCommandsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

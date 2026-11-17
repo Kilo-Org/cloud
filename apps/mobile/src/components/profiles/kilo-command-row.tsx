@@ -4,8 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -87,18 +90,18 @@ export function KiloCommandRowView({
     cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   const visibleName = `/${name}`;
   return (
-    <View className="gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="flex-row items-center gap-1">
+    <View className="gap-1 px-4 py-3">
+      <View className="flex-row items-center gap-3">
+        <IconTile icon={Terminal} tint={NEUTRAL_TINT} />
         <View className="min-w-0 flex-1 gap-0.5">
           <View className="flex-row flex-wrap items-center gap-2">
-            <Terminal size={16} color={colors.mutedForeground} />
             <Text variant="mono" className="text-sm" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
               {visibleName}
             </Text>
             {subtask ? (
-              <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <Eyebrow className="rounded-md border border-border px-1.5 py-0.5">
                 {t('profiles.slashCommands.subtask')}
-              </Text>
+              </Eyebrow>
             ) : null}
           </View>
           {description.length > 0 ? (
@@ -132,7 +135,7 @@ export function KiloCommandRowView({
       onMoveDown !== undefined ||
       onEdit !== undefined ||
       onDelete !== undefined ? (
-        <View className="flex-row items-center justify-end gap-5">
+        <View className="flex-row items-center justify-end gap-3">
           {onMoveUp !== undefined ? (
             <Pressable
               className={controlClass(isFirst)}

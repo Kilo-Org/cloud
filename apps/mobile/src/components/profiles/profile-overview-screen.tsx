@@ -39,12 +39,14 @@ import {
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useLeaveMissingProfileRoute } from '@/lib/hooks/use-leave-missing-profile-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
@@ -242,7 +244,7 @@ export function ProfileOverviewScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
@@ -309,11 +311,8 @@ export function ProfileOverviewScreen({
               canManage={canManage}
             />
 
-            <View className="gap-1">
-              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                {t('profiles.settingsSectionTitle')}
-              </Text>
-              <View>
+            <Section label={t('profiles.settingsSectionTitle')}>
+              <RowGroup leadingTile>
                 {overviewSectionRows(profile).map(row => (
                   <ConfigureRow
                     key={row.key}
@@ -335,8 +334,8 @@ export function ProfileOverviewScreen({
                     }}
                   />
                 ) : null}
-              </View>
-            </View>
+              </RowGroup>
+            </Section>
 
             {!canManage ? null : (
               <Button

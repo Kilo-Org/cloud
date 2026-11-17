@@ -1,10 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Text } from '@/components/ui/text';
-import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { FilterChip } from '@/components/ui/filter-chip';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { thinkingEffortLabel } from '@/lib/hooks/use-available-models';
-import { cn } from '@/lib/utils';
 
 type AgentVariantPickerProps = Readonly<{
   /** The catalogue variants published for the currently typed model. */
@@ -28,21 +27,16 @@ export function AgentVariantPicker({
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium text-foreground">
-        {t('agentChat.modelSelector.thinkingEffort')}
-      </Text>
+      <FormFieldLabel label={t('agentChat.modelSelector.thinkingEffort')} />
       <View className="flex-row flex-wrap gap-2">
         {variants.map(option => {
           const selected = value === option;
           return (
-            <Pressable
+            <FilterChip
               key={option}
-              className={cn(
-                'min-h-[44px] items-center justify-center rounded-full px-4 active:opacity-70',
-                selected ? 'bg-foreground' : 'bg-secondary'
-              )}
+              selected={selected}
+              label={thinkingEffortLabel(option)}
               disabled={disabled}
-              {...selectableRowA11y({ multi: false, selected })}
               accessibilityLabel={
                 selected
                   ? t('agentChat.modelSelector.thinkingEffortSelected', {
@@ -55,16 +49,7 @@ export function AgentVariantPicker({
               onPress={() => {
                 onChange(option);
               }}
-            >
-              <Text
-                className={cn(
-                  'text-sm font-medium',
-                  selected ? 'text-background' : 'text-foreground'
-                )}
-              >
-                {thinkingEffortLabel(option)}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </View>

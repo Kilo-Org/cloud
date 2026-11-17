@@ -16,7 +16,9 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
@@ -26,11 +28,13 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -73,14 +77,13 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
   const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
   const canEdit = skill.sourceType !== 'skills-sh';
   return (
-    <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+      <IconTile icon={Sparkles} tint={NEUTRAL_TINT} />
       <View className="min-w-0 flex-1 gap-0.5">
         <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {skill.name}
         </Text>
-        <Text variant="muted" className="text-xs">
-          {subtitle}
-        </Text>
+        <Text variant="caption">{subtitle}</Text>
       </View>
       <Switch
         value={skill.enabled}
@@ -115,11 +118,11 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
 /** Content-shaped rows in the same slot and height as a loaded skill row. */
 function SkillsSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -257,47 +260,49 @@ export function ProfileSkillsScreen({
     );
   } else {
     content = (
-      <>
-        {skills.map(skill => (
-          <SkillRow
-            key={skill.id}
-            skill={skill}
-            onToggle={
-              canManage
-                ? guardRowPress(enabled => {
-                    setSkillEnabled.mutate(
-                      { profileId, skillId: skill.id, enabled },
-                      {
-                        onError: error => {
-                          if (!hasUsableMessage(error)) {
-                            toast.error(t('profiles.skillToggleFailed'));
-                          }
-                        },
-                      }
-                    );
-                  })
-                : undefined
-            }
-            onEdit={
-              canManage
-                ? guardRowPress(() => {
-                    form.startEdit(skill);
-                  })
-                : undefined
-            }
-            onDelete={
-              canManage
-                ? guardRowPress(() => {
-                    confirmDelete({
-                      id: skill.id,
-                      name: skill.name,
-                      rawMarkdown: skill.rawMarkdown,
-                    });
-                  })
-                : undefined
-            }
-          />
-        ))}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {skills.map(skill => (
+            <SkillRow
+              key={skill.id}
+              skill={skill}
+              onToggle={
+                canManage
+                  ? guardRowPress(enabled => {
+                      setSkillEnabled.mutate(
+                        { profileId, skillId: skill.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.skillToggleFailed'));
+                            }
+                          },
+                        }
+                      );
+                    })
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? guardRowPress(() => {
+                      form.startEdit(skill);
+                    })
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? guardRowPress(() => {
+                      confirmDelete({
+                        id: skill.id,
+                        name: skill.name,
+                        rawMarkdown: skill.rawMarkdown,
+                      });
+                    })
+                  : undefined
+              }
+            />
+          ))}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atSkillCap ? (
             <AccessibleStatus
@@ -310,7 +315,7 @@ export function ProfileSkillsScreen({
             <Text>{t('profiles.addSkill')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -324,7 +329,7 @@ export function ProfileSkillsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

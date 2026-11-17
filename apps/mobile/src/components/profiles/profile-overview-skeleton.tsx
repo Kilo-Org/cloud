@@ -1,45 +1,50 @@
 import { View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Content-shaped loading rows in the same slots as the loaded screen (two
- * fields, the default row, the six section rows, the delete button) so the
- * swap to real content does not move anything.
+ * Content-shaped loading blocks in the same slots as the loaded screen (the
+ * metadata card, the default row, the repo-pins section, the settings rows and
+ * the delete action) so the swap to real content does not move anything. The
+ * rows are the row primitive's own skeleton; the blocks use the card and row
+ * group surfaces the loaded screen uses.
  */
 export function ProfileOverviewSkeleton() {
   return (
     <View className="gap-6">
-      <View className="gap-4">
+      <Card>
         <View className="gap-1.5">
-          <Skeleton className="h-4 w-24 rounded" />
-          <Skeleton className="h-[44px] w-full rounded-md" />
+          <Skeleton className="h-4 w-24 rounded bg-muted-soft" />
+          <Skeleton className="h-11 w-full rounded-md bg-muted-soft" />
         </View>
         <View className="gap-1.5">
-          <Skeleton className="h-4 w-32 rounded" />
-          <Skeleton className="h-20 w-full rounded-md" />
+          <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
+          <Skeleton className="h-20 w-full rounded-md bg-muted-soft" />
         </View>
-        <Skeleton className="h-[44px] w-full rounded-md" />
+        <Skeleton className="h-11 w-full rounded-md bg-muted-soft" />
+      </Card>
+      <RowGroup>
+        <RowSkeleton tile subtitle />
+      </RowGroup>
+      <View className="gap-3">
+        <Skeleton className="h-2 w-28 rounded bg-muted-soft" />
+        <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
+        <RowGroup>
+          <RowSkeleton subtitle />
+        </RowGroup>
       </View>
-      <Skeleton className="h-16 w-full rounded-lg" />
-      <View className="gap-3 rounded-lg border border-border p-3">
-        <View className="flex-row items-center justify-between gap-2">
-          <Skeleton className="h-4 w-40 rounded" />
-          <Skeleton className="h-9 w-28 rounded-md" />
-        </View>
-        <Skeleton className="h-4 w-full rounded" />
-        <Skeleton className="h-9 w-full rounded-md" />
+      <View className="gap-3">
+        <Skeleton className="h-2 w-24 rounded bg-muted-soft" />
+        <RowGroup>
+          {[0, 1, 2, 3, 4, 5].map(index => (
+            <RowSkeleton key={index} tile subtitle />
+          ))}
+        </RowGroup>
       </View>
-      <View className="gap-1">
-        <Skeleton className="h-4 w-28 rounded" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-        <Skeleton className="h-[54px] w-full rounded-lg" />
-      </View>
-      <Skeleton className="h-[44px] w-full rounded-md" />
+      <Skeleton className="h-11 w-full rounded-md bg-muted-soft" />
     </View>
   );
 }

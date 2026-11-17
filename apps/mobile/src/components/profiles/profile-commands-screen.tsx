@@ -22,6 +22,7 @@ import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
@@ -31,6 +32,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -265,7 +267,7 @@ export function ProfileCommandsScreen({
       </View>
     ) : undefined;
     return (
-      <View key={`${generation}-${index}`} className="rounded-lg bg-secondary p-3">
+      <Card key={`${generation}-${index}`}>
         <SetupCommandField
           command={command}
           label={commandLabel}
@@ -282,7 +284,7 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
-      </View>
+      </Card>
     );
   };
 
@@ -346,7 +348,7 @@ export function ProfileCommandsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

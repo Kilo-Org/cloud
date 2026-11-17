@@ -4,10 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
-import {
-  ProfileOwnerHeading,
-  ProfileSectionHeading,
-} from '@/components/profiles/profile-owner-heading';
+import { useProfileOwnerLabel } from '@/components/profiles/profile-owner-heading';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
@@ -26,11 +23,14 @@ import {
   User,
 } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
@@ -51,23 +51,16 @@ function ownerIcon(profile: AgentProfileListItem): LucideIcon {
 }
 
 /**
- * Content-shaped loading rows. Each mirrors a loaded `ConfigureRow` (py-3 +
- * the 30pt icon tile beside the two-line text block) so the swap to real rows
- * does not move the screen.
+ * Content-shaped loading rows: the row primitive's own skeleton, so the swap to
+ * real rows does not move the screen.
  */
 function ProfileListSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3">
-          <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
-          <View className="flex-1 gap-0.5">
-            <Skeleton className="h-5 w-32 rounded bg-muted-soft" />
-            <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-          </View>
-        </View>
+        <RowSkeleton key={index} tile subtitle />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -82,6 +75,7 @@ export function ProfilesListScreen({
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const ownerLabel = useProfileOwnerLabel();
   const colors = useThemeColors();
   const { organizationId, isLoaded } = useOrganization();
   const isOrgContext = organizationId != null;
@@ -149,7 +143,7 @@ export function ProfilesListScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -193,53 +187,59 @@ export function ProfilesListScreen({
           />
         )}
         {/* The rows sit under the screen's own title, so they carry no heading
-            that would repeat it; only an owner section names its group. The
-            sections keep their own gap, and the scroll's gap separates this
-            block from the labeled group below. */}
+            that would repeat it; only an owner section names its group. Each
+            group is one `RowGroup`, with a thin gap between the owner groups. */}
         {!isListLoading && sections.length > 0 && (
           <View className="gap-6">
-            {sections.map(section => (
-              <View key={section.key} className="gap-3">
-                {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
-                {section.profiles.map(profile => {
-                  const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(
-                    ' · '
-                  );
-                  const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
-                  // The star is a visual mark inside the pressable row, so the
-                  // row's own name has to carry the state it announces.
-                  // TalkBack never reads `accessibilityHint` (React Native maps
-                  // it to the node's tooltip), so the action belongs in the
-                  // name as well.
-                  const accessibilityLabel = [
-                    profile.name,
-                    subtitle,
-                    isDefault ? t('profiles.defaultSectionTitle') : '',
-                    t('profiles.openHint'),
-                  ]
-                    .filter(part => part.length > 0)
-                    .join(', ');
-                  return (
-                    <ConfigureRow
-                      key={profile.id}
-                      icon={ownerIcon(profile)}
-                      title={profile.name}
-                      subtitle={subtitle || undefined}
-                      accessibilityLabel={accessibilityLabel}
-                      className="rounded-lg bg-secondary px-3"
-                      trailing={
-                        isDefault ? (
-                          <Star size={16} color={colors.primary} fill={colors.primary} />
-                        ) : undefined
-                      }
-                      onPress={() => {
-                        openProfile(profile);
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            ))}
+            {sections.map(section => {
+              const rows = (
+                <RowGroup leadingTile>
+                  {section.profiles.map(profile => {
+                    const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(
+                      ' · '
+                    );
+                    const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
+                    // The star is a visual mark inside the pressable row, so the
+                    // row's own name has to carry the state it announces.
+                    // TalkBack never reads `accessibilityHint` (React Native maps
+                    // it to the node's tooltip), so the action belongs in the
+                    // name as well.
+                    const accessibilityLabel = [
+                      profile.name,
+                      subtitle,
+                      isDefault ? t('profiles.defaultSectionTitle') : '',
+                      t('profiles.openHint'),
+                    ]
+                      .filter(part => part.length > 0)
+                      .join(', ');
+                    return (
+                      <ConfigureRow
+                        key={profile.id}
+                        icon={ownerIcon(profile)}
+                        title={profile.name}
+                        subtitle={subtitle || undefined}
+                        accessibilityLabel={accessibilityLabel}
+                        trailing={
+                          isDefault ? (
+                            <Star size={16} color={colors.primary} fill={colors.primary} />
+                          ) : undefined
+                        }
+                        onPress={() => {
+                          openProfile(profile);
+                        }}
+                      />
+                    );
+                  })}
+                </RowGroup>
+              );
+              return section.titleKey ? (
+                <Section key={section.key} label={ownerLabel(section.key)}>
+                  {rows}
+                </Section>
+              ) : (
+                <View key={section.key}>{rows}</View>
+              );
+            })}
           </View>
         )}
         {/* The defaults screen binds a repo to one of this list's profiles, so
@@ -249,18 +249,18 @@ export function ProfilesListScreen({
             with a heading, and the same gap above the heading and below it as
             the owner groups. */}
         {!isListLoading && sections.length > 0 && (
-          <View className="gap-3">
-            <ProfileSectionHeading>{repoDefaultsHeading}</ProfileSectionHeading>
-            <ConfigureRow
-              icon={GitBranch}
-              title={t('profiles.repoBindings.entryLabel')}
-              // The visible label is shortened under the section header, so
-              // the row's own name carries the full destination instead.
-              accessibilityLabel={t('profiles.repoBindings.title')}
-              className="rounded-lg bg-secondary px-3"
-              onPress={openRepoBindings}
-            />
-          </View>
+          <Section label={repoDefaultsHeading}>
+            <RowGroup leadingTile>
+              <ConfigureRow
+                icon={GitBranch}
+                title={t('profiles.repoBindings.entryLabel')}
+                // The visible label is shortened under the section header, so
+                // the row's own name carries the full destination instead.
+                accessibilityLabel={t('profiles.repoBindings.title')}
+                onPress={openRepoBindings}
+              />
+            </RowGroup>
+          </Section>
         )}
       </TabScreenScrollView>
     </View>

@@ -9,14 +9,6 @@ export const SUPPRESSED_DEV_LOG_SUBSTRINGS: readonly string[] = [
   // caught render error, and the dev overlay would cover the very fallback the
   // fixture exists to show. Only the fixture's own messages carry this prefix.
   'render recovery fixture:',
-  // Fabric reports this when a screen's own onLayout measurement callback sets
-  // state in the same tick the view tree is placed — the design gate hits it
-  // when a cell's configuration change re-lays out the mounted tab screen
-  // (reproduced on the emulator; a second identical run was clean, so it is a
-  // timing race, not a state). The measurement is legitimate by design: the
-  // height is unknowable before layout, and the guarded setter is a no-op on an
-  // unchanged value. It is dev-instrument noise a release build never renders.
-  "Can't perform a React state update on a component that hasn't mounted yet.",
 ];
 
 type DevLogBox = { ignoreLogs: (patterns: readonly string[]) => void };

@@ -1,6 +1,6 @@
 import { usePathname, useSegments } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { View, type ViewInstance } from 'react-native';
+import { LogBox, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DESIGN_GATE_ANCHOR_ID } from '@/lib/design-gate/collect';
@@ -10,6 +10,24 @@ declare global {
   // eslint-disable-next-line no-var -- a global the design-gate runner reads over the Metro inspector
   var __kiloDesignGate: DesignGateApi | undefined;
 }
+
+/**
+ * React reports this when a screen's own `onLayout` measurement callback sets
+ * state in the same tick the view tree is placed — the gate hits it when a
+ * cell's configuration change re-lays out the mounted tab screen (reproduced on
+ * the emulator; a second identical run was clean, so it is a timing race, not a
+ * state). The measurement is legitimate by design: the height is unknowable
+ * before layout, and the guarded setter is a no-op on an unchanged value.
+ *
+ * The ignore is scoped to the gate's own mount, never `index.js`: the message is
+ * otherwise a real defect signal the app relies on (`setThemePreference` orders
+ * the appearance change before the store emit for exactly this warning), so
+ * ordinary dev builds keep it and the gate's capture measures the screen and
+ * not its own overlay.
+ */
+const DESIGN_GATE_IGNORED_LOGS = [
+  "Can't perform a React state update on a component that hasn't mounted yet.",
+] as const;
 
 /**
  * Development-only: registers the design-gate layout probe while it is mounted.
@@ -33,6 +51,7 @@ export function DesignGateProbe() {
     safeArea.current = insets;
   }, [pathname, screenKey, insets]);
   useEffect(() => {
+    LogBox.ignoreLogs([...DESIGN_GATE_IGNORED_LOGS]);
     const api = createDesignGateApi({
       document: () => anchor.current?.ownerDocument ?? null,
       route: () => route.current,

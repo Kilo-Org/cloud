@@ -31,15 +31,19 @@ describe('applyDevLogBoxFilters', () => {
   it('does not silence every expo-iap log', () => {
     expect(SUPPRESSED_DEV_LOG_SUBSTRINGS).not.toContain('[Expo-IAP]');
   });
+});
 
-  it('matches the Fabric layout-measure warning the design gate hits', () => {
-    const fabricLayoutMeasureWarning =
-      "Can't perform a React state update on a component that hasn't mounted yet. " +
-      'This indicates that you have a side-effect in your render function that asynchronously tries ' +
-      'to update the component. Move this work to useEffect instead.';
-    expect(
-      SUPPRESSED_DEV_LOG_SUBSTRINGS.some(pattern => fabricLayoutMeasureWarning.includes(pattern))
-    ).toBe(true);
+describe('design-gate probe', () => {
+  it('scopes the layout-measure suppression to the probe module, not the app entry', () => {
+    const probeSource = readFileSync(
+      join(__dirname, '..', 'components', 'design-gate-probe.tsx'),
+      'utf8'
+    );
+    const entrySource = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
+    // The Fabric layout-measure warning stays a live signal in ordinary dev
+    // builds; only the gate's own mount may drop it.
+    expect(probeSource).toContain("Can't perform a React state update on a component");
+    expect(entrySource).not.toContain("Can't perform a React state update on a component");
   });
 });
 

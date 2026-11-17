@@ -2492,7 +2492,7 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
-  it('drops a rejected catch-up read that settles after a cursor reconnect, but reports the read failure', async () => {
+  it('records a rejected catch-up read without replaying rows when it settles after a cursor reconnect', async () => {
     jest.useFakeTimers();
     try {
       const stalePage = {
@@ -2539,13 +2539,17 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       resolveRetryRead(stalePage);
       await flushMicrotasks();
 
-      // The stale page is dropped: not replayed, not recorded, not re-fetched.
-      // The read failure itself was already reported on the error channel
-      // (reportSnapshotFailure runs before the epoch check drops the result).
+      // The stale page is recorded so the manager still seeds its
+      // older-messages cursor and queued-turn rows, but its message rows are
+      // not re-emitted over the newer live replay: no session.created, no
+      // page rows. The read failure itself keeps its one error report.
       expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
-      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenCalledWith(stalePage);
       expect(errors).toEqual(['Connection lost.']);
 
+      // The dropped read schedules no new fetch: the newer connection owns
+      // catch-up through its socket replay.
       jest.advanceTimersByTime(8000);
       await flushMicrotasks();
       expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);

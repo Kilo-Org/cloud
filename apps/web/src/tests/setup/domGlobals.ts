@@ -11,6 +11,8 @@
  * path stays off, exactly as it did under the pre-1.4/2.3 packages, and the
  * later linkedom global patch-up in the test cannot re-enable it.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 if (typeof globalThis.HTMLFormElement === 'undefined') {
   Object.defineProperty(globalThis, 'HTMLFormElement', {
     value: class HTMLFormElement {
@@ -51,5 +53,5 @@ if (typeof globalThis.getComputedStyle === 'undefined') {
  * it here, before any test module's import chain reaches `next/server`.
  */
 if (typeof globalThis.AsyncLocalStorage === 'undefined') {
-  globalThis.AsyncLocalStorage = require('node:async_hooks').AsyncLocalStorage;
+  globalThis.AsyncLocalStorage = AsyncLocalStorage;
 }

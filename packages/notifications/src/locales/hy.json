@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA խախտում"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Անվտանգության ստուգումն ունի թարմացում"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Ձեր Kilo նիստը պատրաստ է կառավարվելու ձեր հեռախոսից"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

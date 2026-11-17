@@ -927,3 +927,93 @@ describe('injectVercelModels inference regions', () => {
     ]);
   });
 });
+
+describe('injectVercelModels pricing of models OpenRouter already lists', () => {
+  function pricedListing(endpoint: Partial<NonNullable<OpenRouterModel['endpoint']>>) {
+    return {
+      ...nvidiaModel(),
+      endpoint: {
+        provider_display_name: 'Amazon Bedrock',
+        is_free: false,
+        pricing: { prompt: '0.000001', completion: '0.000004' },
+        data_policy: { training: false, retainsPrompts: false },
+        ...endpoint,
+      },
+    } satisfies OpenRouterModel;
+  }
+
+  function injectBedrockPricing(
+    listing: OpenRouterModel,
+    vercelPricing: NonNullable<Endpoint['pricing']>
+  ) {
+    const providerModelData = [
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [listing],
+      },
+    ];
+    injectSnapshotModels(
+      {
+        [MODEL_SLUG]: {
+          id: MODEL_SLUG,
+          name: listing.name,
+          endpoints: [{ provider_name: 'bedrock', pricing: vercelPricing }],
+        },
+      },
+      providerModelData
+    );
+    expect(providerModelData[0]?.models).toHaveLength(1);
+    return providerModelData[0]?.models[0]?.endpoint;
+  }
+
+  test('raises the listing to the Vercel price when Vercel charges more', () => {
+    const endpoint = injectBedrockPricing(pricedListing({}), {
+      prompt: '0.000002',
+      completion: '0.000003',
+    });
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0.000002', completion: '0.000004' });
+  });
+
+  test('compares against the undiscounted OpenRouter price', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ pricing: { prompt: '0.000001', completion: '0.000002', discount: 0.5 } }),
+      { prompt: '0.0000015', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing?.prompt).toBe('0.000002000000');
+    expect(endpoint?.pricing?.completion).toBe('0.000004000000');
+    expect(endpoint?.pricing).not.toHaveProperty('discount');
+  });
+
+  test('leaves the listing when Vercel charges less', () => {
+    const endpoint = injectBedrockPricing(pricedListing({}), {
+      prompt: '0.0000005',
+      completion: '0.000001',
+    });
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0.000001', completion: '0.000004' });
+  });
+
+  test('leaves a free listing free', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ is_free: true, pricing: { prompt: '0', completion: '0' } }),
+      { prompt: '0.000002', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0', completion: '0' });
+  });
+
+  test('leaves a free variant listing at its own price', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ variant: 'free', pricing: { prompt: '0', completion: '0' } }),
+      { prompt: '0.000002', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0', completion: '0' });
+  });
+});

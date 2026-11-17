@@ -78,6 +78,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'streamlake',
   'tencent',
   'together',
+  'typesafe',
   'upstage',
   'venice',
   'wafer',
@@ -239,6 +240,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'stepfun',
   'streamlake',
   'togetherai',
+  'typesafe-ai',
   'vertexAnthropic',
   'voyage',
   'wafer',
@@ -269,6 +271,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.zai,
   [OpenRouterInferenceProviderIdSchema.enum.together]:
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
+  [OpenRouterInferenceProviderIdSchema.enum.typesafe]:
+    VercelNonUserByokInferenceProviderIdSchema.enum['typesafe-ai'],
 } as Record<string, VercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;

@@ -3519,7 +3519,6 @@
     },
     "settingsOnWeb": {
       "title": "Postavke organizacije na webu",
-      "integrations": "Integracije na webu",
       "usageDetails": "Pojedinosti o potrošnji",
       "providersAndModels": "Pružatelji i modeli",
       "groups": "Grupe",
@@ -3528,9 +3527,19 @@
       "ssoAndDomain": "SSO i domena",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Revizijski zapisnici",
-      "requestLogs": "Zapisnici zahtjeva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodjela sredstava"
+      "requestLogs": "Zapisnici zahtjeva"
+    },
+    "requestLogs": {
+      "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",
+      "older": "Prethodni sat",
+      "newer": "Sljedeći sat",
+      "truncated": "U ovom satu ima više zahtjeva nego što je prikazano.",
+      "emptyTitle": "Nema zahtjeva",
+      "emptyDescription": "U ovom satu nema zahtjeva prema pristupniku.",
+      "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "tokens": "ulaz: {{input}} · izlaz: {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
@@ -4597,6 +4606,8 @@
     "topModels": "Najkorišteniji modeli",
     "topFeatures": "Najkorištenije značajke",
     "emptyTitle": "Nema potrošnje u ovom razdoblju",
+    "unavailableTitle": "Potrošnja nije dostupna",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje potrošnju. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje potrošnje"
   },
@@ -4755,5 +4766,175 @@
     "unavailableDescription": "Ova poveznica za dijeljenje je istekla ili je opozvana.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Poveznica i dalje radi. Pokušajte ponovno za trenutak."
+  },
+  "organizationGuardrails": {
+    "title": "Zaštitne mjere umjetne inteligencije",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati zaštitnim mjerama umjetne inteligencije.",
+    "unavailable": "Zaštitne mjere umjetne inteligencije nisu dostupne za ovu organizaciju.",
+    "loadError": "Nije moguće učitati zaštitne mjere umjetne inteligencije.",
+    "statusSaving": "Spremanje…",
+    "statusSaved": "Spremljeno",
+    "statusFailed": "Spremanje nije uspjelo.",
+    "inputTitle": "Ulazne zaštitne mjere",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Blokirajući detektor odbija zahtjev kada Enkrypt nije dostupan.",
+    "outputTitle": "Izlazne zaštitne mjere",
+    "outputDescription": "Skenira odgovore pomoću Enkrypt AI prije nego ih članovi prime. Isključene su osim ako ih uključite.",
+    "detectorsHint": "Blokiranje odbija označeni zahtjev. Samo evidentiranje ga bilježi bez odgađanja zahtjeva.",
+    "detectorsHintOutput": "Blokiranje odbija označeni odgovor. Samo evidentiranje ga bilježi bez odgađanja odgovora.",
+    "choiceLog": "Samo evidentiranje",
+    "applyTo": "Primijeni na",
+    "applyToAllMembers": "Sve članove",
+    "applyKiloDefault": "Primijeni Kilo zadane postavke",
+    "invalidSavedTitle": "Nije moguće pročitati spremljene postavke ulaznih detektora",
+    "invalidSavedBody": "Zahtjevi su blokirani dok se ulazni detektori ponovno ne spreme. Detektori u nastavku počinju od zadanih Kilo postavki.",
+    "invalidSavedOutputTitle": "Nije moguće pročitati spremljene postavke izlaznih detektora",
+    "invalidSavedOutputBody": "Odgovori se zadržavaju dok se izlazni detektori ponovno ne spreme. Odaberite izlazne detektore u nastavku.",
+    "blockingOutputNote": "Blokirajući izlazni detektor zadržava odgovor dok ga Enkrypt ne provjeri cijelog. Upotrijebite Samo evidentiranje kako biste izbjegli kašnjenje.",
+    "inputDetectorRequired": "Uključite barem jedan ulazni detektor.",
+    "outputDetectorRequired": "Uključite barem jedan izlazni detektor.",
+    "rulesTooMany": "Dodajte najviše {{max}} pravila.",
+    "ruleIdRequired": "Unesite ID pravila.",
+    "ruleIdInvalid": "ID pravila može sadržavati samo slova, brojeve, točke, crtice i donje crte.",
+    "ruleTextRequired": "Opišite što pravilo zabranjuje ili zahtijeva.",
+    "keywordTooLong": "Svaka ključna riječ može imati najviše {{max}} znakova.",
+    "topicTooLong": "Svaka tema može imati najviše {{max}} znakova.",
+    "keywordsTooMany": "Dodajte najviše {{max}} ključnih riječi.",
+    "topicsTooMany": "Dodajte najviše {{max}} tema.",
+    "piiEntityRequired": "Odaberite barem jednu vrstu podataka za otkrivanje.",
+    "keywordRequired": "Dodajte barem jednu ključnu riječ.",
+    "topicRequired": "Dodajte barem jednu temu.",
+    "policyTextRequired": "Unesite tekst politike.",
+    "ruleRequired": "Dodajte barem jedno pravilo.",
+    "ruleIdDuplicate": "Svako pravilo mora imati vlastiti ID pravila.",
+    "piiEntities": "Podaci za otkrivanje",
+    "keywordsLabel": "Ključne riječi",
+    "keywordsHint": "Jedna ključna riječ po retku.",
+    "topicsHint": "Jedna tema po retku.",
+    "policyFormat": "Format politike",
+    "policyFormatRules": "Strukturirana pravila",
+    "policyFormatRulesDescription": "Jedno pravilo po zahtjevu, s kategorijom i ozbiljnošću. Preporučeno.",
+    "policyFormatText": "Tekst politike",
+    "policyFormatTextDescription": "Zalijepite postojeću politiku kao obični tekst.",
+    "rulesEmpty": "Još nema pravila. Svako pravilo opisuje jednu stvar koju unosi ne smiju sadržavati ni tražiti.",
+    "addRule": "Dodajte pravilo",
+    "ruleNumber": "Pravilo {{number}}",
+    "ruleRemove": "Uklonite pravilo {{number}}",
+    "ruleIdLabel": "ID pravila",
+    "ruleNameLabel": "Naziv (nije obavezno)",
+    "ruleTextLabel": "Pravilo",
+    "ruleRiskCategory": "Kategorija rizika",
+    "ruleApplicability": "Opseg",
+    "ruleFrameworks": "Okviri",
+    "detector": {
+      "promptInjection": {
+        "label": "Ubacivanje upita",
+        "description": "Otkiva pokušaje zaobilaženja uputa ili probijanja zaštita modela."
+      },
+      "policyViolation": {
+        "label": "Kršenje politike",
+        "description": "Označava ulaze koji krše politiku vaše organizacije, napisanu kao tekst ili pravila.",
+        "descriptionOutput": "Označava odgovore koji krše politiku vaše organizacije, napisanu kao tekst ili pravila."
+      },
+      "pii": {
+        "label": "PII i tajne",
+        "description": "Otkiva osobne podatke, vjerodajnice, IP adrese i URL adrese."
+      },
+      "keywords": {
+        "label": "Zabranjene ključne riječi",
+        "descriptionOutput": "Otkiva odgovore koji sadrže bilo koju ključnu riječ koju navedete."
+      },
+      "topics": {
+        "label": "Teme",
+        "descriptionOutput": "Označava odgovore o bilo kojoj temi koju navedete."
+      },
+      "toxicity": {
+        "label": "Toksičnost",
+        "description": "Otkiva toksičan, uvredljiv, prijeteći ili mrzilački jezik."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Otkiva seksualni ili drugi sadržaj neprikladan za radno mjesto."
+      },
+      "bias": {
+        "label": "Pristranost",
+        "description": "Otkiva pristran ili diskriminirajući jezik."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osobni podaci",
+        "description": "Imena, adrese e-pošte, telefonski brojevi."
+      },
+      "secrets": {
+        "label": "Tajne",
+        "description": "API ključevi, tokeni, zaporke."
+      },
+      "ipAddress": {
+        "label": "IP adrese",
+        "description": "IPv4 i IPv6 adrese."
+      },
+      "url": {
+        "label": "URL adrese",
+        "description": "Mrežne adrese."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sigurnost i prijevare",
+      "safetyHarm": "Sigurnost i šteta",
+      "privacyDataProtection": "Privatnost i zaštita podataka",
+      "brandReputationTrust": "Brend i reputacija",
+      "biasFairnessEthical": "Pristranost i pravednost",
+      "legalIpLiability": "Pravna odgovornost i odgovornost za intelektualno vlasništvo",
+      "productMisuse": "Zloupotreba proizvoda",
+      "performanceQuality": "Učinkovitost i kvaliteta"
+    },
+    "applicability": {
+      "user": "Korisnički unos",
+      "userAssistant": "Korisnički unos i odgovori"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 najvećih rizika (2025.)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU-a o umjetnoj inteligenciji",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Značajka za poduzeća",
+    "enterpriseOnly": "Ovo je značajka samo za poduzeća.",
+    "readOnly": "Samo vlasnici i administratori organizacije mogu mijenjati ove postavke.",
+    "loadError": "Nije moguće učitati pružatelje i modele.",
+    "tabModels": "Modeli",
+    "tabProviders": "Pružatelji",
+    "tabGateways": "Pristupnici",
+    "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dopuštenih pružatelja počinju uključeni.",
+    "modelsDeniedOnly": "Samo zabranjeni",
+    "modelsEmpty": "Nijedan model ne odgovara ovom pretraživanju.",
+    "providersDescription": "Isključite pružatelja kako Kilo za ovu organizaciju ne bi usmjeravao zahtjeve na njega.",
+    "providersNeedCatalog": "Prekidači pružatelja ostaju samo za čitanje dok se ne učita cijeli katalog modela. Dodirnite Pokušaj ponovno iznad kako biste ih mogli uređivati.",
+    "providersEmpty": "Nijedan pružatelj ne odgovara ovom pretraživanju.",
+    "allowAllShown": "Dopusti sve prikazano",
+    "denyAllShown": "Zabrani sve prikazano",
+    "gatewaysDescription": "Kilo usmjerava zahtjeve modela kroz Vercel AI Gateway ili OpenRouter. Onemogućen pristupnik odbija te zahtjeve.",
+    "emptyProviderList": "Dopustite barem jednog pružatelja. Prazan popis blokira sve Kilo rute modela.",
+    "gatewaysUnavailable": "Postavke pristupnika nisu dostupne za ovu organizaciju.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Zahtjevi kroz OpenRouter nisu vezani uz regiju.",
+    "inferenceRegion": "Regija zaključivanja",
+    "inferenceRegionDescription": "Veže zahtjeve kroz Vercel AI Gateway za ovu regiju. Model koji tamo nije dostupan ne uspijeva.",
+    "disableOpenrouterNote": "Ako onemogućite OpenRouter, također se blokiraju BYOK ključevi koji usmjeravaju zahtjeve kroz njega.",
+    "emptyModelList": "Ostavite barem jedan model uključen. Ako odbijete sve modele, članovi neće imati što koristiti.",
+    "catalogUnavailable": "Puni katalog modela nije se učitao, pa se prikazuju samo vaši spremljeni popisi. Pokušajte ponovno da biste učitali sve modele.",
+    "region": {
+      "global": "Globalno",
+      "us": "Sjedinjene Američke Države",
+      "eu": "Europska unija",
+      "au": "Australija",
+      "jp": "Japan"
+    }
   }
 }

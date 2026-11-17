@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Irufin SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Ayẹwo aabo ni imudojuiwọn"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Igba-ijiroro Kilo rẹ ti ṣetan lati ṣakoso lati foonu rẹ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

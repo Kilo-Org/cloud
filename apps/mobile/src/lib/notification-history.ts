@@ -1,9 +1,11 @@
 import {
+  GENERIC_PUSH_TITLE_KEY,
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
   pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
+  pushTitleCatalogKey,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -38,9 +40,6 @@ export type NotificationHistoryCopy = Readonly<{
   detail: string | null;
 }>;
 
-/** The catalog entry whose title is the product name alone, in every locale. */
-const APP_NAME_TITLE_KEY = 'generic.title';
-
 /** One stored field, translated through its catalog entry when the row has a key. */
 function translatedPart(
   row: NotificationHistoryCopyFields,
@@ -51,7 +50,7 @@ function translatedPart(
   if (row.i18nKey === null) {
     return stored;
   }
-  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : pushTitleCatalogKey(row.i18nKey);
   return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
@@ -63,12 +62,12 @@ function translatedPart(
  *
  * A title that is only the app name adds nothing to a screen the app draws, so
  * the message leads that row alone; a title naming the event (a session, a
- * conversation, an alert) keeps the headline it had. The push catalog writes
- * the former as the bare product name (`generic`, the security lifecycle
- * notice), so the test is a comparison with the same catalog's spelling in
- * `locale` — `I-Kilo` in Zulu, `Kilo` elsewhere — taken from the title template
- * with its params left out: a session the user named "Kilo" keeps its title,
- * because its template is the session name.
+ * conversation, an alert) keeps the headline it had. The security lifecycle
+ * notice reads the product name entry (`GENERIC_PUSH_TITLE_KEY`), so the test
+ * is a comparison with the same catalog's spelling in `locale` — `I-Kilo` in
+ * Zulu, `Kilo` elsewhere — taken from the title template with its params left
+ * out: a session the user named "Kilo" keeps its title, because its template is
+ * the session name.
  */
 export function notificationHistoryCopy(
   row: NotificationHistoryCopyFields,
@@ -77,7 +76,7 @@ export function notificationHistoryCopy(
   const title = translatedPart(row, locale, 'title');
   const body = translatedPart(row, locale, 'body');
   const titleTemplate = translatedPart({ ...row, i18nParams: null }, locale, 'title');
-  return titleTemplate.trim() === translatePush(locale, APP_NAME_TITLE_KEY).trim()
+  return titleTemplate.trim() === translatePush(locale, GENERIC_PUSH_TITLE_KEY).trim()
     ? { headline: body, detail: null }
     : { headline: title, detail: body };
 }

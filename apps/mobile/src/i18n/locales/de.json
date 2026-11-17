@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationseinstellungen im Web",
-      "integrations": "Integrationen im Web",
       "usageDetails": "Nutzungsdetails",
       "providersAndModels": "Anbieter und Modelle",
       "groups": "Gruppen",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO und Domain",
       "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
-      "requestLogs": "Anfrage-Logs",
-      "subOrganizations": "Unterorganisationen",
-      "distributeFunds": "Guthaben verteilen"
+      "requestLogs": "Anfrage-Logs"
+    },
+    "requestLogs": {
+      "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",
+      "older": "Frühere Stunde",
+      "newer": "Spätere Stunde",
+      "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
+      "emptyTitle": "Keine Anfragen",
+      "emptyDescription": "In dieser Stunde gab es keine Gateway-Anfragen.",
+      "loadError": "Anfrage-Logs konnten nicht geladen werden.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "tokens": "{{input}} ein · {{output}} aus",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
@@ -4527,6 +4536,8 @@
     "topModels": "Top-Modelle",
     "topFeatures": "Top-Funktionen",
     "emptyTitle": "Keine Nutzung in diesem Zeitraum",
+    "unavailableTitle": "Nutzung nicht verfügbar",
+    "unavailableDescription": "Dieser Workspace meldet keine Nutzung. Erneutes Versuchen hilft nicht.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
     "viewDetails": "Nutzungsdetails anzeigen"
   },
@@ -4685,5 +4696,175 @@
     "unavailableDescription": "Dieser Freigabelink ist abgelaufen oder wurde widerrufen.",
     "transcriptUnavailableTitle": "Transkript konnte nicht geladen werden",
     "transcriptUnavailableDescription": "Der Link funktioniert noch. Versuche es gleich noch einmal."
+  },
+  "organizationGuardrails": {
+    "title": "KI-Guardrails",
+    "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten.",
+    "unavailable": "KI-Guardrails sind für diese Organisation nicht verfügbar.",
+    "loadError": "KI-Guardrails konnten nicht geladen werden",
+    "statusSaving": "Wird gespeichert…",
+    "statusSaved": "Gespeichert",
+    "statusFailed": "Speichern fehlgeschlagen.",
+    "inputTitle": "Eingabe-Guardrails",
+    "inputDescription": "Prüft jede Eingabe mit Enkrypt AI, einschließlich Tool-Ergebnissen. Ein blockierender Detektor lehnt eine Anfrage ab, wenn Enkrypt nicht verfügbar ist.",
+    "outputTitle": "Ausgabe-Guardrails",
+    "outputDescription": "Prüft Antworten mit Enkrypt AI, bevor Mitglieder sie erhalten. Standardmäßig aus.",
+    "detectorsHint": "Blockieren lehnt eine markierte Anfrage ab. Nur protokollieren zeichnet sie auf, ohne die Anfrage zu verzögern.",
+    "detectorsHintOutput": "Blockieren lässt eine markierte Antwort fehlschlagen. Nur protokollieren zeichnet sie auf, ohne die Antwort zu verzögern.",
+    "choiceLog": "Nur protokollieren",
+    "applyTo": "Anwenden auf",
+    "applyToAllMembers": "Alle Mitglieder",
+    "applyKiloDefault": "Kilo-Standard anwenden",
+    "invalidSavedTitle": "Gespeicherte Einstellungen der Eingabe-Detektoren können nicht gelesen werden",
+    "invalidSavedBody": "Anfragen werden blockiert, bis die Eingabe-Detektoren erneut gespeichert werden. Die Detektoren unten basieren auf dem Kilo-Standard.",
+    "invalidSavedOutputTitle": "Gespeicherte Einstellungen der Ausgabe-Detektoren können nicht gelesen werden",
+    "invalidSavedOutputBody": "Antworten werden zurückgehalten, bis die Ausgabe-Detektoren erneut gespeichert werden. Wähle unten Ausgabe-Detektoren aus.",
+    "blockingOutputNote": "Ein blockierender Ausgabe-Detektor hält eine Antwort zurück, bis Enkrypt sie vollständig geprüft hat. Verwende Nur protokollieren, um die Verzögerung zu vermeiden.",
+    "inputDetectorRequired": "Aktiviere mindestens einen Eingabe-Detektor.",
+    "outputDetectorRequired": "Aktiviere mindestens einen Ausgabe-Detektor.",
+    "rulesTooMany": "Füge bis zu {{max}} Regeln hinzu.",
+    "ruleIdRequired": "Gib eine Regel-ID ein.",
+    "ruleIdInvalid": "Eine Regel-ID darf nur Buchstaben, Zahlen, Punkte, Bindestriche und Unterstriche enthalten.",
+    "ruleTextRequired": "Beschreibe, was die Regel verbietet oder verlangt.",
+    "keywordTooLong": "Jedes Schlüsselwort darf bis zu {{max}} Zeichen lang sein.",
+    "topicTooLong": "Jedes Thema darf bis zu {{max}} Zeichen lang sein.",
+    "keywordsTooMany": "Füge bis zu {{max}} Schlüsselwörter hinzu.",
+    "topicsTooMany": "Füge bis zu {{max}} Themen hinzu.",
+    "piiEntityRequired": "Wähle mindestens einen Typ zu erkennender Daten aus.",
+    "keywordRequired": "Füge mindestens ein Schlüsselwort hinzu.",
+    "topicRequired": "Füge mindestens ein Thema hinzu.",
+    "policyTextRequired": "Gib den Richtlinientext ein.",
+    "ruleRequired": "Füge mindestens eine Regel hinzu.",
+    "ruleIdDuplicate": "Jede Regel benötigt ihre eigene Regel-ID.",
+    "piiEntities": "Zu erkennende Daten",
+    "keywordsLabel": "Schlüsselwörter",
+    "keywordsHint": "Ein Schlüsselwort pro Zeile.",
+    "topicsHint": "Ein Thema pro Zeile.",
+    "policyFormat": "Richtlinienformat",
+    "policyFormatRules": "Strukturierte Regeln",
+    "policyFormatRulesDescription": "Eine Regel pro Anforderung, mit Kategorie und Schweregrad. Empfohlen.",
+    "policyFormatText": "Richtlinientext",
+    "policyFormatTextDescription": "Füge eine bestehende Richtlinie als reinen Text ein.",
+    "rulesEmpty": "Noch keine Regeln. Jede Regel beschreibt eine Sache, die Eingaben nicht enthalten oder anfordern dürfen.",
+    "addRule": "Regel hinzufügen",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Regel {{number}} entfernen",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Name (optional)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risikokategorie",
+    "ruleApplicability": "Geltungsbereich",
+    "ruleFrameworks": "Frameworks",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt Injection",
+        "description": "Erkennt Versuche, Anweisungen zu überschreiben oder das Modell zu jailbreaken."
+      },
+      "policyViolation": {
+        "label": "Richtlinienverstoß",
+        "description": "Markiert Eingaben, die gegen die Richtlinie deiner Organisation verstoßen, formuliert als Text oder Regeln.",
+        "descriptionOutput": "Markiert Antworten, die gegen die Richtlinie deiner Organisation verstoßen, formuliert als Text oder Regeln."
+      },
+      "pii": {
+        "label": "Personenbezogene Daten und Secrets",
+        "description": "Erkennt personenbezogene Daten, Zugangsdaten, IP-Adressen und URLs."
+      },
+      "keywords": {
+        "label": "Gesperrte Schlüsselwörter",
+        "descriptionOutput": "Erkennt Antworten, die eines der aufgeführten Schlüsselwörter enthalten."
+      },
+      "topics": {
+        "label": "Themen",
+        "descriptionOutput": "Markiert Antworten zu einem der aufgeführten Themen."
+      },
+      "toxicity": {
+        "label": "Toxizität",
+        "description": "Erkennt toxische, beleidigende, bedrohliche oder hasserfüllte Sprache."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Erkennt sexuelle oder anderweitig nicht arbeitsplatztaugliche Inhalte."
+      },
+      "bias": {
+        "label": "Voreingenommenheit",
+        "description": "Erkennt voreingenommene oder diskriminierende Sprache."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personenbezogene Daten",
+        "description": "Namen, E-Mail-Adressen, Telefonnummern."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "description": "API-Schlüssel, Tokens, Passwörter."
+      },
+      "ipAddress": {
+        "label": "IP-Adressen",
+        "description": "IPv4- und IPv6-Adressen."
+      },
+      "url": {
+        "label": "URLs",
+        "description": "Webadressen."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sicherheit und Betrug",
+      "safetyHarm": "Sicherheit und Schaden",
+      "privacyDataProtection": "Privatsphäre und Datenschutz",
+      "brandReputationTrust": "Marke und Reputation",
+      "biasFairnessEthical": "Voreingenommenheit und Fairness",
+      "legalIpLiability": "Rechtliche und IP-Haftung",
+      "productMisuse": "Produktmissbrauch",
+      "performanceQuality": "Leistung und Qualität"
+    },
+    "applicability": {
+      "user": "Benutzereingabe",
+      "userAssistant": "Benutzereingabe und Antworten"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise-Funktion",
+    "enterpriseOnly": "Diese Funktion ist nur für Enterprise verfügbar.",
+    "readOnly": "Nur Inhaber und Admins der Organisation können diese Einstellungen ändern.",
+    "loadError": "Anbieter und Modelle konnten nicht geladen werden",
+    "tabModels": "Modelle",
+    "tabProviders": "Anbieter",
+    "tabGateways": "Gateways",
+    "modelsDescription": "Deaktiviere ein Modell, um es für alle Mitglieder zu blockieren. Modelle zugelassener Anbieter sind standardmäßig aktiviert.",
+    "modelsDeniedOnly": "Nur gesperrte",
+    "modelsEmpty": "Keine Modelle entsprechen dieser Suche.",
+    "providersDescription": "Deaktiviere einen Anbieter, damit Kilo für diese Organisation nicht mehr an ihn weiterleitet.",
+    "providersNeedCatalog": "Anbieter-Schalter bleiben schreibgeschützt, bis der vollständige Modellkatalog geladen ist. Tippe oben auf Erneut versuchen, um sie zu bearbeiten.",
+    "providersEmpty": "Keine Anbieter entsprechen dieser Suche.",
+    "allowAllShown": "Alle angezeigten zulassen",
+    "denyAllShown": "Alle angezeigten sperren",
+    "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",
+    "emptyProviderList": "Erlaube mindestens einen Anbieter. Ohne Anbieter kann Kilo keine Modellanfragen weiterleiten.",
+    "gatewaysUnavailable": "Gateway-Einstellungen sind für diese Organisation nicht verfügbar.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-Anfragen sind an keine Region gebunden.",
+    "inferenceRegion": "Inferenzregion",
+    "inferenceRegionDescription": "Bindet Vercel AI Gateway-Anfragen an diese Region. Anfragen an ein Modell, das dort nicht verfügbar ist, schlagen fehl.",
+    "disableOpenrouterNote": "Wenn du OpenRouter deaktivierst, werden auch BYOK-Schlüssel blockiert, die Anfragen darüber weiterleiten.",
+    "emptyModelList": "Lass mindestens ein Modell aktiviert. Wenn du alle Modelle sperrst, haben Mitglieder nichts mehr zur Verfügung.",
+    "catalogUnavailable": "Der vollständige Modellkatalog wurde nicht geladen, daher werden nur deine gespeicherten Listen angezeigt. Versuche es erneut, um alle Modelle zu laden.",
+    "region": {
+      "global": "Global",
+      "us": "Vereinigte Staaten",
+      "eu": "Europäische Union",
+      "au": "Australien",
+      "jp": "Japan"
+    }
   }
 }

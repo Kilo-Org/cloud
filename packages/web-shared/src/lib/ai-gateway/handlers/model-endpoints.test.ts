@@ -1,18 +1,28 @@
-import { beforeAll, describe, expect, test } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { NextRequest } from 'next/server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { handleModelEndpointsRequest } from './model-endpoints';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsMetadataFromDatabase: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn((modelId: string) => Promise.resolve(modelId)),
 }));
 
 const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
   getOpenRouterModelsMetadataFromDatabase
 );
+const mockedGetVercelModelsMetadataFromDatabase = jest.mocked(getVercelModelsMetadataFromDatabase);
+
+beforeEach(() => {
+  mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({});
+});
 
 beforeAll(async () => {
   await cleanupDbForTest();
@@ -111,7 +121,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     }
   );
 
-  test('applies custom pricing to every priced endpoint', async () => {
+  test('ignores custom pricing for provider prices', async () => {
     const model = {
       id: 'google/gemini-3.8-flash',
       name: 'Google: Gemini 3.8 Flash',
@@ -119,10 +129,6 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
         {
           provider_name: 'Google',
           pricing: { prompt: '0.000001', completion: '0.000002' },
-        },
-        {
-          provider_name: 'Another provider',
-          pricing: { prompt: '0.000003', completion: '0.000004' },
         },
         { provider_name: 'Unpriced' },
       ],
@@ -135,27 +141,173 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
 
     expect(response.status).toBe(200);
-    const data = (await response.json()).data;
+    expect((await response.json()).data.endpoints).toEqual(model.endpoints);
+  });
+
+  test('shows the higher of the OpenRouter and Vercel price of each provider', async () => {
+    const model = {
+      id: 'z-ai/glm-5',
+      name: 'Z.ai: GLM 5',
+      endpoints: [
+        {
+          tag: 'z-ai/fp8',
+          provider_name: 'Z.AI',
+          pricing: {
+            prompt: '0.000001',
+            completion: '0.000003',
+            input_cache_read: '0.0000002',
+            discount: 0.5,
+          },
+        },
+        {
+          tag: 'together',
+          provider_name: 'Together',
+          pricing: { prompt: '0.000002', completion: '0.000004' },
+        },
+        {
+          tag: 'novita',
+          provider_name: 'Novita',
+          pricing: { prompt: '0.000003', completion: '0.000005' },
+        },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+    mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({
+      'zai/glm-5': {
+        id: 'zai/glm-5',
+        name: 'GLM 5',
+        endpoints: [
+          {
+            provider_name: 'zai',
+            pricing: { prompt: '0.0000021', completion: '0.000005', input_cache_read: '0.0000003' },
+          },
+          {
+            provider_name: 'togetherai',
+            pricing: { prompt: '0.0000025', completion: '0.0000035' },
+          },
+          {
+            provider_name: 'deepinfra',
+            pricing: { prompt: '0.00001', completion: '0.00001' },
+          },
+        ],
+      },
+    });
+
+    const response = await handleModelEndpointsRequest(request(model.id), {
+      params: Promise.resolve({ provider: 'z-ai', model: 'glm-5' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(
+      (await response.json()).data.endpoints.map((e: { pricing?: unknown }) => e.pricing)
+    ).toEqual([
+      // OpenRouter's undiscounted price, raised where Vercel charges more
+      { prompt: '0.0000021', completion: '0.000006000000', input_cache_read: '0.000000400000' },
+      { prompt: '0.0000025', completion: '0.000004' },
+      { prompt: '0.000003', completion: '0.000005' },
+    ]);
+  });
+
+  test("compares both gateways' peak prices", async () => {
+    const model = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek: DeepSeek V4.1 Flash',
+      endpoints: [
+        {
+          tag: 'alibaba',
+          provider_name: 'Alibaba',
+          pricing: {
+            prompt: '0.00000018',
+            completion: '0.00000072',
+            input_cache_read: '0.0000000036',
+            overrides: [
+              { utc_start: 0, utc_end: 1400, prompt: '0.00000018', completion: '0.00000072' },
+              { utc_start: 1400, utc_end: 0, prompt: '0.00000009', completion: '0.00000036' },
+            ],
+          },
+        },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+    mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({
+      [model.id]: {
+        id: model.id,
+        name: 'DeepSeek V4.1 Flash',
+        endpoints: [
+          {
+            provider_name: 'alibaba',
+            pricing: {
+              prompt: '0.00000015',
+              completion: '0.0000006',
+              input_cache_read: '0.000000015',
+              peak_pricing: { multiplier: 2 },
+            },
+          },
+        ],
+      },
+    });
+
+    const response = await handleModelEndpointsRequest(request(model.id), {
+      params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.endpoints).toEqual([
+      {
+        tag: 'alibaba',
+        provider_name: 'Alibaba',
+        pricing: {
+          prompt: '0.000000300000',
+          completion: '0.000001200000',
+          input_cache_read: '0.000000030000',
+        },
+      },
+    ]);
+  });
+
+  test('lists the endpoints and prices of the model a latest alias resolves to', async () => {
+    const alias = {
+      id: '~anthropic/claude-sonnet-latest',
+      name: 'Anthropic: Claude Sonnet Latest',
+      alias_target: { slug: 'anthropic/claude-sonnet-5' },
+      endpoints: [{ tag: 'anthropic', pricing: { prompt: '0.000003', completion: '0.000015' } }],
+    };
+    const target = {
+      id: 'anthropic/claude-sonnet-5',
+      name: 'Anthropic: Claude Sonnet 5',
+      endpoints: [
+        { tag: 'anthropic', pricing: { prompt: '0.000004', completion: '0.00002' } },
+        { tag: 'google-vertex', pricing: { prompt: '0.000004', completion: '0.00002' } },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({
+      [alias.id]: alias,
+      [target.id]: target,
+    });
+    mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({
+      [target.id]: {
+        id: target.id,
+        name: 'Claude Sonnet 5',
+        endpoints: [
+          {
+            provider_name: 'vertexAnthropic',
+            pricing: { prompt: '0.000005', completion: '0.00002' },
+          },
+        ],
+      },
+    });
+
+    const response = await handleModelEndpointsRequest(request(alias.id), {
+      params: Promise.resolve({ provider: '~anthropic', model: 'claude-sonnet-latest' }),
+    });
+
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.id).toBe(alias.id);
+    expect(data.name).toBe(alias.name);
     expect(data.endpoints).toEqual([
-      {
-        provider_name: 'Google',
-        pricing: {
-          prompt: '0.000000750000',
-          completion: '0.000003750000',
-          input_cache_read: '0.000000075000',
-          input_cache_write: '0.000000041667',
-        },
-      },
-      {
-        provider_name: 'Another provider',
-        pricing: {
-          prompt: '0.000000750000',
-          completion: '0.000003750000',
-          input_cache_read: '0.000000075000',
-          input_cache_write: '0.000000041667',
-        },
-      },
-      { provider_name: 'Unpriced' },
+      { tag: 'anthropic', pricing: { prompt: '0.000004', completion: '0.00002' } },
+      { tag: 'google-vertex', pricing: { prompt: '0.000005', completion: '0.00002' } },
     ]);
   });
 });

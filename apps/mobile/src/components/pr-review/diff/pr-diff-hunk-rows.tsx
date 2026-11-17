@@ -9,6 +9,7 @@ import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type ScrollViewProps, View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -250,14 +251,14 @@ export function PaginationRow({
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}
         </Text>
-        <Pressable
+        <Button
+          variant="outline"
+          size="sm"
           onPress={onFetchAll}
-          className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
-          accessibilityRole="button"
           accessibilityLabel={t('prReview.hunkRows.loadAllFiles')}
         >
-          <Text className="text-xs font-medium">{t('prReview.hunkRows.loadAll')}</Text>
-        </Pressable>
+          <Text>{t('prReview.hunkRows.loadAll')}</Text>
+        </Button>
       </View>
     );
   }
@@ -309,14 +310,14 @@ export function EmptyFilesView({
             : t('prReview.hunkRows.filesStillLoading')}
         </Text>
         {onRequestOverview ? (
-          <Pressable
+          <Button
+            variant="outline"
+            size="sm"
             onPress={onRequestOverview}
-            className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
-            accessibilityRole="button"
             accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
           >
-            <Text className="text-sm font-medium">{t('prReview.hunkRows.goToOverview')}</Text>
-          </Pressable>
+            <Text>{t('prReview.hunkRows.goToOverview')}</Text>
+          </Button>
         ) : null}
       </View>
     </CenteredState>

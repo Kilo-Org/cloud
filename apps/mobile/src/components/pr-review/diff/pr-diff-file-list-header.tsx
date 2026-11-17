@@ -134,7 +134,7 @@ function ViewModeToggle({
       </Text>
       <RadioGroup
         label={t('prReview.fileList.layout')}
-        className="flex-row overflow-hidden rounded-md border border-border bg-secondary"
+        className="flex-row overflow-hidden rounded-md border border-border bg-muted-soft"
       >
         <ViewModeButton
           active={viewMode === 'unified'}
@@ -179,7 +179,7 @@ function ViewModeButton({
       testID={testId}
       className={cn(
         'min-h-9 flex-row items-center gap-1.5 px-3 active:opacity-70',
-        active && 'bg-secondary'
+        active && 'bg-background'
       )}
     >
       <Columns2 size={12} color={active ? colors.foreground : colors.mutedForeground} />

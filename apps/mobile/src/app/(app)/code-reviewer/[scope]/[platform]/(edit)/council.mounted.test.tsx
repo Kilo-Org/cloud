@@ -129,12 +129,13 @@ vi.mock('@/components/centered-state', () => ({
   CenteredState: (props: { children?: ReactNode }) =>
     createElement('CenteredState', null, props.children),
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: ToggleProps) => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: ToggleProps) => {
     state.toggleProps.push(props);
-    return createElement('ToggleRow', props);
+    return createElement('PreferenceRow', props);
   },
 }));
+vi.mock('@/components/ui/icons', () => ({ Users: 'Users' }));
 vi.mock('@/components/ui/choice-row', () => ({
   ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
     createElement('ChoiceRow', props),
@@ -144,7 +145,7 @@ vi.mock('@/components/ui/radio-group', () => ({
     createElement('RadioGroup', null, props.children),
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: ReactNode }) =>
@@ -209,7 +210,7 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).toContain(
       'Council review is not available for this organization.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'PreferenceRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);
 
@@ -240,7 +241,7 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).not.toContain(
       'Council review is not available for this organization.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton').length).toBeGreaterThan(
       0
     );
 

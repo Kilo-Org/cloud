@@ -78,6 +78,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
@@ -539,12 +540,12 @@ export function PrReviewDiscussionTab({
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
+          <Card key={index} className="gap-2">
             <Skeleton className="h-3 w-1/2" />
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-6 w-2/3" />
-          </View>
+          </Card>
         ))}
         {dialog}
       </View>

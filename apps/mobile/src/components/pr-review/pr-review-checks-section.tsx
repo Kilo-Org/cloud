@@ -19,6 +19,7 @@ import {
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -245,11 +246,11 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       return (
         <View className="gap-2">
           <PrReviewSectionLabel label={t('prReview.checks.title')} />
-          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
+          <Card key={CONTENT_CARD_KEY} className="gap-2">
             <Text className="text-sm text-muted-foreground">
               {t('prReview.checks.notAvailable')}
             </Text>
-          </View>
+          </Card>
         </View>
       );
     }
@@ -257,9 +258,9 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       return (
         <View className="gap-2">
           <PrReviewSectionLabel label={t('prReview.checks.title')} />
-          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
+          <Card key={CONTENT_CARD_KEY} className="gap-2">
             <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
-          </View>
+          </Card>
         </View>
       );
     }
@@ -278,7 +279,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
     return (
       <View className="gap-2">
         <PrReviewSectionLabel label={t('prReview.checks.title')} />
-        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+        <Card key={CONTENT_CARD_KEY} className="gap-3">
           <Text className="text-sm text-muted-foreground">
             {state.kind === 'service-unavailable'
               ? t('prReview.reviewServiceUnavailableDescription')
@@ -294,7 +295,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
           >
             <Text>{t('common.retry')}</Text>
           </Button>
-        </View>
+        </Card>
       </View>
     );
   }
@@ -319,7 +320,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
     return (
       <View className="gap-2">
         <PrReviewSectionLabel label={t('prReview.checks.title')} />
-        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+        <Card key={CONTENT_CARD_KEY} className="gap-3">
           <Text className="text-sm text-muted-foreground">
             {t('prReview.checks.noChecksReported')}
           </Text>
@@ -337,7 +338,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
               </View>
             </Button>
           ) : null}
-        </View>
+        </Card>
       </View>
     );
   }
@@ -357,7 +358,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
   return (
     <View className="gap-2">
       <PrReviewSectionLabel label={t('prReview.checks.title')} />
-      <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
+      <Card key={CONTENT_CARD_KEY} className="gap-0 p-0">
         {showTotal ? (
           <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
             <Text variant="muted" className="text-xs">
@@ -385,7 +386,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
             ))}
           </PrReviewChecksStatusRow>
         ))}
-      </View>
+      </Card>
     </View>
   );
 }

@@ -51,7 +51,7 @@ export function PrReviewTabSelector({
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
-    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-md bg-secondary p-1">
+    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-md bg-muted-soft p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
         const disabled = disabledTabs.includes(tab.id);
@@ -79,7 +79,7 @@ export function PrReviewTabSelector({
               // instead: the same raised-surface step a filled neutral control
               // uses, so the pill stays the neutral raised surface light mode
               // shows rather than a tinted accent that pulls the eye.
-              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
+              active && 'bg-background shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
               disabled && 'opacity-60'
             )}
           >

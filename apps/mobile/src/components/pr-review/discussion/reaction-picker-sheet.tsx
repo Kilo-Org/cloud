@@ -10,11 +10,11 @@ import { X } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInstance, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
@@ -41,7 +41,6 @@ export function ReactionPickerSheet({
   onPick,
 }: Readonly<ReactionPickerSheetProps>) {
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const titleRef = useRef<TextInstance | null>(null);
   // Android can deliver layout before attaching the title ref. Retry from the
@@ -98,13 +97,9 @@ export function ReactionPickerSheet({
   return (
     // No snap points: the native sheet sizes to the emoji grid.
     <Sheet visible={visible} onClose={onClose}>
-      <View
-        accessibilityViewIsModal
-        className="gap-4 px-5 pt-4"
-        style={{ paddingBottom: insets.bottom + 24 }}
-      >
+      <View accessibilityViewIsModal className="gap-4 px-4 pb-6 pt-3">
         <View className="flex-row items-center">
-          <View className="size-[48px] shrink-0" />
+          <View className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0')} />
           <Text
             ref={attachTitle}
             onLayout={handleTitleLayout}
@@ -118,7 +113,7 @@ export function ReactionPickerSheet({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('common.closeReactions')}
-            className="size-[48px] shrink-0 items-center justify-center rounded-full active:bg-muted"
+            className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 rounded-full active:bg-muted')}
             onPress={onClose}
           >
             <X size={18} color={colors.foreground} />
@@ -133,14 +128,15 @@ export function ReactionPickerSheet({
                 accessibilityRole="button"
                 accessibilityLabel={reactionLabel(content)}
                 className={cn(
-                  'h-[48px] w-[48px] items-center justify-center rounded-full active:opacity-75',
+                  ICON_TARGET_BOX_CLASS,
+                  'rounded-full active:opacity-75',
                   isReacted ? 'bg-accent-soft' : 'bg-muted'
                 )}
                 onPress={() => {
                   onPick(content);
                 }}
               >
-                <Text className="text-xl">{REACTION_EMOJI[content]}</Text>
+                <Text className="text-lg">{REACTION_EMOJI[content]}</Text>
               </Pressable>
             );
           })}

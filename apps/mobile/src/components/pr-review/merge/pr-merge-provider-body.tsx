@@ -11,6 +11,7 @@ import {
 import { PrFormSheetFooter } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -79,7 +80,7 @@ function MergeRestrictionsList({
     return null;
   }
   return (
-    <View className="gap-2 rounded-lg border border-border bg-secondary p-4">
+    <Card className="gap-2">
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.restrictions.title')}
       </Text>
@@ -89,7 +90,7 @@ function MergeRestrictionsList({
           {row.text}
         </Text>
       ))}
-    </View>
+    </Card>
   );
 }
 

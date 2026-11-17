@@ -203,15 +203,12 @@ export function ContextPreview({
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
   // Single-line context keeps half-detent + keyboard-open room for CTAs.
   return (
-    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
-      <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
+    <View className="gap-0.5 rounded-md border border-hair-soft bg-secondary px-4 py-2">
+      <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={1}>
         {`${isolateLtrBidiText(path)} ${lineLabel}`}
       </Text>
       {previewText.length > 0 ? (
-        <Text
-          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="font-mono-medium text-sm text-foreground" numberOfLines={1}>
           {previewText}
         </Text>
       ) : null}

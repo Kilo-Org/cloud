@@ -145,6 +145,7 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', ScrollText: 'ScrollText' }));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
     skeletonRenders.count += 1;

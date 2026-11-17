@@ -34,6 +34,7 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
@@ -488,7 +489,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             />
           </View>
 
-          <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
+          <Card className="gap-1">
             <Text className="text-sm font-medium text-foreground">
               {formatNumber(queuedCount, i18n.language)}{' '}
               {t('prReview.submit.pendingComment', { count: queuedCount })}
@@ -512,7 +513,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                   />
                 ))
               : null}
-          </View>
+          </Card>
 
           {partialResult ? (
             <AccessibleStatus message={partialResult} tone="status" className="text-xs" />

@@ -67,6 +67,7 @@ vi.mock('@/lib/hooks/use-bitbucket', () => ({
   }),
 }));
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'SheetScrollView' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

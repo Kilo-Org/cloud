@@ -5,7 +5,6 @@ import {
   InputAccessoryView,
   Keyboard,
   Pressable,
-  TextInput,
   type TextInputInstance,
   View,
 } from 'react-native';
@@ -18,6 +17,7 @@ import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { AlertTriangle, Copy } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -151,15 +151,15 @@ function InstructionsEditor({
       </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders.
-          `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten
-          `leading-[1.25rem]` line boxes (10 × 17.5, native rem is 14): a cap
-          that is not a whole number of lines paints the top visible line cut
-          when the field scrolls to the caret. Past the cap the field scrolls
-          its own text, so a multi-thousand-character draft no longer turns the
-          page into one oversized text view that pushes the note and Save out
-          of the viewport; the min height still grows the field with a short
-          stored value. */}
-      <TextInput
+          `max-h-56` (196px) is the `p-3` padding (2 × 10.5) plus ten line
+          boxes (10 × 17.5, native rem is 14): a cap that is not a whole number
+          of lines paints the top visible line cut when the field scrolls to
+          the caret. Past the cap the field scrolls its own text, so a
+          multi-thousand-character draft no longer turns the page into one
+          oversized text view that pushes the note and Save out of the
+          viewport; the min height still grows the field with a short stored
+          value. */}
+      <Input
         ref={fieldRef}
         onLayout={event => {
           fieldHeightRef.current = event.nativeEvent.layout.height;
@@ -169,7 +169,7 @@ function InstructionsEditor({
           contentHeightRef.current = event.nativeEvent.contentSize.height;
           alignFirstLineIfOverflowing();
         }}
-        className="min-h-32 max-h-56 rounded-md border border-border bg-card p-3 text-sm text-foreground"
+        className="min-h-32 max-h-56 rounded-md border border-input bg-background p-3 text-sm text-foreground focus:border-ring"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"

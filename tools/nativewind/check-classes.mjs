@@ -121,6 +121,18 @@ const LAYOUT_RULES = [
     id: 'L7',
     advice: 'use RowChevron or a row primitive',
   },
+  {
+    id: 'L8',
+    patterns: [
+      // An arbitrary length pins one element's box instead of using the scale.
+      // A percentage is a share of a measured frame (the only way to fill one),
+      // and 0.5px/1px are the hairlines the contract names, so those pass;
+      // calc()/var()/theme() re-implement the spacing scale, so they do not.
+      /(?<![\w-])(?:min-h|min-w|max-h|max-w|size|h|w)-\[(?!0\.5px\]|1px\])(?:\d+(?:\.\d+)?(?:px|rem|pt)?|(?:calc|var|theme)\([^\]]*)\]/g,
+    ],
+    advice:
+      "use the spacing scale (h-12, w-8…) or a constant from @/lib/a11y/tap-target (touch targets) / the row primitive's exported skeleton size",
+  },
 ];
 
 /** One rule from the table above, by id. */

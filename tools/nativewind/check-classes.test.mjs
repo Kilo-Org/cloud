@@ -733,6 +733,35 @@ test('flags a chevron imported from the icon modules outside the allowlist', () 
   );
 });
 
+test('flags an arbitrary box size outside the allowlist and passes it inside', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="h-[46px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L8\] "h-\[46px\]"/);
+  assert.match(found[0], /tap-target/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="h-[46px]" />')), []);
+});
+
+test('flags an arbitrary minimum height outside the allowlist', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="min-h-[44px]" />')).join('\n'),
+    /\[L8\] "min-h-\[44px\]"/
+  );
+});
+
+test('passes percentage sizes and hairline arbitrary sizes', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="w-[50%] h-[0.5px] min-h-[1px]" />')),
+    []
+  );
+});
+
+test('flags an arbitrary size written as calc()', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="h-[calc(100%-4px)]" />')).join('\n'),
+    /\[L8\] "h-\[calc\(100%-4px\)\]"/
+  );
+});
+
 /**
  * Run the checker's entry point over a fixture root whose sources carry one
  * layout violation, with `baseline` written beside it.

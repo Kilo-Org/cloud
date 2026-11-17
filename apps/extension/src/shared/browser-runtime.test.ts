@@ -1,4 +1,4 @@
-/* eslint-disable require-await, typescript-eslint/require-await -- fake extension APIs are async by contract; several record a call and resolve. */
+/* eslint-disable max-lines, require-await, typescript-eslint/require-await -- fake extension APIs are async by contract; several record a call and resolve. */
 import { describe, expect, it, vi } from 'vitest';
 import { createTabLeaseRegistry, AGENT_TAB_WAIT_MS } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
@@ -34,18 +34,18 @@ interface FakeDebugger {
   readonly attachCalls: () => number;
   readonly commands: () => readonly string[];
   readonly detachCalls: () => number;
-  /** Holds the next `Runtime.evaluate` until the test releases it. */
-  readonly holdNextEvaluate: () => void;
-  readonly releaseHeldEvaluate: () => void;
-  /** Resolves once a held evaluate has reached the debugger. */
-  readonly whenEvaluateHeld: () => Promise<void>;
+  /** Holds the next command of the named method until the test releases it. */
+  readonly holdNextCommand: (method: string) => void;
+  readonly releaseHeldCommand: () => void;
+  /** Resolves once a held command has reached the debugger. */
+  readonly whenCommandHeld: () => Promise<void>;
 }
 
 const createFakeDebugger = (): FakeDebugger => {
   const commands: string[] = [];
   let attachCalls = 0;
   let detachCalls = 0;
-  let holding = false;
+  let heldMethod: string | undefined = undefined;
   const heldResolvers: (() => void)[] = [];
   const heldListeners: (() => void)[] = [];
   const detachListeners: ChromeDebuggerDetachListener[] = [];
@@ -86,12 +86,8 @@ const createFakeDebugger = (): FakeDebugger => {
     sendCommand: async (_target, method) => {
       commands.push(method);
 
-      if (method !== 'Runtime.evaluate') {
-        return {};
-      }
-
-      if (holding) {
-        holding = false;
+      if (heldMethod === method) {
+        heldMethod = undefined;
 
         for (const listener of heldListeners.splice(0)) {
           listener();
@@ -103,7 +99,7 @@ const createFakeDebugger = (): FakeDebugger => {
         await promise;
       }
 
-      return { result: { type: 'number', value: 1 } };
+      return method === 'Runtime.evaluate' ? { result: { type: 'number', value: 1 } } : {};
     },
   };
 
@@ -112,15 +108,15 @@ const createFakeDebugger = (): FakeDebugger => {
     attachCalls: () => attachCalls,
     commands: () => commands,
     detachCalls: () => detachCalls,
-    holdNextEvaluate: () => {
-      holding = true;
+    holdNextCommand: (method: string) => {
+      heldMethod = method;
     },
-    releaseHeldEvaluate: () => {
+    releaseHeldCommand: () => {
       for (const resolve of heldResolvers.splice(0)) {
         resolve();
       }
     },
-    whenEvaluateHeld: () => {
+    whenCommandHeld: () => {
       const { promise, resolve } = Promise.withResolvers<void>();
 
       heldListeners.push(resolve);
@@ -223,11 +219,11 @@ describe('browser runtime', () => {
     const agentCaller = agent('session-1');
     const panelCaller = panel('conversation-a');
 
-    debugger_.holdNextEvaluate();
+    debugger_.holdNextCommand('Runtime.evaluate');
 
     const agentCall = evaluateToolCall(runtime, agentCaller);
 
-    await debugger_.whenEvaluateHeld();
+    await debugger_.whenCommandHeld();
 
     // The panel may not take a running agent's tab without its confirmation.
     await expect(evaluateToolCall(runtime, panelCaller)).resolves.toMatchObject({
@@ -252,9 +248,80 @@ describe('browser runtime', () => {
     await expect(panelCall).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
 
     // The agent's page command resolves later; its result is dropped, so the panel keeps the tab.
-    debugger_.releaseHeldEvaluate();
+    debugger_.releaseHeldCommand();
     await Promise.resolve();
     expect(leases.holder(TAB_ID)?.caller).toStrictEqual(panelCaller);
+  });
+
+  it('stops a taken call from sending the page commands that follow the one in flight', async () => {
+    const { debugger_, runtime } = createHarness();
+    const agentCaller = agent('session-1');
+
+    // A navigate sends Page.navigate and then reads the page identity.
+    // That identity read must never follow a take-over.
+    debugger_.holdNextCommand('Page.navigate');
+
+    const agentCall = runtime.runTool({
+      arguments: { url: 'https://example.com/next' },
+      caller: agentCaller,
+      tabId: TAB_ID,
+      toolName: 'kilo_browser_navigate',
+    });
+
+    await debugger_.whenCommandHeld();
+
+    const panelCall = runtime.runTool({
+      arguments: { function: '() => 1' },
+      caller: panel('conversation-a'),
+      tabId: TAB_ID,
+      takeOver: true,
+      toolName: 'kilo_browser_evaluate',
+    });
+
+    await expect(agentCall).resolves.toStrictEqual({
+      kind: 'result',
+      result: { error: TAB_TAKEN_ERROR, ok: false },
+    });
+    await expect(panelCall).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
+
+    const commandsAfterTakeOver = debugger_.commands().length;
+
+    // The held navigation lands now: the taken call must not send the identity read that follows it.
+    vi.useFakeTimers();
+    debugger_.releaseHeldCommand();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+
+    expect(debugger_.commands()).toHaveLength(commandsAfterTakeOver);
+  });
+
+  it('hands a conversation lease to the workflow run that claims its tab', async () => {
+    const { leases, runtime } = createHarness();
+    const panelCaller = panel('conversation-a');
+    const run = workflow('run-1');
+
+    await leases.acquire(TAB_ID, panelCaller);
+
+    // A run_workflow in a turn that already used a browser tool must not queue behind that same turn.
+    await expect(runtime.claimTab({ caller: run, from: panelCaller, tabId: TAB_ID })).resolves.toBe(
+      true
+    );
+    expect(leases.holder(TAB_ID)?.caller).toStrictEqual(run);
+  });
+
+  it('refuses a run claim on a tab another caller holds, after the wait window', async () => {
+    vi.useFakeTimers();
+    const { leases, runtime } = createHarness();
+
+    await leases.acquire(TAB_ID, panel('conversation-b'));
+
+    const claim = runtime.claimTab({ caller: workflow('run-1'), tabId: TAB_ID });
+
+    await vi.advanceTimersByTimeAsync(AGENT_TAB_WAIT_MS);
+    await expect(claim).resolves.toBe(false);
+    expect(leases.holder(TAB_ID)?.caller).toStrictEqual(panel('conversation-b'));
+
+    vi.useRealTimers();
   });
 
   it('releases the tab lease and its attachment when the tab closes', async () => {

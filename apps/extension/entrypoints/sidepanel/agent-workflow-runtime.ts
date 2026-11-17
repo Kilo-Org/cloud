@@ -5,7 +5,11 @@ import {
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
-import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
+import {
+  CLAIM_TAB_MESSAGE,
+  EVAL_TAB_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
 /**
@@ -22,6 +26,37 @@ const urlMatches = (left: string, right: string): boolean => {
       leftUrl.pathname === rightUrl.pathname &&
       leftUrl.search === rightUrl.search
     );
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Take the run's tab lease before its first command. A workflow run navigates
+ * to its start URL before it evaluates anything, so the lease has to be held
+ * from the start: a run started while another caller holds the tab must not
+ * rewrite the page and invalidate that holder's refs. The panel hands over its
+ * own conversation's lease in the same message, so the run does not queue
+ * behind the turn that is waiting for it.
+ */
+export const claimTab = async (
+  tabId: number,
+  caller: BrowserCaller,
+  from?: BrowserCaller
+): Promise<boolean> => {
+  try {
+    const response: unknown = await browser.runtime.sendMessage({
+      caller,
+      ...(from === undefined ? {} : { from }),
+      tabId,
+      type: CLAIM_TAB_MESSAGE,
+    });
+
+    if (!isTabDebuggerResponse(response) || !response.ok) {
+      return false;
+    }
+
+    return response.type === CLAIM_TAB_MESSAGE && response.granted;
   } catch {
     return false;
   }

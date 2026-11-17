@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one lease table, one set of contract tests: splitting them would scatter the one-owner-per-tab cases. */
 import { describe, expect, it, vi } from 'vitest';
 import {
   AGENT_TAB_WAIT_MS,
@@ -120,6 +121,66 @@ describe('tab leases', () => {
     expect(leases.holder(7)?.caller).toStrictEqual(owner);
 
     vi.useRealTimers();
+  });
+
+  it('drops a timed-out agent wait from the queue so no release grants it the tab', async () => {
+    vi.useFakeTimers();
+    const leases = createTabLeaseRegistry({});
+    const owner = panel('conversation-1');
+    const later = panel('conversation-2');
+
+    await leases.acquire(7, owner);
+
+    const timedOut = leases.acquire(7, agent('session-1'));
+    const queued = leases.acquire(7, later);
+
+    await vi.advanceTimersByTimeAsync(AGENT_TAB_WAIT_MS);
+    await expect(timedOut).resolves.toStrictEqual({ kind: 'busy' });
+
+    // The agent that already got tab_busy must not become the holder: nothing would release it.
+    leases.release(7, owner);
+    await expect(queued).resolves.toStrictEqual({ kind: 'granted' });
+    expect(leases.holder(7)?.caller).toStrictEqual(later);
+
+    vi.useRealTimers();
+  });
+
+  it('does not resurrect a lease a dispose released while the initial read was in flight', async () => {
+    const { promise: readLeases, resolve: resolveRead } = Promise.withResolvers<
+      PersistedTabLease[] | undefined
+    >();
+    const leases = createTabLeaseRegistry({
+      persistence: {
+        read: () => readLeases,
+        write: () => Promise.resolve(),
+      },
+    });
+    const stored = { caller: agent('session-1'), tabId: 7, title: 'Price check' };
+
+    const first = leases.acquire(7, panel('conversation-1'));
+    // The worker restart's read is still pending; the agent session closes in the meantime.
+    expect(leases.releaseCaller(agent('session-1'))).toBe(0);
+
+    resolveRead([stored]);
+
+    // The tab is free: the released lease must not come back as a phantom owner.
+    await expect(first).resolves.toStrictEqual({ kind: 'granted' });
+    expect(leases.holder(7)?.caller).toStrictEqual(panel('conversation-1'));
+  });
+
+  it('detaches a queued wait abort listener once the waiter is granted', async () => {
+    const leases = createTabLeaseRegistry({});
+    const owner = panel('conversation-1');
+    const abort = new AbortController();
+    const removeListener = vi.spyOn(abort.signal, 'removeEventListener');
+
+    await leases.acquire(7, owner);
+    const queued = leases.acquire(7, panel('conversation-2'), { signal: abort.signal });
+
+    leases.release(7, owner);
+
+    await expect(queued).resolves.toStrictEqual({ kind: 'granted' });
+    expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
   });
 
   it('never lets an agent take a tab from a panel: it waits, then reports busy', async () => {

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BROWSER_TOOL_MESSAGE,
+  CLAIM_TAB_MESSAGE,
   TAB_NOT_INSPECTABLE_ERROR,
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
@@ -878,6 +879,35 @@ describe('tab debugger helpers', () => {
         type: BROWSER_TOOL_MESSAGE,
       })
     ).toBe(false);
+  });
+
+  it('accepts the claim request and response shapes', () => {
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        from: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
+    // A run started outside a turn hands over nothing.
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
+    expect(isTabDebuggerResponse({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE })).toBe(true);
+    // The schema validates caller shape only: which caller may hand a lease over is the runtime's rule.
+    expect(
+      isTabDebuggerRequest({
+        caller: { kind: 'workflow', runId: 'run-1' },
+        from: { kind: 'workflow', runId: 'run-2' },
+        tabId: 7,
+        type: CLAIM_TAB_MESSAGE,
+      })
+    ).toBe(true);
   });
 
   it('reports a browser-internal tab as not inspectable', async () => {

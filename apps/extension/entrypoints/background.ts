@@ -26,6 +26,7 @@ import type {
 } from '@/src/shared/side-panel';
 import {
   BROWSER_TOOL_MESSAGE,
+  CLAIM_TAB_MESSAGE,
   DISPOSE_BROWSER_CALLER_MESSAGE,
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
@@ -320,6 +321,24 @@ export const handleTabDebuggerRequest = async ({
           ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
         }),
         type: EVAL_TAB_MESSAGE,
+      };
+    }
+
+    if (request.type === CLAIM_TAB_MESSAGE) {
+      if (tabsApi === undefined) {
+        return { error: 'Tab lease API is unavailable.', ok: false };
+      }
+
+      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+
+      return {
+        granted: await runtime.claimTab({
+          caller: request.caller,
+          ...(request.from === undefined ? {} : { from: request.from }),
+          tabId: request.tabId,
+        }),
+        ok: true,
+        type: CLAIM_TAB_MESSAGE,
       };
     }
 

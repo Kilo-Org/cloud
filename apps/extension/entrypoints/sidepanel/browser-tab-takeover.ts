@@ -22,20 +22,6 @@ const emit = (): void => {
   }
 };
 
-export const requestTabTakeOver = (request: {
-  readonly sessionTitle: string;
-  readonly tabId: number;
-}): Promise<boolean> => {
-  const requestId = crypto.randomUUID();
-  const { promise, resolve } = Promise.withResolvers<boolean>();
-
-  resolutions.set(requestId, resolve);
-  prompt = { requestId, ...request };
-  emit();
-
-  return promise;
-};
-
 export const answerTabTakeOver = (requestId: string, accepted: boolean): void => {
   const resolve = resolutions.get(requestId);
 
@@ -47,6 +33,29 @@ export const answerTabTakeOver = (requestId: string, accepted: boolean): void =>
   }
 
   resolve?.(accepted);
+};
+
+export const requestTabTakeOver = (request: {
+  readonly sessionTitle: string;
+  readonly tabId: number;
+}): Promise<boolean> => {
+  /*
+   * Two conversations can ask at once. The card only answers the prompt it
+   * shows, so the earlier request is settled as declined instead of being
+   * abandoned: its tool call returns an answer, and its resolver does not leak.
+   */
+  if (prompt !== undefined) {
+    answerTabTakeOver(prompt.requestId, false);
+  }
+
+  const requestId = crypto.randomUUID();
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+
+  resolutions.set(requestId, resolve);
+  prompt = { requestId, ...request };
+  emit();
+
+  return promise;
 };
 
 export const subscribeTabTakeOver = (listener: () => void): (() => void) => {

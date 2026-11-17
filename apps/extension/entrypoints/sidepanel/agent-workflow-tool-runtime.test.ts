@@ -31,6 +31,7 @@ import { runWorkflow } from '@/src/shared/agent-workflow-runner';
 
 const createBaseCtx = (overrides: Partial<WorkflowToolContext> = {}): WorkflowToolContext => ({
   allowWorkflowsInSafeMode: false,
+  claimTab: vi.fn().mockResolvedValue(true),
   disposeBrowserCaller: vi.fn().mockResolvedValue(undefined),
   evalInTab: vi
     .fn()
@@ -823,6 +824,75 @@ describe('run_workflow', () => {
         'Workflow runs are disabled in safe mode. Ask the user to enable "Allow workflows in safe mode" in settings, or to switch this conversation to dangerous mode.',
       ok: false,
     });
+  });
+
+  it('claims the tab for the run caller before the run navigates or evaluates', async () => {
+    const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
+    const claimTab = vi.fn(() => Promise.resolve(true));
+
+    mockedRunWorkflow.mockResolvedValue({ ok: true, pagesVisited: 1, result: 'success' });
+
+    const ctx = createBaseCtx({ claimTab, mode: 'dangerous' });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        approvedScriptHash: 'hash',
+        createdAt: 100,
+        description: 'desc',
+        id: 'wf-1',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        startUrl: 'https://example.com/start',
+        updatedAt: 200,
+      },
+    ]);
+
+    await executeWorkflowToolCall(createToolCall('run_workflow', { workflowId: 'wf-1' }), ctx);
+
+    // The claim lands before the run starts: the run's first navigation happens under its lease.
+    expect(Number(claimTab.mock.invocationCallOrder[0])).toBeLessThan(
+      Number(mockedRunWorkflow.mock.invocationCallOrder[0])
+    );
+    expect(claimTab).toHaveBeenCalledExactlyOnceWith(
+      ctx.selectedTabId,
+      expect.objectContaining({ kind: 'workflow' })
+    );
+  });
+
+  it('returns tab_busy and never runs when the run cannot claim the tab', async () => {
+    const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
+
+    mockedRunWorkflow.mockClear();
+
+    const ctx = createBaseCtx({
+      claimTab: vi.fn().mockResolvedValue(false),
+      mode: 'dangerous',
+    });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        approvedScriptHash: 'hash',
+        createdAt: 100,
+        description: 'desc',
+        id: 'wf-1',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        updatedAt: 200,
+      },
+    ]);
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctx
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ error: expect.stringContaining('tab_busy') });
+    expect(mockedRunWorkflow).not.toHaveBeenCalled();
+    // The run caller is still disposed: a failed claim leaves no caller behind.
+    expect(ctx.disposeBrowserCaller).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'workflow' })
+    );
   });
 
   it('runs in dangerous mode when workflow is found', async () => {

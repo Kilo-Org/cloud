@@ -71,6 +71,7 @@ const makeToolDef = (name: string): KiloGatewayToolDefinition =>
 
 const makeWorkflowCtx = (mode: 'dangerous' | 'safe' = 'dangerous') => ({
   allowWorkflowsInSafeMode: false,
+  claimTab: vi.fn().mockResolvedValue(true),
   disposeBrowserCaller: vi.fn(),
   evalInTab: vi.fn(),
   getTabUrl: vi.fn(),

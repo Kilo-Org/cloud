@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the lease decision, the per-tab serial chain and the caller views are one contract; splitting them would hide who may run in a tab. */
 import { browserCallerKey, TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import { clearBrowserToolResize } from './browser-tool-page-actions';
@@ -48,7 +49,23 @@ export interface BrowserRuntimeDeps {
   readonly tabsApi: BrowserTabsApi & BrowserToolTabsApi;
 }
 
+export interface BrowserTabClaimInput {
+  readonly caller: BrowserCaller;
+  /**
+   * The caller handing its lease over — a conversation's panel lease, so a run
+   * can take the tab its own conversation holds instead of queueing behind the
+   * turn that is waiting for it.
+   */
+  readonly from?: BrowserCaller;
+  readonly tabId: number;
+}
+
 export interface BrowserRuntime {
+  /**
+   * Takes the tab's lease before the caller's first command, so a workflow run
+   * navigates under the lease rather than rewriting the page under its holder.
+   */
+  readonly claimTab: (input: BrowserTabClaimInput) => Promise<boolean>;
   /** Tab closed or left the extension's reach: drop the session, its lease and its override. */
   readonly disposeTab: (tabId: number) => Promise<void>;
   /** Runs workflow `page` scripts through the tab's one attachment. */
@@ -151,6 +168,19 @@ export const createBrowserRuntime = ({
     return { error: reach.error, ok: false };
   };
 
+  const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
+    // The handover runs before the acquire, in one message.
+    // The run's caller takes the panel lease its own turn holds.
+    // A caller already queued for the tab still gets it first (FIFO).
+    if (from !== undefined) {
+      leases.release(tabId, from);
+    }
+
+    const lease = await leases.acquire(tabId, caller);
+
+    return lease.kind === 'granted';
+  };
+
   const runTool = async ({
     arguments: toolArguments,
     caller,
@@ -183,13 +213,18 @@ export const createBrowserRuntime = ({
         return { kind: 'result', result: unreachable };
       }
 
-      const session = sessionFor(tabId).bindCaller(browserCallerKey(caller));
       const { promise: takenAway, resolve: markTaken } = Promise.withResolvers<void>();
       let taken = false;
 
       inFlight.set(tabId, () => {
         taken = true;
         markTaken();
+      });
+
+      // A taken call stops issuing commands instead of interleaving them with the panel's.
+      // The guard is read before every command this call sends.
+      const session = sessionFor(tabId).bindCaller(browserCallerKey(caller), {
+        cancelled: () => taken,
       });
 
       try {
@@ -261,6 +296,7 @@ export const createBrowserRuntime = ({
 
   // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
   return {
+    claimTab,
     disposeCaller,
     disposeTab,
     evalInTab,

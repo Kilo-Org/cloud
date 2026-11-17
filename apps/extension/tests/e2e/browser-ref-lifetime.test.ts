@@ -85,8 +85,8 @@ test('a ref snapped before a turn and another caller still clicks after both tur
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
-    // One entry per gateway call: A's snapshot turn, then A's click turn.
-    // The click entry is filled in once A's snapshot reveals the ref.
+    // One entry per gateway call: A's snapshot turn (two calls), the settings run's auto-turn
+    // (one call — a successful run starts one), then A's click turn (two calls).
     const completionEventsByCall: unknown[][] = [];
 
     await mockKiloApi(context, { completionEventsByCall, toolNames: dangerousToolNames });
@@ -143,15 +143,19 @@ test('a ref snapped before a turn and another caller still clicks after both tur
     const workflowRegion = sidePanel.getByRole('region', { name: 'Workflows' });
 
     await expect(workflowRegion).toBeVisible();
+    // Run closes the settings dialog itself (handleRun sets the run request and closes it).
+    // A successful run starts an auto-turn, which is chat call ordinal 3.
+    // Script its answer first, then wait for that turn, so A's click turn keeps ordinals 4 and 5.
+    completionEventsByCall[2] = contentEvents('The workflow inspected the page.');
     await workflowRegion.getByRole('button', { name: 'Run workflow "Inspect page"' }).click();
     await expect(sidePanel.getByText('run_workflow completed')).toBeVisible();
-    await sidePanel.getByLabel('Close settings').click();
+    await expect(sidePanel.getByText('The workflow inspected the page.')).toBeVisible();
 
     // Conversation A's next turn: click by the ref its earlier turn snapshotted.
-    completionEventsByCall[2] = toolCallEvents('call_click_1', 'kilo_browser_click', {
+    completionEventsByCall[3] = toolCallEvents('call_click_1', 'kilo_browser_click', {
       target: ref,
     });
-    completionEventsByCall[3] = contentEvents('Clicked by the earlier ref.');
+    completionEventsByCall[4] = contentEvents('Clicked by the earlier ref.');
 
     await sidePanel.getByRole('tab', { name: /Take a snapshot/u }).click();
     await sendMessage(sidePanel, 'Click the button.');

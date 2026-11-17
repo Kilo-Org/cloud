@@ -4,7 +4,7 @@ import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
-import { EVAL_TAB_MESSAGE } from '@/src/shared/tab-debugger';
+import { CLAIM_TAB_MESSAGE, EVAL_TAB_MESSAGE } from '@/src/shared/tab-debugger';
 
 type TabListener = (tabId: number, changeInfo: object, tabInfo: object) => void;
 
@@ -49,9 +49,49 @@ vi.mock('#imports', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
+import { claimTab, evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 
 const runCaller = { kind: 'workflow', runId: 'run-1' } as const;
+
+describe('workflow tab claim', () => {
+  it('claims the tab for the run caller and hands over the panel lease', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    const panelCaller = {
+      conversationId: 'conversation-1',
+      kind: 'panel',
+      panelId: 'panel-1',
+    } as const;
+
+    await expect(claimTab(7, runCaller, panelCaller)).resolves.toBe(true);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller: runCaller,
+      from: panelCaller,
+      tabId: 7,
+      type: CLAIM_TAB_MESSAGE,
+    });
+  });
+
+  it('reports a refused claim as false', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ granted: false, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    await expect(claimTab(7, runCaller)).resolves.toBe(false);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller: runCaller,
+      tabId: 7,
+      type: CLAIM_TAB_MESSAGE,
+    });
+  });
+
+  it('reports a failed transport as a refused claim', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockRejectedValueOnce(new Error('disconnected'));
+
+    await expect(claimTab(7, runCaller)).resolves.toBe(false);
+  });
+});
 
 describe('workflow eval', () => {
   it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS and the run caller', async () => {

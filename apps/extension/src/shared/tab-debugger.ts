@@ -11,6 +11,7 @@ export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
 export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
 export const BROWSER_TOOL_MESSAGE = 'kilo.tabs.browserTool';
+export const CLAIM_TAB_MESSAGE = 'kilo.tabs.claim';
 export const RELEASE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.releaseBrowserCaller';
 export const DISPOSE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.disposeBrowserCaller';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
@@ -252,6 +253,12 @@ export type TabDebuggerRequest =
     }
   | {
       readonly caller: BrowserCaller;
+      readonly from?: BrowserCaller;
+      readonly tabId: number;
+      readonly type: typeof CLAIM_TAB_MESSAGE;
+    }
+  | {
+      readonly caller: BrowserCaller;
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
     }
   | {
@@ -320,6 +327,11 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
+    }
+  | {
+      readonly granted: boolean;
+      readonly ok: true;
+      readonly type: typeof CLAIM_TAB_MESSAGE;
     }
   | {
       readonly released: number;
@@ -398,6 +410,12 @@ const tabDebuggerRequestSchema = z.union([
   }),
   z.object({
     caller: browserCallerSchema,
+    from: browserCallerSchema.optional(),
+    tabId: z.number(),
+    type: z.literal(CLAIM_TAB_MESSAGE),
+  }),
+  z.object({
+    caller: browserCallerSchema,
     type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
@@ -443,6 +461,11 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
+  }),
+  z.object({
+    granted: z.boolean(),
+    ok: z.literal(true),
+    type: z.literal(CLAIM_TAB_MESSAGE),
   }),
   z.object({
     ok: z.literal(true),

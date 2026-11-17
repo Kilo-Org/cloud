@@ -498,7 +498,7 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
-    "accountSubtitle": "Reo, ngā paetukutuku whirinaki me ngā wātū pūrere",
+    "accountSubtitle": "Reo, ngā tūmau whirinaki me ngā wātū pūrere",
     "prReviewAttribution": "Tāpirihia te ingoa taupānga ki ngā arotake PR",
     "prReviewAttributionSubtitle": "Tāpirihia he hiku e mea ana 'Kua arotakengia mā Kilo' ina tuku koe i tētahi arotake.",
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
@@ -2917,7 +2917,7 @@
       "loadWithHost": "Utaina {{host}}",
       "httpsOnly": "Ko ngā atahanga HTTPS anake",
       "trustTitle": "Utaina te atahanga mai i {{host}}?",
-      "trustMessage": "Mā te whirinaki ki {{host}} ka utaina ōna atahanga me te kore pātai i ia wā. Ka taea te whakakore ā muri ake i Ngā paetukutuku whirinaki.",
+      "trustMessage": "Mā te whirinaki ki {{host}} ka utaina ōna atahanga me te kore pātai i ia wā. Ka taea te whakakore ā muri ake i Ngā tūmau whirinaki.",
       "loadOnce": "Utaina kotahi"
     },
     "markdownLink": {
@@ -2925,7 +2925,7 @@
       "hostConfirmTitle": "Whakatuwheratia te hononga o waho?",
       "hostConfirmMessage": "Mā tēnei hononga e whakatuwhera a {{host}} ki tō pūtirotiro.",
       "open": "Tuwhera",
-      "trustThisHost": "Whakawhirinaki ki tēnei paetukutuku"
+      "trustThisHost": "Whakawhirinaki ki tēnei tūmau"
     },
     "folderPicker": {
       "accessibility": "Kōpaki: {{label}}",
@@ -3042,7 +3042,7 @@
     "start": "Tīmatahia te tāuru reo",
     "stop": "Whakamutua te tāuru reo",
     "restricted": "Kua rāhuitia te tāuru reo i tēnei pūrere.",
-    "micRequired": "Me whakaae koe ki te whakamahi i te hopuoro mō te tāuru reo.",
+    "micRequired": "E hiahiatia ana te uru ki te hopuoro mō te tāuru reo.",
     "micOff": "Kua monoa te uru ki te hopuoro. Whakahohea i ngā tautuhinga kia taea ai te whakamahi i te tāuru reo.",
     "micOffTitle": "Kua monoa te uru ki te hopuoro",
     "noSpeech": "Kāore i kitea he reo kōrero. Patoa te hopuoro kia whakamātau anō.",
@@ -3050,12 +3050,12 @@
     "busy": "Kei te pukumahi te tāuru reo. Whakamātau anō.",
     "stopped": "Kua mutu te tāuru reo. Patoa te hopuoro kia whakamātau anō.",
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
-    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
+    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere. Tāutatia ōna kōnae kōrero tuimotu, whakamahia rānei tētahi atu reo mō te taupānga.",
     "languageNotInstalledTitle": "Kāore anō te tāuru reo mō {{language}} kia rite",
-    "languageNotInstalledMessage": "Kāore anō ngā kōnae kōrero kore-ipurangi mō {{language}} kia tāruatia, ā, kua whakakorehia te tukatuka ipurangi. Hei whakamahi i te tāuru reo, tāruatia ngā kōnae, whakahohea anō rānei te tukatuka ipurangi.",
+    "languageNotInstalledMessage": "Kāore anō ngā kōnae kōrero tuimotu mō {{language}} kia tikiaketia, ā, kua whakakorehia te tukatuka ipurangi. Hei whakamahi i te tāuru reo, tikiaketia ngā kōnae, whakahohea anō rānei te tukatuka ipurangi.",
     "downloadOfflineModel": "Tikiake",
     "useOnlineTranscription": "Tukua te tukatuka ipurangi",
-    "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
+    "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero tuimotu i te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
     "listeningStopped": "Kua mutu te whakarongo.",
     "transcribing": "E tuhi ana...",
     "gatewayUnreachable": "Kāore i taea te tae ki te Kilo Gateway. Tirohia tō hononga, kātahi ka whakamātau anō.",
@@ -3610,16 +3610,16 @@
     }
   },
   "trustedHosts": {
-    "title": "Ngā paetukutuku whirinaki",
-    "subtitle": "Ngā paetukutuku e whakaaetia ana kia tuwhera me te kore pātai",
-    "emptyTitle": "Kāore he paetukutuku whirinaki",
-    "emptyDescription": "Ina whakawhirinaki koe ki te paetukutuku o tētahi hononga, ka tuwhera taua hononga me te kore pātai anō.",
-    "imagesSectionTitle": "Ngā paetukutuku atahanga whirinaki",
-    "imagesSectionDescription": "Ka utaina ngā atahanga mai i ēnei paetukutuku me te kore pātai anō.",
-    "imagesSectionEmpty": "Kāore he paetukutuku atahanga whirinaki",
+    "title": "Ngā tūmau whirinaki",
+    "subtitle": "Ngā tūmau e whakaaetia ana kia tuwhera me te kore pātai",
+    "emptyTitle": "Kāore he tūmau whirinaki",
+    "emptyDescription": "Ina whakawhirinaki koe ki te tūmau o tētahi hononga, ki tētahi tūmau atahanga rānei, ka tuwhera me te kore pātai anō.",
+    "imagesSectionTitle": "Ngā tūmau atahanga whirinaki",
+    "imagesSectionDescription": "Ka utaina ngā atahanga mai i ēnei tūmau me te kore pātai anō.",
+    "imagesSectionEmpty": "Kāore he tūmau atahanga whirinaki",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
-    "revokeMessage": "Ka pātai anō ngā hononga ki tēnei paetukutuku mō te whakaaetanga.",
-    "revokeImageMessage": "Ka pātai anō ngā atahanga mai i tēnei paetukutuku mō te whakaaetanga.",
+    "revokeMessage": "Ka pātai anō ngā hononga ki tēnei tūmau mō te whakaaetanga.",
+    "revokeImageMessage": "Ka pātai anō ngā atahanga mai i tēnei tūmau mō te whakaaetanga.",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
   "glanceable": {
@@ -3687,12 +3687,12 @@
   },
   "tour": {
     "eyebrow": "Haere poto",
-    "forkTitle": "Ki hea koe e hiahia ana whakahaere i a Kilo?",
+    "forkTitle": "Ki hea koe e hiahia ana ki te whakahaere i a Kilo?",
     "forkSubtitle": "Kōwhiria ki hea e rere ai a Kilo mō tō wātū tuatahi.",
     "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
-    "cloudOptionBody": "Whakahaere i te Kilo i roto i tētahi taiao kapua motumotu, kāore he mea hei tāuta.",
+    "cloudOptionBody": "Whakahaere i a Kilo i roto i tētahi taiao kapua motumotu, kāore he mea hei tāuta.",
     "remoteOptionTitle": "Tō rorohiko",
-    "remoteOptionBody": "Whakahaere i te Kilo ki tō ake mīhini mā te CLI `kilo remote`.",
+    "remoteOptionBody": "Whakahaere i a Kilo ki tō ake mīhini mā te CLI `kilo remote`.",
     "skip": "Waiho te haere",
     "tutorialLabel": "Akoranga"
   },
@@ -3989,7 +3989,7 @@
     "openLastSession": "Whakatuwheratia te wātū whakamutunga"
   },
   "spendAlerts": {
-    "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
+    "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere māori ia hāora.",
     "thresholdTitle": "Whitinga paepae",
     "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu o tēnei rohe i te matapihi kua whiriwhiria i tō paepae",
     "anomalyTitle": "Pikinga ia hāora",
@@ -4004,7 +4004,7 @@
     "loadError": "Kāore i taea ngā matohi whakapaunga te uta.",
     "saveError": "Kāore i taea ngā matohi whakapaunga te tiaki.",
     "sendAlerts": "Tukuna ngā matohi",
-    "noSpend": "Kāore he whakapaunga",
+    "noSpend": "Kāore anō he whakapaunga",
     "spend24h": "Whakapaunga i ngā 24 hāora kua hipa",
     "multiplierError": "Whakaurua he whakarea 1, nui ake rānei",
     "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā matohi whakapaunga.",

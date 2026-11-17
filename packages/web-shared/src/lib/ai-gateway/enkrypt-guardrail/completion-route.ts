@@ -50,6 +50,8 @@ export async function admitCompletionRouteGuardrail(input: {
   apiKind: CompletionRouteApiKind;
   sessionId: string | null;
   clientRequestId: string | null;
+  /** The id of the usage row this request's accounting writes; the guardrail rows point at it. */
+  microdollarUsageId: string;
   parts: RequestScanParts;
   signal: AbortSignal;
 }): Promise<CompletionRouteGuardrail> {
@@ -64,6 +66,7 @@ export async function admitCompletionRouteGuardrail(input: {
         scope && {
           ...scope,
           sessionId: input.sessionId,
+          microdollarUsageId: input.microdollarUsageId,
           apiKind: input.apiKind,
           clientRequestId: input.clientRequestId,
           parts: input.parts,
@@ -71,6 +74,11 @@ export async function admitCompletionRouteGuardrail(input: {
     ),
     input.signal
   );
+  // These routes keep no request-log archive, so nothing else asks the guardrail for its logs.
+  // A detector call that fails reads its error body only once the capture flag resolves
+  // (`detect.ts` `captureErrorBody`), so resolve it here as not archived or that response body is
+  // never released. The promise floats: the scan itself is awaited through the verdict below.
+  void guardrail.requestLogs(false).catch(() => {});
 
   return {
     kind: 'admitted',

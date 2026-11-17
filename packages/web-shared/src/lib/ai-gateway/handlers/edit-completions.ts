@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -171,8 +172,12 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
   const userByokEntry = userByok?.find(entry => entry.providerId === byokProviderKey);
 
+  // The usage row's id, generated here so the guardrail rows this request writes point at the
+  // same inference usage row the accounting stores.
+  const usageId = randomUUID();
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
+    usageId,
     api_kind: 'edit_completions',
     provider: editProvider,
     requested_model: requestBody.model,
@@ -221,6 +226,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     apiKind: 'edit_completions',
     sessionId: usageContext.session_id,
+    microdollarUsageId: usageId,
     clientRequestId: extractHeaderAndLimitLength(request, 'x-kilo-request'),
     parts: promptScanParts([{ header: 'user', body: requestBody.messages[0].content }]),
     signal: request.signal,

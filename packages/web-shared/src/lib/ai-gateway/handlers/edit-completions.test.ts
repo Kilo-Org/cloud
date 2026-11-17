@@ -1054,6 +1054,10 @@ describe('POST /api/edit/completions', () => {
           }),
         ],
       ]);
+      const [guardrailUsageRecord] = mockedRecordEnkryptUsage.mock.calls[0];
+      const [, usageRowContext] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(usageRowContext.usageId).toEqual(expect.any(String));
+      expect(guardrailUsageRecord.microdollarUsageId).toBe(usageRowContext.usageId);
     });
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -177,8 +178,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     .map(providerId => userByok?.find(entry => entry.providerId === providerId))
     .find(entry => entry !== undefined);
 
+  // The usage row's id, generated here so the guardrail rows this request writes point at the
+  // same inference usage row the accounting stores.
+  const usageId = randomUUID();
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
+    usageId,
     api_kind: 'fim_completions',
     provider: fimProvider,
     requested_model: requestBody.model,
@@ -227,6 +232,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     apiKind: 'fim_completions',
     sessionId: usageContext.session_id,
+    microdollarUsageId: usageId,
     clientRequestId: extractHeaderAndLimitLength(request, 'x-kilo-request'),
     parts: promptScanParts([
       { header: 'prompt', body: requestBody.prompt },

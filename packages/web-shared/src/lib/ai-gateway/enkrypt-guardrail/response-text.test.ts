@@ -1116,6 +1116,28 @@ describe('extractResponseText fim_completions json', () => {
   });
 });
 
+describe('extractResponseText fim_completions unknown fields', () => {
+  it('scans a choice field it does not know, but not a base64 data URL or metadata', () => {
+    const body = JSON.stringify({
+      object: 'text_completion',
+      choices: [
+        {
+          index: 0,
+          text: 'def add(a, b):',
+          finish_reason: 'stop',
+          logprobs: null,
+          content_filter_results: 'flagged text',
+          preview: 'data:image/png;base64,iVBORw0KGgo=',
+        },
+      ],
+    });
+
+    expect(extractResponseText('fim_completions', 'json', body)).toBe(
+      'def add(a, b):\n\nflagged text'
+    );
+  });
+});
+
 describe('extractResponseText fim_completions sse', () => {
   it('joins interleaved delta content per choice index in arrival order', () => {
     const body = chatStream([

@@ -9,6 +9,14 @@ import {
 const block = { action: 'block', message: 'Blocked: prompt injection.' } as const;
 const blockWithRevertGuidance =
   'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI).';
+const chatInputTimeout =
+  "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent. Longer conversations take longer to check: compact or prune earlier conversation history, or start a new session, then retry.";
+const chatOutputTimeout =
+  "Your organization's Enkrypt AI guardrail did not finish checking the model's response in time, so it was withheld. Longer responses take longer to check: ask for a shorter response, then retry.";
+const completionInputTimeout =
+  "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent. Please retry.";
+const completionOutputTimeout =
+  "Your organization's Enkrypt AI guardrail did not finish checking the model's response in time, so it was withheld. Please retry.";
 
 describe('enkryptGuardrailRejectionResponse', () => {
   it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {
@@ -53,7 +61,7 @@ describe('enkryptGuardrailRejectionResponse', () => {
       expect(response?.status).toBe(400);
       expect(response?.headers.get('x-should-retry')).toBe('false');
       expect(await response?.json()).toEqual({
-        error: blockWithRevertGuidance,
+        error: block.message,
         error_type: 'guardrail_blocked',
       });
     }
@@ -129,6 +137,33 @@ describe('enkryptGuardrailRejectionResponse', () => {
       error_type: 'guardrail_unavailable',
     });
   });
+
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'keeps the conversation advice in a timeout on %s',
+    async kind => {
+      const response = enkryptGuardrailRejectionResponse(kind, {
+        action: 'unavailable',
+        reason: 'timeout',
+      });
+
+      expect(await response?.json()).toMatchObject({ error: { message: chatInputTimeout } });
+    }
+  );
+
+  it.each(['edit_completions', 'fim_completions'] as const)(
+    'tells a completion client to retry a timeout on %s without conversation advice',
+    async kind => {
+      const response = enkryptGuardrailRejectionResponse(kind, {
+        action: 'unavailable',
+        reason: 'timeout',
+      });
+
+      expect(response?.status).toBe(503);
+      const body = (await response?.json()) as { error: string };
+      expect(body).toEqual({ error: completionInputTimeout, error_type: 'guardrail_unavailable' });
+      expect(body.error).not.toMatch(/conversation|session|compact|revert|undo/i);
+    }
+  );
 });
 
 describe('enkryptOutputGuardrailRejectionResponse', () => {
@@ -220,6 +255,19 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
     }
   );
 
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'keeps the conversation advice in a withheld-response timeout on %s',
+    async kind => {
+      const response = enkryptOutputGuardrailRejectionResponse(
+        kind,
+        { action: 'unavailable', reason: 'timeout' },
+        false
+      );
+
+      expect(await response.json()).toMatchObject({ error: { message: chatOutputTimeout } });
+    }
+  );
+
   it.each([
     ['timeout', /did not finish checking the model's response in time.*ask for a shorter response/],
     ['failed', /could not check the model's response, so it was withheld\. Try again later\.$/],
@@ -240,6 +288,22 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
         error: { type: 'api_error', message: expect.stringMatching(message) },
         error_type: 'guardrail_unavailable',
       });
+    }
+  );
+
+  it.each(['edit_completions', 'fim_completions'] as const)(
+    'tells a completion client to retry a withheld response on %s without conversation advice',
+    async kind => {
+      const response = enkryptOutputGuardrailRejectionResponse(
+        kind,
+        { action: 'unavailable', reason: 'timeout' },
+        false
+      );
+
+      expect(response.status).toBe(503);
+      const body = (await response.json()) as { error: string };
+      expect(body).toEqual({ error: completionOutputTimeout, error_type: 'guardrail_unavailable' });
+      expect(body.error).not.toMatch(/conversation|session|compact|revert|undo/i);
     }
   );
 

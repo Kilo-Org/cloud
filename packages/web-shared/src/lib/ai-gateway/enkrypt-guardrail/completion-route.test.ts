@@ -9,6 +9,8 @@ import {
   storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { promptScanParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { after } from 'next/server';
+import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { admitCompletionRouteGuardrail } from './completion-route';
 
@@ -44,6 +46,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => (
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
+const mockedRecordEnkryptUsage = jest.mocked(recordEnkryptUsage);
 const mockedGetOrganizationGroupPolicyContext = jest.mocked(getOrganizationGroupPolicyContext);
 
 const enkryptDetectUrl = 'https://api.enkryptai.com/guardrails/detect';
@@ -65,6 +68,7 @@ const personalCaller: GatewayCaller = {
 
 const groupId = '00000000-0000-4000-8000-000000000003';
 const otherGroupId = '00000000-0000-4000-8000-000000000004';
+const microdollarUsageId = '00000000-0000-4000-8000-000000000005';
 
 const blockingDetectors = storableEnkryptInputDetectors({
   ...createKiloDefaultEnkryptInputDetectors(),
@@ -129,6 +133,7 @@ function requestInput(overrides: Partial<GuardrailInput> = {}): GuardrailInput {
     apiKind: 'fim_completions',
     sessionId: null,
     clientRequestId: null,
+    microdollarUsageId,
     parts: promptScanParts([{ header: 'user', body: promptText }]),
     signal: new AbortController().signal,
     ...overrides,
@@ -153,6 +158,13 @@ async function admit(input: GuardrailInput) {
   expect(result.kind).toBe('admitted');
   if (result.kind !== 'admitted') throw new Error('expected the request to be admitted');
   return result;
+}
+
+/** Runs the `after()` work the guardrail registered, as the runtime does once the response is out. */
+async function runAfterTasks() {
+  const work = jest.mocked(after).mock.calls.map(([task]) => task);
+  jest.mocked(after).mockClear();
+  await Promise.all(work.map(task => (typeof task === 'function' ? task() : task)));
 }
 
 beforeEach(() => {
@@ -192,6 +204,18 @@ describe('admitCompletionRouteGuardrail', () => {
 
     expect(await result.rejectIfBlocked()).toBeNull();
     expect(detectRequestBodies()).toEqual([expect.objectContaining({ text: renderedPrompt })]);
+  });
+
+  it('links the guardrail usage records to the request usage row', async () => {
+    enkryptAnswers(allowed);
+
+    const result = await admit(requestInput({ microdollarUsageId }));
+
+    expect(await result.rejectIfBlocked()).toBeNull();
+    await runAfterTasks();
+    expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+      [expect.objectContaining({ microdollarUsageId, decision: 'allowed' })],
+    ]);
   });
 
   it('requires a positive organization balance for a guarded organization', async () => {

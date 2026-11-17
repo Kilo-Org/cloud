@@ -270,13 +270,19 @@ const addChatChunk: AddJson = (groups, json) => {
 /** FIM delta fields read below, and the role, which is not model output. */
 const FIM_DELTA_FIELDS = new Set(['role', 'content']);
 
-const fimChoiceSchema = z.object({
+const fimChoiceSchema = z.looseObject({
   index: z.number().optional(),
   /** A non-streamed response carries its text here, and some streaming providers do too. */
   text,
   /** A stream event carries its text here. */
   delta: z.looseObject({ role: text, content: text }).nullish(),
 });
+
+/**
+ * Choice fields read above, and those that are not model output: the finish reason, and log
+ * probabilities, which repeat the text token by token, as on a content part.
+ */
+const FIM_CHOICE_FIELDS = new Set(['index', 'text', 'delta', 'finish_reason', 'logprobs']);
 
 /**
  * FIM completions return `choices[].text` and stream `choices[].delta.content`, so one extractor
@@ -290,6 +296,9 @@ const addFimCompletion: AddJson = (groups, json) => {
     groups.add(choiceKey, choice.text);
     groups.add(choiceKey, choice.delta?.content);
     addUnknownFields(groups, `${choiceKey}:extra`, choice.delta, FIM_DELTA_FIELDS);
+    // Fields the gateway does not know yet, such as a provider's content filter results, still
+    // reach the client.
+    addUnknownFields(groups, `${choiceKey}:extra`, choice, FIM_CHOICE_FIELDS);
   });
   return true;
 };

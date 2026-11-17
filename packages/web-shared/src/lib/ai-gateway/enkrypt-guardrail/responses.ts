@@ -13,7 +13,7 @@ const UNAVAILABLE_MESSAGES: Record<
     transient:
       "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Please retry.",
     timeout:
-      "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent. Longer conversations take longer to check: compact or prune earlier conversation history, or start a new session, then retry.",
+      "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent.",
     failed:
       "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Try again later.",
   },
@@ -21,9 +21,42 @@ const UNAVAILABLE_MESSAGES: Record<
     transient:
       "Your organization's Enkrypt AI guardrail could not check the model's response, so it was withheld. Please retry.",
     timeout:
-      "Your organization's Enkrypt AI guardrail did not finish checking the model's response in time, so it was withheld. Longer responses take longer to check: ask for a shorter response, then retry.",
+      "Your organization's Enkrypt AI guardrail did not finish checking the model's response in time, so it was withheld.",
     failed:
       "Your organization's Enkrypt AI guardrail could not check the model's response, so it was withheld. Try again later.",
+  },
+};
+
+/**
+ * Kinds whose client holds a conversation: the rejected turn stays in it, and the check takes longer
+ * as it grows. Edit and FIM completions are single prompts, which have neither a conversation to
+ * shorten nor a revert affordance.
+ */
+const CONVERSATION_KINDS: Record<EnkryptGuardrailApiKind, boolean> = {
+  chat_completions: true,
+  messages: true,
+  responses: true,
+  edit_completions: false,
+  fim_completions: false,
+};
+
+/**
+ * Only the timeout message carries no retry advice, because the others say to retry already. What
+ * to do before retrying depends on the client: a conversation can be shortened, while a
+ * single-prompt completion can only retry.
+ */
+const TIMEOUT_ADVICE: Record<
+  EnkryptGuardrailDirection,
+  Record<'conversation' | 'completion', string>
+> = {
+  input: {
+    conversation:
+      ' Longer conversations take longer to check: compact or prune earlier conversation history, or start a new session, then retry.',
+    completion: ' Please retry.',
+  },
+  output: {
+    conversation: ' Longer responses take longer to check: ask for a shorter response, then retry.',
+    completion: ' Please retry.',
   },
 };
 
@@ -52,19 +85,23 @@ const REVERT_GUIDANCE =
 
 /**
  * A block is final, so clients are told not to retry, and an unavailable guardrail is retried
- * automatically only after a transient failure. A blocked request stays in the conversation, so the
- * message points at the client's revert affordance, which is how the user edits it and sends a
- * different one. A blocked response needs no such hint: its reason already says to rephrase the
- * request.
+ * automatically only after a transient failure. A blocked request in a conversation stays in it, so
+ * the message points at the client's revert affordance, which is how the user edits it and sends a
+ * different one. Edit and FIM completions have no such affordance, and a blocked response needs no
+ * such hint: its reason already says to rephrase the request.
  */
 function guardrailRejection(
+  kind: EnkryptGuardrailApiKind,
   verdict: EnkryptRejectingVerdict,
   guardrail: EnkryptGuardrailDirection
 ): GuardrailRejection {
   if (verdict.action === 'block') {
     return {
       error: {
-        message: guardrail === 'input' ? `${verdict.message}${REVERT_GUIDANCE}` : verdict.message,
+        message:
+          guardrail === 'input' && CONVERSATION_KINDS[kind]
+            ? `${verdict.message}${REVERT_GUIDANCE}`
+            : verdict.message,
         openAiType: 'invalid_request_error',
         openAiCode: ProxyErrorType.guardrail_blocked,
         anthropicType: 'invalid_request_error',
@@ -74,9 +111,13 @@ function guardrailRejection(
       headers: { 'x-should-retry': 'false' },
     };
   }
+  const advice =
+    verdict.reason === 'timeout'
+      ? TIMEOUT_ADVICE[guardrail][CONVERSATION_KINDS[kind] ? 'conversation' : 'completion']
+      : '';
   return {
     error: {
-      message: UNAVAILABLE_MESSAGES[guardrail][verdict.reason],
+      message: `${UNAVAILABLE_MESSAGES[guardrail][verdict.reason]}${advice}`,
       openAiType: 'server_error',
       openAiCode: ProxyErrorType.guardrail_unavailable,
       anthropicType: 'api_error',
@@ -177,7 +218,7 @@ export function enkryptGuardrailRejectionResponse(
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
   if (verdict.action === 'skip' || verdict.action === 'allow') return null;
-  return rejectionJson(kind, guardrailRejection(verdict, 'input'));
+  return rejectionJson(kind, guardrailRejection(kind, verdict, 'input'));
 }
 
 /**
@@ -190,7 +231,7 @@ export function enkryptOutputGuardrailRejectionResponse(
   verdict: EnkryptRejectingVerdict,
   stream: boolean
 ): NextResponse {
-  const rejection = guardrailRejection(verdict, 'output');
+  const rejection = guardrailRejection(kind, verdict, 'output');
   if (!stream) return rejectionJson(kind, rejection);
   return new NextResponse(streamErrorEvent(kind, rejection.error), {
     status: 200,

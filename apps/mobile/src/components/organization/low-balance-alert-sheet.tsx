@@ -137,7 +137,6 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <FormField
             label={t('organization.lowBalanceAlert.thresholdLabel')}
             required
-            validateWhileTyping
             placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}

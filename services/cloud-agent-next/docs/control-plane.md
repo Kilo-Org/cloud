@@ -373,7 +373,7 @@ so a later report changes nothing.
 `preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
 own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
 the clone fallback, Kilo runtime start, session import), including one create retry, one
-snapshot launch retry (a confirmed stop and its own launch bound) and one retry each of the last
+snapshot launch retry (a stop confirmed within 4 minutes, then its own launch bound) and one retry each of the last
 two steps. Environment snapshot builds run separately. An attempt starts when a route enters
 `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
@@ -655,7 +655,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   same snapshot once. The retry moves the allocation's create deadline to a new 5-minute bound,
   renders a new startup command and artifact grant for that bound, and reports "Retrying the
   snapshot start" on the snapshot step. A slow first attempt therefore never uses up the retry. A
-  stop that does not confirm fails at once. A permanent reason (expired, missing, image mismatch,
+  container wedged in a snapshot start can take minutes to destroy, so the stop repeats with the
+  stop ladder's pauses for up to 4 minutes (`snapshotRetryStopMs`). After the first unconfirmed
+  stop, the snapshot step reports "Waiting for the failed sandbox to stop". A stop that is not
+  confirmed in that bound fails the start. A permanent reason (expired, missing, image mismatch,
   provenance, or a provider that started the image instead) fails at once and asks to rebuild the
   environment.
   A repeated transient failure asks to send the message again, and to rebuild only if the failure
@@ -791,6 +794,62 @@ keep environment snapshots and existing history/worktree recovery.
   it does not delete the provider artifact. Cloudflare retains snapshots for 30 days after creation
   or their last restore, and each restore resets this TTL. Disk snapshots do not preserve running
   processes, terminals or memory. Ship compatible wrapper and Worker before enrollment.
+
+### Workspace artifacts
+
+Each workspace's Sandbox DO owns the artifact index. The stable sandbox ID is the address and the
+workspace identity, so sibling sessions share one index and one `/artifacts` folder. The index
+lives in the Sandbox DO SQLite database. `workspace_artifacts_revision` in `storage.kv` holds the
+monotonic revision.
+
+| Table | Columns | Notes |
+|---|---|---|
+| `workspace_artifacts` | `relative_path` (PK), `object_key`, `content_hash`, `size_bytes`, `content_type`, `updated_at` | Normalized `/`-separated path; hash is hex SHA-256 |
+| `workspace_artifact_orphans` | `object_key` (PK), `queued_at` | Objects to delete from R2 |
+
+`object_key` is `<sandboxId>/<uuid>` in the private `WORKSPACE_ARTIFACTS_BUCKET`. Each upload
+uses a new key. An object carries `contentType` and `customMetadata: { sandboxId, sha256 }`.
+A replaced, deleted or expired object becomes an orphan row in the same transaction as the index
+change; a rejected upload leaves its reservation's orphan row for the alarm. A KV record
+`workspace_artifact_reservation:<objectKey>` holds `{ sandboxId, expiresAt, sizeBytes }`.
+
+**Reservation lifecycle.** `reserveWorkspaceArtifactUpload` validates the path and size, prunes
+expired entries, checks file and byte quotas and bounds queued orphan records, then returns a new object
+key. It inserts the orphan row and writes a reservation with a 10-minute TTL
+(`WORKSPACE_ARTIFACT_RESERVATION_TTL_MS`). Expired reservations still count until the sweep removes
+their orphan rows. An unexpired reservation is an upload in flight that already holds bucket
+storage: at most `WORKSPACE_ARTIFACT_MAX_ACTIVE_RESERVATIONS` (8) may exist, and their declared
+bytes count against the byte quota. Exceeding either returns `busy` (route `429`), which the
+wrapper treats as a backoff. The Worker streams the request body to R2 with the declared SHA-256 and
+`onlyIf: { etagDoesNotMatch: '*' }`, verifies the stored size equals `Content-Length`, then calls
+`commitWorkspaceArtifact`. A failed stream calls `releaseWorkspaceArtifactReservation`, which frees
+the in-flight slot and leaves the orphan row for the sweep.
+
+- A commit needs the unexpired reservation and its orphan row. It reports an unchanged hash,
+  queues the previous object of a replacement, removes the reservation and orphan row, upserts
+  the index row and increments the revision.
+- A missing or expired reservation returns `reservation_missing` or `reservation_expired`; the
+  route maps both to `503`. The alarm claims leftovers after a 60 s minimum and the 10-minute
+  reservation grace, and deletes them in batches of 100.
+- `deleteWorkspaceArtifact` and `deleteWorkspaceArtifactForUser` require `expectedHash` and return
+  `deleted`, `absent` or `hash_mismatch`. Only a match queues the object and increments the
+  revision. The user path has no wrapper-liveness check and works offline.
+- Workspace deletion and exclusive handoff call `clear()`, which queues every entry, removes the
+  index rows and lets the same alarm sweep the objects.
+
+**Storage and expiry.** Entries expire `WORKSPACE_ARTIFACT_RETENTION_MS` (14 days) after
+`updated_at`. Every index access (`list`, `get`, `reserve`, `commit`, `delete`) prunes expired
+rows inside its transaction, queues their objects and increments the revision when it removes
+one. Listing, download URLs and quota counting therefore ignore expired entries. An operator
+lifecycle rule deletes the bytes 15 days after upload; a new key on every update keeps the two
+ages aligned. Limits are 50 MiB per file, 500 MiB and 1,000 files per workspace, 1,024 path bytes
+and 16 segments. Dot segments, `node_modules`, `__pycache__` and `venv` are excluded.
+
+**Change notification.** After a real revision change, the Sandbox DO dispatcher enqueues
+`{ kind: 'workspace_artifacts', payload: { revision } }` for every route in the workspace. The
+Session DO `onWorkspaceArtifactsChanged` persists `cloud.workspace.artifacts.changed` with
+`entityId: workspace-artifacts/<revision>` and broadcasts it. Duplicate revisions are ignored.
+Delivery is best effort; clients also refetch on view open, focus and reconnect.
 
 ## 7. Wrapper
 
@@ -1270,7 +1329,7 @@ them through one development-only override.
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
-| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (up to 30 s) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
+| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (repeated 30-s stops, up to 4 min) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | Adopt an environment snapshot | 2 min | Preserve the workspace and fail preparation |
 | Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |
@@ -1416,6 +1475,57 @@ a patch.
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
+
+### Workspace artifact access
+
+**Transfer grants.** The wrapper sends artifact bytes to
+`/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/artifacts/objects`. Each route
+calls `authorizeTransfer(c, 'workspace_artifacts')`, which verifies the bearer grant, the path
+identity and the scope. A grant is HS256 with `type: 'sandbox_transfer'`, audience
+`cloud-agent-sandbox-transfer`, scopes `logs | workspace_artifacts`, and a four-hour lifetime.
+Legacy `control_log_upload` grants are accepted only on log routes, never on artifact routes.
+Authorization failures are `400` invalid identity, `401` unauthorized, and `403` identity or
+scope mismatch.
+
+The wrapper generates a fresh random `wrapperId` for each process. It sends that ID in `hello`
+and uses it in the transfer URL, so the transfer identity and the control-socket identity match.
+The launch environment also carries `SANDBOX_TRANSFER_URL` and `SANDBOX_TRANSFER_GRANT`; the
+legacy `CONTROL_LOG_*` values stay for old wrappers.
+
+A wrapper that advertises `transferGrants` in `hello` may send
+`{ type: 'transfer.grant', requestId }` on the current control socket. The Sandbox DO answers
+`transfer.grant.result` with `grant` and `expiresAt`, or with an error. It mints only for a
+current bound socket and uses `sandboxId`, the durable `allocationId` and
+`AllocationState.wrapperId`; the frame cannot choose the identity or scopes. Errors are
+`not_ready` and `unavailable`, both retryable. The wrapper renews at half the lifetime and once
+on `401`, only while connected. Without renewal it keeps using the launch grant for logs until
+that grant expires.
+
+**HTTP contract.**
+
+| Route | Success | Errors |
+|---|---|---|
+| `PUT .../artifacts/objects?path=<p>` with `Content-Length` and `X-Content-SHA256` (content type comes from the path) | `200` `{ status: 'committed' \| 'unchanged', revision }` | `400` path, hash or length, `401`/`403` authorization, `409` stale, `411` missing length, `413` file or quota, `415` content encoding, `422` hash mismatch, `429` too many uploads in flight, `503` storage or missing/expired reservation |
+| `DELETE .../artifacts/objects?path=<p>&hash=<h>` | `200` `{ status: 'deleted' \| 'absent' \| 'hash_mismatch', revision }` | `400` path or hash, `401`/`403` authorization, `409` stale, `503` not connected |
+
+`PUT` validates the path and length, reserves a key, streams to R2, then commits. A rejected
+commit leaves the object queued as an orphan. The Sandbox DO checks the current allocation and
+wrapper at reserve and commit; a replaced wrapper gets `409 stale`.
+
+**tRPC.** `listWorkspaceArtifacts`, `getWorkspaceArtifactDownloadUrl` and
+`deleteWorkspaceArtifact` are `protectedProcedure` queries or mutations. They call
+`requireCurrentSessionAccess`, resolve the session's `sandboxId` and read the Sandbox DO. They
+never prepare, start or wake a sandbox. Access failures are `FORBIDDEN`, or
+`SERVICE_UNAVAILABLE` when the access lookup fails. Missing session metadata or a missing
+artifact is `NOT_FOUND`; a missing download configuration is `PRECONDITION_FAILED`.
+
+- `listWorkspaceArtifacts` returns `{ revision, entries }`; entries carry `contentHash`,
+  `updatedAt` and `expiresAt`.
+- `getWorkspaceArtifactDownloadUrl` signs a presigned R2 GET for 300 s with an attachment
+  disposition, using the read-only key scoped to the artifacts bucket. HTML, XML and SVG are
+  forced to `application/octet-stream`.
+- `deleteWorkspaceArtifact` passes `expectedHash` to `deleteWorkspaceArtifactForUser` and returns
+  its status and revision.
 
 ### Startup mode rollout
 
@@ -2084,14 +2194,15 @@ counts.
    from one outcome; one callback. This does not require bypassing a pending command/summary response.
 4. **Kilo final error with A and B accepted.** Both fail with Kilo's reason; the next message
    works.
-5. **Two chats in one worktree, two worktrees in one sandbox.** Turns stream at the same time; Stop
-   in one chat does not affect the others. Deleting the chat that issued the scope handle leaves
-   surviving chats usable: their in-flight model calls keep working through a surviving member, whose
-   attestation `resourceId` is that member, while the deleted root's ingestion/export and title writes
-   are denied. Revoking the deleted member's handle does not stop a surviving chat's in-flight model
-   calls while another member can serve, but a revoked member's new sends are denied. The usage
-   `session_id` stays the forwarded `X-KILOCODE-TASKID`; this repository does not verify that Kilo
-   sets it per chat. Last-member release retires the scope.
+5. **Two chats in one worktree, two worktrees in one workspace, one workspace per sandbox.** Turns
+   stream at the same time; Stop in one chat does not affect the others. Deleting the chat that
+   issued the scope handle leaves surviving chats usable: their in-flight model calls keep working
+   through a surviving member, whose attestation `resourceId` is that member, while the deleted
+   root's ingestion/export and title writes are denied. Revoking the deleted member's handle does
+   not stop a surviving chat's in-flight model calls while another member can serve, but a revoked
+   member's new sends are denied. The usage `session_id` stays the forwarded `X-KILOCODE-TASKID`;
+   this repository does not verify that Kilo sets it per chat. Last-member release retires the
+   scope.
 6. **Slash commands and attachment.** `/compact` summarizes the session; another known command runs
    as a command; an attachment reaches the model.
    A follow-up may wait for the command/summary response, then reaches Kilo in arrival order;

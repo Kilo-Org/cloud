@@ -29,7 +29,7 @@ describe('Māori share copy', () => {
   it('keeps one share root across the flow', () => {
     expect(i18n.t('sessionShare.title')).toBe('Tohatoha wātū');
     expect(i18n.t('sessionShare.existingDescription')).toBe(
-      'He hono tohatoha kē tō tēnei wātū. Mā te waihanga i tētahi hou e whakakapi, ā, ka mutu te mahi a te hono tawhito.'
+      'He hono tohatoha kē tō tēnei wātū. Mā te waihanga i tētahi hono hou me ēnei tautuhinga e whakakapi, ā, ka mutu te mahi a te hono tawhito.'
     );
     expect(i18n.t('sharedSession.title')).toBe('Wātū kua tohatohaina');
     expect(i18n.t('sharedSession.sharedBy', { owner: 'Ana' })).toBe('Nā Ana i tohatoha');

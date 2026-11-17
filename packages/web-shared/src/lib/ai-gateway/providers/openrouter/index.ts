@@ -225,7 +225,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     }),
     getTerminalBenchSummaries(),
   ]);
-  const catalogModels = listedModels
+  const gatewayModels = listedModels
     .map((model): OpenRouterModel => {
       const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);
@@ -240,8 +240,23 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       };
     })
     .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
-    .concat(autoModels)
-    .map(model => applyCustomPricingToModel(customPricingConfig, model))
+    .concat(autoModels);
+  const displayPricingById = new Map(
+    gatewayModels.map(model => [
+      model.id,
+      applyCustomPricingToModel(customPricingConfig, model).pricing,
+    ])
+  );
+  const catalogModels = gatewayModels
+    .map(model => {
+      // An alias shows the price its listed target shows, unless the alias has custom pricing of
+      // its own; an alias whose target is not listed keeps its own price.
+      const targetPricing = model.alias_target && displayPricingById.get(model.alias_target);
+      return applyCustomPricingToModel(
+        customPricingConfig,
+        targetPricing ? { ...model, pricing: targetPricing } : model
+      );
+    })
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);

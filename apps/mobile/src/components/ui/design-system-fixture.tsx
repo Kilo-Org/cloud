@@ -21,6 +21,7 @@ import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 const LONG_TITLE =
@@ -47,7 +48,10 @@ export function DesignSystemFixture() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Design system" />
-      <ScrollView contentContainerClassName={SCREEN_BODY_CLASS} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        showsVerticalScrollIndicator={false}
+      >
         <Section
           label="Section header"
           actionLabel="Action"
@@ -80,7 +84,12 @@ export function DesignSystemFixture() {
               onPress={() => undefined}
               destructive
             />
-            <ConfigureRow icon={Inbox} title={LONG_TITLE} subtitle={LONG_VALUE} onPress={() => undefined} />
+            <ConfigureRow
+              icon={Inbox}
+              title={LONG_TITLE}
+              subtitle={LONG_VALUE}
+              onPress={() => undefined}
+            />
           </RowGroup>
         </Section>
 
@@ -124,7 +133,12 @@ export function DesignSystemFixture() {
                 setChoice('lenient');
               }}
             />
-            <ChoiceRow label={LONG_TITLE} description={LONG_VALUE} selected={false} onPress={() => undefined} />
+            <ChoiceRow
+              label={LONG_TITLE}
+              description={LONG_VALUE}
+              selected={false}
+              onPress={() => undefined}
+            />
           </RowGroup>
         </Section>
 
@@ -166,7 +180,7 @@ export function DesignSystemFixture() {
             description="The state's way out sits under it."
             placement="static"
             action={
-              <Button variant="outline">
+              <Button className={STATE_ACTION_CLASS} variant="outline">
                 <Text>Action</Text>
               </Button>
             }
@@ -207,7 +221,11 @@ export function DesignSystemFixture() {
 
         <Section label="Fields">
           <FormField label="Single-line field" defaultValue="Value" />
-          <FormField label="Field with an error" defaultValue="Value" error="This value is refused" />
+          <FormField
+            label="Field with an error"
+            defaultValue="Value"
+            error="This value is refused"
+          />
           <FormField label={LONG_TITLE} defaultValue={LONG_VALUE} />
         </Section>
 

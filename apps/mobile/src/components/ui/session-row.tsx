@@ -207,7 +207,11 @@ export function SessionRow({
       )}
     >
       <View
-        className={cn('w-[3px] self-stretch rounded-[2px]', color.hueClass, dimStrip && 'opacity-30')}
+        className={cn(
+          'w-[3px] self-stretch rounded-[2px]',
+          color.hueClass,
+          dimStrip && 'opacity-30'
+        )}
       />
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
@@ -235,11 +239,7 @@ export function SessionRow({
           </Text>
         ) : null}
       </View>
-      {/* The row is top-aligned so a multi-line title keeps its first line in
-          line with the eyebrow; the disclosure mark centers on the row. */}
-      <View className="self-center">
-        <RowChevron />
-      </View>
+      <RowChevron />
     </View>
   );
   if (onPress) {

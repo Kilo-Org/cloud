@@ -86,8 +86,7 @@ export function BalanceBlock({
   }
   let visibilityControl = toggle;
   if (state !== 'ready') {
-    visibilityControl =
-      stacked && state === 'failed' ? null : <View className="h-12 w-12" />;
+    visibilityControl = stacked && state === 'failed' ? null : <View className="h-12 w-12" />;
   }
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;

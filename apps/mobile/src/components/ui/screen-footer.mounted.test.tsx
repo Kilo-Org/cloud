@@ -23,7 +23,7 @@ type Props = Parameters<typeof ScreenFooter>[0];
 
 function renderFooter(props: Partial<Props> = {}) {
   act(() => {
-    const element = createElement(ScreenFooter, { ...props, children: createElement('View') });
+    const element = createElement(ScreenFooter, props, createElement('View'));
     if (renderer) {
       renderer.update(element);
     } else {

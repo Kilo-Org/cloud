@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
-      "receiptA11y": "{{description}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
       "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",

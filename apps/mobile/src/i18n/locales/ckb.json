@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "کڕینی کرێدیت",
       "receipt": "پسوولە",
-      "receiptA11y": "کردنەوەی پسوولەی {{description}}",
+      "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
       "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە."
     },
     "title": "کرێدیت بکڕە",

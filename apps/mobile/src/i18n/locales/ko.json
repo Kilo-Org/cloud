@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "크레딧 구매",
       "receipt": "영수증",
-      "receiptA11y": "{{description}} 영수증 열기",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} 영수증 열기",
       "receiptUnavailable": "이 구매에 대한 영수증이 없습니다."
     },
     "title": "크레딧 구매",

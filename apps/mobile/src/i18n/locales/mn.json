@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",
-      "receiptA11y": "Баримтыг нээх: {{description}}",
+      "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна."
     },
     "title": "Кредит худалдан авах",

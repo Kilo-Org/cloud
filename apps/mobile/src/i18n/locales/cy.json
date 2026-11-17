@@ -4575,7 +4575,7 @@
       },
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
-      "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}",
+      "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
     },
     "title": "Prynu credydau",

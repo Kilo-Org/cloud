@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",
-      "receiptA11y": "Fungua risiti ya {{description}}",
+      "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu."
     },
     "title": "Nunua salio",

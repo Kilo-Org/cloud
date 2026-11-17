@@ -4443,7 +4443,7 @@
       },
       "purchaseFallback": "Покупка кредитів",
       "receipt": "Квитанція",
-      "receiptA11y": "Відкрити квитанцію для {{description}}",
+      "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна."
     },
     "title": "Купити кредити",

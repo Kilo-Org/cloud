@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
-      "receiptA11y": "Buksan ang resibo para sa {{description}}",
+      "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
     },
     "title": "Bumili ng kredito",

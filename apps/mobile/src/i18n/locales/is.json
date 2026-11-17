@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
-      "receiptA11y": "Opna kvittun fyrir {{description}}",
+      "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
     },
     "title": "Kaupa inneign",

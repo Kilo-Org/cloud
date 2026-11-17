@@ -4377,7 +4377,7 @@
       },
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
-      "receiptA11y": "Deschide chitanța pentru {{description}}",
+      "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
     },
     "title": "Cumpără credite",

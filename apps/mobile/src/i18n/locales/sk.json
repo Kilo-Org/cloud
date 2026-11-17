@@ -4443,7 +4443,7 @@
       },
       "purchaseFallback": "Nákup kreditov",
       "receipt": "Doklad",
-      "receiptA11y": "Otvoriť doklad za {{description}}",
+      "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
     },
     "title": "Kúpiť kredity",

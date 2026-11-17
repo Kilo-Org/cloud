@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
-      "receiptA11y": "Nagahee {{description}} bani",
+      "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
       "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
     },
     "title": "Kireedita bituu",

@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",
-      "receiptA11y": "Ava kviitung: {{description}}",
+      "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub."
     },
     "title": "Osta krediiti",

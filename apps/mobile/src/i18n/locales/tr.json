@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
-      "receiptA11y": "{{description}} için makbuzu aç",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
     },
     "title": "Kredi satın al",

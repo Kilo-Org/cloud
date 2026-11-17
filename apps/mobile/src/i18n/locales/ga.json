@@ -4509,7 +4509,7 @@
       },
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
-      "receiptA11y": "Oscail an admháil do {{description}}",
+      "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo."
     },
     "title": "Ceannaigh creidmheasanna",

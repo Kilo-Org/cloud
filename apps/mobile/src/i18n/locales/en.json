@@ -4378,7 +4378,7 @@
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
-      "receiptA11y": "Open the receipt for {{description}}",
+      "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase."
     },
     "title": "Buy credits",

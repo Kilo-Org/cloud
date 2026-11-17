@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "ការទិញក្រេឌីត",
       "receipt": "បង្កាន់ដៃ",
-      "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}",
+      "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។"
     },
     "title": "ទិញឥណទាន",

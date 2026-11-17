@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
-      "receiptA11y": "{{description}} üçün qəbzi açın",
+      "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
     },
     "title": "Kredit al",

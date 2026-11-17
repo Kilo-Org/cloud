@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "კრედიტების შეძენა",
       "receipt": "ქვითარი",
-      "receiptA11y": "ქვითრის გახსნა: {{description}}",
+      "receiptA11y": "ქვითრის გახსნა: {{description}}, {{amount}}, {{date}}-დან",
       "receiptUnavailable": "ამ შენაძენისთვის ქვითარი ხელმისაწვდომი არ არის."
     },
     "title": "კრედიტების ყიდვა",

@@ -4443,7 +4443,7 @@
       },
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
-      "receiptA11y": "Atidaryti kvitą: {{description}}",
+      "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra."
     },
     "title": "Pirkti kreditus",

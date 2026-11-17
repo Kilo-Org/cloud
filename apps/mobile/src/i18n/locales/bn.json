@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "ক্রেডিট কেনাকাটা",
       "receipt": "রসিদ",
-      "receiptA11y": "{{description}}-এর রসিদ খুলুন",
+      "receiptA11y": "{{description}}-এর {{amount}} এবং {{date}} তারিখের রসিদ খুলুন",
       "receiptUnavailable": "এই কেনাকাটার জন্য কোনো রসিদ পাওয়া যাচ্ছে না।"
     },
     "title": "ক্রেডিট কিনুন",

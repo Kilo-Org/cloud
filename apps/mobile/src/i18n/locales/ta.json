@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "கிரெடிட் வாங்குதல்",
       "receipt": "ரசீது",
-      "receiptA11y": "{{description}}-க்கான ரசீதைத் திற",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}}-க்கான ரசீதைத் திற",
       "receiptUnavailable": "இந்த வாங்குதலுக்கு ரசீது கிடைக்கவில்லை."
     },
     "title": "கிரெடிட்களை வாங்கவும்",

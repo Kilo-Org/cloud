@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",
-      "receiptA11y": "Vula irisidi ye-{{description}}",
+      "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga."
     },
     "title": "Thenga amakhredithi",

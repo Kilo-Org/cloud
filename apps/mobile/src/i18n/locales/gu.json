@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "ક્રેડિટ ખરીદી",
       "receipt": "રસીદ",
-      "receiptA11y": "{{description}}ની રસીદ ખોલો",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}}ની રસીદ ખોલો",
       "receiptUnavailable": "આ ખરીદી માટે રસીદ ઉપલબ્ધ નથી."
     },
     "title": "ક્રેડિટ ખરીદો",

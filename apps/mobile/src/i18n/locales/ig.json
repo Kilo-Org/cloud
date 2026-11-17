@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
-      "receiptA11y": "Mepee rịsịt maka {{description}}",
+      "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
     },
     "title": "Zụta ego ojiji",

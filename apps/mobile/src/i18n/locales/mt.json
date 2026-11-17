@@ -4509,7 +4509,7 @@
       },
       "purchaseFallback": "Xiri ta' krediti",
       "receipt": "Irċevuta",
-      "receiptA11y": "Iftaħ l-irċevuta għal {{description}}",
+      "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri."
     },
     "title": "Ixtri krediti",

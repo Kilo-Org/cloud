@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Ìrajà kírẹ́dítì",
       "receipt": "Ìwé ẹ̀rí ìsanwó",
-      "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}",
+      "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí."
     },
     "title": "Ra kírẹ́dítì",

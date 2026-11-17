@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
-      "receiptA11y": "{{description}} کی رسید کھولیں",
+      "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔"
     },
     "title": "کریڈٹس خریدیں",

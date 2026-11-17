@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
-      "receiptA11y": "Hap dëftesën për {{description}}",
+      "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
     },
     "title": "Bli kredite",

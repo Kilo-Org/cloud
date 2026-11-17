@@ -4443,7 +4443,7 @@
       },
       "purchaseFallback": "Покупка кредитов",
       "receipt": "Чек",
-      "receiptA11y": "Открыть чек: {{description}}",
+      "receiptA11y": "Открыть чек: {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Чек для этой покупки недоступен."
     },
     "title": "Купить кредиты",

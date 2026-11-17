@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "ക്രെഡിറ്റ് വാങ്ങൽ",
       "receipt": "രസീത്",
-      "receiptA11y": "{{description}} എന്നതിന്റെ രസീത് തുറക്കുക",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} എന്നതിന്റെ രസീത് തുറക്കുക",
       "receiptUnavailable": "ഈ വാങ്ങലിന് രസീത് ലഭ്യമല്ല."
     },
     "title": "ക്രെഡിറ്റുകൾ വാങ്ങുക",

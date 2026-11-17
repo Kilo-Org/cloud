@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Αγορά μονάδων",
       "receipt": "Απόδειξη",
-      "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}",
+      "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}, {{amount}}, από {{date}}",
       "receiptUnavailable": "Δεν υπάρχει διαθέσιμη απόδειξη για αυτήν την αγορά."
     },
     "title": "Αγορά πιστώσεων",

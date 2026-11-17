@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",
-      "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}",
+      "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
     },
     "title": "Hividy kireditra",

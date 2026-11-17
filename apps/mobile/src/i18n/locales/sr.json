@@ -4370,7 +4370,7 @@
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
-      "receiptA11y": "Otvori račun za {{description}}",
+      "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "kind": {
         "adjustment": "Korekcija",

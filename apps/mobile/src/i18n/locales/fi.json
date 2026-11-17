@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Krediittiosto",
       "receipt": "Kuitti",
-      "receiptA11y": "Avaa kuitti: {{description}}",
+      "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia."
     },
     "title": "Osta krediittejä",

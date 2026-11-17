@@ -4304,7 +4304,7 @@
       "googlePlayReceipt": "Անդորրագիր Google Play-ից",
       "purchaseFallback": "Կրեդիտների գնում",
       "receipt": "Անդորրագիր",
-      "receiptA11y": "Բացել անդորրագիրը՝ {{description}}",
+      "receiptA11y": "Բացել անդորրագիրը՝ {{description}}, {{amount}}, {{date}}-ից",
       "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
       "kind": {
         "adjustment": "Ճշգրտում",

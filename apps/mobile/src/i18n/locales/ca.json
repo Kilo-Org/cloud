@@ -4377,7 +4377,7 @@
       },
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
-      "receiptA11y": "Obre el rebut de {{description}}",
+      "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
     },
     "title": "Compra crèdits",

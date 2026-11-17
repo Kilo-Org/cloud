@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Acha kredi",
       "receipt": "Resi",
-      "receiptA11y": "Louvri resi pou {{description}}",
+      "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a."
     },
     "title": "Achte kredi",

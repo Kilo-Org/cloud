@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
-      "receiptA11y": "Mở biên lai cho {{description}}",
+      "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này."
     },
     "title": "Mua tín dụng",

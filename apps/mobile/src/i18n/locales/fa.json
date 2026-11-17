@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
-      "receiptA11y": "باز کردن رسید {{description}}",
+      "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست."
     },
     "title": "خرید اعتبار",

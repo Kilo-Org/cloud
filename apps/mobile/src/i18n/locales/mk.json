@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "Купување кредити",
       "receipt": "Сметка",
-      "receiptA11y": "Отвори ја сметката за {{description}}",
+      "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
       "receiptUnavailable": "Не е достапна сметка за ова купување."
     },
     "title": "Купи кредити",

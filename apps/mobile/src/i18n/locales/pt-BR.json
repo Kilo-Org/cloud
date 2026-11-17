@@ -4383,7 +4383,7 @@
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
-      "receiptA11y": "Abrir o recibo de {{description}}",
+      "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra."
     },
     "title": "Comprar créditos",

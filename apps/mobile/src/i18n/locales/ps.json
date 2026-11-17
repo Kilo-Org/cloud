@@ -4311,7 +4311,7 @@
       },
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
-      "receiptA11y": "د {{description}} رسید پرانیزئ",
+      "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
       "receiptUnavailable": "د دې پېرود لپاره رسید نشته."
     },
     "title": "کریډیټ وپېرئ",

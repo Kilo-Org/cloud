@@ -8,7 +8,6 @@
  * `ModelSelector`, which carries the reasoning effort in the same pick.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -82,24 +81,6 @@ export function TriggerFormAgent({
   const selectedProfile = profiles.profiles.find(profile => profile.id === draft.profileId);
   const modelProblemText = triggerProblemText(shownProblem('model'));
 
-  // The retry keeps the catalogue read's refetch running after the screen
-  // closed; a cache update then re-renders an unmounted block and LogBox
-  // reports a state update after unmount.
-  const isMountedRef = useRef<boolean>(true);
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-  const refetchModels = models.refetch;
-  const handleRetryModels = useCallback(() => {
-    if (!isMountedRef.current) {
-      return;
-    }
-    void refetchModels();
-  }, [refetchModels]);
-
   return (
     <View className="gap-4">
       <View className="gap-1">
@@ -151,10 +132,7 @@ export function TriggerFormAgent({
         </View>
         {models.isError ? (
           <View className="flex-row items-center gap-2">
-            <Text
-              accessibilityRole="alert"
-              className="min-w-0 flex-1 text-xs text-destructive"
-            >
+            <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
               {t('common.couldNotLoadModels')}
             </Text>
             <Pressable
@@ -164,11 +142,9 @@ export function TriggerFormAgent({
               className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] justify-center active:opacity-70')}
               disabled={models.isFetching}
               hitSlop={LINE_ACTION_HIT_SLOP}
-              onPress={handleRetryModels}
+              onPress={() => void models.refetch()}
             >
-              <Text className="text-xs font-medium text-destructive">
-                {t('common.retry')}
-              </Text>
+              <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
             </Pressable>
           </View>
         ) : null}

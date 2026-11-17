@@ -277,7 +277,9 @@ describe('trigger form model list failure', () => {
 
   /** The alert `Text` the block shows while the catalogue read failed. */
   function failureAlert(root: ReactTestRenderer['root']) {
-    return root.findAll(node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert');
+    return root.findAll(
+      node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert'
+    );
   }
 
   it('offers a retry in place of the failure and locks a selector with no model', async () => {
@@ -298,32 +300,14 @@ describe('trigger form model list failure', () => {
         (retry.props.onPress as () => void)();
       });
       expect(availableModels.refetch).toHaveBeenCalledTimes(1);
-      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(true);
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
+        true
+      );
     } finally {
       act(() => {
         view.renderer.unmount();
       });
     }
-  });
-
-  it('does not refetch a retry whose host has unmounted', async () => {
-    availableModels.isError = true;
-    const view = await mountAgent();
-    const root = view.renderer.root;
-    const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
-    if (!retry) {
-      throw new Error('expected a retry action');
-    }
-    // Keep the handler backed by its unmounted host; the guard must stop it.
-    const saved: Record<string, unknown> = { ...retry.props };
-    const retryProps = saved as { onPress: () => void };
-    act(() => {
-      view.renderer.unmount();
-    });
-    act(() => {
-      retryProps.onPress();
-    });
-    expect(availableModels.refetch).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -338,7 +322,9 @@ describe('trigger form model list failure', () => {
       const retryCount = root.findAll(node => Object.is(node.type, PRESSABLE)).length;
       expect(retryCount).toBe(isError ? 1 : 0);
       expect(failureAlert(root).length).toBe(isError ? 1 : 0);
-      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(false);
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
+        false
+      );
     } finally {
       act(() => {
         view.renderer.unmount();

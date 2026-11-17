@@ -93,7 +93,9 @@ describe('injectDirectByokProviders', () => {
   });
 
   test('leaves out listings the snapshot already has, without catalog models, or that fail', async () => {
-    const slugs = (await injectDirectByokProviders(providers, storedModels)).map(provider => provider.slug);
+    const slugs = (await injectDirectByokProviders(providers, storedModels)).map(
+      provider => provider.slug
+    );
 
     expect(slugs.filter(slug => slug === 'edenai')).toHaveLength(1);
     expect(slugs).not.toContain('martian');

@@ -312,8 +312,8 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = (await injectDirectByokProviders(allProviders, openRouterModels)).sort((a, b) =>
-    a.name.localeCompare(b.name)
+  const sortedProviders = (await injectDirectByokProviders(allProviders, openRouterModels)).sort(
+    (a, b) => a.name.localeCompare(b.name)
   );
 
   // Calculate total models across all providers

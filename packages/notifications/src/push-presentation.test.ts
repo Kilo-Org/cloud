@@ -21,6 +21,7 @@ import {
   androidChannelIdForRegisteredClient,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  liveActivityBandStep,
 } from './push-presentation';
 import { genericPushContentForPushData } from './push-copy';
 
@@ -554,21 +555,22 @@ describe('LIVE_ACTIVITY_TIE_BREAK_LIMIT', () => {
     expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBeGreaterThan(0);
   });
 
-  it('resolves the limit from real band values, not a degenerate table', () => {
-    // The derivation the module runs; reports Infinity for a table with
-    // fewer than two distinct values, which the module guard turns into a
-    // load-time error.
-    const stepOf = (values: Record<string, number>): number => {
-      const bands = [...Object.values(values)].sort((a, b) => a - b);
-      let smallest = Number.POSITIVE_INFINITY;
-      for (let index = 1; index < bands.length; index += 1) {
-        const gap = (bands[index] ?? 0) - (bands[index - 1] ?? 0);
-        if (gap > 0 && gap < smallest) smallest = gap;
-      }
-      return smallest;
-    };
-    expect(stepOf({ a: 60, b: 40, c: 20 })).toBe(20);
-    expect(stepOf({ a: 60, b: 60 })).toBe(Infinity);
-    expect(stepOf({ a: 60 })).toBe(Infinity);
+  describe('relevance table retunes (module load guards)', () => {
+    // The derivation the module's own constant runs. Asserting on the real
+    // exported function keeps a regression in the module (not a test-local
+    // copy) failing here, and pins the guard the constant goes through.
+    it('derives the limit from the real table it loads', () => {
+      expect(liveActivityBandStep([60, 40, 20])).toBe(20);
+      expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBe(
+        liveActivityBandStep(Object.values(LIVE_ACTIVITY_RELEVANCE)) - 1
+      );
+    });
+
+    it('refuses to derive a limit when the table cannot space the bands', () => {
+      // A degenerate table would leave every recency score non-finite and
+      // serialize an absent relevance score, so it throws instead.
+      expect(() => liveActivityBandStep([60, 60])).toThrow(/at least two distinct values/);
+      expect(() => liveActivityBandStep([60])).toThrow(/at least two distinct values/);
+    });
   });
 });

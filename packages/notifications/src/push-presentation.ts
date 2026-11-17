@@ -293,29 +293,28 @@ export const LIVE_ACTIVITY_RELEVANCE = {
 } as const;
 
 /**
- * The smallest gap between adjacent relevance bands, derived from the table so
- * retuning it cannot widen a band into its neighbor's range unnoticed. A
- * degenerate table (fewer than two distinct values) throws: a bands-less
- * tie-break would make every recency score non-finite and serialize an absent
- * `relevance-score` in its place, so the derivation fails loudly at module
- * load instead.
+ * The smallest positive gap between adjacent values of a relevance band
+ * table, or `Infinity` when the values cannot space two bands apart (fewer
+ * than two distinct values). The module's own table throws at load instead of
+ * accepting that: a bands-less tie-break would make every recency score
+ * non-finite and serialize an absent `relevance-score` in its place, so a
+ * degenerate table fails loudly rather than silently degrading every score.
  */
-const LIVE_ACTIVITY_BAND_STEP = ((): number => {
-  const bands = [...Object.values(LIVE_ACTIVITY_RELEVANCE)].sort((a, b) => a - b);
+export function liveActivityBandStep(bands: readonly number[]): number {
+  const sorted = [...bands].sort((a, b) => a - b);
   let smallest = Number.POSITIVE_INFINITY;
-  for (let index = 1; index < bands.length; index += 1) {
+  for (let index = 1; index < sorted.length; index += 1) {
     // Both operands exist by the loop bounds; the fallbacks only satisfy the
     // index checker and are guarded below by the positive-gap test.
-    const gap = (bands[index] ?? 0) - (bands[index - 1] ?? 0);
+    const gap = (sorted[index] ?? 0) - (sorted[index - 1] ?? 0);
     if (gap > 0 && gap < smallest) smallest = gap;
   }
+  if (!Number.isFinite(smallest)) {
+    throw new Error(
+      'LIVE_ACTIVITY_RELEVANCE bands must have at least two distinct values to derive the tie-break limit'
+    );
+  }
   return smallest;
-})();
-
-if (!Number.isFinite(LIVE_ACTIVITY_BAND_STEP)) {
-  throw new Error(
-    'LIVE_ACTIVITY_RELEVANCE bands must have at least two distinct values to derive the tie-break limit'
-  );
 }
 
 /**
@@ -324,7 +323,8 @@ if (!Number.isFinite(LIVE_ACTIVITY_BAND_STEP)) {
  * stays under the smallest gap can never promote a score into the next band.
  * Derive the tie-break from the band table, never hardcode 19.
  */
-export const LIVE_ACTIVITY_TIE_BREAK_LIMIT = LIVE_ACTIVITY_BAND_STEP - 1;
+export const LIVE_ACTIVITY_TIE_BREAK_LIMIT =
+  liveActivityBandStep(Object.values(LIVE_ACTIVITY_RELEVANCE)) - 1;
 
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {

@@ -115,8 +115,8 @@ export function connectCardOffer(
       // since that sentence's only subject is a pronoun.
       return {
         offersAction: false,
-        noteKey: 'prReview.connect.bitbucketReconnectAdminOnlyDescription',
-        compactNoteKey: 'prReview.connect.bitbucketReconnectAdminOnlyDescription',
+        noteKey: 'prReview.connect.reconnectAdminOnlyDescription',
+        compactNoteKey: 'prReview.connect.reconnectAdminOnlyDescription',
         compactContextKey: 'prReview.connect.reconnectTitleBitbucket',
       };
     }

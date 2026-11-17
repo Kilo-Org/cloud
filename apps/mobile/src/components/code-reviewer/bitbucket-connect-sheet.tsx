@@ -97,7 +97,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // name, so the sheet is about the connection itself rather than about a form.
   const managesExisting = repair?.kind === 'manage-connection';
   let title = t('prReview.connect.reconnectTitleBitbucket');
-  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  let deniedDescription = t('prReview.connect.reconnectAdminOnlyDescription');
   if (managesExisting) {
     title = t('agentChat.repoPicker.platformBitbucket');
     deniedDescription = t('integrations.managedByOwner');

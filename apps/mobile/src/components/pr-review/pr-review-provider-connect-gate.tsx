@@ -362,7 +362,7 @@ export function ProviderConnectGate({
       // an absent Bitbucket connection cannot make the connect call its title
       // no longer offers, so that title states the absence instead.
       if (platform === 'gitlab') {
-        description = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+        description = t('prReview.connect.reconnectAdminOnlyDescription');
       } else {
         title = t('prReview.connect.bitbucketNotConnectedTitle');
         description = t('prReview.connect.bitbucketAdminOnlyDescription');
@@ -387,7 +387,7 @@ export function ProviderConnectGate({
                   why the connection does not fit. */}
               {action === 'organization-admin-only' && mismatch !== null ? (
                 <Text variant="muted" className="text-center">
-                  {t('prReview.connect.gitlabReconnectAdminOnlyDescription')}
+                  {t('prReview.connect.reconnectAdminOnlyDescription')}
                 </Text>
               ) : null}
             </>

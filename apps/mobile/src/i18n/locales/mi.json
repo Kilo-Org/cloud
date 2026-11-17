@@ -480,7 +480,8 @@
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
     },
-    "changelog": "Ngā mea hou"
+    "changelog": "Ngā mea hou",
+    "changelogVersionPending": "Ka tae mai ngā tuhipoka o tēnei putanga me te whakahōu taupānga e whai ake."
   },
   "preferences": {
     "general": "Whānui",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Ngā mema katoa · Ngā rā e 30 kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
+    },
+    "modes": {
+      "create": "Aratau hou",
+      "deleteAction": "Muku aratau",
+      "deleteMessage": "Ka tangohia te aratau mā te katoa o tēnei whakahaere. Ka hoki te aratau e whakakapi ana i tētahi aratau ā-roto ki ngā tautuhinga ā-roto.",
+      "deleteTitle": "Muku tēnei aratau?",
+      "descriptionLabel": "Whakaahuatanga aratau",
+      "emptyDescription": "Ka wātea ngā aratau ka tāpirihia ki konei mā te katoa o tēnei whakahaere.",
+      "emptyTitle": "Kāore anō ngā aratau ritenga",
+      "identifierHint": "Ngā reta iti, ngā tau, me ngā tohu haehae.",
+      "identifierInvalid": "Whakamahia ngā reta iti, ngā tau, me ngā tohu haehae anake.",
+      "identifierLabel": "Tohu tautuhi",
+      "identifierRequired": "Whakaurua he tohu tautuhi.",
+      "identifierTaken": "Kua whakamahia kē tēnei tohu tautuhi e tētahi atu aratau.",
+      "nameLabel": "Ingoa aratau",
+      "nameRequired": "Whakaurua he ingoa aratau.",
+      "notFound": "Kua kore tēnei aratau.",
+      "restrictionHint": "Ka taea anake te whakatika i ngā kōnae e ō ana ki tēnei tauira. Waiho kia wātea kia āhei ai ngā kōnae katoa.",
+      "restrictionInvalid": "Whakaurua he tauira tika.",
+      "restrictionLabel": "Tapanga here",
+      "restrictionPattern": "Tauira kōnae",
+      "roleLabel": "Whakamārama tūranga",
+      "roleRequired": "Whakaahuahia ngā mahi a tēnei aratau.",
+      "tool": {
+        "browser": "Whakamahi pūtirotiro",
+        "command": "Whakahaere whakahau",
+        "edit": "Whakatika kōnae",
+        "mcp": "Whakamahi MCP",
+        "read": "Pānui kōnae"
+      },
+      "whenToUseLabel": "Te wā e whakamahia ai tēnei aratau"
+    },
+    "groups": {
+      "create": "Kāhui hou",
+      "deleteAction": "Muku kāhui",
+      "deleteMessage": "Ka tangohia te kāhui, ōna kaupapa here, me ōna whakaritenga mema.",
+      "deleteTitle": "Muku tēnei kāhui?",
+      "descriptionLabel": "Whakaahuatanga kāhui",
+      "emptyDescription": "Ka whakahuihui te kāhui i ngā mema kia pā ai tētahi kaupapa here ki a rātou katoa.",
+      "emptyTitle": "Kāore anō ngā kāhui",
+      "enterpriseOnly": "Ka wātea ngā kāhui i te mahere Enterprise.",
+      "memberCount": "{{displayCount}} mema",
+      "memberCount_one": "{{displayCount}} mema",
+      "memberCount_other": "{{displayCount}} mema",
+      "memberViewEmpty": "Kāore koe i roto i tētahi kāhui o tēnei whakahaere.",
+      "memberViewTitle": "Ōu kāhui",
+      "membersEmpty": "Kāore he mema hohe e ō ana ki tāu rapu.",
+      "membersLabel": "Ngā mema kāhui",
+      "nameLabel": "Ingoa kāhui",
+      "nameRequired": "Whakaurua he ingoa kāhui.",
+      "nameTooLong": "Kia kaua e neke atu i te 80 pūāhua te ingoa.",
+      "notFound": "Kua kore tēnei kāhui.",
+      "permissionDenied": "Mā te rangatira, mā te kaiwhakahaere rānei o te whakahaere anake e taea te huri i ōna kāhui.",
+      "searchMembers": "Rapua ngā mema",
+      "selectAllVisible": "Kōwhiria te katoa e kitea ana"
     },
     "hub": {
       "renameTitle": "Whakaingoatia anō te rōpū",

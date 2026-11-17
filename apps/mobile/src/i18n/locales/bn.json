@@ -480,7 +480,8 @@
       "nextStepFinal": "আপিলের সিদ্ধান্ত চূড়ান্ত। আর কোনো আপিল করা যাবে না।",
       "viewReceipt": "রসিদ দেখুন"
     },
-    "changelog": "নতুন কী"
+    "changelog": "নতুন কী",
+    "changelogVersionPending": "এই সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।"
   },
   "preferences": {
     "general": "সাধারণ",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "সকল সদস্য · গত ৩০ দিন",
       "outputTokens": "আউটপুট টোকেন",
       "requests": "অনুরোধ"
+    },
+    "modes": {
+      "create": "নতুন মোড",
+      "deleteAction": "মোড মুছুন",
+      "deleteMessage": "মোডটি এই সংস্থার সবার জন্য সরানো হবে। বিল্ট-ইন মোড প্রতিস্থাপনকারী মোডটি বিল্ট-ইন সেটিংসে ফিরে যাবে।",
+      "deleteTitle": "এই মোডটি মুছবেন?",
+      "descriptionLabel": "মোডের বিবরণ",
+      "emptyDescription": "এখানে যোগ করা মোড এই সংস্থার সবার জন্য উপলব্ধ।",
+      "emptyTitle": "এখনও কোনো কাস্টম মোড নেই",
+      "identifierHint": "ছোট হাতের অক্ষর, সংখ্যা এবং হাইফেন।",
+      "identifierInvalid": "শুধু ছোট হাতের অক্ষর, সংখ্যা এবং হাইফেন ব্যবহার করুন।",
+      "identifierLabel": "আইডেন্টিফায়ার",
+      "identifierRequired": "একটি আইডেন্টিফায়ার লিখুন।",
+      "identifierTaken": "অন্য একটি মোড ইতিমধ্যে এই আইডেন্টিফায়ার ব্যবহার করছে।",
+      "nameLabel": "মোডের নাম",
+      "nameRequired": "একটি মোডের নাম লিখুন।",
+      "notFound": "এই মোডটি আর নেই।",
+      "restrictionHint": "শুধু এই প্যাটার্নের সাথে মেলে এমন ফাইল সম্পাদনা করা যাবে। সব ফাইলের অনুমতি দিতে এটি খালি রাখুন।",
+      "restrictionInvalid": "একটি বৈধ প্যাটার্ন লিখুন।",
+      "restrictionLabel": "সীমাবদ্ধতার লেবেল",
+      "restrictionPattern": "ফাইল প্যাটার্ন",
+      "roleLabel": "ভূমিকার সংজ্ঞা",
+      "roleRequired": "এই মোড কী করে তা বর্ণনা করুন।",
+      "tool": {
+        "browser": "ব্রাউজার ব্যবহার করুন",
+        "command": "কমান্ড চালান",
+        "edit": "ফাইল সম্পাদনা করুন",
+        "mcp": "MCP ব্যবহার করুন",
+        "read": "ফাইল পড়ুন"
+      },
+      "whenToUseLabel": "এই মোড কখন ব্যবহার করবেন"
+    },
+    "groups": {
+      "create": "নতুন গ্রুপ",
+      "deleteAction": "গ্রুপ মুছুন",
+      "deleteMessage": "গ্রুপটি, এর পলিসি এবং এর সদস্য অ্যাসাইনমেন্ট সরানো হবে।",
+      "deleteTitle": "এই গ্রুপটি মুছবেন?",
+      "descriptionLabel": "গ্রুপের বিবরণ",
+      "emptyDescription": "একটি গ্রুপ সদস্যদের একত্র করে যাতে একটি পলিসি তাদের সবার ক্ষেত্রে প্রযোজ্য হয়।",
+      "emptyTitle": "এখনও কোনো গ্রুপ নেই",
+      "enterpriseOnly": "গ্রুপ এন্টারপ্রাইজ প্ল্যানে উপলব্ধ।",
+      "memberCount": "{{displayCount}} জন সদস্য",
+      "memberCount_one": "{{displayCount}} জন সদস্য",
+      "memberCount_other": "{{displayCount}} জন সদস্য",
+      "memberViewEmpty": "আপনি এই সংস্থার কোনো গ্রুপে নেই।",
+      "memberViewTitle": "আপনার গ্রুপ",
+      "membersEmpty": "আপনার অনুসন্ধানের সাথে কোনো সক্রিয় সদস্য মেলে না।",
+      "membersLabel": "গ্রুপের সদস্য",
+      "nameLabel": "গ্রুপের নাম",
+      "nameRequired": "একটি গ্রুপের নাম লিখুন।",
+      "nameTooLong": "নামটি ৮০ অক্ষর বা তার কম রাখুন।",
+      "notFound": "এই গ্রুপটি আর নেই।",
+      "permissionDenied": "শুধু একটি সংস্থার মালিক বা অ্যাডমিন এর গ্রুপ পরিবর্তন করতে পারেন।",
+      "searchMembers": "সদস্য খুঁজুন",
+      "selectAllVisible": "দেখানো সবাইকে নির্বাচন করুন"
     },
     "hub": {
       "renameTitle": "সংস্থার নাম পরিবর্তন করুন",

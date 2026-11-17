@@ -480,7 +480,8 @@
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
-    "changelog": "Sa ki nouvo"
+    "changelog": "Sa ki nouvo",
+    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
   },
   "preferences": {
     "general": "Jeneral",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Tout manm yo · Dènye 30 jou",
       "outputTokens": "Jeton sòti",
       "requests": "Demann"
+    },
+    "modes": {
+      "create": "Nouvo mòd",
+      "deleteAction": "Efase mòd",
+      "deleteMessage": "Yo retire mòd la pou tout moun nan òganizasyon sa a. Yon mòd ki ranplase yon mòd entegre retounen nan paramèt entegre yo.",
+      "deleteTitle": "Efase mòd sa a?",
+      "descriptionLabel": "Deskripsyon mòd",
+      "emptyDescription": "Mòd yo ajoute isit la disponib pou tout moun nan òganizasyon sa a.",
+      "emptyTitle": "Poko gen mòd pèsonalize",
+      "identifierHint": "Lèt miniskil, chif, ak tirè.",
+      "identifierInvalid": "Sèvi sèlman ak lèt miniskil, chif, ak tirè.",
+      "identifierLabel": "Idantifyan",
+      "identifierRequired": "Antre yon idantifyan.",
+      "identifierTaken": "Yon lòt mòd deja itilize idantifyan sa a.",
+      "nameLabel": "Non mòd",
+      "nameRequired": "Antre yon non mòd.",
+      "notFound": "Mòd sa a pa egziste ankò.",
+      "restrictionHint": "Se sèlman fichye ki koresponn ak modèl sa a ki ka modifye. Kite li vid pou pèmèt tout fichye.",
+      "restrictionInvalid": "Antre yon modèl ki valab.",
+      "restrictionLabel": "Etikèt restriksyon",
+      "restrictionPattern": "Modèl fichye",
+      "roleLabel": "Definisyon wòl",
+      "roleRequired": "Dekri sa mòd sa a fè.",
+      "tool": {
+        "browser": "Sèvi ak navigatè",
+        "command": "Egzekite kòmand",
+        "edit": "Modifye fichye",
+        "mcp": "Sèvi ak MCP",
+        "read": "Li fichye"
+      },
+      "whenToUseLabel": "Ki lè pou sèvi ak mòd sa a"
+    },
+    "groups": {
+      "create": "Nouvo gwoup",
+      "deleteAction": "Efase gwoup",
+      "deleteMessage": "Yo retire gwoup la, politik li yo, ak afektasyon manm li yo.",
+      "deleteTitle": "Efase gwoup sa a?",
+      "descriptionLabel": "Deskripsyon gwoup",
+      "emptyDescription": "Yon gwoup rasanble manm pou yon sèl politik ka aplike sou tout moun.",
+      "emptyTitle": "Poko gen gwoup",
+      "enterpriseOnly": "Gwoup disponib nan plan Enterprise la.",
+      "memberCount": "{{displayCount}} manm",
+      "memberCount_one": "{{displayCount}} manm",
+      "memberCount_other": "{{displayCount}} manm",
+      "memberViewEmpty": "Ou pa nan okenn gwoup nan òganizasyon sa a.",
+      "memberViewTitle": "Gwoup ou yo",
+      "membersEmpty": "Pa gen manm aktif ki koresponn ak rechèch ou a.",
+      "membersLabel": "Manm gwoup",
+      "nameLabel": "Non gwoup",
+      "nameRequired": "Antre yon non gwoup.",
+      "nameTooLong": "Kenbe non an nan 80 karaktè oswa mwens.",
+      "notFound": "Gwoup sa a pa egziste ankò.",
+      "permissionDenied": "Se sèlman yon pwopriyetè oswa yon administratè òganizasyon ki ka chanje gwoup li yo.",
+      "searchMembers": "Chèche manm",
+      "selectAllVisible": "Seleksyone tout moun ki parèt"
     },
     "hub": {
       "renameTitle": "Chanje non òganizasyon",

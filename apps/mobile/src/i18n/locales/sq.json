@@ -480,7 +480,8 @@
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
     },
-    "changelog": "Çfarë ka të re"
+    "changelog": "Çfarë ka të re",
+    "changelogVersionPending": "Shënimet e këtij versioni vijnë me përditësimin e ardhshëm."
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Të gjithë anëtarët · 30 Ditët e fundit",
       "outputTokens": "Tokenët dalës",
       "requests": "Kërkesat"
+    },
+    "modes": {
+      "create": "Mënyrë e re",
+      "deleteAction": "Fshi mënyrën",
+      "deleteMessage": "Mënyra hiqet për të gjithë në këtë organizatë. Një mënyrë që zëvendëson një mënyrë të integruar kthehet te cilësimet e integruara.",
+      "deleteTitle": "Të fshihet kjo mënyrë?",
+      "descriptionLabel": "Përshkrimi i mënyrës",
+      "emptyDescription": "Mënyrat e shtuara këtu janë të disponueshme për të gjithë në këtë organizatë.",
+      "emptyTitle": "Nuk ka ende mënyra të personalizuara",
+      "identifierHint": "Shkronja të vogla, numra dhe viza.",
+      "identifierInvalid": "Përdor vetëm shkronja të vogla, numra dhe viza.",
+      "identifierLabel": "Identifikuesi",
+      "identifierRequired": "Vendos një identifikues.",
+      "identifierTaken": "Një mënyrë tjetër e përdor tashmë këtë identifikues.",
+      "nameLabel": "Emri i mënyrës",
+      "nameRequired": "Vendos një emër mënyre.",
+      "notFound": "Kjo mënyrë nuk ekziston më.",
+      "restrictionHint": "Mund të redaktohen vetëm skedarët që përputhen me këtë model. Lëre bosh për të lejuar çdo skedar.",
+      "restrictionInvalid": "Vendos një model të vlefshëm.",
+      "restrictionLabel": "Etiketa e kufizimit",
+      "restrictionPattern": "Modeli i skedarit",
+      "roleLabel": "Përkufizimi i rolit",
+      "roleRequired": "Përshkruaj çfarë bën kjo mënyrë.",
+      "tool": {
+        "browser": "Përdor shfletuesin",
+        "command": "Ekzekuto komandat",
+        "edit": "Redakto skedarët",
+        "mcp": "Përdor MCP",
+        "read": "Lexo skedarët"
+      },
+      "whenToUseLabel": "Kur ta përdorësh këtë mënyrë"
+    },
+    "groups": {
+      "create": "Grup i ri",
+      "deleteAction": "Fshi grupin",
+      "deleteMessage": "Grupi, politikat e tij dhe caktimet e anëtarëve të tij hiqen.",
+      "deleteTitle": "Të fshihet ky grup?",
+      "descriptionLabel": "Përshkrimi i grupit",
+      "emptyDescription": "Një grup mbledh anëtarë që një politikë të zbatohet për të gjithë ata.",
+      "emptyTitle": "Nuk ka ende grupe",
+      "enterpriseOnly": "Grupet janë të disponueshme në planin Enterprise.",
+      "memberCount": "{{displayCount}} anëtarë",
+      "memberCount_one": "{{displayCount}} anëtar",
+      "memberCount_other": "{{displayCount}} anëtarë",
+      "memberViewEmpty": "Nuk je në asnjë grup të kësaj organizate.",
+      "memberViewTitle": "Grupet e tua",
+      "membersEmpty": "Nuk ka anëtar aktiv që përputhet me kërkimin tënd.",
+      "membersLabel": "Anëtarët e grupit",
+      "nameLabel": "Emri i grupit",
+      "nameRequired": "Vendos një emër grupi.",
+      "nameTooLong": "Mbaje emrin me 80 karaktere ose më pak.",
+      "notFound": "Ky grup nuk ekziston më.",
+      "permissionDenied": "Vetëm një pronar ose administrator i organizatës mund të ndryshojë grupet e saj.",
+      "searchMembers": "Kërko anëtarë",
+      "selectAllVisible": "Zgjidh të gjithë të shfaqurit"
     },
     "hub": {
       "renameTitle": "Riemërto organizatën",

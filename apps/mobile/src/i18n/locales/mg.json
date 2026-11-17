@@ -480,7 +480,8 @@
       "nextStepFinal": "Farany ny fanapahan-kevitra momba ny fampakarana. Tsy misy fampakarana hafa azo alefa intsony.",
       "viewReceipt": "Jereo ny porofo"
     },
-    "changelog": "Ny vaovao"
+    "changelog": "Ny vaovao",
+    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Mpikambana rehetra · 30 Andro farany lasa",
       "outputTokens": "Sombin-tsoratra mivoaka",
       "requests": "Fangatahana"
+    },
+    "modes": {
+      "create": "Fomba fiasa vaovao",
+      "deleteAction": "Fafao ny fomba fiasa",
+      "deleteMessage": "Esorina amin'ny rehetra ao amin'ity fikambanana ity ny fomba fiasa. Ny fomba fiasa misolo ny iray tafiditra dia miverina amin'ny fandrindrana tafiditra.",
+      "deleteTitle": "Hamafa ity fomba fiasa ity?",
+      "descriptionLabel": "Famaritana ny fomba fiasa",
+      "emptyDescription": "Ny fomba fiasa ampiana eto dia misy ho an'ny rehetra ao amin'ity fikambanana ity.",
+      "emptyTitle": "Mbola tsy misy fomba fiasa manokana",
+      "identifierHint": "Litera kely, isa, ary tsipika.",
+      "identifierInvalid": "Ampiasao ihany ny litera kely, isa, ary tsipika.",
+      "identifierLabel": "Famantarana",
+      "identifierRequired": "Ampidiro ny famantarana.",
+      "identifierTaken": "Efa mampiasa io famantarana io ny fomba fiasa hafa.",
+      "nameLabel": "Anaran'ny fomba fiasa",
+      "nameRequired": "Ampidiro ny anaran'ny fomba fiasa.",
+      "notFound": "Tsy misy intsony ity fomba fiasa ity.",
+      "restrictionHint": "Ny rakitra mifanaraka amin'ity lamina ity ihany no azo ovaina. Avelao foana izany mba hamela ny rakitra rehetra.",
+      "restrictionInvalid": "Ampidiro ny lamina mety.",
+      "restrictionLabel": "Etikety famerana",
+      "restrictionPattern": "Lamina rakitra",
+      "roleLabel": "Famaritana ny anjara asa",
+      "roleRequired": "Lazao izay ataon'ity fomba fiasa ity.",
+      "tool": {
+        "browser": "Ampiasao ny mpitety tranonkala",
+        "command": "Ampandehano ny baiko",
+        "edit": "Ovao ny rakitra",
+        "mcp": "Ampiasao ny MCP",
+        "read": "Vakio ny rakitra"
+      },
+      "whenToUseLabel": "Rahoviana no hampiasaina ity fomba fiasa ity"
+    },
+    "groups": {
+      "create": "Vondrona vaovao",
+      "deleteAction": "Fafao ny vondrona",
+      "deleteMessage": "Esorina ny vondrona, ny fitsipiny, ary ny fanendrena mpikambana ao aminy.",
+      "deleteTitle": "Hamafa ity vondrona ity?",
+      "descriptionLabel": "Famaritana ny vondrona",
+      "emptyDescription": "Mampivondrona mpikambana ny vondrona mba hahafahan'ny fitsipika iray mihatra amin'izy rehetra.",
+      "emptyTitle": "Mbola tsy misy vondrona",
+      "enterpriseOnly": "Misy amin'ny drafitra Enterprise ny vondrona.",
+      "memberCount": "mpikambana {{displayCount}}",
+      "memberCount_one": "mpikambana {{displayCount}}",
+      "memberCount_other": "mpikambana {{displayCount}}",
+      "memberViewEmpty": "Tsy ao amin'ny vondrona iray aza amin'ity fikambanana ity ianao.",
+      "memberViewTitle": "Ny vondronao",
+      "membersEmpty": "Tsy misy mpikambana mavitrika mifanaraka amin'ny fikarohanao.",
+      "membersLabel": "Mpikambana ao amin'ny vondrona",
+      "nameLabel": "Anaran'ny vondrona",
+      "nameRequired": "Ampidiro ny anaran'ny vondrona.",
+      "nameTooLong": "Aza mihoatra ny 80 litera ny anarana.",
+      "notFound": "Tsy misy intsony ity vondrona ity.",
+      "permissionDenied": "Ny tompon'ny fikambanana na ny mpitantany ihany no afaka manova ny vondrona ao aminy.",
+      "searchMembers": "Karohy ny mpikambana",
+      "selectAllVisible": "Safidio izay rehetra aseho"
     },
     "hub": {
       "renameTitle": "Ovao ny anaran'ny fikambanana",

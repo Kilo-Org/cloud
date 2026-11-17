@@ -480,7 +480,8 @@
       "nextStepFinal": "تصمیم مربوط به درخواست تجدیدنظر قطعی است. امکان ارسال درخواست تجدیدنظر دیگری وجود ندارد.",
       "viewReceipt": "مشاهده رسید"
     },
-    "changelog": "تازه‌ها"
+    "changelog": "تازه‌ها",
+    "changelogVersionPending": "یادداشت‌های این نسخه با به‌روزرسانی بعدی برنامه می‌رسند."
   },
   "preferences": {
     "general": "عمومی",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "همه اعضا · ۳۰ روز گذشته",
       "outputTokens": "توکن‌های خروجی",
       "requests": "درخواست‌ها"
+    },
+    "modes": {
+      "create": "حالت جدید",
+      "deleteAction": "حذف حالت",
+      "deleteMessage": "این حالت برای همه اعضای این سازمان حذف می‌شود. حالتی که جایگزین یک حالت داخلی شده است، به تنظیمات داخلی برمی‌گردد.",
+      "deleteTitle": "این حالت حذف شود؟",
+      "descriptionLabel": "توضیح حالت",
+      "emptyDescription": "حالت‌های افزوده‌شده در اینجا برای همه اعضای این سازمان در دسترس هستند.",
+      "emptyTitle": "هنوز حالت سفارشی وجود ندارد",
+      "identifierHint": "حروف کوچک انگلیسی، اعداد و خط تیره.",
+      "identifierInvalid": "فقط از حروف کوچک انگلیسی، اعداد و خط تیره استفاده کنید.",
+      "identifierLabel": "شناسه",
+      "identifierRequired": "شناسه را وارد کنید.",
+      "identifierTaken": "حالت دیگری از این شناسه استفاده می‌کند.",
+      "nameLabel": "نام حالت",
+      "nameRequired": "نام حالت را وارد کنید.",
+      "notFound": "این حالت دیگر وجود ندارد.",
+      "restrictionHint": "فقط فایل‌هایی که با این الگو مطابقت دارند قابل ویرایش هستند. برای اجازه دادن به همه فایل‌ها آن را خالی بگذارید.",
+      "restrictionInvalid": "الگوی معتبر وارد کنید.",
+      "restrictionLabel": "برچسب محدودیت",
+      "restrictionPattern": "الگوی فایل",
+      "roleLabel": "تعریف نقش",
+      "roleRequired": "کارکرد این حالت را توضیح دهید.",
+      "tool": {
+        "browser": "استفاده از مرورگر",
+        "command": "اجرای دستورها",
+        "edit": "ویرایش فایل‌ها",
+        "mcp": "استفاده از MCP",
+        "read": "خواندن فایل‌ها"
+      },
+      "whenToUseLabel": "زمان استفاده از این حالت"
+    },
+    "groups": {
+      "create": "گروه جدید",
+      "deleteAction": "حذف گروه",
+      "deleteMessage": "گروه، سیاست‌های آن و تخصیص‌های اعضای آن حذف می‌شوند.",
+      "deleteTitle": "این گروه حذف شود؟",
+      "descriptionLabel": "توضیح گروه",
+      "emptyDescription": "گروه اعضا را گرد هم می‌آورد تا یک سیاست برای همه آن‌ها اعمال شود.",
+      "emptyTitle": "هنوز گروهی وجود ندارد",
+      "enterpriseOnly": "گروه‌ها در طرح Enterprise در دسترس هستند.",
+      "memberCount": "{{displayCount}} عضو",
+      "memberCount_one": "{{displayCount}} عضو",
+      "memberCount_other": "{{displayCount}} عضو",
+      "memberViewEmpty": "شما در هیچ گروهی از این سازمان نیستید.",
+      "memberViewTitle": "گروه‌های شما",
+      "membersEmpty": "هیچ عضو فعالی با جستجوی شما مطابقت ندارد.",
+      "membersLabel": "اعضای گروه",
+      "nameLabel": "نام گروه",
+      "nameRequired": "نام گروه را وارد کنید.",
+      "nameTooLong": "نام را حداکثر ۸۰ نویسه نگه دارید.",
+      "notFound": "این گروه دیگر وجود ندارد.",
+      "permissionDenied": "فقط مالک یا مدیر سازمان می‌تواند گروه‌های آن را تغییر دهد.",
+      "searchMembers": "جستجوی اعضا",
+      "selectAllVisible": "انتخاب همه افراد نمایش‌داده‌شده"
     },
     "hub": {
       "renameTitle": "تغییر نام سازمان",

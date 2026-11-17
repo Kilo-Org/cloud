@@ -480,7 +480,8 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
-    "changelog": "Nieuw in deze versie"
+    "changelog": "Nieuw in deze versie",
+    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
   },
   "preferences": {
     "general": "Algemeen",
@@ -3480,6 +3481,61 @@
       "orgLast30Days": "Alle leden · Laatste 30 dagen",
       "outputTokens": "Uitvoertokens",
       "requests": "Verzoeken"
+    },
+    "modes": {
+      "create": "Nieuwe modus",
+      "deleteAction": "Modus verwijderen",
+      "deleteMessage": "De modus wordt verwijderd voor iedereen in deze organisatie. Een modus die een ingebouwde modus vervangt, gaat terug naar de ingebouwde instellingen.",
+      "deleteTitle": "Deze modus verwijderen?",
+      "descriptionLabel": "Modusbeschrijving",
+      "emptyDescription": "Modi die je hier toevoegt, zijn beschikbaar voor iedereen in deze organisatie.",
+      "emptyTitle": "Nog geen aangepaste modi",
+      "identifierHint": "Kleine letters, cijfers en koppeltekens.",
+      "identifierInvalid": "Gebruik alleen kleine letters, cijfers en koppeltekens.",
+      "identifierLabel": "Identificatie",
+      "identifierRequired": "Voer een identificatie in.",
+      "identifierTaken": "Een andere modus gebruikt deze identificatie al.",
+      "nameLabel": "Modusnaam",
+      "nameRequired": "Voer een modusnaam in.",
+      "notFound": "Deze modus bestaat niet meer.",
+      "restrictionHint": "Alleen bestanden die overeenkomen met dit patroon kunnen worden bewerkt. Laat dit leeg om elk bestand toe te staan.",
+      "restrictionInvalid": "Voer een geldig patroon in.",
+      "restrictionLabel": "Beperkingslabel",
+      "restrictionPattern": "Bestandspatroon",
+      "roleLabel": "Roldefinitie",
+      "roleRequired": "Beschrijf wat deze modus doet.",
+      "tool": {
+        "browser": "Browser gebruiken",
+        "command": "Opdrachten uitvoeren",
+        "edit": "Bestanden bewerken",
+        "mcp": "MCP gebruiken",
+        "read": "Bestanden lezen"
+      },
+      "whenToUseLabel": "Wanneer je deze modus gebruikt"
+    },
+    "groups": {
+      "create": "Nieuwe groep",
+      "deleteAction": "Groep verwijderen",
+      "deleteMessage": "De groep, het bijbehorende beleid en de ledentoewijzingen worden verwijderd.",
+      "deleteTitle": "Deze groep verwijderen?",
+      "descriptionLabel": "Groepsbeschrijving",
+      "emptyDescription": "Een groep verzamelt leden, zodat één beleid op allemaal van toepassing is.",
+      "emptyTitle": "Nog geen groepen",
+      "enterpriseOnly": "Groepen zijn beschikbaar in het Enterprise-abonnement.",
+      "memberCount": "{{displayCount}} leden",
+      "memberCount_one": "{{displayCount}} lid",
+      "memberCount_other": "{{displayCount}} leden",
+      "memberViewEmpty": "Je zit in geen enkele groep van deze organisatie.",
+      "memberViewTitle": "Je groepen",
+      "membersEmpty": "Geen actief lid komt overeen met je zoekopdracht.",
+      "membersLabel": "Groepsleden",
+      "nameLabel": "Groepsnaam",
+      "nameRequired": "Voer een groepsnaam in.",
+      "nameTooLong": "Gebruik maximaal 80 tekens.",
+      "notFound": "Deze groep bestaat niet meer.",
+      "permissionDenied": "Alleen een eigenaar of beheerder van de organisatie kan de groepen wijzigen.",
+      "searchMembers": "Leden zoeken",
+      "selectAllVisible": "Iedereen die wordt getoond selecteren"
     },
     "kiloPass": {
       "activating": "Wordt geactiveerd",

@@ -480,7 +480,8 @@
       "nextStepFinal": "คำตัดสินการอุทธรณ์ถือเป็นที่สิ้นสุด ไม่สามารถยื่นอุทธรณ์เพิ่มเติมได้.",
       "viewReceipt": "ดูใบรับ"
     },
-    "changelog": "มีอะไรใหม่"
+    "changelog": "มีอะไรใหม่",
+    "changelogVersionPending": "บันทึกของเวอร์ชันนี้จะมาพร้อมการอัปเดตแอปครั้งถัดไป"
   },
   "preferences": {
     "general": "ทั่วไป",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "สมาชิกทั้งหมด · 30 วันที่ผ่านมา",
       "outputTokens": "โทเคนขาออก",
       "requests": "คำขอ"
+    },
+    "modes": {
+      "create": "โหมดใหม่",
+      "deleteAction": "ลบโหมด",
+      "deleteMessage": "โหมดนี้จะถูกลบสำหรับทุกคนในองค์กรนี้ โหมดที่แทนที่โหมดในตัวจะกลับไปใช้การตั้งค่าในตัว",
+      "deleteTitle": "ลบโหมดนี้หรือไม่",
+      "descriptionLabel": "คำอธิบายโหมด",
+      "emptyDescription": "โหมดที่เพิ่มที่นี่จะใช้ได้กับทุกคนในองค์กรนี้",
+      "emptyTitle": "ยังไม่มีโหมดที่กำหนดเอง",
+      "identifierHint": "ตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลาง",
+      "identifierInvalid": "ใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลาง",
+      "identifierLabel": "ตัวระบุ",
+      "identifierRequired": "กรอกตัวระบุ",
+      "identifierTaken": "มีโหมดอื่นใช้ตัวระบุนี้อยู่แล้ว",
+      "nameLabel": "ชื่อโหมด",
+      "nameRequired": "กรอกชื่อโหมด",
+      "notFound": "ไม่มีโหมดนี้แล้ว",
+      "restrictionHint": "แก้ไขได้เฉพาะไฟล์ที่ตรงกับรูปแบบนี้เท่านั้น เว้นว่างไว้เพื่ออนุญาตทุกไฟล์",
+      "restrictionInvalid": "กรอกรูปแบบที่ถูกต้อง",
+      "restrictionLabel": "ป้ายกำกับข้อจำกัด",
+      "restrictionPattern": "รูปแบบไฟล์",
+      "roleLabel": "นิยามบทบาท",
+      "roleRequired": "อธิบายว่าโหมดนี้ทำอะไร",
+      "tool": {
+        "browser": "ใช้เบราว์เซอร์",
+        "command": "เรียกใช้คำสั่ง",
+        "edit": "แก้ไขไฟล์",
+        "mcp": "ใช้ MCP",
+        "read": "อ่านไฟล์"
+      },
+      "whenToUseLabel": "เมื่อใดควรใช้โหมดนี้"
+    },
+    "groups": {
+      "create": "กลุ่มใหม่",
+      "deleteAction": "ลบกลุ่ม",
+      "deleteMessage": "กลุ่มนี้จะถูกลบพร้อมนโยบายและการกำหนดสมาชิกของกลุ่ม",
+      "deleteTitle": "ลบกลุ่มนี้หรือไม่",
+      "descriptionLabel": "คำอธิบายกลุ่ม",
+      "emptyDescription": "กลุ่มใช้รวมสมาชิกเพื่อให้นโยบายเดียวมีผลกับทุกคน",
+      "emptyTitle": "ยังไม่มีกลุ่ม",
+      "enterpriseOnly": "กลุ่มพร้อมใช้งานในแพ็กเกจ Enterprise",
+      "memberCount": "{{displayCount}} สมาชิก",
+      "memberCount_one": "{{displayCount}} สมาชิก",
+      "memberCount_other": "{{displayCount}} สมาชิก",
+      "memberViewEmpty": "คุณไม่ได้อยู่ในกลุ่มใดขององค์กรนี้",
+      "memberViewTitle": "กลุ่มของคุณ",
+      "membersEmpty": "ไม่พบสมาชิกที่ใช้งานอยู่ที่ตรงกับการค้นหาของคุณ",
+      "membersLabel": "สมาชิกกลุ่ม",
+      "nameLabel": "ชื่อกลุ่ม",
+      "nameRequired": "กรอกชื่อกลุ่ม",
+      "nameTooLong": "ชื่อต้องไม่เกิน 80 ตัวอักษร",
+      "notFound": "ไม่มีกลุ่มนี้แล้ว",
+      "permissionDenied": "เฉพาะเจ้าของหรือผู้ดูแลระบบองค์กรเท่านั้นที่เปลี่ยนกลุ่มได้",
+      "searchMembers": "ค้นหาสมาชิก",
+      "selectAllVisible": "เลือกทุกคนที่แสดง"
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",

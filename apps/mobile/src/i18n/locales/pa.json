@@ -480,7 +480,8 @@
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
-    "changelog": "ਕੀ ਨਵਾਂ ਹੈ"
+    "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
+    "changelogVersionPending": "ਇਸ ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।"
   },
   "preferences": {
     "general": "ਆਮ",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "ਸਾਰੇ ਮੈਂਬਰ · ਪਿਛਲੇ 30 ਦਿਨ",
       "outputTokens": "ਆਉਟਪੁੱਟ ਟੋਕਨ",
       "requests": "ਬੇਨਤੀਆਂ"
+    },
+    "modes": {
+      "create": "ਨਵਾਂ ਮੋਡ",
+      "deleteAction": "ਮੋਡ ਮਿਟਾਓ",
+      "deleteMessage": "ਇਹ ਮੋਡ ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਹਰ ਕਿਸੇ ਲਈ ਹਟਾ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਜੋ ਮੋਡ ਬਿਲਟ-ਇਨ ਮੋਡ ਦੀ ਥਾਂ ਲੈਂਦਾ ਹੈ, ਉਹ ਬਿਲਟ-ਇਨ ਸੈਟਿੰਗਾਂ 'ਤੇ ਵਾਪਸ ਆ ਜਾਵੇਗਾ।",
+      "deleteTitle": "ਇਹ ਮੋਡ ਮਿਟਾਉਣਾ ਹੈ?",
+      "descriptionLabel": "ਮੋਡ ਦਾ ਵੇਰਵਾ",
+      "emptyDescription": "ਇੱਥੇ ਜੋੜੇ ਗਏ ਮੋਡ ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਹਰ ਕਿਸੇ ਲਈ ਉਪਲਬਧ ਹਨ।",
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਕਸਟਮ ਮੋਡ ਨਹੀਂ",
+      "identifierHint": "ਛੋਟੇ ਅੱਖਰ, ਨੰਬਰ ਅਤੇ ਹਾਈਫਨ।",
+      "identifierInvalid": "ਸਿਰਫ਼ ਛੋਟੇ ਅੱਖਰ, ਨੰਬਰ ਅਤੇ ਹਾਈਫਨ ਵਰਤੋ।",
+      "identifierLabel": "ਪਛਾਣਕਰਤਾ",
+      "identifierRequired": "ਪਛਾਣਕਰਤਾ ਦਰਜ ਕਰੋ।",
+      "identifierTaken": "ਕੋਈ ਹੋਰ ਮੋਡ ਪਹਿਲਾਂ ਹੀ ਇਹ ਪਛਾਣਕਰਤਾ ਵਰਤ ਰਿਹਾ ਹੈ।",
+      "nameLabel": "ਮੋਡ ਦਾ ਨਾਮ",
+      "nameRequired": "ਮੋਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
+      "notFound": "ਇਹ ਮੋਡ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
+      "restrictionHint": "ਸਿਰਫ਼ ਉਹ ਫ਼ਾਈਲਾਂ ਸੋਧੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ ਜੋ ਇਸ ਪੈਟਰਨ ਨਾਲ ਮੇਲ ਖਾਂਦੀਆਂ ਹਨ। ਹਰ ਫ਼ਾਈਲ ਦੀ ਆਗਿਆ ਦੇਣ ਲਈ ਇਸ ਨੂੰ ਖਾਲੀ ਛੱਡੋ।",
+      "restrictionInvalid": "ਵੈਧ ਪੈਟਰਨ ਦਰਜ ਕਰੋ।",
+      "restrictionLabel": "ਪਾਬੰਦੀ ਲੇਬਲ",
+      "restrictionPattern": "ਫ਼ਾਈਲ ਪੈਟਰਨ",
+      "roleLabel": "ਭੂਮਿਕਾ ਦੀ ਪਰਿਭਾਸ਼ਾ",
+      "roleRequired": "ਦੱਸੋ ਕਿ ਇਹ ਮੋਡ ਕੀ ਕਰਦਾ ਹੈ।",
+      "tool": {
+        "browser": "ਬ੍ਰਾਊਜ਼ਰ ਵਰਤੋ",
+        "command": "ਕਮਾਂਡਾਂ ਚਲਾਓ",
+        "edit": "ਫ਼ਾਈਲਾਂ ਸੋਧੋ",
+        "mcp": "MCP ਵਰਤੋ",
+        "read": "ਫ਼ਾਈਲਾਂ ਪੜ੍ਹੋ"
+      },
+      "whenToUseLabel": "ਇਹ ਮੋਡ ਕਦੋਂ ਵਰਤਣਾ ਹੈ"
+    },
+    "groups": {
+      "create": "ਨਵਾਂ ਗਰੁੱਪ",
+      "deleteAction": "ਗਰੁੱਪ ਮਿਟਾਓ",
+      "deleteMessage": "ਗਰੁੱਪ, ਇਸ ਦੀਆਂ ਨੀਤੀਆਂ ਅਤੇ ਇਸ ਦੀਆਂ ਮੈਂਬਰ ਅਸਾਈਨਮੈਂਟਾਂ ਹਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।",
+      "deleteTitle": "ਇਹ ਗਰੁੱਪ ਮਿਟਾਉਣਾ ਹੈ?",
+      "descriptionLabel": "ਗਰੁੱਪ ਦਾ ਵੇਰਵਾ",
+      "emptyDescription": "ਇੱਕ ਗਰੁੱਪ ਮੈਂਬਰਾਂ ਨੂੰ ਇਕੱਠਾ ਕਰਦਾ ਹੈ ਤਾਂ ਜੋ ਇੱਕ ਨੀਤੀ ਉਨ੍ਹਾਂ ਸਾਰਿਆਂ 'ਤੇ ਲਾਗੂ ਹੋ ਸਕੇ।",
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਗਰੁੱਪ ਨਹੀਂ",
+      "enterpriseOnly": "ਗਰੁੱਪ ਐਂਟਰਪ੍ਰਾਈਜ਼ ਪਲਾਨ 'ਤੇ ਉਪਲਬਧ ਹਨ।",
+      "memberCount": "{{displayCount}} ਮੈਂਬਰ",
+      "memberCount_one": "{{displayCount}} ਮੈਂਬਰ",
+      "memberCount_other": "{{displayCount}} ਮੈਂਬਰ",
+      "memberViewEmpty": "ਤੁਸੀਂ ਇਸ ਸੰਸਥਾ ਦੇ ਕਿਸੇ ਵੀ ਗਰੁੱਪ ਵਿੱਚ ਨਹੀਂ ਹੋ।",
+      "memberViewTitle": "ਤੁਹਾਡੇ ਗਰੁੱਪ",
+      "membersEmpty": "ਤੁਹਾਡੀ ਖੋਜ ਨਾਲ ਕੋਈ ਵੀ ਸਰਗਰਮ ਮੈਂਬਰ ਨਹੀਂ ਮਿਲਦਾ।",
+      "membersLabel": "ਗਰੁੱਪ ਮੈਂਬਰ",
+      "nameLabel": "ਗਰੁੱਪ ਦਾ ਨਾਮ",
+      "nameRequired": "ਗਰੁੱਪ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
+      "nameTooLong": "ਨਾਮ 80 ਅੱਖਰਾਂ ਜਾਂ ਇਸ ਤੋਂ ਘੱਟ ਰੱਖੋ।",
+      "notFound": "ਇਹ ਗਰੁੱਪ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
+      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਹੀ ਇਸ ਦੇ ਗਰੁੱਪ ਬਦਲ ਸਕਦਾ ਹੈ।",
+      "searchMembers": "ਮੈਂਬਰ ਖੋਜੋ",
+      "selectAllVisible": "ਦਿਖਾਏ ਗਏ ਸਾਰਿਆਂ ਨੂੰ ਚੁਣੋ"
     },
     "hub": {
       "renameTitle": "ਸੰਸਥਾ ਦਾ ਨਾਮ ਬਦਲੋ",

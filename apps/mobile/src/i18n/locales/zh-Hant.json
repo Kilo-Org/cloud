@@ -480,7 +480,8 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
-    "changelog": "最新消息"
+    "changelog": "最新消息",
+    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
   },
   "preferences": {
     "general": "一般",
@@ -3480,6 +3481,61 @@
       "orgLast30Days": "全體成員 · 最近 30 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
+    },
+    "modes": {
+      "create": "新增模式",
+      "deleteAction": "刪除模式",
+      "deleteMessage": "此模式會為此組織中的所有成員移除。若此模式取代內建模式，會還原為內建設定。",
+      "deleteTitle": "要刪除此模式嗎？",
+      "descriptionLabel": "模式說明",
+      "emptyDescription": "在此新增的模式可供此組織中的所有成員使用。",
+      "emptyTitle": "尚無自訂模式",
+      "identifierHint": "小寫字母、數字和連字號。",
+      "identifierInvalid": "只能使用小寫字母、數字和連字號。",
+      "identifierLabel": "識別碼",
+      "identifierRequired": "請輸入識別碼。",
+      "identifierTaken": "已有其他模式使用此識別碼。",
+      "nameLabel": "模式名稱",
+      "nameRequired": "請輸入模式名稱。",
+      "notFound": "此模式已不存在。",
+      "restrictionHint": "僅能編輯符合此樣式的檔案。留空則允許所有檔案。",
+      "restrictionInvalid": "請輸入有效的樣式。",
+      "restrictionLabel": "限制標籤",
+      "restrictionPattern": "檔案樣式",
+      "roleLabel": "角色定義",
+      "roleRequired": "請描述此模式的用途。",
+      "tool": {
+        "browser": "使用瀏覽器",
+        "command": "執行命令",
+        "edit": "編輯檔案",
+        "mcp": "使用 MCP",
+        "read": "讀取檔案"
+      },
+      "whenToUseLabel": "何時使用此模式"
+    },
+    "groups": {
+      "create": "新增群組",
+      "deleteAction": "刪除群組",
+      "deleteMessage": "此群組、其政策及成員指派都會被移除。",
+      "deleteTitle": "要刪除此群組嗎？",
+      "descriptionLabel": "群組說明",
+      "emptyDescription": "群組會彙整成員，讓同一項政策套用至所有成員。",
+      "emptyTitle": "尚無群組",
+      "enterpriseOnly": "群組僅適用於 Enterprise 方案。",
+      "memberCount": "{{displayCount}} 位成員",
+      "memberCount_one": "{{displayCount}} 位成員",
+      "memberCount_other": "{{displayCount}} 位成員",
+      "memberViewEmpty": "你不在此組織的任何群組中。",
+      "memberViewTitle": "你的群組",
+      "membersEmpty": "沒有符合搜尋的有效成員。",
+      "membersLabel": "群組成員",
+      "nameLabel": "群組名稱",
+      "nameRequired": "請輸入群組名稱。",
+      "nameTooLong": "名稱請保持在 80 個字元以內。",
+      "notFound": "此群組已不存在。",
+      "permissionDenied": "只有組織擁有者或管理員可以變更此組織的群組。",
+      "searchMembers": "搜尋成員",
+      "selectAllVisible": "選取所有顯示的成員"
     },
     "kiloPass": {
       "activating": "啟用中",

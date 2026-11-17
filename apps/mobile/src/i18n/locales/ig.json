@@ -480,7 +480,8 @@
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
-    "changelog": "Ihe ọhụrụ"
+    "changelog": "Ihe ọhụrụ",
+    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
   },
   "preferences": {
     "general": "Izugbe",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Ndị otu niile · Ụbọchị 30 gara aga",
       "outputTokens": "Tokin mmepụta",
       "requests": "Arịrịọ"
+    },
+    "modes": {
+      "create": "Ụdị ọrụ ọhụrụ",
+      "deleteAction": "Hichapụ ụdị ọrụ",
+      "deleteMessage": "A na-ewepụ ụdị ọrụ a maka onye ọ bụla nọ n'òtù nzukọ a. Ụdị ọrụ na-edochi nke arụnyere na ya na-alaghachi na ntọala arụnyere.",
+      "deleteTitle": "Hichapụ ụdị ọrụ a?",
+      "descriptionLabel": "Nkọwa ụdị ọrụ",
+      "emptyDescription": "Ụdị ọrụ agbakwunyere ebe a dị maka onye ọ bụla nọ n'òtù nzukọ a.",
+      "emptyTitle": "Enwebeghị ụdị ọrụ ahaziri iche",
+      "identifierHint": "Mkpụrụedemede nta, ọnụọgụ, na akara njikọ.",
+      "identifierInvalid": "Jiri naanị mkpụrụedemede nta, ọnụọgụ, na akara njikọ.",
+      "identifierLabel": "Njirimara",
+      "identifierRequired": "Tinye njirimara.",
+      "identifierTaken": "Ụdị ọrụ ọzọ ejirila njirimara a.",
+      "nameLabel": "Aha ụdị ọrụ",
+      "nameRequired": "Tinye aha ụdị ọrụ.",
+      "notFound": "Ụdị ọrụ a adịkwaghị.",
+      "restrictionHint": "Naanị faịlụ kwekọrọ n'ụkpụrụ a ka enwere ike ịdezi. Hapụ ya tọfụ ka faịlụ niile kweere.",
+      "restrictionInvalid": "Tinye ụkpụrụ ziri ezi.",
+      "restrictionLabel": "Akara mmachi",
+      "restrictionPattern": "Ụkpụrụ faịlụ",
+      "roleLabel": "Nkọwa ọrụ",
+      "roleRequired": "Kọwaa ihe ụdị ọrụ a na-eme.",
+      "tool": {
+        "browser": "Jiri ihe nchọgharị",
+        "command": "Gbaa iwu",
+        "edit": "Dezie faịlụ",
+        "mcp": "Jiri MCP",
+        "read": "Gụọ faịlụ"
+      },
+      "whenToUseLabel": "Mgbe a ga-eji ụdị ọrụ a"
+    },
+    "groups": {
+      "create": "Ìgwè ọhụrụ",
+      "deleteAction": "Hichapụ ìgwè",
+      "deleteMessage": "A na-ewepụ ìgwè a, atụmatụ ya, na ọrụ e kenyere ndị otu ya.",
+      "deleteTitle": "Hichapụ ìgwè a?",
+      "descriptionLabel": "Nkọwa ìgwè",
+      "emptyDescription": "Ìgwè na-achịkọta ndị otu ka otu atụmatụ wee metụta ha niile.",
+      "emptyTitle": "Enwebeghị ìgwè",
+      "enterpriseOnly": "Ìgwè dị na atụmatụ Enterprise.",
+      "memberCount": "Ndị otu {{displayCount}}",
+      "memberCount_one": "Ndị otu {{displayCount}}",
+      "memberCount_other": "Ndị otu {{displayCount}}",
+      "memberViewEmpty": "Ị nọghị n'ìgwè ọ bụla nke òtù nzukọ a.",
+      "memberViewTitle": "Ìgwè gị",
+      "membersEmpty": "Ọ dịghị onye otu na-arụ ọrụ kwekọrọ na nchọgharị gị.",
+      "membersLabel": "Ndị otu ìgwè",
+      "nameLabel": "Aha ìgwè",
+      "nameRequired": "Tinye aha ìgwè.",
+      "nameTooLong": "Debe aha ahụ na mkpụrụedemede 80 ma ọ bụ obere.",
+      "notFound": "Ìgwè a adịkwaghị.",
+      "permissionDenied": "Naanị onye nwe òtù nzukọ ma ọ bụ onye nchịkwa nwere ike ịgbanwe ìgwè ya.",
+      "searchMembers": "Chọọ ndị otu",
+      "selectAllVisible": "Họrọ onye ọ bụla egosiri"
     },
     "hub": {
       "renameTitle": "Gbanwee aha òtù",

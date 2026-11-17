@@ -480,7 +480,8 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
-    "changelog": "Nyheter"
+    "changelog": "Nyheter",
+    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
   },
   "preferences": {
     "general": "Allmänt",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Alla medlemmar · Senaste 30 dagarna",
       "outputTokens": "Utmatade token",
       "requests": "Begäranden"
+    },
+    "modes": {
+      "create": "Nytt läge",
+      "deleteAction": "Ta bort läge",
+      "deleteMessage": "Läget tas bort för alla i den här organisationen. Ett läge som ersätter ett inbyggt läge återgår till de inbyggda inställningarna.",
+      "deleteTitle": "Ta bort det här läget?",
+      "descriptionLabel": "Lägesbeskrivning",
+      "emptyDescription": "Lägen som läggs till här är tillgängliga för alla i den här organisationen.",
+      "emptyTitle": "Inga anpassade lägen ännu",
+      "identifierHint": "Gemener, siffror och bindestreck.",
+      "identifierInvalid": "Använd endast gemener, siffror och bindestreck.",
+      "identifierLabel": "Identifierare",
+      "identifierRequired": "Ange en identifierare.",
+      "identifierTaken": "Ett annat läge använder redan den här identifieraren.",
+      "nameLabel": "Lägesnamn",
+      "nameRequired": "Ange ett lägesnamn.",
+      "notFound": "Det här läget finns inte längre.",
+      "restrictionHint": "Endast filer som matchar det här mönstret kan redigeras. Lämna det tomt för att tillåta alla filer.",
+      "restrictionInvalid": "Ange ett giltigt mönster.",
+      "restrictionLabel": "Begränsningsetikett",
+      "restrictionPattern": "Filmönster",
+      "roleLabel": "Rolldefinition",
+      "roleRequired": "Beskriv vad det här läget gör.",
+      "tool": {
+        "browser": "Använd webbläsare",
+        "command": "Kör kommandon",
+        "edit": "Redigera filer",
+        "mcp": "Använd MCP",
+        "read": "Läs filer"
+      },
+      "whenToUseLabel": "När läget ska användas"
+    },
+    "groups": {
+      "create": "Ny grupp",
+      "deleteAction": "Ta bort grupp",
+      "deleteMessage": "Gruppen, dess policyer och dess medlemstilldelningar tas bort.",
+      "deleteTitle": "Ta bort den här gruppen?",
+      "descriptionLabel": "Gruppbeskrivning",
+      "emptyDescription": "En grupp samlar medlemmar så att en policy kan gälla för alla.",
+      "emptyTitle": "Inga grupper ännu",
+      "enterpriseOnly": "Grupper är tillgängliga på Enterprise-planen.",
+      "memberCount": "{{displayCount}} medlemmar",
+      "memberCount_one": "{{displayCount}} medlem",
+      "memberCount_other": "{{displayCount}} medlemmar",
+      "memberViewEmpty": "Du är inte med i någon grupp i den här organisationen.",
+      "memberViewTitle": "Dina grupper",
+      "membersEmpty": "Ingen aktiv medlem matchar sökningen.",
+      "membersLabel": "Gruppmedlemmar",
+      "nameLabel": "Gruppnamn",
+      "nameRequired": "Ange ett gruppnamn.",
+      "nameTooLong": "Namnet får innehålla högst 80 tecken.",
+      "notFound": "Den här gruppen finns inte längre.",
+      "permissionDenied": "Endast en ägare eller administratör för organisationen kan ändra dess grupper.",
+      "searchMembers": "Sök medlemmar",
+      "selectAllVisible": "Välj alla som visas"
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",

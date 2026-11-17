@@ -480,7 +480,8 @@
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
     },
-    "changelog": "Nýjungar"
+    "changelog": "Nýjungar",
+    "changelogVersionPending": "Upplýsingar um þessa útgáfu berast með næstu uppfærslu forritsins."
   },
   "preferences": {
     "general": "Almennt",
@@ -3475,6 +3476,61 @@
       "orgLast30Days": "Allir meðlimir · Síðustu 30 dagar",
       "outputTokens": "Úttakstókar",
       "requests": "Beiðnir"
+    },
+    "modes": {
+      "create": "Nýr hamur",
+      "deleteAction": "Eyða ham",
+      "deleteMessage": "Hamnum er eytt fyrir alla í þessari stofnun. Hamur sem leysir innbyggðan ham af hólmi fer aftur í innbyggðu stillingarnar.",
+      "deleteTitle": "Eyða þessum ham?",
+      "descriptionLabel": "Lýsing á ham",
+      "emptyDescription": "Hamir sem bætt er við hér eru aðgengilegir öllum í þessari stofnun.",
+      "emptyTitle": "Engir sérsniðnir hamir ennþá",
+      "identifierHint": "Lágstafir, tölur og bandstrik.",
+      "identifierInvalid": "Notaðu eingöngu lágstafi, tölur og bandstrik.",
+      "identifierLabel": "Auðkenni",
+      "identifierRequired": "Sláðu inn auðkenni.",
+      "identifierTaken": "Þetta auðkenni er þegar notað í öðrum ham.",
+      "nameLabel": "Heiti hams",
+      "nameRequired": "Sláðu inn heiti hams.",
+      "notFound": "Þessi hamur er ekki lengur til.",
+      "restrictionHint": "Aðeins er hægt að breyta skrám sem passa við þetta mynstur. Skildu það eftir autt til að leyfa allar skrár.",
+      "restrictionInvalid": "Sláðu inn gilt mynstur.",
+      "restrictionLabel": "Merki takmörkunar",
+      "restrictionPattern": "Skráamynstur",
+      "roleLabel": "Skilgreining hlutverks",
+      "roleRequired": "Lýstu því hvað þessi hamur gerir.",
+      "tool": {
+        "browser": "Nota vafra",
+        "command": "Keyra skipanir",
+        "edit": "Breyta skrám",
+        "mcp": "Nota MCP",
+        "read": "Lesa skrár"
+      },
+      "whenToUseLabel": "Hvenær á að nota þennan ham"
+    },
+    "groups": {
+      "create": "Nýr hópur",
+      "deleteAction": "Eyða hópi",
+      "deleteMessage": "Hópnum er eytt ásamt stefnum hans og meðlimaúthlutunum.",
+      "deleteTitle": "Eyða þessum hópi?",
+      "descriptionLabel": "Lýsing á hópi",
+      "emptyDescription": "Hópur safnar meðlimum svo ein stefna geti átt við þá alla.",
+      "emptyTitle": "Engir hópar ennþá",
+      "enterpriseOnly": "Hópar eru í boði með Enterprise-áskrift.",
+      "memberCount": "Fjöldi meðlima: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} meðlimur",
+      "memberCount_other": "{{displayCount}} meðlimir",
+      "memberViewEmpty": "Þú ert ekki í neinum hópi þessarar stofnunar.",
+      "memberViewTitle": "Þínir hópar",
+      "membersEmpty": "Enginn virkur meðlimur passar við leitina þína.",
+      "membersLabel": "Meðlimir hóps",
+      "nameLabel": "Heiti hóps",
+      "nameRequired": "Sláðu inn heiti hóps.",
+      "nameTooLong": "Hafðu heitið að hámarki 80 stafi.",
+      "notFound": "Þessi hópur er ekki lengur til.",
+      "permissionDenied": "Aðeins eigandi eða stjórnandi stofnunar getur breytt hópum hennar.",
+      "searchMembers": "Leita að meðlimum",
+      "selectAllVisible": "Velja alla sem sýndir eru"
     },
     "hub": {
       "renameTitle": "Endurnefna félag",

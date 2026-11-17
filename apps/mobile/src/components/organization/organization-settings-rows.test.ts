@@ -54,8 +54,6 @@ describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
       'providersAndModels',
-      'customModes',
-      'groups',
       'guardrails',
       'ssoAndDomain',
       'requestLogs',
@@ -67,27 +65,17 @@ describe('visibleOrgSettingsRows', () => {
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
     // The SSO card is the shell's own page, so it carries no billing gate.
-    expect(areas({ role: 'member' })).toEqual([
-      'customModes',
-      'groups',
-      'ssoAndDomain',
-      'integrations',
-    ]);
+    expect(areas({ role: 'member' })).toEqual(['ssoAndDomain', 'integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
     // Data collection is the teams dashboard card the shell hosts, so a member
     // sees it where an enterprise member sees providers and models.
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'customModes',
-      'dataCollection',
-      'integrations',
-    ]);
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['dataCollection', 'integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'customModes',
       'guardrails',
       'dataCollection',
       'requestLogs',
@@ -144,34 +132,45 @@ describe('visibleOrgSettingsRows', () => {
   it('keeps every in-app area out of the web group', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        expect(areas({ role, plan })).not.toContain('auditLogs');
-        expect(areas({ role, plan })).not.toContain('usageDetails');
-        expect(areas({ role, plan })).not.toContain('byok');
+        const rows = areas({ role, plan });
+        expect(rows).not.toContain('auditLogs');
+        expect(rows).not.toContain('usageDetails');
+        expect(rows).not.toContain('customModes');
+        expect(rows).not.toContain('groups');
+        expect(rows).not.toContain('byok');
       }
     }
   });
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns usage to every role and plan, and the audit log and keys to billing roles', () => {
+  it('returns every in-app area to a billing role on enterprise', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['usageDetails', 'auditLogs', 'byok']);
+      expect(inAppAreas({ role })).toEqual([
+        'customModes',
+        'groups',
+        'usageDetails',
+        'auditLogs',
+        'byok',
+      ]);
     }
   });
 
-  it('keeps usage for a member, an unknown role and a teams plan', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual(['usageDetails']);
-    expect(inAppAreas({ role: undefined })).toEqual(['usageDetails']);
-    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['usageDetails']);
+  it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
   });
 
   it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['usageDetails', 'byok']);
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails', 'byok']);
   });
 
-  it('opens the app screens, not pages', () => {
+  it('opens the native screen that owns each setting', () => {
     const rows = visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise' }, 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
+    expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
     expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
     expect(byArea.get('byok')?.href).toEqual({

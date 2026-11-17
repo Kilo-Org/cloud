@@ -151,11 +151,13 @@ export function TriggerDetailScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={triggerId}
+        showBackButton
         onBack={() => {
           // POP_TO puts the list under this screen whether or not it is already
           // beneath (the create flow retires the form after the transition, a
           // deep link may have none), so Back always returns to the list the
-          // trigger is a row of.
+          // trigger is a row of. `showBackButton` keeps the control painted on
+          // a restored stack where the router reports no history to pop.
           router.dismissTo(triggersListHref(organizationId) as Href);
         }}
       />

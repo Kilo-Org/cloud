@@ -1,3 +1,6 @@
+// The account picker is one presented sheet. While a copy of it exists, every
+// opener refuses, so a repeated open cannot stack copies that each need their
+// own Done, and one Done returns to the screen underneath.
 import { createElement, type ReactNode, useEffect } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,26 +9,17 @@ import '@/i18n';
 import { ContextControl } from '@/components/context-control';
 import { darkColors } from '@/lib/hooks/theme-colors.generated';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { enterContextPicker } from '@/lib/picker-presentation';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const list = vi.hoisted(() => vi.fn());
 const pushMock = vi.hoisted(() => vi.fn());
-type NavigationState = { index: number; routes: { name: string }[] };
-const navigation = vi.hoisted(() => ({
-  getState: vi.fn<() => NavigationState | undefined>(() => undefined),
-  /** The navigator above: set per test to exercise the ancestor walk. */
-  getParent: vi.fn<() => { getState: () => NavigationState | undefined } | undefined>(
-    () => undefined
-  ),
-}));
 type FocusEffect = () => (() => void) | undefined;
 const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
-const slotSet = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock, back: vi.fn() }),
-  useNavigation: () => navigation,
   useFocusEffect: (effect: FocusEffect) => {
     if (!focusEffects.includes(effect)) {
       focusEffects.push(effect);
@@ -122,10 +116,6 @@ const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }
 type MountedUi = Awaited<ReturnType<typeof renderWithProviders>>;
 const mountedUi: MountedUi[] = [];
 
-/** The route the opener pushes, the name the presented route carries. */
-const PICKED_ROUTES = [{ name: 'context-picker' }];
-const PRESENTED_STATE = { index: 0, routes: PICKED_ROUTES };
-
 function Surface() {
   return createElement(ContextControl);
 }
@@ -142,33 +132,40 @@ function picker(ui: MountedUi): ReactTestInstance {
   return ui.renderer.root.findByProps({ accessibilityHint: 'Select account' });
 }
 
-async function openPicker(ui: MountedUi): Promise<void> {
+async function press(ui: MountedUi): Promise<void> {
   await act(() => {
     (picker(ui).props.onPress as () => void)();
   });
 }
 
-describe('openPicker while the account picker route is already presented', () => {
+describe('openPicker while the account picker is presented', () => {
+  /** Every release the suite entered, so a failure cannot leak a mark. */
+  const releases: (() => void)[] = [];
+
+  function present(): void {
+    releases.push(enterContextPicker());
+  }
+
   beforeEach(() => {
     vi.stubGlobal('__DEV__', true);
     contextPickerSlot.clearAll();
-    slotSet.mockReset();
     pushMock.mockReset();
-    navigation.getState.mockReset().mockReturnValue(undefined);
-    navigation.getParent.mockReset().mockReturnValue(undefined);
     focusEffects.length = 0;
     list.mockReset().mockReturnValue(orgs as unknown as Promise<typeof orgs>);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    for (const release of releases.splice(0)) {
+      release();
+    }
     for (const ui of mountedUi.splice(0)) {
       ui.unmount();
     }
   });
 
-  it('pushes once and writes the slot once, then the press while presented is a no-op', async () => {
+  it('pushes once and writes the slot once', async () => {
     const ui = await mount();
-    await openPicker(ui);
+    await press(ui);
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith('/(app)/context-picker');
     expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toEqual({
@@ -176,31 +173,49 @@ describe('openPicker while the account picker route is already presented', () =>
       currentIndex: 0,
       onSelect: expect.any(Function),
     });
+  });
 
-    navigation.getState.mockReturnValue(PRESENTED_STATE);
+  it('keeps the single push and the slot of the first open while one is presented', async () => {
+    const ui = await mount();
+    await press(ui);
+    expect(pushMock).toHaveBeenCalledTimes(1);
     const writtenBefore = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
-    await openPicker(ui);
+
+    present();
+    await press(ui);
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toBe(writtenBefore);
   });
 
-  it('returns without writing or pushing when the route is already presented', async () => {
+  it('pushes nothing when the sheet is already presented before the first open', async () => {
+    present();
     const ui = await mount();
-    navigation.getState.mockReturnValue(PRESENTED_STATE);
-    await openPicker(ui);
+    await press(ui);
     expect(pushMock).toHaveBeenCalledTimes(0);
     expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
   });
 
-  it('walks to the parent navigator when only its own state shows the sheet', async () => {
-    // The tab-in-(app)-stack shape: the control's nearest navigator still
-    // reports the tab row on top while the parent `(app)` stack carries the
-    // presented context-picker — the shape the stacking bug came from.
+  it('opens again after the presented copy leaves', async () => {
     const ui = await mount();
-    navigation.getState.mockReturnValue({ index: 0, routes: [{ name: 'index' }] });
-    navigation.getParent.mockReturnValue({ getState: () => PRESENTED_STATE });
-    await openPicker(ui);
+    present();
+    await press(ui);
     expect(pushMock).toHaveBeenCalledTimes(0);
-    expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+
+    for (const release of releases.splice(0)) {
+      release();
+    }
+    await press(ui);
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).not.toBeUndefined();
+  });
+
+  it('releases a presentation once, however often the release runs', async () => {
+    const release = enterContextPicker();
+    present();
+    release();
+    release();
+    await mount().then(ui => press(ui));
+    // One release of the second entry is still outstanding, so the mark holds.
+    expect(pushMock).toHaveBeenCalledTimes(0);
   });
 });

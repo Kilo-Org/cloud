@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -19,25 +18,13 @@ import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { pickerRouteOnTop, PR_PICKER } from '@/lib/picker-routes';
+import { isContextPickerPresented } from '@/lib/picker-presentation';
+import { PR_PICKER } from '@/lib/picker-routes';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
-
-/**
- * A navigator the presented-picker lookup can read: its own route state and the
- * navigator above it. The chain walk is bounded — real chains are two or three
- * deep, so the limit only stops a navigator that reports a cycle instead of a
- * root (the same bound `usePopOnce` uses).
- */
-type PickerGuardNavigator = Readonly<{
-  getState(): { index?: number; routes?: { name?: string }[] } | undefined;
-  getParent?(): PickerGuardNavigator | undefined;
-}>;
-
-const NAVIGATOR_CHAIN_LIMIT = 8;
 
 /**
  * The caller supplies its cached memberships; the picker does not fetch data.
@@ -53,8 +40,9 @@ const NAVIGATOR_CHAIN_LIMIT = 8;
  * drives the check mark and the no-op comparison; a pick still changes the
  * active account, which is what every other surface reads.
  *
- * The opener admits a single push of the shared sheet per press burst, so a
- * double tap does not stack two identical sheets.
+ * The opener admits a single push of the shared sheet per press burst, and none
+ * at all while a presented copy of it exists, so neither a double tap nor a
+ * repeated open stacks copies that each need their own Done.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,
@@ -62,7 +50,6 @@ export function useContextPicker(
   shownOrganizationId?: string | null
 ) {
   const pushOnce = useSinglePushRoute();
-  const navigation = useNavigation();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
@@ -98,26 +85,12 @@ export function useContextPicker(
       if (!orgs) {
         return;
       }
-      // While the sheet is presented, a second open must not write the slot
-      // again or push another copy of the route — one Done then returns to the
-      // screen underneath instead of walking a stack of copies. The picker
-      // route lives on the `(app)` stack, several navigators above the tab
-      // stack that hosts this control, so the walk reads every level's state;
-      // the nearest navigator's own state still shows the tab row on top.
-      let navigator: PickerGuardNavigator = navigation;
-      let pickerPresented = false;
-      for (let depth = 0; depth < NAVIGATOR_CHAIN_LIMIT; depth += 1) {
-        if (pickerRouteOnTop(navigator.getState())) {
-          pickerPresented = true;
-          break;
-        }
-        const parent: PickerGuardNavigator | undefined = navigator.getParent?.();
-        if (parent === undefined || parent === navigator) {
-          break;
-        }
-        navigator = parent;
-      }
-      if (pickerPresented) {
+      // While a copy of the sheet is presented, a second open must not write the
+      // slot again or push another copy — one Done then returns to the screen
+      // underneath instead of walking a stack of copies. The presented route
+      // owns that mark, so it holds for every surface that opens this picker,
+      // whichever navigator hosts the control.
+      if (isContextPickerPresented()) {
         return;
       }
       // The route reads its rows and its pick from the registry, so the

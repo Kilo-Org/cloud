@@ -51,11 +51,6 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useNavigation: () => ({
-    getState: () => undefined,
-    addListener: () => () => undefined,
-    isFocused: () => true,
-  }),
   // The account picker closes itself on the owning screen's focus loss; this
   // suite keeps the screen focused, so the effect lives as long as the tree.
   useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {

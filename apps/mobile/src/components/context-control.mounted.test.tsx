@@ -61,7 +61,6 @@ type FocusEffect = () => (() => void) | undefined;
 const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock, back: vi.fn() }),
-  useNavigation: () => ({ getState: () => undefined }),
   // The real hook runs the effect on focus; this one runs it on mount and on
   // every new effect identity, like the hook the screen sees.
   useFocusEffect: (effect: FocusEffect) => {

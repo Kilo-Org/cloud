@@ -91,11 +91,6 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
-  useNavigation: () => ({
-    getState: () => undefined,
-    addListener: () => () => undefined,
-    isFocused: () => true,
-  }),
   // The account picker closes itself on the owning screen's focus loss; this
   // suite keeps Home focused, so the effect lives as long as the tree.
   useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {

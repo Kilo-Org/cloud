@@ -1027,6 +1027,89 @@ describe('handleSystemOneRequest', () => {
     expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
   });
 
+  it('answers data_collection_required under an organization data collection policy', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'deny' });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('answers data_collection_required under a request data collection policy', async () => {
+    const response = await handleSystemOneRequest(
+      makeRequest({
+        ...requestBody,
+        model: OTHER_SYSTEM_ONE_MODEL,
+        provider: { data_collection: 'deny' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('answers data_collection_required under a zero data retention policy', async () => {
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL, provider: { zdr: true } })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('serves a model under an allowing data collection policy', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'allow' });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.provider).toEqual({ data_collection: 'allow' });
+  });
+
+  it('forwards a data collection policy on a paid model', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'deny' });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.provider).toEqual({ data_collection: 'deny' });
+  });
+
   it.each([[[]], [['virtual']]])(
     'rejects member routes without a real provider: %j',
     async eligible => {

@@ -128,10 +128,6 @@ export async function issueAdmissionChallenge(
     rateLimitKey: `native-challenge:${ipAddress}`,
   });
 
-  // Only an answer that permits the caller issues a challenge: a limited
-  // caller and a limiter that could not be consulted both refuse here. The
-  // shared helper reports both limiter faults, so an unconfigured rule stays
-  // visible without one message per request.
   if (limit !== 'allowed') {
     throw new ChallengeRateLimitError();
   }

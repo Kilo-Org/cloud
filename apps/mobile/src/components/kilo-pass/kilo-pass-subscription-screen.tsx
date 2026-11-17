@@ -206,7 +206,7 @@ function KiloPassEndedBody({
         </View>
         {/* A section break larger than the gaps inside a section, so the plan
             summary and the ledgers do not read as one block. */}
-        <View className="mt-1">
+        <View className="mt-2">
           <KiloPassCreditHistorySection history={creditHistory} />
         </View>
         {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}

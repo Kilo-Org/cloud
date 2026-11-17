@@ -4517,6 +4517,8 @@
     "topModels": "Modelet kryesore",
     "topFeatures": "Veçoritë kryesore",
     "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "unavailableTitle": "Përdorimi nuk është i disponueshëm",
+    "unavailableDescription": "Kjo hapësirë pune nuk raporton përdorim. Riprovimi nuk do të ndihmojë.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit"
   },

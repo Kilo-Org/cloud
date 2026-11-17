@@ -4587,6 +4587,8 @@
     "topModels": "Modelli più usati",
     "topFeatures": "Funzionalità più usate",
     "emptyTitle": "Nessun utilizzo in questo periodo",
+    "unavailableTitle": "Utilizzo non disponibile",
+    "unavailableDescription": "Questo spazio di lavoro non segnala utilizzo. Riprovare non aiuterà.",
     "orgSelfNotice": "Stai visualizzando il tuo utilizzo in questa organizzazione.",
     "viewDetails": "Visualizza dettagli utilizzo"
   },

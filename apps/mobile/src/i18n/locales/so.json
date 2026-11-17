@@ -4517,6 +4517,8 @@
     "topModels": "Moodeellada ugu badan",
     "topFeatures": "Astaamaha ugu badan",
     "emptyTitle": "Isticmaal kuma jiro muddadan",
+    "unavailableTitle": "Isticmaalka lama heli karo",
+    "unavailableDescription": "Hawlwadeenkan ma soo sheego isticmaalka. Dib u dayashada ma caawinayso.",
     "orgSelfNotice": "Waxaad arkaysaa isticmaalkaaga gaarka ah ee ururkan.",
     "viewDetails": "Eeg faahfaahinta isticmaalka"
   },

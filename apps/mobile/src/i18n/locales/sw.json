@@ -4517,6 +4517,8 @@
     "topModels": "Modeli zinazoongoza",
     "topFeatures": "Vipengele vinavyoongoza",
     "emptyTitle": "Hakuna matumizi katika kipindi hiki",
+    "unavailableTitle": "Matumizi hayapatikani",
+    "unavailableDescription": "Eneo hili la kazi haliripoti matumizi. Kujaribu tena hakutasaidia.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
     "viewDetails": "Angalia maelezo ya matumizi"
   },

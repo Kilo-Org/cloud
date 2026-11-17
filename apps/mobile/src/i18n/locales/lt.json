@@ -4657,6 +4657,8 @@
     "topModels": "Populiariausi modeliai",
     "topFeatures": "Populiariausios funkcijos",
     "emptyTitle": "Šiuo laikotarpiu naudojimo nėra",
+    "unavailableTitle": "Naudojimas nepasiekiamas",
+    "unavailableDescription": "Ši darbo sritis nepraneša apie naudojimą. Bandyti dar kartą nepadės.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
     "viewDetails": "Peržiūrėti naudojimo informaciją"
   },

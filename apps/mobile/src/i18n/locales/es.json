@@ -4587,6 +4587,8 @@
     "topModels": "Modelos más usados",
     "topFeatures": "Funciones más usadas",
     "emptyTitle": "Sin uso en este periodo",
+    "unavailableTitle": "Uso no disponible",
+    "unavailableDescription": "Este espacio de trabajo no informa de uso. Reintentar no ayudará.",
     "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
     "viewDetails": "Ver detalles de uso"
   },

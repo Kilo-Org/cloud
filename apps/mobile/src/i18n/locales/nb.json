@@ -4517,6 +4517,8 @@
     "topModels": "Mest brukte modeller",
     "topFeatures": "Mest brukte funksjoner",
     "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "unavailableTitle": "Forbruk er ikke tilgjengelig",
+    "unavailableDescription": "Dette arbeidsområdet rapporterer ikke forbruk. Det hjelper ikke å prøve igjen.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
     "viewDetails": "Vis forbruksdetaljer"
   },

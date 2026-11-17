@@ -4517,6 +4517,8 @@
     "topModels": "Mest använda modeller",
     "topFeatures": "Mest använda funktioner",
     "emptyTitle": "Ingen användning under perioden",
+    "unavailableTitle": "Användning är inte tillgänglig",
+    "unavailableDescription": "Den här arbetsytan rapporterar ingen användning. Det hjälper inte att försöka igen.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
     "viewDetails": "Visa användningsdetaljer"
   },

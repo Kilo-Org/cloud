@@ -4517,6 +4517,8 @@
     "topModels": "Käytetyimmät mallit",
     "topFeatures": "Käytetyimmät ominaisuudet",
     "emptyTitle": "Ei käyttöä tällä aikavälillä",
+    "unavailableTitle": "Käyttö ei ole saatavilla",
+    "unavailableDescription": "Tämä työtila ei raportoi käyttöä. Uudelleen yrittäminen ei auta.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
     "viewDetails": "Näytä käytön tiedot"
   },

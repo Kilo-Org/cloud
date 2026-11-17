@@ -4517,6 +4517,8 @@
     "topModels": "Modèl ki pi itilize",
     "topFeatures": "Fonksyon ki pi itilize",
     "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "unavailableTitle": "Itilizasyon pa disponib",
+    "unavailableDescription": "Espas travay sa a pa rapòte itilizasyon. Repare pa pral ede.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
     "viewDetails": "Wè detay itilizasyon"
   },

@@ -4517,6 +4517,8 @@
     "topModels": "Enimkasutatud mudelid",
     "topFeatures": "Enimkasutatud funktsioonid",
     "emptyTitle": "Sel perioodil kasutust pole",
+    "unavailableTitle": "Kasutus pole saadaval",
+    "unavailableDescription": "See tööruum ei edasta kasutust. Uuesti proovimine ei aita.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju"
   },

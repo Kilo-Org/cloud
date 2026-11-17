@@ -4517,6 +4517,8 @@
     "topModels": "Topmodelle",
     "topFeatures": "Topfunksies",
     "emptyTitle": "Geen gebruik in hierdie tydperk nie",
+    "unavailableTitle": "Gebruik is nie beskikbaar nie",
+    "unavailableDescription": "Hierdie werkruimte rapporteer nie gebruik nie. Om weer te probeer sal nie help nie.",
     "orgSelfNotice": "Jy sien jou eie gebruik in hierdie organisasie.",
     "viewDetails": "Bekyk gebruiksbesonderhede"
   },

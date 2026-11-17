@@ -4517,6 +4517,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Fitur teratas",
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Workspace ini tidak melaporkan penggunaan. Mencoba lagi tidak akan membantu.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
   },

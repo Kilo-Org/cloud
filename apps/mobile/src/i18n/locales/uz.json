@@ -4517,6 +4517,8 @@
     "topModels": "Yetakchi modellar",
     "topFeatures": "Yetakchi funksiyalar",
     "emptyTitle": "Bu davrda foydalanish yo'q",
+    "unavailableTitle": "Foydalanish mavjud emas",
+    "unavailableDescription": "Bu Workspace foydalanish haqida xabar bermaydi. Qayta urinish yordam bermaydi.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish"
   },

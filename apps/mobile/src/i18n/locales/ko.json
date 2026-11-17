@@ -4517,6 +4517,8 @@
     "topModels": "상위 모델",
     "topFeatures": "상위 기능",
     "emptyTitle": "이 기간에 사용량이 없습니다",
+    "unavailableTitle": "사용량을 사용할 수 없습니다",
+    "unavailableDescription": "이 워크스페이스는 사용량을 보고하지 않습니다. 다시 시도해도 해결되지 않습니다.",
     "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
     "viewDetails": "사용량 세부 정보 보기"
   },

@@ -4517,6 +4517,8 @@
     "topModels": "Mô hình hàng đầu",
     "topFeatures": "Tính năng hàng đầu",
     "emptyTitle": "Không có mức sử dụng trong kỳ này",
+    "unavailableTitle": "Mức sử dụng không khả dụng",
+    "unavailableDescription": "Vùng làm việc này không báo cáo mức sử dụng. Thử lại sẽ không giúp ích.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng"
   },

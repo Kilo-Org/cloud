@@ -4587,6 +4587,8 @@
     "topModels": "Najčešći modeli",
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema potrošnje u ovom periodu",
+    "unavailableTitle": "Potrošnja nije dostupna",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje potrošnju. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Vidite vlastitu potrošnju u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje potrošnje"
   },

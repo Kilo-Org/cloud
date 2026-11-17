@@ -4517,6 +4517,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Ciri teratas",
     "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Ruang kerja ini tidak melaporkan penggunaan. Mencuba semula tidak akan membantu.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
     "viewDetails": "Lihat butiran penggunaan"
   },

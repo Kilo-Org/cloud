@@ -4517,6 +4517,8 @@
     "topModels": "Əsas modellər",
     "topFeatures": "Əsas funksiyalar",
     "emptyTitle": "Bu dövrdə istifadə yoxdur",
+    "unavailableTitle": "İstifadə mövcud deyil",
+    "unavailableDescription": "Bu iş sahəsi istifadə barədə məlumat vermir. Yenidən cəhd etmək kömək etməyəcək.",
     "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
     "viewDetails": "İstifadə təfərrüatlarına baxın"
   },

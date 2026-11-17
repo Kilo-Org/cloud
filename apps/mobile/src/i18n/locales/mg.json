@@ -4517,6 +4517,8 @@
     "topModels": "Modely be ampiasaina",
     "topFeatures": "Endri-javatra be ampiasaina",
     "emptyTitle": "Tsy nisy fampiasana tamin'io fe-potoana io",
+    "unavailableTitle": "Tsy azo ny fampiasana",
+    "unavailableDescription": "Tsy mitatitra fampiasana ity toeram-piasana ity. Tsy hamaha izany ny fanandramana indray.",
     "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
     "viewDetails": "Hijery ny antsipirian'ny fampiasana"
   },

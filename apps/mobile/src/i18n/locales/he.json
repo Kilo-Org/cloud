@@ -4587,6 +4587,8 @@
     "topModels": "מודלים מובילים",
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
+    "unavailableTitle": "השימוש אינו זמין",
+    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },

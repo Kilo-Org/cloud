@@ -4587,6 +4587,8 @@
     "topModels": "Populārākie modeļi",
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
+    "unavailableTitle": "Lietojums nav pieejams",
+    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },

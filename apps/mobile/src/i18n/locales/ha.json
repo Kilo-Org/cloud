@@ -4517,6 +4517,8 @@
     "topModels": "Manyan samfura",
     "topFeatures": "Manyan fasaloli",
     "emptyTitle": "Babu amfani a wannan lokaci",
+    "unavailableTitle": "Amfani ba ya samuwa",
+    "unavailableDescription": "Wannan sararin aiki ba ya bayar da rahoton amfani. Sake gwadawa ba zai taimaka ba.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
     "viewDetails": "Duba bayanan amfani"
   },

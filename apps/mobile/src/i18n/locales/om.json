@@ -4517,6 +4517,8 @@
     "topModels": "Moodeelota olaanoo",
     "topFeatures": "Amaloota olaanoo",
     "emptyTitle": "Yeroo kana keessa itti fayyadamni hin jiru",
+    "unavailableTitle": "Itti fayyadama hin argamne",
+    "unavailableDescription": "Iddoo hojii kun itti fayyadama hin gabaasu. Irra deebi'uun homaa hin fayyadu.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
     "viewDetails": "Bal'ina itti fayyadamaa ilaali"
   },

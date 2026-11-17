@@ -4517,6 +4517,8 @@
     "topModels": "ዋና ሞዴሎች",
     "topFeatures": "ዋና ባህሪያት",
     "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "unavailableTitle": "አጠቃቀም አይገኝም",
+    "unavailableDescription": "ይህ የሥራ አካባቢ አጠቃቀምን አይመዘግብም። እንደገና መሞከር አይረዳም።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
     "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
   },

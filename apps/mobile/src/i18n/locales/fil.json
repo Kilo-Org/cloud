@@ -4517,6 +4517,8 @@
     "topModels": "Nangungunang mga model",
     "topFeatures": "Nangungunang mga feature",
     "emptyTitle": "Walang paggamit sa panahong ito",
+    "unavailableTitle": "Hindi available ang paggamit",
+    "unavailableDescription": "Hindi nag-uulat ng paggamit ang workspace na ito. Hindi makakatulong ang pagsubok muli.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
     "viewDetails": "Tingnan ang detalye ng paggamit"
   },

@@ -4517,6 +4517,8 @@
     "topModels": "Leggyakoribb modellek",
     "topFeatures": "Leggyakoribb funkciók",
     "emptyTitle": "Nincs használat ebben az időszakban",
+    "unavailableTitle": "A használat nem érhető el",
+    "unavailableDescription": "Ez a munkaterület nem jelent használatot. Az újrapróbálkozás nem segít.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
     "viewDetails": "Használati részletek megtekintése"
   },

@@ -4587,6 +4587,8 @@
     "topModels": "Najčešći modeli",
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema korišćenja u ovom periodu",
+    "unavailableTitle": "Korišćenje nije dostupno",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje korišćenje. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje korišćenja"
   },

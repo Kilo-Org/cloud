@@ -779,13 +779,18 @@ test('Agents offline pill waits out the connect grace period', async () => {
 
     /*
      * Install the clock before the Agents view exists, because its grace `setTimeout` is created
-     * when the view mounts. Then pause it at a known instant: with time frozen nothing can pass
-     * between the view's `Date.now()` and its `setTimeout`, so the recorded deadline is exactly
-     * `T0 + grace` and no part of setup can eat into it.
+     * when the view mounts. Then freeze it: `pauseAt` cannot jump into the past and time keeps
+     * running after `install`, so the target is read from the page and given a margin. With the
+     * clock paused, nothing can pass between the view's `Date.now()` and its `setTimeout`, so the
+     * recorded deadline is exactly the frozen instant plus the grace.
      */
     await sidePanel.clock.install();
-    const t0 = (await sidePanel.evaluate(() => Date.now())) + 1;
-    await sidePanel.clock.pauseAt(t0);
+    const freezeAt = (await sidePanel.evaluate(() => Date.now())) + 1000;
+    await sidePanel.clock.pauseAt(freezeAt);
+
+    const t0 = await sidePanel.evaluate(() => Date.now());
+    // Proof the clock is frozen at the instant the view will start its timer from.
+    expect(t0).toBe(freezeAt);
 
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
 

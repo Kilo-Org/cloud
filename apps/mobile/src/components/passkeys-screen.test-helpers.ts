@@ -205,7 +205,8 @@ vi.mock('@/components/ui/row-group', () => ({
 }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/screen-footer', () => ({
-  ScreenFooter: (props: { children?: ReactNode }) => createElement('ScreenFooter', null, props.children),
+  ScreenFooter: (props: { children?: ReactNode }) =>
+    createElement('ScreenFooter', null, props.children),
 }));
 vi.mock('@/components/ui/row-skeleton', () => ({
   RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
@@ -247,9 +248,7 @@ vi.mock('@/components/ui/row-frame', () => ({
       'View',
       null,
       props.icon === undefined ? null : createElement(props.icon),
-      props.title === undefined
-        ? null
-        : createElement('Text', { numberOfLines: 1 }, props.title),
+      props.title === undefined ? null : createElement('Text', { numberOfLines: 1 }, props.title),
       props.subtitle === undefined ? null : createElement('Text', null, props.subtitle.text),
       props.secondSubtitle === undefined
         ? null
@@ -258,7 +257,11 @@ vi.mock('@/components/ui/row-frame', () => ({
     ),
 }));
 vi.mock('@/components/ui/icon-button', () => ({
-  IconButton: (props: { children?: ReactNode; accessibilityLabel?: string; onPress?: () => void }) =>
+  IconButton: (props: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    onPress?: () => void;
+  }) =>
     createElement(
       'Pressable',
       { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },

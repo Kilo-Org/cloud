@@ -20,7 +20,11 @@ export type WireEnvLocalFixture = {
 };
 
 export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalFixture {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-snowflake-stack-'));
+  // Canonicalised because the copied module derives its root from its own
+  // `import.meta.dirname`, which is already a real path: on macOS `mkdtemp`
+  // hands back `/var/...` while that is `/private/var/...`, and the two would
+  // never compare equal.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mock-snowflake-stack-')));
   const moduleDir = path.join(root, 'dev', 'mock-snowflake');
   const sourceDir = import.meta.dirname;
   const envLocalPath = path.join(root, '.env.local');

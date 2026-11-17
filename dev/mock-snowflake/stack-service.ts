@@ -2,7 +2,9 @@
 // `dev/local/services.ts` runs this with tsx). Beyond what the standalone
 // `server.ts` does, it keeps a managed section of the repo-root `.env.local`
 // current, so the web app the stack starts beside it picks the mock up without
-// manual steps.
+// manual steps. A `SNOWFLAKE_ACCOUNT_HOST` the developer wrote outside that
+// section is a real warehouse and wins: the entry leaves the file alone, or
+// removes its own section when it finds one.
 //
 // Trusting the mock's certificate needs two things, because `scripts/dev.sh`
 // resolves `NODE_EXTRA_CA_CERTS` as `shell value, else the first matching line
@@ -46,19 +48,61 @@ export type WireResult =
       accountHost: string | undefined;
     }
   | { status: 'unchanged' }
-  | { status: 'keptRealWarehouse' };
+  // `removedSection` says this wire took its own section back out, so the file
+  // did change: a real `SNOWFLAKE_ACCOUNT_HOST` outside the section wins.
+  | { status: 'keptRealWarehouse'; removedSection: boolean };
 
 type LineRange = { start: number; end: number };
 
 /**
- * Locates the managed section. A section written before the end marker existed
- * runs to the end of the file, which is where that writer appended it.
+ * The key a `KEY=value` line defines, or the whole text of a line that has no
+ * `=`. Only used to spot a second block inside a legacy section's run.
+ */
+function keyOf(line: string): string {
+  const equality = line.indexOf('=');
+  return (equality === -1 ? line : line.slice(0, equality)).trim();
+}
+
+/**
+ * Locates the range this entry owns. With both markers that is the section; a
+ * section written before the end marker existed is what the old writer appended
+ * to the end of the file, so its range is the run it left there: blanks, the
+ * `SNOWFLAKE_*` entries, one CA line and the recorded source comments. The scan
+ * stops at anything else, because everything else is the developer's: a real
+ * warehouse block, a heading comment, an unrelated key. A second entry for a key
+ * the run already holds ends it too — the writer emits each key once, so a
+ * repeat means another block starts there.
  */
 function findManagedSection(lines: string[]): LineRange | undefined {
   const start = lines.findIndex(line => line.trim() === SECTION_START);
   if (start === -1) return undefined;
   const last = lines.findIndex((line, index) => index > start && line.trim() === SECTION_END);
-  return { start, end: last === -1 ? lines.length : last + 1 };
+  if (last !== -1) return { start, end: last + 1 };
+
+  const keys = new Set<string>();
+  let end = start + 1;
+  while (end < lines.length) {
+    const line = lines[end] ?? '';
+    if (line.trim() === '' || line.startsWith(CA_SOURCE_PREFIX)) {
+      end++;
+      continue;
+    }
+    if (!line.startsWith('SNOWFLAKE_') && !line.startsWith(`${CA_KEY}=`)) break;
+    const key = keyOf(line);
+    if (keys.has(key)) break;
+    keys.add(key);
+    end++;
+  }
+  return { start, end };
+}
+
+/**
+ * The lines outside `section`, so the caller can tell the developer's own
+ * entries from the ones this entry wrote.
+ */
+function linesOutsideOf(lines: string[], section: LineRange | undefined): string[] {
+  if (!section) return lines;
+  return [...lines.slice(0, section.start), ...lines.slice(section.end)];
 }
 
 /**
@@ -155,10 +199,51 @@ function mergeCaSources(recorded: readonly string[], folded: string | undefined)
 }
 
 /**
+ * Writes `lines` back to `.env.local`, keeping the file's own newline convention.
+ */
+function writeEnvLines(envLocalPath: string, lines: readonly string[], newline: boolean): void {
+  const body = lines.join('\n');
+  fs.writeFileSync(envLocalPath, body === '' || !newline ? body : `${body}\n`);
+}
+
+/**
+ * Takes this entry's section back out — with the blank line the insert put in
+ * front of it — and restores a CA line the section's repointing changed. Every
+ * other line stays where the developer left it.
+ */
+function removeManagedSection(
+  lines: string[],
+  section: LineRange,
+  recordedCaSources: readonly string[],
+  bundlePath: string
+): string[] {
+  const before = lines.slice(0, section.start);
+  if (before[before.length - 1] === '') before.pop();
+  const remaining = [...before, ...lines.slice(section.end)];
+
+  // Pointing the first CA line `dev.sh` reads at the bundle recorded the path it
+  // named; the newest record is the one that line most likely displaced. Put it
+  // back while the line still names the bundle — a line the developer has
+  // changed since is theirs, not ours.
+  const index = remaining.findIndex(line => line.startsWith(`${CA_KEY}=`));
+  const original = recordedCaSources[recordedCaSources.length - 1];
+  if (index === -1 || original === undefined) return remaining;
+  const value = stripEnvValue((remaining[index] ?? '').slice(CA_KEY.length + 1));
+  if (path.resolve(value) !== path.resolve(bundlePath)) return remaining;
+  const restored = [...remaining];
+  restored[index] = `${CA_KEY}=${original}`;
+  return restored;
+}
+
+/**
  * Keeps one managed section of `.env.local` naming the mock's `SNOWFLAKE_*`
- * block, the CA bundle, and the port the server listens on. An existing
- * `SNOWFLAKE_ACCOUNT_HOST` outside that section is a real warehouse
- * configuration and is never replaced: the file stays byte-identical.
+ * block, the CA bundle, and the port the server listens on.
+ *
+ * A `SNOWFLAKE_ACCOUNT_HOST` the developer wrote outside the range this entry
+ * owns is a real warehouse configuration and wins, because `dotenv` keeps the
+ * last definition: a section re-emitted below it would silently point the app at
+ * the mock. With no section owned the file is left byte-identical; with one, the
+ * section is removed and any CA line it repointed is restored.
  */
 export function wireEnvLocal(): WireResult {
   const envLocalPath = path.join(REPO_ROOT, '.env.local');
@@ -167,15 +252,25 @@ export function wireEnvLocal(): WireResult {
   const lines =
     current === '' ? [] : (trailingNewline ? current.slice(0, -1) : current).split('\n');
   const section = findManagedSection(lines);
+  const outsideSection = linesOutsideOf(lines, section);
+  const recordedCaSources = readRecordedCaSources(lines, section);
+  const bundlePath = caBundlePath();
+
+  if (
+    parseEnvEntries(outsideSection.join('\n')).some(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST')
+  ) {
+    if (!section) return { status: 'keptRealWarehouse', removedSection: false };
+    writeEnvLines(
+      envLocalPath,
+      removeManagedSection(lines, section, recordedCaSources, bundlePath),
+      trailingNewline
+    );
+    return { status: 'keptRealWarehouse', removedSection: true };
+  }
 
   // Everything the developer wrote — the shell's own CA included — has to end
   // up in the bundle, but the section's own line names the bundle.
-  const recordedCaSources = readRecordedCaSources(lines, section);
-  const outsideSection = [
-    ...lines.slice(0, section?.start ?? lines.length),
-    ...lines.slice(section?.end ?? lines.length),
-  ];
-  const bundlePath = writeCaBundle([
+  writeCaBundle([
     ...recordedCaSources,
     ...parseEnvEntries(outsideSection.join('\n'))
       .filter(entry => entry.key === CA_KEY)
@@ -193,16 +288,6 @@ export function wireEnvLocal(): WireResult {
     entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST'
   )?.value;
 
-  // A file with a real warehouse configuration is left alone entirely: the
-  // guard runs before the CA line below is rewritten, so nothing this module
-  // does to the file can reach it.
-  if (
-    !section &&
-    parseEnvEntries(lines.join('\n')).some(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST')
-  ) {
-    return { status: 'keptRealWarehouse' };
-  }
-
   const rewritten = pointShadowingCaLineAtBundle(lines, section, bundlePath);
   const caSources = mergeCaSources(recordedCaSources, rewritten.folded);
   const desired = [
@@ -215,7 +300,7 @@ export function wireEnvLocal(): WireResult {
 
   if (!section) {
     const wired = rewritten.lines.length === 0 ? desired : [...rewritten.lines, '', ...desired];
-    fs.writeFileSync(envLocalPath, `${wired.join('\n')}\n`);
+    writeEnvLines(envLocalPath, wired, true);
     return { status: 'inserted' };
   }
 
@@ -237,14 +322,18 @@ export function wireEnvLocal(): WireResult {
     ...desired,
     ...rewritten.lines.slice(section.end),
   ];
-  fs.writeFileSync(envLocalPath, `${wired.join('\n')}${trailingNewline ? '\n' : ''}`);
+  writeEnvLines(envLocalPath, wired, trailingNewline);
   return { status: 'rewritten', previousAccountHost, accountHost };
 }
 
 export async function main(): Promise<void> {
   const result = wireEnvLocal();
   if (result.status === 'keptRealWarehouse') {
-    console.log('keeping the existing real SNOWFLAKE_* configuration in .env.local');
+    console.log(
+      result.removedSection
+        ? 'removed the mock-snowflake section of .env.local: a real SNOWFLAKE_* configuration outside it takes over'
+        : 'keeping the existing real SNOWFLAKE_* configuration in .env.local'
+    );
   } else if (result.status === 'inserted') {
     console.log(`wired .env.local for the mock warehouse (${caBundlePath()})`);
   } else if (result.status === 'rewritten') {

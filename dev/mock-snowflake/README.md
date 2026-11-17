@@ -21,10 +21,14 @@ managed section of the repo-root `.env.local` current. The section, delimited by
 Three guarantees about the file:
 
 - **An existing real warehouse is never replaced.** A `SNOWFLAKE_ACCOUNT_HOST`
-  entry outside the managed section means the stack entry leaves the file
-  byte-identical and the web app keeps talking to your real warehouse. The
-  guard reads parsed entries, so `export KEY=value`, `KEY = value`,
-  `KEY = "value"  # prod` and a plain `KEY=value` all count.
+  entry outside the range this entry owns means the stack entry leaves the file
+  byte-identical when it owns nothing there. When it does own a section — an
+  earlier `dev:start` wrote one, and you then added your real warehouse above or
+  below it — it takes its own section back out instead, restoring any
+  `NODE_EXTRA_CA_CERTS` line it had repointed at the bundle, because `dotenv`
+  keeps the last definition and a section left below your block would silently
+  put the app on the mock. The guard reads parsed entries, so `export KEY=value`,
+  `KEY = value`, `KEY = "value"  # prod` and a plain `KEY=value` all count.
 - **The section is kept current.** A port change — a different worktree offset,
   or a lease that moved this worktree to a free offset — rewrites that one
   section in place: it names the port the mock actually listens on
@@ -46,7 +50,8 @@ fall through to the next file. Node then reads the variable once at startup,
 before Next.js loads `.env*` for its own process.
 
 - **`pnpm dev:start` and `pnpm dev:restart`.** `dev/local/services.ts` prefixes
-  the web app's command with `NODE_EXTRA_CA_CERTS=<bundle>` whenever
+  the web app's command with `NODE_EXTRA_CA_CERTS=<bundle>`, shell-quoted so a
+  checkout path with a space in it stays one argument, whenever
   `mock-snowflake` is in the selection, and every path that relaunches the web
   app passes that selection — a start, a `dev:restart`, a dashboard start or
   restart, the recreate of a pane that died with its process, and the
@@ -110,10 +115,10 @@ the mock is the only extra CA you trust; if you also trust another local CA, the
 stack's `fixtures/tls/ca-bundle.pem` holds the mock's certificate plus the CAs
 you already named, and that is the file it wires. If you later let the stack wire
 the mock, delete the block you appended by hand first: the stack never replaces a
-`SNOWFLAKE_ACCOUNT_HOST` it did not write, so it would leave that block alone and
-keep its own section out of the file. Do not use
-`NODE_TLS_REJECT_UNAUTHORIZED=0` instead: it turns certificate verification off
-for every host the Next.js process talks to.
+`SNOWFLAKE_ACCOUNT_HOST` it did not write, so it leaves that block alone and
+writes no section beside it — and if it already wrote one, it takes its section
+back out. Do not use `NODE_TLS_REJECT_UNAUTHORIZED=0` instead: it turns
+certificate verification off for every host the Next.js process talks to.
 
 Then write fixture rows for a fake account that already signed in once:
 

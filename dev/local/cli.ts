@@ -29,6 +29,7 @@ import {
   manifestPath,
   readManifest,
   manifestServiceNames,
+  restartSelection,
   type Manifest,
   type ManifestEntry,
 } from './manifest';
@@ -78,10 +79,10 @@ import {
   waitForPort,
   restartServiceInTmux,
   buildStartCommand,
-  shellQuote,
   snapshotCloudAgentPublicTunnelEnv,
   waitForCloudAgentPublicTunnelCapture,
 } from './runner';
+import { shellQuote } from './shell';
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
@@ -1306,7 +1307,7 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
   // has to be the one the stack started with: without it the web app loses the
   // Snowflake mock's `NODE_EXTRA_CA_CERTS` export and every usage read fails
   // with a certificate error.
-  const selection = manifestServiceNames(readManifest(repoRoot));
+  const selection = restartSelection(repoRoot);
   const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv, selection);
   if (outcome === 'gave-up') {
     console.error(`${serviceName} did not shut down in time; not relaunched`);

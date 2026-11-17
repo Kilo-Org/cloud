@@ -6,6 +6,7 @@ import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/
 import { resolveE2eInternalSecret } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
 import { caBundlePath } from '../mock-snowflake/tls-env';
 import { readEnvFile } from './env-sync/parse';
+import { shellQuote } from './shell';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const CLOUD_AGENT_DEV_VARS_PATH = path.join(REPO_ROOT, 'services/cloud-agent-next/.dev.vars');
@@ -316,8 +317,8 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // keeps the SNOWFLAKE_* block and the CA bundle that the managed section of
   // .env.local names current, and `serviceCommand` exports that bundle to
   // `next dev` when this service is selected. A real SNOWFLAKE_ACCOUNT_HOST in
-  // .env.local is never replaced; run without the mock with
-  // `pnpm dev:start app --without=mock-snowflake`.
+  // .env.local is never replaced — the entry takes its own section back out
+  // instead; run without the mock with `pnpm dev:start app --without=mock-snowflake`.
   'mock-snowflake': {
     group: 'core',
     dependsOn: [],
@@ -1245,8 +1246,11 @@ export function serviceCommand(serviceName: string, serviceNames: readonly strin
   }
   if (serviceName === 'nextjs' && serviceNames.includes('mock-snowflake')) {
     // `env` opens the web app's command, so the variable joins that prefix.
+    // `buildStartCommand` joins argv with spaces and the pane runs the string
+    // through `/bin/sh -lc`, so the absolute path has to be one quoted word: an
+    // unquoted one splits at the first space in the checkout path.
     const [env, ...prefixAndArgs] = command;
-    return [env, `NODE_EXTRA_CA_CERTS=${caBundlePath()}`, ...prefixAndArgs];
+    return [env, `NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`, ...prefixAndArgs];
   }
   return command;
 }

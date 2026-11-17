@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,7 +28,8 @@ import {
   writePersistedPortOffset,
 } from './services';
 import { buildStartCommand } from './runner';
-import { manifestServiceNames, readManifest } from './manifest';
+import { restartSelection } from './manifest';
+import { shellQuote } from './shell';
 import { caBundlePath } from '../mock-snowflake/tls-env';
 import { LOCAL_FAKE_LLM_ADMIN_TOKEN } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
 import { LOCAL_E2E_INTERNAL_API_SECRET } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
@@ -245,16 +247,26 @@ test('starts the Snowflake mock before the web app on the offset port', () => {
   assert.ok(appTargets.indexOf('mock-snowflake') < appTargets.indexOf('nextjs'));
 });
 
+/**
+ * The value the pane's shell ends up with when it runs `env <assignment>
+ * <command>`, which is the shape `buildStartCommand` produces for the web app.
+ */
+function exportedCaValue(assignment: string): string {
+  return execFileSync('sh', ['-c', `env ${assignment} sh -c 'printf %s "$NODE_EXTRA_CA_CERTS"'`], {
+    encoding: 'utf8',
+  });
+}
+
 test('exports the mock CA bundle to the web app only when the mock is selected', () => {
   const withMock = serviceCommand('nextjs', ['mock-snowflake', 'nextjs']);
   const trusted = withMock.find(arg => arg.startsWith('NODE_EXTRA_CA_CERTS='));
   assert.ok(trusted);
-  const bundle = trusted.slice('NODE_EXTRA_CA_CERTS='.length);
-  assert.equal(path.isAbsolute(bundle), true);
-  assert.equal(
-    bundle.endsWith(path.join('dev', 'mock-snowflake', 'fixtures', 'tls', 'ca-bundle.pem')),
-    true
-  );
+  const exported = exportedCaValue(trusted);
+  assert.equal(path.isAbsolute(exported), true);
+  assert.equal(exported, caBundlePath());
+  // `buildStartCommand` joins argv with spaces and tmux runs the result through
+  // `/bin/sh -lc`, so the assignment is one quoted shell word.
+  assert.equal(trusted, `NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`);
   // The variable joins the `env` prefix the web app command already has.
   assert.deepEqual(withMock.slice(0, 2), ['env', trusted]);
   assert.ok(withMock.includes('pnpm'));
@@ -267,40 +279,69 @@ test('exports the mock CA bundle to the web app only when the mock is selected',
   assert.deepEqual(withoutMock, getService('nextjs').command);
 });
 
-test('a restart rebuilds the web app command from the selection the stack started with', () => {
-  // `dev:restart` and the dashboard read the manifest `dev:start` wrote and hand
-  // its services to `restartServiceInTmux`, which types the same
-  // `buildStartCommand` output into the pane — the relaunch and a recreate both
-  // use it. Without the selection the web app comes back without the mock's CA
-  // export: Node reads `NODE_EXTRA_CA_CERTS` at startup, `scripts/dev.sh` lets an
-  // exported value win over every `.env*` line, and a shell that exports its own
-  // CA leaves the mock's certificate untrusted.
+test('the quoted CA export survives a checkout path with a space in it', () => {
+  // The bundle this checkout ships sits under a path without a space; this one
+  // stands in for a checkout directory that has one, which is the case the
+  // unquoted export broke (`env NODE_EXTRA_CA_CERTS=/Users/kilo work/...`).
+  const spaced = path.join(os.tmpdir(), 'kilo checkout', 'ca-bundle.pem');
+  assert.equal(exportedCaValue(`NODE_EXTRA_CA_CERTS=${shellQuote(spaced)}`), spaced);
+});
+
+test('a restart derives the web app command from the manifest the stack wrote', () => {
+  // Covers `restartSelection` — the derivation `dev:restart` uses — and the
+  // command it feeds: the same `buildStartCommand` output a relaunch types into
+  // the pane and a recreate rebuilds from. What stays at the call site is
+  // forwarding that selection to `restartServiceInTmux`, which needs a live tmux
+  // session. Without the mock in the selection the web app comes back without
+  // the CA export: Node reads `NODE_EXTRA_CA_CERTS` at startup, `scripts/dev.sh`
+  // lets an exported value win over every `.env*` line, and a shell that exports
+  // its own CA leaves the mock's certificate untrusted.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-selection-'));
+  const withoutMockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-no-mock-'));
   try {
-    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'dev', 'logs', 'manifest.json'),
-      JSON.stringify({
-        session: 'kilo-dev-test',
-        portOffset,
-        wranglerRegistryPath: path.join(root, 'dev', 'logs', 'wrangler-registry.json'),
-        services: [
-          { name: 'mock-snowflake', port: 4792 + portOffset, group: 'core', type: 'process' },
-          { name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' },
-        ],
-      })
+    for (const [repoRoot, names] of [
+      [root, ['mock-snowflake', 'nextjs']],
+      [withoutMockRoot, ['nextjs']],
+    ] as const) {
+      fs.mkdirSync(path.join(repoRoot, 'dev', 'logs'), { recursive: true });
+      fs.writeFileSync(
+        path.join(repoRoot, 'dev', 'logs', 'manifest.json'),
+        JSON.stringify({
+          session: 'kilo-dev-test',
+          portOffset,
+          wranglerRegistryPath: path.join(repoRoot, 'dev', 'logs', 'wrangler-registry.json'),
+          services: names.map(name => ({
+            name,
+            port: (name === 'nextjs' ? 3000 : 4792) + portOffset,
+            group: 'core',
+            type: name === 'nextjs' ? 'nextjs' : 'process',
+          })),
+        })
+      );
+    }
+
+    assert.deepEqual(restartSelection(root), ['mock-snowflake', 'nextjs']);
+
+    const restarted = buildStartCommand('nextjs', restartSelection(root));
+    assert.ok(restarted.includes(`NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`));
+    // The selection a `dev:start app` really records builds that same command,
+    // whatever else the group adds around it.
+    assert.equal(buildStartCommand('nextjs', resolveTargets(['app'])), restarted);
+
+    // A stack started with `--without=mock-snowflake` restarts bare, which is
+    // the command that was correct for its own start.
+    assert.deepEqual(restartSelection(withoutMockRoot), ['nextjs']);
+    assert.equal(
+      buildStartCommand('nextjs', restartSelection(withoutMockRoot)).includes(
+        'NODE_EXTRA_CA_CERTS='
+      ),
+      false
     );
-
-    const selection = manifestServiceNames(readManifest(root));
-    assert.deepEqual(selection, ['mock-snowflake', 'nextjs']);
-
-    const started = buildStartCommand('nextjs', ['mock-snowflake', 'nextjs']);
-    assert.ok(started.includes(`NODE_EXTRA_CA_CERTS=${caBundlePath()}`));
-    assert.equal(buildStartCommand('nextjs', selection), started);
     // The omission this guards against: the command a restart used to build.
     assert.equal(buildStartCommand('nextjs').includes('NODE_EXTRA_CA_CERTS='), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(withoutMockRoot, { recursive: true, force: true });
   }
 });
 

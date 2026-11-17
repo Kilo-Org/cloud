@@ -155,7 +155,10 @@ for (const [spelling, envLocal] of [
   test(`an existing real SNOWFLAKE_ACCOUNT_HOST (${spelling}) is never replaced`, async () => {
     const fixture = wireEnvLocalFixture(envLocal);
     try {
-      assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse' });
+      assert.deepEqual(await fixture.wire(), {
+        status: 'keptRealWarehouse',
+        removedSection: false,
+      });
       assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), envLocal);
     } finally {
       fixture.restore();
@@ -271,12 +274,141 @@ test('a real warehouse keeps its own CA line and the file byte-identical', async
   const envLocal = `NODE_EXTRA_CA_CERTS=/corporate/ca.pem\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n`;
   const fixture = wireEnvLocalFixture(envLocal);
   try {
-    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse' });
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: false });
     assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), envLocal);
   } finally {
     fixture.restore();
   }
 });
+
+test('a real warehouse above the section makes the entry take its section back out', async () => {
+  const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const corporateCaPath = path.join(fixture.root, 'corporate-ca.pem');
+    fs.writeFileSync(corporateCaPath, 'CORPORATE CA\n');
+
+    await fixture.wire();
+    const wired = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `# corporate proxy\nNODE_EXTRA_CA_CERTS=${corporateCaPath}\n${wired}`
+    );
+    // The wire points that line at the bundle, because it shadows the section's,
+    // and records the path it named.
+    await fixture.wire();
+    const repointed = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(
+      repointed.startsWith(`# corporate proxy\nNODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`)
+    );
+    assert.ok(repointed.includes(`${CA_SOURCE_PREFIX}${corporateCaPath}`));
+
+    // A real warehouse now sits above our section, so `dotenv` would let the
+    // section's own `SNOWFLAKE_ACCOUNT_HOST` win if it stayed.
+    fs.writeFileSync(fixture.envLocalPath, `SNOWFLAKE_ACCOUNT_HOST=real.example:443\n${repointed}`);
+
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
+
+    // Byte for byte: the section and the blank line the insert added are gone,
+    // the developer's CA line names its own file again, and the rest is untouched.
+    assert.equal(
+      fs.readFileSync(fixture.envLocalPath, 'utf8'),
+      `SNOWFLAKE_ACCOUNT_HOST=real.example:443\n# corporate proxy\nNODE_EXTRA_CA_CERTS=${corporateCaPath}\nNEXTAUTH_SECRET=dev\n`
+    );
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a CA line the developer changed since is left alone when the section goes', async () => {
+  const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const corporateCaPath = path.join(fixture.root, 'corporate-ca.pem');
+    const replacementCaPath = path.join(fixture.root, 'replacement-ca.pem');
+    fs.writeFileSync(corporateCaPath, 'CORPORATE CA\n');
+    fs.writeFileSync(replacementCaPath, 'REPLACEMENT CA\n');
+    await fixture.wire();
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `NODE_EXTRA_CA_CERTS=${corporateCaPath}\n${fs.readFileSync(fixture.envLocalPath, 'utf8')}`
+    );
+    // The wire repoints that line at the bundle and records what it displaced.
+    await fixture.wire();
+    const repointed = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(
+      repointed.startsWith(`NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`) &&
+        repointed.includes(`${CA_SOURCE_PREFIX}${corporateCaPath}`)
+    );
+
+    // The developer points the line at another CA and switches to a real
+    // warehouse. Restoring the recorded source would lose the value they chose.
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `NODE_EXTRA_CA_CERTS=${replacementCaPath}\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n${repointed.slice(
+        `NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`.length
+      )}`
+    );
+
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.startsWith(`NODE_EXTRA_CA_CERTS=${replacementCaPath}\n`));
+    assert.equal(content.includes(SECTION_START), false);
+    assert.equal(content.includes(SECTION_END), false);
+    assert.equal(countKeyLines(content, 'SNOWFLAKE_ACCOUNT_HOST'), 1);
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+for (const [separatorNote, separator] of [
+  ['a heading comment', '\n# my real warehouse\n'],
+  ['nothing at all', '\n'],
+] as const) {
+  test(`a legacy section keeps a real warehouse block appended after it (${separatorNote})`, async () => {
+    const fixture = wireEnvLocalFixture(
+      [
+        'NEXTAUTH_SECRET=dev',
+        '',
+        SECTION_START,
+        'SNOWFLAKE_ACCOUNT_HOST=127.0.0.1:4792',
+        'SNOWFLAKE_USERNAME=local',
+        'NODE_EXTRA_CA_CERTS=/old/cert.pem',
+        `${separator}SNOWFLAKE_ACCOUNT_HOST=real.example:443`,
+        'SNOWFLAKE_USERNAME=fred',
+        '',
+      ].join('\n')
+    );
+    try {
+      assert.deepEqual(await fixture.wire(), {
+        status: 'keptRealWarehouse',
+        removedSection: true,
+      });
+
+      // The legacy block goes, the real one stays, and the file keeps the shape
+      // it had around them.
+      assert.equal(
+        fs.readFileSync(fixture.envLocalPath, 'utf8'),
+        [
+          'NEXTAUTH_SECRET=dev',
+          ...(separator === '\n' ? [] : ['# my real warehouse']),
+          'SNOWFLAKE_ACCOUNT_HOST=real.example:443',
+          'SNOWFLAKE_USERNAME=fred',
+          '',
+        ].join('\n')
+      );
+    } finally {
+      fixture.restore();
+    }
+  });
+}
 
 test('a shell-exported CA stays trusted through the bundle', async () => {
   const fixture = wireEnvLocalFixture('OTHER=1\n');

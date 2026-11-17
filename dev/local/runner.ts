@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { getService, getInfraProfile, getAllInfraProfiles, serviceCommand } from './services';
+import { shellQuote } from './shell';
 import {
   createWindow,
   sendKeys,
@@ -219,10 +220,6 @@ export function buildFollowLogPipeCommand(logPath: string, followPath: string): 
   // Group the cd+tsx command: `|` binds tighter than `&&`, so an ungrouped
   // `tee | cd && tsx` would run tsx with no pane stdin.
   return `tee -a ${shellQuote(followPath)} | ( ${buildLogPipeCommand(logPath)} )`;
-}
-
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 export function stopServiceInTmux(sessionName: string, serviceName: string): void {

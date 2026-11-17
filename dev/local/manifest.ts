@@ -41,12 +41,22 @@ export function findManifestPort(manifest: Manifest | undefined, name: string): 
 }
 
 /**
- * The selection a running stack was started with, in start order. A restart or
- * a recreate rebuilds a service's command from it, so it has to match the one
- * the start used: `serviceCommand` adds the Snowflake mock's CA bundle to the
- * web app only when the mock is in the selection. Undefined when the session
- * recorded no manifest, which keeps the plain service command.
+ * The services a manifest recorded, in start order. A restart or a recreate
+ * rebuilds a service's command from this selection, so the order the start used
+ * is what it has to reproduce.
  */
 export function manifestServiceNames(manifest: Manifest | undefined): string[] | undefined {
   return manifest?.services.map(service => service.name);
+}
+
+/**
+ * The selection a restart rebuilds a service's command from: the services the
+ * running stack recorded in its manifest. `dev:restart` takes it whole — a
+ * relaunch or a recreate rebuilds the command from it, so it has to match the
+ * one the start used, or the web app comes back without the Snowflake mock's
+ * `NODE_EXTRA_CA_CERTS` export. Undefined when no manifest was written, which
+ * keeps the plain service command.
+ */
+export function restartSelection(repoRoot: string): string[] | undefined {
+  return manifestServiceNames(readManifest(repoRoot));
 }

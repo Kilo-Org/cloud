@@ -4699,6 +4699,8 @@
       "created": "Gatilho criado",
       "saved": "Gatilho salvo",
       "statusArrived": "Recebida",
+      "defaultPromptWebhook": "Descreva o corpo da requisição deste webhook:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Execute a tarefa agendada. Acionada às {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Informe um nome.",
         "nameTooShort": "Use pelo menos 8 caracteres.",

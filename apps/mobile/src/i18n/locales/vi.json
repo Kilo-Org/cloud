@@ -4623,6 +4623,8 @@
       "created": "Đã tạo trình kích hoạt",
       "saved": "Đã lưu trình kích hoạt",
       "statusArrived": "Đã đến",
+      "defaultPromptWebhook": "Mô tả nội dung yêu cầu webhook này:\n\n{{body}}",
+      "defaultPromptScheduled": "Chạy tác vụ theo lịch. Được kích hoạt lúc {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Nhập tên.",
         "nameTooShort": "Dùng ít nhất 8 ký tự.",

@@ -4623,6 +4623,8 @@
       "created": "Nagawa ang pampapagana",
       "saved": "Naimbak ang pampapagana",
       "statusArrived": "Dumating",
+      "defaultPromptWebhook": "Ilarawan ang katawan ng kahilingang webhook na ito:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Patakbuhin ang naka-iskedyul na gawain. Sinimulan noong {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Maglagay ng pangalan.",
         "nameTooShort": "Gumamit ng hindi bababa sa 8 karakter.",

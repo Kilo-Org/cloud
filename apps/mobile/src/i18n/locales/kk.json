@@ -4623,6 +4623,8 @@
       "created": "Триггер жасалды",
       "saved": "Триггер сақталды",
       "statusArrived": "Келді",
+      "defaultPromptWebhook": "Осы вебхук сұранысының денесін сипаттаңыз:\n\n{{body}}",
+      "defaultPromptScheduled": "Жоспарланған тапсырманы орындаңыз. Іске қосу {{scheduledTime}}-де басталды.",
       "problems": {
         "nameRequired": "Атау енгізіңіз.",
         "nameTooShort": "Кемінде 8 таңба пайдаланыңыз.",

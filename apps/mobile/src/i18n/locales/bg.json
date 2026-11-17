@@ -4623,6 +4623,8 @@
       "created": "Тригерът е създаден",
       "saved": "Тригерът е запазен",
       "statusArrived": "Пристигна",
+      "defaultPromptWebhook": "Опишете тялото на заявката от този уебхук:\n\n{{body}}",
+      "defaultPromptScheduled": "Изпълнете планираната задача. Изпълнението започна в {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Въведете име.",
         "nameTooShort": "Използвайте поне 8 знака.",

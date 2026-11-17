@@ -4623,6 +4623,8 @@
       "created": "အစပျိုးချက် ဖန်တီးပြီး",
       "saved": "အစပျိုးချက် သိမ်းပြီး",
       "statusArrived": "ရောက်ရှိပြီး",
+      "defaultPromptWebhook": "ဤဝဘ်ဟွတ်တောင်းဆိုမှု၏ ကိုယ်ထည်ကို ဖော်ပြပါ။\n\n{{body}}",
+      "defaultPromptScheduled": "အချိန်ဇယားဆွဲထားသော လုပ်ငန်းတာဝန်ကို လည်ပတ်ပါ။ {{scheduledTime}} တွင် အစပျိုးခဲ့သည်။",
       "problems": {
         "nameRequired": "အမည်ထည့်ပါ။",
         "nameTooShort": "အနည်းဆုံး စာလုံး 8 လုံး သုံးပါ။",

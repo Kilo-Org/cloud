@@ -4623,6 +4623,8 @@
       "created": "ട്രിഗർ സൃഷ്ടിച്ചു",
       "saved": "ട്രിഗർ സേവ് ചെയ്തു",
       "statusArrived": "എത്തി",
+      "defaultPromptWebhook": "ഈ വെബ്ഹുക്ക് അഭ്യർത്ഥനയുടെ ബോഡി വിവരിക്കുക:\n\n{{body}}",
+      "defaultPromptScheduled": "ഷെഡ്യൂൾ ചെയ്ത ടാസ്ക് പ്രവർത്തിപ്പിക്കുക. {{scheduledTime}}-ന് ട്രിഗർ ചെയ്തു.",
       "problems": {
         "nameRequired": "ഒരു പേര് നൽകുക.",
         "nameTooShort": "കുറഞ്ഞത് 8 പ്രതീകങ്ങൾ ഉപയോഗിക്കുക.",

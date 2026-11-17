@@ -4623,6 +4623,8 @@
       "created": "Emepụtara ihe mkpalite",
       "saved": "Echekwara ihe mkpalite",
       "statusArrived": "Rutere",
+      "defaultPromptWebhook": "Kọwaa ahụ arịrịọ webhook a:\n\n{{body}}",
+      "defaultPromptScheduled": "Gbaa ọrụ a haziri. Ọsọ malitere na {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tinye aha.",
         "nameTooShort": "Jiri opekata mpe mkpụrụedemede 8.",

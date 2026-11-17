@@ -4623,6 +4623,8 @@
       "created": "Trigger created",
       "saved": "Trigger saved",
       "statusArrived": "Arrived",
+      "defaultPromptWebhook": "Describe this webhook request payload:\n\n{{body}}",
+      "defaultPromptScheduled": "Run the scheduled task. Triggered at {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Enter a name.",
         "nameTooShort": "Use at least 8 characters.",

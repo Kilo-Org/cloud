@@ -4623,6 +4623,8 @@
       "created": "Pemicu dibuat",
       "saved": "Pemicu disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Jelaskan isi permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas terjadwal. Eksekusi dimulai pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan setidaknya 8 karakter.",

@@ -4623,6 +4623,8 @@
       "created": "ტრიგერი შეიქმნა",
       "saved": "ტრიგერი შენახულია",
       "statusArrived": "მოვიდა",
+      "defaultPromptWebhook": "აღწერეთ ამ ვებჰუკის მოთხოვნის ტანი:\n\n{{body}}",
+      "defaultPromptScheduled": "შეასრულეთ დაგეგმილი დავალება. გაშვება დაიწყო {{scheduledTime}}-ზე.",
       "problems": {
         "nameRequired": "შეიყვანეთ სახელი.",
         "nameTooShort": "გამოიყენეთ მინიმუმ 8 სიმბოლო.",

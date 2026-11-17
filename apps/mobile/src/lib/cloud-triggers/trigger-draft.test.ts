@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { CATALOG_LOADERS } from '@/i18n/catalogs';
+
 import { triggerNameProblem } from './trigger-id';
 import {
   buildCreateInput,
   buildUpdateInput,
   type CloudTriggerDetail,
   createTriggerDraft,
+  defaultPrompt,
   readBodySchema,
   type TriggerDraft,
   triggerDraftFromDetail,
@@ -246,5 +250,71 @@ describe('triggerNameProblem', () => {
     expect(triggerNameProblem('requests', 'edit')).toBe('reserved');
     expect(triggerNameProblem('Nightly', 'edit')).toBe('characters');
     expect(triggerNameProblem('nightly-deps', 'create')).toBeNull();
+  });
+});
+
+describe('defaultPrompt', () => {
+  /** The nested shape a catalog's own default prompts sit at. */
+  type TriggerPromptCatalog = {
+    cloudAgent?: {
+      triggers?: { defaultPromptWebhook?: string; defaultPromptScheduled?: string };
+    };
+  };
+
+  const PLACEHOLDER = /\{\{(\w+)\}\}/g;
+
+  /** A catalog's own default prompt, `undefined` while that key is untranslated. */
+  function catalogPrompt(
+    load: () => unknown,
+    key: 'defaultPromptWebhook' | 'defaultPromptScheduled'
+  ): string | undefined {
+    return (load() as TriggerPromptCatalog).cloudAgent?.triggers?.[key];
+  }
+
+  /** The placeholder names one template carries, so a key cannot drop or add one. */
+  function placeholders(value: string): string[] {
+    return [...value.matchAll(PLACEHOLDER)]
+      .map(match => match[1] ?? '')
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  it('starts each activation on its English catalog prompt', () => {
+    expect(defaultPrompt('webhook')).toBe(
+      catalogPrompt(CATALOG_LOADERS.en, 'defaultPromptWebhook')
+    );
+    expect(defaultPrompt('scheduled')).toBe(
+      catalogPrompt(CATALOG_LOADERS.en, 'defaultPromptScheduled')
+    );
+    expect(placeholders(defaultPrompt('webhook'))).toStrictEqual(['body']);
+    expect(placeholders(defaultPrompt('scheduled'))).toStrictEqual(['scheduledTime']);
+  });
+
+  it('reads the prompt in the language the app is showing', async () => {
+    try {
+      await i18n.changeLanguage('pt-BR');
+      // An untranslated key resolves to English, so the expectation follows
+      // i18next's own fallback instead of a value the catalog lacks.
+      expect(defaultPrompt('webhook')).toBe(
+        catalogPrompt(CATALOG_LOADERS['pt-BR'], 'defaultPromptWebhook') ??
+          catalogPrompt(CATALOG_LOADERS.en, 'defaultPromptWebhook')
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('keeps both placeholders in every catalog', async () => {
+    try {
+      for (const language of Object.keys(CATALOG_LOADERS)) {
+        // The active language is one piece of global i18next state, so each
+        // catalog has to be selected before its prompts are read.
+        // eslint-disable-next-line no-await-in-loop
+        await i18n.changeLanguage(language);
+        expect(placeholders(defaultPrompt('webhook')), language).toStrictEqual(['body']);
+        expect(placeholders(defaultPrompt('scheduled')), language).toStrictEqual(['scheduledTime']);
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

@@ -4623,6 +4623,8 @@
       "created": "ટ્રિગર બન્યો",
       "saved": "ટ્રિગર સાચવ્યો",
       "statusArrived": "આવ્યું",
+      "defaultPromptWebhook": "આ વેબહૂક વિનંતીની બોડીનું વર્ણન કરો:\n\n{{body}}",
+      "defaultPromptScheduled": "નિર્ધારિત કાર્ય ચલાવો. રન {{scheduledTime}} પર શરૂ થયું.",
       "problems": {
         "nameRequired": "નામ દાખલ કરો।",
         "nameTooShort": "ઓછામાં ઓછા 8 અક્ષરો વાપરો।",

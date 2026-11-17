@@ -4623,6 +4623,8 @@
       "created": "A trigger létrejött",
       "saved": "A trigger mentve",
       "statusArrived": "Megérkezett",
+      "defaultPromptWebhook": "Írja le ennek a webhook-kérésnek a törzsét:\n\n{{body}}",
+      "defaultPromptScheduled": "Futtassa az ütemezett feladatot. Indítva: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Adjon meg egy nevet.",
         "nameTooShort": "Használjon legalább 8 karaktert.",

@@ -4623,6 +4623,8 @@
       "created": "Liipaisin luotu",
       "saved": "Liipaisin tallennettu",
       "statusArrived": "Saapunut",
+      "defaultPromptWebhook": "Kuvaile tämän verkkokoukkupyynnön runko:\n\n{{body}}",
+      "defaultPromptScheduled": "Suorita ajastettu tehtävä. Käynnistetty klo {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Anna nimi.",
         "nameTooShort": "Käytä vähintään 8 merkkiä.",

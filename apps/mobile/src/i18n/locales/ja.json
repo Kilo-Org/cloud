@@ -4623,6 +4623,8 @@
       "created": "トリガーを作成しました",
       "saved": "トリガーを保存しました",
       "statusArrived": "到着",
+      "defaultPromptWebhook": "このウェブフックリクエストの本文を説明してください。\n\n{{body}}",
+      "defaultPromptScheduled": "スケジュールされたタスクを実行してください。{{scheduledTime}} に実行を開始しました。",
       "problems": {
         "nameRequired": "名前を入力してください。",
         "nameTooShort": "8文字以上使用してください。",

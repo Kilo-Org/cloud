@@ -10,7 +10,7 @@
  */
 
 import { createElement, type ElementType } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { createTriggerDraft } from '@/lib/cloud-triggers/trigger-draft';
@@ -66,8 +66,18 @@ vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
   }),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The catalogue read each test describes; the mock reads the object live, so a
+// test sets the state it renders instead of remocking the hook.
+const availableModels = vi.hoisted(() => ({
+  models: [] as { id: string; name: string; variants: string[]; isPreferred: boolean }[],
+  isLoading: false,
+  isError: false,
+  isFetching: false,
+  refetch: vi.fn<() => Promise<unknown>>(),
+}));
 vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false, isError: false }),
+  useAvailableModels: () => availableModels,
 }));
 vi.mock('./trigger-choice-sheet', () => ({
   TriggerChoiceSheet: 'TriggerChoiceSheet',
@@ -81,6 +91,15 @@ vi.mock('@/components/agents/mode-normalize', () => ({ BUILTIN_AGENT_MODES: ['co
 const FIELD = 'FormField' as ElementType;
 const SELECT_ROW = 'TriggerSelectRow' as ElementType;
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
+const BUTTON = 'Button' as ElementType;
+
+beforeEach(() => {
+  availableModels.models = [];
+  availableModels.isLoading = false;
+  availableModels.isError = false;
+  availableModels.isFetching = false;
+  availableModels.refetch.mockClear();
+});
 
 const HELPER_KEY_MAP = {
   set: 'cloudAgent.triggers.authSecretSet',
@@ -243,6 +262,83 @@ describe('trigger form gated problems', () => {
         (modelSelector.props.onOpen as () => void)();
       });
       expect(shownModelProblem()).toStrictEqual([triggerProblemMessage('modelRequired')]);
+    } finally {
+      act(() => {
+        view.renderer.unmount();
+      });
+    }
+  });
+});
+
+describe('trigger form model list failure', () => {
+  const CACHED_MODEL = {
+    id: 'anthropic/claude-sonnet-4',
+    name: 'Claude Sonnet 4',
+    variants: [],
+    isPreferred: true,
+  };
+  const AGENT_PROPS = {
+    problems: {},
+    onDraftChange: () => undefined,
+    openSheet: null,
+    onOpenSheetChange: () => undefined,
+  };
+
+  const mountAgent = () =>
+    renderWithProviders(
+      createElement(TriggerFormAgent, { ...AGENT_PROPS, draft: createTriggerDraft('UTC') })
+    );
+
+  /** The alert line the block shows while the catalogue read failed. */
+  function failureAlert(root: ReactTestRenderer['root']) {
+    return root.findAll(
+      node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert'
+    );
+  }
+
+  it('offers a retry in place of the failure and locks a selector with no model', async () => {
+    availableModels.isError = true;
+    const view = await mountAgent();
+    const root = view.renderer.root;
+    try {
+      expect(failureAlert(root).map(node => node.props.children)).toStrictEqual([
+        i18n.t('common.couldNotLoadModels'),
+      ]);
+
+      const [retry] = root.findAll(node => Object.is(node.type, BUTTON));
+      if (!retry) {
+        throw new Error('expected a retry button');
+      }
+      expect(retry.props.disabled).toBe(false);
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      expect(availableModels.refetch).toHaveBeenCalledTimes(1);
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
+        true
+      );
+    } finally {
+      act(() => {
+        view.renderer.unmount();
+      });
+    }
+  });
+
+  it.each([
+    ['a loaded catalogue', false],
+    ['a cached catalogue after a failure', true],
+  ])('keeps a selector holding a model usable with %s', async (_name, isError) => {
+    availableModels.models = [CACHED_MODEL];
+    availableModels.isError = isError;
+    const view = await mountAgent();
+    const root = view.renderer.root;
+    try {
+      const retryCount = root.findAll(node => Object.is(node.type, BUTTON)).length;
+      expect(retryCount).toBe(isError ? 1 : 0);
+      expect(failureAlert(root).length).toBe(isError ? 1 : 0);
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
+        false
+      );
     } finally {
       act(() => {
         view.renderer.unmount();

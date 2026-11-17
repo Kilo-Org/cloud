@@ -4833,6 +4833,8 @@
       "created": "Skattatur maħluq",
       "saved": "Skattatur salvat",
       "statusArrived": "Wasal",
+      "defaultPromptWebhook": "Iddeskrivi l-korp ta' din it-talba webhook:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Eżegwi l-kompitu skedat. Skattat fi {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Daħħal isem.",
         "nameTooShort": "Uża mill-inqas 8 karattri.",

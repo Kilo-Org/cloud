@@ -4693,6 +4693,8 @@
       "created": "Declanșator creat",
       "saved": "Declanșator salvat",
       "statusArrived": "Sosit",
+      "defaultPromptWebhook": "Descrie corpul cererii acestui webhook:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Rulează sarcina programată. Declanșată la {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introdu un nume.",
         "nameTooShort": "Folosește cel puțin 8 caractere.",

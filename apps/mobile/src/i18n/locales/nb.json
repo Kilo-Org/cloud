@@ -4623,6 +4623,8 @@
       "created": "Trigger opprettet",
       "saved": "Trigger lagret",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv innholdet i webhook-forespørselen:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Kjør den planlagte oppgaven. Utløst ved {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Skriv inn et navn.",
         "nameTooShort": "Bruk minst 8 tegn.",

@@ -4623,6 +4623,8 @@
       "created": "Deklanchè kreye",
       "saved": "Deklanchè sove",
       "statusArrived": "Rive",
+      "defaultPromptWebhook": "Dekri kò demann wèbhuk sa a:\n\n{{body}}",
+      "defaultPromptScheduled": "Lanse travay pwograme a. Deklanche a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Antre yon non.",
         "nameTooShort": "Sèvi ak omwen 8 karaktè.",

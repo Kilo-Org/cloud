@@ -4763,6 +4763,8 @@
       "created": "Трыгер створаны",
       "saved": "Трыгер захаваны",
       "statusArrived": "Прыйшла",
+      "defaultPromptWebhook": "Апішыце цела запыту гэтага вэбхука:\n\n{{body}}",
+      "defaultPromptScheduled": "Запусціце задачу па раскладзе. Запуск пачаўся ў {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Увядзіце назву.",
         "nameTooShort": "Не менш за 8 сімвалаў.",

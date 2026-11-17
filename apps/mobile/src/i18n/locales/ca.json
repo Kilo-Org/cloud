@@ -4693,6 +4693,8 @@
       "created": "Disparador creat",
       "saved": "Disparador desat",
       "statusArrived": "Arribat",
+      "defaultPromptWebhook": "Descriu el cos d'aquesta sol·licitud de ganxo web:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa la tasca programada. Activat a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introdueix un nom.",
         "nameTooShort": "Utilitza almenys 8 caràcters.",

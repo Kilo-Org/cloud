@@ -4623,6 +4623,8 @@
       "created": "Päästik loodud",
       "saved": "Päästik salvestatud",
       "statusArrived": "Saabunud",
+      "defaultPromptWebhook": "Kirjelda selle veebihaagi päringu keha:\n\n{{body}}",
+      "defaultPromptScheduled": "Käivita ajastatud ülesanne. Käivitatud kell {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sisesta nimi.",
         "nameTooShort": "Kasuta vähemalt 8 tähemärki.",

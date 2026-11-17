@@ -4693,6 +4693,8 @@
       "created": "Trigeris izveidots",
       "saved": "Trigeris saglabāts",
       "statusArrived": "Saņemts",
+      "defaultPromptWebhook": "Aprakstiet šī tīmekļa āķa pieprasījuma pamattekstu:\n\n{{body}}",
+      "defaultPromptScheduled": "Palaidiet ieplānoto uzdevumu. Palaišanas laiks: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ievadiet nosaukumu.",
         "nameTooShort": "Izmantojiet vismaz 8 rakstzīmes.",

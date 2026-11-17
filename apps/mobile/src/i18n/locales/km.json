@@ -4623,6 +4623,8 @@
       "created": "បានបង្កើតការកេះ",
       "saved": "បានរក្សាទុកការកេះ",
       "statusArrived": "បានមកដល់",
+      "defaultPromptWebhook": "ពិពណ៌នាតួសារសំណើវេបហុកនេះ៖\n\n{{body}}",
+      "defaultPromptScheduled": "ដំណើរការកិច្ចការដែលបានកំណត់ពេល។ ការប្រតិបត្តិបានចាប់ផ្តើមនៅ {{scheduledTime}}។",
       "problems": {
         "nameRequired": "សូមបញ្ចូលឈ្មោះ។",
         "nameTooShort": "ប្រើយ៉ាងតិច 8 តួអក្សរ។",

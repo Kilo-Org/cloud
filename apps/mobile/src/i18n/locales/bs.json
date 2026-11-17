@@ -4693,6 +4693,8 @@
       "created": "Okidač je kreiran",
       "saved": "Okidač je sačuvan",
       "statusArrived": "Stiglo",
+      "defaultPromptWebhook": "Opišite tijelo ovog webhook zahtjeva:\n\n{{body}}",
+      "defaultPromptScheduled": "Pokrenite zakazani zadatak. Pokrenuto u {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Unesite naziv.",
         "nameTooShort": "Koristite najmanje 8 znakova.",

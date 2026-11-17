@@ -4903,6 +4903,8 @@
       "created": "Crëwyd sbardun",
       "saved": "Cadwyd y sbardun",
       "statusArrived": "Wedi cyrraedd",
+      "defaultPromptWebhook": "Disgrifiwch gorff y cais bachyn gwe hwn:\n\n{{body}}",
+      "defaultPromptScheduled": "Rhedwch y dasg ar atodlen. Wedi’i sbarduno am {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Rhowch enw.",
         "nameTooShort": "Defnyddiwch o leiaf 8 nod.",

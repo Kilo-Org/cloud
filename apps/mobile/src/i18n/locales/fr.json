@@ -4693,6 +4693,8 @@
       "created": "Déclencheur créé",
       "saved": "Déclencheur enregistré",
       "statusArrived": "Arrivée",
+      "defaultPromptWebhook": "Décrivez le corps de cette requête webhook :\n\n{{body}}",
+      "defaultPromptScheduled": "Exécutez la tâche planifiée. Déclenché à {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Saisissez un nom.",
         "nameTooShort": "Utilisez au moins 8 caractères.",

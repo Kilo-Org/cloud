@@ -19,6 +19,8 @@ import {
 } from '@kilocode/trpc/mobile';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
+
 import { type TriggerNameProblem, triggerNameProblem } from './trigger-id';
 
 export type CloudTriggerCreateInput = inferRouterInputs<MobileRouter>['webhookTriggers']['create'];
@@ -32,9 +34,14 @@ export type CloudTriggerDelivery =
 /** The body schema a create or update carries: a JSON Schema object. */
 type CloudTriggerBodySchema = Record<string, unknown>;
 
-/** The web form's default prompts, so both surfaces start a trigger the same way. */
-const WEBHOOK_PROMPT_TEMPLATE = 'Describe this webhook request payload:\n\n{{body}}';
-const SCHEDULED_PROMPT_TEMPLATE = 'Run the scheduled task. Triggered at {{scheduledTime}}.';
+/**
+ * The web form's default prompts, so both surfaces start a trigger the same
+ * way, in the language the app is showing.
+ */
+const DEFAULT_PROMPT_KEYS = {
+  webhook: 'cloudAgent.triggers.defaultPromptWebhook',
+  scheduled: 'cloudAgent.triggers.defaultPromptScheduled',
+} satisfies Record<TriggerActivation, string>;
 
 /** The secret length a creator-run webhook must carry (the server's minimum). */
 const MIN_CREATOR_SECRET_LENGTH = 16;
@@ -93,9 +100,13 @@ export type TriggerProblem =
 
 export type TriggerDraftProblems = Partial<Record<TriggerDraftField, TriggerProblem>>;
 
-/** The prompt a new draft starts on, for the activation it fires from. */
+/**
+ * The prompt a new draft starts on, for the activation it fires from. The
+ * template carries its placeholders through untranslated, so `skipOnVariables`
+ * keeps `{{body}}` and `{{scheduledTime}}` even though nothing supplies them.
+ */
 export function defaultPrompt(activation: TriggerActivation): string {
-  return activation === 'scheduled' ? SCHEDULED_PROMPT_TEMPLATE : WEBHOOK_PROMPT_TEMPLATE;
+  return i18n.t(DEFAULT_PROMPT_KEYS[activation], { interpolation: { skipOnVariables: true } });
 }
 
 /**

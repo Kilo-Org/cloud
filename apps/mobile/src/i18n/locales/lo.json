@@ -4623,6 +4623,8 @@
       "created": "ສ້າງຕົວກະຕຸ້ນແລ້ວ",
       "saved": "ບັນທຶກຕົວກະຕຸ້ນແລ້ວ",
       "statusArrived": "ມາຮອດແລ້ວ",
+      "defaultPromptWebhook": "ອະທິບາຍເນື້ອຄວາມຂອງຄຳຮ້ອງເວັບຮຸກນີ້:\n\n{{body}}",
+      "defaultPromptScheduled": "ຣັນວຽກທີ່ກຳນົດເວລາໄວ້. ເລີ່ມດຳເນີນງານເມື່ອ {{scheduledTime}}.",
       "problems": {
         "nameRequired": "ປ້ອນຊື່.",
         "nameTooShort": "ໃຊ້ຢ່າງໜ້ອຍ 8 ຕົວອັກສອນ.",

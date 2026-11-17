@@ -4623,6 +4623,8 @@
       "created": "A ti ṣẹ̀dá ìmúṣiṣẹ́",
       "saved": "A ti fi ìmúṣiṣẹ́ pamọ́",
       "statusArrived": "Ó ti dé",
+      "defaultPromptWebhook": "Ṣàpèjúwe ara ìbéèrè wẹ́ẹ̀bùhóòkù yìí:\n\n{{body}}",
+      "defaultPromptScheduled": "Ṣe iṣẹ́ àtòjọ náà. A mú un ṣiṣẹ́ ní {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tẹ orúkọ kan.",
         "nameTooShort": "Lo ó kéré tó 8 lẹ́tà.",

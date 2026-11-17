@@ -4763,6 +4763,8 @@
       "created": "Utworzono wyzwalacz",
       "saved": "Zapisano wyzwalacz",
       "statusArrived": "Dotarło",
+      "defaultPromptWebhook": "Opisz treść żądania webhooka:\\n\\n{{body}}",
+      "defaultPromptScheduled": "Uruchom zaplanowane zadanie. Wyzwolone o {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Wprowadź nazwę.",
         "nameTooShort": "Użyj co najmniej 8 znaków.",

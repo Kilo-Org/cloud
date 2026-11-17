@@ -4623,6 +4623,8 @@
       "created": "สร้างทริกเกอร์แล้ว",
       "saved": "บันทึกทริกเกอร์แล้ว",
       "statusArrived": "มาถึงแล้ว",
+      "defaultPromptWebhook": "อธิบายบอดี้ของคำขอเว็บฮุคนี้:\n\n{{body}}",
+      "defaultPromptScheduled": "รันงานตามกำหนดเวลา ทริกเกอร์เมื่อ {{scheduledTime}}",
       "problems": {
         "nameRequired": "กรอกชื่อ",
         "nameTooShort": "ใช้อักขระอย่างน้อย 8 ตัว",

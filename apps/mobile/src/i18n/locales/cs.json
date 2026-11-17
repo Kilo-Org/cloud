@@ -4763,6 +4763,8 @@
       "created": "Spouštěč vytvořen",
       "saved": "Spouštěč uložen",
       "statusArrived": "Dorazilo",
+      "defaultPromptWebhook": "Popište tělo tohoto požadavku webhooku:\n\n{{body}}",
+      "defaultPromptScheduled": "Spusťte naplánovaný úkol. Spuštěno v {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Zadejte název.",
         "nameTooShort": "Použijte alespoň 8 znaků.",

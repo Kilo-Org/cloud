@@ -17,8 +17,10 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
+import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -125,13 +127,25 @@ export function TriggerFormAgent({
               markTouched('model');
             }}
             isLoading={models.isLoading}
+            disabled={models.isError && models.models.length === 0}
           />
-          {models.isError ? (
-            <Text className="min-w-0 flex-1 text-xs text-destructive">
+        </View>
+        {models.isError ? (
+          <View className="gap-2">
+            <Text accessibilityRole="alert" className="text-xs text-destructive">
               {t('common.couldNotLoadModels')}
             </Text>
-          ) : null}
-        </View>
+            <Button
+              size="sm"
+              variant="outline"
+              className={STATE_ACTION_CLASS}
+              disabled={models.isFetching}
+              onPress={() => void models.refetch()}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        ) : null}
         {modelProblemText === undefined ? null : (
           <Text className="text-xs text-destructive">{modelProblemText}</Text>
         )}

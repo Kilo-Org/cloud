@@ -4623,6 +4623,8 @@
       "created": "ట్రిగ్గర్ సృష్టించబడింది",
       "saved": "ట్రిగ్గర్ సేవ్ చేయబడింది",
       "statusArrived": "చేరింది",
+      "defaultPromptWebhook": "ఈ వెబ్హుక్ అభ్యర్థన బాడీని వివరించండి:\n\n{{body}}",
+      "defaultPromptScheduled": "షెడ్యూల్ చేసిన పనిని రన్ చేయండి. {{scheduledTime}} సమయంలో ట్రిగ్గర్ అయింది.",
       "problems": {
         "nameRequired": "పేరు నమోదు చేయండి.",
         "nameTooShort": "కనీసం 8 అక్షరాలు ఉపయోగించండి.",

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
+  resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
-  resolveUsageEndpointRoute,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import {
   getEmbeddingProvider,
   getTranscriptionProvider,
@@ -83,9 +83,9 @@ function vercelServes(type: string, ...ids: string[]) {
 }
 
 function resolveEmbedding(
-  overrides: Partial<Parameters<typeof resolveUsageEndpointRoute>[0]> = {}
+  overrides: Partial<Parameters<typeof resolveEmbeddingOrDecisionRoute>[0]> = {}
 ) {
-  return resolveUsageEndpointRoute({
+  return resolveEmbeddingOrDecisionRoute({
     requestedModel: model,
     modelType: 'embedding',
     user,
@@ -106,7 +106,7 @@ beforeEach(() => {
   storeKeys();
 });
 
-describe('resolveUsageEndpointRoute', () => {
+describe('resolveEmbeddingOrDecisionRoute', () => {
   describe('the owner’s OpenRouter key', () => {
     it('serves the model on the owner’s account', async () => {
       storeKeys(key('openrouter'));

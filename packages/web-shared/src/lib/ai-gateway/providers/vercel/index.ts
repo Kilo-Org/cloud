@@ -320,7 +320,7 @@ export function convertProviderOptions(
  * `getRouteInferenceRegion`); Vercel fails the request instead of leaving the region. Both carry
  * the data-handling choices.
  */
-export async function getUsageEndpointGatewayOptions(params: {
+export async function getNonChatGatewayOptions(params: {
   /** The model id the request sends to Vercel, after `mapModelIdToVercel`. */
   vercelModelId: string;
   userByok: readonly BYOKResult[] | null;

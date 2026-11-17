@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import {
+  CAPTURE_ALIGNMENT_BUDGET_MS,
   captureAlignment,
   screenshotObservation,
   type CaptureAlignment,
@@ -116,6 +117,13 @@ const LOADING_SETTLE_TIMEOUT_MS = 30_000;
 const LOADING_ARRIVAL_TIMEOUT_MS = 10_000;
 // The iOS dev client re-downloads the bundle through the SSH tunnel after a reload.
 const RELOAD_WAIT_MS = 150_000;
+// Sampling stops before the screenshot, and the screen does not: a navigation
+// push or a late render lands after the last sample. Reading the bracket while
+// that work is still arriving reads two different screens around one screenshot
+// and reports no alignment for a capture that is otherwise fine, so the bracket
+// opens only once the layout has held still for this window.
+const SCREEN_QUIET_MS = 1_500;
+const SCREEN_QUIET_TIMEOUT_MS = 15_000;
 const RTL_LANGUAGE = 'ar';
 const LTR_FALLBACK_LANGUAGE = 'en';
 
@@ -129,6 +137,12 @@ export type Sampled = {
   blockedBy?: 'loading-placeholder';
   /** Milliseconds this capture spent waiting for the placeholder to clear. */
   loadingWaitMs?: number;
+  /**
+   * Milliseconds between the retained samples, read from their own timestamps.
+   * The shift rule converts sample distance with it, because the app's cadence is
+   * the interval it was asked for plus the dump it runs between ticks.
+   */
+  intervalMs?: number;
   alignment?: CaptureAlignment;
 };
 
@@ -158,10 +172,40 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
   });
 }
 
+/**
+ * The cadence to ask the in-app sampler for, given what one of its dumps costs.
+ *
+ * The dump walks and serializes the whole document on the app's own JS thread, so
+ * an interval shorter than the dump it schedules starves the screen it measures:
+ * the app spends every slice producing samples and the work the screen still owes
+ * (a late navigation, late data) cannot run, so it lands after sampling stops. The
+ * capture bracket then reads two different screens and concludes nothing. Twice
+ * the measured cost leaves the app a slice between dumps; the floor is the default
+ * cadence, never something shorter.
+ */
+export function inAppSampleInterval(dumpMs: number): number {
+  return Math.max(IN_APP_SAMPLE_INTERVAL_MS, Math.ceil(dumpMs * 2));
+}
+
+/**
+ * The window one capture may span, given what one of its dumps costs.
+ *
+ * The bracket reads two full trees around the screenshot, so on a screen whose
+ * dump costs half a second the reads alone exceed the default window and a
+ * perfectly aligned capture is reported inconclusive. The window grows with the
+ * measurement and never shrinks below the constant: a cheap screen keeps it.
+ */
+export function captureBudgetMs(dumpMs: number): number {
+  return Math.max(CAPTURE_ALIGNMENT_BUDGET_MS, Math.ceil(dumpMs * 2) + 1_000);
+}
+
 /** One sampling window, sized for the settle it spans. */
-function startSampling(ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number }) {
+function startSampling(
+  ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number },
+  intervalMs = IN_APP_SAMPLE_INTERVAL_MS
+) {
   return ctx.probe.startSampling(
-    IN_APP_SAMPLE_INTERVAL_MS,
+    intervalMs,
     ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
   );
 }
@@ -317,7 +361,12 @@ export function screenFindings(args: {
     });
   }
   if (args.sampled !== undefined) {
-    findings.push(...checkShift(args.sampled.timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS));
+    findings.push(
+      ...checkShift(
+        args.sampled.timeline.map(normalize),
+        args.sampled.intervalMs ?? IN_APP_SAMPLE_INTERVAL_MS
+      )
+    );
     if (!args.sampled.settled) {
       findings.push(
         unsettledFinding({
@@ -481,10 +530,29 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // about ten seconds unsampled never mounted at all, and the run recorded
   // placeholder frames for the whole budget. Those frames are not the screen
   // either way — the settle below is what the rules read.
-  await ctx.probe.startSampling(
-    IN_APP_SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
-  );
+  // The cadence is asked of this screen rather than assumed: one dump is measured
+  // on the probe that will sample, and an interval shorter than that cost is what
+  // starves the thread and lets pending work escape the sampling window.
+  const measuredFrom = ctx.clock.now();
+  await ctx.probe.dump();
+  const dumpMs = ctx.clock.now() - measuredFrom;
+  const samplingMs = inAppSampleInterval(dumpMs);
+  if (samplingMs > IN_APP_SAMPLE_INTERVAL_MS) {
+    ctx.log(
+      `design-gate: ${target.id} one in-app dump costs ${dumpMs}ms; sampling every ${samplingMs}ms`
+    );
+  }
+  // The bracket reads two full trees around the screenshot, so on a screen whose
+  // dump is expensive those reads alone outlast the default window and a correct
+  // bracket is reported inconclusive. The window follows the same measurement; a
+  // cheap screen keeps the constant.
+  const alignmentBudgetMs = captureBudgetMs(dumpMs);
+  if (alignmentBudgetMs > CAPTURE_ALIGNMENT_BUDGET_MS) {
+    ctx.log(
+      `design-gate: ${target.id} one dump costs ${dumpMs}ms; alignment window ${alignmentBudgetMs}ms`
+    );
+  }
+  await startSampling(ctx, samplingMs);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
@@ -494,19 +562,53 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
     await waitForPlaceholder();
-    await startSampling(ctx);
+    await startSampling(ctx, samplingMs);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
-  const { samples, truncated } = await ctx.probe.stopSampling();
-  if (truncated) {
-    ctx.log(
-      `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
-    );
-  }
+  let { samples, truncated } = await ctx.probe.stopSampling();
+  const reportTruncation = () => {
+    if (truncated) {
+      ctx.log(
+        `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
+      );
+    }
+  };
+  // The samples report the cadence they were produced at, which the app's own
+  // tick cost extends beyond the interval it was asked for. Say so when that
+  // spacing is far enough from the constant that the shift timings would move.
+  // A pass with fewer than two retained samples carries no delta to read, so the
+  // caller keeps the spacing it already had.
+  const reportSpacing = (sampled: readonly ProbeSample[]): number | undefined => {
+    if (sampled.length < 2) return undefined;
+    const spacing = sampleInterval(sampled);
+    if (Math.abs(spacing - IN_APP_SAMPLE_INTERVAL_MS) > IN_APP_SAMPLE_INTERVAL_MS * 0.25) {
+      ctx.log(
+        `design-gate: ${target.id} samples are ${Math.round(spacing)}ms apart; the shift rule reads that spacing`
+      );
+    }
+    return spacing;
+  };
+  reportTruncation();
+  let spacingMs = reportSpacing(samples) ?? IN_APP_SAMPLE_INTERVAL_MS;
   const files = captureFiles(ctx.out, cell, target.id);
-  writeJson(files.absolute(files.timeline), { samples, truncated });
-  const started = ctx.clock.now();
+  // Sampling stops before the screenshot, and the screen does not: a navigation
+  // push or a late render arrives after the last sample. The bracket compares two
+  // dumps around one screenshot, so it opens only once the layout has held still
+  // for the quiet window; reading it while that work is still landing makes a
+  // correct capture look like two different screens. A screen that never holds
+  // still keeps its mismatch instead of becoming a pass.
+  const waitForQuiet = async (): Promise<boolean> => {
+    const held = await waitForStableLayout(
+      ctx.probe,
+      ctx.clock,
+      SCREEN_QUIET_MS,
+      SCREEN_QUIET_TIMEOUT_MS
+    );
+    if (!held) ctx.log(`design-gate: ${target.id} screen still changing before the screenshot`);
+    return held;
+  };
+  let started = ctx.clock.now();
   const readTree = async (): Promise<TimedTree> => {
     const startedMs = ctx.clock.now() - started;
     try {
@@ -516,8 +618,36 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       return { startedMs, completedMs: ctx.clock.now() - started, error: String(error) };
     }
   };
-  const before = await readTree();
-  const dump = before.dump ?? settled.dump;
+  let quiet = await waitForQuiet();
+  let before = await readTree();
+  let dump = before.dump ?? settled.dump;
+  if (before.dump !== undefined && layoutSignature(before.dump) !== layoutSignature(settled.dump)) {
+    // A layout the sampled window never saw is real work, and the bracket must not
+    // absorb it: silent acceptance would hide a late layout shift exactly on the
+    // slow screens this wait exists for. One more pass samples the screen as it now
+    // is, and both passes join one timeline, so the shift rule reports the late
+    // change instead of reading the late layout as the rest state. A bound of one
+    // retry keeps a screen that keeps moving from extending the run.
+    const firstPass = samples;
+    const firstPassTruncated = truncated;
+    ctx.log(`design-gate: ${target.id} late change after sampling stopped; bracket waited for it`);
+    ctx.log(`design-gate: ${target.id} sampling once more; the late change stays in the timeline`);
+    await startSampling(ctx, samplingMs);
+    settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+    const retry = await ctx.probe.stopSampling();
+    // The stretch between the two passes is not a cadence, so the spacing comes
+    // from one pass only: the first pass sizes the gap, and the retry pass, when it
+    // reports one, becomes the spacing the shift rule reads.
+    samples = joinPasses(firstPass, retry.samples, spacingMs);
+    truncated = firstPassTruncated || retry.truncated;
+    reportTruncation();
+    spacingMs = reportSpacing(retry.samples) ?? spacingMs;
+    quiet = await waitForQuiet();
+    started = ctx.clock.now();
+    before = await readTree();
+    dump = before.dump ?? settled.dump;
+  }
+  writeJson(files.absolute(files.timeline), { samples, truncated });
   // Preserve collected tree evidence even if the native screenshot or its decode fails.
   writeJson(files.absolute(files.dump), dump);
   const screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
@@ -530,19 +660,21 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenshot,
     after,
     layoutSignature,
-    screenshotObservation(dump, image)
+    screenshotObservation(dump, image),
+    alignmentBudgetMs
   );
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
     dump,
     timeline: expandSamples(samples),
+    intervalMs: spacingMs,
     alignment,
     // A screen that still paints its loading placeholder is never the settled
-    // screen the target describes, whatever the settle loop saw before it. The
-    // finding reports the wait that ran, not the settle loop's own elapsed time.
-    settled:
-      settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump),
+    // screen the target describes. The settle loop only saw the sampled window, so
+    // work that landed after it counts as settled only when the quiet wait above
+    // proved the layout held still before the bracket opened.
+    settled: settled.settled && !stillLoading && quiet,
     ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
   };
@@ -561,6 +693,70 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
 
 export function expandSamples(samples: readonly ProbeSample[]): ProbeDump[] {
   return samples.flatMap(sample => Array.from({ length: sample.repeat }, () => sample.dump));
+}
+
+/**
+ * The spacing the retained samples report, read from their own timestamps.
+ *
+ * The app samples itself on its own JS thread, so the distance between two
+ * samples is the interval it was asked for plus the cost of the dump between
+ * ticks, and both vary with the screen. Identical consecutive states collapse
+ * into one sample, which keeps the stamp of its first tick, so two retained
+ * stamps are a whole number of spacings apart, never one spacing. The spacing is
+ * therefore the span the samples cover divided by the ticks that span it: every
+ * sample but the last one adds its repeats, because the last sample's repeats
+ * happen after its own stamp. A shift converts sample distance into milliseconds
+ * with the spacing that produced those samples, never with a constant: a change
+ * that arrives two samples after the rest says how long the screen took, and the
+ * constant is only the answer when no sample carries a spacing of its own.
+ */
+export function sampleInterval(samples: readonly ProbeSample[]): number {
+  if (samples.length < 2) return IN_APP_SAMPLE_INTERVAL_MS;
+  const ordered = [...samples].sort((left, right) => left.t - right.t);
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+  if (first === undefined || last === undefined) return IN_APP_SAMPLE_INTERVAL_MS;
+  const span = last.t - first.t;
+  let ticks = 0;
+  for (const sample of ordered.slice(0, -1)) ticks += sample.repeat;
+  if (span <= 0 || ticks === 0) return IN_APP_SAMPLE_INTERVAL_MS;
+  return span / ticks;
+}
+
+// A second sampling pass starts after a stretch no pass sampled. The bracket saw
+// no layout change across that stretch, so the stretch counts as repeats of the
+// last state of the first pass, and both passes stay one timeline. The cap bounds
+// a long quiet wait, and a repeat stores only the reference to the same dump.
+const MAX_GAP_REPEATS = 64;
+
+/**
+ * Join two sampling passes into one timeline.
+ *
+ * The unsampled stretch between the passes is counted as repeats of the last
+ * state of the first pass, at the spacing that pass reported. The join keeps the
+ * late layout change in the timeline the shift rule reads, instead of letting a
+ * fresh pass become the baseline. A pass that retained nothing falls back to the
+ * concatenation.
+ */
+export function joinPasses(
+  first: readonly ProbeSample[],
+  second: readonly ProbeSample[],
+  spacingMs: number
+): ProbeSample[] {
+  const last = first[first.length - 1];
+  const start = second[0];
+  if (last === undefined || start === undefined) return [...first, ...second];
+  // `last.t` stamps the first tick of the collapsed tail, and `last.repeat` counts
+  // every tick that tail already covers, so only the ticks the tail does not
+  // account for are added.
+  const gap = start.t - last.t;
+  const ticks = spacingMs > 0 ? Math.round(gap / spacingMs) - last.repeat : 0;
+  const repeats = Math.min(MAX_GAP_REPEATS, Math.max(0, ticks));
+  return [
+    ...first.slice(0, -1),
+    { t: last.t, repeat: last.repeat + repeats, dump: last.dump },
+    ...second,
+  ];
 }
 
 type LanguageTarget = { preference: string; resolved: string; rtl?: boolean };

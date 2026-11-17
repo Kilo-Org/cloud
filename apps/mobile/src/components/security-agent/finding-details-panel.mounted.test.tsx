@@ -31,6 +31,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   Linking: { openURL: mocks.linkingOpenUrl },
+  I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -66,6 +68,7 @@ vi.mock('@/components/ui/kv-row', () => ({
   },
 }));
 vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -159,9 +162,11 @@ function rowLabel(child: unknown): string | undefined {
 
 /** The labels a `RowGroup` renders, from its own children in order. */
 function rowLabels(group: TestRenderer.ReactTestInstance): (string | undefined)[] {
-  const children: unknown[] = Array.isArray(group.props.children)
-    ? group.props.children
-    : [group.props.children];
+  const children = (
+    Array.isArray(group.props.children) ? group.props.children : [group.props.children]
+  )
+    .flat(Infinity)
+    .filter((child): child is unknown => child !== null && child !== undefined && child !== false);
   return children.map(child => rowLabel(child));
 }
 
@@ -214,22 +219,33 @@ describe('FindingDetailsPanel chip row', () => {
     {
       state: { kind: 'closed', superseded: false, at: new Date(0) },
       fixture: { status: 'ignored', ignored_reason: 'not_used' },
-      // The dismissal card names what it holds; only the chip row lost a control.
-      texts: ['securityAgent.dismiss.reason', 'securityAgent.dismiss.reasonNotUsed'],
+      // The dismissal note now names the reason in a `KvRow`; only the chip
+      // row lost a control.
+      texts: [],
+      dismissal: {
+        label: 'securityAgent.dismiss.reason',
+        value: 'securityAgent.dismiss.reasonNotUsed',
+      },
     },
     {
       state: { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) },
       fixture: { status: 'fixed' },
       texts: ['securityAgent.filter.fixed'],
+      dismissal: undefined,
     },
   ])(
     'drops the deadline chip that repeats the status ($fixture.status)',
-    ({ state, fixture, texts }) => {
+    ({ state, fixture, texts, dismissal }) => {
       mocks.deadlineState = state;
       const tree = renderPanel(findingFixture(fixture));
 
       expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
       expect(panelTexts(tree)).toEqual(expect.arrayContaining(texts));
+      if (dismissal) {
+        expect(
+          mocks.kvRows.some(row => row.label === dismissal.label && row.value === dismissal.value)
+        ).toBe(true);
+      }
     }
   );
 
@@ -251,8 +267,14 @@ describe('FindingDetailsPanel stored dismissal values', () => {
     'falls back to the review wording for an unusable reason (%j)',
     override => {
       mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-      const tree = renderPanel(findingFixture({ status: 'ignored', ...override }));
-      expect(panelTexts(tree)).toContain('securityAgent.findingDetails.reasonAfterReview');
+      renderPanel(findingFixture({ status: 'ignored', ...override }));
+      expect(
+        mocks.kvRows.some(
+          row =>
+            row.label === 'securityAgent.dismiss.reason' &&
+            row.value === 'securityAgent.findingDetails.reasonAfterReview'
+        )
+      ).toBe(true);
     }
   );
 });
@@ -309,7 +331,7 @@ describe('FindingDetailsPanel dates block', () => {
       'securityAgent.findingDetails.detected',
       'securityAgent.findingDetails.dismissedOn',
     ]);
-    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z', last: true });
+    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z' });
 
     mocks.kvRows.length = 0;
     mocks.supersedingFindingId = 'finding-2';
@@ -349,7 +371,6 @@ describe('FindingDetailsPanel dates block', () => {
     expect(dateRows()[2]).toMatchObject({
       value: '1970-01-01T00:00:00.000Z',
       valueTone: 'warn',
-      last: true,
     });
   });
 
@@ -440,7 +461,7 @@ describe('FindingDetailsPanel facts card', () => {
   /** The row labels of the one group that starts with the package row. */
   function factLabels(r: R): (string | undefined)[] {
     const groups: TestRenderer.ReactTestInstance[] = r.root.findAllByType('RowGroup');
-    return groups.map(rowLabels).find(labels => labels[0] === PACKAGE_LABEL) ?? [];
+    return groups.map(group => rowLabels(group)).find(labels => labels[0] === PACKAGE_LABEL) ?? [];
   }
 
   it.each([

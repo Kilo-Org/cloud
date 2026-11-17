@@ -43,6 +43,7 @@ vi.mock('@/lib/format', () => ({
 }));
 vi.mock('@/lib/utils', () => ({
   capitalize: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

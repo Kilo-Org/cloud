@@ -385,9 +385,7 @@ test('a restart keeps the manifest selection when the manifest exists', () => {
         session: 'kilo-dev-test',
         portOffset,
         wranglerRegistryPath: path.join(root, 'dev', 'logs', 'wrangler-registry.json'),
-        services: [
-          { name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' },
-        ],
+        services: [{ name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' }],
       })
     );
     // Narrower than the always-on core group, so a group fallback would show.

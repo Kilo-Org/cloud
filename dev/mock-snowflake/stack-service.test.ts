@@ -551,7 +551,11 @@ test('a real warehouse folds the shell CA and earlier env-file CAs into the bund
     const earlierCaPath = path.join(fixture.root, 'earlier-ca.pem');
     fs.writeFileSync(shellCaPath, 'SHELL CA\n');
     fs.writeFileSync(earlierCaPath, 'EARLIER CA\n');
-    writeEnvFile(fixture.root, 'apps/web/.env.development.local', `NODE_EXTRA_CA_CERTS=${earlierCaPath}\n`);
+    writeEnvFile(
+      fixture.root,
+      'apps/web/.env.development.local',
+      `NODE_EXTRA_CA_CERTS=${earlierCaPath}\n`
+    );
     process.env.NODE_EXTRA_CA_CERTS = shellCaPath;
 
     assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: false });

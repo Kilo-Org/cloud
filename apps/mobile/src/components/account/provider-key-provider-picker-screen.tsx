@@ -5,11 +5,9 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
-
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Search, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
@@ -176,32 +174,37 @@ export function ProviderKeyProviderPickerScreen({
         title={t('profile.providerKeys.chooseProvider')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="flex-row items-center gap-2 px-4 pb-1 pt-2">
-        <Search size={18} color={colors.mutedForeground} />
-        <Input
-          ref={inputRef}
-          className="min-w-0 flex-1 border-0 bg-secondary"
-          placeholder={t('profile.providerKeys.searchProviders')}
-          accessibilityLabel={t('profile.providerKeys.searchProviders')}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          onChangeText={setQuery}
-        />
-        {query === '' ? null : (
-          <Button
-            variant="ghost"
-            size="icon"
-            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-            accessibilityLabel={t('common.clearSearch')}
-            onPress={() => {
-              setQuery('');
-              inputRef.current?.clear();
-            }}
-          >
-            <X size={16} color={colors.mutedForeground} />
-          </Button>
-        )}
+      <View className="px-4 pb-1 pt-2">
+        <View className="min-h-[44px] flex-row items-center gap-2 rounded-lg bg-secondary px-3">
+          <Search size={18} color={colors.mutedForeground} />
+          <Input
+            ref={inputRef}
+            // The row owns the inset on both sides, so the field itself adds
+            // none: a physical inset here pushed the field past its box in
+            // right-to-left layouts, where the row's children swap sides.
+            className="min-w-0 flex-1 pl-0 pr-0"
+            placeholder={t('profile.providerKeys.searchProviders')}
+            accessibilityLabel={t('profile.providerKeys.searchProviders')}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onChangeText={setQuery}
+          />
+          {query === '' ? null : (
+            <Pressable
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clearSearch')}
+              className="h-[38px] w-[38px] items-center justify-center active:opacity-70"
+              onPress={() => {
+                setQuery('');
+                inputRef.current?.clear();
+              }}
+            >
+              <X size={16} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
       </View>
       {body}
     </View>

@@ -392,8 +392,12 @@ for (const [name, files, expected] of [
     { mobile: 'false', lint_only: 'false', catalogs: 'false' },
   ],
   ['no changed path', [], { mobile: 'false', lint_only: 'false', catalogs: 'false' }],
-  // The audit reads both trees without a mobile family selecting them, so each
-  // alone must still turn the catalog job on.
+  // The audit reads both trees, so each alone must still turn the catalog job
+  // on. `mobile: 'false'` here only reflects the stub `node` that answers the
+  // workspace selection: real attribution treats `tools/(i18n|nativewind)/` as
+  // the app's (`OWNED` in scripts/affected-workspaces.mjs) and a services
+  // change may reach reader workspaces, so real detection runs the suite for
+  // some such diffs — either way the audit runs.
   [
     'a services path alone',
     ['services/notifications/src/handler.ts'],

@@ -12,7 +12,8 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type HostInstance, Pressable, View } from 'react-native';
+import { Pressable, type TextInstance, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { Sheet } from '@/components/ui/sheet';
@@ -45,7 +46,8 @@ export function ReactionPickerSheet({
   onPick,
 }: Readonly<ReactionPickerSheetProps>) {
   const { t } = useTranslation();
-  const titleRef = useRef<HostInstance | null>(null);
+  const insets = useSafeAreaInsets();
+  const titleRef = useRef<TextInstance | null>(null);
   // The latch records a dispatched request, not delivered focus: Android
   // reports no outcome. Reaching the title is retried from the two real
   // signals — the open render (a reopened sheet keeps its title mounted) and
@@ -81,44 +83,49 @@ export function ReactionPickerSheet({
   }
 
   return (
-    // No snap points: the native sheet sizes to the emoji grid.
+    // No snap points: the native sheet sizes to the emoji grid. The modal
+    // wrapper covers the header too: a screen reader must not reach the
+    // comment list behind a separate native window. The bottom inset rides on
+    // that wrapper and the 24pt floor is the body's own scale class, so the
+    // sheet clears the home indicator without a literal in the style.
     <Sheet visible={visible} onClose={onClose}>
-      {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
-          ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
-      <SheetHeader
-        title={t('common.reactions')}
-        onDone={onClose}
-        // Same accessible name the picker's own header gave its close control.
-        doneLabel={t('common.closeReactions')}
-        topInset="never"
-        titleRef={titleRef}
-      />
       <View
         accessibilityViewIsModal
-        onLayout={focusTitle}
-        className={cn(SCREEN_BODY_CLASS, 'pb-6')}
+        style={insets.bottom > 0 ? { paddingBottom: insets.bottom } : undefined}
       >
-        <View className="flex-row flex-wrap gap-2">
-          {REVIEW_REACTION_CONTENTS.map(content => {
-            const isReacted = reacted.has(content);
-            return (
-              <Pressable
-                key={content}
-                accessibilityRole="button"
-                accessibilityLabel={reactionLabel(content)}
-                className={cn(
-                  ICON_TARGET_BOX_CLASS,
-                  'rounded-full active:opacity-75',
-                  isReacted ? 'bg-accent-soft' : 'bg-muted'
-                )}
-                onPress={() => {
-                  onPick(content);
-                }}
-              >
-                <Text className="text-lg">{REACTION_EMOJI[content]}</Text>
-              </Pressable>
-            );
-          })}
+        {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+            ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+        <SheetHeader
+          title={t('common.reactions')}
+          onDone={onClose}
+          // Same accessible name the picker's own header gave its close control.
+          doneLabel={t('common.closeReactions')}
+          topInset="never"
+          titleRef={titleRef}
+        />
+        <View onLayout={focusTitle} className={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+          <View className="flex-row flex-wrap gap-2">
+            {REVIEW_REACTION_CONTENTS.map(content => {
+              const isReacted = reacted.has(content);
+              return (
+                <Pressable
+                  key={content}
+                  accessibilityRole="button"
+                  accessibilityLabel={reactionLabel(content)}
+                  className={cn(
+                    ICON_TARGET_BOX_CLASS,
+                    'rounded-full active:opacity-75',
+                    isReacted ? 'bg-accent-soft' : 'bg-muted'
+                  )}
+                  onPress={() => {
+                    onPick(content);
+                  }}
+                >
+                  <Text className="text-lg">{REACTION_EMOJI[content]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
     </Sheet>

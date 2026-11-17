@@ -281,7 +281,10 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
           {reviewMessage ? (
-            <Card>
+            // A failure keeps the danger tile under it: the red ink alone on
+            // the card surface read as ordinary copy, and the tint is the
+            // palette's own danger token, not a hand-built card fill.
+            <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
               <Text
                 variant={cancellationLabel ? 'muted' : undefined}
                 className={cn('text-xs', !cancellationLabel && 'text-destructive')}

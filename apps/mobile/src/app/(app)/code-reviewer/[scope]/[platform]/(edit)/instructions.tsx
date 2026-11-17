@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { AlertTriangle, Copy } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -154,34 +155,37 @@ function InstructionsEditor({
           `max-h-56` (196px) is the `p-3` padding (2 × 10.5) plus ten line
           boxes (10 × 17.5, native rem is 14): a cap that is not a whole number
           of lines paints the top visible line cut when the field scrolls to
-          the caret. Past the cap the field scrolls its own text, so a
-          multi-thousand-character draft no longer turns the page into one
-          oversized text view that pushes the note and Save out of the
-          viewport; the min height still grows the field with a short stored
-          value. */}
-      <Input
-        ref={fieldRef}
-        onLayout={event => {
-          fieldHeightRef.current = event.nativeEvent.layout.height;
-          alignFirstLineIfOverflowing();
-        }}
-        onContentSizeChange={event => {
-          contentHeightRef.current = event.nativeEvent.contentSize.height;
-          alignFirstLineIfOverflowing();
-        }}
-        className="min-h-32 max-h-56 rounded-md border border-input bg-background p-3 text-sm text-foreground focus:border-ring"
-        accessibilityLabel={t('codeReviewer.instructions.title')}
-        multiline
-        textAlignVertical="top"
-        inputAccessoryViewID={accessoryId}
-        placeholder={t('codeReviewer.instructions.placeholder')}
-        defaultValue={initial}
-        onChangeText={text => {
-          editedRef.current = true;
-          draftRef.current = text;
-          onDirty(text);
-        }}
-      />
+          the caret. The border sits on the `InputFrame` around the field, so
+          it is outside the cap and the ten lines stay whole. Past the cap the
+          field scrolls its own text, so a multi-thousand-character draft no
+          longer turns the page into one oversized text view that pushes the
+          note and Save out of the viewport; the min height still grows the
+          field with a short stored value. */}
+      <InputFrame>
+        <Input
+          ref={fieldRef}
+          onLayout={event => {
+            fieldHeightRef.current = event.nativeEvent.layout.height;
+            alignFirstLineIfOverflowing();
+          }}
+          onContentSizeChange={event => {
+            contentHeightRef.current = event.nativeEvent.contentSize.height;
+            alignFirstLineIfOverflowing();
+          }}
+          className="min-h-32 max-h-56 p-3 text-sm text-foreground"
+          accessibilityLabel={t('codeReviewer.instructions.title')}
+          multiline
+          textAlignVertical="top"
+          inputAccessoryViewID={accessoryId}
+          placeholder={t('codeReviewer.instructions.placeholder')}
+          defaultValue={initial}
+          onChangeText={text => {
+            editedRef.current = true;
+            draftRef.current = text;
+            onDirty(text);
+          }}
+        />
+      </InputFrame>
       {/* eslint-disable-next-line typescript-eslint/no-deprecated -- the iOS Done bar needs the keyboard accessory view this SDK still exports */}
       <InputAccessoryView nativeID={accessoryId}>
         <View className="flex-row justify-end bg-background px-4 py-2">

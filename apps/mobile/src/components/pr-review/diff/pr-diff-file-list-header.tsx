@@ -131,8 +131,14 @@ function ViewModeToggle({
       value={viewMode}
       onChange={onChange}
       options={[
-        { value: 'unified', label: t('prReview.fileList.unified') },
-        { value: 'side-by-side', label: t('prReview.fileList.sideBySide') },
+        // The handles the native E2E scripts drive: the segmented control
+        // renders each one on its own segment.
+        { value: 'unified', label: t('prReview.fileList.unified'), testID: 'diff-mode-unified' },
+        {
+          value: 'side-by-side',
+          label: t('prReview.fileList.sideBySide'),
+          testID: 'diff-mode-side-by-side',
+        },
       ]}
     />
   );

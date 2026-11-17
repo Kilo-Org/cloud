@@ -12,14 +12,13 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
@@ -86,7 +85,9 @@ function ReviewListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <RowSkeleton subtitle />;
+    // The next page lands as another row of the list, so its pending body holds
+    // one row's three-line frame instead of a shorter grouped row.
+    return <RowSkeleton lines={3} last />;
   }
   if (error) {
     return (
@@ -194,14 +195,19 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const errorVariant = trpcErrorVariant(error);
 
   let body: ReactNode = null;
+  // The rows are full-bleed with the gutter inside, so the placeholder repeats
+  // that frame: no scroll body gutter, one skeleton per row at the row's own
+  // three-line height, and the hairline between them that the loaded list draws.
   const reviewsLoadingBody = (
-    <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-        <RowSkeleton subtitle />
-        <RowSkeleton subtitle />
-        <RowSkeleton subtitle />
-      </Animated.View>
-    </TabScreenScrollView>
+    <Animated.View
+      exiting={FadeOut.duration(150)}
+      style={listContentContainerStyle}
+      className="flex-1"
+    >
+      <RowSkeleton lines={3} />
+      <RowSkeleton lines={3} />
+      <RowSkeleton lines={3} last />
+    </Animated.View>
   );
   if (!isLoading && firstPage?.success && reviews.length === 0) {
     const offersAction = hasConnectedProvider || canConnect;

@@ -165,7 +165,7 @@ export function PrReviewEntryScreen() {
   } else {
     recentsBody = (
       <View>
-        {recent.map(entry => {
+        {recent.map((entry, index) => {
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
             repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
@@ -174,7 +174,9 @@ export function PrReviewEntryScreen() {
             <View
               key={recentPrKey(entry)}
               testID="recent-row"
-              className="border-b-[0.5px] border-hair-soft"
+              // The list's last row draws no divider under it: there is no next
+              // row for a hairline to separate it from.
+              className={cn(index < recent.length - 1 && 'border-b-[0.5px] border-hair-soft')}
             >
               <Pressable
                 onPress={() => {

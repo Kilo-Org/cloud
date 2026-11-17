@@ -49,13 +49,15 @@ export function useFormSheetKeyboardVisible(): boolean {
 /** The sheet's pinned title row: the shared header, with Close as the way out. */
 export function PrFormSheetHeader(props: { title: string; eyebrow?: string; onBack: () => void }) {
   const { t } = useTranslation();
-  // `SheetHeader` owns one title line. The reference the caller names in
-  // `eyebrow` (owner/repo#number) is what tells two sheets apart, so it rides
-  // on that line instead of a second caption the shared header cannot draw.
-  const title = props.eyebrow ? `${props.title} · ${props.eyebrow}` : props.title;
+  // The reference the caller names in `eyebrow` (owner/repo#number) is what
+  // tells two sheets apart, so it rides the shared header's own caption line
+  // under the title instead of a composed title the header cannot truncate
+  // apart. `close` keeps the one control this sheet has: the X that closes it.
   return (
     <SheetHeader
-      title={title}
+      title={props.title}
+      eyebrow={props.eyebrow}
+      variant="close"
       onDone={props.onBack}
       doneLabel={t('common.close')}
       topInset={useFormSheetHeaderTopInset()}
@@ -64,13 +66,14 @@ export function PrFormSheetHeader(props: { title: string; eyebrow?: string; onBa
 }
 
 /**
- * Trailing ScrollView footer for formSheets: the shared footer bar, with the
- * bottom band left to the host (the sheet's own inset and the scroll view's
- * content inset), and no keyboard lift of its own.
+ * Trailing ScrollView footer for formSheets: the shared footer bar owns the
+ * safe-area band under the CTAs, while the keyboard lift stays with the scroll
+ * view (`keyboard="host"`), whose `automaticallyAdjustKeyboardInsets` hosts the
+ * footer as trailing content.
  */
 export function PrFormSheetFooter(props: { children: ReactNode }) {
   return (
-    <ScreenFooter clearance="host" keyboard="host" className="mt-3">
+    <ScreenFooter clearance="safe-area" keyboard="host" className="mt-3">
       {props.children}
     </ScreenFooter>
   );

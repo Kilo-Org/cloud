@@ -147,7 +147,7 @@ export function RepositoryRowsList({
           </View>
         }
         ListEmptyComponent={noMatchState}
-        ListFooterComponent={footer}
+        ListFooterComponent={footer ? <View className="px-4">{footer}</View> : null}
         refreshControl={refreshControl}
         {...SEARCHABLE_PICKER_LIST_PROPS}
       />

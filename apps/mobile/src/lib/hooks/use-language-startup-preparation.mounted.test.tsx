@@ -25,7 +25,8 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
   getResolvedLanguage: () => 'en',
 }));
 vi.mock('@/i18n/startup-direction-run', () => ({
-  runLanguageStartupDirectionGuardedAsync: mocks.runLanguageStartupDirectionGuardedAsync.mockResolvedValue('applied'),
+  runLanguageStartupDirectionGuardedAsync:
+    mocks.runLanguageStartupDirectionGuardedAsync.mockResolvedValue('applied'),
 }));
 vi.mock('@/i18n/activate-language', () => ({
   activateLanguage: mocks.activateLanguage.mockResolvedValue('loaded'),
@@ -34,7 +35,8 @@ vi.mock('@/i18n/return-target', () => ({
   readLanguageReturnTarget: mocks.readLanguageReturnTarget.mockResolvedValue(null),
 }));
 vi.mock('@/lib/notifications', () => ({
-  renameAndroidNotificationChannels: mocks.renameAndroidNotificationChannels.mockResolvedValue(undefined),
+  renameAndroidNotificationChannels:
+    mocks.renameAndroidNotificationChannels.mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/notification-actions', () => ({
   registerNeedsInputCategories: mocks.registerNeedsInputCategories.mockResolvedValue(undefined),

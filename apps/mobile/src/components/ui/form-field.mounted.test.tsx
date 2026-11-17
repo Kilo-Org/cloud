@@ -67,7 +67,7 @@ function focusInput(mounted: TestRenderer.ReactTestRenderer): void {
   });
 }
 
-/** The reserved-slot nodes, present only while the field is edited or in error. */
+/** The reserved-slot nodes, present only once the field is focused or in error. */
 function slot(mounted: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return mounted.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' });
 }
@@ -98,7 +98,7 @@ describe('FormField reserved validation space', () => {
       const props = { label: catalog.login.emailAddress, reserveErrorMessages };
       const mounted = mountField(props);
 
-      // The slot exists only while the field is edited or in error, so the
+      // The slot exists only once the field is focused or in error, so the
       // announce-through-recovery walk below runs with the field focused.
       focusInput(mounted);
       const reserved = slot(mounted);
@@ -152,7 +152,7 @@ describe('FormField reserved validation space', () => {
     expect(slot(mounted)).toHaveLength(1);
   });
 
-  it('reserves the slot only while the field is edited or in error', () => {
+  it('opens the slot at the first focus and keeps it after blurs', () => {
     const ownError = i18n.t('login.pleaseEnterEmail');
     const mounted = mountField({
       label: i18n.t('login.emailAddress'),
@@ -163,9 +163,10 @@ describe('FormField reserved validation space', () => {
       onBlur: (event: unknown) => void;
     };
 
-    // An idle form keeps the section rhythm of the screen it sits on.
+    // An untouched form keeps the section rhythm of the screen it sits on.
     expect(slot(mounted)).toHaveLength(0);
-    // The slot opens on focus and stays while the field is edited.
+    // The slot opens on focus and stays: a focus/blur cycle grows the form
+    // once instead of moving the content below the field on every blur.
     focusInput(mounted);
     expect(slot(mounted)).toHaveLength(1);
     // After a blur that leaves an error showing, the slot stays with it.
@@ -176,6 +177,16 @@ describe('FormField reserved validation space', () => {
     expect(mounted.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
       ownError
     );
+    // A later blur of a valid field keeps the line; the form never shrinks back.
+    act(() => {
+      mounted.root.findByType('TextInput').props.onChangeText('dev@example.com');
+    });
+    expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
+    act(() => {
+      input.onBlur({});
+    });
+    expect(slot(mounted)).toHaveLength(1);
+    expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
   });
 });
 

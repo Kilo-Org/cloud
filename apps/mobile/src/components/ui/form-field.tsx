@@ -20,14 +20,15 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      */
     labelAccessory?: React.ReactNode;
     /** Reserve the tallest localized message, including wrapping and font scaling. The
-     * reservation exists only while the field is edited or showing an error: an idle
-     * form keeps the section rhythm of the screen it sits on, and the slot appears
-     * once on focus instead of growing the form on every keystroke. */
+     * reservation opens at the field's first focus and stays for the rest of the
+     * screen's life: an untouched form keeps the section rhythm of the screen it
+     * sits on, and a focus/blur cycle grows the form once instead of oscillating
+     * around an error line that comes and goes. */
     reserveErrorMessages?: readonly string[];
     /**
-     * Keep `reserveErrorMessages` mounted from the first render instead of
-     * scoping it to the edited field. For a field whose error arrives without
-     * focus (an async verification result) or that opens focused inside a sheet
+     * Keep `reserveErrorMessages` mounted from the first render instead of at
+     * the field's first focus. For a field whose error arrives without focus
+     * (an async verification result) or that opens focused inside a sheet
      * (`autoFocus`), the late slot is the layout shift AGENTS.md forbids, so
      * those callers reserve permanently and pay the idle line.
      */
@@ -92,7 +93,9 @@ function FormField({
   ...props
 }: Readonly<FormFieldProps>) {
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  // Latched at the first focus and never cleared: a slot that unmounts on blur
+  // moves everything below the field on every focus/blur cycle.
+  const [hasFocused, setHasFocused] = useState(false);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
   // `validate` owns what this field's own rule reports; `error` carries an
@@ -144,11 +147,10 @@ function FormField({
         }}
         onFocus={event => {
           onFocus?.(event);
-          setEditing(true);
+          setHasFocused(true);
         }}
         onBlur={event => {
           onBlur?.(event);
-          setEditing(false);
           if (validate) {
             setValidationError(validate(valueRef.current));
           }
@@ -172,13 +174,13 @@ function FormField({
           className
         )}
       />
-      {reserveErrorMessages?.length && (alwaysReserve || editing || displayedError) ? (
+      {reserveErrorMessages?.length && (alwaysReserve || hasFocused || displayedError) ? (
         <View>
           {/* Full-width overlapping copies reserve the maximum height in native layout,
               before validation, without measuring or clipping larger text/RTL copy. The
-              slot exists only while the field is edited or in error: an idle form keeps
-              the section rhythm a screen's own gap defines, and the slot appears once
-              on focus instead of growing the form on every keystroke. */}
+              slot opens at the first focus and stays: an untouched form keeps the
+              section rhythm a screen's own gap defines, and the focus/blur cycle grows
+              the form once instead of reflowing it on every blur. */}
           <View
             className="flex-row opacity-0"
             pointerEvents="none"

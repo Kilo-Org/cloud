@@ -67,6 +67,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
+  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
 }));
 // The picker opener guards its press burst; this suite asserts the press reaches
 // the route, so the guard's push is the mock it already checks.

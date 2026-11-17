@@ -34,6 +34,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => navigation,
+  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
   // The recent-PR read on focus is not under test here; the recents section
   // stays in its loading state.
   useFocusEffect: vi.fn(),

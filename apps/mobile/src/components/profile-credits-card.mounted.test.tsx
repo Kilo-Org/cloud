@@ -114,6 +114,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
+  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
 }));
 // The credits row opens its route through the press-burst guard; the assertions
 // below read the router mock, so the guarded push is that same function.

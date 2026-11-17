@@ -81,6 +81,7 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
+  useNavigation: () => ({ getState: () => undefined, addListener: () => () => undefined, isFocused: () => true }),
 }));
 
 vi.mock('expo-application', () => ({

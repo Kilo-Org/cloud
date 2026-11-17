@@ -106,7 +106,11 @@ export function updateLatestAliasTargets(params: {
     entries.push(
       Date.parse(effectiveAt) <= nowMs
         ? { alias, target: liveTarget }
-        : { alias, target: stored.target, pending: { target: liveTarget, effective_at: effectiveAt } }
+        : {
+            alias,
+            target: stored.target,
+            pending: { target: liveTarget, effective_at: effectiveAt },
+          }
     );
   }
   return entries.sort((a, b) => (a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0));
@@ -115,9 +119,7 @@ export function updateLatestAliasTargets(params: {
 export function latestAliasTargetsConfig(
   entries: readonly LatestAliasTarget[]
 ): LatestAliasTargetsConfig | null {
-  return entries.length === 0
-    ? null
-    : LatestAliasTargetsConfigSchema.parse({ aliases: entries });
+  return entries.length === 0 ? null : LatestAliasTargetsConfigSchema.parse({ aliases: entries });
 }
 
 function formatModel(modelId: string, namesById: ReadonlyMap<string, string>) {

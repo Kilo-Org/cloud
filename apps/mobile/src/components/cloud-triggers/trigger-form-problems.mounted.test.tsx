@@ -29,11 +29,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 // The harness stays a facade: real row/field components keep their contracts
-// while the test host reads the props they carry.
+// while the test host reads the props they carry (`vi.mock` factories hoist
+// above this file's imports, so the form-field factory loads React itself).
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', async () => {
-  // `vi.mock` factories hoist above this file's imports, so the factory loads
-  // React itself instead of closing over the top-level import.
   const { createElement: h } = await import('react');
   return {
     FormField: (props: Record<string, unknown>) => h('FormField', props),
@@ -46,24 +45,9 @@ vi.mock('./trigger-form-rows', () => ({
   TriggerSwitchRow: 'TriggerSwitchRow',
 }));
 vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
-  useTriggerRepositories: () => ({
-    repositories: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useTriggerEnvironments: () => ({
-    environments: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useTriggerProfiles: () => ({
-    profiles: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useTriggerRepositories: () => emptyOptions(),
+  useTriggerEnvironments: () => emptyOptions(),
+  useTriggerProfiles: () => emptyOptions(),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -82,6 +66,16 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
 vi.mock('./trigger-choice-sheet', () => ({
   TriggerChoiceSheet: 'TriggerChoiceSheet',
 }));
+
+/** An idle options read every trigger form test starts from. */
+const emptyOptions = () => ({
+  repositories: [],
+  environments: [],
+  profiles: [],
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+});
 vi.mock('@/components/agents/mode-options', () => ({
   getBuiltinModeLabelKey: (mode: string) => (mode.length === 0 ? null : `mode:${mode}`),
   getBuiltinModeDescriptionKey: () => null,
@@ -91,7 +85,12 @@ vi.mock('@/components/agents/mode-normalize', () => ({ BUILTIN_AGENT_MODES: ['co
 const FIELD = 'FormField' as ElementType;
 const SELECT_ROW = 'TriggerSelectRow' as ElementType;
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
-const BUTTON = 'Button' as ElementType;
+const PRESSABLE = 'Pressable' as ElementType;
+
+/** A draft change the suite under test never makes. */
+const noop = () => {
+  // not changed by this suite
+};
 
 beforeEach(() => {
   availableModels.models = [];
@@ -137,9 +136,7 @@ describe('trigger secret helper copy', () => {
           problems: {},
           authConfigured: key === HELPER_KEY_MAP.keep,
           secretResetKey: 0,
-          onDraftChange: () => {
-            // not changed by this suite
-          },
+          onDraftChange: noop,
         })
       );
       try {
@@ -160,9 +157,7 @@ describe('trigger secret helper copy', () => {
         problems: {},
         authConfigured: false,
         secretResetKey: 0,
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
       })
     );
     try {
@@ -182,13 +177,9 @@ describe('trigger form gated problems', () => {
         mode: 'create',
         draft: createTriggerDraft('UTC'),
         problems: { name: 'required', repository: 'repositoryRequired' },
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
         repositoryPickerOpen: false,
-        onRepositoryPickerOpenChange: () => {
-          // not changed by this suite
-        },
+        onRepositoryPickerOpenChange: noop,
       })
     );
     const root = view.renderer.root;
@@ -233,13 +224,9 @@ describe('trigger form gated problems', () => {
       createElement(TriggerFormAgent, {
         draft: createTriggerDraft('UTC'),
         problems: { model: 'modelRequired' },
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
         openSheet: null,
-        onOpenSheetChange: () => {
-          // not changed by this suite
-        },
+        onOpenSheetChange: noop,
       })
     );
     const root = view.renderer.root;
@@ -255,7 +242,6 @@ describe('trigger form gated problems', () => {
           .findAll(node => Object.is(node.type, 'Text'))
           .map(node => node.props.children)
           .filter(children => children === i18n.t('cloudAgent.triggers.problems.modelRequired'));
-
       expect(shownModelProblem()).toStrictEqual([]);
 
       act(() => {
@@ -289,11 +275,9 @@ describe('trigger form model list failure', () => {
       createElement(TriggerFormAgent, { ...AGENT_PROPS, draft: createTriggerDraft('UTC') })
     );
 
-  /** The alert line the block shows while the catalogue read failed. */
+  /** The alert `Text` the block shows while the catalogue read failed. */
   function failureAlert(root: ReactTestRenderer['root']) {
-    return root.findAll(
-      node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert'
-    );
+    return root.findAll(node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert');
   }
 
   it('offers a retry in place of the failure and locks a selector with no model', async () => {
@@ -305,23 +289,41 @@ describe('trigger form model list failure', () => {
         i18n.t('common.couldNotLoadModels'),
       ]);
 
-      const [retry] = root.findAll(node => Object.is(node.type, BUTTON));
+      const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
       if (!retry) {
-        throw new Error('expected a retry button');
+        throw new Error('expected a retry action');
       }
       expect(retry.props.disabled).toBe(false);
       act(() => {
         (retry.props.onPress as () => void)();
       });
       expect(availableModels.refetch).toHaveBeenCalledTimes(1);
-      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
-        true
-      );
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(true);
     } finally {
       act(() => {
         view.renderer.unmount();
       });
     }
+  });
+
+  it('does not refetch a retry whose host has unmounted', async () => {
+    availableModels.isError = true;
+    const view = await mountAgent();
+    const root = view.renderer.root;
+    const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
+    if (!retry) {
+      throw new Error('expected a retry action');
+    }
+    // Keep the handler backed by its unmounted host; the guard must stop it.
+    const saved: Record<string, unknown> = { ...retry.props };
+    const retryProps = saved as { onPress: () => void };
+    act(() => {
+      view.renderer.unmount();
+    });
+    act(() => {
+      retryProps.onPress();
+    });
+    expect(availableModels.refetch).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -333,12 +335,10 @@ describe('trigger form model list failure', () => {
     const view = await mountAgent();
     const root = view.renderer.root;
     try {
-      const retryCount = root.findAll(node => Object.is(node.type, BUTTON)).length;
+      const retryCount = root.findAll(node => Object.is(node.type, PRESSABLE)).length;
       expect(retryCount).toBe(isError ? 1 : 0);
       expect(failureAlert(root).length).toBe(isError ? 1 : 0);
-      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
-        false
-      );
+      expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(false);
     } finally {
       act(() => {
         view.renderer.unmount();

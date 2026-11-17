@@ -8,8 +8,9 @@
  * `ModelSelector`, which carries the reasoning effort in the same pick.
  */
 
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   getBuiltinModeDescriptionKey,
@@ -17,10 +18,10 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_HIT_SLOP_DP, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -81,6 +82,24 @@ export function TriggerFormAgent({
   const selectedProfile = profiles.profiles.find(profile => profile.id === draft.profileId);
   const modelProblemText = triggerProblemText(shownProblem('model'));
 
+  // The retry keeps the catalogue read's refetch running after the screen
+  // closed; a cache update then re-renders an unmounted block and LogBox
+  // reports a state update after unmount.
+  const isMountedRef = useRef<boolean>(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  const refetchModels = models.refetch;
+  const handleRetryModels = useCallback(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
+    void refetchModels();
+  }, [refetchModels]);
+
   return (
     <View className="gap-4">
       <View className="gap-1">
@@ -114,34 +133,43 @@ export function TriggerFormAgent({
       )}
 
       <View className="gap-2">
-        <ModelSelector
-          value={draft.model}
-          variant={draft.variant}
-          options={models.models}
-          acceptsVariant
-          onSelect={(model, variant) => {
-            onDraftChange({ ...draft, model, variant });
-          }}
-          onOpen={() => {
-            markTouched('model');
-          }}
-          isLoading={models.isLoading}
-          disabled={models.isError && models.models.length === 0}
-        />
+        <View className="flex-row items-center gap-2">
+          <ModelSelector
+            value={draft.model}
+            variant={draft.variant}
+            options={models.models}
+            acceptsVariant
+            onSelect={(model, variant) => {
+              onDraftChange({ ...draft, model, variant });
+            }}
+            onOpen={() => {
+              markTouched('model');
+            }}
+            isLoading={models.isLoading}
+            disabled={models.isError && models.models.length === 0}
+          />
+        </View>
         {models.isError ? (
-          <View className="gap-2">
-            <Text accessibilityRole="alert" className="text-xs text-destructive">
+          <View className="flex-row items-center gap-2">
+            <Text
+              accessibilityRole="alert"
+              className="min-w-0 flex-1 text-xs text-destructive"
+            >
               {t('common.couldNotLoadModels')}
             </Text>
-            <Button
-              size="sm"
-              variant="outline"
-              className={STATE_ACTION_CLASS}
+            <Pressable
+              accessibilityLabel={t('common.retry')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: models.isFetching }}
+              className={cn(STATE_ACTION_CLASS, 'active:opacity-70')}
               disabled={models.isFetching}
-              onPress={() => void models.refetch()}
+              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+              onPress={handleRetryModels}
             >
-              <Text>{t('common.retry')}</Text>
-            </Button>
+              <Text className="text-xs font-medium text-destructive">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
         {modelProblemText === undefined ? null : (

@@ -332,8 +332,5 @@
   "apps/mobile/src/components/usage/usage-breakdown-list.tsx": { "L3": 2, "L4": 1 },
   "apps/mobile/src/components/usage/usage-content.tsx": { "L4": 1 },
   "apps/mobile/src/components/voice-input-settings-screen.tsx": { "L4": 2 },
-  "apps/mobile/src/components/voice-test-field.tsx": { "L4": 1 },
-  "apps/mobile/src/glanceable-android/active-agents-widget-actions.tsx": { "L6": 4 },
-  "apps/mobile/src/glanceable-android/active-agents-widget-glyphs.tsx": { "L6": 8 },
-  "apps/mobile/src/glanceable-android/active-agents-widget.tsx": { "L6": 1 }
+  "apps/mobile/src/components/voice-test-field.tsx": { "L4": 1 }
 }

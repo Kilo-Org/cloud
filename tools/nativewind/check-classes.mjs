@@ -64,6 +64,13 @@ const LAYOUT_ALLOWLIST = [
 ];
 
 /**
+ * Trees the layout rules never read: the glanceable widgets and Live Activities
+ * are stringified into the home-screen and lock-screen renderers, not React
+ * Native views, so a layout class or a UI primitive has no meaning there.
+ */
+const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
+
+/**
  * The layout contract's rules. `patterns` read one class string (a `className`,
  * a `cn()` argument, a `*_CLASS` constant) and carry the offending class in the
  * diagnostic; a rule without `patterns` reads markup and names what it found.
@@ -725,6 +732,9 @@ function layoutExempt(path) {
   }
   // The allowlist is written relative to `apps/mobile`, so it reads `src/…`.
   const appPath = path.slice('apps/mobile/'.length);
+  if (LAYOUT_EXEMPT_TREES.some(tree => appPath.startsWith(tree))) {
+    return true;
+  }
   return LAYOUT_ALLOWLIST.some(
     entry => appPath === entry || (entry.endsWith('/') && appPath.startsWith(entry))
   );

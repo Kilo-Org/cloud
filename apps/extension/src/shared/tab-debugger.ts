@@ -1026,7 +1026,7 @@ const runInjectedWebMcpExecute = async (
     modelContext?: {
       getTools?: () => Promise<unknown[]>;
       // oxlint-disable-next-line anti-slop/no-unknown-returns -- injected function; the third-party tool result shape is arbitrary and cannot be parsed without importing a schema.
-      executeTool?: (tool: unknown, argumentsText: string) => Promise<unknown>;
+      executeTool?: (tool: unknown, args: unknown) => Promise<unknown>;
     };
   };
   const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
@@ -1111,7 +1111,21 @@ const runInjectedWebMcpExecute = async (
       throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
     }
 
-    return { ok: true, value: await modelContext.executeTool(tool, argumentsText) };
+    // `executeTool` takes the tool arguments as an object. Chromium 145
+    // Accepted a JSON string there; Chromium 158 rejects it with `parameter 2
+    // Is not of type 'object'`. Parse inline because only the function source
+    // Reaches the MAIN world, so a module-scope helper would be undefined.
+    // JSON.parse can yield a non-object (null, array, number): wrap such a
+    // Result as { value: parsed } so the browser receives an object. A
+    // Non-JSON string body passes through verbatim.
+    let args: unknown = argumentsText;
+    try {
+      const parsed: unknown = JSON.parse(argumentsText);
+      args = isPlainObject(parsed) ? parsed : { value: parsed };
+    } catch {
+      // Non-JSON arguments text stays verbatim.
+    }
+    return { ok: true, value: await modelContext.executeTool(tool, args) };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'The page failed to run the WebMCP tool.',

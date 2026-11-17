@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Modifiche",
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
-    "privateRepositoryA11y": "{{name}}, repository privato"
+    "privateRepositoryA11y": "{{name}}, repository privato",
+    "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -643,7 +644,8 @@
       "managedOnWeb": "La connessione Bitbucket di questa organizzazione si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
-      "tokenPlaceholder": "Token di accesso all'area di lavoro"
+      "tokenPlaceholder": "Token di accesso all'area di lavoro",
+      "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
     },
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",
@@ -890,7 +892,8 @@
       "repositoryLine": "Revisioni: {{reviews}} · Segnalazioni: {{findings}}",
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
-      "off": "Le statistiche sono disattivate per questa organizzazione.",
+      "offTitle": "Le statistiche sono disattivate per {{platform}}",
+      "offDescription": "Attivale nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche"
     },
     "council": {

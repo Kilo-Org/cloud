@@ -241,9 +241,7 @@ export function ProfileAgentsScreen({
           isSaving={createAgent.isPending || updateAgent.isPending}
           saveFailure={form.notes}
           onClose={handleClose}
-          onSave={payload => {
-            void saveAgent(form.editing, payload);
-          }}
+          onSave={payload => saveAgent(form.editing, payload)}
         />
       ) : null}
 

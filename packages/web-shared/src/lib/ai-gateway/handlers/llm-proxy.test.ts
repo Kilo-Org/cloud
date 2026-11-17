@@ -17,7 +17,6 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
-  JWT_TOKEN_VERSION,
   validateAuthorizationHeader,
   isRejectedCredentialReason,
 } from '@kilocode/web-shared/lib/tokens';
@@ -25,6 +24,7 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
   getBalanceAndOrgSettings,
   type BalancePayer,
@@ -487,7 +487,7 @@ type AuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 function signedToken(audience: string) {
   return jwt.sign(
     {
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: 'user-123',
       apiTokenPepper: 'test-pepper',
       aud: audience,
@@ -795,7 +795,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
   });
 
   it('rejects an outdated token version instead of answering as anonymous', async () => {
-    const token = signedTokenWithVersion(KILO_GATEWAY_AUDIENCE, JWT_TOKEN_VERSION - 1);
+    const token = signedTokenWithVersion(KILO_GATEWAY_AUDIENCE, KILO_TOKEN_VERSION - 1);
     setSignedTokenAuth(token, {
       user: {
         id: 'user-123',

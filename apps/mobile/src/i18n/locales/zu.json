@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izinguquko",
     "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
-    "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo"
+    "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo",
+    "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela."
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwale nhlangano luphathwa kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
-      "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza"
+      "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
+      "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."
     },
     "scopeList": {
       "personalStillAvailable": "Izinqolobane zakho zekhodi zisatholakala ngezansi.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Ukuhlolwa: {{reviews}} · Okutholakele: {{findings}}",
       "empty": "Akukho kuhlolwa okunezibalo okwamanje",
       "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
-      "off": "Izibalo zivaliwe kule nhlangano.",
+      "offTitle": "Izibalo ze-{{platform}} zivaliwe",
+      "offDescription": "Zivule izibalo kuzilungiselelo zenhlangano kuwebhu ukuqopha ukuhlolwa okuqediwe.",
       "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
     },
     "council": {

@@ -28,9 +28,6 @@ export type ProviderRow = {
 export type OfferingPricing = {
   promptPrice: string;
   completionPrice: string;
-  /** List price, set only when Kilo's custom pricing bills less than it. */
-  originalPromptPrice?: string;
-  originalCompletionPrice?: string;
 };
 
 export type ProviderOffering = OfferingPricing & {

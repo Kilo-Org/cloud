@@ -224,10 +224,13 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.baseline !== (t.db ?? 0));
 
   const new_microdollars_used = cumulativeUsage;
-  const credit_transactions_sum = creditTransactions.reduce(
-    (acc, txn) => acc + txn.amount_microdollars,
-    0
-  );
+  // Kilo Pass consumption debits mirror usage already counted in microdollars_used and never
+  // change total_microdollars_acquired, so they are not acquired credit.
+  const credit_transactions_sum = creditTransactions
+    .filter(
+      txn => !(txn.amount_microdollars < 0 && txn.credit_category?.startsWith('kpo:consumption:'))
+    )
+    .reduce((acc, txn) => acc + txn.amount_microdollars, 0);
   // Preserve the user-visible balance while correcting microdollars_used from the ledger.
   // If microdollars_used drifted, total_acquired shifts to compensate, and an
   // accounting_adjustment transaction reconciles the ledger to match.

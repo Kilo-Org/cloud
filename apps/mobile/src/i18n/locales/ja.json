@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
+    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
+    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -676,7 +677,8 @@
       "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
-      "tokenPlaceholder": "ワークスペースアクセストークン"
+      "tokenPlaceholder": "ワークスペースアクセストークン",
+      "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
     },
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
@@ -922,7 +924,8 @@
       "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
-      "off": "この組織では分析がオフになっています。",
+      "offTitle": "{{platform}}の分析がオフになっています",
+      "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした"
     },
     "council": {

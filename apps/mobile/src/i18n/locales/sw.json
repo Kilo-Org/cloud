@@ -175,7 +175,8 @@
     "durationHourShort": "saa",
     "changes": "Mabadiliko",
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
-    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi"
+    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
+    "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
-      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"
+      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
+      "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
     },
     "scopeList": {
       "personalStillAvailable": "Hazina zako binafsi bado zinapatikana hapa chini.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Ukaguzi: {{reviews}} · Matatizo: {{findings}}",
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
-      "off": "Takwimu zimezimwa kwa shirika hili.",
+      "offTitle": "Takwimu zimezimwa kwa {{platform}}",
+      "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu"
     },
     "council": {

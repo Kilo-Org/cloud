@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   NormalizedProvider,
   OpenRouterModel,
@@ -66,9 +67,13 @@ const providers = [
   snapshotProvider('edenai', [snapshotModel('moonshotai/kimi-k2.6', 'Kimi K2.6')]),
 ];
 
+const storedModels: GatewayModelMap = {
+  'moonshotai/kimi-k2.6': { id: 'moonshotai/kimi-k2.6', name: 'Kimi K2.6', endpoints: [] },
+};
+
 describe('injectDirectByokProviders', () => {
   test('appends listed providers as BYOK only with the snapshot models they serve', async () => {
-    const result = await injectDirectByokProviders(providers);
+    const result = await injectDirectByokProviders(providers, storedModels);
     const synthetic = result.find(provider => provider.slug === 'synthetic');
 
     expect(result.slice(0, providers.length)).toEqual(providers);
@@ -88,11 +93,55 @@ describe('injectDirectByokProviders', () => {
   });
 
   test('leaves out listings the snapshot already has, without catalog models, or that fail', async () => {
-    const slugs = (await injectDirectByokProviders(providers)).map(provider => provider.slug);
+    const slugs = (await injectDirectByokProviders(providers, storedModels)).map(
+      provider => provider.slug
+    );
 
     expect(slugs.filter(slug => slug === 'edenai')).toHaveLength(1);
     expect(slugs).not.toContain('martian');
     expect(slugs).not.toContain('neuralwatt');
     expect(slugs).not.toContain('zai-coding');
+  });
+
+  test('lists the snapshot latest aliases of the models a listing serves like their target', async () => {
+    const aliasedProviders = [
+      ...providers,
+      snapshotProvider('moonshotai', [snapshotModel('~moonshotai/kimi-latest', 'Kimi Latest')]),
+      snapshotProvider('z-ai', [snapshotModel('~z-ai/glm-latest', 'GLM Latest')]),
+    ];
+    const aliasedStoredModels: GatewayModelMap = {
+      ...storedModels,
+      '~moonshotai/kimi-latest': {
+        id: '~moonshotai/kimi-latest',
+        name: 'Kimi Latest',
+        endpoints: [],
+        alias_target: { slug: 'moonshotai/kimi-k2.6' },
+      },
+      '~z-ai/glm-latest': {
+        id: '~z-ai/glm-latest',
+        name: 'GLM Latest',
+        endpoints: [],
+        alias_target: { slug: 'z-ai/glm-6' },
+      },
+      '~example/not-in-snapshot-latest': {
+        id: '~example/not-in-snapshot-latest',
+        name: 'Not in snapshot',
+        endpoints: [],
+        alias_target: { slug: 'moonshotai/kimi-k2.6' },
+      },
+    };
+
+    const synthetic = (await injectDirectByokProviders(aliasedProviders, aliasedStoredModels)).find(
+      provider => provider.slug === 'synthetic'
+    );
+    const alias = synthetic?.models.find(model => model.slug === '~moonshotai/kimi-latest');
+    const target = synthetic?.models.find(model => model.slug === 'moonshotai/kimi-k2.6');
+
+    expect(synthetic?.models.map(model => model.slug)).toEqual([
+      'z-ai/glm-5.2',
+      'moonshotai/kimi-k2.6',
+      '~moonshotai/kimi-latest',
+    ]);
+    expect(alias).toEqual({ ...target, slug: '~moonshotai/kimi-latest', name: 'Kimi Latest' });
   });
 });

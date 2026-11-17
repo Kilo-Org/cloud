@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Muutokset",
     "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
-    "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto"
+    "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto",
+    "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
-      "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
+      "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
+      "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
     },
     "scopeList": {
       "personalStillAvailable": "Omat koodivarastosi ovat edelleen käytettävissä alla.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Katselmoinnit: {{reviews}} · Havainnot: {{findings}}",
       "empty": "Ei vielä analytiikkaa sisältäviä katselmointeja",
       "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
-      "off": "Analytiikka ei ole käytössä tässä organisaatiossa.",
+      "offTitle": "Analytiikka ei ole käytössä alustalla {{platform}}",
+      "offDescription": "Ota se käyttöön organisaation asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
       "couldNotLoad": "Analytiikan lataaminen epäonnistui"
     },
     "council": {

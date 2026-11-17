@@ -175,7 +175,8 @@
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
-    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
+    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
+    "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh."
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -676,7 +677,8 @@
       "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
-      "tokenPlaceholder": "Mã truy cập không gian làm việc"
+      "tokenPlaceholder": "Mã truy cập không gian làm việc",
+      "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
     },
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
@@ -922,7 +924,8 @@
       "repositoryLine": "Rà soát: {{reviews}} · Vấn đề: {{findings}}",
       "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
       "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
-      "off": "Phân tích đang tắt cho tổ chức này.",
+      "offTitle": "Phân tích đang tắt cho {{platform}}",
+      "offDescription": "Bật tính năng Phân tích trong Cài đặt tổ chức trên web để ghi lại các lượt rà soát đã hoàn tất.",
       "couldNotLoad": "Không thể tải dữ liệu phân tích"
     },
     "council": {

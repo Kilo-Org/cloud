@@ -175,7 +175,8 @@
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
-    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
+    "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
-      "tokenPlaceholder": "Ish maydoniga kirish tokeni"
+      "tokenPlaceholder": "Ish maydoniga kirish tokeni",
+      "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
     },
     "scopeList": {
       "personalStillAvailable": "Quyida shaxsiy repozitoriyalaringizdan foydalanishingiz mumkin.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Koʻrib chiqishlar: {{reviews}} · Muammolar: {{findings}}",
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
-      "off": "Bu tashkilot uchun statistika oʻchirilgan.",
+      "offTitle": "{{platform}} uchun statistika oʻchirilgan",
+      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi"
     },
     "council": {

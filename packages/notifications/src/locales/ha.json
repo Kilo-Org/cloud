@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ƙetare SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Wani duban tsaro yana da sabuntawa"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Zaman Kilo naka a shirye don sarrafawa daga wayarka"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

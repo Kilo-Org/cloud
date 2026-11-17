@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA breach"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "A security check has an update"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Your Kilo session is ready to control from your phone"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

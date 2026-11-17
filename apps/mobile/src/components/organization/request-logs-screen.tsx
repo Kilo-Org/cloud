@@ -48,11 +48,17 @@ const HOUR_MS = 60 * 60 * 1000;
 const REQUEST_LOG_LIMIT = 100;
 
 /**
- * The oldest window end the procedure accepts
- * (`REQUEST_LOGS_START_TIME_MAX_AGE_DAYS` in apps/web). The stepper stops
- * there, so the reader never asks for a window the server refuses.
+ * The procedure refuses a start time more than `REQUEST_LOGS_START_TIME_MAX_AGE_DAYS`
+ * (365, apps/web) before its own clock, which runs later than this screen's
+ * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
+ * it opens still names a start time the server accepts.
  */
 const HISTORY_DAYS = 365;
+
+/** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
+export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
+  return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
+}
 
 // FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
 // inset maps to its pixel values; the tab bar's own bottom padding rides on the
@@ -218,8 +224,7 @@ export function OrganizationRequestLogsScreen() {
 
   const windowStart = new Date(windowEndMs - HOUR_MS);
   const windowEnd = new Date(windowEndMs);
-  const oldestEndMs = anchorMs - HISTORY_DAYS * 24 * HOUR_MS;
-  const canStepOlder = windowEndMs - HOUR_MS >= oldestEndMs;
+  const canStepOlder = canStepOlderTo(windowEndMs - HOUR_MS, anchorMs);
   const canStepNewer = windowEndMs < anchorMs;
   const refreshControl = (
     <RefreshControl

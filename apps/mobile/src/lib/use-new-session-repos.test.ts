@@ -89,10 +89,6 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useRecentAgentRepositories: () => ({ data: undefined }),
 }));
 
-vi.mock('@/lib/integration-urls', () => ({
-  getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
-}));
-
 vi.mock('@/lib/app-shell-handoff', () => ({
   appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
 }));

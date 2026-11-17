@@ -14,7 +14,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo, OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -287,6 +287,17 @@ describe('OrganizationRequestLogsScreen', () => {
 
     expect(texts(renderer)).toContain('This hour has more requests than the list shows.');
     unmount();
+  });
+
+  it('stops the stepper inside the oldest start time the server accepts', () => {
+    const anchor = Date.parse('2026-11-17T12:00:00.000Z');
+    const maxAgeMs = 365 * 24 * HOUR_MS;
+    // The procedure measures the window end against its own clock, which runs
+    // later than the mount-time anchor, so the exact 365-day edge is refused
+    // and the step one hour inside it is the oldest one offered.
+    expect(canStepOlderTo(anchor - maxAgeMs, anchor)).toBe(false);
+    expect(canStepOlderTo(anchor - maxAgeMs + HOUR_MS, anchor)).toBe(true);
+    expect(canStepOlderTo(anchor, anchor)).toBe(true);
   });
 
   it('steps a window at a time, and never forward past the current hour', async () => {

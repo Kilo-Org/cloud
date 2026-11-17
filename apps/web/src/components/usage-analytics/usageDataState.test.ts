@@ -1,4 +1,13 @@
+import {
+  isUsageSourceNotConfigured,
+  USAGE_SOURCE_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/app-shared/usage-source';
 import { resolveUsageDashboardState, usageQueryOutcome } from './usageDataState';
+
+/** The tRPC-shaped failure the dashboard's queries put on `error`. */
+function trpcFailure(message: string): unknown {
+  return { data: { code: 'INTERNAL_SERVER_ERROR', message } };
+}
 
 describe('usageQueryOutcome', () => {
   it('treats a failed initial load as an error, not as empty', () => {
@@ -29,6 +38,57 @@ describe('resolveUsageDashboardState', () => {
         queries: ['error', 'success'],
       })
     ).toBe('error');
+  });
+
+  it('maps the unconfigured usage-source message on the summary error to the terminal state', () => {
+    expect(
+      resolveUsageDashboardState({
+        ...emptyToday,
+        summary: undefined,
+        tableRowCount: undefined,
+        queries: ['error', 'success'],
+        summaryError: trpcFailure(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE),
+      })
+    ).toBe('unavailable');
+  });
+
+  it('maps the unconfigured usage-source message on the table error to the terminal state', () => {
+    expect(
+      resolveUsageDashboardState({
+        ...emptyToday,
+        summary: undefined,
+        tableRowCount: undefined,
+        queries: ['success', 'error'],
+        tableError: trpcFailure(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE),
+      })
+    ).toBe('unavailable');
+  });
+
+  it('keeps a warehouse failure retryable even when the summary also failed', () => {
+    expect(
+      resolveUsageDashboardState({
+        ...emptyToday,
+        summary: undefined,
+        tableRowCount: undefined,
+        queries: ['error', 'error'],
+        summaryError: trpcFailure('Usage data temporarily unavailable'),
+        tableError: trpcFailure(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE),
+      })
+    ).toBe('unavailable');
+    expect(
+      resolveUsageDashboardState({
+        ...emptyToday,
+        summary: undefined,
+        tableRowCount: undefined,
+        queries: ['error', 'success'],
+        summaryError: trpcFailure('Usage data temporarily unavailable'),
+      })
+    ).toBe('error');
+  });
+
+  it('matches the condition through the shared matcher', () => {
+    expect(isUsageSourceNotConfigured(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE)).toBe(true);
+    expect(isUsageSourceNotConfigured('Usage data temporarily unavailable')).toBe(false);
   });
 
   it('shows the catching-up state only after successful empty today queries', () => {

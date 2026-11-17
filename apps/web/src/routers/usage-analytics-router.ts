@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { USAGE_SOURCE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/usage-source';
 import * as z from 'zod';
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
@@ -657,9 +658,12 @@ function legacyOAuthProviderKey(provider: AuthProviderId, providerAccountId: str
 function requireSnowflakeConfig() {
   const config = resolveSnowflakeConfig();
   if (!config) {
+    // Not "the warehouse failed": no usage source is configured at all, so the
+    // message names the terminal condition (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`)
+    // instead of the sanitized retryable one (`timedSnowflakeQuery`).
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Usage data temporarily unavailable',
+      message: USAGE_SOURCE_NOT_CONFIGURED_MESSAGE,
     });
   }
   return config;

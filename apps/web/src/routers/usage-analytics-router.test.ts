@@ -9,6 +9,7 @@ import {
   resolveSnowflakeConfig,
   type SnowflakeConfig,
 } from '@/lib/snowflake';
+import { USAGE_SOURCE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/usage-source';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const mockResolveSnowflakeConfig = jest.mocked(resolveSnowflakeConfig);
@@ -446,14 +447,38 @@ describe('usage analytics procedures', () => {
     () => caller().getTimeseries({ ...baseFilters, metric: 'cost' }),
     () => caller().getBreakdown({ ...baseFilters, dimension: 'model', metric: 'cost' }),
     () => caller().getTable({ ...baseFilters, groupBy: [] }),
-  ])('rejects missing Snowflake configuration with a sanitized error', async invoke => {
+  ])('rejects missing usage-source configuration with the terminal message', async invoke => {
     mockResolveSnowflakeConfig.mockReturnValue(null);
 
+    // "Not configured" is permanent and must be distinguishable on the wire
+    // from a configured warehouse that failed, which is retryable.
     await expect(invoke()).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Usage data temporarily unavailable',
+      message: USAGE_SOURCE_NOT_CONFIGURED_MESSAGE,
     });
     expect(mockExecuteSnowflakeStatement).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    () => caller().getSummary(baseFilters),
+    () => caller().getTimeseries({ ...baseFilters, metric: 'cost' }),
+    () => caller().getBreakdown({ ...baseFilters, dimension: 'model', metric: 'cost' }),
+    () => caller().getTable({ ...baseFilters, groupBy: [] }),
+  ])('rejects a configured but failing warehouse with the retryable message', async invoke => {
+    mockResolveSnowflakeConfig.mockReturnValue(SNOWFLAKE_CONFIG);
+    mockExecuteSnowflakeStatement.mockRejectedValue(new Error('upstream response body'));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      await expect(invoke()).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Usage data temporarily unavailable',
+      });
+      expect(mockResolveSnowflakeConfig).toHaveBeenCalledTimes(1);
+    } finally {
+      errorLog.mockRestore();
+      mockExecuteSnowflakeStatement.mockReset();
+    }
   });
 
   it.each([

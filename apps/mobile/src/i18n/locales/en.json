@@ -4462,6 +4462,8 @@
     "topModels": "Top models",
     "topFeatures": "Top features",
     "emptyTitle": "No usage in this period",
+    "unavailableTitle": "Usage is unavailable",
+    "unavailableDescription": "This workspace isn't reporting usage. Retrying won't help.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
   },

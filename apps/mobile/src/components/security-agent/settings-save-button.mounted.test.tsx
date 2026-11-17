@@ -253,7 +253,7 @@ describe('SettingsSaveButton current save', () => {
     act(() => {
       renderer.unmount();
     });
-    settleSave();
+    settleSave(undefined);
     await flushSave();
 
     expect(onSave).toHaveBeenCalledOnce();
@@ -273,7 +273,7 @@ describe('SettingsSaveButton current save', () => {
 
     pressSave(renderer);
     focusState.focused = false;
-    settleSave();
+    settleSave(undefined);
     await flushSave();
 
     expect(onSave).toHaveBeenCalledOnce();
@@ -301,7 +301,7 @@ describe('SettingsSaveButton current save', () => {
 
     pressSave(renderer);
     pressSave(renderer);
-    settleSave();
+    settleSave(undefined);
     await flushSave();
 
     expect(onSave).toHaveBeenCalledOnce();

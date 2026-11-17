@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Modificări",
     "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
-    "privateRepositoryA11y": "{{name}}, repository privat"
+    "privateRepositoryA11y": "{{name}}, repository privat",
+    "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "ການປ່ຽນແປງ",
     "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
-    "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ"
+    "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ",
+    "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ."
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Változtatások",
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "privateRepositoryA11y": "{{name}}, magán adattár"
+    "privateRepositoryA11y": "{{name}}, magán adattár",
+    "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el."
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",

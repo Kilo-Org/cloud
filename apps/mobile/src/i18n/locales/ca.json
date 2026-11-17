@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Canvis",
     "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "privateRepositoryA11y": "{{name}}, repositori privat"
+    "privateRepositoryA11y": "{{name}}, repositori privat",
+    "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",

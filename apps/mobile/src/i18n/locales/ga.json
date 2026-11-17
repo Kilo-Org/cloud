@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Athruithe",
     "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
-    "privateRepositoryA11y": "{{name}}, stór príobháideach"
+    "privateRepositoryA11y": "{{name}}, stór príobháideach",
+    "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin."
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",

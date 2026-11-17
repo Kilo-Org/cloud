@@ -175,7 +175,8 @@
     "durationHourShort": "год",
     "changes": "Зміни",
     "organizationTrialEnded": "Пробний період організації завершився, і вона не має активного плану. Власник організації може оновити платіжні дані на kilo.ai, а потім спробувати ще раз.",
-    "privateRepositoryA11y": "{{name}}, приватний репозиторій"
+    "privateRepositoryA11y": "{{name}}, приватний репозиторій",
+    "legalDocumentEnglishOnly": "Цей документ доступний лише англійською мовою."
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Newidiadau",
     "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
-    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat",
+    "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",

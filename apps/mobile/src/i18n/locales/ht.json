@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Chanjman",
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
-    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive",
+    "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",

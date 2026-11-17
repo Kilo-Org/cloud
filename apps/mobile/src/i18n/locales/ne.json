@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "परिवर्तनहरू",
     "organizationTrialEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। संस्थाको मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
-    "privateRepositoryA11y": "{{name}}, निजी रिपोजिटरी"
+    "privateRepositoryA11y": "{{name}}, निजी रिपोजिटरी",
+    "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",

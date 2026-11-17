@@ -175,7 +175,8 @@
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
     "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
-    "privateRepositoryA11y": "{{name}}, repozitor privat"
+    "privateRepositoryA11y": "{{name}}, repozitor privat",
+    "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",

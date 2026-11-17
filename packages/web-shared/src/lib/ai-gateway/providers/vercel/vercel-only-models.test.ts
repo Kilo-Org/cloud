@@ -163,6 +163,28 @@ describe('findVercelOnlyModels', () => {
     expect(ids(models)).not.toContain('openai/gpt-5-fast');
   });
 
+  it('treats a Vercel free model a free override points to as covered', () => {
+    const models = findVercelOnlyModels({
+      openRouterModelIds: ['reflection/beam:free'],
+      vercelMetadata,
+      overrides: new Map([['reflection/beam:free', 'reflection/beam-free']]),
+    });
+
+    expect(ids(models)).not.toContain('reflection/beam-free');
+    expect(ids(models)).not.toContain('reflection/beam:free');
+  });
+
+  it('lists a Vercel free model under its free override id when OpenRouter dropped that id', () => {
+    const models = findVercelOnlyModels({
+      openRouterModelIds: [],
+      vercelMetadata,
+      overrides: new Map([['reflection/beam:free', 'reflection/beam-free']]),
+    });
+
+    expect(ids(models)).toContain('reflection/beam:free');
+    expect(ids(models)).not.toContain('reflection/beam-free');
+  });
+
   it('skips ids with uppercase letters, which the proxy cannot route', () => {
     const models = findVercelOnlyModels({
       openRouterModelIds: [],
@@ -174,12 +196,71 @@ describe('findVercelOnlyModels', () => {
   });
 });
 
+describe('findVercelOnlyModels name matching', () => {
+  const duplicateMetadata = {
+    'alibaba/qwen3.5-flash': vercelMetadata['alibaba/qwen3.5-flash']!,
+    'reflection/beam-free': vercelMetadata['reflection/beam-free']!,
+  };
+
+  function findWithOpenRouterNames(names: string[]) {
+    const models = names.map((name, index) => ({ id: `qwen/other-${index}`, name }));
+    return ids(
+      findVercelOnlyModels({
+        openRouterModelIds: models.map(model => model.id),
+        openRouterModels: models,
+        vercelMetadata: duplicateMetadata,
+        overrides: new Map(),
+      })
+    );
+  }
+
+  it('omits a Vercel-only model whose listed name equals an OpenRouter model name', () => {
+    expect(findWithOpenRouterNames(['Qwen: Qwen3.5 Flash', 'Qwen: Qwen3 Max'])).toEqual([
+      'reflection/beam-free',
+    ]);
+  });
+
+  it('matches a model without a vendor prefix by its plain name', () => {
+    expect(findWithOpenRouterNames(['Beam (Free)'])).toEqual(['qwen/qwen3.5-flash']);
+  });
+
+  it('keeps a Vercel-only model whose name differs', () => {
+    expect(findWithOpenRouterNames(['Qwen: Qwen3 Max'])).toEqual([
+      'qwen/qwen3.5-flash',
+      'reflection/beam-free',
+    ]);
+  });
+
+  it('matches names exactly, without normalizing case, punctuation or whitespace', () => {
+    expect(
+      findWithOpenRouterNames([
+        'qwen: qwen3.5 flash',
+        'Qwen: Qwen3.5-Flash',
+        'Qwen: Qwen3.5 Flash ',
+        'Qwen: Qwen 3.5 Flash',
+        'Qwen3.5 Flash',
+      ])
+    ).toEqual(['qwen/qwen3.5-flash', 'reflection/beam-free']);
+  });
+
+  it('compares IDs only when no OpenRouter models are given', () => {
+    expect(
+      ids(
+        findVercelOnlyModels({
+          openRouterModelIds: [],
+          vercelMetadata: duplicateMetadata,
+          overrides: new Map(),
+        })
+      )
+    ).toEqual(['qwen/qwen3.5-flash', 'reflection/beam-free']);
+  });
+});
+
 describe('getVercelOnlyCatalogModels', () => {
   beforeEach(() => {
     jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
     jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
     jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
-      vercelEnabled: true,
       vercelOptOutModels: new Set(['openai/gpt-5-codex']),
     });
   });
@@ -246,15 +327,33 @@ describe('getVercelOnlyCatalogModels', () => {
     expect(ids(models)).toEqual(['anthropic/claude-opus-5-fast']);
   });
 
-  it('lists nothing when Vercel routing is disabled', async () => {
-    jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
-      vercelEnabled: false,
-      vercelOptOutModels: new Set(),
+  it('omits a Vercel-only model named like an OpenRouter catalog model', async () => {
+    const models = await getVercelOnlyCatalogModels({
+      openRouterModels: [
+        ...openRouterModels,
+        openRouterModel('qwen/qwen3.5-flash-preview', 'Qwen: Qwen3.5 Flash'),
+      ],
+      openRouterMetadata: {},
     });
 
-    await expect(
-      getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} })
-    ).resolves.toEqual([]);
+    expect(ids(models)).toEqual(['reflection/beam-free', 'openai/gpt-5-fast']);
+  });
+
+  it('keeps a Vercel-only model whose name only an unlisted OpenRouter model has', async () => {
+    const models = await getVercelOnlyCatalogModels({
+      openRouterModels: [
+        ...openRouterModels,
+        openRouterModel('qwen/qwen3.5-flash-preview', 'Qwen: Qwen3.5 Flash'),
+      ],
+      listedOpenRouterModels: openRouterModels,
+      openRouterMetadata: {},
+    });
+
+    expect(ids(models)).toEqual([
+      'qwen/qwen3.5-flash',
+      'reflection/beam-free',
+      'openai/gpt-5-fast',
+    ]);
   });
 
   it('treats models in the stored OpenRouter metadata as covered', async () => {

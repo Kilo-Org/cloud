@@ -24,18 +24,17 @@ import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =
-  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
+  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms.';
 
 /**
- * Shown when the account that linked an organization's shared-services
- * connection is gone: the account row is missing, the account is soft-deleted or
- * being deleted, or it holds no usable email. The copy names that condition
- * instead of an organization membership, which routing never checks. The
- * connection belongs to the organization, so an owner reconnects it instead of
- * losing it.
+ * Shown when the account that linked an organization's connection is gone: the
+ * account row is missing, the account is soft-deleted or being deleted, or it
+ * holds no usable email. The copy names that condition instead of an
+ * organization membership, which routing never checks. The connection belongs
+ * to the organization, so an owner reconnects it instead of losing it.
  */
 export const CLAUDE_BILLING_RECONNECT_MESSAGE =
-  'The account that linked Claude billing for this organization is no longer available, so shared services cannot bill through it.';
+  'The account that linked Claude billing for this organization is no longer available, so requests in this organization cannot bill through it.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */
@@ -48,12 +47,6 @@ export type ClaudeBillingRoutingInput = {
   userId: string | null;
   requesterEmail: string | null;
   organizationId: string | undefined;
-  /**
-   * The platform caller for a service run, such as code review or the Discord
-   * bot; see `OpenAiChatGptRoutingInput`. Set with an organization, it makes the
-   * organization's shared-services connection the first candidate.
-   */
-  botId: string | undefined;
 };
 
 export type ClaudeBillingRoutingResult =
@@ -61,49 +54,39 @@ export type ClaudeBillingRoutingResult =
   /** The owner has a connection that cannot bill. Never serve it another way. */
   | { kind: 'unavailable'; message: string; retryable?: boolean }
   /**
-   * The organization's shared-services connection was linked by a person who is
-   * gone, so it can no longer be gated. Never serve it another way, and never
-   * retry: only an organization owner reconnecting it changes the outcome.
+   * The organization's connection was linked by a person who is gone, so it can
+   * no longer be gated. Never serve it another way, and never retry: only an
+   * organization owner reconnecting it changes the outcome.
    */
   | { kind: 'reconnect'; message: string };
 
 /**
- * The connections a request may use, in order. A member's own request in an
- * organization uses their connection for that organization, never their
- * personal one, and a personal request uses only the personal connection. A
- * service run carries a bot id: it uses the organization's shared-services
- * connection first, because that connection exists so a service run does not
- * spend a member's own Claude organization, and falls back to the caller's
- * connection, which is what every existing caller has.
+ * The connection a request may use. A request in an organization, whether a
+ * member's own request or a bot's service run, uses that organization's
+ * connection and never the requester's personal one. A personal request uses
+ * only the personal connection.
  */
 function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[] {
   if (!input.userId) return [];
-  const owners: ClaudeBillingOwner[] = [];
-  if (input.botId && input.organizationId) {
-    owners.push({ kind: 'shared_services', organizationId: input.organizationId });
-  }
-  owners.push(
-    input.organizationId
-      ? { kind: 'member', kiloUserId: input.userId, organizationId: input.organizationId }
-      : { kind: 'personal', kiloUserId: input.userId }
-  );
-  return owners;
+  return input.organizationId
+    ? [{ kind: 'organization', organizationId: input.organizationId }]
+    : [{ kind: 'personal', kiloUserId: input.userId }];
 }
 
 /**
- * The flag check for a connection, or the reconnect requirement when a
- * shared-services connection's connector is gone. A person's own connection is
- * gated on the person making the request. A shared-services connection is gated
- * on the person who linked it last, because a service run's caller is a bot that
- * no release flag covers. The previous web app release does not report that
- * person, so the requester stands in, as it did there.
+ * The flag check for a connection, or the reconnect requirement when an
+ * organization connection's connector is gone. A personal connection is gated
+ * on the person making the request. An organization connection is gated on the
+ * person who linked it last, because the caller may be a bot that no release
+ * flag covers and a member who did not link it. An answer that does not report
+ * that person falls back to the requester.
  */
 async function gateEmail(
   input: ClaudeBillingRoutingInput,
   owner: ClaudeBillingOwner,
   connection: ClaudeBillingPayerState
 ): Promise<{ kind: 'email'; email: string | null } | { kind: 'connector-gone' }> {
-  if (owner.kind !== 'shared_services' || !connection.created_by) {
+  if (owner.kind !== 'organization' || !connection.created_by) {
     return { kind: 'email', email: input.requesterEmail };
   }
   const connector = await resolveClaudeBillingConnector(connection.created_by, readDb);
@@ -176,9 +159,8 @@ export function buildClaudeBillingProvider(
  * null when the request cannot be served by one. A connection is read before
  * anything about Kilo's configuration: once an owner has a connection, a missing
  * or broken operator credential fails the request instead of quietly serving it
- * on Kilo's credits. A connection that cannot bill fails the request without
- * trying the next one, and a connection that is absent or removed moves on to
- * the next candidate.
+ * on Kilo's credits. A connection that cannot bill fails the request instead of
+ * trying another payer.
  */
 export async function checkClaudeBilling(
   input: ClaudeBillingRoutingInput

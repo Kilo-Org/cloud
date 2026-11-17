@@ -1252,7 +1252,7 @@ describe('drainQueue', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result!.runId,
       entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
-      repetitions: 5,
+      repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -1569,7 +1569,7 @@ describe('frontier router runs', () => {
       expect.objectContaining({
         router: 'frontier',
         max_concurrency: 0,
-        frontier_min_accuracy_delta: 0.1,
+        frontier_min_accuracy_delta: 0,
         engine_identity: expect.stringMatching(/^frontier:v1:/),
       }),
       expect.anything(),

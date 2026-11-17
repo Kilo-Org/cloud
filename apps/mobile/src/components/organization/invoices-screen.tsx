@@ -4,6 +4,7 @@ import { InvoiceListScreen } from '@/components/invoice-list-screen';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrgBoundary, useOrgInvoicesPage } from '@/lib/hooks/use-organization-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export function OrganizationInvoicesScreen() {
         // takes the 13px eyebrow twin, taller than the mono 10px space the
         // reserve would otherwise hold, so the header cannot grow on the swap.
         eyebrow={t('organization.invoices.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
       />
     );
   }
@@ -39,6 +41,7 @@ export function OrganizationInvoicesScreen() {
       eyebrow={t('organization.invoices.title')}
       // The title keeps the header's default tail ellipsis, so the start of the
       // organization name always stays readable.
+      backFallback={ORGANIZATION_HUB_PATH}
       query={query}
       entries={entries}
       hasMore={hasMore}

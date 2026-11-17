@@ -8,7 +8,7 @@ import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-u
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
-  ORGANIZATION_PARENT_ACCESS_ROLES,
+  ORGANIZATION_ROLE_PRIORITY,
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -39,12 +39,16 @@ import {
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
-import { alias, type AnyPgColumn, type SelectedFields } from 'drizzle-orm/pg-core';
+import type { AnyPgColumn, SelectedFields } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
-import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
+import {
+  activeOrganizationJoinCondition,
+  inheritedParentMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationsTable,
+} from '@kilocode/worker-utils/organization-membership';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
-const parentOrganizations = alias(organizations, 'parent_organizations');
 const warnSupportLookupFailure = sentryLogger('support_access_lookup', 'error');
 
 export const OrganizationIdInputSchema = z.object({
@@ -73,10 +77,11 @@ type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organizatio
 
 /**
  * The caller's membership roles in the organizations matched by
- * `organizationFilter`: a direct membership in a live organization, plus the
- * roles inherited from a live parent organization. The membership,
- * live-organization and inheritable-role rules live only here, so the role
- * check and the organization fetch cannot drift.
+ * `organizationFilter`: a direct membership in a live organization, and the
+ * roles inherited from a live parent organization. The inherited-access SQL
+ * comes from one shared definition in
+ * `@kilocode/worker-utils/organization-membership`, so the role check and the
+ * organization fetch apply the same rule.
  *
  * {@link loadEffectiveMembershipRows} and
  * {@link loadEffectiveMembershipRowsWithOrganization} both read through this
@@ -119,20 +124,10 @@ async function selectCallerRoleRows(
     db
       .select(fields)
       .from(organizations)
-      .innerJoin(
-        parentOrganizations,
-        and(
-          eq(parentOrganizations.id, organizations.parent_organization_id),
-          isNull(parentOrganizations.deleted_at)
-        )
-      )
+      .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
       .innerJoin(
         organization_memberships,
-        and(
-          eq(organization_memberships.organization_id, organizations.parent_organization_id),
-          eq(organization_memberships.kilo_user_id, kiloUserId),
-          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-        )
+        inheritedParentMembershipJoinCondition(organization_memberships, organizations, kiloUserId)
       )
       .where(and(organizationFilter(organizations.id), isNull(organizations.deleted_at))),
   ]);
@@ -140,16 +135,15 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
-const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
-
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   return (
-    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
-    null
+    ORGANIZATION_ROLE_PRIORITY.find(
+      role => allowedRoles.includes(role) && rows.some(row => row.role === role)
+    ) ?? null
   );
 }
 
@@ -608,13 +602,7 @@ function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext):
   return supportStandInRole(entry);
 }
 
-/**
- * Resolves the caller's effective role for each of `organizationIds` in a fixed
- * number of queries (vs one per org). Mirrors {@link ensureOrganizationAccess}:
- * admins get 'owner' everywhere, otherwise direct memberships are unioned with
- * roles inherited from a parent org (owner/billing_manager). Orgs the caller has
- * no access to are simply absent from the returned map.
- */
+/** Groups caller role rows by organization id. */
 function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, OrganizationRole[]> {
   const rolesByOrg = new Map<string, OrganizationRole[]>();
   for (const row of rows) {
@@ -625,6 +613,22 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
   return rolesByOrg;
 }
 
+/**
+ * Resolves the caller's effective role for each of `organizationIds` in a fixed
+ * number of queries instead of one per organization.
+ *
+ * With support access OFF and a platform admin caller, every live organization
+ * (not deleted) gets `owner`, and the elevation is recorded once with reason
+ * `organization_access_batch`. In every other case, including support access ON,
+ * the role is the highest one among the caller's direct and inherited membership
+ * rows (a parent org owner, admin, or billing_manager inherits on its children;
+ * only live organizations contribute rows). Organizations without such a role
+ * are absent from the returned map.
+ *
+ * This batch path never consults a support grant. Grants are resolved per
+ * organization by {@link resolveOrganizationAccess} against the procedure
+ * allowlist, and no procedure that gates on this helper is on that allowlist.
+ */
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
@@ -644,7 +648,7 @@ export async function getOrganizationsAccessRoles(
       )
     );
     for (const [organizationId, roles] of rolesByOrg) {
-      const best = rolePriority.find(role => roles.includes(role));
+      const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
       if (best) result.set(organizationId, best);
     }
     return result;
@@ -696,15 +700,16 @@ export async function getOrganizationsAccessRoles(
     await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
   for (const [organizationId, roles] of rolesByOrg) {
-    const best = rolePriority.find(role => roles.includes(role));
+    const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
     if (best) result.set(organizationId, best);
   }
   return result;
 }
 
 /**
- * Batched variant of {@link ensureOrganizationAccess} for many orgs at once.
- * Throws unless the caller has an allowed role on *every* org in the list.
+ * Batched access check over {@link getOrganizationsAccessRoles}: throws
+ * `UNAUTHORIZED` unless every requested organization carries one of the allowed
+ * roles. It consults no support grant, as that helper documents.
  */
 export async function ensureOrganizationsAccess(
   ctx: TRPCContext,
@@ -712,7 +717,7 @@ export async function ensureOrganizationsAccess(
   roles?: OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
     if (!role || !allowedRoles.includes(role)) {

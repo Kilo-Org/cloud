@@ -15,8 +15,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
-
-const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
@@ -35,6 +34,13 @@ type OrganizationBoundaryProps = Readonly<{
    * line box the mono 10px space the reserve would otherwise use cannot hold.
    */
   eyebrow?: string;
+  /**
+   * Where the header's Back lands when the screen opens with no history to pop.
+   * Every caller that passes a `title` names its own area's parent: the Profile
+   * tab's root for that tab's children, the organization hub for the
+   * organization sub-Stack's screens.
+   */
+  backFallback?: Href;
   /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
   organizationIdOverride?: string;
   /** Overrides the default boundary icon (PR-review passes its own glyph). */
@@ -68,6 +74,7 @@ export function OrganizationBoundary({
   title,
   reserveEyebrow,
   eyebrow,
+  backFallback,
   organizationIdOverride,
   icon = Building2,
 }: OrganizationBoundaryProps = {}) {
@@ -113,7 +120,7 @@ export function OrganizationBoundary({
         variant="outline"
         className={STATE_ACTION_CLASS}
         onPress={() => {
-          router.replace(PROFILE_HREF);
+          router.replace(PROFILE_TAB_HREF);
         }}
       >
         <Text>{t('organization.boundary.backToProfile')}</Text>
@@ -170,7 +177,12 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} reservedEyebrow={eyebrow} />
+      <ScreenHeader
+        title={title}
+        reserveEyebrow={reserveEyebrow}
+        reservedEyebrow={eyebrow}
+        backFallback={backFallback}
+      />
       {content}
     </View>
   );

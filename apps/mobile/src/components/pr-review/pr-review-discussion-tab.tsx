@@ -106,7 +106,7 @@ import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -392,7 +392,7 @@ export function PrReviewDiscussionTab({
         // no failure feedback from a confirmed delete (ux2 spot check).
         // The row stays, nothing is pending, and the same row action
         // retries once the banner clears.
-        if (getCommittedConnectivityStatus() === 'offline') {
+        if (connectionRefusesWrites()) {
           announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
           return;
         }

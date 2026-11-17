@@ -14,21 +14,21 @@ import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 import {
   isApiTokenPepperCurrent,
-  isEmailBlacklistedByDomain,
-  isOrganizationMember,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -50,6 +50,7 @@ import {
 import {
   deriveCredentialKind,
   StepUpRequiredError,
+  type PrivilegedActionClass,
   type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
@@ -69,11 +70,6 @@ import {
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
-
-import {
-  getBlockedSignupTlds,
-  isEmailBlacklisted,
-} from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
 // and its debug payloads contain sensitive data (tokens, secrets, provider config).
@@ -206,6 +202,7 @@ type GetAuthResponse =
       webSessionId?: undefined;
       webSessionPepper?: undefined;
       authenticatedAt?: undefined;
+      ssoSourceOrganizationId?: undefined;
     }
   | {
       user: User;
@@ -227,6 +224,13 @@ type GetAuthResponse =
       webSessionPepper?: string | null;
       /** Unix seconds when the browser session signed in. */
       authenticatedAt?: number;
+      /**
+       * The WorkOS organization this browser session authenticated through,
+       * recorded only when the session signed in through SSO. Server-only: it
+       * is the provenance a management approval checks against the
+       * organization the account's domain currently requires.
+       */
+      ssoSourceOrganizationId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -236,142 +240,130 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // so the same request lands in one inventory entry whichever way it resolves.
   const surface = opts.stepUpSurface ?? 'rest';
 
+  const authViaToken = authViaTokenFromHeaders(headersList);
+  const credential = deriveCredentialKind({
+    authViaToken,
+    tokenSource: result.tokenSource ?? null,
+    internalApiUse: result.internalApiUse,
+    delegatedWorkload: result.cloudAgentAuthority !== undefined,
+  });
+
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
-  if (opts.adminOnly === true && result.user) {
-    emitAdminAccessEvent({
-      surface,
-      kind: 'admin_guard',
-      user: result.user,
-      authViaToken: authViaTokenFromHeaders(headersList),
-      tokenSource: result.tokenSource ?? null,
-      credential: deriveCredentialKind({
-        authViaToken: authViaTokenFromHeaders(headersList),
-        tokenSource: result.tokenSource ?? null,
-        internalApiUse: result.internalApiUse,
-        delegatedWorkload: result.cloudAgentAuthority !== undefined,
-      }),
-      route: routeFromHeaders(headersList),
-      method: methodFromHeaders(headersList, opts.requestMethod),
-      userAgentProduct: userAgentProductFromHeaders(headersList),
-      ip: clientIpFromHeaders(headersList),
-    });
-  }
+  if (opts.adminOnly === true && (result.user || authViaToken)) {
+    // One header read and one privileged-inventory lookup per admin request, so
+    // the step-up guard and the token outcome event that reports it cannot name
+    // different actions.
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
+    let attribution: { actionClass: PrivilegedActionClass; inventoryId: string | null } | undefined;
+    const routeAttribution = () =>
+      (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
 
-  if (opts.adminOnly === true && result.user) {
-    const credential = deriveCredentialKind({
-      authViaToken: authViaTokenFromHeaders(headersList),
-      tokenSource: result.tokenSource ?? null,
-      internalApiUse: result.internalApiUse,
-      delegatedWorkload: result.cloudAgentAuthority !== undefined,
-    });
-    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
-      const route = routeFromHeaders(headersList);
-      const method = methodFromHeaders(headersList, opts.requestMethod);
-      const { actionClass, inventoryId } = actionClassForRoute({
+    if (result.user) {
+      emitAdminAccessEvent({
         surface,
-        route: route ?? '',
+        kind: 'admin_guard',
+        user: result.user,
+        authViaToken,
+        tokenSource: result.tokenSource ?? null,
+        credential,
+        route,
         method,
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        ip: clientIpFromHeaders(headersList),
       });
-      try {
-        await runStepUpGuard({
-          userId: result.user.id,
-          credential,
-          webSessionId: result.webSessionId,
-          actionClass,
-          enabled: true,
-          route,
-          method,
-          surface,
-        });
-      } catch (error) {
-        // One privileged-access outcome per guarded non-session request:
-        // `denied` for a policy verdict, `failed` for an unexpected throw.
-        // Session traffic stays on `admin_guard`.
-        const emitOutcome = (outcome: 'denied' | 'failed') => {
-          if (credential === 'session') return;
-          emitPrivilegedAccessEvent({
-            surface,
-            user: result.user,
+
+      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+        const { actionClass, inventoryId } = routeAttribution();
+        try {
+          await runStepUpGuard({
+            userId: result.user.id,
             credential,
-            outcome,
+            webSessionId: result.webSessionId,
             actionClass,
-            actionId: inventoryId,
-            target: null,
-            wouldBlock: true,
-            userAgentProduct: userAgentProductFromHeaders(headersList),
-            tokenSource: result.tokenSource ?? null,
+            enabled: true,
             route,
             method,
-            ip: clientIpFromHeaders(headersList),
+            surface,
           });
-        };
-        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
-          emitOutcome('denied');
-          return authError(403, error.cause.code, result.user.id);
+        } catch (error) {
+          // One privileged-access outcome per guarded non-session request:
+          // `denied` for a policy verdict, `failed` for an unexpected throw.
+          // Session traffic stays on `admin_guard`.
+          const emitOutcome = (outcome: 'denied' | 'failed') => {
+            if (credential === 'session') return;
+            emitPrivilegedAccessEvent({
+              surface,
+              user: result.user,
+              credential,
+              outcome,
+              actionClass,
+              actionId: inventoryId,
+              target: null,
+              wouldBlock: true,
+              userAgentProduct: userAgentProductFromHeaders(headersList),
+              tokenSource: result.tokenSource ?? null,
+              route,
+              method,
+              ip: clientIpFromHeaders(headersList),
+            });
+          };
+          if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+            emitOutcome('denied');
+            return authError(403, error.cause.code, result.user.id);
+          }
+          // Fail closed. The guard normally converts evaluation failures itself;
+          // this covers anything unexpected around it.
+          emitOutcome('failed');
+          reportStepUpFailure('admin_step_up_rest', error);
+          return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
         }
-        // Fail closed. The guard normally converts evaluation failures itself;
-        // this covers anything unexpected around it.
-        emitOutcome('failed');
-        reportStepUpFailure('admin_step_up_rest', error);
-        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }
+    }
+
+    if (authViaToken) {
+      const { actionClass, inventoryId } = routeAttribution();
+      emitPrivilegedAccessEvent({
+        surface,
+        user: result.user ?? undefined,
+        credential,
+        outcome: result.user ? 'succeeded' : 'denied',
+        actionClass,
+        actionId: inventoryId,
+        target: null,
+        wouldBlock: credential !== 'session',
+        userAgentProduct: userAgentProductFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        route,
+        method,
+        ip: clientIpFromHeaders(headersList),
+      });
     }
   }
 
-  if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
-    const credential = deriveCredentialKind({
-      authViaToken: true,
-      tokenSource: result.tokenSource ?? null,
-      internalApiUse: result.internalApiUse,
-      delegatedWorkload: result.cloudAgentAuthority !== undefined,
-    });
-    const route = routeFromHeaders(headersList);
-    const method = methodFromHeaders(headersList, opts.requestMethod);
-    const { actionClass, inventoryId } = actionClassForRoute({
-      surface,
-      route: route ?? '',
-      method,
-    });
-    emitPrivilegedAccessEvent({
-      surface,
-      user: result.user ?? undefined,
-      credential,
-      outcome: result.user ? 'succeeded' : 'denied',
-      actionClass,
-      actionId: inventoryId,
-      target: null,
-      wouldBlock: credential !== 'session',
-      userAgentProduct: userAgentProductFromHeaders(headersList),
-      tokenSource: result.tokenSource ?? null,
-      route,
-      method,
-      ip: clientIpFromHeaders(headersList),
-    });
-  }
-
   if (result.user) {
-    return {
-      ...result,
-      credential: deriveCredentialKind({
-        authViaToken: authViaTokenFromHeaders(headersList),
-        tokenSource: result.tokenSource ?? null,
-        internalApiUse: result.internalApiUse,
-        delegatedWorkload: result.cloudAgentAuthority !== undefined,
-      }),
-    };
+    return { ...result, credential };
   }
   return result;
 }
 
-export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
+/**
+ * Reads the browser session only. A request that presents a credential is
+ * refused, never downgraded to its session, because these callers mint or
+ * exchange credentials and must not do so for a bearer caller.
+ */
+async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
+  if ((await headers()).has('authorization')) {
     return authError(401, 'Unauthorized', '?');
   }
 
-  return resolveUserFromSession({ adminOnly: false }, db);
+  return resolveUserFromSession(opts, db);
+}
+
+export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
+  return resolveSessionOnly({ adminOnly: false });
 }
 
 /**
@@ -380,33 +372,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
  * caller still enforces the route's Origin check before trusting the session.
  */
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
-    return authError(401, 'Unauthorized', '?');
-  }
-
-  return resolveUserFromSession({ adminOnly: true }, db);
+  return resolveSessionOnly({ adminOnly: true });
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
+  if ((await headers()).has('authorization')) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
-  const { user } = await resolveUserFromSession(
-    { adminOnly: false, DANGEROUS_allowBlockedUsers: true },
-    db
+  return userOrRedirect(
+    await resolveUserFromSession({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }, db),
+    loggedOutRedirectUrl
   );
-  if (!user) {
-    redirect(await appendCallbackPath(loggedOutRedirectUrl));
-  }
-  if (isBlockedAccount(user)) {
-    redirect('/account-blocked');
-  }
-  return user;
 }
 
 export async function getUserFromBearerForCredentialExchange(
@@ -461,7 +440,7 @@ async function resolveUserFromAuth(
   // also val.town and other blessed API users who are given their own custom JWTs use this path
   if (authViaTokenFromHeaders(headersList)) {
     const rawAuthorization = headersList.get('Authorization');
-    const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
+    const bearer = extractBearerToken(rawAuthorization);
     let decoded: ReturnType<typeof jwt.decode>;
     try {
       decoded = bearer ? jwt.decode(bearer) : null;
@@ -477,7 +456,7 @@ async function resolveUserFromAuth(
       opts.expectedAudience ?? KILO_API_AUDIENCE
     );
     const runtimeProxyAttestationVerified =
-      bearer !== undefined &&
+      bearer !== null &&
       runtimeAuthorization.success &&
       attestationAudience.success &&
       typeof decodedPayload?.kiloUserId === 'string'
@@ -602,21 +581,33 @@ async function resolveUserFromSession(
       id: session.webSessionId,
       pepper: session.webSessionPepper,
       authenticatedAt: session.authenticatedAt,
+      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
     },
   });
+}
+
+/**
+ * Returns the resolved user, or redirects a request that has none to the
+ * callback-aware sign-in URL, or a blocked account to the blocked-account
+ * page. This is the one place that answers both redirect cases.
+ */
+async function userOrRedirect(auth: GetAuthResponse, loggedOutRedirectUrl: string): Promise<User> {
+  if (!auth.user) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+  if (isBlockedAccount(auth.user)) {
+    redirect('/account-blocked');
+  }
+  return auth.user;
 }
 
 export async function getUserFromAuthOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
-  if (!user) {
-    redirect(await appendCallbackPath(loggedOutRedirectUrl));
-  }
-  if (isBlockedAccount(user)) {
-    redirect('/account-blocked');
-  }
-  return user;
+  return userOrRedirect(
+    await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }),
+    loggedOutRedirectUrl
+  );
 }
 
 export async function signInUrlWithCallbackPath(): Promise<string> {
@@ -676,7 +667,12 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
-  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+  webSession?: {
+    id?: string;
+    pepper?: string | null;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
+  };
 };
 
 async function validateUserAuthorization({
@@ -755,8 +751,16 @@ async function validateUserAuthorization({
         ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
       });
     }
-    const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
-    if (!isMember) {
+    // An organization context resolves through the effective-membership rule:
+    // the caller holds a direct membership in the live organization, or a
+    // permitted role (owner, admin, billing_manager) on its live parent
+    // organization. The balance and member-allowance rules are separate and do
+    // not follow inheritance.
+    const hasAccess = await hasEffectiveOrganizationAccess(fromDb, {
+      kiloUserId,
+      organizationId,
+    });
+    if (!hasAccess) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
         authorizationRefused: true,
         internalApiUse,
@@ -778,6 +782,7 @@ async function validateUserAuthorization({
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,
+    ssoSourceOrganizationId: webSession?.ssoSourceOrganizationId,
   };
 }
 
@@ -790,38 +795,11 @@ async function readActiveDeviceSession(
   kiloUserId: string
 ): Promise<boolean> {
   const session = await db.query.device_sessions.findFirst({
-    where: and(
-      eq(device_sessions.id, deviceSessionId),
-      eq(device_sessions.kilo_user_id, kiloUserId),
-      isNull(device_sessions.revoked_at)
-    ),
+    where: liveDeviceSessionCondition({ deviceSessionId, userId: kiloUserId }),
     columns: { id: true },
   });
   return session !== undefined;
 }
-
-export function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>,
-  fromDb: typeof db = db
-): Promise<boolean> {
-  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
-}
-
-/**
- * Pure TLD gate used by the async {@link isBlockedTLD}. Entries are bare
- * labels (`asia`), so an entry matches every address on that TLD.
- */
-export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[]): boolean {
-  return isEmailBlacklistedByDomain(email, blockedTlds);
-}
-
-/**
- * New-signup TLD gate. The TLD list is admin-configurable in Redis, so a cheap
- * TLD can be blocked without a deploy. Only new accounts are refused; an
- * existing account on a blocked TLD keeps signing in.
- */
-export const isBlockedTLD = async (email: string): Promise<boolean> =>
-  isEmailOnBlockedTld(email, await getBlockedSignupTlds());
 
 export const uuidSchema = z.uuid();
 const uuid = uuidSchema;

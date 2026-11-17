@@ -1,4 +1,6 @@
+/* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,12 +19,12 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
@@ -78,7 +80,9 @@ export function ProviderConnectGate({
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
+  const router = useRouter();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();
@@ -160,37 +164,51 @@ export function ProviderConnectGate({
     connectAbort.current = controller;
     setConnecting(true);
     try {
-      // The provider connections are web-side integrations: open the
-      // existing integration page and re-check the status when the app
-      // returns (pattern: `launchConnectGateBrowser`).
-      const integrationUrl =
-        platform === 'gitlab'
-          ? getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined)
-          : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
-      await launchConnectGateBrowser(integrationUrl, {
-        signal: controller.signal,
-        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: () => {
-          // Detached on purpose: the browser closing is the user's edge, so the
-          // CTA returns to idle as soon as it happens. A status read that stays
-          // pending (the default `networkMode: 'online'` never settles while the
-          // online manager reports offline) must not keep Connect disabled — the
-          // read's own states carry the outcome, and a real failure renders the
-          // retryable QueryError below.
-          void status.refetch().catch(() => undefined);
-          return Promise.resolve();
-        },
-      });
+      // GitLab's OAuth callback lands on the web, so its connection stays a
+      // hand-off: mint the shell integration page's single-use URL and re-check
+      // the status on return. Bitbucket's token is pasted in the app's sheet.
+      await launchConnectGateBrowser(
+        await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(organizationId ? { organizationId } : {}),
+        }),
+        {
+          signal: controller.signal,
+          onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+          onReturn: () => {
+            // Detached on purpose: the browser closing is the user's edge, so the
+            // CTA returns to idle as soon as it happens. A status read that stays
+            // pending (the default `networkMode: 'online'` never settles while the
+            // online manager reports offline) must not keep Connect disabled — the
+            // read's own states carry the outcome, and a real failure renders the
+            // retryable QueryError below.
+            void status.refetch().catch(() => undefined);
+            return Promise.resolve();
+          },
+        }
+      );
     } catch {
-      // `launchConnectGateBrowser` reports a failed launch through
-      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
-      // refresh helper throws before that. The status read's own error state
-      // renders the retryable QueryError.
+      // A mint that failed never reached the browser, so nothing else reported
+      // it. `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`; the status read's own states carry the rest.
+      if (!controller.signal.aborted) {
+        void toast.error(t('authErrors.couldNotOpenBrowser'));
+      }
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);
       }
     }
+  };
+
+  const openBitbucketConnect = () => {
+    if (organizationId === null) {
+      return;
+    }
+    // The connect sheet changes the same status this gate reads, so its
+    // invalidation is what closes the gate; nothing else has to run on return.
+    router.push(bitbucketConnectHref(organizationId));
   };
 
   // A GitLab connection serves exactly one instance, and the status read names
@@ -388,11 +406,15 @@ export function ProviderConnectGate({
                   className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
                   disabled={connecting}
                   onPress={() => {
+                    if (platform === 'bitbucket') {
+                      openBitbucketConnect();
+                      return;
+                    }
                     void handleConnect();
                   }}
                 >
                   {connecting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    <ActivityIndicator size="small" color={mutedDisabledInk} />
                   ) : (
                     <RefreshCcw size={16} color={colors.primaryForeground} />
                   )}

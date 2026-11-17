@@ -14,6 +14,7 @@ import {
   resolvePrefillRepo,
   resolvePrefillRepoSelection,
   resolveStoredRepoSelection,
+  shouldAbandonRepoSeed,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -376,6 +377,57 @@ describe('isRepoSeedPending', () => {
     // rows below the repository section.
     expect(
       isRepoSeedPending({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+});
+
+describe('shouldAbandonRepoSeed', () => {
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    reposSettled: false,
+    providerQueriesResolved: false,
+  };
+
+  it('abandons the request once the bound settles the region without it', () => {
+    // The regression this rule exists for: the lists never answer, the bound
+    // settles the region, and a later answer must not mount a repository the
+    // form already painted without.
+    expect(shouldAbandonRepoSeed({ ...base, providerQueriesResolved: true })).toBe(true);
+  });
+
+  it('keeps waiting while the lists are still within the bound', () => {
+    expect(shouldAbandonRepoSeed(base)).toBe(false);
+  });
+
+  it('leaves a request the lists can satisfy to the seed', () => {
+    // `reposSettled` is the one render in which the seed runs, so dropping the
+    // request there would lose a prefill that can still land.
+    expect(
+      shouldAbandonRepoSeed({ ...base, reposSettled: true, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a plain New session entry', () => {
+    expect(
+      shouldAbandonRepoSeed({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a request that already ran or was abandoned', () => {
+    expect(shouldAbandonRepoSeed({ ...base, applied: true, providerQueriesResolved: true })).toBe(
+      false
+    );
+  });
+
+  it('does not abandon a request the form already satisfied', () => {
+    expect(
+      shouldAbandonRepoSeed({
+        ...base,
+        selectedRepo: 'github:owner/repo',
+        providerQueriesResolved: true,
+      })
     ).toBe(false);
   });
 });

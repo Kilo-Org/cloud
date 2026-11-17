@@ -17,8 +17,6 @@ vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'http://localhost:3000',
   GOOGLE_IOS_CLIENT_ID: 'ios-client-id',
   GOOGLE_WEB_CLIENT_ID: 'web-client-id',
-  TERMS_URL: 'https://app.kilo.ai/terms-app',
-  PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
 }));
 
 vi.mock('react-native', () => ({
@@ -94,12 +92,13 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
 });
 
 vi.mock('@/lib/login-draft', () => ({
-  setLoginEmailDraft: vi.fn(),
-  setSsoRecoveryDraft: vi.fn(),
+  beginLoginEmail: vi.fn(),
+  holdLoginEmail: vi.fn(),
+  holdSsoRecovery: vi.fn(),
 }));
 
-vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: vi.fn(),
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 // UI primitives render as host strings so the test can drive their props.

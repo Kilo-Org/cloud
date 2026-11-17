@@ -22,6 +22,9 @@ jest.mock('@/lib/integrations/github/install-state', () => ({
 jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   cleanupExpiredSessionStepUpRows: jest.fn(),
 }));
+jest.mock('@/lib/app-shell/handoff-token', () => ({
+  cleanupExpiredAppShellHandoffTokens: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
@@ -33,6 +36,7 @@ import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { cleanupExpiredAppShellHandoffTokens } from '@/lib/app-shell/handoff-token';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
 
@@ -45,10 +49,13 @@ describe('GET /api/cron/cleanup-device-auth', () => {
     jest.mocked(cleanupExpiredDeviceAuthRequests).mockResolvedValue(2);
     jest.mocked(cleanupExpiredDeviceRefreshTokens).mockResolvedValue(7);
     jest.mocked(cleanupExpiredAdmissionChallenges).mockResolvedValue(1);
-    jest.mocked(cleanupExpiredPasskeyRows).mockResolvedValue({ challenges: 5, tickets: 6 });
+    jest
+      .mocked(cleanupExpiredPasskeyRows)
+      .mockResolvedValue({ challenges: 5, tickets: 6, managementAuthorizations: 2 });
     jest.mocked(cleanupExpiredAccessCodes).mockResolvedValue(3);
     jest.mocked(cleanupExpiredInstallStates).mockResolvedValue(4);
     jest.mocked(cleanupExpiredSessionStepUpRows).mockResolvedValue({ challenges: 8, proofs: 9 });
+    jest.mocked(cleanupExpiredAppShellHandoffTokens).mockResolvedValue(10);
 
     const response = await GET(
       new Request('http://localhost/api/cron/cleanup-device-auth', {
@@ -64,8 +71,10 @@ describe('GET /api/cron/cleanup-device-auth', () => {
       deleted_admission_challenge_count: 1,
       deleted_passkey_challenge_count: 5,
       deleted_passkey_sign_in_ticket_count: 6,
+      deleted_passkey_management_authorization_count: 2,
       deleted_access_code_count: 3,
       deleted_install_state_count: 4,
+      deleted_app_shell_handoff_token_count: 10,
       deleted_step_up_challenge_count: 8,
       deleted_step_up_proof_count: 9,
     });

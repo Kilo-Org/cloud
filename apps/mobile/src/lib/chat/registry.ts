@@ -26,17 +26,31 @@ import {
   moveState,
   NOTHING,
   type Question,
+  resolveSessionId,
   snapshotOf,
 } from './state';
+import {
+  type ChatFlag,
+  type ChatFlagApplication,
+  chatFlagBehind,
+  chatFlagMoving,
+  type ChatFlagName,
+  flagApplication,
+  flagPersisted,
+  flagPicked,
+  flagRefused,
+} from './chat-flag';
 import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
 import { answerParts } from './answer-parts';
 import { countSessionUsage } from './chat-usage';
 import {
   ensureKiloMcp,
+  mcpChoiceFor,
   mcpEnabledFor,
   moveMcpEnabled,
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
+import { releaseNativeModelRound } from './native-round-slot';
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
@@ -57,6 +71,7 @@ import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
   moveWebSearchEnabled,
   setWebSearchEnabled as persistWebSearchEnabled,
+  webSearchChoiceFor,
   webSearchDefault,
 } from './web-search-setting';
 import { waitForChatBackends } from './backend-store';
@@ -114,6 +129,23 @@ const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
     ...(one.from == null ? {} : { from: one.from }),
   }));
 
+/**
+ * A tool-set change waiting for the chat to be free.
+ *
+ * `seq` identifies one change. A move copies the chat into a new object, so the
+ * acknowledgement must find the installed chat and must not clear a newer
+ * change raised while the move ran. The intent is left in place until the move
+ * that consumes it succeeds, so a failed move keeps it for the retry.
+ */
+type ToolSetIntent = { readonly kind: 'none' } | { readonly kind: 'pending'; readonly seq: number };
+
+let toolSetSeq = 0;
+
+const pendingToolsChange = (): ToolSetIntent => {
+  toolSetSeq += 1;
+  return { kind: 'pending', seq: toolSetSeq };
+};
+
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
   readonly handle: SessionHandle;
@@ -127,7 +159,7 @@ type Chat = {
    * when it settles. The tool set is frozen for the life of a session, so it is
    * never changed under an answer that is still coming.
    */
-  pendingTools: boolean | undefined;
+  tools: ToolSetIntent;
   /**
    * The session's own total when the chat's usage last took from it. The SDK
    * counts from zero each time a session opens, so a new session starts here
@@ -157,13 +189,45 @@ const chats = new Map<string, Chat>();
 const askingKept = new Set<string>();
 
 /**
- * One operation at a time per chat: opening one, and letting one go.
+ * A chat's operations, one at a time, in the order they were asked for.
  *
- * A screen entering twice opens one session, and a chat that is closing has
- * finished closing before the same id is opened again — which is what keeps a
- * close from writing over the chat that replaced it.
+ * An open that ran beside a close would install a session the close then writes
+ * the old state over: the closing chat has already left the live ones, so the
+ * open reads none, opens one, and the close that lands afterwards forgets its
+ * state and settles it unavailable — a live chat saying it is not here. Queued,
+ * the open reads the live ones only after the close is done, which is the only
+ * moment its answer is final.
+ *
+ * Everything else that changes a chat takes the same turn: a flag's write and
+ * the move it causes, the move a question needs, and the move an answer's settle
+ * applies. One per logical conversation, so a chat that moved keeps one order,
+ * and nothing runs between a preference's read and its delete during a move.
  */
-const pending = new Map<string, Promise<void>>();
+type ChatTurn = {
+  /** Resolves when the last queued operation has finished, so a caller can wait for it. */
+  tail: Promise<void>;
+  /** Operations waiting for their turn; a close skips the ones that may be skipped. */
+  readonly waiting: Set<{
+    readonly skippable: boolean;
+    readonly flag: boolean;
+    skip: () => void;
+  }>;
+  forgotten: boolean;
+};
+
+const chatTurns = new Map<string, ChatTurn>();
+let flagAccount = new AbortController();
+let releasingChats: Promise<void> | undefined = undefined;
+
+function isFlagAccountActive(signal: AbortSignal): boolean {
+  return !signal.aborted;
+}
+
+function checkFlagAccount(signal: AbortSignal): void {
+  if (!isFlagAccountActive(signal)) {
+    throw new Error('The chat flag account changed');
+  }
+}
 
 /**
  * One runtime per scope, because whose credit pays is part of the wiring and a
@@ -305,7 +369,7 @@ export async function startChat(
     scope,
     answering: undefined,
     waiting: [],
-    pendingTools: undefined,
+    tools: { kind: 'none' },
     counted: new Map(),
     closing: false,
     ...place,
@@ -339,39 +403,113 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
     await enterChat(place, followed);
     return;
   }
-  await oneAtATime(sessionId, () => openIn(place, sessionId));
+  await runTurn(sessionId, { skippable: false }, async () => {
+    const current = resolveSessionId(sessionId);
+    await openIn(place, current);
+    /* Both flags are read inside the open's turn, after any earlier tap. */
+    await ensureFlags(current);
+  });
+}
+
+/**
+ * The turn of the chat a caller named, following a move to the one it became.
+ *
+ * A tap made before a chat moved and one made after it are two operations on
+ * one conversation, so they share one order: the record the chat moved off is
+ * carried to the id it moved onto rather than a second queue starting there.
+ */
+function turnOf(sessionId: string): ChatTurn {
+  const current = resolveSessionId(sessionId);
+  const held = chatTurns.get(current);
+  if (held !== undefined) {
+    return held;
+  }
+  for (const [key, turn] of chatTurns) {
+    if (resolveSessionId(key) === current) {
+      chatTurns.delete(key);
+      chatTurns.set(current, turn);
+      return turn;
+    }
+  }
+  const created: ChatTurn = {
+    tail: Promise.resolve(),
+    waiting: new Set(),
+    forgotten: false,
+  };
+  chatTurns.set(current, created);
+  return created;
 }
 
 /**
  * Runs one operation on a chat after the one before it, and never two at once.
  *
- * An open that ran beside a close would install a session the close then writes
- * the old state over: the closing chat has already left the live ones, so the
- * open reads none, opens one, and the close that lands afterwards forgets its
- * state and settles it unavailable — a live chat saying it is not here. Queued,
- * the open reads the live ones only after the close is done, which is the only
- * moment its answer is final.
+ * Answers the operation's own result, or undefined when a close opened its gate
+ * as skipped. The next operation waits on this one's turn rather than on its
+ * result: an operation that failed is over either way, and whoever waits on the
+ * turn instead of calling — a question typed while a screen opens — is not its
+ * caller and must not be left holding its failure.
  */
-function oneAtATime(sessionId: string, work: () => Promise<void>): Promise<void> {
-  const previous = pending.get(sessionId);
-  /* The next operation waits on this one's turn rather than on its result: an
-     operation that failed is over either way, and whoever waits on the turn
-     instead of calling — a question typed while a screen opens — is not its
-     caller and must not be left holding its failure. */
-  const turn = Promise.withResolvers<undefined>();
-  pending.set(sessionId, turn.promise);
+function runTurn<T>(
+  sessionId: string,
+  options: { readonly skippable: boolean; readonly flag?: boolean },
+  work: () => Promise<T>
+): Promise<T | undefined> {
+  const turn = turnOf(sessionId);
+  const previous = turn.tail;
+  const gate = Promise.withResolvers<boolean>();
+  const ticket = {
+    skippable: options.skippable,
+    flag: options.flag ?? false,
+    skip: () => {
+      gate.resolve(false);
+    },
+  };
+  turn.waiting.add(ticket);
   const done = (async () => {
+    if (!(await gate.promise)) {
+      return undefined;
+    }
+    turn.waiting.delete(ticket);
+    const result = await work();
+    return result;
+  })();
+  const tail = (async () => {
     await previous;
+    gate.resolve(true);
     try {
-      await work();
+      await done;
+    } catch {
+      /* A waiter owns the ordering, not the preceding caller's failure. */
     } finally {
-      if (pending.get(sessionId) === turn.promise) {
-        pending.delete(sessionId);
+      turn.waiting.delete(ticket);
+      if (turn.forgotten && turn.waiting.size === 0) {
+        for (const [key, held] of chatTurns) {
+          if (held === turn) {
+            chatTurns.delete(key);
+          }
+        }
       }
-      turn.resolve(undefined);
     }
   })();
+  /* A skipped finalizer may finish before its predecessor, but the queue must
+     still wait for that predecessor before starting another operation. */
+  turn.tail = tail;
   return done;
+}
+
+/** A close opens every waiting gate as "skipped", so nothing it interrupts waits on it. */
+function skipWaitingTurns(sessionId: string): void {
+  for (const ticket of turnOf(sessionId).waiting) {
+    if (ticket.skippable) {
+      ticket.skip();
+    }
+  }
+}
+
+/** Retires the queue only after its last waiter, including a reopen, finishes. */
+function forgetTurn(sessionId: string): void {
+  skipWaitingTurns(sessionId);
+  turnOf(sessionId).forgotten = true;
 }
 
 /**
@@ -576,7 +714,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       scope,
       answering: undefined,
       waiting: [],
-      pendingTools: undefined,
+      tools: { kind: 'none' },
       counted: new Map(),
       closing: false,
       ...place,
@@ -704,106 +842,82 @@ export async function say(
 ): Promise<void> {
   const { text, images } = question;
   const { model, effort } = target;
-  /* Where the failure below belongs. It is the chat the move landed on, not
-     the one it started from, or the report goes to a chat nobody is watching. */
-  let current = snapshotOf(sessionId).sessionId;
-  try {
-    /* A person can type before the session has finished opening, and a
-       question asked of a chat that is not there yet used to vanish with the
-       composer reporting success. It waits for the open instead. */
-    await pending.get(current);
-    const held = chats.get(current);
-    if (held?.answering !== undefined) {
-      /* A session answers one question at a time, and the composer stays open
-         while it works. So a second question joins the line rather than racing
-         the first, and it is on screen while it waits. It is held in memory
-         only: an answer that is still arriving is not written down either. */
-      held.waiting.push({
+  await runTurn(sessionId, { skippable: false }, async () => {
+    let current = resolveSessionId(sessionId);
+    try {
+      const held = chats.get(current);
+      if (held?.answering !== undefined) {
+        held.waiting.push({
+          text,
+          images,
+          model,
+          effort,
+          ...(question.from === undefined ? {} : { from: question.from }),
+        });
+        change(current, { waiting: questionsIn(held.waiting) });
+        return;
+      }
+      if (held === undefined) {
+        throw new Error('the chat is not open');
+      }
+      const before = snapshotOf(current);
+      await keepAsked(current);
+      if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+        await rememberFirstQuestion(current, text);
+      }
+      change(current, {
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+      });
+      await rememberAsked(current, {
         text,
-        images,
         model,
         effort,
-        ...(question.from === undefined ? {} : { from: question.from }),
+        images,
+        ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+        ...(question.from == null ? {} : { from: question.from }),
       });
-      change(current, { waiting: questionsIn(held.waiting) });
-      return;
+      current = await ontoForUse(current, { model, effort }, held);
+      const chat = chats.get(current);
+      if (chat === undefined) {
+        throw new Error('the chat is not open');
+      }
+      const runtime = await runtimeFor(chat);
+      const at = Date.now();
+      touchChat(await open(), current, at);
+      change(current, {
+        status: 'working',
+        answering: [],
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+        failed: null,
+        failureKey: null,
+        record: { ...snapshotOf(current).record, updatedAt: at },
+      });
+      chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
+    } catch (error) {
+      current = snapshotOf(current).sessionId;
+      const failureKey = backendFailureKey(error, model);
+      await keepAskedFailure(current, failureKey);
+      change(current, {
+        status: 'idle',
+        answering: [],
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+        failed: reason(error),
+        failureKey,
+      });
     }
-    /* One move, not two: the question is asked on the model on screen, and a
-       switch that moved while the chat sat idle is applied in the same copy.
-       The session freezes its tools, so the list sent to the model has to be
-       the one the switches name at this moment. */
-    if (held === undefined) {
-      throw new Error('the chat is not open');
-    }
-    /* A question with no answer keeps its place in the transcript. It is done
-       before the slot is written, so the words this send takes the place of are
-       already safe if the send itself fails. */
-    const before = snapshotOf(current);
-    await keepAsked(current);
-    /* Nothing said in it yet, so this question is the one the chat is named for
-       while no answer is stored. A question asked again after another one took
-       its place is not the first: the name is already written. */
-    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
-      await rememberFirstQuestion(current, text);
-    }
-    /* Remember the requested target before the move can fail. The live model
-       stays unchanged until onto installs the session that actually moved. */
-    change(current, {
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-    });
-    await rememberAsked(current, {
-      text,
-      model,
-      effort,
-      images,
-      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-      ...(question.from == null ? {} : { from: question.from }),
-    });
-    current = await ontoForUse(current, { model, effort }, held);
-    const chat = chats.get(current);
-    if (chat === undefined) {
-      throw new Error('the chat is not open');
-    }
-    const runtime = await runtimeFor(chat);
-    const at = Date.now();
-    touchChat(await open(), current, at);
-    change(current, {
-      status: 'working',
-      answering: [],
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-      failed: null,
-      failureKey: null,
-      record: { ...snapshotOf(current).record, updatedAt: at },
-    });
-    chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
-  } catch (error) {
-    /* The open, the move, or the write that remembers the question failed. The
-       question is not lost: it stays on screen with a Retry under it, the same
-       as one whose answer never arrived. */
-    /* onto may have installed the new session before its cleanup failed. */
-    current = snapshotOf(current).sessionId;
-    const failureKey = backendFailureKey(error, model);
-    await keepAskedFailure(current, failureKey);
-    change(current, {
-      status: 'idle',
-      answering: [],
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-      failed: reason(error),
-      failureKey,
-    });
-  }
+  });
 }
 
 /**
@@ -1171,6 +1285,13 @@ async function settle(
     await forgetAsked(sessionId);
   }
   chat.answering = undefined;
+  if (failure !== null) {
+    /* A failed exchange ends without `halt`: it can fail between two tool rounds
+       — the model became unavailable while its tools ran — and the round left
+       waiting can never be answered. It is released here, or every other chat
+       on that model is refused until this one asks again. */
+    await releaseNativeModelRound(sessionId);
+  }
   change(sessionId, {
     turns,
     answering: [],
@@ -1205,18 +1326,47 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
      ones and its scope is closing. There is nothing left to move or to ask, and
      asking would wait on that close from inside the answer it is interrupting. */
   if (chat.closing) {
-    chat.pendingTools = undefined;
+    chat.tools = { kind: 'none' };
     chat.waiting.length = 0;
     return;
   }
   let current = sessionId;
-  if (chat.pendingTools !== undefined) {
-    chat.pendingTools = undefined;
+  if (chat.tools.kind === 'pending') {
     /* The names are computed from the switches as they stand now, so a choice
        made while the answer was arriving — the Kilo switch, a Retry, or the
-       settings group switch — all land on the same recomputation. */
+       settings group switch — all land on the same recomputation. The intent is
+       cleared only once the move lands, and on the chat the move installed. */
     try {
-      current = await ontoTools(current, chat);
+      /* Inside the chat's turn, and skippable: a close that is interrupting this
+         very answer holds that turn, so a move queued behind it would wait on
+         the close that waits on the answer's settle. The close opens the gate
+         first, which is what keeps a close from deadlocking on itself. */
+      const from = current;
+      const moved = await runTurn(from, { skippable: true }, async () => {
+        const landed = resolveSessionId(from);
+        const live = chats.get(landed);
+        if (live === undefined || live.closing) {
+          return landed;
+        }
+        const consumed = live.tools;
+        try {
+          const result = await ontoTools(landed, live);
+          const installed = chats.get(result);
+          if (
+            installed?.tools.kind === 'pending' &&
+            consumed.kind === 'pending' &&
+            installed.tools.seq === consumed.seq
+          ) {
+            installed.tools = { kind: 'none' };
+          }
+          settleFlagApplications(result, 'current');
+          return result;
+        } catch (error) {
+          settleFlagApplications(resolveSessionId(landed), 'behind');
+          throw error;
+        }
+      });
+      current = moved ?? snapshotOf(from).sessionId;
       if (!failed) {
         change(current, { failed: null, failureKey: null });
       }
@@ -1224,10 +1374,6 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
       /* A backend can change while its answer arrives. Keep the tool change
          and the whole line for an explicit retry or a new, valid target. */
       current = snapshotOf(current).sessionId;
-      const held = chats.get(current);
-      if (held !== undefined) {
-        held.pendingTools = true;
-      }
       change(current, {
         failed: reason(error),
         failureKey: backendFailureKey(error, snapshotOf(current).model),
@@ -1314,7 +1460,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
           scope,
           answering: undefined,
           waiting: [],
-          pendingTools: undefined,
+          tools: { kind: 'none' },
           counted: new Map(),
           closing: false,
           ...place,
@@ -1428,8 +1574,8 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
  * names keeps its session.
  */
 async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Promise<string> {
-  const marked = chat.pendingTools !== undefined;
-  chat.pendingTools = undefined;
+  const consumed = chat.tools;
+  const marked = consumed.kind === 'pending';
   const names = targetSupportsTools(target.model)
     ? await chatToolNames(organizationIdOf(chat.org), sessionId, target.model)
     : [];
@@ -1439,10 +1585,23 @@ async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Pr
     stored.length === names.length &&
     stored.every((name, i) => name === names[i]);
   const tools = already || (stored === null && !marked) ? undefined : names;
-  return onto(chat, sessionId, {
+  const moved = await onto(chat, sessionId, {
     ...target,
     ...(tools === undefined ? {} : { tools }),
   });
+  /* The move copies the chat, so the intent is acknowledged on the object it
+     installed — and only when it is the same change: a newer one raised while
+     the move ran must survive to the next use. A move that failed throws
+     before this, leaving the intent for the retry. */
+  const installed = chats.get(moved);
+  if (
+    installed?.tools.kind === 'pending' &&
+    consumed.kind === 'pending' &&
+    installed.tools.seq === consumed.seq
+  ) {
+    installed.tools = { kind: 'none' };
+  }
+  return moved;
 }
 
 /**
@@ -1483,7 +1642,7 @@ async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
  */
 export async function refreshChatTools(): Promise<void> {
   for (const chat of chats.values()) {
-    chat.pendingTools = true;
+    chat.tools = pendingToolsChange();
   }
   /* The marking is synchronous, and that is the point: the tap moves nothing.
      The promise is what lets the sheet await the tap finishing before it
@@ -1491,60 +1650,221 @@ export async function refreshChatTools(): Promise<void> {
   await Promise.resolve();
 }
 
-/**
- * Turns the Kilo MCP tools on or off for one chat.
- *
- * The setting is written first, so it survives whatever happens to the session.
- * Turning it on reaches the server, because a chat that had the feature off
- * never ran a discovery: without asking, the session would be moved onto the
- * base tools alone, the sheet would still say the server is not available, and
- * the switch the person just turned on would snap back off. A chat that is
- * answering is not moved under the answer — the tool set would change between
- * two rounds of one question — so the choice is remembered and applied when the
- * answer settles.
- */
-export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
-  const current = snapshotOf(sessionId).sessionId;
-  if ((await mcpEnabledFor(current)) === enabled) {
-    return;
-  }
-  await persistMcpEnabled(current, enabled);
-  const chat = chats.get(current);
-  if (chat === undefined) {
-    return;
-  }
-  if (enabled && KILO_MCP_URL !== undefined) {
-    /* An open, so the four-second bound: a server that is slow or down leaves
-       the chat to be moved onto what is known rather than holding the switch. */
-    await ensureKiloMcp(chat, 'automatic');
-  }
-  if (chat.answering !== undefined) {
-    chat.pendingTools = enabled;
-    return;
-  }
-  await ontoTools(current, chat);
+/** One flag's field on a chat, chosen by name so a change stays typed. */
+function readFlagOf(flag: ChatFlagName, sessionId: string): ChatFlag {
+  return flag === 'webSearch' ? snapshotOf(sessionId).webSearch : snapshotOf(sessionId).kiloTools;
+}
+
+/** Writes one flag's field, the counterpart of `readFlagOf`. */
+function writeFlagOf(flag: ChatFlagName, sessionId: string, value: ChatFlag): void {
+  change(sessionId, flag === 'webSearch' ? { webSearch: value } : { kiloTools: value });
+}
+
+function settleFlagApplications(sessionId: string, application: 'current' | 'behind'): void {
+  const { webSearch, kiloTools } = snapshotOf(sessionId);
+  change(sessionId, {
+    webSearch: chatFlagMoving(webSearch) ? flagApplication(webSearch, application) : webSearch,
+    kiloTools: chatFlagMoving(kiloTools) ? flagApplication(kiloTools, application) : kiloTools,
+  });
 }
 
 /**
- * Turns web search on or off for one chat.
+ * Moves the chat onto the tool set its saved choice names.
  *
- * The choice is written first, so it survives whatever happens to the session,
- * and it is written even when it matches the model's default: from now on the
- * person's choice, not the model, decides. A chat that is answering is not
- * moved under the answer; the move is applied when the answer settles.
+ * The choice is on disk before this runs, so a failure here is only this
+ * session lagging: the flag stays saved and reports `behind`, and the retry is
+ * its recovery.
  */
-export async function setWebSearchEnabled(sessionId: string, enabled: boolean): Promise<void> {
-  const current = snapshotOf(sessionId).sessionId;
-  await persistWebSearchEnabled(current, enabled);
-  const chat = chats.get(current);
-  if (chat === undefined) {
+async function applyFlag(
+  flag: ChatFlagName,
+  sessionId: string,
+  context: { readonly place: ChatPlace; readonly signal: AbortSignal }
+): Promise<ChatFlagApplication> {
+  const { place, signal } = context;
+  checkFlagAccount(signal);
+  const id = snapshotOf(sessionId).sessionId;
+  const chat = chats.get(id);
+  /* Enabling a chat that never discovered tools must reach the server first. */
+  if (
+    flag === 'kiloTools' &&
+    chat !== undefined &&
+    KILO_MCP_URL !== undefined &&
+    (await mcpEnabledFor(id))
+  ) {
+    await ensureKiloMcp(chat, 'automatic');
+  }
+  checkFlagAccount(signal);
+  if (chat?.answering !== undefined) {
+    /* Never under an answer: the tool set would change between two rounds of
+       one question. The settle applies it. */
+    chat.tools = pendingToolsChange();
+    return 'moving';
+  }
+  await ontoTools(id, place);
+  return 'current';
+}
+
+/**
+ * Turns one chat flag on or off, persist and apply as one operation of the chat.
+ *
+ * Runs as the chat's turn, so nothing else touches this conversation — not
+ * another tap, not the other flag, not the move a tap causes — between the
+ * choice being written and the session being moved onto it. Publishes each
+ * step: the tap shows at once, the saved choice replaces it when the write
+ * lands, and `application` reports whether the session followed.
+ *
+ * Rejects only when the choice was not saved (the flag is left `refused`). A
+ * move that fails after the save leaves the flag `saved`/`behind` and resolves:
+ * the choice is the person's and the store holds it, so only the session lags,
+ * and `retryChatFlag` is its recovery.
+ */
+export async function setChatFlag(options: {
+  readonly sessionId: string;
+  /** Where the chat belongs; null when no place is signed in, which skips the move. */
+  readonly place: ChatPlace | null;
+  readonly flag: ChatFlagName;
+  readonly next: boolean;
+}): Promise<void> {
+  const { sessionId, place, flag, next } = options;
+  const signal = flagAccount.signal;
+  await runTurn(sessionId, { skippable: true, flag: true }, async () => {
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
+    /* Resolved inside the turn rather than at the call: a chat that moved while
+       this waited is the one the choice belongs to. */
+    const id = resolveSessionId(sessionId);
+    writeFlagOf(flag, id, flagPicked(readFlagOf(flag, id), next));
+    try {
+      await Effect.runPromise(
+        Effect.promise(() =>
+          flag === 'webSearch'
+            ? persistWebSearchEnabled(id, next, signal)
+            : persistMcpEnabled(id, next, signal)
+        ),
+        { signal }
+      );
+    } catch (error) {
+      if (!isFlagAccountActive(signal)) {
+        return;
+      }
+      /* The write was refused: the switch goes back to the stored choice and
+         the tap is reported. */
+      writeFlagOf(flag, id, flagRefused(readFlagOf(flag, id)));
+      throw error;
+    }
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
+    writeFlagOf(flag, id, flagPersisted(readFlagOf(flag, id), next));
+    if (place === null) {
+      writeFlagOf(flag, id, flagApplication(readFlagOf(flag, id), 'current'));
+      return;
+    }
+    let application: ChatFlagApplication = 'current';
+    try {
+      application = await applyFlag(flag, id, { place, signal });
+    } catch {
+      if (!isFlagAccountActive(signal)) {
+        return;
+      }
+      /* Saved, but this session is not on it. */
+      application = 'behind';
+    }
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
+    /* The move renamed the chat, and the flag travelled with its state. */
+    const landed = resolveSessionId(id);
+    writeFlagOf(flag, landed, flagApplication(readFlagOf(flag, landed), application));
+  });
+}
+
+/** Applies a saved choice to the live session again, after a move that failed. */
+export async function retryChatFlag(options: {
+  readonly sessionId: string;
+  readonly place: ChatPlace | null;
+  readonly flag: ChatFlagName;
+}): Promise<void> {
+  const { sessionId, place, flag } = options;
+  const signal = flagAccount.signal;
+  await runTurn(sessionId, { skippable: true, flag: true }, async () => {
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
+    const id = resolveSessionId(sessionId);
+    if (place === null || !chatFlagBehind(readFlagOf(flag, id))) {
+      return;
+    }
+    writeFlagOf(flag, id, flagApplication(readFlagOf(flag, id), 'moving'));
+    let application: ChatFlagApplication = 'current';
+    try {
+      application = await applyFlag(flag, id, { place, signal });
+    } catch {
+      if (!isFlagAccountActive(signal)) {
+        return;
+      }
+      application = 'behind';
+    }
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
+    const landed = resolveSessionId(id);
+    writeFlagOf(flag, landed, flagApplication(readFlagOf(flag, landed), application));
+  });
+}
+
+/** The phases that still owe a read of the stored choice. */
+const awaitingRead = (flag: ChatFlag): boolean => flag.kind === 'reading' || flag.kind === 'unread';
+
+/** A stored choice, or the fact that reading it failed. */
+type ReadChoice = { readonly ok: true; readonly choice: boolean | null } | { readonly ok: false };
+
+async function readChoice(read: () => Promise<boolean | null>): Promise<ReadChoice> {
+  try {
+    return { ok: true, choice: await read() };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** A flag whose read settled: the stored choice, or `unread` when it failed. */
+function readFlag(flag: ChatFlag, read: ReadChoice): ChatFlag {
+  if (!awaitingRead(flag)) {
+    return flag;
+  }
+  if (!read.ok) {
+    return { kind: 'unread' };
+  }
+  return { kind: 'saved', choice: read.choice, application: 'current' };
+}
+
+/**
+ * Reads both stored choices once, for a chat whose flags are `reading`/`unread`.
+ *
+ * Called inside the turn an open holds, which is what makes the read safe: a
+ * tap that was enqueued before it has already written, so the read is skipped
+ * rather than putting the stored value over the tap, and a tap enqueued after it
+ * runs behind the read.
+ */
+async function ensureFlags(sessionId: string): Promise<void> {
+  const id = resolveSessionId(sessionId);
+  const held = snapshotOf(id);
+  const wantWeb = awaitingRead(held.webSearch);
+  const wantKilo = awaitingRead(held.kiloTools);
+  if (!wantWeb && !wantKilo) {
     return;
   }
-  if (chat.answering !== undefined) {
-    chat.pendingTools = true;
-    return;
+  const [web, kilo] = await Promise.all([
+    wantWeb ? readChoice(() => webSearchChoiceFor(id)) : null,
+    wantKilo ? readChoice(() => mcpChoiceFor(id)) : null,
+  ]);
+  if (web !== null) {
+    change(id, { webSearch: readFlag(snapshotOf(id).webSearch, web) });
   }
-  await ontoTools(current, chat);
+  if (kilo !== null) {
+    change(id, { kiloTools: readFlag(snapshotOf(id).kiloTools, kilo) });
+  }
 }
 
 /**
@@ -1572,11 +1892,18 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
   if (state.status !== 'ready' || state.tools.length === 0) {
     return;
   }
-  if (chat.answering !== undefined) {
-    chat.pendingTools ??= true;
-    return;
-  }
-  await ontoTools(current, chat);
+  await runTurn(current, { skippable: true }, async () => {
+    const landed = resolveSessionId(current);
+    const live = chats.get(landed);
+    if (live === undefined || live.closing) {
+      return;
+    }
+    if (live.answering !== undefined) {
+      live.tools = pendingToolsChange();
+      return;
+    }
+    await ontoTools(landed, live);
+  });
 }
 
 /**
@@ -1613,6 +1940,10 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: [] });
+  /* An answer interrupted while its tools ran leaves an on-device generation
+     waiting for results nothing will supply. It is released here, the one place
+     Stop, a close, a deletion and a sign-out all pass through. */
+  await releaseNativeModelRound(sessionId);
   return true;
 }
 
@@ -1632,12 +1963,18 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
 async function endChat(sessionId: string, chat: Chat): Promise<void> {
   chat.closing = true;
   chats.delete(sessionId);
+  /* A move queued behind this close would wait for the turn this close holds,
+     so its gate is opened first: it resolves without running, the answer's
+     settle finishes, and the interrupt returns. Without this the close waits on
+     a turn only it can release. */
+  skipWaitingTurns(sessionId);
   await halt(sessionId, chat);
   /* Whatever was still waiting goes with the chat. Asking it now would open a
      round on a session whose scope is closing under it. */
   chat.waiting.length = 0;
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
+  forgetTurn(sessionId);
   forgetState(sessionId);
 }
 
@@ -1650,12 +1987,13 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
  * chat running and the old id pointing at one nobody ended.
  */
 export async function releaseChat(sessionId: string): Promise<void> {
-  const current = snapshotOf(sessionId).sessionId;
-  await oneAtATime(current, async () => {
+  await runTurn(sessionId, { skippable: false }, async () => {
+    const current = resolveSessionId(sessionId);
     const chat = chats.get(current);
     if (chat === undefined) {
       /* Deleting a chat that was never opened still has a state subscribed by
          the row that was tapped, so it is forgotten here too. */
+      forgetTurn(current);
       forgetState(current);
       return;
     }
@@ -1664,9 +2002,16 @@ export async function releaseChat(sessionId: string): Promise<void> {
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */
-export async function releaseEveryChat(): Promise<void> {
+async function closeAccountChats(): Promise<void> {
   for (const sessionId of chats.keys()) {
     // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
+    await releaseChat(sessionId);
+  }
+  /* A chat with a queued flag write but no live session is drained too: the
+     preferences are deleted after this returns, and a write that landed after
+     that would restore a choice the sign-out just removed. */
+  for (const sessionId of chatTurns.keys()) {
+    // eslint-disable-next-line no-await-in-loop -- each chat's queue finishes before the next is waited on: their writes share one database
     await releaseChat(sessionId);
   }
   for (const runtime of runtimes.values()) {
@@ -1674,4 +2019,26 @@ export async function releaseEveryChat(): Promise<void> {
     await runtime.dispose();
   }
   runtimes.clear();
+}
+
+export async function releaseEveryChat(): Promise<void> {
+  if (releasingChats !== undefined) {
+    await releasingChats;
+    return;
+  }
+  flagAccount.abort();
+  for (const turn of chatTurns.values()) {
+    for (const ticket of turn.waiting) {
+      if (ticket.flag) {
+        ticket.skip();
+      }
+    }
+  }
+  releasingChats = closeAccountChats();
+  try {
+    await releasingChats;
+  } finally {
+    flagAccount = new AbortController();
+    releasingChats = undefined;
+  }
 }

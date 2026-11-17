@@ -47,10 +47,15 @@ const permission = vi.hoisted(() => ({
 const webhookWarning = vi.hoisted(() => ({ shown: false }));
 const saveMutation = vi.hoisted(() => ({ isPending: false, mutate: vi.fn() }));
 
-const mintInstallState = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ token: 'install-state-token' }))
+const handoffUrl = vi.hoisted(() =>
+  vi.fn((_target: unknown): Promise<string> =>
+    Promise.resolve('https://app.kilo.ai/app-shell/handoff?token=handoff-token')
+  )
 );
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const routerPush = vi.hoisted(() => vi.fn());
+/** Every focus effect the screen registered, in call order; the test re-runs one. */
+const focusEffects = vi.hoisted(() => [] as (() => undefined | (() => void))[]);
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
 
@@ -81,8 +86,13 @@ vi.mock('@/lib/a11y/motion', () => ({
     reducedMotion ? undefined : entrance,
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useFocusEffect: () => undefined,
+  useRouter: () => ({ push: routerPush }),
+  // The real hook runs the effect while the screen is focused; recording it
+  // also lets a test re-run the latest one as the screen regains focus.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    focusEffects.push(effect);
+    effect();
+  },
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -97,13 +107,11 @@ vi.mock('@/components/agents/model-selector', () => ({
   openModelPicker: openPicker,
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: handoffUrl }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: launchBrowser,
   reportLateLaunchFailure: vi.fn(),
-}));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mintInstallState } } },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
@@ -309,8 +317,10 @@ beforeEach(() => {
   motion.reducedMotion = false;
   centeredState.mockClear();
   scrollView.mockClear();
-  mintInstallState.mockClear();
+  handoffUrl.mockClear();
   launchBrowser.mockClear();
+  routerPush.mockClear();
+  focusEffects.length = 0;
   openExternal.mockClear();
   openPicker.mockClear();
 });
@@ -557,12 +567,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: undefined,
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     // Returning from the browser re-reads the config, so a fixed reviewer clears the banner.
     expect(config.refetch).toHaveBeenCalledTimes(1);
@@ -575,53 +582,68 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App', 'org-1');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app', organizationId: 'org-1' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1&installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
   });
 
-  it('falls back to the integration page when minting an install state is refused', async () => {
-    // Organizations whose members can edit the config but not mint an install
-    // state, and organizations that already hold an installation, still reach
-    // the page that opens the install/manage flow.
-    mintInstallState.mockImplementationOnce(() =>
-      Promise.reject(new Error('This organization already has a GitHub installation'))
-    );
-    config.data = makeConfig({
-      actionRequired: makeActionRequired('github_installation_required'),
-    });
-
-    await pressRecovery('Update GitHub App', 'org-1');
-
-    expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1'
-    );
-    expect(config.refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens the GitLab integration page for a project-access block', async () => {
+  it('opens the GitLab integration shell page for a project-access block', async () => {
     config.data = makeConfig({
       actionRequired: makeActionRequired('gitlab_project_access_required'),
     });
 
     await pressRecovery('Update GitLab integration', 'org-1', 'gitlab');
 
+    expect(handoffUrl).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'gitlab',
+      organizationId: 'org-1',
+    });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/organizations/org-1/integrations/gitlab'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     expect(config.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the BYOK settings page for an invalid key', async () => {
+  it('opens the app provider-keys screen for an invalid key, without a browser', async () => {
     config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
 
     await pressRecovery('Update BYOK settings');
 
-    expect(launchBrowser).toHaveBeenCalledWith('https://app.kilo.ai/byok');
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-keys');
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('scopes the provider-keys screen to the organization', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings', 'org-1');
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org-1' },
+    });
+    expect(launchBrowser).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the config when the key screen hands the reviewer back', async () => {
+    config.data = makeConfig({ actionRequired: makeActionRequired('byok_invalid_key') });
+
+    await pressRecovery('Update BYOK settings');
+    // Nothing to re-read yet: the fix happens on the screen just pushed.
+    expect(config.refetch).not.toHaveBeenCalled();
+
+    // Coming back to the reviewer focuses this screen again.
+    const refocus = focusEffects.at(-1);
+    if (refocus === undefined) {
+      throw new Error('the banner registered no focus effect');
+    }
+    act(() => {
+      refocus();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('opens the reviewer model picker for an unavailable model', async () => {

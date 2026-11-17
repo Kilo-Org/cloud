@@ -1,5 +1,6 @@
 import { FileText } from '@/components/ui/icons';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { type Href } from 'expo-router';
 import { type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -11,9 +12,11 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { selectInvoiceErrorVariant } from '@/lib/organization-invoice-error-variant';
 
@@ -31,7 +34,11 @@ type InvoiceListQuery = {
   readonly isFetchingNextPage: boolean;
   readonly error: unknown;
   readonly data: { readonly pages: readonly unknown[] } | undefined;
-  readonly refetch: () => void;
+  /**
+   * The pull's read: it resolves with the settled result so the shared refresh
+   * hook can decide whether to report the failure.
+   */
+  readonly refetch: () => Promise<{ readonly isError: boolean }>;
   readonly fetchNextPage: () => void;
 };
 
@@ -75,6 +82,8 @@ type InvoiceListScreenProps = Readonly<{
    * already this screen's name paints no eyebrow and leaves this off.
    */
   reserveEyebrow?: boolean;
+  /** Where the header's Back lands when the list opens with no history to pop. */
+  backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
   query: InvoiceListQuery;
   entries: readonly Invoice[];
@@ -92,6 +101,7 @@ export function InvoiceListScreen({
   title,
   eyebrow,
   reserveEyebrow,
+  backFallback,
   query,
   entries,
   hasMore,
@@ -101,6 +111,10 @@ export function InvoiceListScreen({
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
   const committedConnectivity = useCommittedConnectivityStatus();
+  // An invoice can appear without a screen change (a renewal charging while the
+  // app is open), so both bodies offer the same pull over the read.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
   // across data updates and only the changed rows re-render.
@@ -147,7 +161,7 @@ export function InvoiceListScreen({
             isPermanentError
               ? undefined
               : () => {
-                  query.refetch();
+                  void query.refetch();
                 }
           }
           isRetrying={query.isFetching}
@@ -155,7 +169,14 @@ export function InvoiceListScreen({
       </Animated.View>
     );
   } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
-    body = <EmptyState icon={FileText} title={emptyTitle} description={emptyDescription} />;
+    body = (
+      <EmptyState
+        icon={FileText}
+        title={emptyTitle}
+        description={emptyDescription}
+        refreshControl={refreshControl}
+      />
+    );
   } else {
     const footer = (
       // The former container gap also separated the last row from this footer
@@ -212,6 +233,7 @@ export function InvoiceListScreen({
           getItemType={() => 'invoice'}
           ItemSeparatorComponent={InvoiceRowSeparator}
           contentContainerStyle={listContentContainerStyle}
+          refreshControl={refreshControl}
           ListEmptyComponent={
             <EmptyState
               placement="top"
@@ -228,7 +250,12 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} eyebrow={eyebrow} reserveEyebrow={reserveEyebrow} />
+      <ScreenHeader
+        title={title}
+        eyebrow={eyebrow}
+        reserveEyebrow={reserveEyebrow}
+        backFallback={backFallback}
+      />
       {body}
     </View>
   );

@@ -247,6 +247,29 @@ describe('fetchEfficientAutoDecision', () => {
     expect(result).toBeNull();
   });
 
+  it('requires an https or loopback worker endpoint', async () => {
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      workerUrl: 'http://worker.example.com',
+    });
+
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it('sends over loopback http', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      workerUrl: 'http://127.0.0.1:8799',
+    });
+
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const [url] = mockedFetch.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8799/decide');
+  });
+
   it('returns null when authToken is not configured', async () => {
     const result = await fetchEfficientAutoDecision(makeParams(), {
       ...options,
@@ -460,6 +483,16 @@ describe('fetchCustomRouterDecision', () => {
     expect(await fetchCustomRouterDecision(customParams(), { ...options, workerUrl: '' })).toEqual({
       kind: 'unavailable',
     });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires an https or loopback worker endpoint', async () => {
+    expect(
+      await fetchCustomRouterDecision(customParams(), {
+        ...options,
+        workerUrl: 'http://worker.example.com',
+      })
+    ).toEqual({ kind: 'unavailable' });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 

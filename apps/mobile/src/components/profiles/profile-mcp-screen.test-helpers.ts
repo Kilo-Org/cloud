@@ -1,9 +1,13 @@
+import { type Href } from 'expo-router';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 
 import { ProfileMcpScreen } from '@/components/profiles/profile-mcp-screen';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 /**
  * Shared harness for the Profile MCP mounted tests. The `vi.mock` calls stay in
@@ -136,7 +140,11 @@ export function confirmRequest(confirm: TestConfirmMock): void {
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 export function mountScreen(organizationId?: string) {
   return renderWithProviders(
-    createElement(ProfileMcpScreen, { profileId: 'profile-1', organizationId })
+    createElement(ProfileMcpScreen, {
+      profileId: 'profile-1',
+      organizationId,
+      backFallback: PROFILES_LIST_HREF,
+    })
   );
 }
 
@@ -150,7 +158,11 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProfileMcpScreen, { profileId: 'profile-1', organizationId })
+      createElement(ProfileMcpScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        backFallback: PROFILES_LIST_HREF,
+      })
     )
   );
 }

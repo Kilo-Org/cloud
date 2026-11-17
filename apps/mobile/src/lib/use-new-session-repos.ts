@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import {
@@ -19,9 +20,9 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -44,7 +45,13 @@ type UseNewSessionReposResult = {
   /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
   /**
-   * True once every provider query has finished its first load.
+   * True once every provider query has finished its first load, or has outlived
+   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while still loading. Every consumer reads
+   * this bounded value: the form's rows and the route-prefill seed gate alike,
+   * so a list that never answers withholds nothing. A prefill still unanswered
+   * at the bound is given up rather than deferred (`shouldAbandonRepoSeed`), so
+   * a late answer cannot mount a repository the region was declared final
+   * without.
    *
    * `isLoading` is false for a query that is paused or disabled, so a screen
    * that is offline (or a personal scope, where the Bitbucket query is
@@ -81,11 +88,28 @@ type UseNewSessionReposResult = {
  */
 const NEW_SESSION_REPOS_STALE_TIME_MS = 5 * 60 * 1000;
 
+/**
+ * How long the three provider lists may stay in their first load before the
+ * repository region stops waiting for them.
+ *
+ * Matches the client control-plane deadline (`CONTROL_PLANE_DEADLINE_MS`):
+ * the three lists travel in one batched request, the transport abandons an
+ * attempt after that deadline, and the query retries it, so a throttled link
+ * can keep the whole set pending for minutes. In a scope with no provider
+ * connected every list answers "not connected", which never changes the
+ * region's shape, so a list that cannot complete must not withhold the form's
+ * rows — the Ambiente row, the only entry to the profile picker — behind it.
+ * After the bound the section renders what it has, exactly as it does for a
+ * provider that reports nothing.
+ */
+export const PROVIDER_QUERY_SETTLE_BOUND_MS = 15_000;
+
 export function useNewSessionRepos({
   organizationId,
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const githubQuery = useQuery(
     organizationId
@@ -348,10 +372,12 @@ export function useNewSessionRepos({
 
   // ── Per-provider connect ──────────────────────────────────────────
   /**
-   * The provider whose connect flow is running, or null. The flow's first step
-   * (GitHub mints an install state over the network; all three then open the
-   * browser and refetch on return) takes long enough that a control without this
-   * flag reads as inert: nothing happens until the network settles.
+   * The provider whose browser connect flow is running, or null. Its first step
+   * (GitHub mints an install state over the network, then both open the browser
+   * and refetch on return) takes long enough that a control without this flag
+   * reads as inert: nothing happens until the network settles. Bitbucket never
+   * sets it: its workspace access token is pasted in the app's own connect
+   * sheet, which opens synchronously.
    */
   const [connectingProvider, setConnectingProvider] = useState<RepositoryPlatform | null>(null);
   // Mirrors the state so a second tap inside the same frame — before the
@@ -360,9 +386,12 @@ export function useNewSessionRepos({
 
   const openGitLabIntegration = useCallback(async () => {
     try {
-      const wait = await openAuthorizationAndWaitForReturn(
-        getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
-      );
+      const url = await appShellHandoffUrl({
+        page: 'integration',
+        platform: 'gitlab',
+        ...(organizationId ? { organizationId } : {}),
+      });
+      const wait = await openAuthorizationAndWaitForReturn(url);
       reportLateLaunchFailure(wait, {
         onFailure: () => {
           toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
@@ -374,27 +403,21 @@ export function useNewSessionRepos({
     }
   }, [organizationId, forceFreshGitLab]);
 
-  const openBitbucketIntegration = useCallback(async () => {
+  const openBitbucketIntegration = useCallback(() => {
     if (!organizationId) {
       return;
     }
-    try {
-      const wait = await openAuthorizationAndWaitForReturn(
-        getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
-      );
-      reportLateLaunchFailure(wait, {
-        onFailure: () => {
-          toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-        },
-      });
-      await forceFreshBitbucket();
-    } catch {
-      toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-    }
-  }, [organizationId, forceFreshBitbucket]);
+    // The sheet owns the token form and invalidates this hook's repository read
+    // when the connection lands, so there is nothing to wait for here.
+    router.push(bitbucketConnectHref(organizationId));
+  }, [organizationId, router]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
+      if (platform === 'bitbucket') {
+        openBitbucketIntegration();
+        return;
+      }
       if (connectingProviderRef.current !== null) {
         return;
       }
@@ -402,13 +425,7 @@ export function useNewSessionRepos({
       setConnectingProvider(platform);
       void (async () => {
         try {
-          if (platform === 'github') {
-            await openGitHubIntegration();
-          } else if (platform === 'gitlab') {
-            await openGitLabIntegration();
-          } else {
-            await openBitbucketIntegration();
-          }
+          await (platform === 'github' ? openGitHubIntegration() : openGitLabIntegration());
         } finally {
           connectingProviderRef.current = null;
           setConnectingProvider(null);
@@ -425,8 +442,42 @@ export function useNewSessionRepos({
     isRefreshingGitHub ||
     isRefreshingProviders;
 
-  const providerQueriesResolved =
+  // A provider list can stay pending forever — a throttled link, a paused query,
+  // a provider that never answers. Waiting for it is therefore a bounded state:
+  // after `PROVIDER_QUERY_SETTLE_BOUND_MS` the region stops withholding its rows
+  // for a list that may never land.
+  //
+  // The bound belongs to the SCOPE, not to one request. These queries retry, and
+  // a retry changes the request while the question — what can this scope's
+  // providers list? — stays the same. Re-arming on each request would withhold
+  // the rows for the whole retry chain, and clearing the timer between attempts
+  // would never fire it at all; an expiry tied to a counter that changes with the
+  // request was valid for a single render, so the rows entered and left again.
+  // One scope therefore arms the timer once and then stays settled, and a
+  // different scope arms its own. A retry of the same list can no longer unseat
+  // a row that is already on screen.
+  //
+  // The cost is the one the bound accepts: a list that answers just after the
+  // bound mounts its card then, which can push these rows once. A row that never
+  // appears is the worse failure, because the profile picker has no other entry
+  // from Home.
+  const providerScopeKey = organizationId ?? 'personal';
+  const [settledScopeKey, setSettledScopeKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (settledScopeKey === providerScopeKey) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSettledScopeKey(providerScopeKey);
+    }, PROVIDER_QUERY_SETTLE_BOUND_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [providerScopeKey, settledScopeKey]);
+  const answersResolved =
     !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
+
+  const providerQueriesResolved = answersResolved || settledScopeKey === providerScopeKey;
 
   const reposSettled =
     !githubQuery.isLoading &&
@@ -553,31 +604,59 @@ export function useRepositoryBranches(
   // A request can stay pending forever — a stalled connection, a paused query,
   // a provider that never answers. Loading is therefore a bounded state: after
   // `BRANCH_SETTLE_BOUND_MS` the row stops presenting a request that may never
-  // land as progress and offers the retry instead. The expiry records the
-  // question it was armed for, so a repository or scope change starts loading
-  // again without a frame of the previous expiry. The query itself keeps
-  // running, and the retry cancels it before starting a fresh request.
+  // land as progress and offers the retry instead. The bound belongs to one
+  // question and one request: `attempt` names the question it was counted for,
+  // so a repository or scope change — including a return to a question that was
+  // pending before — cannot match the previous question's expiry, and a retry or
+  // any new request is a new attempt for the same reason. An earlier expiry can
+  // therefore never present a request that is in flight as stuck.
+  // The query itself keeps running, and the retry cancels it before starting a
+  // fresh request.
   const isPending = isEnabled && branchQuery.isPending;
   const isFetching = isEnabled && branchQuery.isFetching;
-  const [expiredFor, setExpiredFor] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState({ settleKey, count: 0 });
+  const [expiry, setExpiry] = useState<{ settleKey: string; attempt: number } | null>(null);
+  // Records the question a frame renders for and counts each request it makes.
+  // It runs after the frame, which is why `overBound` also compares the attempt's
+  // question with this render's: the frame that changes the question is already
+  // clean, not the frame after it.
+  useEffect(() => {
+    setAttempt(current =>
+      current.settleKey === settleKey && !isPending && !isFetching
+        ? current
+        : { settleKey, count: current.count + 1 }
+    );
+  }, [settleKey, isPending, isFetching]);
   useEffect(() => {
     if (!isPending && !isFetching) {
       return undefined;
     }
+    const armed = { settleKey, attempt: attempt.count };
     const timer = setTimeout(() => {
-      setExpiredFor(settleKey);
+      setExpiry(armed);
     }, BRANCH_SETTLE_BOUND_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [settleKey, isPending, isFetching]);
-  const overBound = isPending && expiredFor === settleKey;
+  }, [attempt, settleKey, isPending, isFetching]);
+  // `attempt` names the question it was counted for, so a frame that returns to
+  // a repository another question replaced cannot match the expiry that
+  // repository's previous visit armed, not even before the effect above records
+  // the change.
+  const overBound =
+    isPending &&
+    attempt.settleKey === settleKey &&
+    expiry?.settleKey === settleKey &&
+    expiry.attempt === attempt.count;
 
   const retry = useCallback(() => {
+    // The retry owns a fresh bound now, so the row returns to the skeleton
+    // instead of the retry row it was tapped on.
+    setAttempt(current => ({ settleKey, count: current.count + 1 }));
     // A refetch cancels the request that is still running, so the retry works
     // while the bounded request is stuck instead of waiting behind it.
     void branchQuery.refetch();
-  }, [branchQuery]);
+  }, [branchQuery, settleKey]);
 
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,

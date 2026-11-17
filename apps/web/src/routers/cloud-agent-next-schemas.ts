@@ -2,7 +2,10 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  ParentCallbackTargetSchema,
+  requestedEnvironmentSchema,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   cloudSessionMetadataSchema,
@@ -13,8 +16,8 @@ import {
   cloudToolPartDetailInputSchema,
   cloudToolPartDetailWireSchema,
 } from '@kilocode/cloud-agent-sdk/tool-part-detail';
-import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { SandboxStatusSessionIdSchema } from '@cloud-agent-shared/sandbox-status';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -35,31 +38,25 @@ import {
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
 } from '@/lib/cloud-agent/constants';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../services/cloud-agent-next/src/shared/preview-port';
-import {
-  previewTargetSchema,
-  type PreviewTarget,
-} from '../../../../services/cloud-agent-next/src/shared/preview-target';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
+import { previewTargetSchema, type PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 export {
   ListPreviewServicesOutputSchema as baseListPreviewServicesNextOutputSchema,
   type ListPreviewServicesOutput,
   type PreviewService,
-} from '../../../../services/cloud-agent-next/src/shared/preview-services';
+} from '@cloud-agent-shared/preview-services';
 export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
   SandboxProviderLabel,
   SandboxStatusDetailCode,
   SandboxStatusSnapshot,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 
 /**
  * Shared schemas for cloud-agent-next routers
@@ -187,26 +184,9 @@ export const cloudAgentReleasePendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
-/**
- * Agent mode enum - all supported modes.
- * - code, plan, debug, orchestrator, ask: CLI agent modes
- * - build, architect: Backward-compatible aliases (build → code, architect → plan)
- * - custom: Custom mode (requires appendSystemPrompt)
- */
 export const messageIdNextSchema = z
   .string()
   .regex(MESSAGE_ID_PATTERN, 'Invalid message ID format');
-
-export const agentModeNextSchema = z.enum([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
 
 // Encrypted envelope shape (re-defined here to avoid importing server-only code).
 const encryptedEnvelopeInputSchema = z.object({
@@ -301,35 +281,31 @@ export const runtimeAgentInputSchema = z.object({
 });
 
 /**
- * Mode field accepted by prepare/update-session calls. Allows built-in
- * enum values plus any custom slug — cloud-agent-next cross-validates the
+ * Agent mode accepted by every cloud-agent-next call that names one: create,
+ * update, and a follow-up send. A mode is a slug, and `custom` is one of them —
+ * it selects the session's stored `appendSystemPrompt`, so a session created in
+ * it stays usable afterwards. cloud-agent-next cross-validates a non-built-in
  * slug against the session's `runtimeAgents` list.
  */
-export const preparedSessionModeSchema = z
+export const agentSessionModeSchema = z
   .string()
   .min(1)
   .max(50)
   .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug');
+
+/**
+ * Thinking-effort variant for a model. Variants are model- and agent-specific
+ * keys (the catalog's `opencode.variants`, or a stored profile agent's
+ * `config.variant`), so only the stored length bound applies — the catalog
+ * decides which keys exist, not this schema.
+ */
+export const agentVariantSchema = z.string().min(1).max(50);
 
 // Combined MCP server configuration schema — CLI-native local/remote format
 export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
   mcpLocalServerConfigSchema,
   mcpRemoteServerConfigSchema,
 ]);
-
-/**
- * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
- * cloud-agent-next cross-validates against the session's stored runtimeAgents.
- * The reserved slug `custom` is still rejected here (requires prepare).
- */
-export const agentModeSendMessageSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
-  .refine(mode => mode !== 'custom', {
-    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
-  });
 
 /**
  * Discriminated execution payload for follow-up messages and prepared-session
@@ -343,25 +319,17 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
     prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
-    mode: agentModeSendMessageSchema,
+    mode: agentSessionModeSchema,
     model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: agentVariantSchema.optional(),
   }),
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
     arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
-    mode: agentModeSendMessageSchema.optional(),
+    mode: agentSessionModeSchema.optional(),
     model: z.string().min(1).optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: agentVariantSchema.optional(),
   }),
 ]);
 
@@ -379,28 +347,6 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
   }),
   sendMessageNextPayloadSchema.options[1],
 ]);
-
-/**
- * The environment the user selected, and the branch of each additional
- * repository of a multi-repository environment. The worker checks both against
- * the owner and the launch repository, and validates each branch.
- */
-const requestedEnvironmentSchema = z
-  .object({
-    id: z.uuid(),
-    repositories: z
-      .array(
-        z
-          .object({
-            repoFullName: z.string().min(1).max(500),
-            branch: z.string().min(1).max(255).optional(),
-          })
-          .strict()
-      )
-      .max(100)
-      .optional(),
-  })
-  .strict();
 
 /**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
@@ -448,13 +394,9 @@ const PrepareSessionSharedFields = {
     .optional(),
 
   // Execution params (required)
-  mode: preparedSessionModeSchema,
+  mode: agentSessionModeSchema,
   model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: agentVariantSchema.optional(),
 
   /** The repository environment the user selected, with branches for its additional repositories. */
   requestedEnvironment: requestedEnvironmentSchema.optional(),
@@ -1011,6 +953,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+  /** The GitHub connection this session's repository was prepared with. */
+  githubIntegrationId: z.string().optional(),
+  /** The Bitbucket workspace that owns this session's repository. */
+  bitbucketWorkspaceUuid: z.string().optional(),
+  /** The Bitbucket repository this session was prepared for. */
+  bitbucketRepositoryUuid: z.string().optional(),
 
   // Execution params
   prompt: z.string().optional(),
@@ -1059,6 +1007,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Versioning
   timestamp: z.number(),
   version: z.number(),
+
+  /** Durability watermark: newest persisted event ID from the session event log. */
+  latestEventId: z.number().int().positive().nullable().optional(),
+
+  // `updateCursor` from the Worker's event log is deliberately NOT projected:
+  // no web consumer reads it, and it is an internal log offset.
 });
 
 // Schema for answering a question

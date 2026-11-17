@@ -34,12 +34,8 @@ import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-ext
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  androidSink,
-  getCurrentWidgetProps,
-  handleAppStateActive,
-  refreshPostedCardAction,
-} from './android-sink';
+import { getCurrentWidgetProps } from './widget-render';
+import { androidSink, handleAppStateActive, refreshPostedCardAction } from './android-sink';
 import {
   formatGlanceableAgo,
   formatGlanceableClock,
@@ -62,14 +58,18 @@ registerGlanceableSink(androidSink);
  * The two session-follow entries this file calls. The module loads on demand:
  * a widget redraw must not carry the notification graph.
  */
-type SessionFollowLazy = {
-  endAllSessionCards: () => void;
-  restoreFollowedSessionCardsFromStorage: () => Promise<boolean>;
-};
+type SessionFollowLazy = { endAllSessionCards: () => void };
+
+type SessionFollowStorageLazy = { restoreFollowedSessionCardsFromStorage: () => Promise<boolean> };
 
 function sessionFollow(): SessionFollowLazy {
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
   return require('./session-follow') as SessionFollowLazy;
+}
+
+function sessionFollowStorage(): SessionFollowStorageLazy {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('./session-follow-storage') as SessionFollowStorageLazy;
 }
 
 // A sign-out, an account change, or a privacy lock blanks every surface; the
@@ -87,12 +87,12 @@ AppState.addEventListener('change', state => {
     // have updated them while no process ran, and a dismissal the receiver
     // missed leaves a stored card for a session the app no longer follows.
     // Loaded here for the same reason as the terminal end above.
-    void sessionFollow().restoreFollowedSessionCardsFromStorage();
+    void sessionFollowStorage().restoreFollowedSessionCardsFromStorage();
   }
 });
 
 if (AppState.currentState === 'active') {
-  void sessionFollow().restoreFollowedSessionCardsFromStorage();
+  void sessionFollowStorage().restoreFollowedSessionCardsFromStorage();
 }
 
 // Turning the in-app switch off must clear the Live Update already in the

@@ -5,71 +5,37 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import { claudeBillingOwnerMatches } from './owner';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
+/**
+ * The owner a pending link completes and the owner of the internal payer-state
+ * wire between the gateway and the web app. The two deployments release
+ * separately, so each side reads the other's previous release: an organization
+ * owner arrives with fields this release no longer names, and parsing ignores
+ * them.
+ */
 export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
-  z.object({
-    kind: z.literal('member'),
-    kiloUserId: z.string().min(1),
-    organizationId: z.uuid(),
-  }),
-  z.object({ kind: z.literal('shared_services'), organizationId: z.uuid() }),
+  z.object({ kind: z.literal('organization'), organizationId: z.uuid() }),
 ]) satisfies z.ZodType<ClaudeBillingOwner>;
-
-/**
- * The owner on the internal payer-state wire between the gateway and the web
- * app. The gateway deploys first, so each side must read the other's previous
- * release: `organization` alone names the shared-services connection, which is
- * the organization connection that release knew, and `organization` with a
- * person names that member's own connection.
- */
-export const ClaudeBillingPayerOwnerSchema = z
-  .discriminatedUnion('kind', [
-    z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
-    z.object({
-      kind: z.literal('organization'),
-      organizationId: z.uuid(),
-      kiloUserId: z.string().min(1).optional(),
-    }),
-  ])
-  .transform((wire): ClaudeBillingOwner => {
-    if (wire.kind === 'personal') return wire;
-    return wire.kiloUserId
-      ? { kind: 'member', kiloUserId: wire.kiloUserId, organizationId: wire.organizationId }
-      : { kind: 'shared_services', organizationId: wire.organizationId };
-  });
-
-function payerOwnerWire(owner: ClaudeBillingOwner): z.input<typeof ClaudeBillingPayerOwnerSchema> {
-  switch (owner.kind) {
-    case 'personal':
-      return owner;
-    case 'member':
-      return {
-        kind: 'organization',
-        organizationId: owner.organizationId,
-        kiloUserId: owner.kiloUserId,
-      };
-    case 'shared_services':
-      return { kind: 'organization', organizationId: owner.organizationId };
-  }
-}
 
 export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
   /**
-   * The person the row belongs to, null for a row that belongs to an
-   * organization. Every web app release since #10300 answers with it, and the
-   * cross-region read binds a personal or member row by it.
+   * The person a personal row belongs to, null for an organization row. The
+   * cross-region read requires the requesting person for a personal owner and
+   * null for an organization owner.
    */
   kilo_user_id: z.string().nullable().optional(),
   /**
-   * The organization an organization-owned connection belongs to; null for a
-   * personal row. The gateway tolerates its absence, because a web app release
-   * that does not send it still answers the shared-services read.
+   * The organization an organization row belongs to, null for a personal row.
+   * The cross-region read requires the requested organization for an
+   * organization owner, and null or absent for a personal owner.
    */
   organization_id: z.uuid().nullable().optional(),
   /** The person who linked it last; every release since #10300 answers with it. */
@@ -101,12 +67,15 @@ export async function getAuthoritativeClaudeBillingState(
   if (!isUSRegion())
     return claudeBillingPayerState(await getGrantedClaudeBillingConnection(owner, db));
   if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
+  if (!parseInternalServiceUrl(APP_URL)) {
+    throw new Error('Claude payer-state endpoint is not configured');
+  }
   const response = await fetchClaudeWithRetry(
     new URL('/api/internal/claude-billing/payer-state', APP_URL).toString(),
     async () => ({
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
-      body: JSON.stringify(payerOwnerWire(owner)),
+      body: JSON.stringify(owner),
       cache: 'no-store',
     }),
     status => status === 429 || status >= 500,
@@ -114,20 +83,6 @@ export async function getAuthoritativeClaudeBillingState(
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
   const { connection } = responseSchema.parse(await response.json());
-  // A personal or member row belongs to the person it names, so the read
-  // returns it only for that person. A shared-services row belongs to an
-  // organization, so it must name the organization the caller asked about when
-  // the answer carries one; an older web app release sends no organization and
-  // is accepted.
-  if (owner.kind !== 'shared_services' && connection?.kilo_user_id !== owner.kiloUserId) {
-    return null;
-  }
-  if (
-    owner.kind === 'shared_services' &&
-    connection?.organization_id &&
-    connection.organization_id !== owner.organizationId
-  ) {
-    return null;
-  }
+  if (!connection || !claudeBillingOwnerMatches(connection, owner)) return null;
   return connection;
 }

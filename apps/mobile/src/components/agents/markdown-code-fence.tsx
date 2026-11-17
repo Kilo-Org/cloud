@@ -1,9 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
-import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+} from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
 import { performCopy } from './use-message-copy';
@@ -46,11 +51,16 @@ export function MarkdownCodeFence({
   const copy = onCopyCode ?? ((source: string) => void performCopy(source));
   return (
     <View
-      className="my-1 overflow-hidden rounded-lg px-3 pt-2 pb-3"
+      className="my-1 overflow-hidden rounded-lg px-3 pb-3"
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the card color is the markdown variant's runtime palette
       style={{ backgroundColor: palette.codeBackground }}
     >
-      <View className="mb-1 flex-row items-center justify-between">
+      <View
+        className={cn(
+          'mb-1 flex-row items-center justify-between',
+          SECTION_HEADER_ROW_PADDING_CLASS
+        )}
+      >
         <Text
           className="text-[11px] font-medium"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
@@ -60,14 +70,22 @@ export function MarkdownCodeFence({
         >
           {language ?? ''}
         </Text>
-        <IconButton
+        {/* The copy control keeps the section header's compact box, and the row
+            reserves its hit slop as padding, so the whole touch target lies
+            inside the row that delivers it: the row is 28 + 9 + 9 dp tall
+            instead of the 48 dp icon box's, and the box itself is never larger
+            than one text line (apps/mobile/AGENTS.md:211). */}
+        <Pressable
+          className={cn(SECTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+          hitSlop={SECTION_ACTION_HIT_SLOP}
+          accessibilityRole="button"
           accessibilityLabel={t('common.copy')}
           onPress={() => {
             copy(code);
           }}
         >
           <Clipboard size={14} color={palette.mutedTextColor} />
-        </IconButton>
+        </Pressable>
       </View>
       <CodeBlock
         code={code}

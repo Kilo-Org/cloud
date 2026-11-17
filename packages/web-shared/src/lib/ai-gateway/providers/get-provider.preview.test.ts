@@ -311,7 +311,6 @@ function routedStepsOfPreview(steps: ByokRoutePreviewStep[]): RoutedSteps {
         outcome: 'selected',
         gateway: used.gateway,
         bounded_spending: false,
-        organization_disabled_vercel_ai_gateway: false,
         kilo_ignored_providers: [],
       });
       break;

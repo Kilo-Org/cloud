@@ -26,6 +26,8 @@ const getDevicePushToken = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const registerTokenOptions = vi.hoisted(() => vi.fn());
 const setPreferenceOptions = vi.hoisted(() => vi.fn());
+const requestPermissionsAsync = vi.hoisted(() => vi.fn());
+const registerForPushNotifications = vi.hoisted(() => vi.fn());
 
 // The suite runs on iOS so the live-activity copy stays covered.
 // Tests that need Android paint restore this afterwards.
@@ -68,7 +70,7 @@ vi.mock('@/glanceable-ios/system-switch', () => ({
 }));
 vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
-  requestPermissionsAsync: vi.fn(),
+  requestPermissionsAsync,
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.4' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
@@ -117,7 +119,7 @@ vi.mock('@/lib/notifications', () => ({
   getNotificationPermissionStatus,
   getDevicePushToken,
   getPlatform: () => 'android',
-  registerForPushNotifications: vi.fn(),
+  registerForPushNotifications,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -158,11 +160,9 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReasonCode: null },
     agentAttention: { available: true, unavailableReasonCode: null },
     agentUpdates: { available: true, unavailableReasonCode: null },
     sessionStatus: { available: true, unavailableReasonCode: null },
-    kiloclawActivity: { available: true, unavailableReasonCode: null },
     balanceAlerts: { available: true, unavailableReasonCode: null },
     spendAlerts: { available: true, unavailableReasonCode: null },
     securityFindings: { available: true, unavailableReasonCode: null },
@@ -172,11 +172,9 @@ function fullCapabilities(overrides: Record<string, unknown> = {}): Record<strin
 
 function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: true,
     agentAttention: true,
     agentUpdates: true,
     sessionStatus: true,
-    kiloclawActivity: true,
     balanceAlerts: true,
     spendAlerts: true,
     securityFindings: true,
@@ -362,7 +360,6 @@ describe('NotificationsScreen category rows', () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
     await waitForEnabledSwitch(renderer, 'Agent updates');
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
     expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
     act(() => {
       switchOnValueChange(renderer.root, 'Agent updates')?.(false);
@@ -791,11 +788,9 @@ describe('NotificationsScreen category availability', () => {
 
   it('happy: a preferences response without capabilities renders every row as available', async () => {
     prefsQueryFn.mockResolvedValue({
-      chatMessages: true,
       agentAttention: true,
       agentUpdates: true,
       sessionStatus: true,
-      kiloclawActivity: true,
       balanceAlerts: true,
       spendAlerts: true,
       securityFindings: true,
@@ -808,7 +803,6 @@ describe('NotificationsScreen category availability', () => {
     expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
   });
 
   it('retryable unhappy: a capabilities query failure keeps last good availability and shows retry', async () => {
@@ -997,6 +991,51 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       expect(
         textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
       ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('NotificationsScreen enable flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue(null);
+    pushTokensQueryFn.mockResolvedValue([]);
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+    requestPermissionsAsync.mockResolvedValue({ status: 'granted', granted: true });
+    registerForPushNotifications.mockResolvedValue('expo-token');
+    setPreferenceMutationFn.mockResolvedValue({});
+  });
+
+  function enableCta(root: I): I | undefined {
+    return root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        n.props.accessibilityLabel === 'Enable notifications'
+    )[0];
+  }
+
+  it('requests the permission once for two taps in the same tick', async () => {
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitFor(() => enableCta(renderer.root) !== undefined, 200);
+      const onPress = enableCta(renderer.root)?.props.onPress as (() => void) | undefined;
+
+      // Both taps land before the first render that could disable the CTA: the
+      // permission read is the window, so only a synchronous lock closes it.
+      await act(async () => {
+        onPress?.();
+        onPress?.();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => registerForPushNotifications.mock.calls.length > 0, 200);
+      expect(requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(registerForPushNotifications).toHaveBeenCalledTimes(1);
     } finally {
       unmount();
     }

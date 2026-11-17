@@ -187,7 +187,7 @@ export function DiscussionThread({
             <View
               key={comment.nodeId}
               style={index > 0 ? SEPARATED_COMMENT_PADDING : undefined}
-              className={cn(index > 0 && 'border-t border-border')}
+              className={cn(index > 0 && 'border-t-[0.5px] border-hair-soft')}
             >
               <CommentRow
                 comment={comment}

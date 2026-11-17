@@ -91,7 +91,7 @@ describe('RowSkeleton', () => {
 
   it('reserves the 48pt trailing icon target', () => {
     const bars = skeletons(renderSkeleton({ trailingControl: true }));
-    const control = bars[bars.length - 1];
+    const control = bars.at(-1);
 
     expect(classesOf(first(control))).toEqual(
       expect.arrayContaining(['h-[48px]', 'w-[48px]', 'shrink-0'])
@@ -100,7 +100,7 @@ describe('RowSkeleton', () => {
 
   it('reserves the switch a preference row ends in', () => {
     const bars = skeletons(renderSkeleton({ trailing: 'switch' }));
-    const toggle = bars[bars.length - 1];
+    const toggle = bars.at(-1);
 
     expect(classesOf(first(toggle))).toEqual(expect.arrayContaining(['rounded-full', 'shrink-0']));
   });

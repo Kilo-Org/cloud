@@ -3,6 +3,7 @@ import { useWindowDimensions } from 'react-native';
 
 import { type LucideProps } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
+import { type RowTrailingSpec } from '@/components/ui/row-trailing';
 import {
   NEUTRAL_TINT,
   type RowHue,
@@ -119,6 +120,12 @@ export function ConfigureRow({
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
+  let rowTrailing: RowTrailingSpec | undefined;
+  if (trailing !== undefined) {
+    rowTrailing = { kind: 'node', node: trailing };
+  } else if (showChevron) {
+    rowTrailing = { kind: 'chevron' };
+  }
 
   // A disabled row dims by token, once, and never by row opacity: halving the
   // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
@@ -149,7 +156,7 @@ export function ConfigureRow({
           : { text: subtitle, numberOfLines: subtitleNumberOfLines }
       }
       subtitlePlaceholder={subtitlePlaceholder}
-      trailing={trailing ?? (showChevron ? { kind: 'chevron' } : undefined)}
+      trailing={rowTrailing}
       stack={stack}
       onPress={onPress}
       accessibilityRole="button"

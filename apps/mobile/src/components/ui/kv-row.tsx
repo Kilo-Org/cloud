@@ -1,13 +1,9 @@
 import { type ComponentType, type ReactNode } from 'react';
-import { View, type Insets } from 'react-native';
+import { type Insets, View } from 'react-native';
 
 import { type LucideProps } from '@/components/ui/icons';
-import {
-  RowFrame,
-  type RowEllipsizeMode,
-  RowValue,
-  type RowValueTone,
-} from '@/components/ui/row-frame';
+import { RowFrame } from '@/components/ui/row-frame';
+import { type RowEllipsizeMode, RowValue, type RowValueTone } from '@/components/ui/row-value';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -173,16 +169,19 @@ export function KvRow({
     <RowFrame
       leading={labelNode}
       trailing={
-        trailing === undefined ? (
-          valueNode
-        ) : (
-          // The value keeps its right edge beside the control, so the pair reads
-          // as one trailing group on the row the control belongs to.
-          <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
-            {valueNode}
-            {trailing}
-          </View>
-        )
+        trailing === undefined
+          ? { kind: 'node', node: valueNode }
+          : {
+              // The value keeps its right edge beside the control, so the pair
+              // reads as one trailing group on the row the control belongs to.
+              kind: 'node',
+              node: (
+                <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+                  {valueNode}
+                  {trailing}
+                </View>
+              ),
+            }
       }
       testID={testID}
       className={className}

@@ -1,7 +1,8 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
-import { type ReactElement, createElement } from 'react';
+import { type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { RowGroup, RowGroupItem } from './row-group';
@@ -37,11 +38,11 @@ function first(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.R
 }
 
 function item(position: 'only' | 'first' | 'middle' | 'last', leadingTile = false) {
-  return createElement(RowGroupItem, {
-    position,
-    leadingTile,
-    children: createElement('Text', null, `${position}-row`),
-  });
+  return (
+    <RowGroupItem position={position} leadingTile={leadingTile}>
+      <Text>{position}-row</Text>
+    </RowGroupItem>
+  );
 }
 
 afterEach(() => {
@@ -52,13 +53,10 @@ afterEach(() => {
 describe('RowGroup', () => {
   it('draws the surface and a separator between rows only', () => {
     const root = renderGroup(
-      createElement(RowGroup, {
-        leadingTile: true,
-        children: [
-          createElement('Text', null, 'first-row'),
-          createElement('Text', null, 'last-row'),
-        ],
-      })
+      <RowGroup leadingTile>
+        <Text>first-row</Text>
+        <Text>last-row</Text>
+      </RowGroup>
     );
     const group = root.findAll(node => Object.is(node.type, 'View'))[0];
     const separators = root.findAll(
@@ -76,8 +74,7 @@ describe('RowGroup', () => {
 describe('RowGroupItem', () => {
   it('rounds both ends when it is the whole section', () => {
     const root = renderGroup(item('only'));
-    const cell = root.findAll(node => Object.is(node.type, 'View'))[0];
-    const classes = classesOf(first(cell));
+    const classes = classesOf(first(root.findAll(node => Object.is(node.type, 'View'))[0]));
 
     expect(classes).toEqual(
       expect.arrayContaining(['overflow-hidden', 'bg-secondary', 'rounded-xl'])
@@ -95,8 +92,7 @@ describe('RowGroupItem', () => {
     { position: 'last', rounded: 'rounded-b-xl', separator: false },
   ])('draws $position at its place in the section', ({ position, rounded, separator }) => {
     const root = renderGroup(item(position));
-    const cell = root.findAll(node => Object.is(node.type, 'View'))[0];
-    const classes = classesOf(first(cell));
+    const classes = classesOf(first(root.findAll(node => Object.is(node.type, 'View'))[0]));
     const separators = root.findAll(node => classesOf(node).includes('border-b-[0.5px]'));
 
     expect(classes).toContain('bg-secondary');

@@ -1,4 +1,4 @@
-import { type ComponentType } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { useColorScheme, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -83,6 +83,42 @@ export function PreferenceRow({
   // that boundary, reports a two-line frame while it paints one line, and the
   // description drops a whole line below the title. The extra 3.5 dp keeps the
   // title clear of the boundary, so the frame is the line the row paints.
+  // Only the visible subtitle is painted and announced. When the caller passes
+  // both, full-width overlapping copies reserve the taller one in native
+  // layout — the idiom in form-field's reserved error area — so swapping them
+  // cannot change the row's height in any language, font scale or width,
+  // without measuring.
+  let subtitleNode: ReactNode = null;
+  if (subtitle !== undefined) {
+    subtitleNode =
+      inactiveSubtitle === undefined ? (
+        <Text variant="muted" className="mt-0.5 text-xs">
+          {subtitle}
+        </Text>
+      ) : (
+        <View className="mt-0.5">
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Text variant="muted" className="w-full shrink-0 text-xs">
+              {subtitle}
+            </Text>
+            <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
+              {inactiveSubtitle}
+            </Text>
+          </View>
+          <View className="absolute inset-x-0 top-0">
+            <Text variant="muted" className="text-xs">
+              {subtitle}
+            </Text>
+          </View>
+        </View>
+      );
+  }
+
   return (
     <RowFrame
       testID={testID}
@@ -116,37 +152,7 @@ export function PreferenceRow({
       <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
         {title}
       </Text>
-      {/* Only the visible subtitle is painted and announced. When the caller
-          passes both, full-width overlapping copies reserve the taller one in
-          native layout — the idiom in form-field's reserved error area — so
-          swapping them cannot change the row's height in any language, font
-          scale or width, without measuring. */}
-      {subtitle === undefined ? null : inactiveSubtitle === undefined ? (
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {subtitle}
-        </Text>
-      ) : (
-        <View className="mt-0.5">
-          <View
-            className="flex-row opacity-0"
-            pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Text variant="muted" className="w-full shrink-0 text-xs">
-              {subtitle}
-            </Text>
-            <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
-              {inactiveSubtitle}
-            </Text>
-          </View>
-          <View className="absolute inset-x-0 top-0">
-            <Text variant="muted" className="text-xs">
-              {subtitle}
-            </Text>
-          </View>
-        </View>
-      )}
+      {subtitleNode}
     </RowFrame>
   );
 }

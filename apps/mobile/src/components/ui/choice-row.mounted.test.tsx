@@ -31,7 +31,7 @@ type RowProps = {
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
-  onPress?: () => void;
+  onPress?: (() => void) | (() => boolean);
   testID?: string;
   children?: ReactNode;
 };

@@ -84,7 +84,7 @@ function renderRow(
 function rowClasses(root: TestRenderer.ReactTestInstance): string[] {
   const body = root.find(
     node =>
-      typeof node.props.className === 'string' && String(node.props.className).includes('py-3')
+      typeof node.props.className === 'string' && node.props.className.includes('py-3')
   );
   return String(body.props.className).split(' ');
 }

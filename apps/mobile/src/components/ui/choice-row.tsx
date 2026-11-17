@@ -26,7 +26,7 @@ type ChoiceRowProps = {
    * haptic never announces a choice that did not happen. `void` counts as
    * applied, which keeps every existing caller unchanged.
    */
-  onPress: () => void | boolean;
+  onPress: (() => void) | (() => boolean);
   disabled?: boolean;
   /** Marks the row as busy for a11y, e.g. while its own save is in flight. */
   busy?: boolean;

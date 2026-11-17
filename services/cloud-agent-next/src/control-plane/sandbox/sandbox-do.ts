@@ -6230,9 +6230,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const previousDeadline = launchDeadline;
       launchDeadline = Date.now() + DEADLINE_MS.repositoryStartup;
-      if (
-        !(await this.startSnapshotRetry(input.allocationId, launchDeadline, retryStep))
-      ) {
+      if (!(await this.startSnapshotRetry(input.allocationId, launchDeadline, retryStep))) {
         recordFailure({
           ...failure,
           failureStage: 'allocation_owned',

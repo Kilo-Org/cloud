@@ -594,6 +594,8 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       staticMessages: [],
       dynamicMessages: [],
       pendingMessages: new Map(),
+      resolvedDeliveryFailures: new Set(),
+      supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
       unreadablePermissions: [],

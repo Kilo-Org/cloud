@@ -738,11 +738,7 @@ export default function CloudChatPage({
   }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(
-    async (
-      prompt: string,
-      attachments?: CloudAgentAttachments,
-      onOptimisticSend?: () => void
-    ) => {
+    async (prompt: string, attachments?: CloudAgentAttachments, onOptimisticSend?: () => void) => {
       // Sending takes the position over only once the send is accepted: end a
       // resume that is still looking for its anchor, or its effect re-pauses
       // follow and cancels this scroll when the message lands. A rejected send

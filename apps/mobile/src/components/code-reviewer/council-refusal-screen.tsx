@@ -1,14 +1,13 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
-import { cn } from '@/lib/utils';
 
 /**
  * The unavailable sentence each refused scope reads. A personal account never
@@ -67,12 +66,12 @@ export function CouncilRefusalScreen({
   const actionKey = membershipState === 'some' ? personalActionKey(true) : personalActionKey(false);
   return (
     <CenteredState contentContainerClassName="px-6">
-      <View className="items-center gap-2">
+      <View className="items-center gap-3">
         <Text className="text-center text-xs text-muted-foreground">
           {t(unavailableCopyKey(scope, platformSupportsCouncil, refusalReason))}
         </Text>
         {personal ? (
-          <Pressable
+          <Button
             onPress={() => {
               if (membershipState === 'some') {
                 // The reviewer scope list is the account switcher: every
@@ -83,18 +82,10 @@ export function CouncilRefusalScreen({
               }
               router.push(CREATE_ORGANIZATION_HREF);
             }}
-            accessibilityRole="button"
             accessibilityLabel={t(actionKey)}
-            hitSlop={UNDER_COPY_ACTION_HIT_SLOP}
-            className={cn(
-              'justify-center self-center rounded-md active:opacity-70',
-              UNDER_COPY_ACTION_BOX_CLASS
-            )}
           >
-            <Text className="text-xs font-semibold text-muted-foreground underline">
-              {t(actionKey)}
-            </Text>
-          </Pressable>
+            <Text>{t(actionKey)}</Text>
+          </Button>
         ) : null}
       </View>
     </CenteredState>

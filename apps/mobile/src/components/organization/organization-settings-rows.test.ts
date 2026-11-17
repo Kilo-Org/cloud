@@ -67,11 +67,23 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual(['customModes', 'groups', 'integrations']);
+    // The SSO card is the shell's own page, so it carries no billing gate.
+    expect(areas({ role: 'member' })).toEqual([
+      'customModes',
+      'groups',
+      'ssoAndDomain',
+      'integrations',
+    ]);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['customModes', 'integrations']);
+    // Data collection is the teams dashboard card the shell hosts, so a member
+    // sees it where an enterprise member sees providers and models.
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
+      'customModes',
+      'dataCollection',
+      'integrations',
+    ]);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {

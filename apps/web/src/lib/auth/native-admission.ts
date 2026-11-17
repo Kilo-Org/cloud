@@ -13,10 +13,7 @@ import {
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
-import {
-  countAdmissionCondition,
-  rollAdmissionWindowIfNeeded,
-} from './native-admission-telemetry';
+import { countAdmissionCondition, rollAdmissionWindowIfNeeded } from './native-admission-telemetry';
 import { captureMessage } from '@sentry/nextjs';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────

@@ -150,18 +150,15 @@ function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
   const projectNumber = GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   const serviceAccountKey = GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
 
+  const expectedCertDigests = parseCertDigestAllowlist();
   if (
     !projectNumber ||
     !serviceAccountKey ||
     !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME ||
-    isCertDigestAllowlistMissing()
+    expectedCertDigests.length === 0
   ) {
     return null;
   }
-
-  const expectedCertDigests = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS!.split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
 
   return {
     serviceAccountKey,
@@ -170,14 +167,12 @@ function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
   };
 }
 
-/** True when the signing-certificate allowlist is unset, blank, or all separators. */
-export function isCertDigestAllowlistMissing(): boolean {
-  const raw = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS;
+/** The configured signing-certificate digests, or an empty list when unset. */
+function parseCertDigestAllowlist(): string[] {
   return (
-    (raw
-      ?.split(',')
+    GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS?.split(',')
       .map(s => s.trim())
-      .filter(Boolean) ?? []).length === 0
+      .filter(Boolean) ?? []
   );
 }
 
@@ -198,7 +193,7 @@ export async function verifyPlayIntegrity(
   const config = getPlayIntegrityConfig();
 
   if (!config) {
-    if (isCertDigestAllowlistMissing()) {
+    if (parseCertDigestAllowlist().length === 0) {
       captureMessage('play_integrity_cert_digest_allowlist_missing');
       throw new Error('Google Play Integrity certificate allowlist not configured');
     }

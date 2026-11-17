@@ -28,6 +28,10 @@ import {
   UpstreamTimeoutError,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -76,6 +80,10 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
 }));
 
 jest.mock('next/server', () => ({
@@ -186,6 +194,7 @@ async function flushAfter() {
 describe('POST /api/fim/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     jest.mocked(isFreeModel).mockReturnValue(false);
@@ -204,6 +213,74 @@ describe('POST /api/fim/completions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('rate limits the account before authentication or upstream work', async () => {
+    jest.mocked(gatewayRateLimitKey).mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    const request = makeRequest();
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(request as never);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.rate_limit_exceeded,
+    });
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('serves a codestral model with the first returned BYOK key', async () => {
+    setOrganizationAuth({ settings: { data_collection: 'deny' } satisfies OrganizationSettings });
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { providerId: 'mistral', decryptedAPIKey: 'org-mistral-key' },
+      { providerId: 'codestral', decryptedAPIKey: 'org-codestral-key' },
+    ] as never);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      makeRequest('mistralai/codestral-2508') as never
+    );
+
+    expect(response.status).toBe(200);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://api.mistral.ai/v1/fim/completions');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer org-mistral-key');
+    await flushAfter();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ user_byok: true })
+    );
+  });
+
+  it('serves a codestral model with the key the owner ranked first when it is the codestral one', async () => {
+    setOrganizationAuth({ settings: { data_collection: 'deny' } satisfies OrganizationSettings });
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { providerId: 'codestral', decryptedAPIKey: 'org-codestral-key' },
+      { providerId: 'mistral', decryptedAPIKey: 'org-mistral-key' },
+    ] as never);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      makeRequest('mistralai/codestral-2508') as never
+    );
+
+    expect(response.status).toBe(200);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://codestral.mistral.ai/v1/fim/completions');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer org-codestral-key');
+    await flushAfter();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ user_byok: true })
+    );
   });
 
   it('bills the Inception model when using the system key', async () => {

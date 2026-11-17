@@ -23,6 +23,10 @@ import {
   UpstreamTimeoutError,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -65,6 +69,10 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
 }));
 
 jest.mock('next/server', () => ({
@@ -199,6 +207,7 @@ describe('POST /api/edit/completions', () => {
       policy: {} as never,
       decision: { allowed: true },
     });
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     jest.mocked(isFreeModel).mockReturnValue(false);
@@ -211,6 +220,24 @@ describe('POST /api/edit/completions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('rate limits the account before authentication or upstream work', async () => {
+    jest.mocked(gatewayRateLimitKey).mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    const request = makeRequest(makeValidRequestBody());
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(request as never);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.rate_limit_exceeded,
+    });
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('answers malformed JSON without reporting it to Sentry', async () => {

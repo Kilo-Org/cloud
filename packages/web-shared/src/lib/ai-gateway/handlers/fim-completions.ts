@@ -27,6 +27,7 @@ import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import {
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
@@ -100,6 +101,13 @@ const FIMRequestBody = z.object({
 export async function handleFimCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
+
+  // FIM completions share the account's inference allowance with every other
+  // gateway route. Like the chat route, this check runs before the caller is
+  // resolved; its key comes from the signed token, so it needs no lookup.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, rawClientIp(request));
+  if (accountRateLimited) return accountRateLimited;
+
   const requesBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -170,9 +178,11 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
     : await getBYOKforUser(readDb, user.id, byokProviderKeys);
-  const userByokEntry = byokProviderKeys
-    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
-    .find(entry => entry !== undefined);
+  // `getBYOKfor*` returns this owner's enabled keys for these providers in
+  // `BYOK_KEY_ORDER`: keys the owner prioritized first, then oldest first. Keep that
+  // order so the key the owner ranked first serves the model; the selected key's
+  // provider also selects the upstream host.
+  const userByokEntry = userByok?.find(entry => byokProviderKeys.includes(entry.providerId));
 
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,

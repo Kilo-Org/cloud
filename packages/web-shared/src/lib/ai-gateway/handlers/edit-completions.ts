@@ -27,6 +27,7 @@ import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import {
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
@@ -91,6 +92,13 @@ const EditRequestBody = z.object({
 export async function handleEditCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
+
+  // Edit completions share the account's inference allowance with every other
+  // gateway route. Like the chat route, this check runs before the caller is
+  // resolved; its key comes from the signed token, so it needs no lookup.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, rawClientIp(request));
+  if (accountRateLimited) return accountRateLimited;
+
   const requestBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });

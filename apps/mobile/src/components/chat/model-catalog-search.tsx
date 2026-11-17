@@ -54,12 +54,12 @@ export function ModelSearchField({ search }: Readonly<{ search: ModelSearch }>) 
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <View className="mx-[22px] my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+    <View className="mx-4 my-2 flex-row items-center gap-2 rounded-md border border-input bg-background px-2">
       <Search size={18} color={colors.mutedForeground} />
       <Input
         ref={search.inputRef}
         accessibilityLabel={t('modelChat.catalog.search')}
-        className="flex-1 text-[15px] text-foreground"
+        className="flex-1 text-sm text-foreground"
         numberOfLines={1}
         placeholder={t('modelChat.catalog.search')}
         placeholderTextColor={colors.mutedForeground}
@@ -75,7 +75,7 @@ export function ModelSearchField({ search }: Readonly<{ search: ModelSearch }>) 
           accessibilityLabel={t('common.clearSearch')}
           accessibilityRole="button"
           hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-          className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
+          className="-mr-2 size-10 items-center justify-center active:opacity-70"
         >
           <X size={16} color={colors.mutedForeground} />
         </Pressable>

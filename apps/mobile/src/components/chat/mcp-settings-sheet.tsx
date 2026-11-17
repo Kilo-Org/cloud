@@ -35,6 +35,8 @@ import {
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
 import { WebSearchRow, type WebSearchSetting } from './web-search-row';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 /**
  * The chat-tools sheet.
@@ -282,7 +284,7 @@ export function McpSettingsSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pb-6 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
         showsVerticalScrollIndicator={false}
       >
         <WebSearchRow setting={webSearch} />

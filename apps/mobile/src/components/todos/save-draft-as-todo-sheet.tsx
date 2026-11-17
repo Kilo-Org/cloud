@@ -13,8 +13,10 @@ import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { ListTodo } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { i18n } from '@/i18n';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -129,16 +131,14 @@ export function SaveDraftAsTodoSheet({
         accessibilityRole="button"
         accessibilityLabel={list.name}
         accessibilityState={{ disabled: savingListId !== null }}
-        className="min-h-14 flex-row items-center gap-3 border-b border-hair-soft px-5 py-2 active:opacity-70"
+        className="min-h-14 flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
       >
-        <View className="size-8 items-center justify-center rounded-lg bg-secondary">
-          {list.emoji ? (
-            <Text className="text-base">{list.emoji}</Text>
-          ) : (
-            <ListTodo size={16} color={colors.mutedForeground} />
-          )}
-        </View>
-        <Text className="min-w-0 flex-1 text-base text-foreground" numberOfLines={1}>
+        <IconTile
+          tint={NEUTRAL_TINT}
+          icon={list.emoji ? undefined : ListTodo}
+          content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
+        />
+        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
           {list.name}
         </Text>
         {savingListId === list.id ? <ActivityIndicator color={colors.mutedForeground} /> : null}

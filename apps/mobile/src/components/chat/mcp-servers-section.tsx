@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
+import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { Button } from '@/components/ui/button';
 import { Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,15 +102,12 @@ export function McpServersSection({
     ));
   }
   return (
-    <View className="gap-2">
-      <Text className="px-1 text-xs font-semibold uppercase text-muted-foreground">
-        {t('profiles.mcp.title')}
-      </Text>
+    <Section label={t('profiles.mcp.title')}>
       {list}
       <Button variant="secondary" onPress={onAdd}>
         <Text>{t('profiles.mcp.add')}</Text>
       </Button>
-    </View>
+    </Section>
   );
 }
 
@@ -122,7 +121,7 @@ export function McpServersSection({
  */
 function McpServerRowSkeleton() {
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card>
       <View className="flex-row items-center gap-3">
         <View className="min-w-0 flex-1">
           <Skeleton className="h-5 w-1/2 rounded-md" />
@@ -136,7 +135,7 @@ function McpServerRowSkeleton() {
         <Skeleton className="h-9 w-20 rounded-md" />
         <Skeleton className="h-9 w-24 rounded-md" />
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -166,7 +165,7 @@ function McpServerRow({
 }: Readonly<McpServerRowProps>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card>
       <View className="flex-row items-center gap-3">
         <View className="min-w-0 flex-1">
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
@@ -239,6 +238,6 @@ function McpServerRow({
           <Text>{t('modelChat.mcp.deleteServer')}</Text>
         </Button>
       </View>
-    </View>
+    </Card>
   );
 }

@@ -117,11 +117,11 @@ export function useAgentsListChrome({
     [tabBarHeight, right]
   );
 
-  // The fixed 22px margins on the skeleton rows and the status wrapper gain
-  // the landscape side insets so they clear the sensor housing too; portrait
-  // insets are 0, keeping the geometry unchanged.
+  // The page gutter on the skeleton rows and the status wrapper gains the
+  // landscape side insets so they clear the sensor housing too; portrait
+  // insets are 0, leaving only the contract's 14pt gutter.
   const sidePadding = useMemo(
-    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
+    () => ({ paddingLeft: FAB_GUTTER + left, paddingRight: FAB_GUTTER + right }),
     [left, right]
   );
 

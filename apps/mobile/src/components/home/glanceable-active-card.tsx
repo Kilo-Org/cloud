@@ -30,11 +30,10 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /** Shared minimum frame; text determines the loaded card's height. */
-const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'px-4 py-3';
 const COUNT_ROW_CLASS = `${DENSE_ROW_FRAME_CLASS} flex-row items-center gap-2`;
-const DIVIDER_CLASS = 'h-px bg-border';
-const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
+const DIVIDER_CLASS = 'h-px bg-hair-soft';
+const NEWEST_BLOCK_CLASS = 'min-h-20 justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
 type GlanceableActiveCardProps = {
@@ -42,7 +41,6 @@ type GlanceableActiveCardProps = {
   onPressSession: (session: ActiveSession) => void;
   /** Opens the live index narrowed to one state. Rows stay inert without it. */
   onPressStatus?: (kind: GlanceableStatusKind) => void;
-  embedded?: boolean;
 };
 
 /**
@@ -58,7 +56,6 @@ export function GlanceableActiveCard({
   sessions,
   onPressSession,
   onPressStatus,
-  embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
   // A minute-bucketed clock keeps the relative age fresh without reading
@@ -91,8 +88,7 @@ export function GlanceableActiveCard({
   return (
     <View
       className={cn(
-        CARD_CLASS,
-        embedded && 'rounded-none border-0 bg-transparent',
+        'overflow-hidden',
         // The frame reserves the counts card's height, so the zero state fills
         // that height with its one message instead of leaving a band below it.
         empty && 'flex-1'
@@ -191,12 +187,10 @@ export function GlanceableActiveCard({
 }
 
 /** The pending placeholder repeats the card's minimum frame and count rows. */
-export function GlanceableActiveCardSkeleton({
-  embedded = false,
-}: { readonly embedded?: boolean } = {}) {
+export function GlanceableActiveCardSkeleton() {
   return (
     <View
-      className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}
+      className="overflow-hidden"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >

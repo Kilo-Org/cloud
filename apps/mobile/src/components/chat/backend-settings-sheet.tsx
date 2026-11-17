@@ -26,6 +26,7 @@ import {
 } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 import { BackendForm } from './backend-form';
@@ -189,16 +190,16 @@ function BackendSettingsContent({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.backends.cloud')}</Text>
+          <Text variant="heading">{t('modelChat.backends.cloud')}</Text>
           <CloudProviderChoice {...providerSelection} />
         </View>
         <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.localModels.title')}</Text>
+          <Text variant="heading">{t('modelChat.localModels.title')}</Text>
           <Text className="text-sm text-muted-foreground">{t('modelChat.localModels.help')}</Text>
           <LocalModelSection {...providerSelection} />
           <GgufModelSection
@@ -211,7 +212,7 @@ function BackendSettingsContent({
           />
         </View>
         <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.backends.title')}</Text>
+          <Text variant="heading">{t('modelChat.backends.title')}</Text>
           {!loaded ? (
             <Text>{t('common.loading')}</Text>
           ) : (
@@ -219,7 +220,7 @@ function BackendSettingsContent({
               {backends.length === 0 && <Text>{t('modelChat.backends.empty')}</Text>}
               {backends.map(backend => (
                 <View key={backend.id} className="gap-2 rounded-xl border border-border p-4">
-                  <Text className="font-semibold">{backend.name}</Text>
+                  <Text variant="heading">{backend.name}</Text>
                   <Text className="text-sm text-muted-foreground">{backend.baseUrl}</Text>
                   {backend.models.map(model => (
                     <BackendProviderChoice
@@ -283,7 +284,7 @@ function BackendSettingsContent({
           />
           <ScrollView
             className="flex-1"
-            contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+            contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
           >

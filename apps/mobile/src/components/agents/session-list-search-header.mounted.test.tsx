@@ -56,7 +56,7 @@ function fieldRow(renderer: TestRenderer.ReactTestRenderer) {
       node =>
         node.type === ('View' as ElementType) &&
         typeof node.props.className === 'string' &&
-        node.props.className.includes('rounded-[10px]')
+        node.props.className.includes('rounded-md')
     )
     .at(0);
   if (!row) {
@@ -93,27 +93,28 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     });
   });
 
-  it('keeps the fixed 22px margins in portrait where the side insets are 0', async () => {
+  it('keeps the page gutter in portrait where the side insets are 0', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 22, marginRight: 22 });
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-4');
+    expect(fieldRow(renderer).props.style).toBeUndefined();
   });
 
   it('gains the landscape sensor insets on both sides so the field clears the housing', async () => {
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
+    expect(fieldRow(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
-  it('updates the margins on rotation without a remount', async () => {
+  it('updates the insets on rotation without a remount', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 22, marginRight: 22 });
+    expect(fieldRow(renderer).props.style).toBeUndefined();
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     await act(() => {
       renderer.update(<SessionListSearchHeader {...baseProps} />);
     });
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
+    expect(fieldRow(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
   it('asks the IME for no full-screen editor so the screen keeps the keyboard', async () => {
@@ -232,19 +233,15 @@ describe('SessionListSearchHeader clear control', () => {
     const declarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
     const field = Object.assign({}, ...declarations) as { minHeight?: number };
 
-    // The row's `py-1.5` compiles to a 5.25pt `paddingBlock` per side at the
-    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — and its
-    // `border` adds 1pt per side, 2pt vertically. React Native lays the row out
-    // as a border box, so the field's floor must already hold the control's box
-    // plus both. Read the padding and the border from the compiled row rather
-    // than a hand-written rem figure.
+    // The row carries no vertical padding of its own (the shared field's floor
+    // is the box height), and its `border` adds 1pt per side, 2pt vertically.
+    // React Native lays the row out as a border box, so the field's floor must
+    // already hold the control's box plus the border.
     const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
     const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
-    expect(rowVerticalPaddingDp).toBe(10.5);
+    expect(rowVerticalPaddingDp).toBe(0);
     expect(rowVerticalBorderDp).toBe(2);
-    expect(field.minHeight).toBeGreaterThanOrEqual(
-      box.height + rowVerticalPaddingDp + rowVerticalBorderDp
-    );
+    expect(field.minHeight).toBeGreaterThanOrEqual(box.height + rowVerticalBorderDp);
   });
 
   it('takes the row height from the shared field floor, not the row floor', async () => {
@@ -260,14 +257,13 @@ describe('SessionListSearchHeader clear control', () => {
     const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
     const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
 
-    // The shared field's 44pt floor is taller than the 38pt clear control, so
-    // the field's floor lays the row out: 44 + 10.5 + 2 = 56.5pt. The row's own
-    // `min-h-[51px]` is a lower bound the field dominates, not the height the
-    // row takes.
+    // The shared field's 44pt floor is taller than the clear control and the
+    // row no longer states a floor of its own, so the field's floor lays the
+    // row out: 44 + 2pt of border = 46pt.
     const fieldFloorDp = input.minHeight ?? 0;
     expect(fieldFloorDp).toBe(44);
     const laidOutHeightDp = fieldFloorDp + rowVerticalPaddingDp + rowVerticalBorderDp;
-    expect(laidOutHeightDp).toBe(56.5);
-    expect(row.minHeight).toBeLessThan(laidOutHeightDp);
+    expect(laidOutHeightDp).toBe(46);
+    expect(row.minHeight ?? 0).toBeLessThan(laidOutHeightDp);
   });
 });

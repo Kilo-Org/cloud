@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
-import { SectionHeader } from '@/components/ui/section-header';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
@@ -45,9 +46,9 @@ export function UpNextSection({
     return null;
   }
   return (
-    <View>
-      <SectionHeader label={t('todos.upNext')} reserveLabelAir />
-      {items.map(item => {
+    <Section label={t('todos.upNext')} reserveLabelAir>
+      <RowGroup leadingTile>
+        {items.map(item => {
         const list = lists.data?.find(candidate => candidate.id === item.listId);
         const newestSession = item.sessions[0] ?? null;
         const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
@@ -58,7 +59,7 @@ export function UpNextSection({
           ? t('todos.item.startNewSessionHint')
           : t('todos.item.startNowHint');
         return (
-          <View key={item.id} className="mx-4 min-h-14 flex-row items-center gap-3">
+          <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4 py-2">
             <Pressable
               onPress={() => {
                 router.push(todoItemPath(item.id));
@@ -124,6 +125,7 @@ export function UpNextSection({
           </View>
         );
       })}
-    </View>
+      </RowGroup>
+    </Section>
   );
 }

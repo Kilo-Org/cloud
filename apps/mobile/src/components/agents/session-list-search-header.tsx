@@ -1,12 +1,13 @@
 import { Search, X } from '@/components/ui/icons';
-import { type RefObject, useMemo } from 'react';
+import { type RefObject } from 'react';
 import { Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -28,7 +29,7 @@ type SessionListSearchHeaderProps = {
   onClearSearch: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
-  compact?: boolean;
+  /** The field sits inline in a header row, so it takes no gutter or vertical margin. */
   inline?: boolean;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
   defaultValue?: string;
@@ -44,7 +45,6 @@ export function SessionListSearchHeader({
   onClearSearch,
   onFocus,
   onBlur,
-  compact = false,
   inline = false,
   defaultValue,
   inputKey,
@@ -52,32 +52,23 @@ export function SessionListSearchHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
   // The landscape side insets keep the field's rounded border and left tap
-  // area clear of the sensor housing; portrait insets are 0, keeping the
-  // fixed 22px margin unchanged.
-  const { left, right } = useSafeAreaInsets();
-  const fieldMargins = useMemo(
-    () => ({ marginLeft: 22 + left, marginRight: 22 + right }),
-    [left, right]
-  );
+  // area clear of the sensor housing; portrait insets are 0, leaving only the
+  // page gutter.
+  const sideInsetStyle = useSideInsetStyle();
   return (
     <View className={inline ? 'min-w-0 flex-1' : undefined}>
       <View
-        style={inline ? undefined : fieldMargins}
+        style={inline ? undefined : sideInsetStyle}
         className={cn(
-          // Dark keeps the same two-part definition the light cell gets from its
-          // near-white page: an elevated fill (the compact/inline field carries
-          // none in light) and the input border token every other text field in
-          // the app uses, because `--border` is 7% white and disappears on the
-          // dark page.
-          'flex-row items-center gap-2 rounded-[10px] border border-border dark:border-input',
-          !inline && 'my-2',
-          compact
-            ? 'min-h-[44px] px-2 dark:bg-secondary'
-            : 'min-h-[51px] bg-card px-4 py-1.5 dark:bg-secondary'
+          // The same field recipe `FormField` draws: the canvas fill, the input
+          // border token and the control radius. The compact field sits in a
+          // header row, so it carries the page gutter rather than a card.
+          'flex-row items-center gap-2 rounded-md border border-input bg-background px-2',
+          !inline && cn('my-2', SCREEN_GUTTER_CLASS)
         )}
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
-        <View className="h-[18px] w-[18px] items-center justify-center">
+        <View className="size-5 items-center justify-center">
           {showSearchBusy ? (
             <ActivityIndicator
               size="small"
@@ -96,7 +87,7 @@ export function SessionListSearchHeader({
           // insets the already-centered text rect by padding and draws the
           // placeholder low) and the RTL content alignment, so this field keeps
           // only its own size and text size.
-          className="flex-1 text-[15px] text-foreground"
+          className="flex-1 text-sm text-foreground"
           // One line, always: at a narrow width with a large font scale the
           // placeholder wrapped inside the field and the field grew with it.
           numberOfLines={1}
@@ -128,7 +119,7 @@ export function SessionListSearchHeader({
             // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
             // and the frame's left edge inside the field's right padding.
             hitSlop={CLEAR_HIT_SLOP}
-            className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
+            className="-mr-2 size-10 items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

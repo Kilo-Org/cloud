@@ -22,9 +22,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
-import { externalBillingAction } from '@/lib/external-billing-action';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber } from '@/lib/format';
 import {
@@ -38,6 +38,7 @@ import {
   useOrgSeats,
   useOrgSeatSubscription,
 } from '@/lib/hooks/use-org-billing-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 /** A settings block: the raised surface the hub's own cards paint. */
 function BillingCard({ children }: Readonly<{ children: ReactNode }>) {
@@ -95,9 +96,9 @@ function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
  * seats in use, auto top-up, and the organization's Kilo Pass.
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
- * auto top-up exist only on the web, so those controls lead there — a link on
- * Android and plain text on iOS, the App Store rule `ExternalBillingLink`
- * carries.
+ * auto top-up exist only on the web, so those controls lead there — a link only
+ * on an iOS build in the US storefront, plain text everywhere else, the rule
+ * `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen() {
   const { t } = useTranslation();
@@ -111,15 +112,21 @@ export function OrganizationBillingScreen() {
     organizationId,
     hasBillingRole && parentLink === null
   );
+  // The storefront rule that decides whether the lapsed-plan banner may link to
+  // the web billing page. Read with the other hooks, before the boundary's
+  // early returns.
+  const canLinkBilling = useCanLinkExternalPurchase();
+
+  const screenTitle = t('organization.billing.title');
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.billing.title')} />;
+    return <OrganizationBoundary title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />;
   }
 
   if (!hasBillingRole) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.billing.title')} />
+        <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
         <PermissionDenied description={t('organization.billing.permissionDenied')} />
       </View>
     );
@@ -132,13 +139,12 @@ export function OrganizationBillingScreen() {
       : t('organization.hub.planTeams');
   const subscriptionsUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   const changePlanLabel = t('organization.billing.changePlan');
-  const planChange = externalBillingAction(subscriptionsUrl);
   // The banner is the one place the change-plan destination belongs while the
-  // plan has lapsed and the platform may link, so the card's copy of it would
+  // plan has lapsed and the surface may link, so the card's copy of it would
   // only outweigh the banner. One value feeds both, so the two cannot drift.
-  // A platform that gets text only (iOS) keeps the card's copy: its banner has
-  // no action.
-  const changePlanOnBanner = planEnded && planChange.kind === 'link';
+  // A surface that gets text only keeps the card's copy: its banner has no
+  // action.
+  const changePlanOnBanner = planEnded && canLinkBilling;
 
   const subscriptionState = subscription.data ? getOrgSubscriptionState(subscription.data) : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
@@ -244,15 +250,15 @@ export function OrganizationBillingScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.billing.title')} />
+      <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* A lapsed plan blocks every new session, so it is stated before the
-            numbers. Only a billing role reaches this screen, and iOS may not
-            link to the billing page, so its action is absent there and the
+            numbers. Only a billing role reaches this screen, and a surface the
+            storefront rule keeps from linking shows no action here: the
             manage-on-web block below carries the destination as text. */}
         {planEnded ? (
           <OrganizationPlanRefusal
@@ -262,7 +268,7 @@ export function OrganizationBillingScreen() {
                 ? {
                     label: changePlanLabel,
                     onPress: () => {
-                      void openExternalUrl(planChange.url, { label: changePlanLabel });
+                      void openExternalUrl(subscriptionsUrl, { label: changePlanLabel });
                     },
                   }
                 : undefined

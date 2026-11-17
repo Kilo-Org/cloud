@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Tantano amin'ny tranonkala",
     "creditHistory": "Tantaran'ny kredita",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Foano",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Fividianana, rosia ary hetsika momba ny kredita",
     "invoicesSubtitle": "Ampidino ny faktioran'ny fividiananao",
-    "manageBilling": "Tantano ny fandoavam-bola ao amin'ny kilo.ai",
-    "manageBillingIosNote": "Ao amin'ny kilo.ai no itantanana ny fomba fandoavam-bola, ny famenoana ho azy ary ny antsipirian'ny fandoavam-bola.",
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",
     "securityAgentSubtitle": "Tadiavo sy ahitsio ny fahalemena ara-piarovana",
     "reviews": "Fandinihana",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Hofoanana amin'ny {{date}}",
       "cancelScheduledChange": "Foano ny fanovana voalahatra",
       "cancelled": "Voafoana ny famandrihana",
-      "changePlan": "Ovay ny tolotra ao amin'ny kilo.ai",
-      "changePlanIosNote": "Azo atao ao amin'ny kilo.ai ny fanovana tolotra mandoa vola.",
       "creditHistoryEmpty": "Mbola tsy misy kredita Kilo Pass.",
-      "manageInStore": "Tantano ao amin'ny {{store}}",
       "resume": "Tohizo ny famandrihana",
       "resumeCancelledDescription": "Hiverina havaozina ho azy indray ny Kilo Pass anao.",
       "resumePausedDescription": "Mitohy izao ny Kilo Pass anao, alohan'ny daty voalahatra hitohizany.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Tombony maimaim-poana",
     "bonusReferral": "Tombon'ny fanondroana",
     "bonusAvailable": "Tombony maimaim-poana azo ampiasaina",
-    "kiloPassManagement": "Fitantanana ny Kilo Pass",
-    "kiloPassSetup": "Fametrahana ny Kilo Pass",
-    "opensManagementOnWeb": "Manokatra ny fitantanana ny Kilo Pass ao amin'ny tranonkala.",
     "loadFailedRetry": "Jereo ny fifandraisanao, dia andramo indray.",
     "legalTermsOfUse": "Fepetran'ny fampiasana (EULA)",
     "purchaseDifferentAccount": "Tsy mifandray amin'ny kaontinao Kilo ity fividianana tao amin'ny App Store ity. Midira amin'ny Apple Account nampiasaina tamin'ny fividianana, dia andramo indray.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Mividiana toerana",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
-      "webAddress": "Adiresy amin'ny tranonkala {{url}}",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Vondrona",
       "guardrails": "Fefy fiarovana",
       "byok": "Ampiasao ny lakilenao manokana",
-      "ssoAndDomain": "SSO sy sehatra",
-      "emailPreferences": "Safidy mailaka",
-      "dataCollection": "Fanangonana angona",
       "auditLogs": "Rakitry ny fanaraha-maso",
       "requestLogs": "Rakitry ny fangatahana",
       "subOrganizations": "Zana-pikambanana",
@@ -3550,8 +3536,7 @@
       "paymentPending": "Miandry fandoavana",
       "processingBlocked": "Voasakana ny fikirakirana",
       "processingNeedsReview": "Mila dinihina ny fikirakirana",
-      "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
-      "setupHint": "Manokatra ny fikirakirana ny Kilo Pass amin'ny tranonkala."
+      "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass."
     }
   },
   "authErrors": {

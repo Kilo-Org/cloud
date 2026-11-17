@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Διαχείριση στο web",
     "creditHistory": "Ιστορικό μονάδων",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ακύρωση",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Αγορές, αποδείξεις και δραστηριότητα μονάδων",
     "invoicesSubtitle": "Λήψη τιμολογίων για τις αγορές σας",
-    "manageBilling": "Διαχείριση χρεώσεων στο kilo.ai",
-    "manageBillingIosNote": "Οι τρόποι πληρωμής, η αυτόματη ανανέωση υπολοίπου και τα στοιχεία χρέωσης διαχειρίζονται στο kilo.ai.",
     "codeReviewerSubtitle": "Αυτόματοι έλεγχοι PR",
     "securityAgentSubtitle": "Εντοπισμός και αποκατάσταση ευπαθειών",
     "reviews": "Έλεγχοι κώδικα",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Ακυρώνεται στις {{date}}",
       "cancelScheduledChange": "Ακύρωση προγραμματισμένης αλλαγής",
       "cancelled": "Η συνδρομή ακυρώθηκε",
-      "changePlan": "Αλλαγή προγράμματος στο kilo.ai",
-      "changePlanIosNote": "Οι αλλαγές επί πληρωμή προγραμμάτων είναι διαθέσιμες στο kilo.ai.",
       "creditHistoryEmpty": "Δεν υπάρχουν ακόμα μονάδες Kilo Pass.",
-      "manageInStore": "Διαχείριση στο {{store}}",
       "resume": "Επανέναρξη συνδρομής",
       "resumeCancelledDescription": "Το Kilo Pass σας θα ανανεώνεται ξανά αυτόματα.",
       "resumePausedDescription": "Το Kilo Pass σας επανενεργοποιείται τώρα, πριν από την προγραμματισμένη ημερομηνία επανέναρξης.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Δωρεάν μπόνους",
     "bonusReferral": "Μπόνους σύστασης",
     "bonusAvailable": "Διαθέσιμο δωρεάν μπόνους",
-    "kiloPassManagement": "Διαχείριση του Kilo Pass",
-    "kiloPassSetup": "Ρύθμιση του Kilo Pass",
-    "opensManagementOnWeb": "Ανοίγει τη διαχείριση του Kilo Pass στην ιστοσελίδα.",
     "loadFailedRetry": "Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
     "legalTermsOfUse": "όρους χρήσης (EULA)",
     "purchaseDifferentAccount": "Αυτή η αγορά από το App Store δεν συνδέεται με τον λογαριασμό σου στο Kilo. Συνδέσου στο Apple Account που χρησιμοποιήθηκε για την αγορά και δοκίμασε ξανά.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Αγορά θέσεων",
       "setupAutoTopUp": "Ρύθμιση αυτόματης αναπλήρωσης",
       "manageAutoTopUp": "Διαχείριση αυτόματης αναπλήρωσης",
-      "webAddress": "Διεύθυνση ιστού {{url}}",
       "opensOnWeb": "Ανοίγει στον ιστότοπο"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Ομάδες",
       "guardrails": "Όρια ασφαλείας",
       "byok": "Χρήση δικού σας κλειδιού",
-      "ssoAndDomain": "SSO και τομέας",
-      "emailPreferences": "Προτιμήσεις email",
-      "dataCollection": "Συλλογή δεδομένων",
       "auditLogs": "Αρχεία ελέγχου",
       "requestLogs": "Αρχεία αιτημάτων",
       "subOrganizations": "Υπο-οργανισμοί",
@@ -3550,8 +3536,7 @@
       "paymentPending": "Η πληρωμή εκκρεμεί",
       "processingBlocked": "Η επεξεργασία έχει μπλοκαριστεί",
       "processingNeedsReview": "Η επεξεργασία χρειάζεται έλεγχο",
-      "retryHint": "Προσπαθεί ξανά να φορτώσει την κατάσταση του Kilo Pass.",
-      "setupHint": "Ανοίγει τη ρύθμιση του Kilo Pass στο πρόγραμμα περιήγησης."
+      "retryHint": "Προσπαθεί ξανά να φορτώσει την κατάσταση του Kilo Pass."
     }
   },
   "authErrors": {

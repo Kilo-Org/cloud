@@ -219,9 +219,9 @@ export function ProfileOverviewScreen({
     <View className="flex-1 bg-background">
       {/* Back keeps the route it was opened from (the Profiles list, or the
           session whose profile chip opened it); `backFallback` still lands on
-          Profiles when the app has no history, as a cold deep link does. The
-          profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break.
+          this stack's Profiles list when the app has no history, as a cold deep
+          link does. The profile name is user prose, not a UI label, so it keeps
+          a second line for a natural break.
 
           A read that has not answered yet shows a title-shaped bar in the
           title's own slot. The header used to read the generic Profiles title
@@ -237,7 +237,7 @@ export function ProfileOverviewScreen({
           ) : undefined
         }
         titleNumberOfLines={2}
-        backFallback={getProfilesPath()}
+        backFallback={getProfilesPath(stack)}
       />
       <TabScreenScrollView
         className="flex-1"

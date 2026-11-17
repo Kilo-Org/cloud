@@ -10,7 +10,7 @@ import {
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import { Limits } from '../schema.js';
+import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
 
 /**
@@ -216,11 +216,7 @@ export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
     prompt: z.string().min(1),
     mode: z.string().min(1),
     model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: AgentVariantSchema.optional(),
   }),
   z.object({
     type: z.literal('command'),
@@ -313,11 +309,7 @@ export const MetadataSchema = z.object({
   // Mode accepts built-in slugs plus any custom slug from runtimeAgents.
   mode: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).optional(),
   model: z.string().optional(),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   appendSystemPrompt: z.string().max(10000).optional(),

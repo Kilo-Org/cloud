@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Pamahalaan sa web",
     "creditHistory": "Kasaysayan ng credit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselahin",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Mga pagbili, resibo, at aktibidad ng credit",
     "invoicesSubtitle": "I-download ang mga invoice ng iyong mga binili",
-    "manageBilling": "Pamahalaan ang billing sa kilo.ai",
-    "manageBillingIosNote": "Ang mga paraan ng pagbabayad, auto top-up, at mga detalye ng billing ay pinamamahalaan sa kilo.ai.",
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",
     "securityAgentSubtitle": "Hanapin at ayusin ang mga kahinaan sa seguridad",
     "reviews": "Mga pagsusuri",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Makakansela sa {{date}}",
       "cancelScheduledChange": "Kanselahin ang nakaiskedyul na pagbabago",
       "cancelled": "Nakansela na ang subscription",
-      "changePlan": "Palitan ang plan sa kilo.ai",
-      "changePlanIosNote": "Magagawa ang pagpapalit ng bayad na plan sa kilo.ai.",
       "creditHistoryEmpty": "Wala pang Kilo Pass credit.",
-      "manageInStore": "Pamahalaan sa {{store}}",
       "resume": "Ituloy ang subscription",
       "resumeCancelledDescription": "Muling awtomatikong magre-renew ang iyong Kilo Pass.",
       "resumePausedDescription": "Itutuloy na ngayon ang iyong Kilo Pass, bago ang nakaiskedyul na petsa ng pagtuloy nito.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Libreng bonus",
     "bonusReferral": "Bonus sa referral",
     "bonusAvailable": "Magagamit na libreng bonus",
-    "kiloPassManagement": "Pamamahala ng Kilo Pass",
-    "kiloPassSetup": "Pag-set up ng Kilo Pass",
-    "opensManagementOnWeb": "Bubuksan ang pamamahala ng Kilo Pass sa web.",
     "loadFailedRetry": "Suriin ang iyong koneksyon, pagkatapos ay subukang muli.",
     "legalTermsOfUse": "Mga tuntunin sa paggamit (EULA)",
     "purchaseDifferentAccount": "Hindi naka-link sa iyong Kilo account ang pagbiling ito sa App Store. Mag-sign in sa Apple Account na ginamit sa pagbili, saka subukang muli.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Bumili ng mga puwesto",
       "setupAutoTopUp": "I-set up ang auto top-up",
       "manageAutoTopUp": "Pamahalaan ang auto top-up",
-      "webAddress": "Web address {{url}}",
       "opensOnWeb": "Bubuksan sa web"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Mga grupo",
       "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
-      "ssoAndDomain": "SSO at domain",
-      "emailPreferences": "Mga kagustuhan sa email",
-      "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
       "requestLogs": "Mga request log",
       "subOrganizations": "Mga sub-organisasyon",
@@ -3550,8 +3536,7 @@
       "paymentPending": "Nakabinbin ang pagbabayad",
       "processingBlocked": "Naharang ang pagproseso",
       "processingNeedsReview": "Kailangang suriin ang pagproseso",
-      "retryHint": "Muling sinusubukang i-load ang status ng Kilo Pass.",
-      "setupHint": "Bubuksan ang pag-setup ng Kilo Pass sa web."
+      "retryHint": "Muling sinusubukang i-load ang status ng Kilo Pass."
     }
   },
   "authErrors": {

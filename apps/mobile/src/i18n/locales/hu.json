@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Kezelés a weben",
     "creditHistory": "Kreditelőzmények",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Mégse",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Vásárlások, nyugták és kreditmozgások",
     "invoicesSubtitle": "Töltsd le a vásárlásaid számláit",
-    "manageBilling": "Számlázás kezelése a kilo.ai oldalon",
-    "manageBillingIosNote": "A fizetési módok, az automatikus feltöltés és a számlázási adatok a kilo.ai oldalon kezelhetők.",
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
     "reviews": "Ellenőrzések",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Megszűnik: {{date}}",
       "cancelScheduledChange": "Ütemezett módosítás visszavonása",
       "cancelled": "Előfizetés lemondva",
-      "changePlan": "Csomagváltás a kilo.ai oldalon",
-      "changePlanIosNote": "A fizetős csomagok módosítása a kilo.ai oldalon érhető el.",
       "creditHistoryEmpty": "Még nincsenek Kilo Pass-kreditek.",
-      "manageInStore": "Kezelés itt: {{store}}",
       "resume": "Előfizetés folytatása",
       "resumeCancelledDescription": "A Kilo Pass ismét automatikusan megújul.",
       "resumePausedDescription": "A Kilo Pass most folytatódik, még az ütemezett folytatási dátum előtt.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Ingyenes bónusz",
     "bonusReferral": "Ajánlási bónusz",
     "bonusAvailable": "Elérhető ingyenes bónusz",
-    "kiloPassManagement": "Kilo Pass kezelése",
-    "kiloPassSetup": "Kilo Pass beállítása",
-    "opensManagementOnWeb": "Megnyitja a Kilo Pass kezelőfelületét a weboldalon.",
     "loadFailedRetry": "Ellenőrizd a kapcsolatot, majd próbáld újra.",
     "legalTermsOfUse": "Felhasználási feltételek (EULA)",
     "purchaseDifferentAccount": "Ez az App Store-vásárlás nem kapcsolódik a Kilo-fiókodhoz. Jelentkezz be a vásárláshoz használt Apple Account-fiókkal, majd próbáld újra.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Férőhelyek vásárlása",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
-      "webAddress": "Webcím: {{url}}",
       "opensOnWeb": "A weben nyílik meg"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Csoportok",
       "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
-      "ssoAndDomain": "SSO és domain",
-      "emailPreferences": "E-mail-beállítások",
-      "dataCollection": "Adatgyűjtés",
       "auditLogs": "Auditnaplók",
       "requestLogs": "Kérésnaplók",
       "subOrganizations": "Alszervezetek",
@@ -3550,8 +3536,7 @@
       "paymentPending": "A fizetés függőben",
       "processingBlocked": "A feldolgozás blokkolva",
       "processingNeedsReview": "A feldolgozás felülvizsgálatot igényel",
-      "retryHint": "Újra megpróbálja betölteni a Kilo Pass állapotát.",
-      "setupHint": "Megnyitja a Kilo Pass beállításait a böngészőben."
+      "retryHint": "Újra megpróbálja betölteni a Kilo Pass állapotát."
     }
   },
   "authErrors": {

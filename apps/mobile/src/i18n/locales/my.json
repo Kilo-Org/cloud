@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ဝဘ်ပေါ်တွင် စီမံပါ",
     "creditHistory": "ခရက်ဒစ် မှတ်တမ်း",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "။ ",
     "listJoiner": "၊ ",
     "cancel": "ပယ်ဖျက်ပါ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ဝယ်ယူမှုများ၊ ပြေစာများနှင့် ခရက်ဒစ် လှုပ်ရှားမှုများ",
     "invoicesSubtitle": "သင့်ဝယ်ယူမှုများအတွက် ငွေတောင်းခံလွှာများကို ဒေါင်းလုဒ်လုပ်ပါ",
-    "manageBilling": "kilo.ai တွင် ငွေပေးချေမှုကို စီမံရန်",
-    "manageBillingIosNote": "ငွေပေးချေနည်းလမ်းများ၊ အလိုအလျောက် ငွေဖြည့်ခြင်းနှင့် ငွေတောင်းခံမှု အသေးစိတ်များကို kilo.ai တွင် စီမံပါသည်။",
     "codeReviewerSubtitle": "အလိုအလျောက် PR သုံးသပ်မှုများ",
     "securityAgentSubtitle": "အားနည်းချက်များကို ရှာဖွေပြီး ပြုပြင်ပါ",
     "reviews": "သုံးသပ်မှုများ",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}} တွင် ပယ်ဖျက်မည်",
       "cancelScheduledChange": "စီစဉ်ထားသော ပြောင်းလဲမှုကို ပယ်ဖျက်ရန်",
       "cancelled": "စာရင်းသွင်းမှုကို ပယ်ဖျက်ပြီးပါပြီ",
-      "changePlan": "kilo.ai တွင် အစီအစဉ် ပြောင်းရန်",
-      "changePlanIosNote": "အခပေး အစီအစဉ် ပြောင်းလဲမှုများကို kilo.ai တွင် ပြုလုပ်နိုင်ပါသည်။",
       "creditHistoryEmpty": "Kilo Pass ခရက်ဒစ်များ မရှိသေးပါ။",
-      "manageInStore": "{{store}} တွင် စီမံရန်",
       "resume": "စာရင်းသွင်းမှုကို ပြန်စရန်",
       "resumeCancelledDescription": "သင့် Kilo Pass သည် အလိုအလျောက် ပြန်လည် သက်တမ်းတိုးပါမည်။",
       "resumePausedDescription": "သင့် Kilo Pass သည် စီစဉ်ထားသော ပြန်စမည့်ရက် မတိုင်မီ ယခုပင် ပြန်စပါမည်။",
@@ -3123,9 +3116,6 @@
     "bonusFree": "အခမဲ့ ဘောနပ်စ်",
     "bonusReferral": "မိတ်ဆက်ပေးမှု ဘောနပ်စ်",
     "bonusAvailable": "ရရှိနိုင်သော အခမဲ့ ဘောနပ်စ်",
-    "kiloPassManagement": "Kilo Pass စီမံခန့်ခွဲမှု",
-    "kiloPassSetup": "Kilo Pass ပြင်ဆင်မှု",
-    "opensManagementOnWeb": "ဝက်ဘ်ဆိုက်တွင် Kilo Pass စီမံခန့်ခွဲမှုကို ဖွင့်ပေးသည်။",
     "loadFailedRetry": "သင့်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
     "legalTermsOfUse": "အသုံးပြုမှု စည်းကမ်းများ (EULA)",
     "purchaseDifferentAccount": "ဤ App Store ဝယ်ယူမှုသည် သင့် Kilo အကောင့်နှင့် ချိတ်ဆက်မထားပါ။ ဝယ်ယူစဉ်က အသုံးပြုခဲ့သော Apple Account ဖြင့် ဝင်ရောက်ပြီး ထပ်ကြိုးစားပါ။",
@@ -3311,7 +3301,6 @@
       "buySeats": "အသုံးပြုခွင့်နေရာများ ဝယ်ရန်",
       "setupAutoTopUp": "အလိုအလျောက် ငွေဖြည့်ခြင်းကို သတ်မှတ်ရန်",
       "manageAutoTopUp": "အလိုအလျောက် ငွေဖြည့်ခြင်းကို စီမံခန့်ခွဲရန်",
-      "webAddress": "ဝဘ်လိပ်စာ {{url}}",
       "opensOnWeb": "ဝဘ်တွင် ဖွင့်ပါမည်"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "အုပ်စုများ",
       "guardrails": "ကာကွယ်ရေးစည်းမျဉ်းများ",
       "byok": "ကိုယ်ပိုင်ကီး အသုံးပြုရန်",
-      "ssoAndDomain": "SSO နှင့် ဒိုမိန်း",
-      "emailPreferences": "အီးမေးလ် ရွေးချယ်မှုများ",
-      "dataCollection": "ဒေတာစုဆောင်းမှု",
       "auditLogs": "စစ်ဆေးမှုမှတ်တမ်းများ",
       "requestLogs": "တောင်းဆိုမှုမှတ်တမ်းများ",
       "subOrganizations": "လက်အောက်ခံ အဖွဲ့အစည်းများ",
@@ -3550,8 +3536,7 @@
       "paymentPending": "ငွေပေးချေမှုကို စောင့်နေသည်",
       "processingBlocked": "လုပ်ဆောင်မှု ပိတ်ဆို့နေသည်",
       "processingNeedsReview": "လုပ်ဆောင်မှု ပြန်လည်စစ်ဆေးရန် လိုအပ်သည်",
-      "retryHint": "Kilo Pass အခြေအနေကို ထပ်ရယူကြည့်ပါမည်။",
-      "setupHint": "ဝဘ်ပေါ်တွင် Kilo Pass ပြင်ဆင်သတ်မှတ်သည့် စာမျက်နှာကို ဖွင့်ပါမည်။"
+      "retryHint": "Kilo Pass အခြေအနေကို ထပ်ရယူကြည့်ပါမည်။"
     }
   },
   "authErrors": {

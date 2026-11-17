@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Menaxho në ueb",
     "creditHistory": "Historiku i kredive",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulo",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Blerjet, dëftesat dhe aktiviteti i kredive",
     "invoicesSubtitle": "Shkarko faturat për blerjet e tua",
-    "manageBilling": "Menaxho faturimin në kilo.ai",
-    "manageBillingIosNote": "Metodat e pagesës, rimbushja automatike dhe detajet e faturimit menaxhohen në kilo.ai.",
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
     "reviews": "Rishikimet",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Anulohet më {{date}}",
       "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
       "cancelled": "Abonimi u anulua",
-      "changePlan": "Ndrysho planin në kilo.ai",
-      "changePlanIosNote": "Ndryshimet e planeve me pagesë mund të bëhen në kilo.ai.",
       "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
-      "manageInStore": "Menaxho në {{store}}",
       "resume": "Rifillo abonimin",
       "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
       "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Bonus falas",
     "bonusReferral": "Bonus referimi",
     "bonusAvailable": "Bonus falas i disponueshëm",
-    "kiloPassManagement": "Menaxhimi i Kilo Pass",
-    "kiloPassSetup": "Konfigurimi i Kilo Pass",
-    "opensManagementOnWeb": "Hap menaxhimin e Kilo Pass në ueb.",
     "loadFailedRetry": "Kontrollo lidhjen, pastaj riprovo.",
     "legalTermsOfUse": "Kushtet e përdorimit (EULA)",
     "purchaseDifferentAccount": "Kjo blerje në App Store nuk është e lidhur me llogarinë tënde Kilo. Hyr në Apple Account që përdore për blerjen, pastaj provo përsëri.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Bli vende",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
-      "webAddress": "Adresa në ueb {{url}}",
       "opensOnWeb": "Hapet në ueb"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Grupet",
       "guardrails": "Masat mbrojtëse",
       "byok": "Përdor çelësin tënd",
-      "ssoAndDomain": "SSO dhe domeni",
-      "emailPreferences": "Preferencat e email-it",
-      "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
       "requestLogs": "Regjistrat e kërkesave",
       "subOrganizations": "Nënorganizatat",
@@ -3550,8 +3536,7 @@
       "paymentPending": "Pagesa në pritje",
       "processingBlocked": "Përpunimi i bllokuar",
       "processingNeedsReview": "Përpunimi kërkon shqyrtim",
-      "retryHint": "Riprovon ngarkimin e statusit të Kilo Pass.",
-      "setupHint": "Hap konfigurimin e Kilo Pass në ueb."
+      "retryHint": "Riprovon ngarkimin e statusit të Kilo Pass."
     }
   },
   "authErrors": {

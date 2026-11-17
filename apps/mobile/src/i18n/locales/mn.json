@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Вэб дээр удирдах",
     "creditHistory": "Кредитийн түүх",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Цуцлах",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Худалдан авалт, баримт, кредитийн гүйлгээ",
     "invoicesSubtitle": "Худалдан авалтынхаа нэхэмжлэхийг татаж авах",
-    "manageBilling": "Төлбөрөө kilo.ai дээр удирдах",
-    "manageBillingIosNote": "Төлбөрийн хэрэгсэл, автомат цэнэглэлт болон төлбөрийн мэдээллийг kilo.ai дээр удирдана.",
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
     "reviews": "Кодын хяналт",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Цуцлагдах огноо: {{date}}",
       "cancelScheduledChange": "Товлосон өөрчлөлтийг цуцлах",
       "cancelled": "Захиалга цуцлагдлаа",
-      "changePlan": "Багцаа kilo.ai дээр өөрчлөх",
-      "changePlanIosNote": "Төлбөртэй багцын өөрчлөлтийг kilo.ai дээр хийх боломжтой.",
       "creditHistoryEmpty": "Kilo Pass-ын кредит одоогоор алга.",
-      "manageInStore": "{{store}} дээр удирдах",
       "resume": "Захиалгыг сэргээх",
       "resumeCancelledDescription": "Таны Kilo Pass дахин автоматаар сунгагдаж эхэлнэ.",
       "resumePausedDescription": "Таны Kilo Pass товлосон огнооноосоо өмнө одоо сэргэнэ.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Үнэгүй бонус",
     "bonusReferral": "Урилгын бонус",
     "bonusAvailable": "Ашиглах боломжтой үнэгүй бонус",
-    "kiloPassManagement": "Kilo Pass-ын удирдлага",
-    "kiloPassSetup": "Kilo Pass-ын тохиргоо",
-    "opensManagementOnWeb": "Kilo Pass-ийн удирдлагын хуудсыг вэб сайтад нээнэ.",
     "loadFailedRetry": "Холболтоо шалгаад, дахин оролдоно уу.",
     "legalTermsOfUse": "Ашиглалтын нөхцөл (EULA)",
     "purchaseDifferentAccount": "Энэ App Store худалдан авалт таны Kilo бүртгэлтэй холбогдоогүй байна. Худалдан авалтад ашигласан Apple Account-д нэвтэрч, дахин оролдоно уу.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Хэрэглэгчийн эрх авах",
       "setupAutoTopUp": "Автомат цэнэглэлт тохируулах",
       "manageAutoTopUp": "Автомат цэнэглэлт удирдах",
-      "webAddress": "Вэб хаяг {{url}}",
       "opensOnWeb": "Вэб дээр нээгдэнэ"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Бүлгүүд",
       "guardrails": "Хамгаалалтын хязгаарлалт",
       "byok": "Өөрийн түлхүүрээ ашиглах",
-      "ssoAndDomain": "SSO ба домэйн",
-      "emailPreferences": "Имэйлийн тохиргоо",
-      "dataCollection": "Өгөгдөл цуглуулалт",
       "auditLogs": "Аудитын бүртгэлүүд",
       "requestLogs": "Хүсэлтийн бүртгэлүүд",
       "subOrganizations": "Дэд байгууллагууд",
@@ -3550,8 +3536,7 @@
       "paymentPending": "Төлбөр хүлээгдэж байна",
       "processingBlocked": "Боловсруулах ажиллагаа зогссон",
       "processingNeedsReview": "Боловсруулах ажиллагааг шалгах шаардлагатай",
-      "retryHint": "Kilo Pass-ийн төлөвийг дахин ачаална.",
-      "setupHint": "Kilo Pass-ийн тохиргоог вэб дээр нээнэ."
+      "retryHint": "Kilo Pass-ийн төлөвийг дахин ачаална."
     }
   },
   "authErrors": {

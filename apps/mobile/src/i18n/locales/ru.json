@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Управление в веб-версии",
     "creditHistory": "История кредитов",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Отмена",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Покупки, чеки и операции с кредитами",
     "invoicesSubtitle": "Скачивайте счета за покупки",
-    "manageBilling": "Управление оплатой на kilo.ai",
-    "manageBillingIosNote": "Способы оплаты, автопополнение и платёжные данные настраиваются на kilo.ai.",
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
     "reviews": "Проверки",
@@ -2608,10 +2604,7 @@
       "cancelScheduled": "Отменяется {{date}}",
       "cancelScheduledChange": "Отменить запланированное изменение",
       "cancelled": "Подписка отменена",
-      "changePlan": "Сменить тариф на kilo.ai",
-      "changePlanIosNote": "Сменить платный тариф можно на kilo.ai.",
       "creditHistoryEmpty": "Кредитов Kilo Pass пока нет.",
-      "manageInStore": "Управлять в {{store}}",
       "resume": "Возобновить подписку",
       "resumeCancelledDescription": "Kilo Pass снова будет продлеваться автоматически.",
       "resumePausedDescription": "Kilo Pass возобновится сейчас, не дожидаясь запланированной даты.",
@@ -2648,9 +2641,6 @@
     "bonusFree": "Бесплатный бонус",
     "bonusReferral": "Бонус за приглашение",
     "bonusAvailable": "Доступный бесплатный бонус",
-    "kiloPassManagement": "Управление Kilo Pass",
-    "kiloPassSetup": "Настройка Kilo Pass",
-    "opensManagementOnWeb": "Открывает управление Kilo Pass в веб-версии.",
     "loadFailedRetry": "Проверьте подключение и попробуйте снова.",
     "legalTermsOfUse": "Условия использования (EULA)",
     "purchaseDifferentAccount": "Эта покупка в App Store не привязана к вашему аккаунту Kilo. Войдите в Apple Account, использованный для покупки, и попробуйте снова.",
@@ -3417,7 +3407,6 @@
       "buySeats": "Купить места",
       "setupAutoTopUp": "Настроить автопополнение",
       "manageAutoTopUp": "Управлять автопополнением",
-      "webAddress": "Веб-адрес {{url}}",
       "opensOnWeb": "Открывается в браузере"
     },
     "boundary": {
@@ -3572,9 +3561,6 @@
       "groups": "Группы",
       "guardrails": "Ограничения",
       "byok": "Собственный ключ",
-      "ssoAndDomain": "SSO и домен",
-      "emailPreferences": "Настройки эл. почты",
-      "dataCollection": "Сбор данных",
       "auditLogs": "Журналы аудита",
       "requestLogs": "Журналы запросов",
       "subOrganizations": "Дочерние организации",
@@ -3659,7 +3645,6 @@
       "processingBlocked": "Обработка заблокирована",
       "processingNeedsReview": "Нужно проверить обработку",
       "retryHint": "Повторяет загрузку статуса Kilo Pass.",
-      "setupHint": "Открывает настройку Kilo Pass в веб-версии.",
       "paidSeat_few": "{{displayCount}} оплаченных места",
       "paidSeat_many": "{{displayCount}} оплаченных мест"
     }

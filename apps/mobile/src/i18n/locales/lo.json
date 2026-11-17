@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ຈັດການໃນເວັບ",
     "creditHistory": "ປະຫວັດເຄຣດິດ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ການຊື້, ໃບຮັບເງິນ ແລະ ການເຄື່ອນໄຫວເຄຣດິດ",
     "invoicesSubtitle": "ດາວໂຫຼດໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານ",
-    "manageBilling": "ຈັດການການຮຽກເກັບເງິນໃນ kilo.ai",
-    "manageBillingIosNote": "ວິທີຊຳລະເງິນ, ການເຕີມເງິນອັດຕະໂນມັດ ແລະ ລາຍລະອຽດການຮຽກເກັບເງິນແມ່ນຈັດການໃນ kilo.ai.",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
       "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
       "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
-      "changePlan": "ປ່ຽນແຜນໃນ kilo.ai",
-      "changePlanIosNote": "ການປ່ຽນແຜນແບບເສຍເງິນສາມາດເຮັດໄດ້ໃນ kilo.ai.",
       "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
-      "manageInStore": "ຈັດການໃນ {{store}}",
       "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
       "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
       "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "ໂບນັດຟຣີ",
     "bonusReferral": "ໂບນັດແນະນຳ",
     "bonusAvailable": "ໂບນັດຟຣີທີ່ມີໃຫ້",
-    "kiloPassManagement": "ການຈັດການ Kilo Pass",
-    "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
-    "opensManagementOnWeb": "ເປີດໜ້າຈັດການ Kilo Pass ໃນເວັບ.",
     "loadFailedRetry": "ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງໃໝ່.",
     "legalTermsOfUse": "ຂໍ້ກຳນົດການນຳໃຊ້ (EULA)",
     "purchaseDifferentAccount": "ການຊື້ App Store ນີ້ບໍ່ໄດ້ເຊື່ອມໂຍງກັບບັນຊີ Kilo ຂອງທ່ານ. ເຂົ້າສູ່ລະບົບ Apple Account ທີ່ໃຊ້ສຳລັບການຊື້, ແລ້ວລອງອີກຄັ້ງ.",
@@ -3311,7 +3301,6 @@
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
-      "webAddress": "ທີ່ຢູ່ເວັບ {{url}}",
       "opensOnWeb": "ເປີດໃນເວັບ"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "ກຸ່ມ",
       "guardrails": "ມາດຕະການປ້ອງກັນ",
       "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
-      "ssoAndDomain": "SSO ແລະ ໂດເມນ",
-      "emailPreferences": "ການຕັ້ງຄ່າອີເມວ",
-      "dataCollection": "ການເກັບກຳຂໍ້ມູນ",
       "auditLogs": "ບັນທຶກການກວດສອບ",
       "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
       "subOrganizations": "ອົງກອນຍ່ອຍ",
@@ -3550,8 +3536,7 @@
       "paymentPending": "ລໍຖ້າການຊຳລະເງິນ",
       "processingBlocked": "ບໍ່ສາມາດປະມວນຜົນຕໍ່ໄດ້",
       "processingNeedsReview": "ຕ້ອງກວດສອບການປະມວນຜົນ",
-      "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
-      "setupHint": "ເປີດໜ້າຕັ້ງຄ່າ Kilo Pass ໃນເວັບ."
+      "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ."
     }
   },
   "authErrors": {

@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
-import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-data';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,
   sessionLiveActivityRelevance,
   sessionLiveActivityTitle,
 } from './session-live-activity';
+import { sessionLiveActivityContentStateSchema } from './session-live-content';
 
 const options = {
   approvalKey: 'a'.repeat(64),

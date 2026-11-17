@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "په ویب کې یې اداره کړئ",
     "creditHistory": "د کریډیټ تاریخچه",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغوه کړئ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "پېرودنې، رسیدونه، او د کریډیټ فعالیت",
     "invoicesSubtitle": "د خپلو پېرودنو بلونه ډاونلوډ کړئ",
-    "manageBilling": "په kilo.ai کې تادیات اداره کړئ",
-    "manageBillingIosNote": "د تادیې طریقې، اتومات چارج، او د تادیاتو جزئیات په kilo.ai کې اداره کېږي.",
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
     "reviews": "بیاکتنې",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "په {{date}} لغوه کېږي",
       "cancelScheduledChange": "ټاکل شوی بدلون لغوه کړئ",
       "cancelled": "ګډون لغوه شو",
-      "changePlan": "په kilo.ai کې پلان بدل کړئ",
-      "changePlanIosNote": "د پیسو لرونکو پلانونو بدلونونه په kilo.ai کې شته.",
       "creditHistoryEmpty": "تر اوسه د Kilo Pass کریډیټونه نشته.",
-      "manageInStore": "په {{store}} کې اداره کړئ",
       "resume": "ګډون بیا پیل کړئ",
       "resumeCancelledDescription": "ستاسو Kilo Pass بیا په اتومات ډول نوي کېدل پیلوي.",
       "resumePausedDescription": "ستاسو Kilo Pass د بیا پیل له ټاکل شوې نېټې مخکې همدا اوس بیا پیلېږي.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "وړیا بونس",
     "bonusReferral": "معرفي بونس",
     "bonusAvailable": "د لاسرسي وړ وړیا بونس",
-    "kiloPassManagement": "د Kilo Pass مدیریت",
-    "kiloPassSetup": "د Kilo Pass تنظیم",
-    "opensManagementOnWeb": "په وېب کې د Kilo Pass د مدیریت پاڼه پرانیزي.",
     "loadFailedRetry": "خپل اتصال وګورئ، بیا هڅه وکړئ.",
     "legalTermsOfUse": "د کارولو شرایط (EULA)",
     "purchaseDifferentAccount": "دا د App Store پېرود ستاسو د Kilo له حساب سره تړلی نه دی. هغه Apple Account ته ننوځئ چې پېرود مو پرې کړی، بیا هڅه وکړئ.",
@@ -3311,7 +3301,6 @@
       "buySeats": "د غړیتوب ځایونه واخلئ",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
-      "webAddress": "وېب پته {{url}}",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "ډلې",
       "guardrails": "خوندي حدونه",
       "byok": "خپله کیلي راوړئ",
-      "ssoAndDomain": "SSO او ډومېن",
-      "emailPreferences": "د برېښنالیک غوره توبونه",
-      "dataCollection": "د معلوماتو راټولول",
       "auditLogs": "د پلټنې لاګونه",
       "requestLogs": "د غوښتنو لاګونه",
       "subOrganizations": "فرعي سازمانونه",
@@ -3550,8 +3536,7 @@
       "paymentPending": "تادیه په تمه ده",
       "processingBlocked": "پروسس بند شوی",
       "processingNeedsReview": "پروسس بیاکتنې ته اړتیا لري",
-      "retryHint": "د Kilo Pass د حالت د بارولو بیا هڅه کوي.",
-      "setupHint": "په وېب کې د Kilo Pass د تنظیم پاڼه پرانیزي."
+      "retryHint": "د Kilo Pass د حالت د بارولو بیا هڅه کوي."
     }
   },
   "authErrors": {

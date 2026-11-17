@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Upravljaj na vebu",
     "creditHistory": "Istorija kredita",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Otkaži",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Kupovine, računi i aktivnost kredita",
     "invoicesSubtitle": "Preuzmite fakture za svoje kupovine",
-    "manageBilling": "Upravljajte naplatom na kilo.ai",
-    "manageBillingIosNote": "Načinima plaćanja, automatskom dopunom i podacima za naplatu upravlja se na kilo.ai.",
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
     "reviews": "Pregledi",
@@ -3140,10 +3136,7 @@
       "cancelScheduled": "Otkazuje se {{date}}",
       "cancelScheduledChange": "Otkaži zakazanu promenu",
       "cancelled": "Pretplata je otkazana",
-      "changePlan": "Promenite plan na kilo.ai",
-      "changePlanIosNote": "Promene plaćenog plana dostupne su na kilo.ai.",
       "creditHistoryEmpty": "Još nema Kilo Pass kredita.",
-      "manageInStore": "Upravljajte u prodavnici {{store}}",
       "resume": "Nastavi pretplatu",
       "resumeCancelledDescription": "Vaš Kilo Pass će ponovo početi automatski da se obnavlja.",
       "resumePausedDescription": "Vaš Kilo Pass se nastavlja odmah, pre zakazanog datuma nastavka.",
@@ -3180,9 +3173,6 @@
     "bonusFree": "Besplatan bonus",
     "bonusReferral": "Bonus za preporuku",
     "bonusAvailable": "Dostupan besplatan bonus",
-    "kiloPassManagement": "Upravljanje pretplatom na Kilo Pass",
-    "kiloPassSetup": "Podešavanje pretplate na Kilo Pass",
-    "opensManagementOnWeb": "Otvara upravljanje Kilo Pass-om na vebu.",
     "loadFailedRetry": "Proveri vezu, pa pokušaj ponovo.",
     "legalTermsOfUse": "Uslovi korišćenja (EULA)",
     "purchaseDifferentAccount": "Ova kupovina u prodavnici App Store nije povezana sa tvojim Kilo nalogom. Prijavi se na nalog Apple Account koji je korišćen za kupovinu, pa pokušaj ponovo.",
@@ -3368,7 +3358,6 @@
       "buySeats": "Kupi mesta",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
-      "webAddress": "Veb adresa {{url}}",
       "opensOnWeb": "Otvara se na vebu"
     },
     "boundary": {
@@ -3510,9 +3499,6 @@
       "groups": "Grupe",
       "guardrails": "Zaštitna ograničenja",
       "byok": "Sopstveni ključ",
-      "ssoAndDomain": "SSO i domen",
-      "emailPreferences": "Podešavanja e-pošte",
-      "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
       "requestLogs": "Dnevnici zahteva",
       "subOrganizations": "Podorganizacije",
@@ -3609,7 +3595,6 @@
       "processingBlocked": "Obrada blokirana",
       "processingNeedsReview": "Potrebna je provera obrade",
       "retryHint": "Pokušava ponovo da učita status pretplate Kilo Pass.",
-      "setupHint": "Otvara podešavanja pretplate Kilo Pass na vebu.",
       "paidSeat_few": "{{displayCount}} plaćena mesta"
     }
   },

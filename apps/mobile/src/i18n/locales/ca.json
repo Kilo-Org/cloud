@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Gestiona-ho al web",
     "creditHistory": "Historial de crèdits",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel·la",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Compres, rebuts i activitat de crèdits",
     "invoicesSubtitle": "Baixa les factures de les teves compres",
-    "manageBilling": "Gestiona la facturació a kilo.ai",
-    "manageBillingIosNote": "Els mètodes de pagament, la recàrrega automàtica i les dades de facturació es gestionen a kilo.ai.",
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
     "reviews": "Revisions",
@@ -3140,10 +3136,7 @@
       "cancelScheduled": "Es cancel·la el {{date}}",
       "cancelScheduledChange": "Cancel·la el canvi programat",
       "cancelled": "Subscripció cancel·lada",
-      "changePlan": "Canvia de pla a kilo.ai",
-      "changePlanIosNote": "Els canvis de pla de pagament estan disponibles a kilo.ai.",
       "creditHistoryEmpty": "Encara no hi ha crèdits del Kilo Pass.",
-      "manageInStore": "Gestiona a {{store}}",
       "resume": "Reprèn la subscripció",
       "resumeCancelledDescription": "El teu Kilo Pass tornarà a renovar-se automàticament.",
       "resumePausedDescription": "El teu Kilo Pass es reprèn ara, abans de la data de represa programada.",
@@ -3180,9 +3173,6 @@
     "bonusFree": "Bonus gratuït",
     "bonusReferral": "Bonus per referència",
     "bonusAvailable": "Bonus gratuït disponible",
-    "kiloPassManagement": "Gestió de Kilo Pass",
-    "kiloPassSetup": "Configuració de Kilo Pass",
-    "opensManagementOnWeb": "Obre la gestió de Kilo Pass al web.",
     "loadFailedRetry": "Comprova la connexió i torna-ho a provar.",
     "legalTermsOfUse": "Condicions d'ús (EULA)",
     "purchaseDifferentAccount": "Aquesta compra de l'App Store no està vinculada al teu compte de Kilo. Inicia la sessió amb l'Apple Account que vas utilitzar per fer la compra i torna-ho a provar.",
@@ -3368,7 +3358,6 @@
       "buySeats": "Compra llicències",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
-      "webAddress": "Adreça web {{url}}",
       "opensOnWeb": "S'obre al web"
     },
     "boundary": {
@@ -3510,9 +3499,6 @@
       "groups": "Grups",
       "guardrails": "Salvaguardes",
       "byok": "Utilitza la teva pròpia clau",
-      "ssoAndDomain": "SSO i domini",
-      "emailPreferences": "Preferències de correu electrònic",
-      "dataCollection": "Recollida de dades",
       "auditLogs": "Registres d'auditoria",
       "requestLogs": "Registres de sol·licituds",
       "subOrganizations": "Suborganitzacions",
@@ -3609,7 +3595,6 @@
       "processingBlocked": "Processament bloquejat",
       "processingNeedsReview": "Cal revisar el processament",
       "retryHint": "Torna a provar de carregar l'estat de Kilo Pass.",
-      "setupHint": "Obre la configuració de Kilo Pass al web.",
       "paidSeat_many": "{{displayCount}} llicències de pagament"
     }
   },

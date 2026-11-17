@@ -12,6 +12,7 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { ReviewGuidelineSourceRepositoriesSchema } from '@kilocode/db/schema-types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
@@ -59,12 +60,7 @@ const RepositoryModelOverrideInputSchema = z.object({
   // so an over-long slug is rejected at save time rather than failing the config's
   // canonical parse on read.
   modelSlug: z.string().max(512),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
 });
 
 // Bound the overrides array so a caller cannot grow the JSONB config unbounded, and
@@ -98,12 +94,7 @@ const SaveReviewConfigInputSchema = z.object({
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
   modelSlug: z.string(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
@@ -132,12 +123,7 @@ const PatchReviewConfigInputSchema = z.object({
   focusAreas: z.array(z.string()).optional(),
   customInstructions: z.string().optional(),
   modelSlug: z.string().optional(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   // Compatibility: selectedRepositoryIds full-array input kept for web save and mobile clients before delta support; remove when web and all shipped mobile clients send deltas.

@@ -33,6 +33,7 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import {
   triggerIdSchema,
@@ -60,12 +61,6 @@ import {
 
 const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
 
-// Input schemas
-const variantSchema = z
-  .string()
-  .max(50)
-  .regex(/^[a-zA-Z]+$/);
-
 export const WebhookTriggerCreateInput = z
   .object({
     triggerId: triggerIdCreateSchema,
@@ -78,7 +73,7 @@ export const WebhookTriggerCreateInput = z
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1, 'Model is required').optional(),
-    variant: variantSchema.optional(),
+    variant: agentVariantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     environmentId: z.string().uuid().nullable().optional(),
     profileId: z.string().uuid().nullable().optional(),
@@ -212,7 +207,7 @@ export const WebhookTriggerUpdateInput = z
     organizationId: z.string().uuid().optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1).optional(),
-    variant: variantSchema.nullable().optional(),
+    variant: agentVariantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),

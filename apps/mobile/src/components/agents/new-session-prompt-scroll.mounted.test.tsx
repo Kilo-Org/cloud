@@ -276,13 +276,10 @@ const SCROLLED_OFFSET = PROMPT_INPUT_INSET + 10;
 
 /** A fade band over a cut line: the edge it sits on and how tall it is. */
 function findFade(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
-  const node = renderer.root.find(instance => {
-    if (typeof instance.type !== 'string' || (instance.type as string) !== 'Animated.View') {
-      return false;
-    }
-    const [frame] = instance.props.style as [{ bottom?: number; top?: number }];
-    return frame[edge] !== undefined;
-  });
+  const node = findFadeBands(renderer, edge)[0];
+  if (!node) {
+    throw new Error(`no ${edge} fade band`);
+  }
   const [frame, size] = node.props.style as [
     { bottom?: number; top?: number },
     { height?: number },
@@ -290,6 +287,21 @@ function findFade(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
   return edge === 'top'
     ? { height: size.height, top: frame.top }
     : { bottom: frame.bottom, height: size.height };
+}
+
+/** Every fade band over a cut line, in render order. */
+function findFadeBands(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
+  return renderer.root.findAll(node => {
+    if (typeof node.type !== 'string' || (node.type as string) !== 'Animated.View') {
+      return false;
+    }
+    const style = node.props.style as unknown;
+    if (!Array.isArray(style)) {
+      return false;
+    }
+    const [frame] = style as [{ bottom?: number; top?: number }];
+    return frame[edge] !== undefined;
+  });
 }
 
 /** Report the field's scroll offset the way the native field does. */
@@ -353,9 +365,8 @@ describe('NewSessionPrompt top fade band', () => {
 });
 
 /**
- * A scroll offset where the bottom cut differs by platform: with the three-line
- * field, iOS's bottom edge lands 19 points into its line and Android's text-box
- * edge lands on the halfway point of its own.
+ * A scroll offset where the iOS field's bottom edge lands inside its line: with
+ * the three-line field, the edge falls 19 points into the line.
  */
 const BOTTOM_SCROLLED_OFFSET = 10;
 
@@ -384,24 +395,18 @@ describe('NewSessionPrompt bottom fade band', () => {
     renderer.unmount();
   });
 
-  it('fades the cut bottom line at the text box on Android', async () => {
+  it('draws no bottom band on Android, where the typed line pitch is not the assumed line height', async () => {
     platform.OS = 'android';
-    // The bottom inset is a module-level constant, so the component must be
-    // re-imported after the platform flips.
+    // The top band's clip edge is a module-level constant, so the component
+    // must be re-imported after the platform flips.
     const { platformAct, renderer } = await mountPromptAfterPlatformChange();
 
     reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, platformAct);
 
-    // The edit text clips at its padding, so the band's bottom is one inset
-    // above the field's bottom and the cut edge is one inset higher.
-    expect(findFade(renderer, 'bottom')).toEqual({
-      bottom: PROMPT_INPUT_INSET,
-      height: resolveComposerEdgeFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset:
-          BOTTOM_SCROLLED_OFFSET + PROMPT_HEIGHT - PROMPT_INPUT_INSET - PROMPT_INPUT_INSET,
-      }),
-    });
+    // Android's typed text uses a line pitch that is not the 24 dp line height
+    // the band assumes, so a band there would not sit on the line the field
+    // cuts. The Android field keeps its hard cut.
+    expect(findFadeBands(renderer, 'bottom')).toEqual([]);
 
     renderer.unmount();
   });

@@ -41,12 +41,13 @@ let platformIntegrationId: string;
 
 type PeerRequest = { path: string; body: unknown };
 const cloudAgentRequests: PeerRequest[] = [];
-let admissionOutcome: 'unavailable' | 'admitted' = 'unavailable';
+let admissionOutcome: 'unavailable' | 'admitted' | 'refused' = 'unavailable';
 
 /**
  * Cloud Agent peer. `unavailable` answers the admission query the way a peer
  * without the query does (404), which the service classifies as undecidable;
- * `admitted` answers it and serves the start calls.
+ * `refused` answers it with a 403, which the service classifies as a permanent
+ * refusal; `admitted` answers it and serves the start calls.
  */
 async function cloudAgentFetch(request: Request): Promise<Response> {
   const { pathname } = new URL(request.url);
@@ -56,6 +57,9 @@ async function cloudAgentFetch(request: Request): Promise<Response> {
   if (pathname === '/trpc/getAnalysisCreditAdmission') {
     if (admissionOutcome === 'unavailable') {
       return new Response('missing query', { status: 404 });
+    }
+    if (admissionOutcome === 'refused') {
+      return new Response('refused', { status: 403 });
     }
     return Response.json({ result: { data: { outcome: 'admitted' } } });
   }
@@ -383,6 +387,34 @@ describe('manual analysis command replay', () => {
     expect(await readCommand(command.commandId)).toEqual({
       status: 'failed',
       resultCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+    });
+  });
+
+  it('settles a refused admission with the declared code on the row and the command', async () => {
+    const findingId = await insertFinding({ analysisStatus: null });
+    const command = await insertCommand({ findingId });
+    admissionOutcome = 'refused';
+
+    const delivery = await deliver(command, 1);
+
+    expect(delivery.ack).toHaveBeenCalledTimes(1);
+    expect(delivery.retry).not.toHaveBeenCalled();
+    expect(triageRequests).toHaveLength(0);
+    expect(cloudAgentRequests.map(request => request.path)).toEqual([
+      '/trpc/getAnalysisCreditAdmission',
+    ]);
+    expect(await readQueueRow(findingId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+      attemptCount: 0,
+    });
+    expect(await readCommand(command.commandId)).toEqual({
+      status: 'failed',
+      resultCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+    expect(await readFinding(findingId)).toEqual({
+      analysisStatus: 'failed',
+      sessionId: null,
     });
   });
 

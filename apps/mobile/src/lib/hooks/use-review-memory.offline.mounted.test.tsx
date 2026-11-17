@@ -70,7 +70,12 @@ function callsTo(procedure: string): number {
 type Probe = {
   setEnabled: ((enabled: boolean) => Promise<unknown>) | null;
   triggerAnalysis: ((repoFullName: string) => Promise<unknown>) | null;
-  save: ((proposalId: string, draft: { title: string; rationale: string; proposedMarkdown: string }) => Promise<unknown>) | null;
+  save:
+    | ((
+        proposalId: string,
+        draft: { title: string; rationale: string; proposedMarkdown: string }
+      ) => Promise<unknown>)
+    | null;
   reject: ((proposalId: string) => Promise<unknown>) | null;
   approve: ((proposalId: string) => Promise<unknown>) | null;
   isPending: boolean;

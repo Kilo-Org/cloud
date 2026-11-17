@@ -15,7 +15,7 @@ import {
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { isRetryableTrpcError } from '@/lib/trpc-error';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { capitalize, cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
@@ -110,7 +110,8 @@ function creditRowTitle(description: string): string {
   if (stripped.length === 0) {
     return i18n.t('common.creditHistory');
   }
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // The first grapheme is display text, so its case is the active locale's.
+  return capitalize(stripped);
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {

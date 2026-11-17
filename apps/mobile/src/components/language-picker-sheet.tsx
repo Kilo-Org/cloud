@@ -40,9 +40,10 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
-// second opaque layer would cover the sheet's own themed surface.
+// second opaque layer would cover the sheet's own themed surface. Rows own the
+// page gutter themselves, so the list adds none of its own.
 const listFlexStyle = { flex: 1 } satisfies ViewStyle,
-  listPadStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
+  listPadStyle = { paddingBottom: 16 } satisfies ViewStyle;
 // A query that matches nothing leaves the no-match state as the list's only
 // content, and the sheet body is far taller than it. Without this the content
 // box shrinks to the state's own height, so the state's own centring collapses
@@ -282,7 +283,7 @@ export function LanguagePickerSheet({
         scrollable={false}
       >
         <CenteredState>
-          <View className="items-center px-6">
+          <View className="items-center px-4">
             <Text variant="muted" className="text-center">
               {t('language.languageSaved')}
             </Text>
@@ -306,7 +307,7 @@ export function LanguagePickerSheet({
         scrollable={false}
       >
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <ActivityIndicator color={colors.mutedForeground} />
             <Text variant="muted" className="text-center">
               {t('language.restarting')}

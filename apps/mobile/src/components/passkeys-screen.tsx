@@ -9,17 +9,20 @@ import { PasskeyVerificationPanel } from '@/components/passkey-verification-pane
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isShortViewport } from '@/lib/centered-state-layout';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { usePasskeyManagement } from '@/lib/passkeys/use-passkey-management';
@@ -45,7 +48,7 @@ function InlineFailure({
 }: Readonly<{ message: string; onRetry: () => void; pending: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3">
+    <Card className="flex-row items-center">
       <Text accessibilityRole="alert" className="min-w-0 flex-1 text-sm text-muted-foreground">
         {message}
       </Text>
@@ -58,7 +61,7 @@ function InlineFailure({
       >
         <Text>{t('common.retry')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }
 
@@ -97,7 +100,6 @@ export function PasskeysScreen() {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const { token } = useAuth();
-  const tabBarBottomPadding = useTabBarBottomPadding();
   const { userId, email } = useCurrentUserId();
   // The body sits between the header and a footer that already reserves the
   // tab bar, so in a phone held sideways its band is only a few dozen points
@@ -153,7 +155,7 @@ export function PasskeysScreen() {
       onPress={management.handleAddPasskey}
     >
       <Plus size={16} color={colors.foreground} />
-      <Text className="mr-[24px] flex-1 text-center">{t('profile.addPasskey')}</Text>
+      <Text className="flex-1 text-center">{t('profile.addPasskey')}</Text>
     </Button>
   ) : null;
 
@@ -205,26 +207,11 @@ export function PasskeysScreen() {
     // Loading is checked ahead of error and empty: the first frame of a cold
     // open must be the skeleton, never the empty state.
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {SKELETON_ROWS.map(index => (
-          <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {/* Reserves the loaded row's 30 dp IconTile frame. */}
-            <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
-            <View className="flex-1 gap-1.5">
-              <Skeleton className="h-5 w-28" />
-              <Skeleton className="h-4 w-40" />
-            </View>
-            {/* Reserve the row controls' final 44x44pt boxes (the glyphs stay
-                16pt) so a loaded row is the same height as its skeleton. */}
-            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-              <Skeleton className="h-4 w-4 rounded" />
-            </View>
-            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-              <Skeleton className="h-4 w-4 rounded" />
-            </View>
-          </View>
+          <RowSkeleton key={index} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (isError && data === undefined) {
     body = (
@@ -269,7 +256,7 @@ export function PasskeysScreen() {
     body = (
       <>
         {failureNotice}
-        <View className="gap-3">
+        <RowGroup leadingTile>
           {passkeys.map(passkey => (
             <PasskeyListRow
               key={passkey.id}
@@ -279,7 +266,7 @@ export function PasskeysScreen() {
               onRemove={confirmRemove}
             />
           ))}
-        </View>
+        </RowGroup>
       </>
     );
   }
@@ -289,7 +276,7 @@ export function PasskeysScreen() {
       <ScreenHeader title={t('profile.passkeysTitle')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         // The panel's code field lives in this scroller, so the native inset is
         // what keeps the field and the controls under it above the keyboard.
@@ -315,10 +302,12 @@ export function PasskeysScreen() {
           the query renders skeletons, no rows, or rows. The notice that
           explains a failed or unavailable add shares the slot, beside the
           control it is about. */}
-      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
-        {footerNotice}
-        {addControl}
-      </View>
+      <ScreenFooter clearance="tab-bar" keyboard="host">
+        <View className="gap-3">
+          {footerNotice}
+          {addControl}
+        </View>
+      </ScreenFooter>
 
       {renameTarget && (
         <RenameModal

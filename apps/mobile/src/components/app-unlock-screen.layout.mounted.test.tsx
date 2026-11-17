@@ -19,8 +19,10 @@ it('centers the unlock content and keeps a separate gap before Retry', async () 
   const copy = heading.parent;
   const content = copy?.parent;
   expect(content?.props.className).toContain('gap-8');
-  expect(content?.parent?.type).toBe('CenteredState');
-  expect(content?.props.style).toEqual({ paddingLeft: 24, paddingRight: 24 });
+  // The scene centres through `CenteredState`, and the page gutter is the
+  // layout token's class rather than an inline inset.
+  expect(content?.parent?.parent?.type).toBe('CenteredState');
+  expect(String(content?.props.className).split(' ')).toContain('px-4');
   expect(content?.findAll(node => node === retry())).toHaveLength(1);
   expect(copy?.findAll(node => node === retry())).toHaveLength(0);
   expect(retry()?.props.accessibilityLabel).toBe('Retry');

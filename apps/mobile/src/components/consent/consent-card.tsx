@@ -1,25 +1,32 @@
 import { type Href, useRouter } from 'expo-router';
 import { LineChart, Shield } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowGroup } from '@/components/ui/row-group';
+import { ScreenFooter } from '@/components/ui/screen-footer';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
@@ -50,7 +57,7 @@ export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom, top } = useSafeAreaInsets();
+  const { top } = useSafeAreaInsets();
   const sideInsetStyle = useSideInsetStyle();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
@@ -58,18 +65,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
   const rootStyle = { paddingTop: top, ...sideInsetStyle };
-  const contentContainerStyle = {
-    paddingTop: 24,
-    paddingBottom: 24,
-  };
-  // The action buttons sit in a pinned footer below the ScrollView, not in
-  // the scroll content: the review modal is shorter than the card, and the
-  // primary CTA was clipping off the sheet bottom (b911 vr1 spot check,
-  // e2-pre-revoke.png / p1-declined-off.png). The footer keeps its own
-  // layout space, so scrolling never moves the actions.
-  const footerStyle = {
-    paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
-  };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   // The catalogue key, not the copy: the card translates it at render, so the
   // line follows an applied language instead of keeping the words of the
@@ -239,101 +234,94 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       {/* The body keeps the platform scroll indicator: at a compact window it
           is taller than the viewport, and the hidden thumb made the rest of it
           read as missing rather than as one scroll away. */}
-      <ScrollView className="flex-1" contentContainerStyle={contentContainerStyle}>
-        <View className="px-6">
-          {/* The badge alone carries the brand: the title below already states
-              what the screen is about, and repeating the product name beside
-              the mark said nothing a reader did not already see. The mark keeps
-              the name for assistive tech, which cannot read the glyph. */}
-          <View
-            accessible
-            accessibilityRole="image"
-            accessibilityLabel={t('consent.kilo')}
-            className="h-10 w-10 items-center justify-center rounded-lg bg-secondary"
-          >
-            <Shield size={20} color={colors.foreground} />
-          </View>
+      <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+        {/* The badge alone carries the brand: the title below already states
+            what the screen is about, and repeating the product name beside
+            the mark said nothing a reader did not already see. The mark keeps
+            the name for assistive tech, which cannot read the glyph. */}
+        <View
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={t('consent.kilo')}
+          className="h-10 w-10 items-center justify-center rounded-lg border border-border"
+        >
+          <Shield size={20} color={colors.foreground} />
+        </View>
 
-          <Text className="mt-6 text-2xl font-bold text-foreground">
+        <View className="gap-1">
+          <Text variant="large">
             {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
           </Text>
-          <Text className="mt-3 text-base text-muted-foreground">
-            {t('consent.introDescription')}
-          </Text>
+          <Text variant="muted">{t('consent.introDescription')}</Text>
+        </View>
 
-          <Text className="mt-6 text-sm font-semibold text-foreground">
-            {t('consent.required')}
-          </Text>
-
+        <Section label={t('consent.required')}>
           <ConsentRequiredRows />
+        </Section>
 
-          <Text className="mt-6 text-sm font-semibold text-foreground">
-            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
-          </Text>
-
-          <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
-            <View className="mt-0.5">
-              <LineChart size={18} color={colors.mutedForeground} />
-            </View>
-            <View className="flex-1 shrink gap-1">
-              <Text className="text-base font-semibold text-foreground">
-                {t('consent.helpImprove')}
-              </Text>
-              <Text className="text-sm text-muted-foreground">
-                {t('consent.helpImproveDescription')}
-              </Text>
-            </View>
+        <Section
+          label={
+            mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')
+          }
+        >
+          <RowGroup leadingTile>
+            {/* Until the stored choice loads the row shows no switch: a switch
+                would present a value the user has not chosen and a tap could
+                flip the wrong way, so the slot holds a control-sized
+                placeholder in the same row shape instead. */}
             {optionalControlPending ? (
-              // Same footprint as the iOS Switch (51x31), so the real control
-              // swaps in without moving the row.
-              <Skeleton className="h-[31px] w-[51px] shrink-0 rounded-full" />
+              <ConfigureRow
+                icon={LineChart}
+                title={t('consent.helpImprove')}
+                subtitle={t('consent.helpImproveDescription')}
+                trailing={<Skeleton className="h-8 w-14 rounded-full" />}
+              />
             ) : (
-              <Switch
+              <PreferenceRow
+                icon={LineChart}
+                title={t('consent.helpImprove')}
+                subtitle={t('consent.helpImproveDescription')}
                 value={optionalToggle}
                 disabled={mode === 'review' && savingOptional}
-                accessibilityLabel={t('consent.helpImprove')}
                 onValueChange={handleToggleOptional}
               />
             )}
-          </View>
+          </RowGroup>
+        </Section>
 
-          <Pressable
-            onPress={() => {
-              router.push(
-                mode === 'review'
-                  ? ('/(app)/consent-details?mode=review' as Href)
-                  : ('/(app)/consent-details' as Href)
-              );
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('consent.seeFullDetails')}
-            // The row's own node carries the control-size floor: the link's
-            // text line is 17.5dp, below the audit's 28dp minimum, and the
-            // 8dp slop carries the 44pt region on top of it.
-            className="mt-6 min-h-[28px] flex-row items-center gap-1 active:opacity-70"
-          >
-            <Text className="text-sm font-semibold text-primary">
-              {t('consent.seeFullDetails')}
-            </Text>
-            <DirectionalChevronRight size={16} color={colors.primary} />
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={() => {
+            router.push(
+              mode === 'review'
+                ? ('/(app)/consent-details?mode=review' as Href)
+                : ('/(app)/consent-details' as Href)
+            );
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('consent.seeFullDetails')}
+          // The row's own node carries the control-size floor: the link's text
+          // line is below the audit's 28dp minimum, and the 8dp slop carries the
+          // 44pt region on top of `ROW_TARGET_CLASS`.
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
+        >
+          <Text variant="small" className="text-primary">
+            {t('consent.seeFullDetails')}
+          </Text>
+          <RowChevron />
+        </Pressable>
       </ScrollView>
 
-      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
+      <ScreenFooter>
+        <View className="gap-3">
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
-            one-line slot is always reserved, so an error appears without
-            moving the actions. The privacy disclosure is pinned here too,
-            because at the foot of the scrolling body the footer edge cut the
-            sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
-            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
-            inside this footer's `pt-3` top padding rather than reaching the
-            scroll region above it. */}
+            disclosure is pinned here too, because at the foot of the scrolling
+            body the footer edge cut the sentence in half. Its font scale is
+            capped so the pinned height stays bounded (see
+            CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
@@ -341,7 +329,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error ? t(error) : null} className="text-sm" />
+          <AccessibleStatus message={error ? t(error) : null} />
         </View>
         <Button
           onPress={() => {
@@ -366,7 +354,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         >
           <Text>{actions.secondaryLabel}</Text>
         </Button>
-      </View>
+        </View>
+      </ScreenFooter>
       {dialog}
     </View>
   );

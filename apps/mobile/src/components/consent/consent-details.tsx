@@ -258,7 +258,7 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-6">
+        <View className="px-4">
           <Section
             title={t('consent.aiProvidersTitle')}
             what={t('consent.aiProvidersWhat')}

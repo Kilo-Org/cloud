@@ -9,11 +9,15 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Ban } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { Ban, BellOff, type LucideIcon } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
@@ -21,6 +25,7 @@ const SKELETON_ROWS = [0, 1];
 
 /** One GitHub login the reader has hidden, with the action that reveals it again. */
 function HiddenLoginRow({
+  icon,
   login,
   actionLabel,
   actionA11y,
@@ -28,6 +33,7 @@ function HiddenLoginRow({
   disabled,
   onAction,
 }: Readonly<{
+  icon: LucideIcon;
   login: string;
   actionLabel: string;
   actionA11y: string;
@@ -38,27 +44,29 @@ function HiddenLoginRow({
   onAction: () => void;
 }>) {
   return (
-    <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-        {login}
-      </Text>
-      <Button
-        variant="outline"
-        size="sm"
-        className={STATE_ACTION_CLASS}
-        disabled={disabled}
-        loading={pending}
-        accessibilityLabel={actionA11y}
-        onPress={onAction}
-      >
-        <Text>{actionLabel}</Text>
-      </Button>
-    </View>
+    <ConfigureRow
+      icon={icon}
+      title={login}
+      trailing={
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          disabled={disabled}
+          loading={pending}
+          accessibilityLabel={actionA11y}
+          onPress={onAction}
+        >
+          <Text>{actionLabel}</Text>
+        </Button>
+      }
+    />
   );
 }
 
 function HiddenLoginsSection({
   title,
+  icon,
   logins,
   actionLabel,
   actionA11y,
@@ -67,6 +75,7 @@ function HiddenLoginsSection({
   onAction,
 }: Readonly<{
   title: string;
+  icon: LucideIcon;
   logins: readonly string[];
   actionLabel: string;
   actionA11y: (login: string) => string;
@@ -78,14 +87,12 @@ function HiddenLoginsSection({
     return null;
   }
   return (
-    <View className="gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      <View className="gap-3">
+    <Section label={title}>
+      <RowGroup leadingTile>
         {logins.map(login => (
           <HiddenLoginRow
             key={login}
+            icon={icon}
             login={login}
             actionLabel={actionLabel}
             actionA11y={actionA11y(login)}
@@ -96,8 +103,8 @@ function HiddenLoginsSection({
             }}
           />
         ))}
-      </View>
-    </View>
+      </RowGroup>
+    </Section>
   );
 }
 
@@ -142,11 +149,11 @@ export function BlockedPeopleScreen() {
   let body: ReactNode = null;
   if (hidden.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[54px] rounded-lg" />
+          <RowSkeleton key={row} tile />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (hidden.isError) {
     body = <QueryError onRetry={() => void hidden.refetch()} isRetrying={hidden.isFetching} />;
@@ -161,9 +168,10 @@ export function BlockedPeopleScreen() {
     );
   } else {
     body = (
-      <View className="gap-6">
+      <>
         <HiddenLoginsSection
           title={t('profile.blockedPeople.blockedSection')}
+          icon={Ban}
           logins={hidden.data.blockedLogins}
           actionLabel={t('profile.blockedPeople.unblock')}
           actionA11y={login => t('profile.blockedPeople.unblockA11y', { login })}
@@ -175,6 +183,7 @@ export function BlockedPeopleScreen() {
         />
         <HiddenLoginsSection
           title={t('profile.blockedPeople.mutedSection')}
+          icon={BellOff}
           logins={hidden.data.mutedLogins}
           actionLabel={t('profile.blockedPeople.unmute')}
           actionA11y={login => t('profile.blockedPeople.unmuteA11y', { login })}
@@ -184,7 +193,7 @@ export function BlockedPeopleScreen() {
             unmute.mutate({ githubLogin: login });
           }}
         />
-      </View>
+      </>
     );
   }
 
@@ -193,7 +202,7 @@ export function BlockedPeopleScreen() {
       <ScreenHeader title={t('profile.blockedPeople.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted" className="text-xs">

@@ -12,6 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,6 +29,7 @@ import {
 } from '@/lib/byok/provider-key-scope';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
@@ -37,11 +39,12 @@ type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
 const SKELETON_ROWS = [0, 1];
 
 /**
- * The height the pending band already occupies: two 104 dp skeletons and the gap
+ * The height the pending band already occupies: two key cards and the gap
  * between them. Every state that is not the key list keeps it, so the Add key
- * action below never moves when the skeletons are replaced by the settled state.
+ * action below never moves when the skeletons are replaced by the settled
+ * state.
  */
-const BODY_BAND_CLASS = 'min-h-[220px]';
+const BODY_BAND_CLASS = 'min-h-64';
 
 function ProviderKeyRow({
   providerKey,
@@ -73,10 +76,10 @@ function ProviderKeyRow({
   const busy = testing || toggling || deleting;
 
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card>
       <View className="flex-row items-center gap-3">
         <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+          <Text variant="small" numberOfLines={1}>
             {providerKey.provider_name}
           </Text>
           {/*
@@ -84,7 +87,7 @@ function ProviderKeyRow({
             carry the state and the row has to name the plan instead.
           */}
           {managed ? (
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            <Text variant="caption" numberOfLines={1}>
               {t('profile.providerKeys.managedByPlan')}
             </Text>
           ) : null}
@@ -129,7 +132,7 @@ function ProviderKeyRow({
           <Text>{t('common.remove')}</Text>
         </Button>
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -244,11 +247,18 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   let body: ReactNode = null;
   if (keys.isPending) {
     body = (
-      <View className="gap-3">
+      <>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[104px] rounded-lg" />
+          <Card key={row}>
+            <View className="flex-row items-center gap-3">
+              <Skeleton className="h-4 w-32 max-w-full" />
+              <View className="flex-1" />
+              <Skeleton className="h-6 w-12 rounded-full" />
+            </View>
+            <Skeleton className="h-8 w-full rounded-md" />
+          </Card>
         ))}
-      </View>
+      </>
     );
   } else if (keys.isError) {
     // A terminal code (a refusal the server will repeat) gets the state its
@@ -271,7 +281,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
     );
   } else {
     body = (
-      <View className="gap-3">
+      <>
         {keys.data.map(providerKey => (
           <ProviderKeyRow
             key={providerKey.id}
@@ -295,7 +305,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
             }}
           />
         ))}
-      </View>
+      </>
     );
   }
 
@@ -304,33 +314,29 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
       <ScreenHeader title={t('profile.providerKeys.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
+        <Text variant="muted">
           {scope.kind === 'organization'
             ? t('profile.providerKeys.orgDescription')
             : t('profile.providerKeys.description')}
         </Text>
         {scope.kind === 'organization' && !permissions.canEdit ? (
-          <Text variant="muted" className="text-xs">
-            {t('profile.providerKeys.viewOnly')}
-          </Text>
+          <Text variant="muted">{t('profile.providerKeys.viewOnly')}</Text>
         ) : null}
         <View className={BODY_BAND_CLASS}>{body}</View>
         {permissions.canEdit ? (
-          <View className="pt-3">
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                router.push(providerKeyAddHref(scope));
-              }}
-            >
-              <Plus size={16} color={colors.foreground} />
-              <Text>{t('profile.providerKeys.add')}</Text>
-            </Button>
-          </View>
+          <Button
+            variant="outline"
+            className={STATE_ACTION_CLASS}
+            onPress={() => {
+              router.push(providerKeyAddHref(scope));
+            }}
+          >
+            <Plus size={16} color={colors.foreground} />
+            <Text>{t('profile.providerKeys.add')}</Text>
+          </Button>
         ) : null}
       </TabScreenScrollView>
       {dialog}

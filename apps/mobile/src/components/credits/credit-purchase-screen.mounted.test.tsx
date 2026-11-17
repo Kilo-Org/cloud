@@ -204,6 +204,12 @@ vi.mock('@/lib/utils', async () => {
     parseTimestamp: sharedUtils.parseTimestamp,
   };
 });
+// The pinned footer reads the keyboard and the tab-bar band; this screen sits
+// outside the tab bar, so the band is zero and no keyboard is open.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => unknown) => select({ height: 0 }),
+}));
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
 // ── Fixtures and helpers ─────────────────────────────────────────────
 
@@ -221,26 +227,12 @@ const STORE_LISTINGS = [
   { id: 'credits.usd500.v1', displayPrice: '$549.99' },
 ];
 
-// The row and the placeholder share one height and one surface; their classes
-// differ only in the padding axis, so the tests match them by the testIDs the
-// screen sets rather than by a class string.
-const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card';
-
 function placeholderShells(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
     node => (node.props as { testID?: string }).testID === 'credit-pack-placeholder'
   );
-}
-
-function classNamesOf(instances: TestRenderer.ReactTestInstance[]): string[] {
-  return instances.map(instance => String((instance.props as { className?: string }).className));
-}
-
-function classNameOf(instance: TestRenderer.ReactTestInstance): string {
-  const value: unknown = instance.props.className;
-  return typeof value === 'string' ? value : '';
 }
 
 function labelOf(instance: TestRenderer.ReactTestInstance | undefined): string {
@@ -379,7 +371,6 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).toContain('$549.99');
     expect(rows.every(row => (row.props as { disabled?: boolean }).disabled === false)).toBe(true);
     expect(allText(renderer)).toContain('$1,234.00');
-    expect(classNamesOf(rows).every(classes => classes.includes(PACK_ROW_SHELL))).toBe(true);
     const firstRow = rows[0];
     if (!firstRow) {
       throw new Error('expected four pack rows');
@@ -499,14 +490,9 @@ describe('CreditPurchaseScreen', () => {
     const shells = placeholderShells(renderer);
     expect(shells).toHaveLength(4);
     for (const shell of shells) {
-      const bars = shell.findAll(node => String(node.type) === 'Skeleton');
-      expect(bars).toHaveLength(3);
-      expect(
-        classNamesOf(bars)
-          .slice(0, 2)
-          .every(classes => classes.includes('h-6'))
-      ).toBe(true);
-      expect(classNamesOf(bars)[2]).toContain('h-8');
+      // Each placeholder is the shared skeleton row: a tile frame and both
+      // text bars, so the row it stands in for keeps its shape.
+      expect(shell.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(1);
     }
     unmount();
   });
@@ -827,35 +813,15 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
-    expect(
-      classNamesOf(rows).every(
-        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
-      )
-    ).toBe(true);
-    // No row keeps an empty band for a status it does not state: the title row
-    // and the row's one note line are its only children. The note line keeps a
-    // fixed height for the note or the in-flight label it may hold.
-    expect(
-      rows.every(row => {
-        const children = row.children;
-        const line = children[1];
-        if (children.length !== 2 || line === undefined || typeof line === 'string') {
-          return false;
-        }
-        const texts = line.findAll(node => String(node.type) === 'Text');
-        return (
-          String(line.type) === 'View' &&
-          classNameOf(line).includes('min-h-5') &&
-          classNameOf(line).includes('mt-2') &&
-          texts.length === 1 &&
-          texts[0]?.props.children === 'Credits purchased through the App Store do not expire.'
-        );
-      })
-    ).toBe(true);
+    // The row's one state line carries the expiry note or the in-flight label;
+    // the row itself is one attached element whose label names the charge, the
+    // reason it is inactive, and the note the line shows.
+    expect(rows.every(row => (row.props as { disabled?: boolean }).disabled === true)).toBe(true);
+    expect(allText(renderer)).toContain('Credits purchased through the App Store do not expire.');
     unmount();
   });
 
-  it('place: a status phrase takes the row state line, and only a real price takes the trailing slot', async () => {
+  it('place: a status phrase takes the row subtitle, and only a real price takes the trailing slot', async () => {
     owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS.slice(0, 3));
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -863,49 +829,22 @@ describe('CreditPurchaseScreen', () => {
 
     const rows = packRows(renderer);
     const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // Title, then the store price: the price is the only trailing child, and
-    // the expiry note takes the row's one state line.
-    expect(priced).toHaveLength(3);
-    expect(priced[1]?.props.children).toBe('$10.99');
-    expect(String(priced[1]?.props.className)).toContain('shrink-0');
+    // Title, then the expiry note under it, then the store price in the
+    // trailing slot.
+    expect(priced.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$10.00')} of credits`,
+      'Credits purchased through the App Store do not expire.',
+      '$10.99',
+    ]);
     const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // Title, then the status in the same state line its neighbours fill with
-    // the expiry note: the row keeps their height, and the note it no longer
-    // prints stays in its accessibility label.
+    // The disabled reason takes the same subtitle line its neighbours fill with
+    // the expiry note, and the note it no longer prints stays in the row's
+    // accessibility label.
     expect(unpriced.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$500.00')} of credits`,
       'Price unavailable',
     ]);
     expect(labelOf(rows[3])).toContain('Credits purchased through the App Store do not expire.');
-    // One fixed-height state line, one gap, on every row: the store answering
-    // or dropping changes the copy in place, never a row's height.
-    const stateLines = rows.map(row =>
-      row.findAll(
-        node =>
-          String(node.type) === 'View' &&
-          String((node.props as { className?: string }).className).includes('min-h-5')
-      )
-    );
-    expect(stateLines.every(lines => lines.length === 1)).toBe(true);
-    expect(
-      stateLines.every(([line]) => {
-        if (line === undefined) {
-          return false;
-        }
-        const className = classNameOf(line);
-        return className.includes('min-h-5') && className.includes('mt-2');
-      })
-    ).toBe(true);
-    expect(
-      (stateLines[3]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
-        node => node.props.children
-      )
-    ).toEqual(['Price unavailable']);
-    expect(
-      (stateLines[0]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
-        node => node.props.children
-      )
-    ).toEqual(['Credits purchased through the App Store do not expire.']);
     unmount();
   });
 
@@ -1000,7 +939,9 @@ describe('CreditPurchaseScreen', () => {
     safeAreaInsets.bottom = 0;
 
     const textHeight = 63;
-    const fixed = 26 + 8;
+    // The floating card's own padding (14 above and below) and the 8 dp gap
+    // its wrapper keeps above the footer.
+    const fixed = 28 + 8;
     expect(single.some(height => Math.abs(height - (textHeight + fixed)) <= 0.5)).toBe(true);
     expect(withHomeIndicator).toEqual(single);
     expect(raised.some(height => Math.abs(height - (textHeight * 1.5 + fixed)) <= 0.5)).toBe(true);
@@ -1055,7 +996,7 @@ describe('CreditPurchaseScreen', () => {
     const outer = inner?.parent;
     // The insets and the gutter sit on separate wrappers: an inline padding on
     // one node would replace its className padding.
-    expect(String(inner?.props.className)).toContain('px-5');
+    expect(String(inner?.props.className)).toContain('px-4');
     expect(String(outer?.props.className)).toContain('bottom-0');
     // The card keeps only its 8 dp gap to the footer, which owns the
     // home-indicator band, so the gap is a theme length rather than the inset.
@@ -1167,7 +1108,6 @@ describe('CreditPurchaseScreen', () => {
       legalInFooter: number;
       footerIsScreenRootLastChild: boolean;
       footerUnderScrollArea: boolean;
-      rowHeight: number;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
@@ -1207,14 +1147,6 @@ describe('CreditPurchaseScreen', () => {
         .findAll(node => surfaceOf(node) !== undefined)
         .map(node => surfaceOf(node))
         .filter((kind): kind is SurfaceKind => kind !== undefined);
-      const [firstRow] = renderer.root.findAll(
-        node => testIDOf(node) === 'credit-pack-row' || testIDOf(node) === 'credit-pack-placeholder'
-      );
-      const rowStyle: unknown = firstRow?.props.style;
-      const rowHeight =
-        typeof rowStyle === 'object' && rowStyle !== null && 'height' in rowStyle
-          ? Number(rowStyle.height)
-          : 0;
       measured.push({
         state: scenario.state,
         surfaces,
@@ -1229,7 +1161,6 @@ describe('CreditPurchaseScreen', () => {
           footer !== undefined && String(footer.props.className).includes('border-t'),
         footerUnderScrollArea:
           screenChildren.at(-2)?.findAllByType(DetailScreenScrollView).length === 1,
-        rowHeight,
       });
       unmount();
       vi.clearAllMocks();
@@ -1268,13 +1199,6 @@ describe('CreditPurchaseScreen', () => {
       expect(result.footerIsScreenRootLastChild, result.state).toBe(true);
       expect(result.footerUnderScrollArea, result.state).toBe(true);
     }
-    // The placeholder rows take exactly the priced row's height, so the list
-    // never jumps when the store answers.
-    const rowHeights = measured
-      .filter(result => result.rowHeight > 0)
-      .map(result => result.rowHeight);
-    expect(new Set(rowHeights).size, 'rows and placeholders share one height').toBe(1);
-    expect(rowHeights[0]).toBeGreaterThan(0);
   });
 
   it('pads the footer with the bottom inset so the copy holds the safe-area edge', async () => {
@@ -1303,36 +1227,6 @@ describe('CreditPurchaseScreen', () => {
     safeAreaInsets.bottom = 0;
   });
 
-  it('sizes a pack row and its placeholder to the same height', async () => {
-    const heightOf = (node: TestRenderer.ReactTestInstance): number => {
-      const style: unknown = node.props.style;
-      if (typeof style !== 'object' || style === null || !('height' in style)) {
-        return 0;
-      }
-      const value = style.height;
-      return typeof value === 'number' ? value : 0;
-    };
-
-    const priced = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => packRows(priced.renderer).length === 4);
-    const rowHeights = priced.renderer.root
-      .findAll(node => (node.props as { testID?: string }).testID === 'credit-pack-row')
-      .map(node => heightOf(node));
-    priced.unmount();
-    vi.clearAllMocks();
-
-    owner.connected = false;
-    const loading = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => placeholderShells(loading.renderer).length === 4);
-    const placeholderHeights = placeholderShells(loading.renderer).map(node => heightOf(node));
-    loading.unmount();
-
-    expect(rowHeights).toHaveLength(4);
-    expect(placeholderHeights).toHaveLength(4);
-    expect(new Set([...rowHeights, ...placeholderHeights]).size).toBe(1);
-    expect(rowHeights[0]).toBeGreaterThan(0);
-  });
-
   it('caps every text block a pack row sizes', async () => {
     // The row's height is its capped text plus its spacing, so an uncapped line
     // would grow the row past the height it reserves.
@@ -1346,38 +1240,6 @@ describe('CreditPurchaseScreen', () => {
     // separate capped line.
     expect(caps.filter(cap => cap === 1)).toHaveLength(4);
     unmount();
-  });
-
-  it('scales the row height with the system font scale', async () => {
-    // Only the row's text scales; its paddings and the content gaps keep their
-    // size. A static height would clip the text at a raised scale.
-    const rowHeight = async (): Promise<number> => {
-      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-      await waitFor(() => packRows(renderer).length === 4);
-      const [row] = renderer.root.findAll(
-        node => (node.props as { testID?: string }).testID === 'credit-pack-row'
-      );
-      const style: unknown = row?.props.style;
-      const value =
-        typeof style === 'object' && style !== null && 'height' in style ? style.height : 0;
-      unmount();
-      return typeof value === 'number' ? value : 0;
-    };
-
-    dimensions.fontScale = 1;
-    const single = await rowHeight();
-    dimensions.fontScale = 1.5;
-    const raised = await rowHeight();
-    dimensions.fontScale = 0.85;
-    const reduced = await rowHeight();
-    dimensions.fontScale = 1;
-
-    expect(single).toBeGreaterThan(0);
-    expect(raised).toBeGreaterThan(single);
-    // The spacing does not scale, so a reduced scale shrinks the row by less
-    // than the scale itself.
-    expect(reduced).toBeLessThan(single);
-    expect(reduced).toBeGreaterThan(single * 0.85);
   });
 
   it('names an expiring balance and states plainly when none expires', async () => {

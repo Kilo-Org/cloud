@@ -72,6 +72,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
@@ -95,6 +96,12 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({ useLiveFontScale: () => 1 }));
+vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
@@ -440,7 +447,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     // The Review PR row is the row whose subtitle is the destination identity.
     const subtitles = renderer.root
       .findAllByType('Text')
-      .filter(node => node.props.className === 'text-sm text-muted-foreground')
+      .filter(node => node.props.className === 'mt-0.5 text-xs text-muted-foreground')
       .map(node => node.children.filter(child => typeof child === 'string').join(''));
     expect(subtitles).toEqual(['group/sub/repo!7']);
 

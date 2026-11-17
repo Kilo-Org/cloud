@@ -296,7 +296,8 @@ describe('LanguagePickerSheet apply', () => {
     // list starts instead of being pushed down a filled body.
     const listContentStyle: unknown =
       renderer.root.findByType(flashListMock).props.contentContainerStyle;
-    expect(listContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+    // Rows own the page gutter themselves, so the list adds no horizontal pad.
+    expect(listContentStyle).toEqual({ paddingBottom: 16 });
 
     renderer.unmount();
   });
@@ -392,7 +393,7 @@ describe('LanguagePickerSheet apply', () => {
     // top-aligned: centring the empty state would push the field off the top.
     const compactContentStyle: unknown =
       renderer.root.findByType(flashListMock).props.contentContainerStyle;
-    expect(compactContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+    expect(compactContentStyle).toEqual({ paddingBottom: 16 });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

@@ -8,8 +8,9 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLegalDocument } from '@/lib/hooks/use-legal-document';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type LegalDocument } from '@/lib/legal-document';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 import { planLegalInContentLink } from './legal-document-link';
 
@@ -37,6 +38,7 @@ export function LegalDocumentScreen({
   const router = useRouter();
   const { state, retry } = useLegalDocument(document);
   const sideInsetStyle = useSideInsetStyle();
+  const bottomPadding = useDetailScreenBottomPadding();
 
   // The documents cross-reference each other. Both stay in the app: opening the
   // web page would hand the reader the marketing site's chrome, pricing links
@@ -78,7 +80,7 @@ export function LegalDocumentScreen({
   function renderState() {
     if (state.kind === 'loading') {
       return (
-        <View className="gap-3 px-5 pt-4">
+        <View className="gap-3 px-4 pt-3">
           {LOADING_LINE_WIDTHS.map((width, index) => (
             <Skeleton key={index} className={`h-4 rounded ${width}`} />
           ))}
@@ -95,8 +97,8 @@ export function LegalDocumentScreen({
     return (
       <ScrollView
         className="flex-1"
-        contentContainerStyle={sideInsetStyle}
-        contentContainerClassName="px-5 pt-4 pb-10"
+        contentContainerStyle={{ ...sideInsetStyle, paddingBottom: bottomPadding }}
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <MarkdownText value={state.html} onPressLink={openInContentLink} />

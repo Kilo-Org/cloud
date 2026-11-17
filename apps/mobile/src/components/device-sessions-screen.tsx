@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -12,11 +12,13 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { IconTile } from '@/components/ui/icon-tile';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isolateBidiText } from '@/lib/bidi';
@@ -28,6 +30,7 @@ import {
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
@@ -46,56 +49,47 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const lastSeen = formatDate(parseTimestamp(session.last_seen_at), i18n.language);
 
   return (
-    <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3">
-      <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
-      <View className="min-w-0 flex-1">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <Text className="text-sm font-medium" numberOfLines={1}>
-            {device}
-          </Text>
+    <ConfigureRow
+      icon={Smartphone}
+      title={device}
+      subtitle={t('deviceSessions.signedIn', { signedIn, lastSeen })}
+      variant="action"
+      trailing={
+        <View className="flex-row items-center gap-2">
           {session.isCurrent && (
             /* The badge keeps the light olive in dark mode: the dark accent
                 (#ffdd00) as a full pill glares and pulls focus, so dark swaps
                 in `--selection`, the same hue lifted to stand off the page,
                 with its own label tone. */
             <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
-              <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground dark:text-selection-foreground">
+              <Text
+                variant="eyebrow"
+                className="text-primary-foreground dark:text-selection-foreground"
+              >
                 {t('deviceSessions.thisDevice')}
               </Text>
             </View>
           )}
+          <IconButton
+            disabled={disabled}
+            accessibilityLabel={
+              session.isCurrent
+                ? t('deviceSessions.signOutThisDevice')
+                : t('deviceSessions.signOutSessionLabel', {
+                    device: isolateBidiText(device),
+                    signedIn,
+                    lastSeen,
+                  })
+            }
+            onPress={() => {
+              onPress(session);
+            }}
+          >
+            <DirectionalLogOut size={16} color={colors.destructive} />
+          </IconButton>
         </View>
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {t('deviceSessions.signedIn', { signedIn, lastSeen })}
-        </Text>
-      </View>
-      {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
-          14 dp inside the card's 10.5 dp padding, while the leading tile sat
-          on that padding and the card read lopsided. At 28 dp the glyph's
-          outer edge is 6 dp inside the card's 14 dp padding, and 9 dp of hit
-          slop per side reaches 46 dp, so pixel rounding cannot drop the target
-          under 44 dp. */}
-      <Pressable
-        onPress={() => {
-          onPress(session);
-        }}
-        disabled={disabled}
-        hitSlop={9}
-        accessibilityRole="button"
-        accessibilityLabel={
-          session.isCurrent
-            ? t('deviceSessions.signOutThisDevice')
-            : t('deviceSessions.signOutSessionLabel', {
-                device: isolateBidiText(device),
-                signedIn,
-                lastSeen,
-              })
-        }
-        className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"
-      >
-        <DirectionalLogOut size={16} color={colors.destructive} />
-      </Pressable>
-    </View>
+      }
+    />
   );
 }
 
@@ -194,52 +188,34 @@ export function DeviceSessionsScreen() {
     body = (
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {state === 'loading' ? (
-          <View className="gap-3">
+          <RowGroup leadingTile>
             {[0, 1, 2].map(index => (
-              <View
-                key={index}
-                className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3"
-              >
-                {/* The leading cell reserves the loaded row's 30 dp IconTile
-                    frame, so the title starts at the same x and the row keeps
-                    the same height when the sessions arrive. */}
-                <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
-                <View className="flex-1 gap-1.5">
-                  <Skeleton className="h-5 w-28" />
-                  <Skeleton className="h-4 w-48" />
-                </View>
-                {/* Reserve the sign-out control's final 28x28pt box so the
-                    loaded row is the same height as its skeleton and the list
-                    does not jump when sessions arrive. The glyph stays 16pt. */}
-                <View className="min-h-[28px] min-w-[28px] items-center justify-center">
-                  <Skeleton className="h-4 w-4 rounded" />
-                </View>
-              </View>
+              <RowSkeleton key={index} tile subtitle />
             ))}
-          </View>
+          </RowGroup>
         ) : (
-          <View className="gap-3">
-            {sessions.map(session => (
-              <SessionRow
-                key={session.id}
-                session={session}
-                disabled={revokeSession.isPending}
-                onPress={confirmSessionAction}
-              />
-            ))}
+          <Section>
+            <RowGroup leadingTile>
+              {sessions.map(session => (
+                <SessionRow
+                  key={session.id}
+                  session={session}
+                  disabled={revokeSession.isPending}
+                  onPress={confirmSessionAction}
+                />
+              ))}
+            </RowGroup>
             {state === 'no-current' && (
-              <Text variant="muted" className="text-center text-xs">
+              <Text variant="caption" className="text-center">
                 {t('deviceSessions.currentDeviceUnidentified')}
               </Text>
             )}
-            <Text variant="muted" className="text-xs">
-              {t('deviceSessions.signInScopeNote')}
-            </Text>
-          </View>
+            <Text variant="caption">{t('deviceSessions.signInScopeNote')}</Text>
+          </Section>
         )}
       </TabScreenScrollView>
     );

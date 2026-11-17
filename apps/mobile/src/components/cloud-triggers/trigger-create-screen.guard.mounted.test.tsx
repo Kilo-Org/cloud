@@ -280,6 +280,14 @@ describe('TriggerCreateScreen leave guard', () => {
     await waitFor(() => h.replace.mock.calls.length === 1);
     await waitFor(() => !h.guard.enabled);
 
+    // The create reset the draft to the screen's starting form, so the
+    // re-armed test reads the trigger's saved values as saved: a Back on the
+    // surviving screen leaves without a prompt about a draft that landed.
+    expect(h.guard.enabled).toBe(false);
+    pressBack();
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.repeat).toHaveBeenCalledTimes(1);
+
     // A later edit on the surviving screen must be guarded again: the latch
     // cleared once the leave settled, so the derived recompute runs.
     editDraft(renderer, { name: 'trigger-new-edited' });

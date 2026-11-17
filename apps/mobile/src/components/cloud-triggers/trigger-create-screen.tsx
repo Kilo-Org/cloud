@@ -88,6 +88,12 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
         return;
       }
       announcingToast.success(t('cloudAgent.triggers.created'));
+      // The hand-off can drop its retire (a Back that lands before the push
+      // settles keeps this screen mounted), and the guard re-arms once the
+      // leave settles: reset the draft to the screen's starting form so the
+      // re-armed test reads the trigger's saved values as saved, not as an
+      // unsaved draft.
+      setDraft(initialDraft);
       // Landing on the detail replaces this create screen: Back must not return
       // to a form for a trigger that now exists. Leaving through the guard
       // disarms it first, so the retire `navigation.reset` that the push-then-

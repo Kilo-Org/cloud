@@ -430,7 +430,11 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={scopeLabel} value={scopeName} selectable />
+        {/* The owner of the alert is a name, not an identifier: it paints in the
+            sans face, like the row label and the empty amount below it, while
+            the amount keeps the code face because that is the value someone
+            copies. The name stays selectable all the same. */}
+        <KvRow label={scopeLabel} value={scopeName} valueFace="text" selectable />
         {/* A selectable value is exempt from the row's one-line clamp (Android's
             selection path re-applies selection and drops it), so only the amount
             — the value someone copies — is selectable. The empty placeholder is

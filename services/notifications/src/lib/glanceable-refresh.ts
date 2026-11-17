@@ -21,6 +21,17 @@ import { deliverSessionCards, type SessionCardMemory } from './session-card-deli
 export const GLANCEABLE_DELIVERY_MIN_INTERVAL_MS = 10_000;
 
 /**
+ * Minimum interval between two device wakes for a refresh that carries an
+ * approval move. `needsApproval` gates the Approve control, so that path must
+ * advance promptly on the locked and background surfaces rather than wait out
+ * the full window, exactly as the in-app publisher emits a question <->
+ * permission move without waiting. One eighth of the window keeps the control
+ * inside a screen-refresh interval; a move inside the interval is deferred and
+ * lands from the trailing alarm.
+ */
+export const GLANCEABLE_APPROVAL_MIN_INTERVAL_MS = GLANCEABLE_DELIVERY_MIN_INTERVAL_MS / 8;
+
+/**
  * Ceiling for the trailing-refresh retry backoff. A permanently failing build
  * or transport re-arms its pending record instead of dropping the deferred
  * counts, so without a ceiling it would rebuild and resend every window
@@ -84,6 +95,11 @@ const pendingRefreshSchema = z.object({
   // instead of re-arming every window forever; a new deferral or a landed
   // delivery clears it. Optional for records written before this field existed.
   attempts: z.number().int().nonnegative().optional(),
+  // Set when the deferred change carries an approval move. The trailing
+  // refresh that lands it must not be bounced a second time by the delivery
+  // window it was deferred out of. Optional: a record without it defers a
+  // counts-only change, which only ever lands after the full window.
+  approvalChanged: z.boolean().optional(),
 });
 type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
 type DeliveryState = z.infer<typeof deliveryStateSchema>;
@@ -153,6 +169,7 @@ async function rearmTrailingRefresh(
   deliveryAtStart: DeliveryState | undefined,
   deferredChangeAt: number | undefined,
   retryAttempts: number | undefined,
+  approvalChanged: boolean,
   nowMs: () => number
 ): Promise<void> {
   const pendingK = pendingKey(scope);
@@ -174,6 +191,9 @@ async function rearmTrailingRefresh(
       dueAt: now + glanceableRetryDelayMs(attempts),
       deferredAt: deferredChangeAt ?? now,
       attempts,
+      // A retried approval move is still an approval move: without the flag its
+      // next attempt would be bounced by the window it was deferred out of.
+      ...(approvalChanged ? { approvalChanged: true } : {}),
     });
   });
 }
@@ -194,32 +214,52 @@ export async function refreshGlanceableSnapshot(
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
   const deliveryKey = deliveryStateKey(scope);
-  // Rate-limit the device wake per scope. A change inside the window is
-  // deferred to the alarm rather than dropping it, so the final counts land.
-  // `needsApproval` is exempt: it gates the Approve control, which must appear
-  // and clear at once on the locked/background surfaces, exactly as the
-  // in-app publisher emits a question <-> permission move without waiting.
+  // Rate-limit the device wake per scope. A change inside the interval is
+  // deferred to the alarm rather than dropped, so the final counts land.
+  // `needsApproval` gates the Approve control, which must appear and clear on
+  // the locked/background surfaces promptly, so that path uses the shorter
+  // approval interval.
   const delivery = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
-  if (
-    options.approvalChanged !== true &&
-    delivery !== undefined &&
-    nowMs() - delivery.deliveredAt < GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
-  ) {
+  const floorMs =
+    options.approvalChanged === true
+      ? GLANCEABLE_APPROVAL_MIN_INTERVAL_MS
+      : GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+  if (delivery !== undefined && nowMs() - delivery.deliveredAt < floorMs) {
     const now = nowMs();
-    const dueAt = delivery.deliveredAt + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    const dueAt = delivery.deliveredAt + floorMs;
+    // Merge with a deferral already stored instead of overwriting it, so an
+    // approval deferral keeps its floor deadline when a counts-only change
+    // defers later in the same window: the earliest deadline wins, and the
+    // approval exemption travels with it. The write time stays this change's,
+    // so a delivery that lands meanwhile cannot treat its counts as covered.
+    const stored = pendingRefreshSchema.optional().parse(await storage.get(pendingKey(scope)));
+    const storedDueAt = stored?.dueAt;
+    const storedAttempts = stored?.attempts;
+    const keepStoredDeadline = storedDueAt !== undefined && storedDueAt <= dueAt;
+    const effectiveDueAt = keepStoredDeadline ? storedDueAt : dueAt;
+    const approvalChanged =
+      options.approvalChanged === true || stored?.approvalChanged === true;
     await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
       userId: scope.userId,
       organizationId: scope.organizationId,
-      dueAt,
+      dueAt: effectiveDueAt,
       deferredAt: now,
+      // A fresh change retries at the normal cadence, so the backoff of a
+      // record it replaces is dropped unless that record's deadline is kept and
+      // has not elapsed: a record already due is about to be flushed, and its
+      // lost attempts do not describe this change.
+      ...(keepStoredDeadline && storedDueAt > now && storedAttempts !== undefined
+        ? { attempts: storedAttempts }
+        : {}),
+      ...(approvalChanged ? { approvalChanged: true } : {}),
     });
     const currentAlarm = await storage.getAlarm();
-    // Only keep an alarm that will actually fire and reschedule before `dueAt`.
-    // A past alarm is not a usable schedule — it may be a stale record left by a
-    // restart — so a deferral must (re)arm at `dueAt` or the trailing delivery
-    // that lands the final counts is never delivered.
-    if (currentAlarm === null || currentAlarm <= now || dueAt < currentAlarm) {
-      await storage.setAlarm(dueAt);
+    // Only keep an alarm that will actually fire and reschedule before the
+    // stored deadline. A past alarm is not a usable schedule — it may be a stale
+    // record left by a restart — so a deferral must (re)arm at that deadline or
+    // the trailing delivery that lands the final counts is never delivered.
+    if (currentAlarm === null || currentAlarm <= now || effectiveDueAt < currentAlarm) {
+      await storage.setAlarm(effectiveDueAt);
     }
     return;
   }
@@ -297,6 +337,7 @@ export async function refreshGlanceableSnapshot(
         delivery,
         options.deferredAt,
         options.attempts,
+        options.approvalChanged === true,
         nowMs
       );
     }
@@ -342,6 +383,7 @@ export async function refreshGlanceableSnapshot(
         delivery,
         options.deferredAt,
         options.attempts,
+        options.approvalChanged === true,
         nowMs
       );
     }
@@ -507,6 +549,9 @@ export async function flushDueGlanceableRefreshes(
         trailing: true,
         deferredAt: record.deferredAt,
         attempts: record.attempts,
+        // A deferred approval move lands on the short floor, not the window it
+        // was deferred out of, or the Approve control would wait the window.
+        approvalChanged: record.approvalChanged === true,
       });
     } catch (error) {
       console.warn('Glanceable trailing refresh failed', {
@@ -534,6 +579,7 @@ export async function flushDueGlanceableRefreshes(
         deliveryAtStart,
         record.deferredAt,
         record.attempts,
+        record.approvalChanged === true,
         nowMs
       );
     }

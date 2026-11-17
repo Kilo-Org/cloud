@@ -54,7 +54,7 @@ const state = vi.hoisted(() => {
     patches: [] as SavedPatch[],
     routerPush: vi.fn(),
     gateReason: null as string | null,
-    orgs: [] as { organizationId: string }[],
+    orgs: undefined as { organizationId: string }[] | undefined,
   };
 });
 
@@ -312,6 +312,21 @@ describe('council route gate', () => {
     expect(texts).not.toContain(
       'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
     );
+
+    mounted.unmount();
+  });
+
+  it('keeps the create step while the organization list has not settled', async () => {
+    state.scope = 'personal';
+    state.gate.allowed = false;
+    state.orgs = undefined;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    expect(renderedTexts(renderer)).toContain('Create an organization');
+    expect(renderedTexts(renderer)).not.toContain('Switch organization');
 
     mounted.unmount();
   });

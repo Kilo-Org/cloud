@@ -76,8 +76,11 @@ function CouncilScreen({
   // read the reviewer permission hook runs, so no extra request: the shared
   // query cache answers it. It must sit above the early return below, with
   // every other hook of this screen.
-  const orgs = useQuery(trpc.organizations.list.queryOptions()).data;
-  const hasMemberships = (orgs?.length ?? 0) > 0;
+  const orgs = useQuery(trpc.organizations.list.queryOptions());
+  let membershipState: 'none' | 'some' | 'unsettled' = 'unsettled';
+  if (orgs.data !== undefined) {
+    membershipState = orgs.data.length > 0 ? 'some' : 'none';
+  }
   const surface = councilSurface({
     pending: gate.pending,
     allowed: gate.allowed,
@@ -140,7 +143,7 @@ function CouncilScreen({
             scope={scope}
             platformSupportsCouncil={capabilities.council}
             refusalReason={refusalReason}
-            hasMemberships={hasMemberships}
+            membershipState={membershipState}
           />
         ) : (
           <View className="gap-3 px-6 pt-4">

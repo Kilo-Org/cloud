@@ -51,17 +51,22 @@ export function CouncilRefusalScreen({
   scope,
   platformSupportsCouncil,
   refusalReason,
-  hasMemberships,
+  membershipState,
 }: Readonly<{
   scope: string;
   platformSupportsCouncil: boolean;
   refusalReason: CouncilRefusalReason;
-  hasMemberships: boolean;
+  /** What the account's organization list answers: none, some, or not settled. */
+  membershipState: 'none' | 'some' | 'unsettled';
 }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const personal = isPersonal(scope);
-  const actionKey = personalActionKey(hasMemberships);
+  // An unsettled list says nothing about memberships, so its action copy stays
+  // neutral: "Create an organization" names a step that exists either way,
+  // while "Switch organization" names one only a member can take.
+  const actionKey = membershipState === 'some' ? personalActionKey(true) : personalActionKey(false);
+  const actionHref = membershipState === 'some' ? PROFILE_TAB_HREF : CREATE_ORGANIZATION_HREF;
   return (
     <CenteredState contentContainerClassName="px-6">
       <View className="items-center gap-2">
@@ -71,7 +76,7 @@ export function CouncilRefusalScreen({
         {personal ? (
           <Pressable
             onPress={() => {
-              router.push(hasMemberships ? PROFILE_TAB_HREF : CREATE_ORGANIZATION_HREF);
+              router.push(actionHref);
             }}
             accessibilityRole="button"
             accessibilityLabel={t(actionKey)}

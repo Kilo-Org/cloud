@@ -110,7 +110,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', async importOriginal => {
-  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  const actual = await importOriginal<object>();
   return { ...actual, useQuery: () => ({ data: state.orgs }) };
 });
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({

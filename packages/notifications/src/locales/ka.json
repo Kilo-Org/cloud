@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "თქვენს აგენტის სესიას განახლება აქვს",
-      "chatMessage": "თქვენ გაქვთ ახალი შეტყობინება",
-      "instanceLifecycle": "თქვენს ინსტანსს განახლება აქვს",
-      "scheduledAction": "დაგეგმილ მოქმედებას განახლება აქვს",
       "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
       "spendAlert": "თქვენი ხარჯი ყურადღებას საჭიროებს",
       "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · უსათაურო",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "უსაფრთხოების შემოწმებას განახლება აქვს"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} მზადაა",
-      "body": "შეეხეთ ჩატის დასაწყებად."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} გაშვება ვერ მოხერხდა",
-      "body": "გაშვება ვერ მოხერხდა."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} მალე გადაიტვირთება",
-      "body": "დაგეგმილია გადატვირთვა {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} გადატვირთვა გაუქმდა",
-      "body": "ადრე დაგეგმილი გადატვირთვა გაუქმდა."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} მალე განახლდება",
-      "bodyWithTag": "განახლება {{targetImageTag}}-ზე {{when}}.",
-      "bodyWithoutTag": "დაგეგმილი განახლება {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} განახლება გაუქმდა",
-      "body": "ადრე დაგეგმილი განახლება გაუქმდა."
     }
   },
   "sessionReady": {

@@ -478,6 +478,10 @@ export function NewSessionScreenBody() {
     entityKey: repositoryDraftKey,
   });
 
+  // The seed gate reads the region's own bounded signal, so a list that never
+  // answers cannot withhold the form's rows on a prefilled entry either; the
+  // hook gives the request up at the bound so a late answer cannot mount a
+  // repository the region was declared final without.
   const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,

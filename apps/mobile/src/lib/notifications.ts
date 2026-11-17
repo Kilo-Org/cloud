@@ -138,13 +138,26 @@ const appBadgeSink: GlanceableSink = {
   },
 };
 
+/** The one field the retirement check needs from a raw push payload. */
+const pushTypeCarrierSchema = z.object({ type: z.string() });
+
+/**
+ * The `type` discriminator of a raw push payload, when it carries one. Read
+ * straight off the payload, before the push-data parse, so a kind this build no
+ * longer declares still reaches the retirement check (`isRetiredPushType`).
+ */
+function rawPushType(data: unknown): string | null {
+  const parsed = pushTypeCarrierSchema.safeParse(data);
+  return parsed.success ? parsed.data.type : null;
+}
+
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
 // A payload this build's schema does not declare — a kind the server removed,
 // or one a newer server added — parses to null and its tap does nothing. A kind
-// this build retired but the schema still declares is suppressed by the
-// foreground handler instead (`isRetiredPushType`).
+// this build retired is suppressed by the foreground handler instead
+// (`isRetiredPushType`), which runs before this parse.
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
@@ -302,15 +315,18 @@ const suppressed = {
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     handleNotification: async notification => {
-      const parsed = pushDataSchema.safeParse(notification.request.content.data);
-      const data = parsed.success ? parsed.data : null;
-
-      if (data && isRetiredPushType(data.type)) {
-        // A kind this app retired still parses and still has catalog copy, so
-        // this handler is the only thing between it and a foreground banner
-        // whose tap resolves no route. Suppress it until the senders stop.
+      const retiredType = rawPushType(notification.request.content.data);
+      if (retiredType !== null && isRetiredPushType(retiredType)) {
+        // A kind this app retired still arrives from a server that has not
+        // stopped sending it. It no longer parses and the catalog no longer has
+        // its copy, but its banner would still be drawn from the
+        // server-supplied title and body, so this check is the only thing
+        // between it and a foreground banner whose tap resolves no route.
         return suppressed;
       }
+
+      const parsed = pushDataSchema.safeParse(notification.request.content.data);
+      const data = parsed.success ? parsed.data : null;
 
       if (data?.type === 'session_live_update') {
         // The session carrier is data-only: the app draws the ongoing

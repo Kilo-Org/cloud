@@ -19,10 +19,10 @@
   "internal": {
     "lowBalance": {
       "title": "Te whakatūpato toenga iti",
-      "body": "Kua heke te toenga {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
+      "body": "Kua heke te toenga o {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "He whakatūpato whakapaunga",
+      "title": "Te whakatūpato whakapaunga",
       "body": "Kua eke te whakapaunga a {{scopeName}} ki runga ake i te ${{amountUsd}}"
     },
     "securityFinding": {

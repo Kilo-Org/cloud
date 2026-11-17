@@ -5,8 +5,6 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.Icon
-import android.os.Build
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -64,17 +62,8 @@ internal object ApprovalGate {
     icon: Int,
     label: String,
     pendingIntent: PendingIntent
-  ): Notification.Action {
-    val builder = Notification.Action.Builder(
-      Icon.createWithResource(context, icon),
-      label,
-      pendingIntent
-    )
-    if (Build.VERSION.SDK_INT >= 31) {
-      builder.setAuthenticationRequired(true)
-    }
-    return builder.build()
-  }
+  ): Notification.Action =
+    CardBuilders.action(context, icon, label, pendingIntent, authenticationRequired = true)
 
   /** The device is locked behind a credential the user has set. */
   fun isDeviceLocked(context: Context): Boolean =

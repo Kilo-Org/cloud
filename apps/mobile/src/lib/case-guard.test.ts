@@ -61,6 +61,8 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/pr-review/provider-pr-url.ts': 'URL scheme/host comparison',
   'components/login/idle-auth.tsx': 'email normalization',
   'components/organization/invite-member-sheet.tsx': 'email normalization',
+  'components/organization/group-form.tsx': 'member search folding',
+  'components/organization/org-mode-form-model.ts': 'mode-slug normalization',
   'components/share/share-destination-list.tsx': 'search folding',
   'components/pr-review/discussion/comment-row.tsx': 'login comparison',
   'components/pr-review/discussion/pr-review-discussion-list.tsx': 'login comparison',

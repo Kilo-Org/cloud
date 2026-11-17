@@ -121,9 +121,7 @@ const mockedResolveOrganizationMemberModelDecision = jest.mocked(
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 const mockedRecordEnkryptUsage = jest.mocked(recordEnkryptUsage);
-const mockedGetOrganizationGroupPolicyContext = jest.mocked(
-  getOrganizationGroupPolicyContext
-);
+const mockedGetOrganizationGroupPolicyContext = jest.mocked(getOrganizationGroupPolicyContext);
 
 function makeRequest(body: unknown, extraHeaders: Record<string, string> = {}) {
   return new Request('http://localhost:3000/api/edit/completions', {
@@ -846,7 +844,9 @@ describe('POST /api/edit/completions', () => {
 
     it('rejects a blocked prompt with a 400 before calling upstream', async () => {
       setOrganizationAuth(
-        guardedSettings({ enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } } }),
+        guardedSettings({
+          enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+        }),
         GUARDED_BALANCE,
         []
       );
@@ -870,15 +870,18 @@ describe('POST /api/edit/completions', () => {
 
     it('answers 503 when the Enkrypt scan is unavailable', async () => {
       setOrganizationAuth(
-        guardedSettings({ enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } } }),
+        guardedSettings({
+          enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+        }),
         GUARDED_BALANCE,
         []
       );
-      mockedFetch.mockImplementation(async () =>
-        new Response(JSON.stringify({ detail: 'internal error' }), {
-          status: 500,
-          headers: { 'x-enkrypt-credits-cost': '2' },
-        })
+      mockedFetch.mockImplementation(
+        async () =>
+          new Response(JSON.stringify({ detail: 'internal error' }), {
+            status: 500,
+            headers: { 'x-enkrypt-credits-cost': '2' },
+          })
       );
 
       const { handleEditCompletionsRequest } = await import('./edit-completions');
@@ -897,7 +900,9 @@ describe('POST /api/edit/completions', () => {
 
     it('asks for organization credits before any Enkrypt call when the guarded organization has none', async () => {
       setOrganizationAuth(
-        guardedSettings({ enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } } }),
+        guardedSettings({
+          enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+        }),
         0,
         []
       );
@@ -1012,7 +1017,9 @@ describe('POST /api/edit/completions', () => {
 
     it('writes a usage record with the edit_completions api kind', async () => {
       setOrganizationAuth(
-        guardedSettings({ enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } } }),
+        guardedSettings({
+          enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+        }),
         GUARDED_BALANCE,
         []
       );

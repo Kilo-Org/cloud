@@ -146,15 +146,12 @@ describe('EnkryptUsageWriteSchema', () => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ kiloUserId: '' })).success).toBe(false);
   });
 
-  test.each([
-    'chat_completions',
-    'messages',
-    'responses',
-    'edit_completions',
-    'fim_completions',
-  ])('accepts the api kind %s', apiKind => {
-    expect(EnkryptUsageWriteSchema.safeParse(writeWith({ apiKind })).success).toBe(true);
-  });
+  test.each(['chat_completions', 'messages', 'responses', 'edit_completions', 'fim_completions'])(
+    'accepts the api kind %s',
+    apiKind => {
+      expect(EnkryptUsageWriteSchema.safeParse(writeWith({ apiKind })).success).toBe(true);
+    }
+  );
 
   test.each(['embeddings', ''])('rejects the api kind %j', apiKind => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ apiKind })).success).toBe(false);

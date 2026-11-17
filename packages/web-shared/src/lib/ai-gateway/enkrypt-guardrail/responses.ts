@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import type {
-  EnkryptGuardrailApiKind,
-  EnkryptGuardrailDirection,
-} from '@kilocode/db/schema-types';
+import type { EnkryptGuardrailApiKind, EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { EnkryptUnavailableReason } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';

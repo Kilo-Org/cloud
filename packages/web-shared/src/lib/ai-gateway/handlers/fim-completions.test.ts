@@ -133,9 +133,7 @@ const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 const mockedRecordEnkryptUsage = jest.mocked(recordEnkryptUsage);
-const mockedGetOrganizationGroupPolicyContext = jest.mocked(
-  getOrganizationGroupPolicyContext
-);
+const mockedGetOrganizationGroupPolicyContext = jest.mocked(getOrganizationGroupPolicyContext);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 
 function makeRequest(
@@ -992,9 +990,12 @@ describe('POST /api/fim/completions', () => {
       });
       mockedFetch.mockImplementation(async (_url, init) =>
         isEnkryptCall(init)
-          ? Response.json({ summary: { pii: 1 }, result_message: null }, {
-              headers: { 'x-enkrypt-credits-cost': '2' },
-            })
+          ? Response.json(
+              { summary: { pii: 1 }, result_message: null },
+              {
+                headers: { 'x-enkrypt-credits-cost': '2' },
+              }
+            )
           : makeUpstreamResponse()
       );
 
@@ -1031,9 +1032,12 @@ describe('POST /api/fim/completions', () => {
         `data: ${JSON.stringify({ id: 'cmpl-1', model: 'mercury-edit-2', created: 1, ...fields })}\n\n`;
       mockedFetch.mockImplementation(async (_url, init) =>
         isEnkryptCall(init)
-          ? Response.json({ summary: { pii: 1 }, result_message: null }, {
-              headers: { 'x-enkrypt-credits-cost': '2' },
-            })
+          ? Response.json(
+              { summary: { pii: 1 }, result_message: null },
+              {
+                headers: { 'x-enkrypt-credits-cost': '2' },
+              }
+            )
           : new Response(
               chunk({ choices: [{ index: 0, text: 'contain ', role: 'assistant' }] }) +
                 chunk({ choices: [{ index: 0, text: 'sk-live-4f9a2c', role: 'assistant' }] }) +

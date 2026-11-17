@@ -555,11 +555,10 @@ describe('ProfileSkillsScreen', () => {
     pressSheetDone(renderer.root);
     expect(h.mutations.createCustomSkill.mutateAsync).toHaveBeenCalledTimes(1);
 
+    // The save is still in flight, so the guard closes without asking: the
+    // request already left and there is nothing unsaved to discard.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -587,11 +586,9 @@ describe('ProfileSkillsScreen', () => {
     changeText(renderer.root, 'Skill content', 'Body');
     pressSheetDone(renderer.root);
 
+    // The save is still in flight, so the guard closes without asking.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {

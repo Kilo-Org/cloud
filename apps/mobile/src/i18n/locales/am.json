@@ -1354,7 +1354,8 @@
       "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
-      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን"
+      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
+      "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "scopeList": {
       "personalStillAvailable": "የግል ማከማቻዎች አሁንም ከታች ይገኛሉ።",
@@ -3462,7 +3463,6 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
-      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -3471,9 +3471,19 @@
       "ssoAndDomain": "SSO እና ጎራ",
       "dataCollection": "የውሂብ አሰባሰብ",
       "auditLogs": "የኦዲት መዝገቦች",
-      "requestLogs": "የጥያቄ መዝገቦች",
-      "subOrganizations": "ንዑስ ድርጅቶች",
-      "distributeFunds": "ገንዘብ ያከፋፍሉ"
+      "requestLogs": "የጥያቄ መዝገቦች"
+    },
+    "requestLogs": {
+      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
+      "older": "ቀዳሚ ሰዓት",
+      "newer": "ቀጣይ ሰዓት",
+      "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
+      "emptyTitle": "ምንም ጥያቄዎች የሉም",
+      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
+      "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
+      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
@@ -4527,6 +4537,8 @@
     "topModels": "ዋና ሞዴሎች",
     "topFeatures": "ዋና ባህሪያት",
     "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "unavailableTitle": "አጠቃቀም አይገኝም",
+    "unavailableDescription": "ይህ የሥራ አካባቢ አጠቃቀምን አይመዘግብም። እንደገና መሞከር አይረዳም።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
     "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
   },
@@ -4685,5 +4697,175 @@
     "unavailableDescription": "ይህ የማጋሪያ ሊንክ ጊዜው አልፏል ወይም ተሰርዟል።",
     "transcriptUnavailableTitle": "ይህን ግልባጭ መጫን አልተቻለም",
     "transcriptUnavailableDescription": "ሊንኩ አሁንም ይሰራል። ትንሽ ቆይተው እንደገና ይሞክሩ።"
+  },
+  "organizationGuardrails": {
+    "title": "የAI ጥበቃ ገደቦች",
+    "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
+    "unavailable": "የAI ጥበቃ ገደቦች ለዚህ ድርጅት አይገኙም።",
+    "loadError": "የAI ጥበቃ ገደቦችን መጫን አልተቻለም",
+    "statusSaving": "በማስቀመጥ ላይ…",
+    "statusSaved": "ተቀምጧል",
+    "statusFailed": "ማስቀመጥ አልተቻለም።",
+    "inputTitle": "የግብዓት ጥበቃ ገደቦች",
+    "inputDescription": "የመሣሪያ ውጤቶችን ጨምሮ እያንዳንዱን ግብዓት በEnkrypt AI ይቃኛል። Enkrypt በማይገኝበት ጊዜ የሚያግድ መመርመሪያ ጥያቄውን ውድቅ ያደርጋል።",
+    "outputTitle": "የውጤት ጥበቃ ገደቦች",
+    "outputDescription": "አባላት ምላሾችን ከመቀበላቸው በፊት በEnkrypt AI ይቃኛል። እርስዎ ካላበሩት በስተቀር ጠፍቷል።",
+    "detectorsHint": "«አግድ» የተጠቆመ ጥያቄን ውድቅ ያደርጋል። «መዝግብ ብቻ» ጥያቄውን ሳያዘገይ ይመዘግበዋል።",
+    "detectorsHintOutput": "«አግድ» የተጠቆመ ምላሽን ያከሽፋል። «መዝግብ ብቻ» ምላሹን ሳያዘገይ ይመዘግበዋል።",
+    "choiceLog": "መዝግብ ብቻ",
+    "applyTo": "የሚተገበርበት",
+    "applyToAllMembers": "ሁሉም አባላት",
+    "applyKiloDefault": "የKilo ነባሪን ተግብር",
+    "invalidSavedTitle": "የተቀመጡ የግብዓት መመርመሪያ ቅንብሮችን ማንበብ አልተቻለም",
+    "invalidSavedBody": "የግብዓት መመርመሪያዎቹ እንደገና እስኪቀመጡ ድረስ ጥያቄዎች ይታገዳሉ። ከታች ያሉት መመርመሪያዎች ከKilo ነባሪ ይጀምራሉ።",
+    "invalidSavedOutputTitle": "የተቀመጡ የውጤት መመርመሪያ ቅንብሮችን ማንበብ አልተቻለም",
+    "invalidSavedOutputBody": "የውጤት መመርመሪያዎቹ እንደገና እስኪቀመጡ ድረስ ምላሾች ይያዛሉ። ከታች የውጤት መመርመሪያዎችን ይምረጡ።",
+    "blockingOutputNote": "የሚያግድ የውጤት መመርመሪያ Enkrypt ምላሹን ሙሉ በሙሉ እስኪፈትሽ ድረስ ይይዘዋል። መዘግየቱን ለማስቀረት «መዝግብ ብቻ»ን ይጠቀሙ።",
+    "inputDetectorRequired": "ቢያንስ አንድ የግብዓት መመርመሪያ ያብሩ።",
+    "outputDetectorRequired": "ቢያንስ አንድ የውጤት መመርመሪያ ያብሩ።",
+    "rulesTooMany": "እስከ {{max}} ደንቦች ያክሉ።",
+    "ruleIdRequired": "የደንብ መታወቂያ ያስገቡ።",
+    "ruleIdInvalid": "የደንብ መታወቂያ ፊደላትን፣ ቁጥሮችን፣ ነጥቦችን፣ ሰረዞችን እና የታችኛው መስመሮችን (_) ብቻ መጠቀም ይችላል።",
+    "ruleTextRequired": "ደንቡ ምን እንደሚከለክል ወይም እንደሚያስገድድ ይግለጹ።",
+    "keywordTooLong": "እያንዳንዱ ቁልፍ ቃል እስከ {{max}} ቁምፊዎች ሊኖረው ይችላል።",
+    "topicTooLong": "እያንዳንዱ ርዕስ እስከ {{max}} ቁምፊዎች ሊኖረው ይችላል።",
+    "keywordsTooMany": "እስከ {{max}} ቁልፍ ቃላት ያክሉ።",
+    "topicsTooMany": "እስከ {{max}} ርዕሶች ያክሉ።",
+    "piiEntityRequired": "ቢያንስ አንድ የሚመረመር የውሂብ ዓይነት ይምረጡ።",
+    "keywordRequired": "ቢያንስ አንድ ቁልፍ ቃል ያክሉ።",
+    "topicRequired": "ቢያንስ አንድ ርዕስ ያክሉ።",
+    "policyTextRequired": "የፖሊሲ ጽሑፉን ያስገቡ።",
+    "ruleRequired": "ቢያንስ አንድ ደንብ ያክሉ።",
+    "ruleIdDuplicate": "እያንዳንዱ ደንብ የራሱ የደንብ ID ሊኖረው ይገባል።",
+    "piiEntities": "የሚመረመር ውሂብ",
+    "keywordsLabel": "ቁልፍ ቃላት",
+    "keywordsHint": "በአንድ መስመር አንድ ቁልፍ ቃል።",
+    "topicsHint": "በአንድ መስመር አንድ ርዕስ።",
+    "policyFormat": "የፖሊሲ ቅርጸት",
+    "policyFormatRules": "የተዋቀሩ ደንቦች",
+    "policyFormatRulesDescription": "ለእያንዳንዱ መስፈርት አንድ ደንብ፣ ከምድብ እና ከክብደት ጋር። የሚመከር።",
+    "policyFormatText": "የፖሊሲ ጽሑፍ",
+    "policyFormatTextDescription": "ያለውን ፖሊሲ እንደ ግልጽ ጽሑፍ ይለጥፉ።",
+    "rulesEmpty": "እስካሁን ምንም ደንቦች የሉም። እያንዳንዱ ደንብ ግብዓቶች መያዝ ወይም መጠየቅ የሌለባቸውን አንድ ነገር ይገልጻል።",
+    "addRule": "ደንብ አክል",
+    "ruleNumber": "ደንብ {{number}}",
+    "ruleRemove": "ደንብ {{number}}ን አስወግድ",
+    "ruleIdLabel": "የደንብ መታወቂያ",
+    "ruleNameLabel": "ስም (አማራጭ)",
+    "ruleTextLabel": "ደንብ",
+    "ruleRiskCategory": "የስጋት ምድብ",
+    "ruleApplicability": "ወሰን",
+    "ruleFrameworks": "ማዕቀፎች",
+    "detector": {
+      "promptInjection": {
+        "label": "የፕሮምፕት ሰርጎ ማስገባት",
+        "description": "መመሪያዎችን ለመሻር ወይም ሞዴሉን ጄልብሬክ ለማድረግ የሚደረጉ ሙከራዎችን ይለያል።"
+      },
+      "policyViolation": {
+        "label": "የፖሊሲ ጥሰት",
+        "description": "በጽሑፍ ወይም በደንቦች የተጻፈውን የድርጅትዎን ፖሊሲ የሚጥሱ ግብዓቶችን ይጠቁማል።",
+        "descriptionOutput": "በጽሑፍ ወይም በደንቦች የተጻፈውን የድርጅትዎን ፖሊሲ የሚጥሱ ምላሾችን ይጠቁማል።"
+      },
+      "pii": {
+        "label": "የግል መረጃ እና ሚስጥሮች",
+        "description": "የግል ውሂብን፣ የመግቢያ ምስክርነቶችን፣ የIP አድራሻዎችን እና URLዎችን ይለያል።"
+      },
+      "keywords": {
+        "label": "የተከለከሉ ቁልፍ ቃላት",
+        "descriptionOutput": "እርስዎ የዘረዘሩትን ማንኛውንም ቁልፍ ቃል የያዙ ምላሾችን ይለያል።"
+      },
+      "topics": {
+        "label": "ርዕሶች",
+        "descriptionOutput": "እርስዎ ስለዘረዘሩት ማንኛውም ርዕስ የሚያወሩ ምላሾችን ይጠቁማል።"
+      },
+      "toxicity": {
+        "label": "መርዛማ ይዘት",
+        "description": "መርዛማ፣ ስድብ፣ ዛቻ ወይም የጥላቻ ቋንቋን ይለያል።"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "ወሲባዊ ወይም በሌላ መንገድ ለሥራ ቦታ የማይመጥን ይዘትን ይለያል።"
+      },
+      "bias": {
+        "label": "አድልዎ",
+        "description": "አድሏዊ ወይም አግላይ ቋንቋን ይለያል።"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "የግል ውሂብ",
+        "description": "ስሞች፣ የኢሜይል አድራሻዎች፣ የስልክ ቁጥሮች።"
+      },
+      "secrets": {
+        "label": "ሚስጥሮች",
+        "description": "የAPI ቁልፎች፣ ቶከኖች፣ የይለፍ ቃላት።"
+      },
+      "ipAddress": {
+        "label": "የIP አድራሻዎች",
+        "description": "የIPv4 እና IPv6 አድራሻዎች።"
+      },
+      "url": {
+        "label": "URLዎች",
+        "description": "የድር አድራሻዎች።"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "ደህንነት እና ማጭበርበር",
+      "safetyHarm": "ጥበቃ እና ጉዳት",
+      "privacyDataProtection": "ግላዊነት እና የውሂብ ጥበቃ",
+      "brandReputationTrust": "የምርት ስም እና መልካም ስም",
+      "biasFairnessEthical": "አድልዎ እና ፍትሃዊነት",
+      "legalIpLiability": "የሕግ እና የአእምሯዊ ንብረት ተጠያቂነት",
+      "productMisuse": "ምርትን አላግባብ መጠቀም",
+      "performanceQuality": "አፈጻጸም እና ጥራት"
+    },
+    "applicability": {
+      "user": "የተጠቃሚ ግብዓት",
+      "userAssistant": "የተጠቃሚ ግብዓት እና ምላሾች"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "የአውሮፓ ህብረት AI ሕግ",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "የኢንተርፕራይዝ ባህሪ",
+    "enterpriseOnly": "ይህ ለኢንተርፕራይዝ ብቻ የሆነ ባህሪ ነው።",
+    "readOnly": "እነዚህን ቅንብሮች መቀየር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
+    "loadError": "አቅራቢዎችን እና ሞዴሎችን መጫን አልተቻለም",
+    "tabModels": "ሞዴሎች",
+    "tabProviders": "አቅራቢዎች",
+    "tabGateways": "ጌትዌዮች",
+    "modelsDescription": "ሞዴልን ለሁሉም አባላት ለማገድ ያጥፉት። ከተፈቀዱ አቅራቢዎች የሚመጡ ሞዴሎች በርተው ይጀምራሉ።",
+    "modelsDeniedOnly": "የተከለከሉ ብቻ",
+    "modelsEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ ሞዴሎች የሉም።",
+    "providersDescription": "Kilo ለዚህ ድርጅት ወደ አንድ አቅራቢ ማዘዋወሩን እንዲያቆም አቅራቢውን ያጥፉት።",
+    "providersNeedCatalog": "ሙሉው የሞዴል ካታሎግ እስኪጫን ድረስ የአቅራቢ ማብሪያ/ማጥፊያዎች ሊቀየሩ አይችሉም። እነሱን ለማርትዕ ከላይ ያለውን እንደገና ሞክር ይንኩ።",
+    "providersEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ አቅራቢዎች የሉም።",
+    "allowAllShown": "የሚታዩትን ሁሉ ፍቀድ",
+    "denyAllShown": "የሚታዩትን ሁሉ ከልክል",
+    "gatewaysDescription": "Kilo የሞዴል ጥያቄዎችን በVercel AI Gateway ወይም በOpenRouter በኩል ያዘዋውራል። የተሰናከለ ጌትዌይ እነዚያን ጥያቄዎች ያከሽፋል።",
+    "emptyProviderList": "ቢያንስ አንድ አቅራቢ ይፍቀዱ። ባዶ ዝርዝር Kilo ወደ ማንኛውም ሞዴል እንዳያዘዋውር ያግዳል።",
+    "gatewaysUnavailable": "የጌትዌይ ቅንብሮች ለዚህ ድርጅት አይገኙም።",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "የOpenRouter ጥያቄዎች ከአንድ የተወሰነ ክልል ጋር አልተቆራኙም።",
+    "inferenceRegion": "የኢንፈረንስ ክልል",
+    "inferenceRegionDescription": "የVercel AI Gateway ጥያቄዎችን ከዚህ ክልል ጋር ያቆራኛል። እዚያ የማይገኝ ሞዴል ይከሽፋል።",
+    "disableOpenrouterNote": "OpenRouterን ማሰናከል ጥያቄዎችን በእሱ በኩል የሚያዘዋውሩ የBYOK ቁልፎችንም ያግዳል።",
+    "emptyModelList": "ቢያንስ አንድ ሞዴል እንደበራ ይተዉ። ሁሉንም ሞዴሎች መከልከል አባላት የሚጠቀሙበት ምንም ነገር እንዳይኖራቸው ያደርጋል።",
+    "catalogUnavailable": "ሙሉ የሞዴል ካታሎግ አልተጫነም፣ ስለዚህ የተቀመጡ ዝርዝሮችዎ ብቻ ናቸው የሚታዩት። ሁሉንም ሞዴሎች ለመጫን እንደገና ይሞክሩ።",
+    "region": {
+      "global": "ዓለም አቀፍ",
+      "us": "ዩናይትድ ስቴትስ",
+      "eu": "የአውሮፓ ህብረት",
+      "au": "አውስትራሊያ",
+      "jp": "ጃፓን"
+    }
   }
 }

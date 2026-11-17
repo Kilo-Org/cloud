@@ -16,7 +16,6 @@ import {
   pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
-  type TestConfirmMock,
   testProfile,
   testServer,
 } from '@/components/profiles/profile-mcp-screen.test-helpers';
@@ -615,13 +614,11 @@ describe('ProfileMcpScreen', () => {
     pressSheetDone(renderer.root);
     expect(h.mutations.createMcp.mutateAsync).toHaveBeenCalledTimes(1);
 
-    // Dismiss that attempt and open a different form: the refusal of the first
-    // save belongs to the first form and must not appear under the second.
+    // The save is still in flight, so the guard closes without asking; the
+    // refusal of the first save belongs to the first form and must not appear
+    // under the second.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {

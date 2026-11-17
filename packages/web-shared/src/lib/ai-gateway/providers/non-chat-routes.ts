@@ -26,9 +26,9 @@ import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/p
  * The Vercel model `type` of a non-chat endpoint's models: `embedding` for embeddings and
  * `evaluation` for System One decisions.
  */
-export type UsageEndpointVercelModelType = 'embedding' | 'evaluation';
+export type NonChatVercelModelType = 'embedding' | 'evaluation';
 
-export type UsageEndpointRoute = {
+export type NonChatRoute = {
   provider: Provider;
   /** The owner's keys that pay for the route, or null when Kilo pays. */
   userByok: BYOKResult[] | null;
@@ -39,9 +39,9 @@ export type UsageEndpointRoute = {
  * The request names an OpenRouter catalog id: models only Vercel serves are deliberately not
  * supported on these endpoints yet (see `packages/web-shared/AGENTS.md`).
  */
-export async function isVercelUsageEndpointModel(
+export async function isVercelNonChatModel(
   requestedModel: string,
-  modelType: UsageEndpointVercelModelType
+  modelType: NonChatVercelModelType
 ): Promise<boolean> {
   const [vercelModels, vercelModelId] = await Promise.all([
     getVercelModelsMetadataFromDatabase(),
@@ -80,19 +80,19 @@ async function loadEnabledKeysInRouteOrder(
  * does not apply to these endpoints; the gateway settings decide afterwards whether the route may
  * serve the request.
  */
-export async function resolveUsageEndpointRoute(input: {
+export async function resolveEmbeddingOrDecisionRoute(input: {
   requestedModel: string;
-  modelType: UsageEndpointVercelModelType;
+  modelType: NonChatVercelModelType;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
   /** The OpenRouter provider slugs the organization policy allows, or undefined for any. */
   allowedProviders: ReadonlySet<string> | undefined;
   openRouterDisabled: boolean;
-}): Promise<UsageEndpointRoute> {
+}): Promise<NonChatRoute> {
   const { requestedModel, modelType, user, organizationId } = input;
   let vercelServesModel: Promise<boolean> | undefined;
   const servesOnVercel = () =>
-    (vercelServesModel ??= isVercelUsageEndpointModel(requestedModel, modelType));
+    (vercelServesModel ??= isVercelNonChatModel(requestedModel, modelType));
 
   if (!isAnonymousContext(user)) {
     const allowedProviderIds = await getAllowedGatewayRoutedByokProviders(requestedModel, {
@@ -152,7 +152,7 @@ export async function resolveTranscriptionRoute(input: {
   requestedModel: string;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
-}): Promise<UsageEndpointRoute> {
+}): Promise<NonChatRoute> {
   const { requestedModel, user, organizationId } = input;
   if (!isAnonymousContext(user) && isGatewayUserByokEligibleModel(requestedModel)) {
     const { keys, decrypt } = await loadEnabledKeysInRouteOrder(user, organizationId);

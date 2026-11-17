@@ -50,11 +50,7 @@ export type UsageByOrganization = Map<
 export type UsageDataStatus = 'loading' | 'available' | 'unavailable';
 
 /** A seats cell's value: the shared readout, linted against a zero total. */
-function formatSeatCell(input: {
-  seatsEnforced: boolean;
-  used: number;
-  total: number;
-}): string {
+function formatSeatCell(input: { seatsEnforced: boolean; used: number; total: number }): string {
   return seatCountReadout({ ...input, formatNumber: value => value.toLocaleString() });
 }
 

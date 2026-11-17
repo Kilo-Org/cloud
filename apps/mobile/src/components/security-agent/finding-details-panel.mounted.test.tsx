@@ -3,7 +3,7 @@
 // finding surfaces: a supported review link navigates in-app, everything else
 // goes through the shared external-link helper.
 
-import { createElement } from 'react';
+import { createElement, isValidElement } from 'react';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
@@ -31,6 +31,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   Linking: { openURL: mocks.linkingOpenUrl },
+  I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -65,6 +67,8 @@ vi.mock('@/components/ui/kv-row', () => ({
     return null;
   },
 }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -151,6 +155,21 @@ function pressAdvisory(r: R): void {
   });
 }
 
+/** The label a group child carries, when it is a row element. */
+function rowLabel(child: unknown): string | undefined {
+  return isValidElement<{ label?: string }>(child) ? child.props.label : undefined;
+}
+
+/** The labels a `RowGroup` renders, from its own children in order. */
+function rowLabels(group: TestRenderer.ReactTestInstance): (string | undefined)[] {
+  const children = (
+    Array.isArray(group.props.children) ? group.props.children : [group.props.children]
+  )
+    .flat(Infinity)
+    .filter((child): child is unknown => child !== null && child !== undefined && child !== false);
+  return children.map(child => rowLabel(child));
+}
+
 describe('FindingDetailsPanel advisory link routing', () => {
   beforeEach(() => {
     mocks.routerPush.mockReset();
@@ -200,22 +219,33 @@ describe('FindingDetailsPanel chip row', () => {
     {
       state: { kind: 'closed', superseded: false, at: new Date(0) },
       fixture: { status: 'ignored', ignored_reason: 'not_used' },
-      // The dismissal card names what it holds; only the chip row lost a control.
-      texts: ['securityAgent.dismiss.reason', 'securityAgent.dismiss.reasonNotUsed'],
+      // The dismissal note now names the reason in a `KvRow`; only the chip
+      // row lost a control.
+      texts: [],
+      dismissal: {
+        label: 'securityAgent.dismiss.reason',
+        value: 'securityAgent.dismiss.reasonNotUsed',
+      },
     },
     {
       state: { kind: 'fixed', beforeDeadline: false, fixedAt: new Date(0) },
       fixture: { status: 'fixed' },
       texts: ['securityAgent.filter.fixed'],
+      dismissal: undefined,
     },
   ])(
     'drops the deadline chip that repeats the status ($fixture.status)',
-    ({ state, fixture, texts }) => {
+    ({ state, fixture, texts, dismissal }) => {
       mocks.deadlineState = state;
       const tree = renderPanel(findingFixture(fixture));
 
       expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(0);
       expect(panelTexts(tree)).toEqual(expect.arrayContaining(texts));
+      if (dismissal) {
+        expect(
+          mocks.kvRows.some(row => row.label === dismissal.label && row.value === dismissal.value)
+        ).toBe(true);
+      }
     }
   );
 
@@ -237,8 +267,14 @@ describe('FindingDetailsPanel stored dismissal values', () => {
     'falls back to the review wording for an unusable reason (%j)',
     override => {
       mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
-      const tree = renderPanel(findingFixture({ status: 'ignored', ...override }));
-      expect(panelTexts(tree)).toContain('securityAgent.findingDetails.reasonAfterReview');
+      renderPanel(findingFixture({ status: 'ignored', ...override }));
+      expect(
+        mocks.kvRows.some(
+          row =>
+            row.label === 'securityAgent.dismiss.reason' &&
+            row.value === 'securityAgent.findingDetails.reasonAfterReview'
+        )
+      ).toBe(true);
     }
   );
 });
@@ -295,7 +331,7 @@ describe('FindingDetailsPanel dates block', () => {
       'securityAgent.findingDetails.detected',
       'securityAgent.findingDetails.dismissedOn',
     ]);
-    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z', last: true });
+    expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z' });
 
     mocks.kvRows.length = 0;
     mocks.supersedingFindingId = 'finding-2';
@@ -335,7 +371,6 @@ describe('FindingDetailsPanel dates block', () => {
     expect(dateRows()[2]).toMatchObject({
       value: '1970-01-01T00:00:00.000Z',
       valueTone: 'warn',
-      last: true,
     });
   });
 
@@ -412,24 +447,22 @@ describe('FindingDetailsPanel identifier values', () => {
   });
 });
 
-describe('FindingDetailsPanel facts card divider', () => {
-  // The card's rows decide which one suppresses the hairline under it. Without
-  // the manifest, or without an advisory id, the card still has to end cleanly
-  // on whatever row it draws last.
-  const FACT_LABELS: Record<string, true> = {
-    'securityAgent.findingDetails.package': true,
-    'securityAgent.findingDetails.vulnerableVersions': true,
-    'securityAgent.findingDetails.patchedVersion': true,
-    'securityAgent.findingDetails.cve': true,
-    'securityAgent.findingDetails.ghsa': true,
-    'securityAgent.findingDetails.manifest': true,
-  };
+describe('FindingDetailsPanel facts card', () => {
+  // The facts live in one `RowGroup`: rows draw no divider of their own, so the
+  // group owns the hairlines and whatever row it draws last ends the card.
+  const PACKAGE_LABEL = 'securityAgent.findingDetails.package';
 
   beforeEach(() => {
     mocks.kvRows.length = 0;
     mocks.deadlineState = { kind: 'no-deadline' };
     mocks.supersedingFindingId = null;
   });
+
+  /** The row labels of the one group that starts with the package row. */
+  function factLabels(r: R): (string | undefined)[] {
+    const groups: TestRenderer.ReactTestInstance[] = r.root.findAllByType('RowGroup');
+    return groups.map(group => rowLabels(group)).find(labels => labels[0] === PACKAGE_LABEL) ?? [];
+  }
 
   it.each([
     { name: 'manifest row', overrides: {}, lastLabel: 'securityAgent.findingDetails.manifest' },
@@ -448,12 +481,27 @@ describe('FindingDetailsPanel facts card divider', () => {
       overrides: { manifest_path: null, ghsa_id: null, cve_id: null },
       lastLabel: 'securityAgent.findingDetails.patchedVersion',
     },
-  ])('ends the card on the $name', ({ overrides, lastLabel }) => {
-    renderPanel(findingFixture(overrides));
+  ])('ends the group on the $name', ({ overrides, lastLabel }) => {
+    const labels = factLabels(renderPanel(findingFixture(overrides)));
 
-    const rows = mocks.kvRows.filter(row => FACT_LABELS[row.label as string]);
-    expect(rows.at(-1)?.label).toBe(lastLabel);
-    expect(rows.filter(row => row.last === true)).toHaveLength(1);
-    expect(rows.at(-1)?.last).toBe(true);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.at(-1)).toBe(lastLabel);
+  });
+
+  it('keeps every fact row in that one group', () => {
+    const r = renderPanel(findingFixture());
+    const factGroups: TestRenderer.ReactTestInstance[] = r.root
+      .findAllByType('RowGroup')
+      .filter(group => rowLabels(group)[0] === PACKAGE_LABEL);
+
+    expect(factGroups).toHaveLength(1);
+    expect(factLabels(r)).toEqual([
+      PACKAGE_LABEL,
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+      'securityAgent.findingDetails.cve',
+      'securityAgent.findingDetails.ghsa',
+      'securityAgent.findingDetails.manifest',
+    ]);
   });
 });

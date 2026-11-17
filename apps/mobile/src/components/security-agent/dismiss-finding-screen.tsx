@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
@@ -12,6 +12,8 @@ import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import {
   type DismissFailure,
@@ -23,7 +25,9 @@ import { securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
+import { useMutedDisabledInk } from '@/lib/hooks/use-theme-colors';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -50,7 +54,6 @@ type DismissFindingScreenProps = {
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   // This header is inside a formSheet route: the sheet edge owns the top
   // clearance unless the sheet is the stack's first screen.
@@ -138,7 +141,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
           modalTopInset={modalTopInset}
@@ -156,7 +158,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
           modalTopInset={modalTopInset}
@@ -173,7 +174,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
           modalTopInset={modalTopInset}
@@ -201,7 +201,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
           modalTopInset={modalTopInset}
@@ -219,7 +218,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
           modalTopInset={modalTopInset}
@@ -243,15 +241,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        className="px-6"
-        title={t('securityAgent.dismiss.title')}
-        modal
-        modalTopInset={modalTopInset}
-      />
+      <ScreenHeader title={t('securityAgent.dismiss.title')} modal modalTopInset={modalTopInset} />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
@@ -260,7 +253,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             repository, then the package. Every line wraps instead of
             truncating — a long title must stay readable to confirm the
             finding. */}
-        <View className="gap-1 rounded-lg bg-secondary p-3">
+        <Card>
           <Text className="text-base font-medium">{finding.title}</Text>
           <Text variant="muted" className="text-xs">
             {finding.repo_full_name}
@@ -268,7 +261,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           <Text variant="muted" className="text-xs">
             {finding.package_name} ({finding.package_ecosystem})
           </Text>
-        </View>
+        </Card>
         {findingQuery.isError ? (
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}
@@ -297,24 +290,18 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        <View className="gap-1.5">
-          <Text className="text-sm font-medium text-muted-foreground">
-            {t('securityAgent.dismiss.commentLabel')}
-          </Text>
-          <TextInput
-            accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
-            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
-            multiline
-            textAlignVertical="top"
-            placeholder={t('securityAgent.dismiss.commentPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            defaultValue={dismissDraft.draft?.comment ?? ''}
-            onChangeText={value => {
-              commentRef.current = value;
-              persistOnType(reason, value);
-            }}
-          />
-        </View>
+        <FormField
+          label={t('securityAgent.dismiss.commentLabel')}
+          multiline
+          textAlignVertical="top"
+          placeholder={t('securityAgent.dismiss.commentPlaceholder')}
+          defaultValue={dismissDraft.draft?.comment ?? ''}
+          className="h-24 leading-[1.25rem]"
+          onChangeText={value => {
+            commentRef.current = value;
+            persistOnType(reason, value);
+          }}
+        />
 
         {dismissFailure === null ? null : (
           <Text className="text-sm text-destructive">{dismissFailure.message}</Text>

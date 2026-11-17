@@ -20,6 +20,8 @@ import { SecurityAgentSetup } from '@/components/security-agent/security-agent-s
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -39,19 +41,19 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * resolved config already points at a setup state; an unanswered config paints
  * the dashboard frame instead (`DashboardLoadingView`).
  *
- * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
- * title line, two `text-sm` description lines, the `mt-3` the button carries,
- * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ * Frames come from the spacing scale, not hand-picked pixels: the `ShieldCheck`
+ * mark, the title line, two description lines, the step the button carries, and
+ * a button-height box at the shared control radius.
  */
 function ScopeEntryBodySkeleton() {
   return (
-    <View className="flex-1 items-center justify-center px-6">
+    <View className={cn('flex-1 items-center justify-center', SCREEN_GUTTER_CLASS)}>
       <View className="w-full items-center gap-3">
-        <Skeleton className="size-[28px] rounded-full" />
-        <Skeleton className="h-[20px] w-40 rounded" />
-        <Skeleton className="h-[14px] w-full rounded" />
-        <Skeleton className="h-[14px] w-2/3 rounded" />
-        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
+        <Skeleton className="size-8 rounded-full" />
+        <Skeleton className="h-5 w-40 rounded" />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-2/3 rounded" />
+        <Skeleton className="mt-3 h-11 w-full rounded-md" />
       </View>
     </View>
   );
@@ -62,7 +64,7 @@ function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScreenHeader title={scopeTitle} eyebrow={t('common.securityAgent')} />
       <ScopeEntryBodySkeleton />
     </View>
   );
@@ -303,7 +305,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
             title={scopeTitle}
             eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
@@ -344,7 +345,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
             title={scopeTitle}
             eyebrow={t('common.securityAgent')}
             headerRight={auditAction}

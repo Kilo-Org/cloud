@@ -1,4 +1,5 @@
 import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
+import { Clock } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +10,15 @@ import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -32,13 +37,16 @@ function SlaSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.sla.title')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
+      <ScreenHeader title={t('securityAgent.sla.title')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <RowGroup>
+          <RowSkeleton subtitle />
+        </RowGroup>
+        <RowGroup>
+          {SLA_ROWS.map(row => (
+            <RowSkeleton key={row.key} subtitle />
+          ))}
+        </RowGroup>
       </View>
     </View>
   );
@@ -95,15 +103,12 @@ function SlaDayRow({
   const [days, setDays] = useState(initialValue);
 
   return (
-    <View
-      className={cn(
-        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
-        disabled && 'opacity-50'
-      )}
-    >
-      <View className="min-w-0 flex-1 pe-3">
-        <Text className="text-sm font-medium">{label}</Text>
-        <Text variant="muted" className="text-xs">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
+      <View className="min-w-0 flex-1">
+        <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
+          {label}
+        </Text>
+        <Text variant="muted" className="mt-0.5 text-xs">
           {description}
         </Text>
         {!isValidDayCount(days) && (
@@ -117,7 +122,7 @@ function SlaDayRow({
         accessibilityHint={
           isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
-        className="w-16 rounded-lg border border-input bg-background pl-2 pr-2 text-sm text-foreground"
+        className="w-16 rounded-md border border-input bg-background pl-2 pr-2 text-sm text-foreground"
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}
@@ -271,7 +276,6 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.sla.title')}
         onBack={onBack}
         headerRight={
@@ -291,39 +295,41 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <ToggleRow
-          title={t('securityAgent.sla.enableTracking')}
-          subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
-          value={slaEnabled}
-          disabled={!canManage}
-          onValueChange={setSlaEnabled}
-        />
+        <RowGroup>
+          <ToggleRow
+            icon={Clock}
+            title={t('securityAgent.sla.enableTracking')}
+            subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
+            value={slaEnabled}
+            disabled={!canManage}
+            onValueChange={setSlaEnabled}
+          />
+        </RowGroup>
 
         {slaEnabled && (
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('securityAgent.sla.deadlinesHeading')}
-            </Text>
-            {SLA_ROWS.map(row => (
-              <SlaDayRow
-                key={row.key}
-                label={t(row.labelKey)}
-                description={t(row.descriptionKey)}
-                initialValue={slaDays[row.key]}
-                disabled={!canManage}
-                onChangeValue={value => {
-                  setSlaDays(current => ({ ...current, [row.key]: value }));
-                }}
-              />
-            ))}
-          </View>
+          <Section label={t('securityAgent.sla.deadlinesHeading')}>
+            <RowGroup>
+              {SLA_ROWS.map(row => (
+                <SlaDayRow
+                  key={row.key}
+                  label={t(row.labelKey)}
+                  description={t(row.descriptionKey)}
+                  initialValue={slaDays[row.key]}
+                  disabled={!canManage}
+                  onChangeValue={value => {
+                    setSlaDays(current => ({ ...current, [row.key]: value }));
+                  }}
+                />
+              ))}
+            </RowGroup>
+          </Section>
         )}
       </TabScreenScrollView>
       {dialog}

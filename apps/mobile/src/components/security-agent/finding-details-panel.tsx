@@ -19,9 +19,13 @@ import { DISMISSAL_REASON_LABEL_KEYS } from '@/components/security-agent/dismiss
 import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy, isOpenDeadline } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
@@ -88,26 +92,19 @@ function DismissalOrSupersessionNote({
 }: Readonly<{ finding: SecurityFinding; scope: string; supersedingFindingId: string | null }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const colors = useThemeColors();
 
   if (supersedingFindingId) {
     return (
-      <Pressable
-        className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
-        onPress={() => {
-          pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
-        }}
-      >
-        <View className="flex-row items-center gap-2">
-          <GitMerge size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">
-            {t('securityAgent.findingDetails.supersededBy')}
-          </Text>
-        </View>
-        <Text variant="muted" className="text-xs">
-          {t('securityAgent.findingDetails.supersededByDescription')}
-        </Text>
-      </Pressable>
+      <RowGroup leadingTile>
+        <ConfigureRow
+          icon={GitMerge}
+          title={t('securityAgent.findingDetails.supersededBy')}
+          subtitle={t('securityAgent.findingDetails.supersededByDescription')}
+          onPress={() => {
+            pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
+          }}
+        />
+      </RowGroup>
     );
   }
 
@@ -116,12 +113,14 @@ function DismissalOrSupersessionNote({
   }
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.dismiss.reason')}</Text>
-      <Text variant="muted" className="text-xs" selectable>
-        {getDismissalReasonLabel(finding.ignored_reason)}
-      </Text>
-    </View>
+    <RowGroup>
+      <KvRow
+        label={t('securityAgent.dismiss.reason')}
+        value={getDismissalReasonLabel(finding.ignored_reason)}
+        valueFace="text"
+        selectable
+      />
+    </RowGroup>
   );
 }
 
@@ -230,7 +229,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
 
   return (
     <View className="gap-4">
-      <View className="gap-2 rounded-lg bg-secondary p-3">
+      <Card>
         <Text className="text-base font-medium" selectable>
           {finding.title}
         </Text>
@@ -254,7 +253,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             {description}
           </Text>
         ) : null}
-      </View>
+      </Card>
 
       <DismissalOrSupersessionNote
         finding={finding}
@@ -262,7 +261,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         supersedingFindingId={supersedingFindingId}
       />
 
-      <View className="rounded-lg bg-secondary px-3">
+      <RowGroup>
         <KvRow
           label={t('securityAgent.findingDetails.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
@@ -302,9 +301,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             selectable
           />
         ) : null}
-      </View>
+      </RowGroup>
 
-      <View className="rounded-lg bg-secondary px-3">
+      <RowGroup>
         {dateRows.map(row => (
           <KvRow
             key={row.key}
@@ -314,25 +313,27 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
             valueTone={row.tone}
           />
         ))}
-      </View>
+      </RowGroup>
 
       <CollapsibleSection title={t('securityAgent.findingDetails.sourceRecord')}>
-        <KvRow
-          label={t('securityAgent.findingDetails.source')}
-          value={getFindingSourceLabel(finding.source)}
-          valueFace="text"
-        />
-        <KvRow
-          label={t('securityAgent.findingDetails.sourceId')}
-          value={finding.source_id}
-          valueDirection="ltr"
-          selectable
-        />
+        <RowGroup>
+          <KvRow
+            label={t('securityAgent.findingDetails.source')}
+            value={getFindingSourceLabel(finding.source)}
+            valueFace="text"
+          />
+          <KvRow
+            label={t('securityAgent.findingDetails.sourceId')}
+            value={finding.source_id}
+            valueDirection="ltr"
+            selectable
+          />
+        </RowGroup>
       </CollapsibleSection>
 
       {advisoryUrl ? (
         <Pressable
-          className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
           onPress={() => {
             openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
           }}

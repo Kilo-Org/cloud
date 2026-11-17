@@ -9,8 +9,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
-import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { FolderGit2, RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -20,6 +19,9 @@ import { toast } from 'sonner-native';
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { ScreenHeader } from '@/components/screen-header';
 import {
   DashboardSections,
@@ -37,6 +39,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -99,7 +102,7 @@ const METRIC_TONE_CLASS = {
  * The metric tile's frame, shared with its placeholder so the loading state
  * cannot drift from the rendered card.
  */
-const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
+const STAT_TILE_CLASS = 'min-w-0 flex-1 basis-2/5';
 
 // One placeholder per tile: the metrics fill four of them with or without SLA
 // deadlines. Each bar is the loaded line's own box at the app's default text
@@ -111,7 +114,7 @@ const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
 const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
 const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
 const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
-const STAT_DETAIL_LINE_CLASS = 'h-[15px] rounded';
+const STAT_DETAIL_LINE_CLASS = 'h-4 rounded';
 
 export function buildLocalizedMetrics(
   data: DashboardStats,
@@ -265,7 +268,6 @@ function DashboardHeader({
   const { t } = useTranslation();
   return (
     <ScreenHeader
-      className="px-6"
       title={scopeTitle}
       eyebrow={t('common.securityAgent')}
       // The scope name is the one thing that tells two organizations apart,
@@ -310,12 +312,12 @@ function DashboardMetricTiles({ neverSynced }: Readonly<{ neverSynced: boolean }
   return (
     <View className="flex-row flex-wrap gap-3">
       {STAT_TILE_PLACEHOLDERS.map(placeholder => (
-        <View key={placeholder} className={STAT_TILE_CLASS}>
+        <Card key={placeholder} className={STAT_TILE_CLASS}>
           {/* The loaded card's own line boxes: label, value, detail. */}
           <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
           <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
           {neverSynced ? null : <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />}
-        </View>
+        </Card>
       ))}
     </View>
   );
@@ -768,7 +770,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -950,24 +952,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
-              <View key={metric.label} className={STAT_TILE_CLASS}>
+              <Card key={metric.label} className={STAT_TILE_CLASS}>
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>
-                <Text
-                  className={cn(
-                    'text-xl font-semibold tabular-nums',
-                    METRIC_TONE_CLASS[metric.tone]
-                  )}
-                >
+                <Text variant="figure" className={METRIC_TONE_CLASS[metric.tone]}>
                   {metric.value}
                 </Text>
-                {metric.detail ? (
-                  <Text variant="muted" className="text-[11px]">
-                    {metric.detail}
-                  </Text>
-                ) : null}
-              </View>
+                {metric.detail ? <Text variant="caption">{metric.detail}</Text> : null}
+              </Card>
             ))}
           </View>
         )}
@@ -985,27 +978,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         // read. Until both hold, this link is the screen's only way there.
         !(repositoryScopeEmpty && data.repoHealth.length === 0 && !lastSync.isPending) ? (
           // The header’s Sync now button already starts this run, so the empty
-          // state offers only the navigation it alone provides. It carries the
-          // dashboard’s card language — the same surface and radius as the
-          // sections below, at the same gap — because bare body text in the
-          // section gap read as a stray label, not a tappable action. The label
-          // takes the accent and a trailing chevron says it navigates.
-          <Pressable
-            onPress={() => {
-              pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-row items-center justify-between gap-2 rounded-lg bg-secondary px-3 active:opacity-70'
-            )}
-          >
-            <Text className="text-sm font-medium text-primary">
-              {t('securityAgent.dashboard.manageRepositories')}
-            </Text>
-            <DirectionalChevronRight size={16} color={colors.primary} />
-          </Pressable>
+          // state offers only the navigation it alone provides. It is the
+          // settings row primitive, in its own group, so the destination reads
+          // with the same anatomy as every other navigation row on the app.
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={FolderGit2}
+              title={t('securityAgent.dashboard.manageRepositories')}
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+            />
+          </RowGroup>
         ) : null}
 
         {dashboardStats.isError && !data ? (
@@ -1060,7 +1044,7 @@ export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-center justify-between gap-3">

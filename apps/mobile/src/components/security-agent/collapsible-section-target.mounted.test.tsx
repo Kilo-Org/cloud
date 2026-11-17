@@ -1,11 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
-// The CollapsibleSection header's own frame is its row's target. The control
-// audit and assistive technology read a pressable's node rect, not a `hitSlop`,
-// so the header has to reach the shared row floor on its own box, and it has to
-// be the box that already holds the card's inset — a caller's padding must not
-// slide the frame inside the card. That contract lives here rather than beside
-// the motion suite, whose file is at its line budget.
+// The CollapsibleSection header is a grouped row: the control audit and
+// assistive technology read a pressable's node rect, not a `hitSlop`, so the
+// header carries the shared row floor and the group's row inset on its own box,
+// and it sits inside the section's `RowGroup` surface. The expanded body sits on
+// the page, not on the header's surface. That contract lives here rather than
+// beside the motion suite, whose file is at its line budget.
 
 import { type ComponentProps, type ElementType, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -37,13 +37,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: (ms: number) => ms },
 }));
 
-const CARD_CLASSES = 'rounded-lg bg-secondary';
-const HEADER_INSET = 'px-3 pt-3 pb-3';
-const BODY_INSET = 'px-3 pb-3';
+const GROUP_SURFACE_CLASS = 'rounded-xl bg-secondary';
+const HEADER_INSET = 'px-4 py-3';
+const BODY_FRAME = 'gap-3 pt-3';
 const SECTION_BODY = 'section body';
-
-/** Any padding utility, which the card must not carry: the header owns it. */
-const PADDING_UTILITY = /(?:^|\s)-?p[xytrblse]?-\S+/;
 
 let mounted: ReactTestRenderer | undefined = undefined;
 
@@ -73,8 +70,18 @@ function animatedBoxes(renderer: ReactTestRenderer) {
   return renderer.root.findAllByType('Animated.View' as ElementType);
 }
 
-function boxWithClass(renderer: ReactTestRenderer, className: string) {
-  return animatedBoxes(renderer).find(node => String(node.props.className).includes(className));
+/** The one box that carries the section's group surface. */
+function groupSurface(renderer: ReactTestRenderer) {
+  return renderer.root
+    .findAllByType('View' as ElementType)
+    .find(node => String(node.props.className).includes(GROUP_SURFACE_CLASS));
+}
+
+/** The expanded body, whose frame the section owns. */
+function bodyNode(renderer: ReactTestRenderer) {
+  return animatedBoxes(renderer).find(node =>
+    String(node.props.className).includes(BODY_FRAME)
+  );
 }
 
 afterEach(() => {
@@ -83,7 +90,7 @@ afterEach(() => {
 });
 
 describe('CollapsibleSection header frame', () => {
-  it('carries the row target and the card inset on the pressable itself', () => {
+  it('carries the row target and the group row inset on the pressable itself', () => {
     const header = headerNode(mountSection());
 
     expect(header.props.className).toContain(ROW_TARGET_CLASS);
@@ -93,43 +100,30 @@ describe('CollapsibleSection header frame', () => {
     expect(header.props.hitSlop).toBeUndefined();
   });
 
-  it('leaves the inset to the header, so the card carries no padding of its own', () => {
+  it('draws the header on the section group surface', () => {
     const renderer = mountSection();
 
-    const card = boxWithClass(renderer, CARD_CLASSES);
-    expect(card).toBeDefined();
-    expect(String(card?.props.className)).not.toMatch(PADDING_UTILITY);
+    expect(groupSurface(renderer)).toBeDefined();
   });
 
-  it('keeps the header flush when a caller supplies its own card classes', () => {
+  it('keeps the header frame when a caller supplies its own classes', () => {
     const callerClasses = 'mt-3 rounded-lg border border-border bg-card';
     const renderer = mountSection({ className: callerClasses });
 
-    // The caller's classes land on the surface, and the header's frame keeps
-    // its own inset: no caller padding can push the frame inside the card.
-    expect(boxWithClass(renderer, callerClasses)).toBeDefined();
-    expect(headerNode(renderer).props.className).toContain(ROW_TARGET_CLASS);
-    expect(headerNode(renderer).props.className).toContain(HEADER_INSET);
-    expect(String(boxWithClass(renderer, callerClasses)?.props.className)).not.toMatch(
-      PADDING_UTILITY
-    );
+    expect(String(headerNode(renderer).props.className)).toContain(ROW_TARGET_CLASS);
+    expect(String(headerNode(renderer).props.className)).toContain(HEADER_INSET);
   });
 
-  it('gives the expanded body the card horizontal and bottom inset', () => {
+  it('puts the expanded body on the page with the section frame', () => {
     const renderer = mountSection({ defaultExpanded: true });
 
-    const body = boxWithClass(renderer, BODY_INSET);
-    expect(body).toBeDefined();
-    expect(String(body?.props.className)).toContain('gap-2');
+    expect(String(bodyNode(renderer)?.props.className)).toContain(BODY_FRAME);
   });
 
-  it('moves a wider inset onto the header and the body together', () => {
-    const renderer = mountSection({ inset: 'roomy', defaultExpanded: true });
+  it('keeps the caller content classes on the expanded body', () => {
+    const renderer = mountSection({ defaultExpanded: true, contentClassName: 'gap-1' });
 
-    // One preset feeds both boxes, so a caller can widen the card without
-    // leaving the header's frame short of its edges.
-    expect(headerNode(renderer).props.className).toContain('px-4 pt-4 pb-4');
-    expect(boxWithClass(renderer, 'px-4 pb-4')).toBeDefined();
+    expect(String(bodyNode(renderer)?.props.className)).toContain('gap-1');
   });
 
   it('keeps the button role, the title as its name, and the expanded state', () => {

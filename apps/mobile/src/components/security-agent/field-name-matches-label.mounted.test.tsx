@@ -37,7 +37,12 @@ vi.mock('expo-router', () => ({
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff', Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Check: 'Check',
+  Clock3: 'Clock3',
+  ShieldOff: 'ShieldOff',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -210,6 +215,7 @@ describe('dismissal comment field name', () => {
     const copy = i18n.t('securityAgent.dismiss.commentLabel');
 
     expect(visibleLabel(mounted, copy)).toBeDefined();
-    expect(mounted.root.findByType('TextInput').props.accessibilityLabel).toBe(copy);
+    // The comment is a `FormField`, whose input is the shared `Input`.
+    expect(mounted.root.findByType('Input').props.accessibilityLabel).toBe(copy);
   });
 });

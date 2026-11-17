@@ -7,6 +7,7 @@ import { View, type ViewStyle } from 'react-native';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { MIN_TAP_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
@@ -40,8 +41,14 @@ const keyExtractor = (_section: string, index: number) => String(index);
 export function ChangelogScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
+  // Every release bullet ends in an inline PR link, and the native markdown
+  // renderer exposes that link's rectangle and accepts its tap as the text line
+  // box. A span carries no box and no `hitSlop`, so this screen alone raises
+  // the body line height to the inline-link target floor.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => <MarkdownText value={item} />,
+    ({ item }: ListRenderItemInfo<string>) => (
+      <MarkdownText value={item} lineHeight={MIN_TAP_TARGET_DP} />
+    ),
     []
   );
 

@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
-      "tokenPlaceholder": "İş sahəsinin giriş tokeni"
+      "tokenPlaceholder": "İş sahəsinin giriş tokeni",
+      "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
     },
     "scopeList": {
       "personalStillAvailable": "Şəxsi repozitoriyalar aşağıda hələ də əlçatandır.",

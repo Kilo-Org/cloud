@@ -1354,7 +1354,8 @@
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke nzukọ a na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
-      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ"
+      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
+      "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
     },
     "scopeList": {
       "personalStillAvailable": "Ebe nchekwa nke gị ka dị n'okpuru.",

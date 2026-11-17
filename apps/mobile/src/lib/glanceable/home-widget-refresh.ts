@@ -6,7 +6,7 @@ import {
 import {
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   homeWidgetDataSchema,
   homeWidgetRefreshAt,
   homeWidgetResponseSchema,
@@ -316,7 +316,7 @@ export async function applyHomeWidgetResponse(
       accountEpoch: authEpoch,
       status: 'privacy',
     });
-    rememberHomeWidgetData({ snapshot, details: EMPTY_HOME_WIDGET_DETAILS });
+    rememberHomeWidgetData({ snapshot, details: emptyHomeWidgetDetails() });
     setWidgetSnapshot(snapshot);
     endLiveUpdate();
     return true;

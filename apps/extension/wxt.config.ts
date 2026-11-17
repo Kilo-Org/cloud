@@ -23,6 +23,12 @@ export default defineConfig({
         id: 'browser-agent@kilo.ai',
       },
     },
+    commands: {
+      'stop-all-local-agents': {
+        // Stop every local agent without hunting for the side panel.
+        suggested_key: { default: 'Alt+Shift+K' },
+      },
+    },
     description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
@@ -34,8 +40,8 @@ export default defineConfig({
     name: 'Kilo Code',
     permissions:
       browser === 'firefox'
-        ? ['contextMenus', 'identity', 'scripting', 'storage', 'tabs']
-        : ['contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
+        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
+        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

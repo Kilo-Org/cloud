@@ -26,7 +26,9 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -119,7 +121,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <RowGroup>
-        <View className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3">
+        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
           <Text className="text-sm font-medium text-foreground">
             {t('organization.lowBalanceAlert.title')}
           </Text>

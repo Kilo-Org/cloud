@@ -23,6 +23,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -270,32 +271,30 @@ export function InviteMemberSheet() {
                 one form, so the role group does not wear the list-section
                 eyebrow the rest of the app uses for section headings. */}
             <FormFieldLabel label={t('common.role')} />
-            <RadioGroup
-              label={t('common.role')}
-              className="overflow-hidden rounded-xl bg-secondary"
-            >
-              {roles.map((value, index) => {
-                const selected = selectedRole === value;
-                return (
-                  <Pressable
-                    key={value}
-                    className={cn(
-                      ROW_TARGET_CLASS,
-                      'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
-                      index < roles.length - 1 && 'border-b-[0.5px] border-hair-soft'
-                    )}
-                    onPress={() => {
-                      setRole(value);
-                    }}
-                    {...radioItemA11y({ label: roleLabel(value), checked: selected })}
-                  >
-                    <Text className="flex-1 text-sm font-medium text-foreground">
-                      {roleLabel(value)}
-                    </Text>
-                    {selected && <Check size={16} color={selectionCheckColor(colors)} />}
-                  </Pressable>
-                );
-              })}
+            <RadioGroup label={t('common.role')}>
+              <RowGroup>
+                {roles.map(value => {
+                  const selected = selectedRole === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      className={cn(
+                        ROW_TARGET_CLASS,
+                        'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+                      )}
+                      onPress={() => {
+                        setRole(value);
+                      }}
+                      {...radioItemA11y({ label: roleLabel(value), checked: selected })}
+                    >
+                      <Text className="flex-1 text-sm font-medium text-foreground">
+                        {roleLabel(value)}
+                      </Text>
+                      {selected && <Check size={16} color={selectionCheckColor(colors)} />}
+                    </Pressable>
+                  );
+                })}
+              </RowGroup>
             </RadioGroup>
           </View>
         )}

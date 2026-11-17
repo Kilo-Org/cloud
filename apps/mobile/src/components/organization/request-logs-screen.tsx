@@ -13,7 +13,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { FileText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +27,6 @@ import {
   UNMEASURED_VALUE,
 } from '@/lib/format';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
@@ -184,7 +182,6 @@ const RequestLogRow = memo(function RequestLogRow({
  */
 export function OrganizationRequestLogsScreen() {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   // The window's newest end. The anchor is captured once, so "Newer" has a
   // fixed edge to return to instead of sliding with the clock.
@@ -341,7 +338,6 @@ export function OrganizationRequestLogsScreen() {
             }}
             accessibilityLabel={t('organization.requestLogs.older')}
           >
-            <DirectionalChevronLeft size={16} color={colors.foreground} />
             <Text>{t('organization.requestLogs.older')}</Text>
           </Button>
           <Button
@@ -355,7 +351,6 @@ export function OrganizationRequestLogsScreen() {
             accessibilityLabel={t('organization.requestLogs.newer')}
           >
             <Text>{t('organization.requestLogs.newer')}</Text>
-            <DirectionalChevronRight size={16} color={colors.foreground} />
           </Button>
         </View>
         <Text variant="caption">

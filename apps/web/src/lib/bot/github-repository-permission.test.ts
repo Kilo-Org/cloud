@@ -110,6 +110,41 @@ describe('authorizeGitHubRepository', () => {
     expect(fetchPermission).toHaveBeenCalledTimes(2);
   });
 
+  test('an unreachable GitHub is reported as temporary, not as a denial', async () => {
+    const fetchPermission = createFetchPermission('write');
+    const lookupError = new Error('GitHub rate limited until 2026-11-17T00:01:00.000Z');
+    fetchPermission.mockRejectedValue(lookupError);
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/unreachable',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).not.toContain('write access');
+    expect(result.markdown).toContain('`acme/unreachable`');
+    expect(result.markdown).toContain('temporary');
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('a permission lookup that fails once is retried and allowed', async () => {
+    const fetchPermission = createFetchPermission('write');
+    fetchPermission.mockRejectedValueOnce(new Error('Bad gateway')).mockResolvedValueOnce('write');
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/recovered',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result).toEqual({ allowed: true });
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
   test('personally owned integrations do not consult repository permissions', async () => {
     const fetchPermission = createFetchPermission('none');
 

@@ -440,7 +440,11 @@ export async function hasPRCommentWithMarker(
 
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
- * if the lookup fails (e.g. the App lacks permission to query collaborators).
+ * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
+ * reports a permission outside the known set, or the App cannot query collaborators
+ * (for example a disconnected installation, whose token mint fails here).
+ * Rate limits, server errors and network failures are thrown so callers can decide
+ * whether to retry rather than treating a temporary failure as a denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
@@ -454,14 +458,27 @@ export async function getCollaboratorPermissionLevel(
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string
 ): Promise<CollaboratorPermission | null> {
+  let tokenData: InstallationToken;
   try {
-    const tokenData = await generateGitHubInstallationToken(
+    tokenData = await generateGitHubInstallationToken(
       installationId,
       appType,
       expectedIntegrationId
     );
-    const octokit = new Octokit({ auth: tokenData.token });
+  } catch (error) {
+    // The mint fails for a locally unavailable installation, so this App cannot
+    // query collaborators at all: a definitive null, not a temporary failure.
+    warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+      installationId,
+      owner,
+      repo,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+  const octokit = new Octokit({ auth: tokenData.token });
 
+  try {
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
       owner,
       repo,
@@ -473,8 +490,15 @@ export async function getCollaboratorPermissionLevel(
       return data.permission as CollaboratorPermission;
     }
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (isHttpError(error) && error.status === 404) return null;
+    warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+      owner,
+      repo,
+      username,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw toGitHubRateLimitError(error) ?? error;
   }
 }
 
@@ -539,16 +563,24 @@ export async function exchangeGitHubOAuthCode(
     throw new Error(`Missing GitHub ${appType} App credentials`);
   }
 
-  const response = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      code,
-      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        code,
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      }),
+    });
+  } catch (error) {
+    logExceptInTest('[exchangeGitHubOAuthCode] Token exchange request failed', { error });
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`GitHub OAuth code exchange failed (${response.status})`);
   }
@@ -581,7 +613,9 @@ export async function exchangeGitHubOAuthCode(
     auth: accessToken,
   });
 
-  const { data: githubUser } = await octokit.rest.users.getAuthenticated();
+  const { data: githubUser } = await octokit.rest.users.getAuthenticated({
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
 
   return {
     id: githubUser.id.toString(),

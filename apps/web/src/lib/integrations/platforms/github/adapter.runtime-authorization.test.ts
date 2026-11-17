@@ -12,7 +12,11 @@ jest.mock('../../github/runtime-authorization', () => ({
 }));
 
 import { getGitHubAppCredentials } from './app-selector';
-import { generateGitHubInstallationToken, getCollaboratorPermissionLevel } from './adapter';
+import {
+  generateGitHubInstallationToken,
+  getCollaboratorPermissionLevel,
+  GitHubRateLimitError,
+} from './adapter';
 
 describe('GitHub installation authorization', () => {
   beforeEach(() => {
@@ -91,5 +95,34 @@ describe('GitHub installation authorization', () => {
 
     expect(mockAuth).not.toHaveBeenCalled();
     expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('treats an unknown collaborator as no answer', async () => {
+    mockPermission.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+  });
+
+  it('throws a rate-limit failure instead of reporting no answer', async () => {
+    mockPermission.mockRejectedValueOnce({
+      status: 429,
+      message: 'rate limit exceeded',
+      response: { headers: {} },
+    });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).rejects.toBeInstanceOf(GitHubRateLimitError);
+  });
+
+  it('throws a server failure instead of reporting no answer', async () => {
+    const serverError = { status: 502, message: 'Bad gateway' };
+    mockPermission.mockRejectedValueOnce(serverError);
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).rejects.toBe(serverError);
   });
 });

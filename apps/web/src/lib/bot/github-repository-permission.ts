@@ -108,12 +108,58 @@ function writeAccessRequiredMarkdown(repository: string | null): string {
   );
 }
 
+/**
+ * Read as a temporary failure, not a permission refusal: GitHub could not be
+ * reached to answer the question at all.
+ */
+function transientAccessRequiredMarkdown(repository: string | null): string {
+  const target = repository ? `\`${repository}\`` : 'this repository';
+  return (
+    `I couldn't reach GitHub to check whether your account has permission on ${target}, so I ` +
+    "didn't start any work. This is usually temporary, so mention me again in a moment."
+  );
+}
+
 function notAllowed(repository: string | null): GitHubRepositoryAuthorization {
   return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
 }
 
 function isSameRepository(left: string, right: string): boolean {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+type WriteAccessResult = 'allowed' | 'denied' | 'transient';
+
+type PermissionLookup =
+  | { status: 'answered'; permission: CollaboratorPermission | null }
+  | { status: 'unreachable'; error: string };
+
+/**
+ * Asks GitHub for the collaborator permission at most twice: a single failure
+ * must not end the action, and neither must a definitive null on the first ask
+ * (the adapter returns null for a 404, and one retry covers a lookup that raced
+ * an installation change). A null on the retry is answered: GitHub said no.
+ * Two thrown failures in a row mean GitHub stayed unreachable.
+ */
+async function lookupRepositoryPermission(
+  permissionInput: GitHubRepositoryPermissionInput,
+  fetchPermission: FetchRepositoryPermission | undefined
+): Promise<PermissionLookup> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
+      if (permission !== null) return { status: 'answered', permission };
+      lastError = null;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError === null) return { status: 'answered', permission: null };
+  return {
+    status: 'unreachable',
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  };
 }
 
 async function hasRepositoryWriteAccess(params: {
@@ -123,9 +169,9 @@ async function hasRepositoryWriteAccess(params: {
   repository: string;
   username: string;
   fetchPermission?: FetchRepositoryPermission;
-}): Promise<boolean> {
+}): Promise<WriteAccessResult> {
   const [owner, repo] = params.repository.split('/');
-  if (!owner || !repo) return false;
+  if (!owner || !repo) return 'denied';
 
   const permissionInput = {
     installationId: params.installationId,
@@ -142,20 +188,29 @@ async function hasRepositoryWriteAccess(params: {
       params.appType,
       params.platformIntegrationId
     );
-    let permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
-    if (permission === null) {
-      // A single GitHub error (rate limit, 5xx, timeout) must not end the action.
-      permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
-    }
-    return permission === 'admin' || permission === 'maintain' || permission === 'write';
   } catch (error) {
     console.warn('[KiloBot] Failed to verify GitHub repository access:', {
       repository: params.repository,
       platformIntegrationId: params.platformIntegrationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return false;
+    return 'denied';
   }
+
+  const lookup = await lookupRepositoryPermission(permissionInput, params.fetchPermission);
+  if (lookup.status === 'unreachable') {
+    console.warn('[KiloBot] Could not reach GitHub to verify repository access:', {
+      repository: params.repository,
+      platformIntegrationId: params.platformIntegrationId,
+      error: lookup.error,
+    });
+    return 'transient';
+  }
+
+  const { permission } = lookup;
+  return permission === 'admin' || permission === 'maintain' || permission === 'write'
+    ? 'allowed'
+    : 'denied';
 }
 
 /**
@@ -193,7 +248,7 @@ export async function authorizeGitHubRepository(params: {
   const installationId = platformIntegration.platform_installation_id;
   if (!installationId) return notAllowed(repository);
 
-  const allowed = await hasRepositoryWriteAccess({
+  const writeAccess = await hasRepositoryWriteAccess({
     installationId,
     appType: platformIntegration.github_app_type ?? 'standard',
     platformIntegrationId: platformIntegration.id,
@@ -201,5 +256,9 @@ export async function authorizeGitHubRepository(params: {
     username: actorLogin,
     fetchPermission: params.fetchPermission,
   });
-  return allowed ? { allowed: true } : notAllowed(repository);
+  if (writeAccess === 'allowed') return { allowed: true };
+  if (writeAccess === 'transient') {
+    return { allowed: false, markdown: transientAccessRequiredMarkdown(repository) };
+  }
+  return notAllowed(repository);
 }

@@ -78,7 +78,11 @@ describe('exchangeGitHubOAuthCode', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://github.com/login/oauth/access_token',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({
+        method: 'POST',
+        redirect: 'error',
+        signal: expect.any(AbortSignal),
+      })
     );
     expect(requestBody(fetchMock)).toEqual({
       client_id: 'github-client-id',
@@ -134,6 +138,34 @@ describe('exchangeGitHubOAuthCode', () => {
     await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toThrow(
       'GitHub OAuth code exchange returned a non-JSON response'
     );
+  });
+
+  it('propagates the abort error when the token request times out', async () => {
+    const timeoutError = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError'
+    );
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(timeoutError);
+
+    await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toBe(timeoutError);
+  });
+
+  it('authenticates the user with a bounded request', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(tokenResponse());
+
+    await exchangeGitHubOAuthCode('auth-code', 'standard');
+
+    expect(mockGetAuthenticated).toHaveBeenCalledWith({
+      request: { signal: expect.any(AbortSignal) },
+    });
+  });
+
+  it('propagates a failure from the authenticated user lookup', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(tokenResponse());
+    const lookupError = new Error('Bad credentials');
+    mockGetAuthenticated.mockRejectedValueOnce(lookupError);
+
+    await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toBe(lookupError);
   });
 });
 

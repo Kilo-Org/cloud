@@ -71,6 +71,9 @@ describe('SettingsSwitchRow', () => {
     expect(row.props.accessible).toBe(false);
     expect(row.props.accessibilityElementsHidden).toBe(true);
     expect(row.props.importantForAccessibility).toBe('no-hide-descendants');
+    // The copy's own node carries the 48dp frame, so the tap target clears the
+    // 44dp floor even when the copy is a single short line.
+    expect(row.props.className).toContain('min-h-[48px]');
   });
 
   it('toggles once whether the copy or the switch is tapped', () => {

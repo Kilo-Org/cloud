@@ -69,12 +69,12 @@ export function SettingsSwitchRow({
   // accessibility, and the native control carries the switch role, label, and
   // state, so a tap runs one handler and a screen reader sees one target.
   return (
-    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 py-2')}>
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3')}>
       <Pressable
         accessible={false}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        className="min-w-0 flex-1 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 justify-center active:opacity-70')}
         disabled={disabled}
         onPress={() => {
           onValueChange(!value);

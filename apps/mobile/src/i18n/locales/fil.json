@@ -1366,7 +1366,8 @@
       "noReviews": "Wala pang pagsusuri",
       "noReviewsDescription": "Lalabas dito ang mga pagsusuri kapag nagsuri na ng pull request ang Code Reviewer.",
       "startManualReview": "Magsimula ng manu-manong pagsusuri",
-      "configureProvider": "Isaayos ang provider"
+      "configureProvider": "Isaayos ang provider",
+      "connectOwnerOnly": "Hilingin sa isang may-ari ng organisasyon o admin na ikonekta ang isang provider."
     },
     "platformList": {
       "checking": "Sinusuri…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "I-sign out ang device na ito",
     "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}, huling nakita: {{lastSeen}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
+    "sessionSignOutFailed": "Hindi ma-sign out ang sesyong ito. Subukan muli.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Huling nakita: {{lastSeen}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Kasaysayan ng billing",
       "billingHistoryEmpty": "Wala pang kasaysayan ng billing.",
+      "billingHistoryError": "Hindi ma-load ang kasaysayan ng billing",
       "cancel": "Kanselahin ang subscription",
       "cancelDescription": "Mananatiling aktibo ang iyong Kilo Pass hanggang sa katapusan ng billing period at hindi na ito magre-renew.",
       "cancelScheduled": "Makakansela sa {{date}}",
       "cancelScheduledChange": "Kanselahin ang nakaiskedyul na pagbabago",
       "cancelled": "Nakansela na ang subscription",
       "creditHistoryEmpty": "Wala pang Kilo Pass credit.",
+      "creditHistoryError": "Hindi ma-load ang kasaysayan ng credit",
       "resume": "Ituloy ang subscription",
       "resumeCancelledDescription": "Muling awtomatikong magre-renew ang iyong Kilo Pass.",
       "resumePausedDescription": "Itutuloy na ngayon ang iyong Kilo Pass, bago ang nakaiskedyul na petsa ng pagtuloy nito.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
       "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
-      "accessDeniedDescription": "Wala kang access sa organisasyong ito."
+      "accessDeniedDescription": "Hilingin sa isang may-ari o admin ng organisasyon na bigyan ka ng pag-access."
     },
     "create": {
       "title": "Gumawa ng organisasyon",
@@ -3464,6 +3468,8 @@
       "groups": "Mga grupo",
       "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
+      "ssoAndDomain": "SSO at domain",
+      "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
       "requestLogs": "Mga request log",
       "subOrganizations": "Mga sub-organisasyon",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Ekspresyong cron",
       "fieldCronHelp": "Limang patlang: minuto, oras, araw, buwan at araw ng linggo. Ang pinakamaikling agwat ay isang minuto.",
       "fieldTimezone": "Sona ng oras",
-      "nameLocked": "Bahagi ng URL ng webhook ang pangalan at hindi ito mababago.",
+      "nameLocked": "Hindi na mababago ang pangalan pagkatapos magawa ang pampapagana.",
       "repositoryLocked": "Hindi na mababago ang imbakan pagkatapos magawa ang pampapagana.",
       "environmentAutomatic": "Awtomatiko batay sa imbakan",
       "notSelected": "Hindi napili",
@@ -4607,6 +4613,7 @@
       "authHeaderLabel": "Pangalan ng header",
       "authSecretLabel": "Pinagsasaluhang sekreto",
       "authSecretKeep": "Iwanang blangko para mapanatili ang nakaimbak na sekreto.",
+      "authSecretSet": "Kinakailangan. Pumili ng malakas at random na string.",
       "authSecretCreator": "Gumamit ng hindi bababa sa 16 na karakter kapag tumakbo ang pampapagana bilang tagalikha nito.",
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
@@ -4617,6 +4624,7 @@
       "saveFailedTitle": "Hindi maimbak ang pampapagana",
       "deleteTitle": "Tanggalin ang pampapaganang ito?",
       "deleteMessage": "Mabibigo ang mga tawag sa {{name}}. Hindi na ito maibabalik.",
+      "deleteMessageScheduled": "Titigil ang mga naka-iskedyul na pagtakbo ng {{name}}. Hindi na ito maibabalik.",
       "runNow": "Patakbuhin ngayon",
       "runStarted": "Nagsimula ang pagtakbo",
       "created": "Nagawa ang pampapagana",

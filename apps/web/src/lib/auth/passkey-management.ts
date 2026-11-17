@@ -8,7 +8,7 @@ import {
   passkey_management_authorizations,
 } from '@kilocode/db/schema';
 import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
-import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 
 /** The one passkey-management action a grant authorizes. */
 export type PasskeyManagementOperation = 'enroll' | 'rename' | 'remove';

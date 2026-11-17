@@ -1366,7 +1366,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
+    "sessionSignOutFailed": "Bu sessiyadan çıxış etmək mümkün olmadı. Yenidən cəhd edin.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Ödəniş tarixçəsi",
       "billingHistoryEmpty": "Hələ ödəniş tarixçəsi yoxdur.",
+      "billingHistoryError": "Ödəniş tarixçəsi yüklənə bilmədi",
       "cancel": "Abunəliyi ləğv et",
       "cancelDescription": "Kilo Pass ödəniş dövrünün sonunadək aktiv qalacaq və yenilənməyəcək.",
       "cancelScheduled": "{{date}} tarixində ləğv olunur",
       "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
       "cancelled": "Abunəlik ləğv edildi",
       "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
+      "creditHistoryError": "Kredit tarixçəsi yüklənə bilmədi",
       "resume": "Abunəliyi bərpa et",
       "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
       "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
-      "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
+      "accessDeniedDescription": "Təşkilat sahibindən və ya inzibatçısından sənə giriş icazəsi verməsini xahiş et."
     },
     "create": {
       "title": "Təşkilat yarat",
@@ -3464,6 +3468,8 @@
       "groups": "Qruplar",
       "guardrails": "Qoruyucu qaydalar",
       "byok": "Öz açarınızdan istifadə edin",
+      "ssoAndDomain": "SSO və domen",
+      "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
       "requestLogs": "Sorğu jurnalları",
       "subOrganizations": "Alt təşkilatlar",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Kron ifadəsi",
       "fieldCronHelp": "Beş sahə: dəqiqə, saat, gün, ay və həftənin günü. Ən qısa interval bir dəqiqədir.",
       "fieldTimezone": "Saat qurşağı",
-      "nameLocked": "Ad vebhuk URL-in bir hissəsidir və dəyişdirilə bilməz.",
+      "nameLocked": "Tətikləyici yaradıldıqdan sonra ad dəyişdirilə bilməz.",
       "repositoryLocked": "Tətikləyici yaradıldıqdan sonra repozitoriya dəyişdirilə bilməz.",
       "environmentAutomatic": "Repozitoriyaya görə avtomatik",
       "notSelected": "Seçilməyib",
@@ -4607,6 +4613,7 @@
       "authHeaderLabel": "Başlıq adı",
       "authSecretLabel": "Ortaq sirr",
       "authSecretKeep": "Yadda saxlanmış sirri saxlamaq üçün boş buraxın.",
+      "authSecretSet": "Məcburi. Güclü təsadüfi sətir seçin.",
       "authSecretCreator": "Tətikləyici yaradıcısı kimi işləyərkən ən azı 16 simvol istifadə edin.",
       "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
       "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",
@@ -4617,6 +4624,7 @@
       "saveFailedTitle": "Tətikləyici yadda saxlanıla bilmədi",
       "deleteTitle": "Bu tətikləyici silinsin?",
       "deleteMessage": "{{name}} ünvanına edilən çağırışlar uğursuz olacaq. Bu əməliyyat geri qaytarıla bilməz.",
+      "deleteMessageScheduled": "{{name}} tətikləyicisinin planlaşdırılıb icra olunan çağırışları dayanacaq. Bu əməliyyat geri qaytarıla bilməz.",
       "runNow": "İndi işlət",
       "runStarted": "İcra başladı",
       "created": "Tətikləyici yaradıldı",

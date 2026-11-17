@@ -1366,7 +1366,8 @@
       "noReviews": "Akukho ukuhlolwa okwamanje",
       "noReviewsDescription": "Ukuhlolwa kuvela lapha ngemva kokuba umhloli wekhodi esebenze esicelweni sokuhlanganisa ikhodi.",
       "startManualReview": "Qalisa ukuhlola ngokwakho",
-      "configureProvider": "Setha umhlinzeki"
+      "configureProvider": "Setha umhlinzeki",
+      "connectOwnerOnly": "Cela umnikazi noma umlawuli wenhlangano ukuxhuma umhlinzeki."
     },
     "platformList": {
       "checking": "Kuyahlolwa…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Phuma ngemvume kule divayisi",
     "signOutSessionLabel": "Phuma ngemvume ku-{{device}}, kungene ngemvume: {{signedIn}}, kugcine ukubonwa: {{lastSeen}}",
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
+    "sessionSignOutFailed": "Akwenzekanga ukuphuma ngemvume kule seshini. Zama futhi.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",
     "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Kugcine ukubonwa: {{lastSeen}}. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Umlando wokukhokha",
       "billingHistoryEmpty": "Awukabi nomlando wokukhokha.",
+      "billingHistoryError": "Ayikwazanga ukulayisha umlando wokukhokha",
       "cancel": "Khansela ukubhalisa",
       "cancelDescription": "I-Kilo Pass yakho ihlala isebenza kuze kuphele isikhathi sokukhokha futhi ngeke iphinde ivuselelwe.",
       "cancelScheduled": "Izokhanselwa ngo-{{date}}",
       "cancelScheduledChange": "Khansela ushintsho oluhleliwe",
       "cancelled": "Ukubhalisa kukhanseliwe",
       "creditHistoryEmpty": "Awukabi namakhredithi e-Kilo Pass.",
+      "creditHistoryError": "Ayikwazanga ukulayisha umlando wamakhredithi",
       "resume": "Qhubeka nokubhalisa",
       "resumeCancelledDescription": "I-Kilo Pass yakho izophinde iqale ukuvuselelwa ngokuzenzakalelayo.",
       "resumePausedDescription": "I-Kilo Pass yakho iyaqhubeka manje, ngaphambi kosuku obekwe ukuthi iqhubeke ngalo.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Khetha inhlangano",
       "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kuphrofayili yakho ukuze uqhubeke.",
       "unavailableSessionsDescription": "Le nhlangano ayisatholakali. Amaseshini ayo awakwazi ukulayishwa.",
-      "accessDeniedDescription": "Awunayo imvume yokufinyelela kule nhlangano."
+      "accessDeniedDescription": "Cela umnikazi noma umlawuli wenhlangano ukuthi akunikeze ukufinyelela."
     },
     "create": {
       "title": "Dala inhlangano",
@@ -3464,6 +3468,8 @@
       "groups": "Amaqembu",
       "guardrails": "Izivikelo",
       "byok": "Sebenzisa ukhiye wakho",
+      "ssoAndDomain": "I-SSO nesizinda",
+      "dataCollection": "Ukuqoqwa kwedatha",
       "auditLogs": "Amarekhodi okucwaninga",
       "requestLogs": "Amarekhodi ezicelo",
       "subOrganizations": "Izinhlangano ezingaphansi",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Isisho se-Cron",
       "fieldCronHelp": "Izinkambu ezinhlanu: umzuzu, ihora, usuku, inyanga nosuku lweviki. Isikhathi esifushane kakhulu umzuzu owodwa.",
       "fieldTimezone": "Isikhathi sendawo",
-      "nameLocked": "Igama liyingxenye ye-URL ye-webhook futhi alikwazi ukushintshwa.",
+      "nameLocked": "Igama alikwazi ukushintsha ngemva kokudalwa kwesibangeli.",
       "repositoryLocked": "Irejithori ayikwazi ukushintsha ngemva kokudalwa kwesibangeli.",
       "environmentAutomatic": "Kuzenzekela ngokwerejithori",
       "notSelected": "Akukhethiwe",
@@ -4607,6 +4613,7 @@
       "authHeaderLabel": "Igama leheda",
       "authSecretLabel": "Imfihlo eyabiwe",
       "authSecretKeep": "Shiya kungenalutho ukuze ugcine imfihlo egciniwe.",
+      "authSecretSet": "Kuyadingeka. Khetha iyunithi yezinhlamvu engahleliwe eqinile.",
       "authSecretCreator": "Sebenzisa okungenani izinhlamvu eziyi-16 lapho isibangeli sisebenza njengomdali waso.",
       "autoCommit": "Gcina izinguquko lapho ukusebenza kuphela",
       "condenseOnComplete": "Fingqa umongo lapho ukusebenza kuphela",
@@ -4617,6 +4624,7 @@
       "saveFailedTitle": "Akukwazekanga ukugcina isibangeli",
       "deleteTitle": "Susa lesi sibangeli?",
       "deleteMessage": "Izingcingo eziya ku-{{name}} zizohluleka. Lokhu ngeke kubuyiselwe.",
+      "deleteMessageScheduled": "Ukusebenza okuhleliwe kwesibangeli {{name}} kuzoma. Lokhu ngeke kubuyiselwe.",
       "runNow": "Sebenza manje",
       "runStarted": "Ukusebenza kuqalile",
       "created": "Isibangeli sidalwe",

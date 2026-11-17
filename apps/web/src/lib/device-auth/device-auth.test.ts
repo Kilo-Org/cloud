@@ -28,7 +28,7 @@ import {
   DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
   getDeviceAuthPendingLink,
 } from './device-auth';
-import { createPendingLink } from '@/lib/auth/pending-link';
+import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
@@ -1162,29 +1162,141 @@ describe('Device Auth', () => {
     });
   });
 
-  describe('isDeviceAuthRequestExpired', () => {
-    test('returns true for expired request', () => {
-      const request = {
-        expires_at: new Date(Date.now() - 1000).toISOString(),
-        status: 'pending',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(true);
+  describe('expiry boundary', () => {
+    const deadline = '2026-03-01T00:00:00.000Z';
+    const createdCodes: string[] = [];
+
+    beforeEach(() => {
+      // Fake only the clock, so equality with the deadline is exact and the
+      // database driver keeps its real timers.
+      jest.useFakeTimers({
+        now: new Date(deadline),
+        doNotFake: [
+          'setTimeout',
+          'setInterval',
+          'setImmediate',
+          'clearTimeout',
+          'clearInterval',
+          'clearImmediate',
+          'queueMicrotask',
+          'nextTick',
+          'hrtime',
+          'performance',
+        ],
+      });
     });
 
-    test('returns false for valid request', () => {
-      const request = {
-        expires_at: new Date(Date.now() + 60000).toISOString(),
-        status: 'pending',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(false);
+    afterEach(async () => {
+      jest.useRealTimers();
+      for (const code of createdCodes.splice(0)) {
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.code, code));
+      }
     });
 
-    test('returns true for request with expired status', () => {
-      const request = {
-        expires_at: new Date(Date.now() + 60000).toISOString(),
+    async function createRequest(params: { pendingLinkToken?: string } = {}) {
+      const created = await createDeviceAuthRequest(params);
+      createdCodes.push(created.code);
+      return created;
+    }
+
+    async function setDeadline(code: string, expiresAt: string) {
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: expiresAt })
+        .where(eq(device_auth_requests.code, code));
+    }
+
+    test('a request expires at its deadline, not after it', () => {
+      expect(isDeviceAuthRequestExpired({ expires_at: deadline, status: 'pending' })).toBe(true);
+      expect(
+        isDeviceAuthRequestExpired({
+          expires_at: '2026-03-01T00:00:01.000Z',
+          status: 'pending',
+        })
+      ).toBe(false);
+      expect(
+        isDeviceAuthRequestExpired({
+          expires_at: '2026-03-01T00:00:01.000Z',
+          status: 'expired',
+        })
+      ).toBe(true);
+    });
+
+    test('the approval page and the approval action agree at the deadline', async () => {
+      const { secret } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-boundary',
+          display_name: 'octocat',
+        },
+        emailCodeAllowed: true,
+      });
+      // Pin the link's deadline in real time: createPendingLink derives it from
+      // the frozen clock, and a parallel test file's cleanup drops expired rows.
+      await db
+        .update(pending_auth_links)
+        .set({ expires_at: sql`NOW() + interval '15 minutes'` })
+        .where(eq(pending_auth_links.secret_hash, hashPendingLinkSecret(secret)));
+
+      const { code, userCode } = await createRequest({ pendingLinkToken: secret });
+
+      // The approval page shows the live link while the request is live.
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toEqual({
+        provider: 'github',
+        email: testUserEmail,
+        displayName: 'octocat',
+      });
+
+      await setDeadline(code, deadline);
+
+      // The row is still pending and the link is still live, so only the
+      // request deadline hides it.
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toBeNull();
+
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
+        'Device authorization request has expired'
+      );
+      const request = await getDeviceAuthRequest(userCode);
+      expect(request?.status).toBe('expired');
+    });
+
+    test('both redeemers report a request past its deadline as expired', async () => {
+      const device = await createRequest();
+      await approveDeviceAuthRequest(device.userCode, testUserId);
+      await setDeadline(device.code, deadline);
+
+      await expect(consumeDeviceAuthByDeviceCode(device.deviceCode)).resolves.toEqual({
         status: 'expired',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(true);
+      });
+      const deviceRequest = await getDeviceAuthRequest(device.userCode);
+      expect(deviceRequest?.status).toBe('expired');
+
+      const legacy = await createRequest();
+      await approveDeviceAuthRequest(legacy.userCode, testUserId);
+      await setDeadline(legacy.code, deadline);
+
+      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({ status: 'expired' });
+      const legacyRequest = await getDeviceAuthRequest(legacy.userCode);
+      expect(legacyRequest?.status).toBe('expired');
+    });
+
+    test('cleanup deletes the request that expires at the deadline and keeps the later one', async () => {
+      const expired = await createRequest();
+      await setDeadline(expired.code, deadline);
+      const live = await createRequest();
+      await setDeadline(live.code, '2026-03-01T00:01:00.000Z');
+
+      const deletedCount = await cleanupExpiredDeviceAuthRequests();
+      expect(deletedCount).toBeGreaterThanOrEqual(1);
+
+      await expect(getDeviceAuthRequest(expired.userCode)).resolves.toBeUndefined();
+      await expect(getDeviceAuthRequest(live.userCode)).resolves.toBeDefined();
     });
   });
 

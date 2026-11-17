@@ -1366,7 +1366,8 @@
       "noReviews": "Hakuna ukaguzi bado",
       "noReviewsDescription": "Ukaguzi utaonekana hapa baada ya mkaguzi wa msimbo kukagua ombi la kuunganisha.",
       "startManualReview": "Anzisha ukaguzi mwenyewe",
-      "configureProvider": "Sanidi mtoa huduma"
+      "configureProvider": "Sanidi mtoa huduma",
+      "connectOwnerOnly": "Omba mmiliki wa shirika au msimamizi aunganishe mtoa huduma."
     },
     "platformList": {
       "checking": "Inaangalia…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
     "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}, Kuingia: {{signedIn}}, Kuonekana mara ya mwisho: {{lastSeen}}",
     "sessionSignedOut": "Kikao kimeondolewa kwenye akaunti.",
+    "sessionSignOutFailed": "Imeshindikana kuondoka kwenye kikao hiki. Jaribu tena.",
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",
     "signOutThisSessionMessage": "{{device}} kitaondolewa kwenye akaunti. Kuonekana mara ya mwisho: {{lastSeen}}. Kinaweza kuendelea kufikia API kwa hadi saa moja.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Historia ya malipo",
       "billingHistoryEmpty": "Bado hakuna historia ya malipo.",
+      "billingHistoryError": "Imeshindwa kupakia historia ya malipo",
       "cancel": "Ghairi usajili",
       "cancelDescription": "Kilo Pass yako itaendelea kutumika hadi mwisho wa kipindi cha malipo na haitasasishwa.",
       "cancelScheduled": "Itaghairiwa tarehe {{date}}",
       "cancelScheduledChange": "Ghairi mabadiliko yaliyoratibiwa",
       "cancelled": "Usajili umeghairiwa",
       "creditHistoryEmpty": "Bado hakuna salio la Kilo Pass.",
+      "creditHistoryError": "Imeshindwa kupakia historia ya salio",
       "resume": "Endeleza usajili",
       "resumeCancelledDescription": "Kilo Pass yako itaanza tena kusasishwa kiotomatiki.",
       "resumePausedDescription": "Kilo Pass yako inaendelea sasa, kabla ya tarehe iliyoratibiwa ya kuendelea.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Chagua shirika",
       "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
       "unavailableSessionsDescription": "Shirika hili halipatikani tena. Vikao vyake haviwezi kupakiwa.",
-      "accessDeniedDescription": "Huna ruhusa ya kufikia shirika hili."
+      "accessDeniedDescription": "Mwombe mmiliki wa shirika au msimamizi akupatie ruhusa."
     },
     "create": {
       "title": "Unda shirika",
@@ -3464,6 +3468,8 @@
       "groups": "Vikundi",
       "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
+      "ssoAndDomain": "SSO na kikoa",
+      "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
       "requestLogs": "Kumbukumbu za maombi",
       "subOrganizations": "Mashirika tanzu",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Usemi wa ratiba",
       "fieldCronHelp": "Sehemu tano: dakika, saa, siku, mwezi na siku ya wiki. Muda mfupi zaidi ni dakika moja.",
       "fieldTimezone": "Eneo la saa",
-      "nameLocked": "Jina ni sehemu ya URL ya ndoano ya wavuti na haliwezi kubadilika.",
+      "nameLocked": "Jina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "repositoryLocked": "Hazina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "environmentAutomatic": "Kiotomatiki kwa hazina",
       "notSelected": "Haijachaguliwa",
@@ -4607,6 +4613,7 @@
       "authHeaderLabel": "Jina la kichwa",
       "authSecretLabel": "Siri inayoshirikiwa",
       "authSecretKeep": "Acha tupu ili kubaki na siri iliyohifadhiwa.",
+      "authSecretSet": "Inahitajika. Chagua mfuatano wa nasibu ulio imara.",
       "authSecretCreator": "Tumia angalau herufi 16 kichocheo kinapotekelezwa kama muundaji wake.",
       "autoCommit": "Hifadhi mabadiliko utekelezaji unapokamilika",
       "condenseOnComplete": "Fupisha muktadha utekelezaji unapokamilika",
@@ -4617,6 +4624,7 @@
       "saveFailedTitle": "Imeshindwa kuhifadhi kichocheo",
       "deleteTitle": "Futa kichocheo hiki?",
       "deleteMessage": "Miito kwa {{name}} itashindikana. Hili haliwezi kutenduliwa.",
+      "deleteMessageScheduled": "Utekelezaji uliopangwa wa {{name}} utasimama. Hili haliwezi kutenduliwa.",
       "runNow": "Tekeleza sasa",
       "runStarted": "Utekelezaji umeanza",
       "created": "Kichocheo kimeundwa",

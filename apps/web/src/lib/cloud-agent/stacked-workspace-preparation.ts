@@ -25,7 +25,6 @@ type SessionMetadataReader = {
     githubIntegrationId?: string;
     bitbucketWorkspaceUuid?: string;
     bitbucketRepositoryUuid?: string;
-    gitlabProject?: string;
   }>;
 };
 
@@ -266,7 +265,7 @@ function deriveRepository(params: {
   }
 
   if (platform === 'gitlab') {
-    const project = metadata.gitlabProject ?? repositoryPath(gitUrl);
+    const project = repositoryPath(gitUrl);
     if (project === null) {
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',

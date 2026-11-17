@@ -41,7 +41,10 @@ import {
   isFreeNemotronModel,
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
-import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import {
+  applyCustomPricingToModel,
+  applyCustomPricingToPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import {
   getCustomLlmsById,
@@ -249,13 +252,16 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
   );
   const catalogModels = gatewayModels
     .map(model => {
-      // An alias shows the price its listed target shows, unless the alias has custom pricing of
-      // its own; an alias whose target is not listed keeps its own price.
-      const targetPricing = model.alias_target && displayPricingById.get(model.alias_target);
-      return applyCustomPricingToModel(
-        customPricingConfig,
-        targetPricing ? { ...model, pricing: targetPricing } : model
-      );
+      if (!model.alias_target) return applyCustomPricingToModel(customPricingConfig, model);
+      // An alias keeps its own name and shows the price its listed target shows. An alias whose
+      // target is not listed shows its own price, replaced by its target's custom pricing as
+      // billing replaces it.
+      return {
+        ...model,
+        pricing:
+          displayPricingById.get(model.alias_target) ??
+          applyCustomPricingToPricing(customPricingConfig, model.id, model.pricing),
+      };
     })
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.

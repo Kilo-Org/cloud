@@ -42,7 +42,7 @@ export interface WorkflowToolContext {
   readonly evalInTab: (
     tabId: number,
     code: string,
-    caller?: BrowserCaller
+    caller: BrowserCaller
   ) => Promise<EvalTabResult>;
   readonly disposeBrowserCaller: (caller: BrowserCaller) => Promise<void>;
   readonly navigateTab: (tabId: number, url: string) => Promise<void>;

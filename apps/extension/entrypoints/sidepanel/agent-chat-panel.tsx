@@ -1109,7 +1109,7 @@ export const AgentChatPanel = ({
         result = await executeWorkflowToolCall(toolCall, {
           allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
           disposeBrowserCaller,
-          evalInTab: (tabId, code) => evalInTab(tabId, code),
+          evalInTab,
           getTabUrl: tabId => getTabUrl(tabId),
           mode: runMode,
           navigateTab: (tabId, url) => navigateTab(tabId, url),

@@ -31,15 +31,19 @@ const urlMatches = (left: string, right: string): boolean => {
  * Evaluate workflow page code in a tab through the background transport.
  * Always sends WORKFLOW_PAGE_EVAL_TIMEOUT_MS (30 s); the default 5 s
  * timeout is too short for multi-action page scripts.
+ *
+ * The caller is required: every page of one run must use the run's own caller,
+ * because the tab lease is held by that caller across the run's pages. A fresh
+ * caller per page would queue behind the first page's lease forever.
  */
 export const evalInTab = async (
   tabId: number,
   code: string,
-  caller?: BrowserCaller
+  caller: BrowserCaller
 ): Promise<EvalTabResult> => {
   try {
     const response: unknown = await browser.runtime.sendMessage({
-      caller: caller ?? { kind: 'workflow', runId: crypto.randomUUID() },
+      caller,
       code,
       tabId,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,

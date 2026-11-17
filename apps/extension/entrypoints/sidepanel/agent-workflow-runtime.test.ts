@@ -51,6 +51,8 @@ vi.mock('#imports', () => ({
 // eslint-disable-next-line import/first
 import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 
+const runCaller = { kind: 'workflow', runId: 'run-1' } as const;
+
 describe('workflow eval', () => {
   it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS and the run caller', async () => {
     mocks.sendMessage.mockReset();
@@ -79,7 +81,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockRejectedValueOnce(new Error('disconnected'));
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'disconnected',
       ok: false,
     });
@@ -89,7 +91,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'Extension background returned an invalid response.',
       ok: false,
     });
@@ -102,7 +104,7 @@ describe('workflow eval', () => {
       ok: false,
     });
 
-    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 1;', runCaller)).resolves.toStrictEqual({
       error: 'tab closed',
       ok: false,
     });
@@ -116,7 +118,7 @@ describe('workflow eval', () => {
       type: 'kilo.tabs.snapshot',
     });
 
-    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({
+    await expect(evalInTab(7, 'return 42;', runCaller)).resolves.toStrictEqual({
       error: 'Extension background returned the wrong response.',
       ok: false,
     });

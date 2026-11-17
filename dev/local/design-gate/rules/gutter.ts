@@ -17,6 +17,21 @@ const fmt = (value: number) => `${Math.round(value * 10) / 10} dp`;
 const ICON_TARGET_MAX_DP = 56;
 
 /**
+ * React Navigation's bottom tab bar components, from the probe's owner stack.
+ *
+ * The bar is navigation chrome the screen does not place: each tab item
+ * centres its icon and label inside its own share of the bar, so a tab label's
+ * start edge lands a fifth of the bar in from the page edge on every tab
+ * screen. That is a centred item, not a page column.
+ */
+const TAB_BAR_OWNERS: Record<string, true> = {
+  BottomTabBar: true,
+  BottomTabItem: true,
+  TabBarLabel: true,
+  TabBarIcon: true,
+};
+
+/**
  * The boxes a page gutter is measured inside.
  *
  * A native sheet or dialog lays its content out in a window of its own, so the
@@ -109,20 +124,80 @@ function verticallyOverlaps(a: LayoutNode, b: LayoutNode): boolean {
 }
 
 /**
- * Whether the content starts beside an element that already sits on the gutter
- * in the same row: a session row's hue strip, an `IconTile`, an avatar. The
- * title after it starts past the gutter by design, and only the leading element
- * is the row's column. A sibling above the box (a stacked section label) does
- * not count: content under it is a column of its own and must still start at
- * the gutter.
+ * Whether the node is an out-of-flow bar pinned across the page's bottom: the
+ * tab bar is absolutely positioned by the navigator, spans the page and ends on
+ * its bottom edge. A full-height absolute layer — a modal backdrop — starts at
+ * the page's own top and is not a bar, so its content is still measured.
  */
-function followsGutterSibling(node: LayoutNode, page: Page, nodes: readonly LayoutNode[]): boolean {
+function fixedBottomBar(node: LayoutNode, page: Page): boolean {
+  if (!node.absolute) return false;
+  const rect = layoutRect(node);
+  return (
+    rect[1] > page.box[1] + GUTTER_TOLERANCE_DP &&
+    Math.abs(bottom(rect) - bottom(page.box)) <= GUTTER_TOLERANCE_DP &&
+    fullBleed(node, page)
+  );
+}
+
+/**
+ * Whether the node belongs to the bottom tab bar: navigation chrome, not page
+ * content. The bar's own component tree names it; an out-of-flow bar pinned
+ * across the page's bottom covers a bar that does not use those components.
+ */
+function insideTabBar(nodes: readonly LayoutNode[], page: Page): boolean {
+  return nodes.some(
+    node =>
+      (node.probe.owners ?? []).some(owner => TAB_BAR_OWNERS[owner] === true) ||
+      fixedBottomBar(node, page)
+  );
+}
+
+/**
+ * Whether the node holds a control whose start edge is on or before the page
+ * gutter: the header pulls a 48 dp back target into the gutter, so the title
+ * after it is placed by the row, not by the page column. A box that paints
+ * nothing and holds no control is not a leading element, and a control further
+ * in is the row's own content, so neither exempts the text that follows.
+ */
+function leadingControl(node: LayoutNode, page: Page, touch: number): boolean {
+  const rect = layoutRect(node);
+  if (startOffset(rect, page.box, page) > SCREEN_GUTTER_DP + GUTTER_TOLERANCE_DP) return false;
+  return controlOnGutter(node, page, touch);
+}
+
+function controlOnGutter(node: LayoutNode, page: Page, touch: number): boolean {
+  if (node.isControl) {
+    const rect = layoutRect(node);
+    return (
+      startOffset(rect, page.box, page) <= SCREEN_GUTTER_DP + GUTTER_TOLERANCE_DP &&
+      rect[2] >= touch &&
+      rect[3] >= touch
+    );
+  }
+  return node.children.some(child => controlOnGutter(child, page, touch));
+}
+
+/**
+ * Whether the content starts beside an element that already sits on the gutter
+ * in the same row: a session row's hue strip, an `IconTile`, an avatar, or the
+ * header's leading back control. The title after it starts past the gutter by
+ * design, and only the leading element is the row's column. A sibling above the
+ * box (a stacked section label) does not count: content under it is a column of
+ * its own and must still start at the gutter.
+ */
+function followsGutterSibling(
+  node: LayoutNode,
+  page: Page,
+  nodes: readonly LayoutNode[],
+  touch: number
+): boolean {
   for (const current of nodes) {
     const parent = current.parent;
     if (!parent) continue;
     for (const sibling of parent.children) {
       if (sibling === current) break;
       if (sibling.absolute || !verticallyOverlaps(sibling, node)) continue;
+      if (leadingControl(sibling, page, touch)) return true;
       if (
         Math.abs(startOffset(layoutRect(sibling), page.box, page) - SCREEN_GUTTER_DP) >
         GUTTER_TOLERANCE_DP
@@ -170,6 +245,16 @@ function centered(node: LayoutNode, page: Page): boolean {
 }
 
 /**
+ * Whether the box, or a block it sits in, is centred: an empty or error state
+ * centres a stack of content, and the text inside that stack begins where the
+ * stack does. That is the block's own placement, not the page column, and the
+ * stack's own padding is an inner inset the block owns.
+ */
+function insideCenteredBlock(nodes: readonly LayoutNode[], page: Page): boolean {
+  return nodes.some(candidate => centered(candidate, page));
+}
+
+/**
  * Every screen starts its content at the 14 dp page gutter, in both reading
  * directions: a header title, a section label, a card, a row group, a flat list
  * row's content and an empty state's block all begin on one column.
@@ -184,12 +269,13 @@ function centered(node: LayoutNode, page: Page): boolean {
  *
  * The rule measures the page column, not inner insets: a card, a row group or a
  * sheet places its own content from its own edge, and content after a leading
- * element of a row (a hue strip, an icon tile) starts past the gutter on
- * purpose. Full-bleed chrome — a list row's background and its divider — is not
- * a column, but the content inside it is. Centred content (an empty or error
- * state's box) is the content's own placement, and content a native sheet or
- * dialog hosts is measured from that surface's root. Unknown side insets skip
- * the rule, as they do the safe-area check: the page edge is not known.
+ * element of a row (a hue strip, an icon tile, the header's back control) starts
+ * past the gutter on purpose. Full-bleed chrome — a list row's background, its
+ * divider and the bottom tab bar — is not a column, but the content inside it
+ * is. Centred content (an empty or error state's box and the stack inside it) is
+ * the content's own placement, and content a native sheet or dialog hosts is
+ * measured from that surface's root. Unknown side insets skip the rule, as they
+ * do the safe-area check: the page edge is not known.
  */
 export function checkGutter(tree: LayoutTree): Finding[] {
   const { env } = tree;
@@ -207,6 +293,7 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     const nodes = chain(node, root);
     if (nodes.some(candidate => candidate.scroll.x)) continue;
     if (nodes.some(candidate => iconTarget(candidate, page, env.tapTarget.touch))) continue;
+    if (insideTabBar(nodes, page)) continue;
     if (fullBleed(node, page)) continue;
     const offset = startOffset(layoutRect(node), page.box, page);
 
@@ -232,8 +319,8 @@ export function checkGutter(tree: LayoutTree): Finding[] {
 
     if (insidePaintedBlock(nodes, page)) continue;
     if (!alignedToContentStart(node, page)) continue;
-    if (centered(node, page)) continue;
-    if (followsGutterSibling(node, page, nodes)) continue;
+    if (insideCenteredBlock(nodes, page)) continue;
+    if (followsGutterSibling(node, page, nodes, env.tapTarget.touch)) continue;
 
     const scroller = nodes.find(candidate => candidate.scroll.y && !candidate.scroll.x);
     const key = `${root?.index ?? 'window'}:${scroller?.index ?? 'page'}`;

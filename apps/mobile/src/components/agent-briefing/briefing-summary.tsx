@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';

@@ -68,8 +68,8 @@ function mount<P extends object>(component: FunctionComponent<P>, props: P) {
   return mounted;
 }
 
-function switchOf(mounted: TestRenderer.ReactTestRenderer) {
-  return mounted.root.find(node => (node.type as string) === 'Switch');
+function categoryRowOf(mounted: TestRenderer.ReactTestRenderer) {
+  return mounted.root.find(node => (node.type as string) === 'PreferenceRow');
 }
 
 it('shows the device-notifications link from Briefing settings', () => {
@@ -86,9 +86,13 @@ it('saves the brief preference from its Notifications category row', () => {
   mutate.mockClear();
   const mounted = mount(BriefingNotificationCategoryRow, { disabled: false });
 
+  // The row is the shared switch row: no surface, no divider, no second action.
   expect(mounted.root.findAll(node => (node.type as string) === 'Button')).toHaveLength(0);
+  const row = categoryRowOf(mounted);
+  expect(row.props.icon).toBe('Newspaper');
+  expect(row.props.disabled).toBe(false);
   act(() => {
-    (switchOf(mounted).props.onValueChange as (value: boolean) => void)(true);
+    (row.props.onValueChange as (value: boolean) => void)(true);
   });
   expect(mutate).toHaveBeenCalledWith({
     notificationsEnabled: true,
@@ -108,10 +112,8 @@ it('disables the category row with the device-notification gate', () => {
   mutate.mockClear();
   const mounted = mount(BriefingNotificationCategoryRow, { disabled: true });
 
-  expect(switchOf(mounted).props.disabled).toBe(true);
-  act(() => {
-    (switchOf(mounted).props.onValueChange as (value: boolean) => void)(true);
-  });
+  // The gate travels to the primitive, which owns the disabled switch.
+  expect(categoryRowOf(mounted).props.disabled).toBe(true);
   expect(mutate).not.toHaveBeenCalled();
 
   act(() => {

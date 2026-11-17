@@ -125,6 +125,59 @@ function pressBack() {
   });
 }
 
+/** The draft the form reports, over the base the screen starts on. */
+function editedDraft(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  return {
+    activation: 'webhook',
+    cron: '',
+    timezone: deviceTimeZone(),
+    repository: '',
+    agent: 'code',
+    model: '',
+    variant: '',
+    prompt: 'Describe this webhook request payload:\n\n{{body}}',
+    environmentId: null,
+    profileId: null,
+    bodySchemaJson: '',
+    autoCommit: false,
+    condenseOnComplete: false,
+    active: true,
+    authEnabled: false,
+    authHeader: '',
+    authSecret: '',
+    runAsCreator: false,
+    ...overrides,
+  };
+}
+
+/** Hand the form the draft change a field edit produces. */
+function editDraft(
+  renderer: {
+    root: { findByProps: (props: Record<string, unknown>) => { props: Record<string, unknown> } };
+  },
+  overrides: Partial<Record<string, unknown>> = {}
+): void {
+  const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
+    onDraftChange: (next: Record<string, unknown>) => void;
+  };
+  act(() => {
+    formProps.onDraftChange(editedDraft(overrides));
+  });
+}
+
+/** Press the form's submit with the handler the latest render carries. */
+async function submitForm(renderer: {
+  root: { findByProps: (props: Record<string, unknown>) => { props: Record<string, unknown> } };
+}): Promise<void> {
+  const submitProps = renderer.root.findByProps({ mode: 'create' }).props as {
+    onSubmit: () => void;
+  };
+  await act(async () => {
+    submitProps.onSubmit();
+    await Promise.resolve();
+  });
+}
+
 describe('TriggerCreateScreen leave guard', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -149,33 +202,7 @@ describe('TriggerCreateScreen leave guard', () => {
     const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
 
     // The form is mocked; drive the draft change the form would report.
-    const formNode = renderer.root.findByProps({ mode: 'create' });
-    const formProps = formNode.props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
-    };
-    act(() => {
-      formProps.onDraftChange({
-        name: 'probe-draft',
-        activation: 'webhook',
-        cron: '',
-        timezone: deviceTimeZone(),
-        repository: '',
-        agent: 'code',
-        model: '',
-        variant: '',
-        prompt: 'Describe this webhook request payload:\n\n{{body}}',
-        environmentId: null,
-        profileId: null,
-        bodySchemaJson: '',
-        autoCommit: false,
-        condenseOnComplete: false,
-        active: true,
-        authEnabled: false,
-        authHeader: '',
-        authSecret: '',
-        runAsCreator: false,
-      });
-    });
+    editDraft(renderer, { name: 'probe-draft' });
     expect(h.guard.enabled).toBe(true);
 
     pressBack();
@@ -199,32 +226,7 @@ describe('TriggerCreateScreen leave guard', () => {
   it('Discard replays the leave and disarms the guard', async () => {
     const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
 
-    const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
-    };
-    act(() => {
-      formProps.onDraftChange({
-        name: 'probe-draft',
-        activation: 'webhook',
-        cron: '',
-        timezone: deviceTimeZone(),
-        repository: '',
-        agent: 'code',
-        model: '',
-        variant: '',
-        prompt: 'Describe this webhook request payload:\n\n{{body}}',
-        environmentId: null,
-        profileId: null,
-        bodySchemaJson: '',
-        autoCommit: false,
-        condenseOnComplete: false,
-        active: true,
-        authEnabled: false,
-        authHeader: '',
-        authSecret: '',
-        runAsCreator: false,
-      });
-    });
+    editDraft(renderer, { name: 'probe-draft' });
     pressBack();
     expect(h.repeat).not.toHaveBeenCalled();
 
@@ -242,43 +244,16 @@ describe('TriggerCreateScreen leave guard', () => {
     h.createMutation.mutateAsync.mockResolvedValue({ triggerId: 'trigger-new' });
     const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
 
-    const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
-    };
-    act(() => {
-      formProps.onDraftChange({
-        name: 'trigger-new',
-        activation: 'webhook',
-        cron: '',
-        timezone: deviceTimeZone(),
-        repository: 'owner/repo',
-        agent: 'code',
-        model: 'kilo-auto/efficient',
-        variant: '',
-        prompt: 'Describe this webhook request payload:\n\n{{body}}',
-        environmentId: null,
-        profileId: null,
-        bodySchemaJson: '',
-        autoCommit: false,
-        condenseOnComplete: false,
-        active: true,
-        authEnabled: false,
-        authHeader: '',
-        authSecret: '',
-        runAsCreator: false,
-      });
+    editDraft(renderer, {
+      name: 'trigger-new',
+      repository: 'owner/repo',
+      model: 'kilo-auto/efficient',
     });
     expect(h.guard.enabled).toBe(true);
 
     // The draft change re-rendered the form; its submit handler closes over
     // the new draft.
-    const submitProps = renderer.root.findByProps({ mode: 'create' }).props as {
-      onSubmit: () => void;
-    };
-    await act(async () => {
-      submitProps.onSubmit();
-      await Promise.resolve();
-    });
+    await submitForm(renderer);
 
     expect(h.confirm).not.toHaveBeenCalled();
     // The leave waits one task behind the disarm render (`useMetadataLeaveGuard`),
@@ -296,69 +271,18 @@ describe('TriggerCreateScreen leave guard', () => {
     h.createMutation.mutateAsync.mockResolvedValue({ triggerId: 'trigger-new' });
     const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
 
-    const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
-      onSubmit: () => void;
-    };
-    act(() => {
-      formProps.onDraftChange({
-        name: 'trigger-new',
-        activation: 'webhook',
-        cron: '',
-        timezone: deviceTimeZone(),
-        repository: 'owner/repo',
-        agent: 'code',
-        model: 'kilo-auto/efficient',
-        variant: '',
-        prompt: 'Describe this webhook request payload:\n\n{{body}}',
-        environmentId: null,
-        profileId: null,
-        bodySchemaJson: '',
-        autoCommit: false,
-        condenseOnComplete: false,
-        active: true,
-        authEnabled: false,
-        authHeader: '',
-        authSecret: '',
-        runAsCreator: false,
-      });
+    editDraft(renderer, {
+      name: 'trigger-new',
+      repository: 'owner/repo',
+      model: 'kilo-auto/efficient',
     });
-    await act(async () => {
-      formProps.onSubmit();
-      await Promise.resolve();
-    });
+    await submitForm(renderer);
     await waitFor(() => h.replace.mock.calls.length === 1);
     await waitFor(() => !h.guard.enabled);
 
     // A later edit on the surviving screen must be guarded again: the latch
     // cleared once the leave settled, so the derived recompute runs.
-    const formNode = renderer.root.findByProps({ mode: 'create' });
-    const draftProps = formNode.props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
-    };
-    act(() => {
-      draftProps.onDraftChange({
-        name: 'trigger-new-edited',
-        activation: 'webhook',
-        cron: '',
-        timezone: deviceTimeZone(),
-        repository: 'owner/repo',
-        agent: 'code',
-        model: 'kilo-auto/efficient',
-        variant: '',
-        prompt: 'Describe this webhook request payload:\n\n{{body}}',
-        environmentId: null,
-        profileId: null,
-        bodySchemaJson: '',
-        autoCommit: false,
-        condenseOnComplete: false,
-        active: true,
-        authEnabled: false,
-        authHeader: '',
-        authSecret: '',
-        runAsCreator: false,
-      });
-    });
+    editDraft(renderer, { name: 'trigger-new-edited' });
     expect(h.guard.enabled).toBe(true);
 
     pressBack();

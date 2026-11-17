@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
-      "tokenPlaceholder": "Token qasjeje për hapësirën e punës"
+      "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
+      "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
     },
     "scopeList": {
       "personalStillAvailable": "Depot personale janë ende të disponueshme më poshtë.",

@@ -1377,7 +1377,8 @@
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
-      "tokenPlaceholder": "Token za pristup radnom prostoru"
+      "tokenPlaceholder": "Token za pristup radnom prostoru",
+      "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."
     },
     "scopeList": {
       "personalStillAvailable": "Osobni repozitoriji i dalje su dostupni u nastavku.",

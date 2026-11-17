@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket na wannan ƙungiyar a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
-      "tokenPlaceholder": "Lambar izinin shiga muhallin aiki"
+      "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
+      "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."
     },
     "scopeList": {
       "personalStillAvailable": "Har yanzu kana iya samun ma'ajiyoyinka na kanka a ƙasa.",

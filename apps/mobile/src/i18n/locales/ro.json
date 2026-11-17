@@ -1377,7 +1377,8 @@
       "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",
       "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
-      "tokenPlaceholder": "Token de acces la spațiul de lucru"
+      "tokenPlaceholder": "Token de acces la spațiul de lucru",
+      "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."
     },
     "scopeList": {
       "personalStillAvailable": "Depozitele personale sunt în continuare disponibile mai jos.",

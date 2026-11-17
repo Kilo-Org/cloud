@@ -12,6 +12,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { Fab } from '@/components/ui/fab';
 import { FormField } from '@/components/ui/form-field';
 import { Bell, Inbox, Settings, Sparkles, Trash2 } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { KvRow } from '@/components/ui/kv-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
@@ -143,7 +144,9 @@ export function DesignSystemFixture() {
         </Section>
 
         <Section label="Flat list rows">
-          <View>
+          {/* The flat row owns the page gutter itself, so the list leaves the
+              body's own inset instead of adding a second one. */}
+          <View className="-mx-4">
             <SessionRow
               agentLabel="platform"
               agentState="platform"
@@ -167,7 +170,7 @@ export function DesignSystemFixture() {
           <RowGroup>
             <RowSkeleton tile subtitle />
           </RowGroup>
-          <View>
+          <View className="-mx-4">
             <RowSkeleton variant="session" subtitle />
             <RowSkeleton variant="session" last />
           </View>
@@ -227,6 +230,7 @@ export function DesignSystemFixture() {
             error="This value is refused"
           />
           <FormField label={LONG_TITLE} defaultValue={LONG_VALUE} />
+          <Input className="rounded-md border border-border bg-card" defaultValue="A bare input" />
         </Section>
 
         <Section label="Segmented control">

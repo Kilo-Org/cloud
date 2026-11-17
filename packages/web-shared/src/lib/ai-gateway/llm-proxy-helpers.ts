@@ -263,7 +263,10 @@ export function allowedInferenceProviders(
 }
 
 export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
+  const error =
+    inferenceProviders.length > 0
+      ? `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`
+      : 'No eligible provider can serve the selected model.';
   return NextResponse.json(
     {
       error: error,
@@ -271,6 +274,18 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
       message: error,
     },
     { status: 403 }
+  );
+}
+
+/**
+ * Clients route with OpenRouter's `provider` object. The gateway builds the Vercel
+ * `providerOptions` itself, so a client value could bypass provider and region policies.
+ */
+export function providerOptionsNotSupportedResponse() {
+  const error = 'The providerOptions field is not supported. Use provider instead.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unsupported_field, message: error },
+    { status: 400 }
   );
 }
 

@@ -1259,8 +1259,17 @@ function cmdStartCommand(serviceName: string, repoRoot: string): void {
   // must not be prefixed twice.
   // The selection the stack recorded carries the mock's CA export
   // (`serviceCommand`), so a pane driven by this line behaves like the pane the
-  // stack started.
-  const command = buildStartCommand(serviceName, manifestServiceNames(manifest));
+  // stack started. A missing or empty manifest falls back to the always-on
+  // core selection, and the downgrade is worth a line on stderr because a
+  // narrowed start would differ from it.
+  const selection = restartSelection(repoRoot);
+  if (manifestServiceNames(manifest)?.length !== selection.length) {
+    console.error(
+      `No usable manifest in dev/logs — derived the command from the always-on core selection. ` +
+        `If this stack started with --without, run it from the stack's own pane instead.`
+    );
+  }
+  const command = buildStartCommand(serviceName, selection);
   console.log(command.startsWith('cd ') ? command : `cd ${shellQuote(repoRoot)} && ${command}`);
 }
 
@@ -1306,8 +1315,16 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
   // The relaunch and any recreate rebuild the command from the selection, so it
   // has to be the one the stack started with: without it the web app loses the
   // Snowflake mock's `NODE_EXTRA_CA_CERTS` export and every usage read fails
-  // with a certificate error.
+  // with a certificate error. A missing or empty manifest falls back to the
+  // always-on core group — visible on stderr, because a start narrowed with
+  // `--without` would rebuild a wider command than it ran.
+  const manifest = readManifest(repoRoot);
   const selection = restartSelection(repoRoot);
+  if (manifestServiceNames(manifest)?.length !== selection.length) {
+    console.error(
+      `No usable manifest in dev/logs — rebuilding ${serviceName} from the always-on core selection.`
+    );
+  }
   const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv, selection);
   if (outcome === 'gave-up') {
     console.error(`${serviceName} did not shut down in time; not relaunched`);

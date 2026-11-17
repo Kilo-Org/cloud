@@ -27,6 +27,7 @@ import {
   planTunnelRestart,
   writePersistedPortOffset,
 } from './services';
+
 import { buildStartCommand } from './runner';
 import { restartSelection } from './manifest';
 import { shellQuote } from './shell';
@@ -342,6 +343,80 @@ test('a restart derives the web app command from the manifest the stack wrote', 
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(withoutMockRoot, { recursive: true, force: true });
+  }
+});
+
+test('a restart without a manifest derives the always-on core selection', () => {
+  // A start interrupted before `writeManifest` (dev/logs cleared, crash) leaves
+  // a live session with no record of what it started. Every start runs the
+  // always-on core group, so the fallback derives that selection: the web app
+  // keeps its mock CA export instead of silently losing it, and `dashboard`'s
+  // per-service rebuild keeps targeting the group's own services.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-missing-'));
+  try {
+    const fallback = restartSelection(root);
+    assert.ok(Array.isArray(fallback));
+    assert.ok(fallback.length > 0);
+    assert.deepEqual(fallback, resolveGroups(getAlwaysOnGroupIds()));
+
+    // The core group carries the mock (always on) and `nextjs` depends on it,
+    // so the derived web app command carries the CA export exactly as a real
+    // start's selection does.
+    assert.ok(fallback.includes('mock-snowflake'));
+    assert.ok(fallback.includes('nextjs'));
+    const command = buildStartCommand('nextjs', fallback);
+    assert.equal(command, buildStartCommand('nextjs', resolveTargets(['app'])));
+    assert.ok(command.includes(`NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a restart keeps the manifest selection when the manifest exists', () => {
+  // The fallback must not outrank the real record: a start narrowed with
+  // `--without=mock-snowflake` recorded that narrower selection, and a restart
+  // has to rebuild exactly what that start ran.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-narrow-'));
+  try {
+    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'dev', 'logs', 'manifest.json'),
+      JSON.stringify({
+        session: 'kilo-dev-test',
+        portOffset,
+        wranglerRegistryPath: path.join(root, 'dev', 'logs', 'wrangler-registry.json'),
+        services: [
+          { name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' },
+        ],
+      })
+    );
+    // Narrower than the always-on core group, so a group fallback would show.
+    assert.notDeepEqual(restartSelection(root), resolveGroups(getAlwaysOnGroupIds()));
+    assert.deepEqual(restartSelection(root), ['nextjs']);
+    assert.equal(
+      buildStartCommand('nextjs', restartSelection(root)).includes('NODE_EXTRA_CA_CERTS='),
+      false
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('an empty manifest services list derives the fallback like a missing file', () => {
+  // `readManifest` accepts `{ services: [] }`; an empty selection is just as
+  // useless to command-building as no manifest — and a start interrupted after
+  // mkdir but before the entries were appended can leave one. Take the core
+  // selection then too.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-empty-'));
+  try {
+    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'dev', 'logs', 'manifest.json'),
+      JSON.stringify({ session: 'kilo-dev-test', portOffset, services: [] })
+    );
+    assert.deepEqual(restartSelection(root), resolveGroups(getAlwaysOnGroupIds()));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });
 

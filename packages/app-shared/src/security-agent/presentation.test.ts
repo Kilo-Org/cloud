@@ -348,22 +348,28 @@ describe('getSecurityDeadlinePresentation', () => {
           { ...(args[1] as Intl.DateTimeFormatOptions), timeZone: zoneAt.value },
         ]);
       } as unknown as typeof Intl.DateTimeFormat);
+    // Module state from the preceding tests is live: a formatter built in the
+    // host zone is cached and the probe clock is fresh. Own the wall clock for
+    // the whole test and stage it past the probe window between renders, so
+    // each render re-probes and the zone move is really observed.
+    const t0 = Date.now();
+    const advance = vi.spyOn(Date, 'now').mockReturnValue(t0 + 2000);
     try {
       // The fixed-at instant is noon UTC; Pacific/Midway (UTC-11) reads Jul 1.
       expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
         formatIn(new Date('2026-07-01T12:00:00Z'))
       );
 
-      // Step the wall clock forward past the one-second probe window and move
-      // the device zone to UTC+14, whose midnight already reads Jul 2; the
-      // next call must rebuild and re-render the day boundary.
-      const advance = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 2000);
+      // Move the device zone to UTC+14, whose midnight already reads Jul 2,
+      // and step the clock past the one-second probe window again; the next
+      // call must rebuild and re-render the day boundary.
+      advance.mockReturnValue(t0 + 4000);
       zoneAt.value = 'Pacific/Kiritimati';
       expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
         formatIn(new Date('2026-07-01T12:00:00Z'))
       );
-      advance.mockRestore();
     } finally {
+      advance.mockRestore();
       mock.mockRestore();
     }
   });

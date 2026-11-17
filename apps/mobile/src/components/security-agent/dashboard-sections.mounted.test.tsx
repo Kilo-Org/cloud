@@ -10,6 +10,8 @@ import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { Section } from '@/components/ui/section';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   DashboardSections,
@@ -485,26 +487,11 @@ describe('DashboardSectionsSkeleton', () => {
     );
   }
 
-  /** The row blocks of a placeholder card, one per loaded row. */
-  function rowBlocks(card: Instance): Instance[] {
-    return card.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'View' &&
-        String(n.props.className ?? '').includes('py-3')
-    );
-  }
-
-  it.each([true, false])(
-    'draws one placeholder per loaded card, in the card frame (slaEnabled=%s)',
-    slaEnabled => {
-      const loaded = cards(renderSections({ slaEnabled }).root);
-      const placeholders = cards(renderSkeleton(slaEnabled).root);
+  it.each([true, false])('draws one placeholder per loaded section (slaEnabled=%s)', slaEnabled => {
+    const loaded = renderSections({ slaEnabled }).root.findAllByType(Section);
+    const placeholders = renderSkeleton(slaEnabled).root.findAllByType(Section);
 
       expect(placeholders).toHaveLength(loaded.length);
-      expect(new Set(placeholders.map(card => card.props.className))).toEqual(
-        new Set(loaded.map(card => card.props.className))
-      );
     }
   );
 
@@ -540,25 +527,25 @@ describe('DashboardSectionsSkeleton', () => {
   });
 
   it('draws the risk placeholder at the row count the loaded card shows', () => {
-    // The skeleton card order mirrors the sections': priority, posture (only
-    // without SLA tracking), risk, repositories. The risk card's rows are the
-    // analysis outcomes, so they read the same with SLA tracking on and off and
-    // the placeholder must not carry a row the loaded card has dropped.
+    // The skeleton section order mirrors the sections': priority, posture
+    // (only without SLA tracking), risk, repositories. The risk card's rows are
+    // the analysis outcomes, so they read the same with SLA tracking on and off
+    // and the placeholder must not carry a row the loaded card has dropped.
     const loadedRows = (slaEnabled: boolean) => {
-      const risk = cards(renderSections({ slaEnabled }).root).find(card =>
-        copy(card).includes('securityAgent.dashboard.codebaseRisk')
-      );
+      const risk = renderSections({ slaEnabled })
+        .root.findAllByType(Section)
+        .find(section => copy(section).includes('securityAgent.dashboard.codebaseRisk'));
       if (!risk) {
         throw new Error('risk card not found');
       }
       return risk.findAllByType('KvRow').length;
     };
     const placeholderRows = (slaEnabled: boolean) => {
-      const card = cards(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
-      if (!card) {
+      const section = renderSkeleton(slaEnabled).root.findAllByType(Section)[slaEnabled ? 1 : 2];
+      if (!section) {
         throw new Error('risk placeholder not found');
       }
-      return rowBlocks(card).length;
+      return section.findAllByType(RowSkeleton).length;
     };
 
     expect(placeholderRows(true)).toBe(loadedRows(true));

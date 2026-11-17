@@ -56,8 +56,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
 }));
 
-const OUTER_CLASSES = 'rounded-lg bg-secondary';
-const BODY_CLASSES = 'gap-2 px-3 pb-3';
+const BODY_CLASSES = 'gap-3 pt-3';
 const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;
@@ -77,6 +76,16 @@ function mountSection(
     throw new Error('CollapsibleSection did not mount');
   }
   return mounted;
+}
+
+/** The section's own animated frame: `DisclosureLayout` wraps everything, so it
+ *  is the first `Animated.View` in the tree (the carat and body are inside). */
+function layoutView(renderer: ReactTestRenderer) {
+  const [first] = renderer.root.findAll(node => node.type === ('Animated.View' as ElementType));
+  if (!first) {
+    throw new Error('the section did not render its layout frame');
+  }
+  return first;
 }
 
 /** The single `Animated.View` rendered with the given resolved className. */
@@ -234,7 +243,7 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
     expect(title(renderer).props.className).toBe(
       'flex-1 text-sm font-medium text-base font-semibold'
     );
-    expect(animatedView(renderer, 'gap-2 px-3 pb-3 bg-card p-4 gap-3')).toBeDefined();
+    expect(animatedView(renderer, 'gap-3 pt-3 bg-card p-4 gap-3')).toBeDefined();
   });
 });
 

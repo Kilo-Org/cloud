@@ -8,6 +8,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { NotificationSettingsScreen } from './notification-settings-screen';
@@ -34,7 +35,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Check: 'Check', Clock3: 'Clock3' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -157,11 +158,11 @@ describe('personal scope', () => {
     expect(sectionHeadings(screen)).toEqual([]);
   });
 
-  it('separates the two switch groups by a break wider than the steps inside one', () => {
+  it('separates the two switch groups by the page body gap', () => {
     const screen = mount(PERSONAL_SCOPE);
 
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-7'
+      SCREEN_BODY_CLASS
     );
   });
 });
@@ -185,7 +186,7 @@ describe('organization scope', () => {
     const screen = mount(ORGANIZATION_SCOPE);
 
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-6'
+      SCREEN_BODY_CLASS
     );
   });
 });

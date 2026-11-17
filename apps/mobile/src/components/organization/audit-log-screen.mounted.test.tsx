@@ -23,6 +23,7 @@ import '@/i18n';
 // The screen reaches this adapter through `use-manual-refresh`; importing the
 // mocked module here is how the test reads its spy.
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { i18n } from '@/i18n';
 import { OrganizationAuditLogScreen } from './audit-log-screen';
 
 const pageQuery = {
@@ -199,6 +200,10 @@ function entries(count: number, action = 'organization.settings.change') {
   }));
 }
 
+// The long actor address the truncation case needs: wide enough that the row
+// can only hold the whole time when the actor text is the one that shrinks.
+const LONG_ACTOR_EMAIL = 'kilokwf1763399999_with_a_really_long_local_part@example.com';
+
 // A message that runs well past the clamped two lines: the sentence a role
 // change writes, long enough that the collapsed row must clip it.
 const LONG_MESSAGE =
@@ -356,8 +361,9 @@ describe('OrganizationAuditLogScreen', () => {
     // The row names the event in the reader's language, never the wire action.
     expect(messages).toContain('Settings changed');
     expect(messages.some(text => text.includes('organization.settings.change'))).toBe(false);
-    // The actor's meta line follows the event name, with the time after it.
-    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
+    // The actor and the time are separate texts now; the actor comes first.
+    expect(messages).toContain('owner@example.com');
+    expect(messages.some(text => text.startsWith('Jan 1, 2026 · 12:00 AM'))).toBe(true);
 
     const loadMore = renderer.root
       .findAllByType('Button')
@@ -370,6 +376,69 @@ describe('OrganizationAuditLogScreen', () => {
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it('lets the actor truncate in its own text and keeps the whole time', async () => {
+    // The wire address an actual long actor email fills the row with: the time
+    // must survive it, because the time is what tells the entries apart.
+    pageHook.entries = entries(1, 'organization.settings.change').map(entry => ({
+      ...entry,
+      actor_email: LONG_ACTOR_EMAIL,
+    }));
+    const { renderer, unmount } = await mount();
+
+    const texts = renderer.root.findAllByType('Text');
+    const actorText = texts.find(node => node.props.children === LONG_ACTOR_EMAIL);
+    const timeText = texts.find(
+      node => typeof node.props.children === 'string' && node.props.children.includes('12:00 AM')
+    );
+    expect(actorText).toBeDefined();
+    expect(timeText).toBeDefined();
+    // RN defaults flexShrink to 0; the actor must opt in to shrinking, or the
+    // long address paints the time off the row's end instead of truncating.
+    expect(actorText?.props.className).toContain('min-w-0');
+    expect(actorText?.props.className).toContain('shrink');
+    expect(actorText?.props.className).not.toContain('shrink-0');
+    expect(actorText?.props.numberOfLines).toBe(1);
+    // The time never yields its width, so the whole reading stays on screen
+    // whatever the actor does.
+    expect(timeText?.props.className).toContain('shrink-0');
+    expect(timeText?.props.children).toBe('Jan 1, 2026 · 12:00 AM');
+    unmount();
+  });
+
+  it('reads the Arabic time in its own order next to the left-to-right email', async () => {
+    pageHook.entries = entries(1, 'organization.settings.change');
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    try {
+      const { renderer, unmount } = await mount();
+
+      const texts = renderer.root.findAllByType('Text');
+      const actorText = texts.find(node => node.props.children === 'owner@example.com');
+      // The meta time is the row's only text that keeps the catalog's ` · `
+      // separator shape.
+      const timeText = texts.find(
+        node => typeof node.props.children === 'string' && node.props.children.includes(' · ')
+      );
+      expect(actorText).toBeDefined();
+      expect(timeText).toBeDefined();
+      // The date carries the Arabic month in its own element, so its parts
+      // keep the language's reading order instead of running inside the email
+      // line's direction; the email stays beside it as plain Latin text.
+      expect(timeText?.props.children).toContain('يناير 2026');
+      expect(actorText?.props.children).toBe('owner@example.com');
+      // The reader hears actor and time in one sentence, with the date parts
+      // in the order the catalog writes them.
+      const pressable = renderer.root.findByType('Pressable');
+      expect(pressable.props.accessibilityLabel).toContain('owner@example.com, ');
+      unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 
   it('omits the restating server message on the created organization row', async () => {
@@ -391,8 +460,9 @@ describe('OrganizationAuditLogScreen', () => {
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
     expect(messages).toContain('Organization created');
-    // The actor's meta line carries the time after the actor.
-    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
+    // The actor and the time are separate texts; the actor comes first.
+    expect(messages).toContain('owner@example.com');
+    expect(messages.some(text => text.startsWith('Jan 1, 2026 · 12:00 AM'))).toBe(true);
     // The row keeps the translated event name and drops the server sentence,
     // which only restates that name and would age into a stale one.
     expect(messages).not.toContain('Organization Acme created');

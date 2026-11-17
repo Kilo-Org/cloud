@@ -354,6 +354,10 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
+  # iOS: hold the execution request for the length of a launch. A task that
+  # finishes on another thread releases it mid-launch, and the launch then sends
+  # `maybeEvaluate` to a freed object, which is the background-task launch crash
+  # (expo/expo#51789, expo/expo#47316).
   expo-task-manager@58.0.14: patches/expo-task-manager@58.0.14.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not

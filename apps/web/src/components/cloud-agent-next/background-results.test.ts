@@ -40,11 +40,11 @@ test('agent notices stay inside the collapsed work group', () => {
   const parts = getVisibleAssistantParts(messages[0]?.parts ?? []);
   expect(parts).toHaveLength(1);
   expect(groupAssistantParts(parts, 'live')).toEqual([
-    { type: 'agent-work', parts, summary: '1 tool call' },
+    { type: 'agent-work', parts, summary: 'Agent work' },
   ]);
 });
 
-test('a notice after tool work joins the same group and counts toward the summary', () => {
+test('a notice after tool work joins the same group without counting as a tool call', () => {
   const messages = readKilo2Messages(session, [
     {
       id: 'msg_work',
@@ -69,6 +69,6 @@ test('a notice after tool work joins the same group and counts toward the summar
   const parts = getVisibleAssistantParts(messages.flatMap(message => message.parts));
   expect(parts).toHaveLength(2);
   expect(groupAssistantParts(parts, 'live')).toEqual([
-    { type: 'agent-work', parts, summary: 'Worked for 3s · 2 tool calls' },
+    { type: 'agent-work', parts, summary: 'Worked for 3s · 1 tool call' },
   ]);
 });

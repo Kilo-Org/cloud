@@ -136,7 +136,9 @@ function formatWorkedDuration(durationMs: number): string {
 }
 
 export function summarizeAgentWork(parts: Part[], working = false): string {
-  const tools = parts.filter(isToolPart);
+  const tools = parts.filter(
+    (part): part is ToolPart => isToolPart(part) && readBackgroundResult(part)?.kind !== 'notice'
+  );
   const reasoning = parts.filter(shouldRenderReasoningPart);
   const subtasks = parts.filter(isSubtaskPart);
 

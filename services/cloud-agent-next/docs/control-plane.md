@@ -334,6 +334,12 @@ so a later report changes nothing.
   billing/provider work or physical start/stop.
 - A `prepare` during `stopping` stores the route as `preparing` and returns its view at once. The
   Sandbox DO starts `creating` after `stopped`.
+- Native provider stop interrupts a pending main-process readiness probe for the same allocation.
+  This releases the provider queue for destruction. Physical start, billing and destruction stay
+  serialized. A late probe cannot mark the old allocation running or change its replacement.
+  Stop also cancels queued launches and launches awaiting pre-start work before physical start.
+  The Sandbox DO treats this cancellation as `launch_interrupted`, without a snapshot retry or
+  create-failure diagnostic. The caller that requested the stop owns its completion.
 - On `stopping` or `stopped`, every `ready` route is removed and its session gets `route lost`. A
   session with queued messages calls `prepare` again, which creates a new allocation.
 - A `preparing` route stays across a failed allocation (create error, connect timeout, sandbox gone)

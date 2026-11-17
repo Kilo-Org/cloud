@@ -287,6 +287,13 @@ export function createSecureStorePreference<T>(options: {
     hasPendingWrite: () =>
       requested !== undefined || inFlight !== undefined || asyncWriteTarget !== undefined,
     /**
+     * The choice whose persist-then-apply write is on disk's way, or undefined.
+     * The language follow's restore reads this: `getRequested()` deliberately
+     * keeps reporting the durable value while the write runs, so the only place
+     * the still-unpersisted pick lives is here.
+     */
+    getPendingWriteTarget: (): T | undefined => asyncWriteTarget,
+    /**
      * Persist-then-apply write for callers that must not change memory on a
      * failed disk write (e.g. language apply). Writes disk first; on success
      * updates memory and emits, returning true. On failure shows the existing

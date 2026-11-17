@@ -8,6 +8,7 @@ import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import { type LanguageReturnTarget, writeLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getLanguagePreference,
+  getPendingLanguageWriteTarget,
   type LanguagePreference,
   setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
@@ -51,12 +52,29 @@ function refreshLocalizedNotifications(): void {
   void registerNeedsInputCategories();
 }
 
-/** The login screen's registered draft flush, so a device change it did not ask for persists what it holds. */
+/**
+ * Persist what the running screens hold before a relaunch they did not ask
+ * for. The login screen registers its own flush only on the globe press, so a
+ * device change it never asked for has to persist its typed state directly;
+ * `persistLoginDrafts` refuses an uninitialized or retired attempt on its own,
+ * so calling it unasked is safe. A bridge registered by another screen is
+ * flushed too, because the reload discards the JS context without running
+ * React cleanup.
+ */
 async function flushBeforeReload(): Promise<void> {
+  try {
+    // Loaded here, not at module scope: the login draft module reaches the
+    // native keychain through `lib/auth/secure-store`, and the picker screens
+    // that import this module mock the apply rather than the keychain.
+    const { persistLoginDrafts } = await import('@/lib/login-draft');
+    await persistLoginDrafts();
+  } catch {
+    // A failed convenience flush must not block the language change.
+  }
   try {
     await getLanguagePickerBridge()?.beforeReload?.();
   } catch {
-    // A failed convenience flush must not block the language change.
+    // Same: a screen other than the login one may have registered extra state.
   }
 }
 
@@ -194,11 +212,14 @@ export async function applyDeviceLanguage(
  * Only a same-direction pick is restored: a pick that changes the layout
  * direction writes its preference and reloads the app itself, and switching
  * the catalog in place would paint the new language into the old direction.
+ * The preference read prefers the pick whose write is still in flight, because
+ * `getRequested()` deliberately keeps reporting the durable value while that
+ * write runs — the very window this restore exists for.
  * Returns null when nothing had to be restored, or the catalog failure that
  * kept the pick from loading.
  */
 export async function restorePickedLanguage(): Promise<ApplyLanguageOutcome | null> {
-  const preference = getLanguagePreference();
+  const preference = getPendingLanguageWriteTarget() ?? getLanguagePreference();
   if (
     preference === 'device' ||
     preference === i18n.resolvedLanguage ||

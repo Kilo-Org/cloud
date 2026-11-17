@@ -227,6 +227,37 @@ describe('createSecureStorePreference', () => {
     expect(store.hasPendingWrite()).toBe(false);
   });
 
+  it('surfaces the setAsync pick as the pending write target', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+
+    // The restore of the language follow reads this: the durable value keeps
+    // reading `en` while the write runs, so the pick lives only here.
+    const applying = store.setAsync('es');
+    expect(store.getPendingWriteTarget()).toBe('es');
+    expect(store.getRequested()).toBe('en');
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+    expect(store.getRequested()).toBe('es');
+  });
+
   it('keeps the durable value in getRequested after a failed setAsync write', async () => {
     getItemAsync.mockResolvedValue(null);
     setItemAsync.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('disk refused'));
@@ -244,6 +275,7 @@ describe('createSecureStorePreference', () => {
 
     // The caller rolls its own apply back; memory keeps the durable choice.
     expect(store.getRequested()).toBe('en');
+    expect(store.getPendingWriteTarget()).toBeUndefined();
     expect(store.hasPendingWrite()).toBe(false);
     expect(store.get()).toBe('en');
   });

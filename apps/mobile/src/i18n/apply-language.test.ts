@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   setLanguagePreferenceAsync: vi.fn(),
   preference: 'device' as 'device' | 'es' | 'ar',
   getLanguagePreference: vi.fn(),
+  getPendingWriteTarget: vi.fn(),
+  persistLoginDrafts: vi.fn(),
   writeLanguageReturnTarget: vi.fn(),
   writeDirectionAttemptAsync: vi.fn(),
   readDirectionAttemptAsync: vi.fn(),
@@ -40,7 +42,9 @@ vi.mock('@/i18n/direction-attempt', () => ({
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   setLanguagePreferenceAsync: mocks.setLanguagePreferenceAsync,
   getLanguagePreference: mocks.getLanguagePreference,
+  getPendingLanguageWriteTarget: mocks.getPendingWriteTarget,
 }));
+vi.mock('@/lib/login-draft', () => ({ persistLoginDrafts: mocks.persistLoginDrafts }));
 vi.mock('@/lib/intl-cache', () => ({ prewarmIntl: mocks.prewarmIntl }));
 vi.mock('@/lib/notifications', () => ({
   renameAndroidNotificationChannels: mocks.renameAndroidNotificationChannels,
@@ -229,6 +233,7 @@ describe('restorePickedLanguage', () => {
     mocks.i18nManager.isRTL = false;
     mocks.preference = 'device';
     mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
+    mocks.getPendingWriteTarget.mockReset().mockReturnValue(undefined);
     await i18n.changeLanguage('en');
   });
 
@@ -243,6 +248,18 @@ describe('restorePickedLanguage', () => {
     expect(i18n.resolvedLanguage).toBe('es');
     expect(mocks.renameAndroidNotificationChannels).toHaveBeenCalledTimes(1);
     expect(mocks.registerNeedsInputCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the pick whose write has not landed yet', async () => {
+    // The pick's persist-then-apply write is still on its way, so the durable
+    // preference still reads `device`: only the pending target names the pick.
+    mocks.getPendingWriteTarget.mockReturnValue('es');
+    await i18n.changeLanguage('fr');
+
+    await expect(restorePickedLanguage()).resolves.toEqual({ kind: 'applied-ltr' });
+
+    expect(i18n.resolvedLanguage).toBe('es');
+    expect(mocks.getLanguagePreference).not.toHaveBeenCalled();
   });
 
   it('restores nothing while the preference is the device language', async () => {
@@ -295,6 +312,7 @@ describe('automatic relaunch — login draft flush', () => {
     mocks.preference = 'device';
     mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
     mocks.getLanguagePickerBridge.mockReset().mockReturnValue(null);
+    mocks.persistLoginDrafts.mockReset().mockResolvedValue(undefined);
     await i18n.changeLanguage('en');
   });
 
@@ -302,10 +320,12 @@ describe('automatic relaunch — login draft flush', () => {
     mocks.syncRtl.mockReturnValue(false);
     const flushes: string[] = [];
     const reloadsWhenFlushed: number[] = [];
+    const persistsWhenFlushed: number[] = [];
     mocks.getLanguagePickerBridge.mockReturnValue({
       beforeReload: () => {
         flushes.push('flush');
         reloadsWhenFlushed.push(mocks.reloadAppAsync.mock.calls.length);
+        persistsWhenFlushed.push(mocks.persistLoginDrafts.mock.calls.length);
         return Promise.resolve();
       },
     });
@@ -313,6 +333,10 @@ describe('automatic relaunch — login draft flush', () => {
     await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
 
     expect(flushes).toHaveLength(1);
+    // The direct persist runs first, so the login screen's typed state is
+    // written even when the bridge only carries another screen's extra state.
+    expect(persistsWhenFlushed).toEqual([1]);
+    expect(mocks.persistLoginDrafts).toHaveBeenCalledTimes(1);
     // The flush finished before the reload started: the drafts it writes live
     // in the same JS context the reload discards.
     expect(reloadsWhenFlushed).toEqual([0]);
@@ -338,8 +362,10 @@ describe('automatic relaunch — login draft flush', () => {
     ).resolves.toEqual({ kind: 'restarting-rtl' });
 
     // The manual path runs the flush the picker handed it; flushing the
-    // registered bridge too would persist the same drafts twice.
+    // registered bridge or the login drafts too would persist the same state
+    // twice.
     expect(flushes).toEqual([]);
+    expect(mocks.persistLoginDrafts).not.toHaveBeenCalled();
     expect(manualFlushRan).toBe(true);
   });
 
@@ -351,6 +377,21 @@ describe('automatic relaunch — login draft flush', () => {
 
     await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
 
+    expect(mocks.persistLoginDrafts).toHaveBeenCalledTimes(1);
+    expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the login drafts when no bridge is registered', async () => {
+    // The login screen registers its flush only on the globe press, so with no
+    // picker screen on top the bridge is null exactly when the typed state is
+    // still live.
+    mocks.getLanguagePickerBridge.mockReturnValue(null);
+    mocks.i18nManager.isRTL = false;
+    mocks.syncRtl.mockReturnValue(false);
+
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
+
+    expect(mocks.persistLoginDrafts).toHaveBeenCalledTimes(1);
     expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
   });
 });

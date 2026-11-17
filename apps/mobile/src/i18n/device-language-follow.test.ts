@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   captureException: vi.fn(),
   preference: 'device' as 'device' | 'es',
   writeInFlight: false,
+  pendingWriteTarget: vi.fn(),
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
@@ -19,6 +20,7 @@ vi.mock('@/i18n/apply-language', () => ({
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => mocks.preference,
   hasLanguagePreferenceWriteInFlight: () => mocks.writeInFlight,
+  getPendingLanguageWriteTarget: mocks.pendingWriteTarget,
 }));
 
 /**
@@ -38,6 +40,7 @@ describe('requestDeviceLanguageFollow', () => {
   beforeEach(async () => {
     mocks.preference = 'device';
     mocks.writeInFlight = false;
+    mocks.pendingWriteTarget.mockReset().mockReturnValue(undefined);
     mocks.applyDeviceLanguage.mockReset();
     mocks.applyDeviceLanguage.mockImplementation(async (language: string) => {
       await i18n.changeLanguage(language);
@@ -195,6 +198,29 @@ describe('requestDeviceLanguageFollow', () => {
     // The pick wins over the device language the apply already switched to.
     expect(i18n.resolvedLanguage).toBe('es');
     expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+
+  it('restores the pick whose write is still in flight', async () => {
+    // The person picks a language while the apply runs. The pick's
+    // persist-then-apply write is on disk's way, so the durable read still
+    // says `device` and only the pending target names what to put back.
+    mocks.applyDeviceLanguage.mockImplementation(async (picked: string) => {
+      await i18n.changeLanguage(picked);
+      mocks.writeInFlight = true;
+      mocks.pendingWriteTarget.mockReturnValue('es');
+      return { kind: 'applied-ltr' };
+    });
+    mocks.restorePickedLanguage.mockImplementation(async () => {
+      await i18n.changeLanguage('es');
+      return { kind: 'applied-ltr' };
+    });
+
+    requestDeviceLanguageFollow('fr');
+    await vi.waitFor(() => {
+      expect(mocks.restorePickedLanguage).toHaveBeenCalledTimes(1);
+    });
+
+    expect(i18n.resolvedLanguage).toBe('es');
   });
 
   it('reports a pick whose catalog failed to restore', async () => {

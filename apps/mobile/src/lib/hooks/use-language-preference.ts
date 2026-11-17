@@ -45,6 +45,16 @@ export function hasLanguagePreferenceWriteInFlight(): boolean {
   return store.hasPendingWrite();
 }
 
+/**
+ * The pick whose write is still on disk's way, or undefined. The follow's
+ * restore reads this: `getLanguagePreference()` keeps reporting the durable
+ * value while the write runs, so this is the only place the pending pick
+ * lives.
+ */
+export function getPendingLanguageWriteTarget(): LanguagePreference | undefined {
+  return store.getPendingWriteTarget();
+}
+
 /** Apply and persist a preference; returns false when the disk write failed. */
 export async function setLanguagePreferenceAsync(
   preference: LanguagePreference,

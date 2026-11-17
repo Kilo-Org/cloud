@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
+      "planManagedOnWeb": "Die plan word op die web bestuur.",
+      "seatsManagedOnWeb": "Gebruikersplekke word op die web bestuur.",
+      "autoTopUpManagedOnWeb": "Outomatiese aanvulling word op die web bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"

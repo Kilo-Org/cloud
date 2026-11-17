@@ -3374,6 +3374,9 @@
       "manageOnWeb": "הגדרות חיוב באתר",
       "changePlan": "שינוי תוכנית",
       "buySeats": "רכישת רישיונות",
+      "planManagedOnWeb": "התוכנית מנוהלת באתר.",
+      "seatsManagedOnWeb": "הרישיונות מנוהלים באתר.",
+      "autoTopUpManagedOnWeb": "הטעינה האוטומטית מנוהלת באתר.",
       "setupAutoTopUp": "הגדרת טעינה אוטומטית",
       "manageAutoTopUp": "ניהול טעינה אוטומטית",
       "opensOnWeb": "נפתח באתר"

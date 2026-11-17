@@ -3439,6 +3439,9 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
+      "planManagedOnWeb": "Planas valdomas žiniatinklyje.",
+      "seatsManagedOnWeb": "Vietos valdomos žiniatinklyje.",
+      "autoTopUpManagedOnWeb": "Automatinis papildymas valdomas žiniatinklyje.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"

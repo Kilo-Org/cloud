@@ -3382,6 +3382,9 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
+      "planManagedOnWeb": "Plāns tiek pārvaldīts tīmeklī.",
+      "seatsManagedOnWeb": "Vietas tiek pārvaldītas tīmeklī.",
+      "autoTopUpManagedOnWeb": "Automātiskā papildināšana tiek pārvaldīta tīmeklī.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"

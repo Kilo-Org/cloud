@@ -3405,6 +3405,9 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
+      "planManagedOnWeb": "The plan is managed on the web.",
+      "seatsManagedOnWeb": "Seats are managed on the web.",
+      "autoTopUpManagedOnWeb": "Auto top-up is managed on the web.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"

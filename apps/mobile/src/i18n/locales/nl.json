@@ -3317,6 +3317,9 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
+      "planManagedOnWeb": "Het plan wordt op het web beheerd.",
+      "seatsManagedOnWeb": "Licenties worden op het web beheerd.",
+      "autoTopUpManagedOnWeb": "Automatisch opwaarderen wordt op het web beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"

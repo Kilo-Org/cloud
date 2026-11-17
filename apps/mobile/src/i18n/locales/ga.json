@@ -3496,6 +3496,9 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
+      "planManagedOnWeb": "Bainistítear an plean ar an ngréasán.",
+      "seatsManagedOnWeb": "Bainistítear na suíocháin ar an ngréasán.",
+      "autoTopUpManagedOnWeb": "Bainistítear an breisiú uathoibríoch ar an ngréasán.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"

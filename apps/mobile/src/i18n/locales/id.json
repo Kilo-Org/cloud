@@ -3317,6 +3317,9 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
+      "planManagedOnWeb": "Paket dikelola di web.",
+      "seatsManagedOnWeb": "Lisensi pengguna dikelola di web.",
+      "autoTopUpManagedOnWeb": "Isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"

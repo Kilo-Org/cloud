@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
+      "planManagedOnWeb": "Planen hanteras på webben.",
+      "seatsManagedOnWeb": "Platser hanteras på webben.",
+      "autoTopUpManagedOnWeb": "Automatisk påfyllning hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"

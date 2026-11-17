@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Laskutusasetukset verkossa",
       "changePlan": "Vaihda pakettia",
       "buySeats": "Osta käyttäjäpaikkoja",
+      "planManagedOnWeb": "Pakettia hallitaan verkossa.",
+      "seatsManagedOnWeb": "Käyttäjäpaikkoja hallitaan verkossa.",
+      "autoTopUpManagedOnWeb": "Automaattista täydennystä hallitaan verkossa.",
       "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
       "manageAutoTopUp": "Hallinnoi automaattista täydennystä",
       "opensOnWeb": "Avautuu verkossa"

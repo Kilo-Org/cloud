@@ -10,8 +10,14 @@ import { cn } from '@/lib/utils';
 type ExternalBillingLinkProps = Readonly<{
   /** The web page that performs the change. It does not exist in the app. */
   url: string;
-  /** What the press does, in the same words both shapes show. */
+  /** The control's words: what pressing it does. */
   label: string;
+  /**
+   * The same destination stated as a fact, for the surface that may not draw
+   * the control. It never instructs a purchase and never points anywhere: the
+   * plain text is a status line, not an action.
+   */
+  description: string;
   className?: string;
 }>;
 
@@ -21,16 +27,22 @@ type ExternalBillingLinkProps = Readonly<{
  *
  * Only an iOS build in the US storefront may draw the link
  * (`useCanLinkExternalPurchase`). Every other case — another storefront, an
- * unanswered storefront, Android — prints the same label as plain text with no
- * control to press, because a review guideline forbids the link outside that
- * one storefront and Google Play forbids it everywhere. The label is shown in
- * both shapes, so the surface reads the same and only the affordance differs.
+ * unanswered storefront, Android — draws no control and no call to action,
+ * because a review guideline forbids the link outside that one storefront and
+ * Google Play forbids it everywhere. Those surfaces show `description` instead:
+ * the action label is a purchase call to action wherever it is printed, even
+ * without a link to press.
  */
-export function ExternalBillingLink({ url, label, className }: ExternalBillingLinkProps) {
+export function ExternalBillingLink({
+  url,
+  label,
+  description,
+  className,
+}: ExternalBillingLinkProps) {
   const { t } = useTranslation();
   const canLink = useCanLinkExternalPurchase();
   if (!canLink) {
-    return <Text className={cn('text-sm text-muted-foreground', className)}>{label}</Text>;
+    return <Text className={cn('text-sm text-muted-foreground', className)}>{description}</Text>;
   }
   return (
     <Button

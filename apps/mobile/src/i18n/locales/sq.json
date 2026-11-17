@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
+      "planManagedOnWeb": "Plani menaxhohet në ueb.",
+      "seatsManagedOnWeb": "Vendet menaxhohen në ueb.",
+      "autoTopUpManagedOnWeb": "Rimbushja automatike menaxhohet në ueb.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"

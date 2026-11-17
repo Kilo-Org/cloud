@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
+      "planManagedOnWeb": "Áætluninni er stjórnað á vefnum.",
+      "seatsManagedOnWeb": "Notendasætum er stjórnað á vefnum.",
+      "autoTopUpManagedOnWeb": "Sjálfvirkri áfyllingu er stjórnað á vefnum.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"

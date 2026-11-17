@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
+      "planManagedOnWeb": "Tantanina amin'ny tranonkala ny drafitra.",
+      "seatsManagedOnWeb": "Tantanina amin'ny tranonkala ny toerana.",
+      "autoTopUpManagedOnWeb": "Tantanina amin'ny tranonkala ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"

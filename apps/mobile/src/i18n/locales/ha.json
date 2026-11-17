@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Saitunan biyan kuɗi a yanar gizo",
       "changePlan": "Canza tsari",
       "buySeats": "Sayi gurabe",
+      "planManagedOnWeb": "Ana sarrafa tsari a yanar gizo.",
+      "seatsManagedOnWeb": "Ana sarrafa gurabe a yanar gizo.",
+      "autoTopUpManagedOnWeb": "Ana sarrafa ƙara kuɗi ta atomatik a yanar gizo.",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
       "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
       "opensOnWeb": "Yana buɗewa a yanar gizo"

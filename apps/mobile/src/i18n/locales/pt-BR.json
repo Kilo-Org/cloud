@@ -3380,6 +3380,9 @@
       "manageOnWeb": "Configurações de faturamento na web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar licenças",
+      "planManagedOnWeb": "O plano é gerenciado na web.",
+      "seatsManagedOnWeb": "As licenças são gerenciadas na web.",
+      "autoTopUpManagedOnWeb": "A recarga automática é gerenciada na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gerenciar recarga automática",
       "opensOnWeb": "Abre na web"

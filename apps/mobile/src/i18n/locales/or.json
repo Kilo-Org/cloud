@@ -3325,6 +3325,9 @@
       "manageOnWeb": "ୱେବରେ ବିଲିଂ ସେଟିଂସ୍",
       "changePlan": "ଯୋଜନା ବଦଳାନ୍ତୁ",
       "buySeats": "ସିଟ୍ କିଣନ୍ତୁ",
+      "planManagedOnWeb": "ଯୋଜନା ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
+      "seatsManagedOnWeb": "ସିଟ୍ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
+      "autoTopUpManagedOnWeb": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
       "setupAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ସେଟ୍ ଅପ୍ କରନ୍ତୁ",
       "manageAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ପରିଚାଳନା କରନ୍ତୁ",
       "opensOnWeb": "ୱେବ୍‌ରେ ଖୋଲେ"

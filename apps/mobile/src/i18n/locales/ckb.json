@@ -3325,6 +3325,9 @@
       "manageOnWeb": "ڕێکخستنەکانی پارەدان لە وێب",
       "changePlan": "گۆڕینی پلان",
       "buySeats": "کڕینی شوێن",
+      "planManagedOnWeb": "پلانەکە لە وێب بەڕێوە دەبرێت.",
+      "seatsManagedOnWeb": "شوێنەکان لە وێب بەڕێوە دەبرێن.",
+      "autoTopUpManagedOnWeb": "پڕکردنەوەی خۆکار لە وێب بەڕێوە دەبرێت.",
       "setupAutoTopUp": "ڕێکخستنی پڕکردنەوەی خۆکار",
       "manageAutoTopUp": "بەڕێوەبردنی پڕکردنەوەی خۆکار",
       "opensOnWeb": "لە وێب دەکرێتەوە"

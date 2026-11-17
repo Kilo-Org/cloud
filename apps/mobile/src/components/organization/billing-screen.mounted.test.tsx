@@ -369,14 +369,23 @@ describe('OrganizationBillingScreen change plan placement', () => {
     unmount();
   });
 
-  it('keeps the card copy and prints it as plain text when the storefront rule refuses the link', async () => {
-    // Outside the US storefront nothing links, so the banner has no action.
+  it('states where each setting lives when the storefront rule refuses the link', async () => {
+    // Outside the US storefront nothing links, so the banner has no action and
+    // the card may not carry a purchase call to action either.
     boundary.isTrialExpiredForEnforcement = true;
     platform.linkAllowed = false;
     const { renderer, unmount } = await mount();
 
     expect(bannerAction(renderer)).toBeUndefined();
-    expect(renderer.root.findAllByType('BillingDestinationText' as never)).toHaveLength(3);
+    const statements = renderer.root.findAllByType('BillingDestinationText' as never);
+    expect(statements.map(statement => statement.props.description)).toEqual([
+      'The plan is managed on the web.',
+      'Seats are managed on the web.',
+      'Auto top-up is managed on the web.',
+    ]);
+    // The action labels are not what the refused shape prints: they name a
+    // purchase the storefront may not offer outside the app.
+    expect(statements.some(statement => statement.props.description === 'Buy seats')).toBe(false);
     unmount();
   });
 

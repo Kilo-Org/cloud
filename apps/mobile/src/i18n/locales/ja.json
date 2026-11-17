@@ -3317,6 +3317,9 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
+      "planManagedOnWeb": "プランはWebで管理されています。",
+      "seatsManagedOnWeb": "シート数はWebで管理されています。",
+      "autoTopUpManagedOnWeb": "自動チャージはWebで管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"

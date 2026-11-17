@@ -3382,6 +3382,9 @@
       "manageOnWeb": "Podešavanja naplate na vebu",
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
+      "planManagedOnWeb": "Planom se upravlja na vebu.",
+      "seatsManagedOnWeb": "Mestima se upravlja na vebu.",
+      "autoTopUpManagedOnWeb": "Automatskom dopunom se upravlja na vebu.",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na vebu"

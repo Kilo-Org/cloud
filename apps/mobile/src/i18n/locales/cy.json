@@ -3553,6 +3553,9 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
+      "planManagedOnWeb": "Caiff y cynllun ei reoli ar y we.",
+      "seatsManagedOnWeb": "Caiff y seddau eu rheoli ar y we.",
+      "autoTopUpManagedOnWeb": "Caiff ail-lenwi awtomatig ei reoli ar y we.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"

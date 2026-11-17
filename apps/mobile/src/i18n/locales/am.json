@@ -3325,6 +3325,9 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "planManagedOnWeb": "ዕቅዱ የሚተዳደረው በድር ላይ ነው።",
+      "seatsManagedOnWeb": "የተጠቃሚ ፈቃዶች የሚተዳደሩት በድር ላይ ነው።",
+      "autoTopUpManagedOnWeb": "ራስ-ሰር መሙላት የሚተዳደረው በድር ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"

@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Faktureringsindstillinger på nettet",
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
+      "planManagedOnWeb": "Planen administreres på nettet.",
+      "seatsManagedOnWeb": "Pladser administreres på nettet.",
+      "autoTopUpManagedOnWeb": "Automatisk optankning administreres på nettet.",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
       "opensOnWeb": "Åbner på nettet"

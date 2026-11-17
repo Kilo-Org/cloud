@@ -3439,6 +3439,9 @@
       "manageOnWeb": "Налады аплаты ў вэб-версіі",
       "changePlan": "Змяніць план",
       "buySeats": "Купіць месцы",
+      "planManagedOnWeb": "План кіруецца ў вэб-версіі.",
+      "seatsManagedOnWeb": "Месцы кіруюцца ў вэб-версіі.",
+      "autoTopUpManagedOnWeb": "Аўтапапаўненне кіруецца ў вэб-версіі.",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
       "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"

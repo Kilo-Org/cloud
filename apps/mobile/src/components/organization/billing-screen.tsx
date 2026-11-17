@@ -95,8 +95,8 @@ function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
  * auto top-up exist only on the web, so those controls lead there — a link only
- * on an iOS build in the US storefront, plain text everywhere else, the rule
- * `useCanLinkExternalPurchase` owns.
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen() {
   const { t } = useTranslation();
@@ -330,16 +330,25 @@ export function OrganizationBillingScreen() {
         <View className="gap-2">
           <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
           <View className="gap-3 rounded-lg bg-secondary p-3">
+            {/* Each destination states where the setting lives when this
+                surface may not link: the action labels are purchase calls to
+                action on a storefront that forbids linking out. */}
             {changePlanOnBanner ? null : (
-              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
+              <ExternalBillingLink
+                url={subscriptionsUrl}
+                label={changePlanLabel}
+                description={t('organization.billing.planManagedOnWeb')}
+              />
             )}
             <ExternalBillingLink
               url={`${subscriptionsUrl}/seats`}
               label={t('organization.billing.buySeats')}
+              description={t('organization.billing.seatsManagedOnWeb')}
             />
             <ExternalBillingLink
               url={organizationBillingUrl(organizationId)}
               label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+              description={t('organization.billing.autoTopUpManagedOnWeb')}
             />
           </View>
         </View>

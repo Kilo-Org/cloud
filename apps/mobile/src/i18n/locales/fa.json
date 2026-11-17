@@ -3325,6 +3325,9 @@
       "manageOnWeb": "تنظیمات صورت‌حساب در وب",
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
+      "planManagedOnWeb": "طرح در وب مدیریت می‌شود.",
+      "seatsManagedOnWeb": "مجوزهای کاربری در وب مدیریت می‌شوند.",
+      "autoTopUpManagedOnWeb": "شارژ خودکار در وب مدیریت می‌شود.",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
       "opensOnWeb": "در وب باز می‌شود"

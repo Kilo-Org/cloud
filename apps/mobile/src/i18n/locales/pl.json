@@ -3431,6 +3431,9 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
+      "planManagedOnWeb": "Plan jest zarządzany w wersji internetowej.",
+      "seatsManagedOnWeb": "Miejsca są zarządzane w wersji internetowej.",
+      "autoTopUpManagedOnWeb": "Automatyczne doładowanie jest zarządzane w wersji internetowej.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"

@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Paramèt faktirasyon sou entènèt",
       "changePlan": "Chanje plan",
       "buySeats": "Achte plas",
+      "planManagedOnWeb": "Se sou entènèt yo jere plan an.",
+      "seatsManagedOnWeb": "Se sou entènèt yo jere plas yo.",
+      "autoTopUpManagedOnWeb": "Se sou entènèt yo jere rechaj otomatik la.",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
       "opensOnWeb": "Ap louvri sou entènèt la"

@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Izilungiselelo zokukhokha kuwebhu",
       "changePlan": "Shintsha uhlelo",
       "buySeats": "Thenga izikhala",
+      "planManagedOnWeb": "Uhlelo luphathwa kuwebhu.",
+      "seatsManagedOnWeb": "Izikhala ziphathwa kuwebhu.",
+      "autoTopUpManagedOnWeb": "Ukugcwalisa okuzenzakalelayo kuphathwa kuwebhu.",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
       "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
       "opensOnWeb": "Kuvuleka kuwebhu"

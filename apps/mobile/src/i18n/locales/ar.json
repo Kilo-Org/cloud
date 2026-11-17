@@ -3545,6 +3545,9 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "planManagedOnWeb": "تتم إدارة الخطة على الويب.",
+      "seatsManagedOnWeb": "تتم إدارة المقاعد على الويب.",
+      "autoTopUpManagedOnWeb": "تتم إدارة الشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"

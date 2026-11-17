@@ -3317,6 +3317,9 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
+      "planManagedOnWeb": "प्लान वेब पर प्रबंधित किया जाता है।",
+      "seatsManagedOnWeb": "सीटें वेब पर प्रबंधित की जाती हैं।",
+      "autoTopUpManagedOnWeb": "ऑटो टॉप-अप वेब पर प्रबंधित किया जाता है।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"

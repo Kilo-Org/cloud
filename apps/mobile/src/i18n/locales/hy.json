@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Վճարումների կարգավորումները վեբում",
       "changePlan": "Փոխել պլանը",
       "buySeats": "Գնել տեղեր",
+      "planManagedOnWeb": "Պլանը կառավարվում է վեբում։",
+      "seatsManagedOnWeb": "Տեղերը կառավարվում են վեբում։",
+      "autoTopUpManagedOnWeb": "Ավտոմատ համալրումը կառավարվում է վեբում։",
       "setupAutoTopUp": "Կարգավորել ավտոմատ համալրումը",
       "manageAutoTopUp": "Կառավարել ավտոմատ համալրումը",
       "opensOnWeb": "Բացվում է վեբում"

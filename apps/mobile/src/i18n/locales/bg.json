@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Настройки на плащанията в уеб",
       "changePlan": "Смени плана",
       "buySeats": "Купи места",
+      "planManagedOnWeb": "Планът се управлява в уеб.",
+      "seatsManagedOnWeb": "Местата се управляват в уеб.",
+      "autoTopUpManagedOnWeb": "Автоматичното зареждане се управлява в уеб.",
       "setupAutoTopUp": "Настрой автоматично зареждане",
       "manageAutoTopUp": "Управлявай автоматично зареждане",
       "opensOnWeb": "Отваря се в уеб версията"

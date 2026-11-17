@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
+      "planManagedOnWeb": "Plan vebdə idarə olunur.",
+      "seatsManagedOnWeb": "İstifadəçi yerləri vebdə idarə olunur.",
+      "autoTopUpManagedOnWeb": "Avtomatik artırma vebdə idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"

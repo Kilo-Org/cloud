@@ -3317,6 +3317,9 @@
       "manageOnWeb": "Cài đặt thanh toán trên web",
       "changePlan": "Đổi gói",
       "buySeats": "Mua suất sử dụng",
+      "planManagedOnWeb": "Gói được quản lý trên web.",
+      "seatsManagedOnWeb": "Suất sử dụng được quản lý trên web.",
+      "autoTopUpManagedOnWeb": "Tự động nạp tiền được quản lý trên web.",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
       "opensOnWeb": "Mở trên web"

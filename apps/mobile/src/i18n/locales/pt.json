@@ -3388,6 +3388,9 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
+      "planManagedOnWeb": "O plano é gerido na Web.",
+      "seatsManagedOnWeb": "Os lugares são geridos na Web.",
+      "autoTopUpManagedOnWeb": "O carregamento automático é gerido na Web.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"

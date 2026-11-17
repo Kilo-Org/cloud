@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Mga setting ng pagsingil sa web",
       "changePlan": "Palitan ang plano",
       "buySeats": "Bumili ng mga puwesto",
+      "planManagedOnWeb": "Ang plano ay pinamamahalaan sa web.",
+      "seatsManagedOnWeb": "Ang mga puwesto ay pinamamahalaan sa web.",
+      "autoTopUpManagedOnWeb": "Ang auto top-up ay pinamamahalaan sa web.",
       "setupAutoTopUp": "I-set up ang auto top-up",
       "manageAutoTopUp": "Pamahalaan ang auto top-up",
       "opensOnWeb": "Bubuksan sa web"

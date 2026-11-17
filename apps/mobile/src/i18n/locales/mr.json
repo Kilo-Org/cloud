@@ -3325,6 +3325,9 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
+      "planManagedOnWeb": "प्लॅन वेबवर व्यवस्थापित केला जातो.",
+      "seatsManagedOnWeb": "जागा वेबवर व्यवस्थापित केल्या जातात.",
+      "autoTopUpManagedOnWeb": "ऑटो टॉप-अप वेबवर व्यवस्थापित केले जाते.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"

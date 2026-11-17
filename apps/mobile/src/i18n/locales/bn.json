@@ -3325,6 +3325,9 @@
       "manageOnWeb": "ওয়েবে বিলিং সেটিংস",
       "changePlan": "প্ল্যান পরিবর্তন করুন",
       "buySeats": "সিট কিনুন",
+      "planManagedOnWeb": "প্ল্যান ওয়েবে পরিচালিত হয়।",
+      "seatsManagedOnWeb": "সিট ওয়েবে পরিচালিত হয়।",
+      "autoTopUpManagedOnWeb": "অটো টপ-আপ ওয়েবে পরিচালিত হয়।",
       "setupAutoTopUp": "অটো টপ-আপ সেট আপ করুন",
       "manageAutoTopUp": "অটো টপ-আপ পরিচালনা করুন",
       "opensOnWeb": "ওয়েবে খোলে"

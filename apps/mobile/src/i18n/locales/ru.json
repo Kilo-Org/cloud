@@ -3431,6 +3431,9 @@
       "manageOnWeb": "Настройки оплаты в веб-версии",
       "changePlan": "Сменить план",
       "buySeats": "Купить места",
+      "planManagedOnWeb": "План управляется в веб-версии.",
+      "seatsManagedOnWeb": "Места управляются в веб-версии.",
+      "autoTopUpManagedOnWeb": "Автопополнение управляется в веб-версии.",
       "setupAutoTopUp": "Настроить автопополнение",
       "manageAutoTopUp": "Управлять автопополнением",
       "opensOnWeb": "Открывается в браузере"

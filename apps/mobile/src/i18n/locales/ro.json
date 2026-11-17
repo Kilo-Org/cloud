@@ -3382,6 +3382,9 @@
       "manageOnWeb": "Setările de facturare pe web",
       "changePlan": "Schimbă planul",
       "buySeats": "Cumpără locuri",
+      "planManagedOnWeb": "Planul este gestionat pe web.",
+      "seatsManagedOnWeb": "Locurile sunt gestionate pe web.",
+      "autoTopUpManagedOnWeb": "Reîncărcarea automată este gestionată pe web.",
       "setupAutoTopUp": "Configurează reîncărcarea automată",
       "manageAutoTopUp": "Gestionează reîncărcarea automată",
       "opensOnWeb": "Se deschide pe web"

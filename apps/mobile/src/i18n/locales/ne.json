@@ -3325,6 +3325,9 @@
       "manageOnWeb": "वेबमा बिलिङ सेटिङहरू",
       "changePlan": "प्लान बदल्नुहोस्",
       "buySeats": "सिटहरू किन्नुहोस्",
+      "planManagedOnWeb": "प्लान वेबमा व्यवस्थापन गरिन्छ।",
+      "seatsManagedOnWeb": "सिटहरू वेबमा व्यवस्थापन गरिन्छन्।",
+      "autoTopUpManagedOnWeb": "स्वतः टप-अप वेबमा व्यवस्थापन गरिन्छ।",
       "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
       "manageAutoTopUp": "स्वतः टप-अप व्यवस्थापन गर्नुहोस्",
       "opensOnWeb": "वेबमा खुल्छ"

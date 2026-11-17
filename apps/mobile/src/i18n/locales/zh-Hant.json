@@ -3317,6 +3317,9 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
+      "planManagedOnWeb": "套餐是在網頁版上管理。",
+      "seatsManagedOnWeb": "席次是在網頁版上管理。",
+      "autoTopUpManagedOnWeb": "自動儲值是在網頁版上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"

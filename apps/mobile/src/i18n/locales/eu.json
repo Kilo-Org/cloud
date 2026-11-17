@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
+      "planManagedOnWeb": "Plana webean kudeatzen da.",
+      "seatsManagedOnWeb": "Lizentziak webean kudeatzen dira.",
+      "autoTopUpManagedOnWeb": "Birkarga automatikoa webean kudeatzen da.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"

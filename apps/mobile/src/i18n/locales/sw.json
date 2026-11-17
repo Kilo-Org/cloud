@@ -3325,6 +3325,9 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
+      "planManagedOnWeb": "Mpango unasimamiwa kwenye wavuti.",
+      "seatsManagedOnWeb": "Nafasi zinasimamiwa kwenye wavuti.",
+      "autoTopUpManagedOnWeb": "Kuongeza salio kiotomatiki kunasimamiwa kwenye wavuti.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"

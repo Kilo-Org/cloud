@@ -4,22 +4,27 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { MarkdownText } from '@/components/agents/markdown-text';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
-import { changelogNotesArePending, splitChangelogSections } from './changelog-sections';
+import {
+  changelogNotesArePending,
+  changelogSections,
+  type ChangelogSection,
+} from './changelog-sections';
 
 /**
- * The release notes the app ships with. `CHANGELOG.md` is inlined into the
- * bundle as a string by babel-plugin-inline-import. The newest section here is
- * the release before this build: the Release workflow writes a build's section
- * after its submission lands, so the bytes this build compiled cannot carry
- * their own entry (it arrives in the next build's bundle).
+ * The release notes the app ships with, as a reader sees them. `CHANGELOG.md` is
+ * inlined into the bundle as a string by babel-plugin-inline-import, and
+ * `changelogSections` drops the file's maintainer parts and turns each commit
+ * subject into a sentence. The newest section here is the release before this
+ * build: the Release workflow writes a build's section after its submission
+ * lands, so the bytes this build compiled cannot carry their own entry (it
+ * arrives in the next build's bundle).
  */
-const CHANGELOG_SECTIONS = splitChangelogSections(changelog);
+const CHANGELOG_SECTIONS = changelogSections(changelog);
 
 /**
  * Whether the bundled sections stop short of the running build's version.
@@ -35,13 +40,31 @@ const listContentContainerStyle = {
   paddingBottom: 40,
 } satisfies ViewStyle;
 
-const keyExtractor = (_section: string, index: number) => String(index);
+const keyExtractor = (_section: ChangelogSection, index: number) => String(index);
+
+function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
+  return (
+    <View className="gap-2 pb-6">
+      {section.version === null ? null : (
+        <Text variant="h4" className="pt-2">
+          {section.version}
+        </Text>
+      )}
+      {section.notes.map(note => (
+        <View key={note} className="flex-row gap-2">
+          <Text className="text-sm text-muted-foreground">•</Text>
+          <Text className="flex-1 text-sm text-muted-foreground">{note}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export function ChangelogScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => <MarkdownText value={item} />,
+    ({ item }: ListRenderItemInfo<ChangelogSection>) => <ReleaseSection section={item} />,
     []
   );
 

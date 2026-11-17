@@ -3439,6 +3439,9 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
+      "planManagedOnWeb": "Plán se spravuje na webu.",
+      "seatsManagedOnWeb": "Uživatelská místa se spravují na webu.",
+      "autoTopUpManagedOnWeb": "Automatické dobití se spravuje na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"

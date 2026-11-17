@@ -3382,6 +3382,9 @@
       "manageOnWeb": "Configuració de la facturació al web",
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
+      "planManagedOnWeb": "El pla es gestiona al web.",
+      "seatsManagedOnWeb": "Les llicències es gestionen al web.",
+      "autoTopUpManagedOnWeb": "La recàrrega automàtica es gestiona al web.",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "opensOnWeb": "S'obre al web"

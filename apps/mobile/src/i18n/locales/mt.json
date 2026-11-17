@@ -3496,6 +3496,9 @@
       "manageOnWeb": "Issettjar tal-ħlasijiet fuq il-web",
       "changePlan": "Ibdel il-pjan",
       "buySeats": "Ixtri postijiet",
+      "planManagedOnWeb": "Il-pjan jiġi ġestit fuq il-web.",
+      "seatsManagedOnWeb": "Il-postijiet jiġu ġestiti fuq il-web.",
+      "autoTopUpManagedOnWeb": "Ir-rikarika awtomatika tiġi ġestita fuq il-web.",
       "setupAutoTopUp": "Issettja r-rikarika awtomatika",
       "manageAutoTopUp": "Immaniġġja r-rikarika awtomatika",
       "opensOnWeb": "Jinfetaħ fuq il-web"

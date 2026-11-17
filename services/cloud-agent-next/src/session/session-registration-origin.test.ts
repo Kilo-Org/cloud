@@ -42,6 +42,63 @@ describe('isEligibleFirstWorktreeSession', () => {
     ).toBe(true);
   });
 
+  it('admits an Agent Manager create with no initial turn', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        ctx
+      )
+    ).toBe(true);
+  });
+
+  it('requires a prompt for a browser create', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'browser',
+            createdOnPlatform: 'cloud-agent-web',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+
+  it('requires a prompt for an authenticated child create', () => {
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          parentCloudAgentSessionId: parentSessionId,
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        {
+          ...ctx,
+          cloudAgentAuthority: {
+            version: 1 as const,
+            ownerId: 'usr_test',
+            parentSessionId,
+            organizationId: null,
+            authorizationId: '12345678-1234-4234-8234-123456789abc',
+            expiresAt: 1_800_000_000,
+          },
+        }
+      )
+    ).toBe(false);
+  });
+
   it('admits a server-marked clone-only continuation create', () => {
     expect(
       isEligibleFirstWorktreeSession(
@@ -126,6 +183,52 @@ describe('isEligibleFirstWorktreeSession', () => {
         ctx
       )
     ).toBe(false);
+  });
+});
+
+describe('stacked agent workspace creation', () => {
+  const input: Parameters<typeof isEligibleFirstWorktreeSession>[0] = {
+    agent: { model: 'kilo/test-model', mode: 'code' },
+    repository: { type: 'github', repo: 'acme/widgets' },
+    initialTurn: { type: 'prompt', prompt: 'Implement the next stack layer' },
+    parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+    parentCloudAgentSessionId: 'workspace_parent',
+    options: {
+      createdOnPlatform: 'cloud-agent',
+      operationKey: '22222222-2222-4222-8222-222222222222',
+    },
+  };
+  const context = {
+    userId: 'user',
+    authToken: 'fixture',
+    cloudAgentAuthority: { parentSessionId: 'workspace_parent' },
+  } as Parameters<typeof isEligibleFirstWorktreeSession>[1];
+
+  it('registers a workspace for an authorized stacked launch', () => {
+    expect(isEligibleFirstWorktreeSession(input, context)).toBe(true);
+  });
+  it('does not trust a parent link without scoped authority', () => {
+    expect(
+      isEligibleFirstWorktreeSession(input, { ...context, cloudAgentAuthority: undefined })
+    ).toBe(false);
+    expect(
+      isEligibleFirstWorktreeSession(
+        { ...input, parentCloudAgentSessionId: 'workspace_other' },
+        context
+      )
+    ).toBe(false);
+  });
+  it('registers an independent worker workspace for an orchestrator', () => {
+    expect(isEligibleFirstWorktreeSession({ ...input, parentWorktreeId: undefined }, context)).toBe(
+      true
+    );
+  });
+  it('requires the creation key and initial turn', () => {
+    expect(isEligibleFirstWorktreeSession({ ...input, options: undefined }, context)).toBe(false);
+    expect(isEligibleFirstWorktreeSession({ ...input, initialTurn: undefined }, context)).toBe(
+      false
+    );
+    expect(isEligibleFirstWorktreeSession(input, { ...context, botId: 'bot' })).toBe(false);
   });
 });
 

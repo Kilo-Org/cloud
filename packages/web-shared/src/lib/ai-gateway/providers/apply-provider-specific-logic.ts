@@ -2,7 +2,6 @@ import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
-  isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
@@ -13,6 +12,7 @@ import {
   applyMistralModelSettings,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import {
   AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
   isAutoSmallFreeModel,
@@ -20,6 +20,10 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import {
+  applyOpenAiModelSettings,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -72,10 +76,6 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
   const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
@@ -156,15 +156,22 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
 }
 
 /**
- * Claude goes to Anthropic directly only for non-trial enterprise
- * organizations; everyone else is served by the other Claude providers.
+ * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
+ * non-trial enterprise organizations; everyone else is served by the other
+ * providers of the model.
  */
 export function getIgnoredProviders(
   requestedModel: string,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ): string[] {
-  if (!isAnthropicProviderAllowed && isClaudeModel(requestedModel)) {
+  if (isNonTrialEnterprise) {
+    return [];
+  }
+  if (isClaudeModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  if (isOpenAiModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']];
   }
   return [];
 }
@@ -186,19 +193,17 @@ export function applyPreferredProvider(
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
     | GatewayMessagesRequest,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ) {
   const preferredProviderOrder = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     requestedModel
   );
-  const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
+  const ignoredProviders = getIgnoredProviders(requestedModel, isNonTrialEnterprise);
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
-  const provider = isOpenRouterProviderConfig(requestToMutate.provider)
-    ? requestToMutate.provider
-    : {};
+  const provider = isRecord(requestToMutate.provider) ? requestToMutate.provider : {};
   if (preferredProviderOrder.length > 0 && !provider.order) {
     console.debug(
       `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
@@ -387,6 +392,10 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
+  if (isOpenAiModel(requestedModel)) {
+    applyOpenAiModelSettings(requestToMutate);
+  }
+
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
   if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     applyPreferredProvider(
@@ -416,11 +425,12 @@ export async function applyProviderSpecificLogic(
   if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
+    // The inference region pins only a route Kilo pays for; a user's own key is exempt.
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
       usesUserGatewayKey ? null : userByok,
-      dataRegion
+      userByok === null ? dataRegion : null
     );
   }
 

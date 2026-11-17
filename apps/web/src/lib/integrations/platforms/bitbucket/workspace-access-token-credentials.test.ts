@@ -1162,4 +1162,29 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         .where(eq(platform_integrations.owned_by_organization_id, organization.id))
     ).resolves.toEqual([]);
   });
+
+  it('rejects an organization owner whose block timestamp is set before sending the credential', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Timestamp Owner Organization', actor.id, 0);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, actor.id));
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(
+      connectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: actor.id,
+        accessToken: ACCESS_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(
+      db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organization.id))
+    ).resolves.toEqual([]);
+  });
 });

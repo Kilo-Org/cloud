@@ -37,6 +37,7 @@ export type StreamEventType =
   | 'preparing' // lazy workspace preparation step progress
   | 'cloud.status' // cloud infrastructure status
   | 'cloud.worktree.changes.ready'
+  | 'cloud.workspace.artifacts.changed'
   | 'cloud.message.queued' // user message accepted into pending queue
   | 'cloud.message.sent' // queued user message delivered to Kilo
   | 'cloud.message.completed' // accepted user message completed execution
@@ -112,6 +113,8 @@ export type StreamFilters = {
   startTime?: number;
   /** Only return events at or before this timestamp (Unix ms, inclusive) */
   endTime?: number;
+  /** `preview` bounds completed tool bodies in historical replay; live events stay complete. */
+  toolDisplay?: 'preview';
 };
 
 /**

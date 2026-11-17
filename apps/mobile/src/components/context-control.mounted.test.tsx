@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
+import { createElement, type ElementType, type ReactNode, useEffect } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import '@/i18n';
 import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -52,6 +53,23 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+const pushMock = vi.hoisted(() => vi.fn());
+// The picker opener registers its press-burst reset through `useFocusEffect`.
+// Collecting the registered effects lets one case prove the guard really holds
+// a second press back inside a burst and really releases it on a return.
+type FocusEffect = () => (() => void) | undefined;
+const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: pushMock, back: vi.fn() }),
+  // The real hook runs the effect on focus; this one runs it on mount and on
+  // every new effect identity, like the hook the screen sees.
+  useFocusEffect: (effect: FocusEffect) => {
+    if (!focusEffects.includes(effect)) {
+      focusEffects.push(effect);
+    }
+    useEffect(() => effect(), [effect]);
+  },
+}));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
@@ -99,30 +117,25 @@ const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let persisted: string | null = null;
-let rerender: (() => void) | undefined = undefined;
 
 function Surface({
   scope,
   value,
   onSelectionChange,
   variant,
+  failurePlacement,
 }: {
   scope?: ContextDisplayScope;
   value?: string | null;
   onSelectionChange?: (organizationId: string | null) => void;
   variant?: 'inline' | 'field';
+  failurePlacement?: 'rows' | 'row' | 'none';
 }) {
   const { organizationId: id } = useOrganization();
-  const [, setVersion] = useState(0);
-  useEffect(() => {
-    rerender = () => {
-      setVersion(version => version + 1);
-    };
-  }, []);
   return createElement(
     'GlobalScope',
     { id },
-    createElement(ContextControl, { scope, value, onSelectionChange, variant })
+    createElement(ContextControl, { scope, value, onSelectionChange, variant, failurePlacement })
   );
 }
 
@@ -132,6 +145,7 @@ async function mount(
     value?: string | null;
     onSelectionChange?: (organizationId: string | null) => void;
     variant?: 'inline' | 'field';
+    failurePlacement?: 'rows' | 'row' | 'none';
   } = {}
 ) {
   const result = await renderWithProviders(createElement(Surface, props), {
@@ -153,95 +167,74 @@ function retry(ui: Mounted) {
   return ui.renderer.root.findByProps({ accessibilityLabel: 'Retry' });
 }
 
-async function press(node: ReactTestInstance) {
+/** Every registered effect runs again, as a press right after a return would. */
+async function regainFocus() {
+  await act(() => {
+    for (const effect of focusEffects) {
+      effect();
+    }
+  });
+}
+
+/** One press with no focus change first: both presses land in the same burst. */
+async function pressWithoutReturn(node: ReactTestInstance) {
   const onPress = node.props.onPress as () => void;
   await act(() => {
     onPress();
   });
 }
 
-/** The selected state of an account action button, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (
-    typeof state !== 'object' ||
-    state === null ||
-    !('selected' in state) ||
-    typeof state.selected !== 'boolean'
-  ) {
-    return undefined;
+async function press(node: ReactTestInstance) {
+  await regainFocus();
+  await pressWithoutReturn(node);
+}
+
+/** The bridge the press handed the picker route, once the route was pushed. */
+function pickerBridge() {
+  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (bridge === undefined) {
+    throw new Error('the account picker route was not handed a bridge');
   }
-  return state.selected;
+  return bridge;
 }
 
-/** The open sheet's account action buttons, in option order. */
-function rows(ui: Mounted) {
-  return ui.renderer.root
-    .findAll(
-      node =>
-        node.type === Pressable &&
-        node.props.accessibilityRole === 'button' &&
-        selectedState(node) !== undefined
-    )
-    .map(node => {
-      const selected = selectedState(node);
-      if (selected === undefined) {
-        throw new Error('Account action button is missing its selected state');
-      }
-      const checks = node.findAll(child => child.type === Check);
-      return {
-        label: node.props.accessibilityLabel as string,
-        role: node.props.accessibilityRole as string,
-        selected,
-        divider:
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('border-hair-soft'),
-        check: checks.length > 0,
-        checkColor: checks[0]?.props.color as string | undefined,
-      };
-    });
+/** The account rows the route would render, in option order. */
+function rows() {
+  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (bridge === undefined) {
+    return [];
+  }
+  return bridge.options.map((label, index) => ({ label, selected: bridge.currentIndex === index }));
 }
 
-function accountRow(ui: Mounted, label: string) {
-  return ui.renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessibilityLabel === label &&
-      node.props.accessibilityRole === 'button' &&
-      selectedState(node) !== undefined
-  );
+function accountRow(label: string) {
+  const index = pickerBridge().options.indexOf(label);
+  if (index === -1) {
+    throw new Error(`${label} is not one of the picker's rows`);
+  }
+  return index;
 }
 
-/** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
-function backdrop(ui: Mounted) {
-  return ui.renderer.root.find(node => (node.type as string) === 'BottomSheet');
-}
-
-/** The Cancel row of the open sheet: a plain button with no radio state. */
-function cancelRow(ui: Mounted) {
-  return ui.renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessibilityRole === 'button' &&
-      node.props.accessibilityLabel === 'Cancel' &&
-      node.props.accessibilityHint === undefined
-  );
-}
-
+/** Pressing the control opens the shared picker route with these rows. */
 async function openSheet(ui: Mounted) {
   await press(picker(ui));
 }
 
-async function chooseRow(ui: Mounted, label: string) {
-  await press(accountRow(ui, label));
+async function chooseRow(_ui: Mounted, label: string) {
+  const bridge = pickerBridge();
+  await act(() => {
+    bridge.onSelect(accountRow(label));
+  });
 }
 
 beforeEach(() => {
   auth.token = 'token';
   persisted = null;
-  rerender = undefined;
   platform.OS = 'android';
   appearance.colors = { ...DARK_COLORS };
+  contextPickerSlot.clearAll();
+  pushMock.mockReset();
+  focusEffects.length = 0;
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
@@ -304,10 +297,6 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { choice: 'Personal', expected: null },
     { choice: name, expected: 'org-a' },
-    // The stored organization is missing from the list, so the provider
-    // recovers to the first listed membership before the sheet opens; a
-    // Cancel is then a plain dismissal of that recovered scope.
-    { choice: 'Cancel', expected: 'org-a' },
   ])(
     'applies the picked account $choice without an implicit reset',
     async ({ choice, expected }) => {
@@ -315,45 +304,53 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
       await openSheet(ui);
-      expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
-      expect(texts(ui)).toContain('Cancel');
-      await press(choice === 'Cancel' ? cancelRow(ui) : accountRow(ui, choice));
+      expect(pushMock).toHaveBeenCalledWith('/(app)/context-picker');
+      expect(rows().map(row => row.label)).toEqual(['Personal', name]);
+      await chooseRow(ui, choice);
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
 
-  it('dismisses the sheet without changing the scope', async () => {
+  it('opens the picker once for two presses in one burst, and again after a return', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    // Two presses with no return between them are one burst: the second would
+    // stack a second identical picker, so the reader pays two Back presses.
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith('/(app)/context-picker');
+    // Returning to the screen ends the burst, so the next press navigates.
+    await regainFocus();
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the account unchanged when the picker is dismissed without a pick', async () => {
     storage.read.mockResolvedValue('org-missing');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     // The stored organization is missing from the list, so the provider has
-    // already recovered to the first listed membership before the sheet opens.
+    // already recovered to the first listed membership before the picker opens.
     await waitFor(
       () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
     );
     await openSheet(ui);
-    // The native sheet's dismiss path, not a row: the scope stays as it was.
-    await act(() => {
-      (backdrop(ui).props.onClose as () => void)();
-    });
-    expect(rows(ui)).toHaveLength(0);
+    // The route owns its own dismissal (Done, Android Back, the sheet gesture):
+    // none of them reaches the caller, so nothing here changes the scope.
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
-  it('exposes account buttons with the current selection state', async () => {
+  it('marks the current account in the rows the picker route receives', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
-    const opened = rows(ui);
+    const opened = rows();
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
     expect(opened.map(row => row.selected)).toEqual([false, true]);
-    expect(opened.map(row => row.role)).toEqual(['button', 'button']);
-    // Rows divide themselves only: the full rule that closes the list belongs
-    // to the dismiss row's area, not to the last account.
-    expect(opened.map(row => row.divider)).toEqual([true, false]);
-    expect(opened.map(row => row.check)).toEqual([false, true]);
-    expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });
 
   it("names the caller's account while the active one differs, and a pick still switches the active one", async () => {
@@ -365,7 +362,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // so the control must not name org-a.
     expect(picker(ui).props.accessibilityLabel).toBe('Personal');
     await openSheet(ui);
-    expect(rows(ui).map(row => row.selected)).toEqual([true, false]);
+    expect(rows().map(row => row.selected)).toEqual([true, false]);
     await chooseRow(ui, name);
     expect(onSelectionChange).toHaveBeenCalledWith('org-a');
   });
@@ -394,9 +391,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
       await openSheet(ui);
-      expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+      expect(rows().map(row => row.label)).toEqual(['Personal', name]);
       expect(
-        rows(ui)
+        rows()
           .filter(row => row.selected)
           .map(row => row.label)
       ).toEqual([selected]);
@@ -408,26 +405,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
-    expect(
-      rows(ui).map(row => ({ label: row.label, selected: row.selected, check: row.check }))
-    ).toEqual([{ label: 'Personal', selected: true, check: true }]);
-    expect(texts(ui)).toContain('Cancel');
-  });
-
-  it('paints the current-account check with the active theme colors', async () => {
-    storage.read.mockResolvedValue('org-a');
-    const ui = await mount();
-    await waitFor(() => !picker(ui).props.disabled);
-    await openSheet(ui);
-    expect(rows(ui)[1]?.checkColor).toBe(DARK_COLORS.primary);
-
-    // Switching the active palette and re-rendering must change what the sheet
-    // paints; the picker cannot be hardcoding the dark tokens.
-    appearance.colors = { ...LIGHT_COLORS };
-    await act(() => {
-      rerender?.();
-    });
-    expect(rows(ui)[1]?.checkColor).toBe(LIGHT_COLORS.primary);
+    expect(rows()).toEqual([{ label: 'Personal', selected: true }]);
   });
 
   it('keeps the mocked palettes mirroring the generated theme tokens', () => {
@@ -459,7 +437,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     );
     expect(texts(ui)).not.toContain('Organization unavailable');
     await openSheet(ui);
-    expect(rows(ui).map(row => row.label)).toEqual(['Personal']);
+    expect(rows().map(row => row.label)).toEqual(['Personal']);
   });
 
   it.each([false, true])('retries only the failed name query, read-only=%s', async readOnly => {
@@ -512,6 +490,85 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     });
     await waitFor(() => !texts(ui).includes('Retry'));
     expect(texts(ui)).toContain(name);
+  });
+
+  it('leaves the account-list failure to the surface that draws it, never adding a row', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValue(new Error('offline'));
+    const ui = await mount({ failurePlacement: 'none' });
+    // Home draws this failure and its Retry in its live-session card, and both
+    // Retry actions would refetch the same query. Two rows stacked under a
+    // fixed header's single row made that header taller by exactly their height,
+    // so the body moved down while the list failed and back up on recovery.
+    await waitFor(() => ui.renderer.root.findAll(node => node.type === Text).length === 1);
+    expect(texts(ui)).not.toContain("Couldn't load your organizations");
+    expect(texts(ui)).not.toContain('Retry');
+    // The control gives up the failure block only: it still names an account and
+    // stays the same single-row button.
+    expect(picker(ui).props.accessibilityRole).toBe('button');
+    expect(picker(ui).props.accessibilityLabel).toEqual(expect.any(String));
+  });
+
+  it('keeps the account-list failure inside its one row, and a press retries', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(orgs);
+    const ui = await mount({ failurePlacement: 'row' });
+    // The personal scope has no other recovery for this query, so the row itself
+    // becomes it: the label is the message and the press refetches the list.
+    await waitFor(
+      () =>
+        ui.renderer.root.findAll(
+          node =>
+            node.type === Pressable &&
+            node.props.accessibilityLabel === "Couldn't load your organizations"
+        ).length === 1
+    );
+    const failureRow = ui.renderer.root.findAll(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityLabel === "Couldn't load your organizations"
+    );
+    // Still one row: the message is the label, and there is no message line, no
+    // second Retry row, and no account picker chevron beside it.
+    expect(texts(ui)).toEqual(["Couldn't load your organizations"]);
+    expect(ui.renderer.root.findAll(node => node.type === Check)).toHaveLength(0);
+    expect(failureRow[0]?.props.accessibilityRole).toBe('button');
+    await press(failureRow[0] as ReactTestInstance);
+    // The retry reaches the list, and the control returns to naming the account
+    // with the picker it has on every healthy frame.
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain("Couldn't load your organizations");
+    expect(picker(ui).props.accessibilityHint).toBe('Select account');
+  });
+
+  it('keeps the picker on a failed refetch that still has cached memberships', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount({ failurePlacement: 'row' });
+    await waitFor(() => texts(ui).includes(name));
+    // A background refetch fails while the memberships the picker needs are
+    // still cached: the list is usable, so the row stays the picker and opens
+    // the sheet, and the one-row placement only stops adding failure rows below.
+    list.mockRejectedValue(new Error('offline'));
+    await act(async () => {
+      await ui.queryClient.invalidateQueries();
+    });
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Retry');
+    expect(picker(ui).props.accessibilityHint).toBe('Select account');
+    await openSheet(ui);
+    expect(rows().map(row => row.label)).toEqual(['Personal', name]);
+  });
+
+  it('keeps the stored choice failure in the control even when the list failure moves out', async () => {
+    // Nothing else on the screen reaches the provider's own read/write failure,
+    // so that message and its Retry stay wherever the control is mounted.
+    storage.read.mockRejectedValueOnce(new Error('read failed')).mockResolvedValue('org-a');
+    const ui = await mount({ failurePlacement: 'none' });
+    expect(texts(ui)).toContain('Something went wrong');
+    await press(retry(ui));
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Something went wrong');
+    expect(texts(ui)).not.toContain('Retry');
   });
 
   it('offers restoration Retry without publishing Personal', async () => {
@@ -620,16 +677,34 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     const trigger = picker(ui).props.className as string;
     // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
-    // render, so one label-value row on the form keeps one shape. The inline
-    // default is a bare row with no box.
+    // render, so one label-value column on the form keeps one shape. The frame
+    // carries the chrome and the body inside it the 48 dp height, so a value,
+    // a skeleton or a retry fills one box. The inline default is a bare row
+    // with no box.
     expect(trigger).toContain('border');
     expect(trigger).toContain('bg-secondary');
-    expect(trigger).toContain('justify-between');
+    expect(trigger).not.toContain('min-h-');
+    const body = picker(ui).find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('min-h-[48px]')
+    );
+    expect(body.props.className).toContain('flex-1');
     const label = picker(ui).findByType(Text);
     expect(label.props.className).toContain('flex-1');
     expect(label.props.className).toContain('text-foreground');
+    // The column's chevrons all end on the body's trailing edge — the
+    // Repository and Branch triggers draw a bare 14 dp glyph — so this one must
+    // not sit in a fixed `size-5` box (17.52 dp at this app's 14 pt rem), which
+    // left the top chevron ~1.9 dp short of the ones below it.
+    const glyphBox = picker(ui).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(glyphBox).not.toContain('size-5');
     const inline = await mount();
     const inlineTrigger = picker(inline).props.className as string;
     expect(inlineTrigger).not.toContain('bg-secondary');
+    // The inline row keeps its fixed glyph box, which holds the line height.
+    const inlineGlyphBox = picker(inline).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(inlineGlyphBox).toContain('size-5');
   });
 });

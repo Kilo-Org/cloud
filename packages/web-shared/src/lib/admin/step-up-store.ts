@@ -7,7 +7,11 @@ import {
   session_step_up_proofs,
   type SessionStepUpProof,
 } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleConnection,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
 import type {
   AdminStepUpState,
   PrivilegedActionClass,
@@ -146,7 +150,7 @@ export async function evaluateStepUp(
 export async function revokeStepUpProofs(
   userId: string,
   reason: string,
-  fromDb: typeof db | DrizzleTransaction = db,
+  fromDb: DrizzleConnection = db,
   now: Date = new Date()
 ): Promise<number> {
   const revoked = await fromDb

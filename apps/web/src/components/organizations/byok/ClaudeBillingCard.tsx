@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -9,36 +9,115 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
+import type { ClaudeBillingOwnerInput } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
+import { claudeBillingOutcomeParam } from '@/lib/claude-billing/constants';
 
-const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms';
+const subscribeHydration = () => () => {};
+const LINKED_PLATFORMS_URL = 'https://platform.claude.com/linked-platforms';
 
-function outcomeMessage(outcome: string) {
+/**
+ * Which connection the card shows: the person's personal account, or the
+ * connection of the organization the page belongs to.
+ */
+export type ClaudeBillingScope = 'personal' | 'organization';
+
+const CARD_TITLE = 'Claude (linked billing)';
+
+const ELIGIBILITY_NOTE =
+  'Linked billing works with Claude API organizations only. Claude Pro and Max subscriptions and cloud marketplace billing do not qualify.';
+const APPROVAL_NOTE =
+  'To link, sign in to Claude Console and approve the link there. Only an owner, admin, or billing admin of the Claude organization can approve.';
+const SPEND_LIMIT_NOTE =
+  'You can set a monthly spend limit for Kilo when you link, or later under Linked platforms in Claude Console. At the limit, Claude requests pause until you raise it or the month resets on the 1st (UTC). The limit counts usage at list price, before any discount.';
+const CREDITS_NOTE =
+  'Usage is billed to your purchased credit balance or your monthly invoice. Monthly API credits from Max, Ultra, or Team plans and credits from Anthropic partner, VC, or startup programs cannot pay.';
+const EMAIL_NOTE =
+  'Anthropic usually emails your Claude organization’s owners, admins, and billing members when Kilo is linked or unlinked, and emails admins when usage reaches 80% and 100% of a spend limit.';
+const DATA_NOTE =
+  'Linking changes only who pays. Requests still run in Kilo’s Anthropic organization under Kilo’s data terms with Anthropic, so your organization’s BAA, customer-managed keys, and data retention settings do not apply.';
+const REFUSED_BILLING_NOTE =
+  'If Anthropic declines billing, Claude requests pause. Kilo does not fall back to Kilo credits.';
+
+const SCOPE_COPY: Record<
+  ClaudeBillingScope,
+  { description: string; coverageNote: string | null; removeNote: string }
+> = {
+  personal: {
+    description:
+      'Pay Anthropic directly for your Claude usage in Kilo through your Claude API organization. No API key needed.',
+    coverageNote: null,
+    removeNote:
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, then restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
+  },
+  organization: {
+    description:
+      "Pay Anthropic directly for Claude usage in this organization, both members' requests and Kilo services such as code review, through a Claude API organization. No API key needed.",
+    coverageNote:
+      "Covers every member's Claude requests in this organization and Kilo services such as code review.",
+    removeNote:
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, stops every Claude request in this organization from billing it, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
+  },
+};
+
+function ClaudeConsoleLink({ children }: { children: ReactNode }) {
+  return (
+    <a
+      className="text-foreground underline underline-offset-4"
+      href={LINKED_PLATFORMS_URL}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {children}
+    </a>
+  );
+}
+
+function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: boolean) {
   switch (outcome) {
     case 'connected':
-      return 'Your Claude organization is connected. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.';
+      // Only a personal link replaces the person's stored Anthropic API key.
+      return scope === 'personal'
+        ? 'Your Claude organization is linked. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.'
+        : 'Your Claude organization is linked.';
     case 'declined':
-      return 'The connection did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
+      return connected
+        ? 'Linking did not complete. An owner, admin, or billing admin of that Claude organization must approve it, or remove the current link first to link a different Claude organization.'
+        : 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already connected to another Kilo account or organization. Ask that account’s administrator to disconnect it first.';
+      return 'This Claude organization already has a link. Use an existing link below if you control it, or ask its owner to share it. If neither applies, unlink Kilo under Linked platforms in Claude Console, then link again.';
     case 'forbidden':
-      return 'Only a Kilo organization owner or admin can connect it.';
+      return scope === 'organization'
+        ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
+        : 'Claude linked billing is not available for your account yet.';
     default:
-      return 'We could not connect your Claude organization. Try again.';
+      return 'We could not link your Claude organization. Try again.';
   }
 }
 
 function refusalMessage(status: ClaudeBillingStatus) {
+  if (status.state === 'reconnect_required') {
+    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must link Claude billing again before Claude requests in this organization can bill through it.';
+  }
   if (status.state === 'billing_unavailable') {
-    return 'Claude billing is unavailable. The connection may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, reconnect if needed, or contact Kilo support.';
+    return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Linked platforms in Claude Console, link it again if needed, or contact Kilo support.';
   }
   switch (status.lastRefusalCode) {
     case 'linked_organization_spend_limit_reached':
-      return 'A Claude spend limit was reached. Check both the Kilo connection cap in Connected platforms and the organization’s monthly spend limit in Claude billing settings.';
+      return 'A Claude spend limit was reached, or your Claude organization has no credit that can pay. Check the spend limit for Kilo and your organization’s monthly spend limit under Linked platforms in Claude Console, and check your balance.';
     case 'linked_organization_billing_unavailable':
     case 'billing_error':
-      return 'Anthropic cannot bill your Claude organization. Check its billing status and spend limits in Claude Console.';
+      return 'Anthropic cannot bill your Claude organization. Check its spend limits, balance, and account in Claude Console.';
     case 'permission_error':
       return 'Claude refused the request. Check model access and billing in Claude Console, or contact Kilo support.';
     default:
@@ -48,49 +127,58 @@ function refusalMessage(status: ClaudeBillingStatus) {
 
 export type ClaudeBillingCardViewProps = {
   status: ClaudeBillingStatus | undefined;
-  organizationId?: string;
+  scope?: ClaudeBillingScope;
   outcome?: string | null;
-  onConnect: () => void;
+  onConnect?: () => void;
+  onShare?: (source: ClaudeBillingOwnerInput) => void;
   onRemove?: () => void;
   onRetry?: () => void;
   connecting?: boolean;
+  sharing?: boolean;
   removing?: boolean;
   error?: string | null;
 };
 
 export function ClaudeBillingCardView({
   status,
-  organizationId,
+  scope = 'personal',
   outcome,
   onConnect,
+  onShare,
   onRemove,
   onRetry,
   connecting,
+  sharing,
   removing,
   error,
 }: ClaudeBillingCardViewProps) {
+  const copy = SCOPE_COPY[scope];
   const refusal = status ? refusalMessage(status) : null;
-  const connected = status?.state === 'connected' || status?.state === 'billing_unavailable';
+  const reconnectRequired = status?.state === 'reconnect_required';
+  const connected =
+    status?.state === 'connected' || status?.state === 'billing_unavailable' || reconnectRequired;
+  const shareableLinks = !connected && status ? status.shareableLinks : [];
+  const [selectedPayerId, setSelectedPayerId] = useState<string | null>(null);
+  const selectedShareLink =
+    shareableLinks.find(link => link.payerId === selectedPayerId) ?? shareableLinks[0];
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-        <CardTitle className="text-base">Claude organization</CardTitle>
-        {status ? (
-          <Badge variant={status.state === 'billing_unavailable' ? 'destructive' : 'outline'}>
-            {status.state === 'connected'
-              ? 'Connected'
-              : status.state === 'billing_unavailable'
-                ? 'Billing unavailable'
-                : 'Not connected'}
-          </Badge>
-        ) : (
+      <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
+        <CardTitle>{CARD_TITLE}</CardTitle>
+        {!status ? (
           <Skeleton className="h-5 w-20" />
-        )}
+        ) : status.state === 'connected' ? (
+          <Badge variant="new">Linked</Badge>
+        ) : status.state === 'reconnect_required' ? (
+          <Badge variant="destructive">New link required</Badge>
+        ) : status.state === 'billing_unavailable' ? (
+          <Badge variant="destructive">Billing unavailable</Badge>
+        ) : null}
       </CardHeader>
-      <CardContent className="flex min-h-[8rem] flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {outcome && (outcome !== 'connected' || connected) ? (
           <Alert variant={outcome === 'connected' ? 'default' : 'destructive'}>
-            <AlertDescription>{outcomeMessage(outcome)}</AlertDescription>
+            <AlertDescription>{outcomeMessage(outcome, scope, connected)}</AlertDescription>
           </Alert>
         ) : null}
         {error ? (
@@ -110,73 +198,130 @@ export function ClaudeBillingCardView({
         ) : null}
         {status ? (
           <>
-            <p className="text-muted-foreground text-sm">
-              Pay Anthropic for Claude usage in Kilo through your Claude API organization. No API
-              key needed. Claude Pro and Max subscriptions and cloud marketplace billing do not
-              qualify.
-            </p>
-            <p className="text-muted-foreground text-sm">
-              You will go to Claude to approve. An owner, admin, or billing admin of your Claude
-              organization must approve.
-              {organizationId
-                ? ' Only an owner or admin of this Kilo organization can start the connection.'
-                : ''}{' '}
-              Claude requests pause if Anthropic refuses billing. Kilo does not fall back to Kilo
-              credits.
-            </p>
-            {status.connectedAt && connected ? (
-              <p className="text-muted-foreground text-xs">
-                Connected {new Date(status.connectedAt).toLocaleDateString()}.
+            <p className="type-body text-muted-foreground">{copy.description}</p>
+            {connected && (status.connectedAt || status.sharedWith.length > 0) ? (
+              <p className="type-body text-muted-foreground">
+                {status.connectedAt
+                  ? `Linked on ${new Date(status.connectedAt).toLocaleDateString()}.`
+                  : null}
+                {status.connectedAt && status.sharedWith.length > 0 ? ' ' : null}
+                {status.sharedWith.length > 0
+                  ? `Shared with ${status.sharedWith.join(', ')}.`
+                  : null}
               </p>
             ) : null}
-            <a
-              className="text-sm underline underline-offset-4"
-              href={CONNECTED_PLATFORMS_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Set a spend limit or disconnect in Claude Console
-            </a>
-            {status.canManage ? (
+            {status.canManage && (onConnect || (onShare && selectedShareLink) || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={connecting || removing}
-                  onClick={onConnect}
-                  className="h-auto min-h-10 whitespace-normal text-left"
-                >
-                  <ClaudeLogo />
-                  {connecting
-                    ? 'Redirecting to Claude…'
-                    : connected
-                      ? 'Reconnect your Claude organization'
-                      : 'Connect your Claude organization'}
-                </Button>
+                {onConnect ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={connecting || sharing || removing}
+                    onClick={onConnect}
+                    className="h-auto min-h-10 whitespace-normal text-left"
+                  >
+                    <ClaudeLogo />
+                    {connecting
+                      ? 'Redirecting to Claude…'
+                      : reconnectRequired
+                        ? 'Link Claude billing again'
+                        : connected
+                          ? 'Link your Claude organization again'
+                          : 'Link your Claude organization'}
+                  </Button>
+                ) : null}
+                {onShare && selectedShareLink ? (
+                  shareableLinks.length > 1 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select
+                        value={selectedShareLink.payerId}
+                        onValueChange={setSelectedPayerId}
+                        disabled={connecting || sharing || removing}
+                      >
+                        <SelectTrigger
+                          aria-label="Existing Claude link"
+                          className="min-h-10 min-w-52"
+                        >
+                          <SelectValue>{selectedShareLink.label}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shareableLinks.map(link => (
+                            <SelectItem key={link.payerId} value={link.payerId}>
+                              {link.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={connecting || sharing || removing}
+                        onClick={() => onShare(selectedShareLink.source)}
+                        className="h-auto min-h-10 whitespace-normal text-left"
+                      >
+                        <ClaudeLogo />
+                        {sharing ? 'Applying Claude link…' : 'Use selected Claude link'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={connecting || sharing || removing}
+                      onClick={() => onShare(selectedShareLink.source)}
+                      className="h-auto min-h-10 whitespace-normal text-left"
+                    >
+                      <ClaudeLogo />
+                      {sharing
+                        ? 'Applying Claude link…'
+                        : selectedShareLink.source.organizationId === undefined &&
+                            selectedShareLink.label === 'Personal account'
+                          ? 'Use your personal Claude link'
+                          : `Use Claude link from ${selectedShareLink.label}`}
+                    </Button>
+                  )
+                ) : null}
                 {connected ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    disabled={connecting || removing}
+                    disabled={connecting || sharing || removing}
                     onClick={onRemove}
                   >
                     {removing ? 'Removing…' : 'Remove from Kilo'}
                   </Button>
                 ) : null}
               </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Ask a Kilo organization owner or admin to manage Claude billing.
-              </p>
-            )}
-            {connected && status.canManage ? (
-              <p className="text-muted-foreground text-xs">
-                Removing this connection restores normal BYOK or Kilo-credit routing. It does not
-                revoke consent in Claude Console.
+            ) : !status.canManage ? (
+              <p className="type-body text-muted-foreground">
+                Ask a Kilo organization owner or admin to link a Claude organization.
               </p>
             ) : null}
+            <p className="type-body">
+              <ClaudeConsoleLink>
+                Set a spend limit or unlink under Linked platforms in Claude Console
+              </ClaudeConsoleLink>
+            </p>
+            <details>
+              <summary className="type-body text-muted-foreground hover:text-foreground w-fit cursor-pointer">
+                How Linked billing with Claude Platform works
+              </summary>
+              <ul className="type-body text-muted-foreground mt-2 list-disc space-y-1 pl-5">
+                <li>{ELIGIBILITY_NOTE}</li>
+                <li>{APPROVAL_NOTE}</li>
+                <li>{SPEND_LIMIT_NOTE}</li>
+                <li>{CREDITS_NOTE}</li>
+                <li>{EMAIL_NOTE}</li>
+                <li>{DATA_NOTE}</li>
+                {copy.coverageNote ? <li>{copy.coverageNote}</li> : null}
+                <li>{REFUSED_BILLING_NOTE}</li>
+                {connected && status.canManage ? <li>{copy.removeNote}</li> : null}
+              </ul>
+            </details>
           </>
         ) : error ? null : (
           <Skeleton className="h-24 w-full" />
@@ -186,80 +331,161 @@ export function ClaudeBillingCardView({
   );
 }
 
-function ClaudeBillingCardContent({ organizationId }: { organizationId?: string }) {
+function ClaudeBillingCardContent({
+  organizationId,
+  scope,
+}: {
+  organizationId?: string;
+  scope: ClaudeBillingScope;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [outcome, setOutcome] = useState(() => searchParams.get('claude_billing'));
+  const outcomeParam = claudeBillingOutcomeParam({ kind: scope });
+  const [outcome, setOutcome] = useState(() => searchParams.get(outcomeParam));
   useEffect(() => {
-    const returned = searchParams.get('claude_billing');
+    const returned = searchParams.get(outcomeParam);
     if (!returned) return;
     setOutcome(returned);
     const params = new URLSearchParams(searchParams.toString());
-    params.delete('claude_billing');
+    params.delete(outcomeParam);
     const query = params.toString();
     router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`, { scroll: false });
-  }, [router, searchParams]);
+  }, [outcomeParam, router, searchParams]);
   const [connecting, setConnecting] = useState(false);
-  const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions({ organizationId }));
+  const [lastShareSource, setLastShareSource] = useState<ClaudeBillingOwnerInput | null>(null);
+  const input = { organizationId };
+  const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions(input));
+  const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
+  const invalidateBillingQueries = () =>
+    Promise.all([
+      queryClient.invalidateQueries(trpc.claudeBilling.status.pathFilter()),
+      queryClient.invalidateQueries(trpc.byok.previewRouting.pathFilter()),
+      ...(scope === 'personal' ? [queryClient.invalidateQueries(trpc.byok.list.pathFilter())] : []),
+    ]);
+  const shareMutation = useMutation(
+    trpc.claudeBilling.share.mutationOptions({
+      onSuccess: () => {
+        setOutcome('connected');
+        return invalidateBillingQueries();
+      },
+    })
+  );
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () => {
         setOutcome(null);
-        return queryClient.invalidateQueries({
-          queryKey: trpc.claudeBilling.status.queryKey({ organizationId }),
-        });
+        return invalidateBillingQueries();
       },
     })
   );
-  const failureCode = statusQuery.error?.data?.code ?? removeMutation.error?.data?.code;
+  const shareFailureCode = shareMutation.error?.data?.code;
+  const removeFailureCode = removeMutation.error?.data?.code;
+  const failureCode = statusQuery.error?.data?.code ?? shareFailureCode ?? removeFailureCode;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
+  const nonRetryableShareError =
+    shareFailureCode === 'CONFLICT' || shareFailureCode === 'PRECONDITION_FAILED';
+  // Before launch the card appears only for an owner who already has a
+  // connection, so they can still see its state and remove it.
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false
+  );
+  const launched = hydrated && flagEnabled === true;
+  const hasConnection =
+    statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
+  if (!launched && !hasConnection) return null;
   return (
     <ClaudeBillingCardView
       status={statusQuery.data}
-      organizationId={organizationId}
+      scope={scope}
       outcome={outcome}
       connecting={connecting}
+      sharing={shareMutation.isPending}
       removing={removeMutation.isPending}
       error={
         needsSignIn
-          ? 'Sign in again to manage this connection.'
+          ? 'Sign in again to manage this link.'
           : needsAdmin
-            ? 'An organization owner or admin must manage this connection.'
-            : statusQuery.isError
-              ? 'We could not load your Claude connection.'
-              : removeMutation.isError
-                ? 'We could not remove your Claude connection. Try again.'
-                : null
+            ? scope === 'organization'
+              ? 'An organization owner or admin must manage Claude billing for this organization.'
+              : 'Linked billing with Claude Platform is not available for your account yet.'
+            : shareFailureCode === 'CONFLICT'
+              ? 'This scope already has a Claude link. Remove it from Kilo first to use another link.'
+              : shareFailureCode === 'PRECONDITION_FAILED'
+                ? 'That Claude link is no longer connected. Link a Claude organization first, then share it here.'
+                : statusQuery.isError
+                  ? 'We could not load your Claude link.'
+                  : shareMutation.isError
+                    ? 'We could not share that Claude link. Try again.'
+                    : removeMutation.isError
+                      ? removeFailureCode === 'PRECONDITION_FAILED'
+                        ? 'Kilo kept this Claude link. Unlink Kilo under Linked platforms in Claude Console, then remove it here again.'
+                        : removeFailureCode === 'SERVICE_UNAVAILABLE'
+                          ? 'Anthropic did not confirm the unlink, so Kilo kept this Claude link. Try again.'
+                          : 'We could not remove your Claude link. Try again.'
+                      : null
       }
       onRetry={
-        needsSignIn || needsAdmin
+        needsSignIn || needsAdmin || nonRetryableShareError
           ? undefined
           : () => {
-              if (removeMutation.isError && !statusQuery.isError)
-                removeMutation.mutate({ organizationId });
-              else void statusQuery.refetch();
+              if (shareMutation.isError && !statusQuery.isError && lastShareSource) {
+                shareMutation.mutate({ source: lastShareSource, target: input });
+              } else if (removeMutation.isError && !statusQuery.isError) {
+                removeMutation.mutate(input);
+              } else {
+                void statusQuery.refetch();
+              }
             }
       }
-      onConnect={() => {
-        setConnecting(true);
-        const query = new URLSearchParams({
-          owner: organizationId ?? 'personal',
-          return: window.location.pathname,
-        });
-        window.location.assign(`/claude/billing/connect?${query}`);
+      onConnect={
+        launched
+          ? () => {
+              setConnecting(true);
+              const query = new URLSearchParams({
+                owner: scope === 'personal' ? 'personal' : (organizationId ?? 'personal'),
+                return: window.location.pathname,
+              });
+              window.location.assign(`/claude/billing/connect?${query}`);
+            }
+          : undefined
+      }
+      onShare={
+        launched && (statusQuery.data?.shareableLinks.length ?? 0) > 0
+          ? source => {
+              removeMutation.reset();
+              setLastShareSource(source);
+              shareMutation.mutate({ source, target: input });
+            }
+          : undefined
+      }
+      onRemove={() => {
+        shareMutation.reset();
+        removeMutation.mutate(input);
       }}
-      onRemove={() => removeMutation.mutate({ organizationId })}
     />
   );
 }
 
-export function ClaudeBillingCard({ organizationId }: { organizationId?: string }) {
+/**
+ * One Claude billing connection card. `scope` picks which connection it shows;
+ * the organization card is rendered for every member, with its actions for the
+ * owners and admins who may manage it.
+ */
+export function ClaudeBillingCard({
+  organizationId,
+  scope = organizationId ? 'organization' : 'personal',
+}: {
+  organizationId?: string;
+  scope?: ClaudeBillingScope;
+}) {
   return (
     <Suspense fallback={null}>
-      <ClaudeBillingCardContent organizationId={organizationId} />
+      <ClaudeBillingCardContent organizationId={organizationId} scope={scope} />
     </Suspense>
   );
 }

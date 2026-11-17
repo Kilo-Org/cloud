@@ -13,10 +13,12 @@ import {
   type SupportAccessGrantEventType,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_REQUEST_TTL_SECONDS,
+  isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { getPostgresErrorCode } from '@/lib/db-errors';
@@ -95,7 +97,7 @@ async function lockActors(
 }
 
 function assertAdminActor(actor: GrantActorRow | undefined): GrantActorRow {
-  if (!actor || actor.blocked_reason !== null || !actor.is_admin) {
+  if (!actor || isBlockedAccount(actor) || !actor.is_admin) {
     throw forbidden('Platform admin access required');
   }
   return actor;
@@ -135,6 +137,10 @@ async function writeEvent(
 /**
  * Advances grants whose clock has run out. Called under the actor/org advisory
  * lock so two requests cannot both claim the same stale row.
+ *
+ * The grant deadline bounds access. These write paths record an elapsed grant on
+ * the row, and `deriveGrantStatus` applies the same deadline when a grant is
+ * presented.
  */
 async function expireStaleGrants(
   tx: DrizzleTransaction,
@@ -199,14 +205,28 @@ export type SupportGrantSummary = {
   reviewedAt: string | null;
 };
 
-export function toSupportGrantSummary(grant: SupportAccessGrant): SupportGrantSummary {
+/** Presents a grant through its own time box: the deadline decides the status. */
+function deriveGrantStatus(grant: SupportAccessGrant, nowMs: number): SupportAccessGrantStatus {
+  if (grant.status === 'active' && grant.expires_at !== null) {
+    return Date.parse(grant.expires_at) <= nowMs ? 'expired' : 'active';
+  }
+  if (grant.status === 'pending' && grant.request_expires_at !== null) {
+    return Date.parse(grant.request_expires_at) <= nowMs ? 'expired' : 'pending';
+  }
+  return grant.status;
+}
+
+export function toSupportGrantSummary(
+  grant: SupportAccessGrant,
+  nowMs: number = Date.now()
+): SupportGrantSummary {
   return {
     id: grant.id,
     actorKiloUserId: grant.actor_kilo_user_id,
     organizationId: grant.organization_id,
     actionClass: grant.action_class,
     grantKind: grant.grant_kind,
-    status: grant.status,
+    status: deriveGrantStatus(grant, nowMs),
     reason: grant.reason,
     ticketReference: grant.ticket_reference,
     requestedAt: grant.requested_at,
@@ -259,9 +279,10 @@ export async function toSupportGrantListItems(
   const people = new Map(userRows.map(row => [row.id, row]));
   const person = (id: string): SupportGrantPerson =>
     people.get(id) ?? { id, name: null, email: null };
+  const nowMs = Date.now();
 
   return grants.map(grant => ({
-    ...toSupportGrantSummary(grant),
+    ...toSupportGrantSummary(grant, nowMs),
     organizationName: organizationNames.get(grant.organization_id) ?? null,
     actor: person(grant.actor_kilo_user_id),
     approvedBy: grant.approved_by_kilo_user_id ? person(grant.approved_by_kilo_user_id) : null,
@@ -372,7 +393,7 @@ export async function approveSupportGrant(params: {
     }
     assertAdminActor(actors.get(pending.actor_kilo_user_id));
     const approver = actors.get(params.approverKiloUserId);
-    if (!approver || approver.blocked_reason !== null || !approver.is_admin) {
+    if (!approver || isBlockedAccount(approver) || !approver.is_admin) {
       throw forbidden('Platform admin access required');
     }
     await assertLiveOrganization(tx, pending.organization_id);
@@ -421,7 +442,7 @@ export async function denySupportGrant(params: {
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const actors = await lockActors(tx, [params.approverKiloUserId]);
     const approver = actors.get(params.approverKiloUserId);
-    if (!approver || approver.blocked_reason !== null || !approver.is_admin) {
+    if (!approver || isBlockedAccount(approver) || !approver.is_admin) {
       throw forbidden('Platform admin access required');
     }
     const [grant] = await tx
@@ -496,7 +517,7 @@ export async function revokeSupportGrant(params: {
       .for('update');
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
     const actor = actors.get(params.actorKiloUserId);
-    if (!actor || actor.blocked_reason !== null) {
+    if (!actor || isBlockedAccount(actor)) {
       throw forbidden('Support access revocation permission required');
     }
     const canRevoke =
@@ -547,7 +568,7 @@ export async function emergencyIssueSupportGrant(params: {
         actorKiloUserId: params.superadminKiloUserId,
         organizationId: params.organizationId,
       });
-      if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+      if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
         throw forbidden('Superadmin access required');
       }
       await assertLiveOrganization(tx, params.organizationId);
@@ -607,7 +628,7 @@ export async function reviewSupportGrant(params: {
       .for('update');
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
     const reviewer = actors.get(params.reviewerKiloUserId);
-    if (!reviewer || reviewer.blocked_reason !== null || !userIsSuperadmin(reviewer)) {
+    if (!reviewer || isBlockedAccount(reviewer) || !userIsSuperadmin(reviewer)) {
       throw forbidden('Superadmin access required');
     }
     if (!existing.review_required || existing.reviewed_at !== null) {
@@ -668,16 +689,46 @@ export async function listUnreviewedEmergencyGrants(): Promise<SupportAccessGran
     .orderBy(desc(support_access_grants.issued_at));
 }
 
+/**
+ * Active grants for an organization, including grants on its live direct
+ * parent when support access is on. A parent grant applies to the child, so the
+ * org banner and the View Org button must see it; the grant row still names the
+ * parent organization it was issued for.
+ *
+ * The deadline decides: a row counts as active only while `expires_at` is
+ * still ahead, the same rule `deriveGrantStatus` applies when a grant is
+ * presented.
+ */
 export async function getActiveSupportGrantsForOrganization(
   organizationId: string
 ): Promise<SupportAccessGrant[]> {
+  const organizationIds = [organizationId];
+  if (isSupportAccessEnabled()) {
+    const [target] = await db
+      .select({ parentOrganizationId: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    if (target?.parentOrganizationId) {
+      const [liveParent] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+          and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
+        )
+        .limit(1);
+      if (liveParent) organizationIds.push(target.parentOrganizationId);
+    }
+  }
+
   return db
     .select()
     .from(support_access_grants)
     .where(
       and(
-        eq(support_access_grants.organization_id, organizationId),
-        eq(support_access_grants.status, 'active')
+        inArray(support_access_grants.organization_id, organizationIds),
+        eq(support_access_grants.status, 'active'),
+        sql`${support_access_grants.expires_at} > now()`
       )
     )
     .orderBy(asc(support_access_grants.expires_at));

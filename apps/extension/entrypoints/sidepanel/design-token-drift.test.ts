@@ -222,22 +222,26 @@ const parseThemeHexes = (source: string): Record<string, string> => {
 const collectIconHexViolations = (source: string): string[] => {
   const violations: string[] = [];
 
-  if (!/#F7F586/iu.test(source)) {
-    violations.push('icon.svg must contain brand #F7F586');
+  if (!/#FFDD00/iu.test(source)) {
+    violations.push('icon.svg must contain brand #FFDD00');
   }
 
   if (/#EDFF00/iu.test(source)) {
     violations.push('icon.svg must not contain legacy #EDFF00');
   }
 
+  if (/#F7F586/iu.test(source)) {
+    violations.push('icon.svg must not contain legacy #F7F586');
+  }
+
   const hexes = source.match(/#[0-9a-fA-F]{3,8}\b/gu) ?? [];
-  const allowed = new Set([normalizeHex('#F7F586'), normalizeHex('#000000')]);
+  const allowed = new Set([normalizeHex('#FFDD00'), normalizeHex('#000000')]);
 
   for (const hex of hexes) {
     const normalized = normalizeHex(hex);
 
     if (!allowed.has(normalized)) {
-      violations.push(`icon.svg hex #${normalized} is not in {#F7F586, #000000}`);
+      violations.push(`icon.svg hex #${normalized} is not in {#FFDD00, #000000}`);
     }
   }
 

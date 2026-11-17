@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_workspace_folders" ADD COLUMN "manual_worktree_order" text[] DEFAULT '{}'::text[] NOT NULL;

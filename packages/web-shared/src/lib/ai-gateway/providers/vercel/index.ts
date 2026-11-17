@@ -6,6 +6,7 @@ import {
   BedrockCredentialsSchema,
   getRequestIgnoredVercelProviderIds,
   getVercelProviderIdForUserByok,
+  isGatewayUserByokProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -17,10 +18,15 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  getVercelModelIdOverrides,
+  mapModelIdToVercel,
+  mapVercelModelIdToOpenRouter,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromDatabase,
+  isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -96,20 +102,18 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 export type VercelRoutingInput = {
   requestedModel: string;
   boundedSpending: boolean;
-  organizationDisabledVercelAiGateway: boolean;
+  /**
+   * The organization disabled OpenRouter, directly or through an inference region. Kilo's
+   * Vercel opt-out list then does not apply, so a model Vercel serves goes there instead of
+   * failing on the disabled OpenRouter.
+   */
+  openRouterDisabled?: boolean;
 };
 
 export async function shouldRouteToVercel(
-  { requestedModel, boundedSpending, organizationDisabledVercelAiGateway }: VercelRoutingInput,
+  { requestedModel, boundedSpending, openRouterDisabled = false }: VercelRoutingInput,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
-  if (organizationDisabledVercelAiGateway) {
-    console.debug(
-      `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because the organization disabled it`
-    );
-    return false;
-  }
-
   if (boundedSpending) {
     console.debug(
       `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because a spend ceiling is set`
@@ -117,17 +121,54 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const routingConfig = await getRuntimeGatewayRoutingConfig();
-  if (!routingConfig.vercelEnabled) {
+  if (!openRouterDisabled && !(await isVercelRoutingEnabledForModel(requestedModel))) {
     return false;
   }
 
+  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/** Whether Kilo's routing config sends the model to Vercel: the model is not opted out. Vercel must still serve the model. */
+export async function isVercelRoutingEnabledForModel(requestedModel: string) {
+  const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
     console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
     return false;
   }
 
-  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+  return true;
+}
+
+/** Whether Vercel serves the model, regardless of the request's routing settings. */
+export async function isVercelModel(requestedModel: string) {
+  const [vercelModels, vercelModelId] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  return vercelModels.has(vercelModelId);
+}
+
+/**
+ * Whether a request to Vercel may name the model. Vercel must serve the model, and the request must
+ * name it by a Kilo model ID: an OpenRouter ID, a retained legacy alias, or the OpenRouter-style ID
+ * a Vercel-only model is listed under. Vercel's own spelling, such as `zai/glm-5` for `z-ai/glm-5`,
+ * is rejected. Like `isValidOpenRouterModelId`, it assumes the model is valid while Vercel's model
+ * list is unavailable, so requests through a user's own Vercel key keep working during a metadata
+ * outage.
+ */
+export async function isValidVercelModelId(requestedModel: string) {
+  const [vercelModels, overrides, vercelModelId] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    getVercelModelIdOverrides(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  if (vercelModels.size === 0) return true;
+  if (!vercelModels.has(vercelModelId)) return false;
+
+  return (
+    mapVercelModelIdToOpenRouter(vercelModelId, overrides) === requestedModel ||
+    (await isValidOpenRouterModelId(requestedModel))
+  );
 }
 
 /**
@@ -212,6 +253,31 @@ function convertProviderSort(
   }
 }
 
+/**
+ * The request-level fields both routing paths forward: the caller's sort
+ * preference, data-handling choices, fallback models and session affinity.
+ */
+function getSharedGatewayOptions(
+  request: GatewayRequest
+): Pick<
+  NonNullable<VercelProviderConfig['gateway']>,
+  | 'sort'
+  | 'zeroDataRetention'
+  | 'disallowPromptTraining'
+  | 'models'
+  | 'sessionId'
+  | 'sessionAffinity'
+> {
+  const provider = request.body.provider;
+  return {
+    sort: convertProviderSort(provider?.sort),
+    zeroDataRetention: provider?.zdr,
+    disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+    models: request.body.models,
+    ...getSessionAffinityOptions(request),
+  };
+}
+
 export function convertProviderOptions(
   requestToMutate: GatewayRequest,
   vercelInferenceProviders: string[] | null
@@ -239,12 +305,102 @@ export function convertProviderOptions(
     gateway: {
       only,
       order: provider?.order?.map(openRouterToVercelInferenceProviderId),
-      sort: convertProviderSort(provider?.sort),
-      zeroDataRetention: provider?.zdr,
-      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
-      models: requestToMutate.body.models,
       serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
-      ...getSessionAffinityOptions(requestToMutate),
+      ...getSharedGatewayOptions(requestToMutate),
+    },
+  };
+}
+
+/**
+ * The Vercel gateway options of a non-chat request, such as embeddings or System One. Provider keys
+ * sent through Kilo's Vercel account travel as `byok`, restricted to their providers, as on chat;
+ * the request's `provider.ignore` drops a key unless it would drop them all. Kilo's own route and
+ * the owner's Vercel AI Gateway key carry the effective provider routing settings instead (`only`,
+ * `ignore` and `order`, in Vercel's provider ids), and only Kilo's route a region (see
+ * `getRouteInferenceRegion`); Vercel fails the request instead of leaving the region. Both carry
+ * the data-handling choices.
+ *
+ * Vercel treats an empty `only` as no filter, so when the routing settings leave no provider that
+ * serves the model, the result names the model's providers instead and the caller rejects the
+ * request, as `canRouteToVercel` keeps chat off Vercel.
+ */
+export async function getNonChatGatewayOptions(params: {
+  /** The model id the request sends to Vercel, after `mapModelIdToVercel`. */
+  vercelModelId: string;
+  userByok: readonly BYOKResult[] | null;
+  provider:
+    | Pick<OpenRouterProviderConfig, 'only' | 'ignore' | 'order' | 'zdr' | 'data_collection'>
+    | undefined;
+  dataRegion: OrganizationDataRegion | null;
+}): Promise<
+  | { kind: 'routable'; gateway: NonNullable<VercelProviderConfig['gateway']> }
+  /** `providers` holds the model's Vercel providers, when known. */
+  | { kind: 'no-eligible-provider'; providers: string[] }
+> {
+  const { vercelModelId, userByok, provider, dataRegion } = params;
+  const dataHandling = {
+    zeroDataRetention: provider?.zdr,
+    disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+  };
+  const providerKeys = userByok?.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
+  if (providerKeys && providerKeys.length > 0) {
+    const ignored = new Set(provider?.ignore?.map(openRouterToVercelInferenceProviderId));
+    const allByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    const retainedByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    for (const byokEntry of providerKeys) {
+      const [key, list] = getVercelInferenceProviderConfigForUserByok(byokEntry);
+      allByokProviders[key] = [...(allByokProviders[key] ?? []), ...list];
+      if (!ignored.has(key)) {
+        retainedByokProviders[key] = [...(retainedByokProviders[key] ?? []), ...list];
+      }
+    }
+    // A routing preference never removes the last key, so BYOK traffic never bills Kilo.
+    const byokProviders =
+      Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
+    return {
+      kind: 'routable',
+      gateway: { only: Object.keys(byokProviders), byok: byokProviders, ...dataHandling },
+    };
+  }
+  const vercelInferenceProviders =
+    provider?.only || provider?.ignore?.length
+      ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
+      : null;
+  const only = (() => {
+    if (!provider?.ignore?.length) {
+      if (
+        provider?.only &&
+        !hasCompatibleVercelInferenceProvider(provider.only, vercelInferenceProviders)
+      ) {
+        return [];
+      }
+      return provider?.only?.map(openRouterToVercelInferenceProviderId);
+    }
+    if (vercelInferenceProviders) {
+      return getVercelInferenceProvidersExcludingIgnored(
+        provider.ignore,
+        provider.only,
+        vercelInferenceProviders
+      );
+    }
+    if (provider.only) return applyVercelIgnoreToOnlyProviders(provider.ignore, provider.only);
+    throw new Error('Vercel inference provider data is unavailable to apply provider.ignore');
+  })();
+  if (only?.length === 0) {
+    return {
+      kind: 'no-eligible-provider',
+      providers: vercelInferenceProviders
+        ? routableVercelProviderIds(vercelInferenceProviders, () => true)
+        : [],
+    };
+  }
+  return {
+    kind: 'routable',
+    gateway: {
+      only,
+      order: provider?.order?.map(openRouterToVercelInferenceProviderId),
+      ...dataHandling,
+      ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
     },
   };
 }
@@ -353,16 +509,12 @@ export async function applyVercelSettings(
     // https://anaconda.slack.com/archives/C0BQLEKUCV9/p1792652138592319
     // Request-level data handling preferences travel with the request on every routing path,
     // so upstream providers receive the caller's retention and training choices consistently.
+    // `order` and `serviceTier` apply to the managed path only.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
-        sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
-        models: requestToMutate.body.models,
-        zeroDataRetention: requestToMutate.body.provider?.zdr,
-        disallowPromptTraining:
-          requestToMutate.body.provider?.data_collection === 'deny' || undefined,
-        ...getSessionAffinityOptions(requestToMutate),
+        ...getSharedGatewayOptions(requestToMutate),
       },
     };
   } else {
@@ -374,8 +526,9 @@ export async function applyVercelSettings(
     );
   }
 
+  // The caller passes a region only for a route Kilo pays for (see `getRouteInferenceRegion`).
   if (dataRegion && requestToMutate.body.providerOptions?.gateway) {
-    // Vercel fails the request instead of leaving the region, for BYOK credentials too.
+    // Vercel fails the request instead of leaving the region.
     // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
     requestToMutate.body.providerOptions.gateway.inferenceRegion = {
       scope: 'zone',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EnvironmentMemberCredentialError } from '../../sandbox-control/session-credential-members.js';
 import { SessionCredentialUpgradeRequiredError } from '../../sandbox-control/session-credentials.js';
 import { grantIssueFailure } from './routes.js';
+import { OrganizationMembershipUnavailableError } from './organization-membership.js';
 import {
   MixedCredentialClassError,
   ScopeHandleConflictError,
@@ -43,6 +44,20 @@ describe('grantIssueFailure', () => {
       reason: 'workspace_setup_failed',
       stage,
     });
+  });
+
+  it('names an unreadable membership instead of the caller stage', () => {
+    // The two callers fall back to different grant stages, so the deny would
+    // otherwise read as a grant-mint fault on both paths.
+    const error = new OrganizationMembershipUnavailableError();
+
+    expect(grantIssueFailure(error, 'credential_grant_failed')).toEqual({
+      reason: 'workspace_setup_failed',
+      stage: 'organization_membership_unavailable',
+    });
+    expect(grantIssueFailure(error, 'runtime_proxy_bind_failed').stage).toBe(
+      'organization_membership_unavailable'
+    );
   });
 
   it('gives any other error, a timeout included, the generic reason and the caller stage', () => {

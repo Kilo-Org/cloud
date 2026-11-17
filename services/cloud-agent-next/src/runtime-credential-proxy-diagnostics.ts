@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import type { RuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
 
 /** Stable searchable tag for one failed runtime credential proxy request. */
 export const RUNTIME_PROXY_REQUEST_FAILED_LOG_TAG = 'runtime_proxy_request_failed';
@@ -8,6 +9,10 @@ export const RUNTIME_PROXY_REQUEST_FAILED_LOG_TAG = 'runtime_proxy_request_faile
  * proxy request before it reaches the upstream gateway. Retained evidence names
  * one bounded stage so a local rejection is distinguishable from an upstream
  * status.
+ *
+ * `resolve` means the session credential could not be resolved. `route` means
+ * the facade has no allowlist entry for the method, path or body, so the
+ * request was refused without a credential or upstream call.
  */
 export const RUNTIME_PROXY_REJECTION_STAGES = [
   'handle',
@@ -17,8 +22,67 @@ export const RUNTIME_PROXY_REJECTION_STAGES = [
   'grant',
   'token',
   'resolve',
+  'route',
 ] as const;
 export type RuntimeProxyRejectionStage = (typeof RUNTIME_PROXY_REJECTION_STAGES)[number];
+
+/**
+ * Fixed-shape description of the request that failed. `pathShape` keeps only
+ * route words; every other segment becomes a placeholder, so the shape never
+ * carries an id, a query string or a credential.
+ */
+export type RuntimeProxyRequestShape = {
+  proxyRoute: RuntimeCredentialProxyRoute;
+  requestMethod: string;
+  pathShape: string;
+};
+
+const REQUEST_METHODS: ReadonlySet<string> = new Set([
+  'GET',
+  'HEAD',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'OPTIONS',
+]);
+const ROUTE_WORD = /^(?:[a-z][a-z_-]{0,31}|v\d{1,2})$/;
+const MAX_PATH_SEGMENTS = 8;
+const MAX_PATH_SHAPE_LENGTH = 160;
+
+function pathSegmentShape(segment: string, knownIds: ReadonlyMap<string, string>): string {
+  const known = knownIds.get(segment);
+  if (known) return known;
+  return segment === '' || ROUTE_WORD.test(segment) ? segment : ':id';
+}
+
+/**
+ * Builds the bounded request shape for a proxy diagnostic. The caller passes
+ * the facade-relative path without its query string. The session's own
+ * organization and Kilo session ids get named placeholders, so the shape tells
+ * an own-scope request from one that names another id.
+ */
+export function runtimeProxyRequestShape(input: {
+  route: RuntimeCredentialProxyRoute;
+  method: string;
+  path: string;
+  organizationId?: string;
+  kiloSessionId?: string;
+}): RuntimeProxyRequestShape {
+  const knownIds = new Map<string, string>();
+  if (input.organizationId) knownIds.set(input.organizationId, ':organizationId');
+  if (input.kiloSessionId) knownIds.set(input.kiloSessionId, ':kiloSessionId');
+  const segments = input.path.split('/').slice(1);
+  const shaped = segments
+    .slice(0, MAX_PATH_SEGMENTS)
+    .map(segment => pathSegmentShape(segment, knownIds));
+  if (segments.length > MAX_PATH_SEGMENTS) shaped.push('...');
+  return {
+    proxyRoute: input.route,
+    requestMethod: REQUEST_METHODS.has(input.method) ? input.method : 'OTHER',
+    pathShape: `/${shaped.join('/')}`.slice(0, MAX_PATH_SHAPE_LENGTH),
+  };
+}
 
 /**
  * Opaque correlation IDs already in scope at the proxy decision point. Never a
@@ -177,7 +241,8 @@ export async function readUpstreamFailureEvidence(
  * request reached the gateway. Successful requests must not call this.
  */
 export function logRuntimeProxyRequestFailed(
-  input: RuntimeProxyCorrelation & RuntimeProxyRequestFailure
+  input: RuntimeProxyCorrelation &
+    RuntimeProxyRequestFailure & { request?: RuntimeProxyRequestShape }
 ): void {
   logger
     .withFields({
@@ -186,6 +251,7 @@ export function logRuntimeProxyRequestFailed(
       ...(input.upstreamAttempted
         ? { upstreamStatus: input.upstreamStatus, ...input.evidence }
         : { rejectionStage: input.rejectionStage }),
+      ...input.request,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.kiloSessionId ? { kiloSessionId: input.kiloSessionId } : {}),
       ...(input.allocationId ? { allocationId: input.allocationId } : {}),

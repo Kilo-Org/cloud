@@ -9,8 +9,10 @@ import {
   isDefaultSessionTitle,
 } from '../ingest/default-session-title';
 
+export const sessionTitleSchema = z.string().trim().min(1).max(200);
+
 export const reportSessionTitleSchema = z.object({
-  title: z.string().trim().min(1).max(200),
+  title: sessionTitleSchema,
   generated: z.boolean(),
 });
 

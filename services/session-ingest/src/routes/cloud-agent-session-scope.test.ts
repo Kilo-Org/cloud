@@ -1159,6 +1159,23 @@ describe('Cloud Agent session scope v2 routes', () => {
     expect(getSessionExport).not.toHaveBeenCalled();
   });
 
+  it('bounds the body the route parses', async () => {
+    const { db } = makeDb([], []);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const response = await makeApp().fetch(
+      new Request(`http://local/session/${childSessionId}/title`, {
+        method: 'POST',
+        headers: v2Headers(),
+        body: JSON.stringify({ title: 'x'.repeat(2000), generated: false }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(413);
+    expect(resolveScopedChildSession).not.toHaveBeenCalled();
+  });
+
   it('renames a child only after the child predicate passes', async () => {
     vi.mocked(resolveScopedChildSession).mockResolvedValue({
       kind: 'ok',

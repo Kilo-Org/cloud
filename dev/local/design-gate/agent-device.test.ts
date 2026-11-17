@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
 import { InfraError } from './capture';
+import { normalize } from './rules';
+import { checkTouchOverlap } from './rules/screen';
+import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
 const node = (fields: Record<string, unknown>) => ({ bundleId: APP, kind: 'group', ...fields });
@@ -122,6 +125,7 @@ test('agent-device snapshot converts app nodes to a ProbeDump in dp', () => {
     parent: 2,
     tag: 'ViewGroup',
     rect: [198.86, 529.9, 13.71, 14.1],
+    style: { overflow: 'hidden' },
     label: 'seed-small-target',
     pressable: true,
   });
@@ -168,4 +172,121 @@ test('system bars establish safe insets before their nodes are filtered', () => 
   assert.equal(dump.nodes.length, 2);
   const absent = agentDeviceToProbeDump(SNAPSHOT);
   assert.equal(absent.env.safeAreaKnown, false);
+});
+
+/** Frames measured on a 1080x2400 emulator (density 2.625) over a scrolled transcript. */
+const SCROLLED_TRANSCRIPT = JSON.stringify({
+  data: {
+    androidSnapshot: { pixelDensity: 2.625 },
+    viewport: { width: 1080, height: 2400 },
+    nodes: [
+      {
+        index: 0,
+        bundleId: APP,
+        type: 'android.widget.FrameLayout',
+        rect: { x: 0, y: 0, width: 1080, height: 2400 },
+      },
+      {
+        index: 1,
+        parentIndex: 0,
+        bundleId: APP,
+        type: 'android.widget.ScrollView',
+        kind: 'scroll-area',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 1900 },
+      },
+      {
+        index: 2,
+        parentIndex: 1,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        label: 'User message',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 310 },
+      },
+      {
+        index: 3,
+        parentIndex: 2,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        label: 'User message',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 310 },
+      },
+      {
+        index: 4,
+        parentIndex: 2,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        rect: { x: 218, y: 359, width: 825, height: 301 },
+      },
+      {
+        index: 5,
+        parentIndex: 4,
+        bundleId: APP,
+        type: 'android.widget.FrameLayout',
+        rect: { x: 250, y: 359, width: 762, height: 278 },
+      },
+      {
+        index: 6,
+        parentIndex: 5,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        hittable: true,
+        rect: { x: 250, y: 359, width: 762, height: 215 },
+      },
+      {
+        index: 7,
+        parentIndex: 6,
+        bundleId: APP,
+        type: 'android.view.View',
+        kind: 'text',
+        label: 'User message 57 of 60.',
+        hittable: true,
+        rect: { x: 250, y: 123, width: 443, height: 73 },
+      },
+      {
+        index: 8,
+        parentIndex: 6,
+        bundleId: APP,
+        type: 'android.view.View',
+        kind: 'text',
+        label: 'Padded so fifty messages overflow the chat viewport.',
+        hittable: true,
+        rect: { x: 250, y: 196, width: 761, height: 378 },
+      },
+      {
+        index: 9,
+        parentIndex: 1,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        label: 'Assistant message',
+        hittable: true,
+        rect: { x: 0, y: 669, width: 1080, height: 406 },
+      },
+    ],
+  },
+});
+
+test('agent-device snapshot marks a scrolled box as one that clips what it draws', () => {
+  const dump = agentDeviceToProbeDump(SCROLLED_TRANSCRIPT);
+  const byLabel = (query: string): ProbeNode =>
+    dump.nodes.find(entry => entry.label === query || entry.text === query) ?? dump.nodes[0];
+  // Every node keeps the frame the platform gave it, so the size and overflow
+  // rules still measure this control instead of the slice of a pane it shows.
+  assert.deepEqual(
+    byLabel('Padded so fifty messages overflow the chat viewport.').rect,
+    [95.24, 74.67, 289.9, 144]
+  );
+  assert.deepEqual(byLabel('Assistant message').style, { overflow: 'hidden' });
+  // A box outside every scrolling pane keeps its frame and carries no marker:
+  // a child that really paints outside it must still reach the overflow rules.
+  assert.equal(dump.nodes.find(entry => entry.tag === 'FrameLayout')?.style, undefined);
+});
+
+test('a clipped text run leaves one tap owner on the message row', () => {
+  const findings = checkTouchOverlap(normalize(agentDeviceToProbeDump(SCROLLED_TRANSCRIPT)));
+  assert.deepEqual(findings, []);
 });

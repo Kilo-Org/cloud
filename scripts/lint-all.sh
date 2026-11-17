@@ -10,8 +10,9 @@ set -euo pipefail
 #
 # Groups split the work across parallel CI jobs. The trpc group runs on every
 # full lint, which `selectAffected` reports whenever a change has no base, hits
-# a GLOBAL path or the group script itself, moves root or unscoped dependencies,
-# or holds a file it cannot attribute to any workspace. The merge queue is one
+# a GLOBAL path, hits an input only lint reads (the lint config and its plugins)
+# or the group script itself, moves root or unscoped dependencies, or holds a
+# file it cannot attribute to any workspace. The merge queue is one
 # of those runs and has no extension trigger, so the group keeps the
 # extension's gate there. On every other pull request that affects the
 # extension, its own workflow lints it with a stricter, type-aware config for

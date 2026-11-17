@@ -21,7 +21,7 @@ import {
   isNeedsInputActionIdentifier,
   registerNeedsInputCategories,
 } from './notification-actions';
-import { notificationIdentifierForSession } from './needs-input-notification';
+import { notificationIdentifierForSession } from './needs-input-presentation';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({
@@ -504,7 +504,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
   it('dismisses an answer action whose notification carries no session', async () => {
     const handled = await handleNeedsInputNotificationResponse(
       raiseResponse({
-        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+        data: { type: 'agent_briefing', url: '/agent-briefing' },
       }),
       { runInteraction: mocks.runNeedsInputInteraction }
     );
@@ -851,9 +851,30 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.runNeedsInputInteraction).not.toHaveBeenCalled();
   });
 
-  it('leaves the pending destination alone for malformed tap data', async () => {
+  it('leaves the pending destination alone for a push kind this build does not route', async () => {
     setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
 
+    // A kind the shared schema does not declare — a retired push, or one a
+    // newer server sends: the tap resolves no destination, so nothing opens and
+    // no route is stashed.
+    const handled = await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'retired_kind' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(handled).toBe(false);
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+  });
+
+  it('leaves the pending destination alone for payload data with no destination', async () => {
+    setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+
+    // This finding payload fails its schema (no finding id), so the tap has no
+    // destination at all.
     const handled = await handleNeedsInputNotificationResponse(
       raiseResponse({
         actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',

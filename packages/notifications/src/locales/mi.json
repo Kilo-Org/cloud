@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "He whakahoutanga tā tō wātū kaihoko",
-      "chatMessage": "He karere hōu tāu",
-      "instanceLifecycle": "He whakahoutanga tā tō wae",
-      "scheduledAction": "He whakahoutanga tā tētahi mahi kua whakaritea",
       "lowBalance": "Me aro ki tō toenga",
       "spendAlert": "Me aro ki tō whakapaunga",
       "securityFinding": "Me aro ki tētahi kitenga haumaru",
@@ -13,89 +10,37 @@
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Kua oti te mahi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "I rahua: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "I haukotia: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Kāore he taitara",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
       "title": "Te whakatūpato toenga iti",
-      "body": "Kua heke te toenga {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
+      "body": "Kua heke te toenga o {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "He whakatūpato whakapaunga",
+      "title": "Te whakatūpato whakapaunga",
       "body": "Kua eke te whakapaunga a {{scopeName}} ki runga ake i te ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "He kitenga haumaru hōu ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "He kitenga haumaru hōu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Te whakatūpato SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Te whakatūpato SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Te takahitanga SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "He whakahoutanga tā tētahi whakamātautau haumaru"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "Kua rite a {{instanceName}}",
-      "body": "Pāwhiri kia tīmata te kōrero."
-    },
-    "startFailed": {
-      "title": "I rahua te tīmata a {{instanceName}}",
-      "body": "I rahua te tīmata."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "Ka tīmata anō a {{instanceName}} ākuanei",
-      "body": "Kua whakaritea kia tīmata anō i {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Kua whakakorea te tīmatanga anō a {{instanceName}}",
-      "body": "Kua whakakorea te tīmatanga anō i whakaritea i mua."
-    },
-    "versionChangeNotice": {
-      "title": "Ka whakamohoatia a {{instanceName}} ākuanei",
-      "bodyWithTag": "Whakamohoa ki {{targetImageTag}} i {{when}}.",
-      "bodyWithoutTag": "Kua whakaritea te whakamohoatanga i {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Kua whakakorea te whakamohoatanga a {{instanceName}}",
-      "body": "Kua whakakorea te whakamohoatanga i whakaritea i mua."
+      "title": "Te takahitanga SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kua rite tō wātū Kilo kia whakahaere mai i tō waea"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

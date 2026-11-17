@@ -110,36 +110,35 @@ describe('selectRowPlatformPresentation', () => {
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
   });
 
-  it('leaves spokenPlatform undefined when the git URL yields no repo name', () => {
-    expect(
-      selectRowPlatformPresentation({
-        platform: 'cli',
-        variant: 'list',
-        needsInput: false,
-        statusGlyph: false,
-        gitUrl: null,
-      })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
+  it('draws no glyph when the eyebrow already names the platform (no repo name)', () => {
+    // The eyebrow renders the platform label itself, so a glyph beside the
+    // timestamp would repeat the word.
+    for (const gitUrl of [null, undefined, '']) {
+      expect(
+        selectRowPlatformPresentation({
+          platform: 'cloud-agent-web',
+          variant: 'list',
+          needsInput: false,
+          statusGlyph: false,
+          gitUrl,
+        })
+      ).toEqual({ iconKind: null, spokenPlatform: undefined });
+    }
+  });
 
+  it('treats a git URL with an empty project segment as the label fallback', () => {
+    // `repoNameFromGitUrl` answers `''` here, and the label helpers read it as
+    // absent, so the glyph has to fall back with them or the row states its
+    // type twice.
     expect(
       selectRowPlatformPresentation({
-        platform: 'cli',
+        platform: 'cloud-agent-web',
         variant: 'list',
         needsInput: false,
         statusGlyph: false,
-        gitUrl: undefined,
+        gitUrl: 'git@github.com:/',
       })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
-
-    expect(
-      selectRowPlatformPresentation({
-        platform: 'cli',
-        variant: 'list',
-        needsInput: false,
-        statusGlyph: false,
-        gitUrl: '',
-      })
-    ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
+    ).toEqual({ iconKind: null, spokenPlatform: undefined });
   });
 
   it('sets spokenPlatform when an icon shows with a repo-name eyebrow (stored git_url shape)', () => {

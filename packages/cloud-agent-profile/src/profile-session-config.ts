@@ -107,8 +107,8 @@ export type MergeProfileConfigurationResult = {
   /** The environment's start commands. Only an environment supplies them. */
   startCommands?: string[];
   /**
-   * How many leading `setupCommands` are the environment's own. An environment
-   * snapshot already ran them; the rest are the session's.
+   * How many leading `setupCommands` are the environment's build commands.
+   * They run only in an environment build; the rest are session setup commands.
    */
   environmentSetupCommandCount?: number;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
@@ -438,11 +438,10 @@ export async function mergeProfileConfiguration(
   for (const layer of [base, top]) {
     const data = layer ? profileData.find(d => d.profileId === layer.profileId) : undefined;
     if (!data) continue;
-    const profileLayer = profileToLayer(data);
-    // The repository environment owns setup: profile setup commands do not run
-    // beside it, so a setup moved into the environment never runs twice.
-    // Profile variables still apply over it.
-    layers.push(args.environment ? { ...profileLayer, commands: [] } : profileLayer);
+    // Profile setup commands are session setup: they run beside an environment
+    // as non-fatal commands. A command that was also moved into the environment
+    // runs twice; the user can remove the duplicate from the profile.
+    layers.push(profileToLayer(data));
   }
   const inline = inlineToLayer(args);
   if (inline) layers.push(inline);

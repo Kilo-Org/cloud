@@ -1,13 +1,24 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
-import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  getEnvironment,
+  normalizeRepoFullName,
+  type EnvironmentOwner,
+  type EnvironmentResponse,
+} from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
+import pLimit from 'p-limit';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
@@ -27,6 +38,7 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import {
   triggerIdSchema,
@@ -54,11 +66,9 @@ import {
 
 const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
 
-// Input schemas
-const variantSchema = z
-  .string()
-  .max(50)
-  .regex(/^[a-zA-Z]+$/);
+// `list` reads the worker once per row to answer editability. The cap keeps a
+// large organization's list from turning one query into an unbounded burst.
+const TRIGGER_EDITABILITY_CONCURRENCY = 4;
 
 export const WebhookTriggerCreateInput = z
   .object({
@@ -72,8 +82,9 @@ export const WebhookTriggerCreateInput = z
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1, 'Model is required').optional(),
-    variant: variantSchema.optional(),
+    variant: agentVariantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
     // Shared fields
@@ -187,6 +198,13 @@ export const WebhookTriggerCreateInput = z
           path: ['sandboxAllocation'],
         });
       }
+      if (data.environmentId != null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Environment selection is not applicable for KiloClaw Chat triggers',
+          path: ['environmentId'],
+        });
+      }
     }
   });
 
@@ -198,8 +216,9 @@ export const WebhookTriggerUpdateInput = z
     organizationId: z.string().uuid().optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1).optional(),
-    variant: variantSchema.nullable().optional(),
+    variant: agentVariantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
@@ -322,6 +341,48 @@ function assertCanEditExecutionUserTrigger(
   });
 }
 
+/**
+ * Whether an organization viewer may write a trigger, and why not when they may
+ * not — the same rule `assertCanEditExecutionUserTrigger` enforces on update and
+ * `ensureOrganizationAccess` enforces on the router. A caller that renders a
+ * write control needs the answer before the person taps it.
+ */
+function triggerEditability(
+  actorRole: OrganizationRole | undefined,
+  executionUserId: string | null,
+  userId: string
+): { canEdit: boolean; canEditReason: WebhookTriggerEditRestriction | null } {
+  const canEdit =
+    actorRole !== undefined &&
+    TRIGGER_WRITE_ROLES.includes(actorRole) &&
+    (!executionUserId || executionUserId === userId || canManageOrganization(actorRole));
+  // A creator-run trigger names its creator only when that is someone else.
+  const creatorRunLock = executionUserId !== null && executionUserId !== userId;
+  return { canEdit, canEditReason: canEdit ? null : creatorRunLock ? 'creator_run' : 'role' };
+}
+
+/**
+ * The viewer's role for a trigger surface: the write role they hold when they
+ * hold one, otherwise their highest-priority role for read access. `list` must
+ * resolve this exactly as `get` does, or a row's write control disagrees with
+ * the screen it opens — a child-org member who also inherits a parent-org
+ * billing manager role resolves to `billing_manager` unfiltered, which no
+ * trigger write accepts.
+ */
+async function resolveTriggerViewerRole(
+  ctx: TRPCContext,
+  organizationId: string
+): Promise<OrganizationRole> {
+  try {
+    return await ensureOrganizationAccess(ctx, organizationId, TRIGGER_WRITE_ROLES);
+  } catch (error) {
+    if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
+      throw error;
+    }
+    return ensureOrganizationAccess(ctx, organizationId);
+  }
+}
+
 async function getOrganizationTriggerExecutionUserId(
   organizationId: string,
   triggerId: string,
@@ -375,6 +436,50 @@ async function assertProfileOwnership(
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Profile not found or not accessible',
+    });
+  }
+}
+
+function environmentOwner(userId: string, organizationId?: string): EnvironmentOwner {
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: userId };
+}
+
+function environmentHasGithubRepository(
+  environment: EnvironmentResponse,
+  githubRepo: string
+): boolean {
+  const normalizedRepo = normalizeRepoFullName(githubRepo);
+  if (environment.repositories !== undefined) {
+    return environment.repositories.some(
+      repository =>
+        repository.platform === 'github' &&
+        normalizeRepoFullName(repository.repoFullName) === normalizedRepo
+    );
+  }
+  return (
+    environment.platform === 'github' &&
+    normalizeRepoFullName(environment.repoFullName) === normalizedRepo
+  );
+}
+
+async function assertEnvironmentOwnershipAndRepository(
+  userId: string,
+  organizationId: string | undefined,
+  environmentId: string,
+  githubRepo: string
+): Promise<void> {
+  const environment = await getEnvironment(
+    db,
+    environmentId,
+    environmentOwner(userId, organizationId)
+  );
+
+  if (!environmentHasGithubRepository(environment, githubRepo)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Environment does not include the selected repository',
     });
   }
 }
@@ -475,6 +580,16 @@ export const webhookTriggersRouter = createTRPCRouter({
   /**
    * List triggers for current user or organization.
    * Reads from PostgreSQL only (can't enumerate DOs).
+   *
+   * `withEditability` also answers, per organization row, whether this viewer
+   * may write it — the question `get` answers for one trigger. That answer
+   * depends on the execution identity the worker holds for a run-as-creator
+   * trigger, so it costs one worker read per row, capped and isolated per row:
+   * a worker failure leaves that row at what the viewer's role alone allows
+   * rather than failing a list the database can serve. A surface that renders a
+   * write control per row asks for it and the web list, which does not, keeps
+   * its single database read. Without the flag an organization row reports
+   * `canEdit: null` (unknown), never a guessed `false`.
    */
   list: baseProcedure
     .input(
@@ -482,14 +597,16 @@ export const webhookTriggersRouter = createTRPCRouter({
         organizationId: z.string().uuid().optional(),
         targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
         activationMode: z.enum(['webhook', 'scheduled']).optional(),
+        withEditability: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
       // Verify org membership if organizationId provided
+      let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Query PostgreSQL with ownership + optional target type filter
@@ -524,7 +641,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         .where(whereClause)
         .orderBy(cloud_agent_webhook_triggers.created_at);
 
-      return triggers.map(trigger => ({
+      const rows = triggers.map(trigger => ({
         ...trigger,
         inboundUrl: buildInboundUrl(
           input.organizationId ? undefined : userId,
@@ -532,6 +649,47 @@ export const webhookTriggersRouter = createTRPCRouter({
           trigger.triggerId
         ),
       }));
+
+      // One row shape for every branch: a caller's type must not depend on the
+      // scope or the flag, or a cache write of one list cannot accept another.
+      const projectRow = (
+        row: (typeof rows)[number],
+        canEdit: boolean | null,
+        canEditReason: WebhookTriggerEditRestriction | null
+      ) => ({ ...row, canEdit, canEditReason });
+
+      const organizationId = input.organizationId;
+      const readsEditability = organizationId !== undefined && input.withEditability === true;
+      const limit = pLimit(TRIGGER_EDITABILITY_CONCURRENCY);
+      return Promise.all(
+        rows.map(row =>
+          limit(async () => {
+            if (organizationId === undefined) {
+              return projectRow(row, true, null);
+            }
+            if (!readsEditability) {
+              return projectRow(row, null, null);
+            }
+            // The worker client throws on a transient error. That is one row's
+            // unknown execution identity, not a reason to fail a list the
+            // database can serve, so it degrades exactly like `found: 'error'`
+            // and keeps what the viewer's role alone allows.
+            let executionUserId: string | null = null;
+            try {
+              const workerResult = await getWorkerTrigger(undefined, organizationId, row.triggerId);
+              executionUserId =
+                workerResult.found === true ? (workerResult.config.executionUserId ?? null) : null;
+            } catch (error) {
+              console.error('Worker request failed while reading list editability', {
+                triggerId: row.triggerId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+            const editability = triggerEditability(actorRole, executionUserId, userId);
+            return projectRow(row, editability.canEdit, editability.canEditReason);
+          })
+        )
+      );
     }),
 
   /**
@@ -550,18 +708,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        try {
-          actorRole = await ensureOrganizationAccess(
-            ctx,
-            input.organizationId,
-            TRIGGER_WRITE_ROLES
-          );
-        } catch (error) {
-          if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
-            throw error;
-          }
-          actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
-        }
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Verify ownership via PostgreSQL
@@ -603,21 +750,15 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
 
       const executionUserId = workerResult.config.executionUserId ?? null;
-      const canEdit =
-        !input.organizationId ||
-        (actorRole !== undefined &&
-          TRIGGER_WRITE_ROLES.includes(actorRole) &&
-          (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+      // A trigger of the viewer's own is always theirs to change.
+      const { canEdit, canEditReason } = input.organizationId
+        ? triggerEditability(actorRole, executionUserId, userId)
+        : { canEdit: true, canEditReason: null };
       const canRun = !input.organizationId
         ? !executionUserId || executionUserId === userId
         : actorRole !== undefined &&
           TRIGGER_WRITE_ROLES.includes(actorRole) &&
           (!executionUserId || executionUserId === userId);
-      const canEditReason: WebhookTriggerEditRestriction = canEdit
-        ? null
-        : executionUserId && executionUserId !== userId
-          ? 'creator_run'
-          : 'role';
 
       return {
         ...workerResult.config,
@@ -682,6 +823,20 @@ export const webhookTriggersRouter = createTRPCRouter({
         userId,
         input.runAsCreator ? undefined : input.organizationId,
         input.profileId
+      );
+    }
+    if (input.environmentId != null) {
+      if (!input.githubRepo) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Environment selection requires a GitHub repository',
+        });
+      }
+      await assertEnvironmentOwnershipAndRepository(
+        userId,
+        input.organizationId,
+        input.environmentId,
+        input.githubRepo
       );
     }
     if (input.targetType === 'kiloclaw_chat') {
@@ -756,6 +911,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           model: input.model,
           variant: input.variant,
           sandboxAllocation: input.sandboxAllocation,
+          environmentId: input.environmentId,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
           bodySchema: input.bodySchema,
@@ -859,6 +1015,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
+    if (input.environmentId != null && dbTrigger.target_type === 'kiloclaw_chat') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Environment selection is not applicable for KiloClaw Chat triggers',
+      });
+    }
+
     if (input.sandboxAllocation !== undefined && input.sandboxAllocation !== null) {
       await assertSandboxAllocationAvailable(
         ctx.user,
@@ -887,11 +1050,27 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
     }
 
+    if (input.environmentId != null) {
+      if (!dbTrigger.github_repo) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Environment selection requires a GitHub repository',
+        });
+      }
+      await assertEnvironmentOwnershipAndRepository(
+        userId,
+        input.organizationId,
+        input.environmentId,
+        dbTrigger.github_repo
+      );
+    }
+
     const hasUpdates = [
       input.mode,
       input.model,
       input.variant,
       input.sandboxAllocation,
+      input.environmentId,
       input.promptTemplate,
       input.profileId,
       input.bodySchema,
@@ -919,6 +1098,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       model: input.model,
       variant: input.variant,
       sandboxAllocation: input.sandboxAllocation,
+      environmentId: input.environmentId,
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,

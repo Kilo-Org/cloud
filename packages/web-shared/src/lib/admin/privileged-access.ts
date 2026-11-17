@@ -116,8 +116,6 @@ const DELEGATED_WORKLOAD_TOKEN_SOURCES = new Set([
   'mcp-catalog',
   'internal-bot',
   'discord-bot',
-  'gastown',
-  'wasteland',
 ]);
 
 export function deriveCredentialKind(input: CredentialProvenanceInput): PrivilegedCredentialKind {

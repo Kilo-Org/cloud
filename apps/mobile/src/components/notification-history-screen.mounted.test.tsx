@@ -55,6 +55,8 @@ const state = vi.hoisted(() => {
     pageSize: undefined as number | undefined,
     /** A failure for a non-first page only. */
     pageError: undefined as Error | undefined,
+    /** Cursors requested after page one; an unbounded read-on would grow this. */
+    pageRequests: 0,
     /** The rendered list's paging hook, so a test can drive a next page. */
     listProps: undefined as { onEndReached?: () => void; onRefresh?: () => void } | undefined,
   };
@@ -140,6 +142,9 @@ vi.mock('@/lib/trpc', () => ({
             queryKey: [HISTORY_PATH, { input, type: 'infinite' }],
             initialPageParam: undefined,
             queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
+              if (pageParam !== undefined) {
+                state.pageRequests += 1;
+              }
               if (pageParam !== undefined && state.pageError) {
                 throw state.pageError;
               }
@@ -263,6 +268,7 @@ beforeEach(() => {
   state.historyOptions = [];
   state.pageSize = undefined;
   state.pageError = undefined;
+  state.pageRequests = 0;
   state.listProps = undefined;
   vi.clearAllMocks();
 });
@@ -287,15 +293,15 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('filters the list by the tapped chip', async () => {
-    state.rows = [row(), row({ id: 'row-2', category: 'chatMessages', pushType: 'chat.message' })];
+    state.rows = [row(), row({ id: 'row-2', category: 'sessionStatus' })];
     await mount();
     expect(byType('Cell')).toHaveLength(2);
 
-    const chatChip = withText(byType('Button'), 'Chat messages');
-    press(chatChip);
+    const sessionChip = withText(byType('Button'), 'Session status');
+    press(sessionChip);
 
     await waitFor(() => byType('Cell').length === 1);
-    expect(state.historyInputs.at(-1)).toMatchObject({ category: 'chatMessages' });
+    expect(state.historyInputs.at(-1)).toMatchObject({ category: 'sessionStatus' });
   });
 
   it('opens a row through the pending deep link slot, not the router', async () => {
@@ -323,6 +329,37 @@ describe('NotificationHistoryScreen', () => {
     expect(mocks.toastError).toHaveBeenCalledWith('This notification no longer opens anywhere.');
     expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
     expect(byType('Cell')).toHaveLength(1);
+  });
+
+  it('hides a stored row of a retired kind and keeps the rows it still routes', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    await mount();
+
+    expect(byType('Cell')).toHaveLength(1);
+    expect(byType('Pressable')).toHaveLength(1);
+  });
+
+  it('reads past a page of retired rows instead of reporting an empty account', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    state.pageSize = 1;
+    await mount();
+
+    await waitFor(() => byType('Cell').length === 1);
+    expect(byType('EmptyState')).toHaveLength(0);
   });
 
   it('states the retention window when the account has no rows', async () => {
@@ -448,10 +485,10 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('announces the chip row as a tab list with the selected chip marked', async () => {
-    state.rows = [row({ category: 'chatMessages', pushType: 'chat.message' })];
+    state.rows = [row({ category: 'sessionStatus' })];
     await mount();
 
-    const chip = withText(byType('Button'), 'Chat messages');
+    const chip = withText(byType('Button'), 'Session status');
     expect(chipProps(chip)).toMatchObject({
       // iOS is the mocked platform: a chip is typed as a button there so
       // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
@@ -462,7 +499,7 @@ describe('NotificationHistoryScreen', () => {
     press(chip);
     await waitFor(
       () =>
-        chipProps(withText(byType('Button'), 'Chat messages'))?.accessibilityState?.selected ===
+        chipProps(withText(byType('Button'), 'Session status'))?.accessibilityState?.selected ===
         true
     );
   });
@@ -470,7 +507,7 @@ describe('NotificationHistoryScreen', () => {
   it('says a category has nothing rather than that the account has nothing', async () => {
     state.rows = [row({ category: 'balanceAlerts' })];
     await mount();
-    press(withText(byType('Button'), 'Chat messages'));
+    press(withText(byType('Button'), 'Session status'));
     await waitFor(() => byType('EmptyState').length === 1);
 
     const empty = byType('EmptyState')[0];
@@ -527,6 +564,26 @@ describe('NotificationHistoryScreen', () => {
     expect(footer).toBeDefined();
   });
 
+  it('stops reading on after a failed next page instead of retrying without bound', async () => {
+    // Page one is nothing but a retired row, so the list reads on: the failed
+    // second page keeps the cursor and clears the fetching flag, and only the
+    // footer's Retry may request it again.
+    state.pageSize = 1;
+    state.pageError = new Error('paging failed');
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    await mount();
+
+    await waitFor(() => withText(byType('Button'), 'Retry loading more') !== undefined);
+    expect(state.pageRequests).toBe(1);
+  });
+
   it('settles the chip row offline instead of holding its skeletons', async () => {
     // The online manager reports offline, so a read that keeps the default
     // `networkMode: 'online'` pauses in `pending` and never renders a chip.
@@ -535,7 +592,7 @@ describe('NotificationHistoryScreen', () => {
     await mount();
 
     expect(withText(byType('Button'), 'All')).toBeDefined();
-    expect(withText(byType('Button'), 'Chat messages')).toBeDefined();
+    expect(withText(byType('Button'), 'Session status')).toBeDefined();
   });
 
   it('turns off the network gate so an offline first load can fail into its retry', async () => {

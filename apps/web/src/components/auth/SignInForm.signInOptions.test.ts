@@ -13,11 +13,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
+let mockClaudeEnabled = false;
 let mockReturning = false;
-let mockClaudeConfigured = true;
+let mockProviderSelect = false;
 
-jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
-  useClaudeSignInConfigured: () => mockClaudeConfigured,
+jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
+  useClaudeSignInEnabled: () => mockClaudeEnabled,
 }));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
@@ -30,7 +31,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     emailValidation: { isValid: true, error: null },
     error: '',
     showTurnstile: false,
-    flowState: 'landing',
+    flowState: mockProviderSelect ? 'provider-select' : 'landing',
     tier: mockReturning ? 'returning' : 'new',
     hint: mockHintEmail
       ? { lastEmail: mockHintEmail, lastAuthMethod: mockReturning ? 'claude' : 'openai' }
@@ -38,7 +39,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     showEmailInput: mockReturning ? false : !isSignUp,
     email: mockFlowEmail,
     isVerifying: false,
-    availableProviders: [],
+    availableProviders: mockProviderSelect ? ['google', 'claude'] : [],
     isNewUser: false,
     pendingSignIn: null,
     turnstileError: false,
@@ -86,6 +87,15 @@ jest.mock('@/components/auth/sign-in/EmailInputForm', () => ({
     createElement('button', null, submitLabel ?? 'Continue'),
 }));
 
+jest.mock('@/components/auth/sign-in/ProviderSelectView', () => ({
+  ProviderSelectView: ({ providers }: { providers: string[] }) =>
+    createElement(
+      Fragment,
+      null,
+      ...providers.map(provider => createElement('button', { key: provider }, provider))
+    ),
+}));
+
 const { SignInForm } = require('./SignInForm') as {
   SignInForm: (props: {
     searchParams: Record<string, string>;
@@ -97,8 +107,9 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
+  mockClaudeEnabled = false;
   mockReturning = false;
-  mockClaudeConfigured = true;
+  mockProviderSelect = false;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -133,23 +144,24 @@ describe('SignInForm sign-in options', () => {
     expect(html).toContain('Continue with Email');
   });
 
-  it('omits an unconfigured Claude provider on the landing and remembered views', () => {
-    mockClaudeConfigured = false;
-    const landing = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-    expect(landing).not.toContain('Continue with Claude');
-    expect(landing).toContain('Continue with Google');
-    mockReturning = true;
-    mockHintEmail = 'remembered@example.com';
-    const returning = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-    expect(returning).not.toContain('Continue with Claude');
-    expect(returning).toContain('or see other sign-in methods');
+  it('offers server-discovered Claude without an identified browser PostHog person', () => {
+    mockProviderSelect = true;
+    mockFlowEmail = 'employee@kilocode.ai';
+    mockClaudeEnabled = false;
+    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(html).toContain('claude');
+    expect(html).toContain('google');
   });
 
-  it('offers a remembered Claude method', () => {
-    mockReturning = true;
-    mockHintEmail = 'remembered@example.com';
-    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-    expect(html).toContain('Continue with Claude');
-    expect(html).toContain('or see other sign-in methods');
-  });
+  it.each([false, true])(
+    'offers a remembered Claude method only when it is available (%s)',
+    enabled => {
+      mockClaudeEnabled = enabled;
+      mockReturning = true;
+      mockHintEmail = 'remembered@example.com';
+      const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+      expect(html.includes('Continue with Claude')).toBe(enabled);
+      expect(html).toContain('or see other sign-in methods');
+    }
+  );
 });

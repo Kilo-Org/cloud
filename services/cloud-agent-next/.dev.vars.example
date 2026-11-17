@@ -47,6 +47,10 @@ PREVIEW_HOST_SUFFIX=localhost
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
+# Optional Cloud Agent error reporting; application SENTRY_* settings are separate.
+CLOUD_AGENT_SENTRY_DSN=
+CLOUD_AGENT_SENTRY_ENVIRONMENT=development
+
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
@@ -59,9 +63,9 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
 BYOC_VERCEL_IDS=
 
-# Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
-WORKSPACE_SNAPSHOT_ORG_IDS=
-WORKSPACE_SNAPSHOT_USER_IDS=
+# Comma-separated user or organization IDs allowed to capture and restore registered workspace tail snapshots.
+# `*` enables snapshots for everyone; empty or unset is off.
+WORKSPACE_SNAPSHOT_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

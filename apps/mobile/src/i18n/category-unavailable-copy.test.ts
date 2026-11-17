@@ -19,7 +19,6 @@ import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
  * assertions below therefore fire on every translation that lands.
  */
 const UNAVAILABLE_REASON_KEYS = [
-  'notifications.category.kiloclawActivityUnavailable',
   'notifications.category.balanceAlertsUnavailable',
   'notifications.category.securityFindingsUnavailable',
 ] as const;

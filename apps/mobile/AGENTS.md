@@ -48,14 +48,6 @@ git diff --check
   `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
   soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
   clears `minimumReleaseAge`.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
-
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
-
-  Then restart Metro and force-quit the app.
 
 ## Library First
 
@@ -74,7 +66,8 @@ reason.
 
 ## Unified Elements
 
-One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
 
 | Concern | Element | Use instead of |
 |---|---|---|
@@ -82,14 +75,18 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
 | Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
 | Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
 | Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -112,19 +109,42 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; `useKeyboardState` is the app's one keyboard-height read.
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
+`@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
+writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
+the property it last applied stays on the native view). The pad never takes more room than the body can spare:
+it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
+`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
+and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
-pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
-(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard.
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
 
 Android searchable `formSheet` routes use only the existing safe-area-capped full detent.
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
+
+A searchable picker in a window shorter than 600pt also presents at the full detent, on either platform.
+The half detent sizes the sheet to its title row and search field, so a short window leaves the list under
+one row and the first result is clipped at the sheet edge (measured in a 501pt-tall iPad window).
+`searchPickerHeaderInList` (`@/lib/form-sheet-detents`) owns that threshold, and the language picker moves
+its search field into the scrolling list there so the title row, its actions, the field and a row stay
+together.
 
 An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
 detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
@@ -155,9 +175,30 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt exactly once. Leave no entry behind that nothing renders; the doc in `@/lib/surface-feedback` says which settle keeps one.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 
@@ -199,6 +240,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
@@ -258,8 +300,9 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
-- The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
+- The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
@@ -283,6 +326,12 @@ Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux servi
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

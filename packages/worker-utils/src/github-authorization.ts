@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const githubBrokerRejectionProvenanceSchema = z.enum([
+  'managed_lookup_miss',
+  'ambiguous_eligible_installations',
+  'installation_token_http404',
+]);
+export type GitHubBrokerRejectionProvenance = z.infer<typeof githubBrokerRejectionProvenanceSchema>;
+
 export const githubRepositoryAuthorizationFailureReasonSchema = z.enum([
   'database_not_configured',
   'invalid_repo_format',

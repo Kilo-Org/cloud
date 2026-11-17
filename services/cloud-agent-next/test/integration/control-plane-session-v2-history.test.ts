@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +11,8 @@ import {
 } from '../../src/control-plane/session/event-queries.js';
 import {
   MAX_SESSION_PAGE_BYTES,
+  MAX_SESSION_PREVIEW_PAGE_BYTES,
+  encodeCursor,
   readSessionMessagesPage,
 } from '../../src/control-plane/session/history.js';
 import {
@@ -24,6 +26,7 @@ import {
   readNativeEventPayload,
 } from '../../src/control-plane/session/native-events.js';
 import {
+  controlPlaneMessages,
   eventMutationCursor,
   events,
   historyImport,
@@ -33,6 +36,7 @@ import { parseSessionMetadata } from '../../src/persistence/session-metadata.js'
 import { sessionDoName } from '../../src/session-identity.js';
 import type { SessionIngestBinding } from '../../src/session-ingest-binding.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 
 const USER_ID = 'history-user';
 const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2> })
@@ -56,7 +60,7 @@ async function fixture() {
     }),
     sandboxSelection: { provider: 'cloudflare' },
   });
-  await stub.registerSession({
+  await seedRegistration(stub, {
     sandboxId,
     spec: {
       sessionId,
@@ -158,6 +162,24 @@ afterEach(async () => {
 });
 
 describe('workspace DO history and mutation cursors', () => {
+  it('authorizes upload descendants only through the registered root and stored ancestry', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const child = nativeId();
+    const grandchild = nativeId();
+    const unrelated = nativeId();
+    for (const [id, parentID] of [
+      [child, kiloSessionId],
+      [grandchild, child],
+      [unrelated, nativeId()],
+    ]) {
+      await publish(stub, 'session.created', { info: { ...snapshot(id), parentID } });
+    }
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, child)).toBe(true);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, grandchild)).toBe(true);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, unrelated)).toBe(false);
+    expect(await stub.hasSessionSyncDescendant(nativeId(), child)).toBe(false);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, nativeId())).toBe(false);
+  });
   it('sanitizes native turn-close errors in durable storage and the public stream', async () => {
     const { stub, sessionId, kiloSessionId } = await fixture();
     await runInDurableObject(stub, (_instance, state) => {
@@ -190,6 +212,285 @@ describe('workspace DO history and mutation cursors', () => {
       part: part(kiloSessionId, 'msg_plan', 'prt_plan'),
     });
     await expectIndexedEventReads(stub);
+  });
+
+  it('carries the stream rows on the first history page only', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, async (instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_failed',
+          intent: JSON.stringify({
+            messageId: 'msg_failed',
+            turn: { type: 'prompt', prompt: 'Fix the build' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+      const recorder = instance['preparationRecorder']('attempt_failed', 'msg_failed');
+      recorder.onProgress('workspace_setup', 'Preparing environment');
+      recorder.finalize({ status: 'failed', safeError: 'Workspace setup failed' });
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const first = await stub.getSessionMessagesPage();
+    expect(first).toMatchObject({
+      preparationAttempts: [expect.objectContaining({ id: 'attempt_failed', status: 'failed' })],
+      queuedMessages: [
+        expect.objectContaining({
+          messageId: 'msg_failed',
+          content: 'Fix the build',
+          terminalFailure: expect.objectContaining({
+            status: 'failed',
+            delivery: 'queued',
+            reason: 'workspace_setup_failed',
+          }),
+        }),
+      ],
+    });
+
+    const older = await stub.getSessionMessagesPage({
+      cursor: encodeCursor({
+        version: 1,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        createdAt: 0,
+        messageId: 'msg_oldest',
+        rowId: 1,
+      }),
+    });
+    expect(older).not.toHaveProperty('preparationAttempts');
+    expect(older).not.toHaveProperty('queuedMessages');
+  });
+
+  it('reserves the appended stream rows from the page budget', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const reserved = 2 * 1024 * 1024;
+    const [plain, shrunk] = await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const queries = createSessionEventQueries(db, state.storage);
+      // Each stored info is ~200 KB, so the hard cap decides how many messages
+      // fit and the reservation visibly drops the older ones.
+      for (let index = 0; index < 30; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'kilocode',
+          entityId: `message/msg_reserved_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            event: 'message.updated',
+            type: 'message.updated',
+            properties: {
+              info: {
+                ...message(kiloSessionId, `msg_reserved_${index}`, index),
+                padding: 'x'.repeat(200_000),
+              },
+            },
+          }),
+        });
+      }
+      const input = {
+        db,
+        storage: state.storage,
+        queries,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        metadata: null,
+      };
+      return [
+        readSessionMessagesPage(input),
+        readSessionMessagesPage({ ...input, reservedBytes: reserved }),
+      ];
+    });
+    expect(plain.messages.length).toBeGreaterThan(1);
+    expect(shrunk.messages.length).toBeLessThan(plain.messages.length);
+    expect(
+      new TextEncoder().encode(JSON.stringify(shrunk)).byteLength + reserved
+    ).toBeLessThanOrEqual(MAX_SESSION_PAGE_BYTES);
+  });
+
+  it('trims the appended stream rows to the newest rows under their own cap', async () => {
+    const { stub, sessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_trimmed',
+          intent: JSON.stringify({
+            messageId: 'msg_trimmed',
+            turn: { type: 'prompt', prompt: 'Keep the question' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+    });
+    await runInDurableObject(stub, instance => {
+      const queries = instance['eventQueries'];
+      for (let index = 0; index < 12; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'preparing',
+          entityId: `preparation/attempt/attempt_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            action: 'attempt_snapshot',
+            attempt: {
+              id: `attempt_${index}`,
+              triggerMessageId: `msg_${index}`,
+              status: 'failed',
+              startedAt: index,
+              safeError: 'x'.repeat(40_000),
+              revision: 1,
+            },
+          }),
+        });
+      }
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const rows = await runInDurableObject(stub, instance => instance['readSnapshotRows']());
+    const kept = rows.preparationAttempts.map(attempt => attempt.id);
+    expect(kept.length).toBeLessThan(12);
+    expect(kept.at(-1)).toBe('attempt_11');
+    expect(kept).toEqual(
+      Array.from({ length: 12 }, (_, index) => `attempt_${index}`).slice(-kept.length)
+    );
+    expect(rows.queuedMessages.map(item => item.messageId)).toEqual(['msg_trimmed']);
+    expect(rows.bytes).toBeLessThanOrEqual(256 * 1024);
+    expect(rows.bytes).toBeGreaterThan(0);
+    // The queued turn survives whole: only preparation attempts give way.
+    expect(rows.queuedMessages[0]?.content).toBe('Keep the question');
+  });
+
+  it('keeps the failed queued turn when preparation attempts would exhaust the row budget', async () => {
+    const { stub, sessionId } = await fixture();
+    const now = Date.now();
+    const question = 'Why did preparation fail? '.repeat(200);
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_question',
+          intent: JSON.stringify({
+            messageId: 'msg_question',
+            turn: { type: 'prompt', prompt: question },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+    });
+    await runInDurableObject(stub, instance => {
+      const queries = instance['eventQueries'];
+      for (const index of [0, 1]) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'preparing',
+          entityId: `preparation/attempt/attempt_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            action: 'attempt_snapshot',
+            attempt: {
+              id: `attempt_${index}`,
+              triggerMessageId: 'msg_question',
+              status: 'failed',
+              startedAt: index,
+              safeError: 'x'.repeat(130_000),
+              revision: 1,
+            },
+          }),
+        });
+      }
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const rows = await runInDurableObject(stub, instance => instance['readSnapshotRows']());
+    // The question alone is ~5 KB, so only the newest attempt still fits beside it.
+    expect(rows.queuedMessages.map(item => item.messageId)).toEqual(['msg_question']);
+    expect(rows.queuedMessages[0]?.content).toBe(question);
+    expect(rows.preparationAttempts.map(attempt => attempt.id)).toEqual(['attempt_1']);
+    expect(rows.bytes).toBeLessThanOrEqual(256 * 1024);
+  });
+
+  it('reserves the appended stream rows from a native v2 page budget', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const reserved = 2 * 1024 * 1024;
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+    // Each native message is ~500 KB, so the hard cap decides how many fit and
+    // the reservation visibly drops the older ones.
+    for (let index = 0; index < 12; index += 1) {
+      await publish(stub, 'conversation.message.updated', {
+        sessionID: kiloSessionId,
+        source,
+        message: {
+          id: `msg_v2_reserved_${index}`,
+          type: 'user',
+          time: { created: index + 1 },
+          content: [],
+          padding: 'x'.repeat(500_000),
+        },
+      });
+    }
+    const [plain, shrunk] = await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const input = {
+        db,
+        storage: state.storage,
+        queries: createSessionEventQueries(db, state.storage),
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        metadata: null,
+      };
+      return [
+        readSessionMessagesPage(input),
+        readSessionMessagesPage({ ...input, reservedBytes: reserved }),
+      ];
+    });
+    if (plain.source.version !== 'v2' || shrunk.source.version !== 'v2')
+      throw new Error('Expected native v2 history pages');
+    expect(plain.messages.length).toBeGreaterThan(1);
+    expect(shrunk.messages.length).toBeGreaterThan(0);
+    expect(shrunk.messages.length).toBeLessThan(plain.messages.length);
+    expect(new TextEncoder().encode(JSON.stringify(plain)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PAGE_BYTES
+    );
+    expect(
+      new TextEncoder().encode(JSON.stringify(shrunk)).byteLength + reserved
+    ).toBeLessThanOrEqual(MAX_SESSION_PAGE_BYTES);
   });
 
   it('keeps native v2 history pages on indexed entity ranges', async () => {
@@ -1202,6 +1503,10 @@ describe('workspace DO history and mutation cursors', () => {
             lifecycle: { version: 1, timestamp: 1 },
           })
         );
+        await instance.getSessionToolPartDetail({
+          messageId: 'msg_missing',
+          partId: 'prt_missing',
+        });
         await instance.getSessionMessagesPage();
         expect(messages).toHaveBeenCalledTimes(version === 'v1' ? 1 : 0);
       });
@@ -1421,5 +1726,375 @@ describe('workspace DO history and mutation cursors', () => {
       expect(readHistoryHydration(state.storage)?.phase).toBe('complete');
       expect(db.select().from(events).all()).toHaveLength(1);
     });
+  });
+});
+
+describe('tool previews and authorized tool details', () => {
+  const largeOutput = 'output line\n'.repeat(4_000);
+  const largeInput = 'c'.repeat(10_000);
+
+  function toolPart(sessionID: string, messageID: string, id: string, output = largeOutput) {
+    const content = output.length > 100 ? largeInput : 'small';
+    return {
+      id,
+      sessionID,
+      messageID,
+      type: 'tool',
+      callID: `call_${id}`,
+      tool: 'write',
+      state: {
+        status: 'completed',
+        input: { filePath: '/repo/a.ts', content },
+        output,
+        title: 'a.ts',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+  }
+
+  async function publishTool(
+    stub: DurableObjectStub<SandboxSessionV2>,
+    kiloSessionId: string,
+    messageId = 'msg_tool',
+    partId = 'prt_tool',
+    output = largeOutput
+  ) {
+    await publish(stub, 'message.updated', { info: message(kiloSessionId, messageId, 1) });
+    await publish(stub, 'message.part.updated', {
+      part: toolPart(kiloSessionId, messageId, partId, output),
+    });
+  }
+
+  async function rowCursor(stub: DurableObjectStub<SandboxSessionV2>, entityId: string) {
+    return runInDurableObject(stub, (_instance, state) => {
+      const row = drizzle(state.storage)
+        .select({ cursor: events.mutation_cursor })
+        .from(events)
+        .where(eq(events.entity_id, entityId))
+        .get();
+      return row?.cursor;
+    });
+  }
+
+  it('returns bounded previews with a revision only when requested', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    await publishTool(stub, kiloSessionId);
+    await publishTool(stub, kiloSessionId, 'msg_small', 'prt_small', 'small');
+    const full = await stub.getSessionMessagesPage();
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    const fullParts = full?.messages.flatMap(item => ('parts' in item ? item.parts : []));
+    const previewParts = preview?.messages.flatMap(item => ('parts' in item ? item.parts : []));
+    expect(fullParts?.find(item => item.id === 'prt_tool')).toMatchObject({
+      state: { output: largeOutput },
+    });
+    const projected = previewParts?.find(item => item.id === 'prt_tool') as
+      | (ReturnType<typeof toolPart> & { cloudDetail: { revision: number; omitted: string[] } })
+      | undefined;
+    expect(projected?.state.output.length).toBeLessThan(5_000);
+    expect(projected?.state.input.filePath).toBe('/repo/a.ts');
+    expect(projected?.cloudDetail).toMatchObject({
+      revision: await rowCursor(stub, 'part/msg_tool/prt_tool'),
+      omitted: ['output', 'input.content'],
+    });
+    expect(previewParts?.find(item => item.id === 'prt_small')).toEqual(
+      fullParts?.find(item => item.id === 'prt_small')
+    );
+    expect(new TextEncoder().encode(JSON.stringify(preview)).byteLength).toBeLessThan(
+      new TextEncoder().encode(JSON.stringify(full)).byteLength / 4
+    );
+    // The preview still parses through the strict client page schema.
+    expect(cloudSessionMessagesPageSchema.parse(preview)?.messages).toHaveLength(2);
+  });
+
+  it('reads complete stored details for the current revision without waking compute', async () => {
+    const { stub, kiloSessionId, peer } = await fixture();
+    await publishTool(stub, kiloSessionId);
+    const detail = await stub.getSessionToolPartDetail({
+      messageId: 'msg_tool',
+      partId: 'prt_tool',
+    });
+    expect(detail).toMatchObject({
+      kind: 'found',
+      source: { version: 'v1' },
+      revision: await rowCursor(stub, 'part/msg_tool/prt_tool'),
+      part: { id: 'prt_tool', state: { output: largeOutput, input: { content: largeInput } } },
+    });
+    expect(peer.fetchCalls).toEqual([]);
+    expect(peer.statusCalls).toEqual([]);
+    expect(peer.prepareCalls).toEqual([]);
+    // A newer row revision is reported, so a client can retire stale details.
+    await publishTool(stub, kiloSessionId, 'msg_tool', 'prt_tool', `${largeOutput}more`);
+    const newer = await stub.getSessionToolPartDetail({
+      messageId: 'msg_tool',
+      partId: 'prt_tool',
+    });
+    expect(newer?.kind === 'found' && newer.revision).toBeGreaterThan(
+      detail?.kind === 'found' ? detail.revision : Infinity
+    );
+  });
+
+  it('hydrates an ingest-only tool before the first detail read without waking compute', async () => {
+    const { stub, sessionId, kiloSessionId, peer } = await fixture();
+    await runInDurableObject(stub, async (instance, state) => {
+      state.storage.kv.delete('client_history_hydration');
+      const importedPart = toolPart(kiloSessionId, 'msg_imported', 'prt_imported');
+      const readMessages = vi.fn().mockResolvedValue({
+        kiloSessionId,
+        cloudAgentSessionId: sessionId,
+        history: {
+          messages: [{ info: message(kiloSessionId, 'msg_imported', 1), parts: [importedPart] }],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+      });
+      const ingest = instance.env.SESSION_INGEST;
+      instance.env.SESSION_INGEST = {
+        getCloudAgentRootSessionSnapshot: vi.fn().mockResolvedValue(null),
+        getCloudAgentRootSessionMessages: readMessages,
+      } as unknown as SessionIngestBinding;
+      Reflect.set(
+        instance,
+        'metadata',
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: USER_ID, createdOnPlatform: 'cloud-agent-web' },
+          auth: { kiloSessionId, kilocodeToken: 'test-kilo-token' },
+          agent: { mode: 'code', model: 'test/model' },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      );
+      try {
+        expect(
+          await instance.getSessionToolPartDetail({
+            messageId: 'msg_imported',
+            partId: 'prt_imported',
+          })
+        ).toMatchObject({
+          kind: 'found',
+          source: { version: 'v1' },
+          part: {
+            id: importedPart.id,
+            messageID: importedPart.messageID,
+            sessionID: kiloSessionId,
+            state: { input: importedPart.state.input, output: importedPart.state.output },
+          },
+        });
+        expect(readMessages).toHaveBeenCalledTimes(1);
+        expect(readHistoryHydration(state.storage)?.phase).toBe('complete');
+        expect((await instance.getSessionMessagesPage())?.messages).toHaveLength(1);
+        expect(readMessages).toHaveBeenCalledTimes(1);
+      } finally {
+        instance.env.SESSION_INGEST = ingest;
+      }
+    });
+    expect(peer.fetchCalls).toEqual([]);
+    expect(peer.statusCalls).toEqual([]);
+    expect(peer.prepareCalls).toEqual([]);
+  });
+
+  it('keeps a small tool at the hard-cap boundary without reserving an unused marker', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const messageId = 'msg_boundary';
+    await publish(stub, 'message.updated', { info: message(kiloSessionId, messageId, 1) });
+    const text = 'x'.repeat(Math.floor((MAX_SESSION_PAGE_BYTES - 10_000) / 6));
+    for (let index = 0; index < 6; index++) {
+      await publish(stub, 'message.part.updated', {
+        part: part(kiloSessionId, messageId, `prt_${index}`, text),
+      });
+    }
+    await publish(stub, 'message.part.updated', {
+      part: toolPart(kiloSessionId, messageId, 'prt_ztool', 'small'),
+    });
+
+    const full = await stub.getSessionMessagesPage();
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    expect(full?.messages[0]?.parts).toHaveLength(7);
+    expect(preview?.messages).toEqual(full?.messages);
+    expect(preview?.omittedItemCount).toBe(0);
+    expect(preview?.nextCursor).toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(preview)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PAGE_BYTES
+    );
+  });
+
+  it('does not reveal removed, foreign-session or non-tool rows', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const child = nativeId();
+    const foreign = nativeId();
+    await publish(stub, 'session.created', { info: { id: child, parentID: kiloSessionId } });
+    await publish(stub, 'session.updated', { info: { id: foreign } });
+    await publishTool(stub, kiloSessionId);
+    await publish(stub, 'message.part.updated', {
+      part: part(kiloSessionId, 'msg_tool', 'prt_text'),
+    });
+    const read = (input: Parameters<SandboxSessionV2['getSessionToolPartDetail']>[0]) =>
+      stub.getSessionToolPartDetail(input);
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_text' })).toEqual({
+      kind: 'not_found',
+    });
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_missing' })).toEqual({
+      kind: 'not_found',
+    });
+    // The part belongs to the root, not to the selected child.
+    expect(await read({ kiloSessionId: child, messageId: 'msg_tool', partId: 'prt_tool' })).toEqual(
+      { kind: 'not_found' }
+    );
+    expect(await read({ kiloSessionId: foreign, messageId: 'msg_tool', partId: 'prt_tool' })).toBe(
+      null
+    );
+    expect(
+      await read({ expectedRootKiloSessionId: foreign, messageId: 'msg_tool', partId: 'prt_tool' })
+    ).toBeNull();
+    await publish(stub, 'message.part.removed', {
+      sessionID: kiloSessionId,
+      messageID: 'msg_tool',
+      partID: 'prt_tool',
+    });
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_tool' })).toEqual({
+      kind: 'not_found',
+    });
+  });
+
+  it('projects native v2 tool entries and returns one complete call', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+    const tool = (id: string) => ({
+      type: 'tool',
+      id,
+      name: 'shell',
+      state: {
+        status: 'completed',
+        input: { command: 'cat big' },
+        content: [{ type: 'text', text: largeOutput }],
+      },
+      time: { created: 1, completed: 2 },
+    });
+    await publish(stub, 'conversation.message.updated', {
+      sessionID: kiloSessionId,
+      source,
+      message: {
+        id: 'msg_v2_tools',
+        type: 'assistant',
+        time: { created: 2 },
+        content: [tool('call_a'), tool('call_b')],
+      },
+    });
+    const revision = await rowCursor(stub, 'message/msg_v2_tools');
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    const first = preview?.messages[0] as
+      | { message: { content: Array<Record<string, unknown>> } }
+      | undefined;
+    const content = first?.message.content ?? [];
+    expect(content.map(item => item.cloudDetail)).toMatchObject([{ revision }, { revision }]);
+    expect(cloudSessionMessagesPageSchema.parse(preview)?.messages[0]?.parts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ callID: 'call_a', cloudDetail: expect.any(Object) }),
+      ])
+    );
+    const detail = await stub.getSessionToolPartDetail({
+      messageId: 'msg_v2_tools',
+      partId: 'unused',
+      callId: 'call_b',
+    });
+    expect(detail).toMatchObject({ kind: 'found', source, revision });
+    const detailContent = (detail as { message: { content: Array<Record<string, unknown>> } })
+      .message.content;
+    expect(detailContent[0]?.cloudDetail).toBeDefined();
+    expect(detailContent[1]).toEqual(tool('call_b'));
+    expect(
+      await stub.getSessionToolPartDetail({ messageId: 'msg_v2_tools', partId: 'unused' })
+    ).toEqual({ kind: 'not_found' });
+  });
+
+  it.each(['v1', 'v2'] as const)(
+    'keeps %s preview pages on user-turn boundaries without skipping the partial older turn',
+    async version => {
+      const { stub, kiloSessionId } = await fixture();
+      const source = {
+        version: 'v2',
+        session: {
+          id: kiloSessionId,
+          location: { directory: '/workspace/app' },
+          time: { created: 1, updated: 8 },
+        },
+      };
+      if (version === 'v2')
+        await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+      for (let index = 1; index <= 8; index++) {
+        const role = index % 3 === 1 ? 'user' : 'assistant';
+        if (version === 'v1') {
+          await publish(stub, 'message.updated', {
+            info: { ...message(kiloSessionId, `msg_turn_${index}`, index), role },
+          });
+          await publish(stub, 'message.part.updated', {
+            part: part(kiloSessionId, `msg_turn_${index}`, `prt_turn_${index}`),
+          });
+        } else {
+          await publish(stub, 'conversation.message.updated', {
+            sessionID: kiloSessionId,
+            source,
+            message: {
+              id: `msg_turn_${index}`,
+              type: index === 4 ? 'synthetic' : role,
+              time: { created: index },
+              content: [{ type: 'text', text: `Message ${index}` }],
+            },
+          });
+        }
+      }
+      const ids = (page: Awaited<ReturnType<typeof stub.getSessionMessagesPage>>) =>
+        page?.messages.map(item => ('info' in item ? item.info.id : item.message.id));
+      expect(ids(await stub.getSessionMessagesPage({ limit: 4 }))).toEqual([
+        'msg_turn_5',
+        'msg_turn_6',
+        'msg_turn_7',
+        'msg_turn_8',
+      ]);
+      const first = await stub.getSessionMessagesPage({ limit: 4, toolDisplay: 'preview' });
+      expect(ids(first)).toEqual(['msg_turn_7', 'msg_turn_8']);
+      const second = await stub.getSessionMessagesPage({
+        limit: 4,
+        toolDisplay: 'preview',
+        cursor: first?.nextCursor ?? undefined,
+      });
+      expect(ids(second)).toEqual(['msg_turn_4', 'msg_turn_5', 'msg_turn_6']);
+      const last = await stub.getSessionMessagesPage({
+        limit: 4,
+        toolDisplay: 'preview',
+        cursor: second?.nextCursor ?? undefined,
+      });
+      expect(ids(last)).toEqual(['msg_turn_1', 'msg_turn_2', 'msg_turn_3']);
+      expect(last?.nextCursor).toBeNull();
+      expect([first, second, last].map(page => page?.omittedItemCount)).toEqual([0, 0, 0]);
+    }
+  );
+
+  it('continues preview pages at the soft budget instead of omitting messages', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const text = 'x'.repeat(400_000);
+    for (let index = 0; index < 4; index += 1) {
+      await publish(stub, 'message.updated', {
+        info: message(kiloSessionId, `msg_soft_${index}`, index + 1),
+      });
+      await publish(stub, 'message.part.updated', {
+        part: part(kiloSessionId, `msg_soft_${index}`, `prt_soft_${index}`, text),
+      });
+    }
+    const first = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    expect(new TextEncoder().encode(JSON.stringify(first)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PREVIEW_PAGE_BYTES
+    );
+    expect(first?.omittedItemCount).toBe(0);
+    expect(first?.nextCursor).toBeTruthy();
+    expect((await stub.getSessionMessagesPage())?.messages).toHaveLength(4);
   });
 });

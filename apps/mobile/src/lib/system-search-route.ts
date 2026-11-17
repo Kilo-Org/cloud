@@ -10,6 +10,8 @@
  * the launch capture runs at `_layout.tsx` module scope.
  */
 
+import { i18n } from '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 import { setPendingDeepLink } from './deep-link-launch';
@@ -18,6 +20,7 @@ import {
   consumePendingSystemSearchRoute,
 } from './native-system-search';
 import { systemSearchHrefFromRoute } from './system-search-entries';
+import { isSystemSearchUnresolvedFailure } from './system-search-telemetry';
 
 /**
  * Resolve one identifier the OS handed back and stash the route it names.
@@ -42,15 +45,35 @@ export function routeSystemSearchOpen(routeId: string | null): void {
 }
 
 /**
- * One report per failed slot read, tagged so the subsystem is filterable. The
- * native read is a get-and-clear, so a rejection means the tap is gone and the
- * report is its only trace. Never log the identifier.
+ * One report per failed slot read, tagged so the subsystem is filterable. A
+ * rejected read means this consume did not route the tap; the Android module
+ * keeps the picked identifier when its own read failed, and drops it otherwise.
+ * Never log the identifier.
  */
 function reportSystemSearchRouteFailure(error: unknown): void {
   captureTelemetry({
     error,
     level: 'warning',
     tags: { 'error.subsystem': 'system-search', 'error.operation': 'consume-route' },
+  });
+}
+
+/** One toast for one stuck tap: retries update it instead of stacking copies. */
+const UNRESOLVED_TOAST_ID = 'system-search-unresolved';
+
+/**
+ * Tells the reader that a picked result could not be opened yet, with the retry
+ * that consumes the module's slot again.
+ *
+ * The Android module keeps the picked identifier until its resolution
+ * succeeded, so the retry the action runs is the same consume as the one that
+ * failed and re-reads the index. A repeated failure replaces the toast instead
+ * of adding a second copy of the same message.
+ */
+export function showSystemSearchUnresolvedFeedback(retry: () => void): void {
+  announcingToast.error(i18n.t('systemSearch.couldNotOpenResult'), {
+    id: UNRESOLVED_TOAST_ID,
+    action: { label: i18n.t('common.tryAgain'), onClick: retry },
   });
 }
 
@@ -71,6 +94,11 @@ function consumeAndRoute(): void {
       routeSystemSearchOpen(await consumePendingSystemSearchRoute());
     } catch (error) {
       reportSystemSearchRouteFailure(error);
+      if (isSystemSearchUnresolvedFailure(error)) {
+        // The tap is still in the module's slot, so offering the same consume
+        // again is what retries it.
+        showSystemSearchUnresolvedFeedback(consumeAndRoute);
+      }
     }
   })();
 }

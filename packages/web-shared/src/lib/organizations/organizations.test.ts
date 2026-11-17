@@ -909,6 +909,46 @@ describe('Organizations', () => {
       });
       expect(updatedMember?.personal_account_disabled).toBe(false);
     });
+
+    test('does not add a user to a child organization without a live parent membership', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const added = await addSsoUserToOrganization(child.id, member.id, { isNewUser: true });
+
+      expect(added).toBe(false);
+      expect(await isOrganizationMember(db, child.id, member.id)).toBe(false);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(false);
+    });
+
+    test('adds a live parent member to a child organization', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, member.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const added = await addSsoUserToOrganization(child.id, member.id);
+
+      expect(added).toBe(true);
+      const memberOrgs = await getUserOrganizationsWithSeats(member.id);
+      expect(memberOrgs.map(org => org.organizationId).sort()).toEqual(
+        [parent.id, child.id].sort()
+      );
+    });
   });
 
   describe('updateUserRoleInOrganization', () => {
@@ -1604,12 +1644,60 @@ describe('Organizations', () => {
         .update(organizations)
         .set({ sso_domain: 'example.com' })
         .where(eq(organizations.id, organization.id));
-      const result = await acceptOrganizationInvite(invitee.id, invitation.token, {
-        provider: 'workos',
-        ssoSourceOrganizationId: organization.id,
-      });
-      expect(result.success).toBe(false);
-      expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+      try {
+        await db.insert(external_side_effect_outbox).values({
+          invitation_id: invitation.id,
+          payload: {
+            invitationId: invitation.id,
+            to: invitee.google_user_email,
+            organizationName: organization.name,
+            inviterName: 'Owner',
+            acceptInviteUrl: 'https://example.com/accept-invite',
+          },
+          status: 'delivered',
+          attempts: 1,
+          delivered_at: sql`NOW()`,
+        });
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token, {
+          provider: 'workos',
+          ssoSourceOrganizationId: organization.id,
+        });
+        expect(result).toEqual({ success: false, error: 'Invitation is no longer valid' });
+        expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+
+        const storedInvitation = await db.query.organization_invitations.findFirst({
+          where: eq(organization_invitations.id, invitation.id),
+        });
+        expect(storedInvitation).toBeDefined();
+        expect(storedInvitation?.accepted_at).toBeNull();
+        expect(new Date(storedInvitation?.expires_at ?? '').getTime()).toBeLessThanOrEqual(
+          Date.now()
+        );
+        const storedOutbox = await db.query.external_side_effect_outbox.findFirst({
+          where: eq(external_side_effect_outbox.invitation_id, invitation.id),
+        });
+        expect(storedOutbox).toMatchObject({ status: 'delivered', last_error: null });
+
+        const retry = await acceptOrganizationInvite(invitee.id, invitation.token, {
+          provider: 'workos',
+          ssoSourceOrganizationId: organization.id,
+        });
+        expect(retry).toEqual({ success: false, error: 'Invitation has expired' });
+
+        const replacement = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        expect(replacement.id).not.toBe(invitation.id);
+        expect(replacement.authentication_requirement).toBe('workos');
+        expect(replacement.sso_source_organization_id).toBe(organization.id);
+      } finally {
+        await db
+          .delete(external_side_effect_outbox)
+          .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+      }
     });
 
     test('rejects a direct SSO invitation after the SSO policy changes', async () => {

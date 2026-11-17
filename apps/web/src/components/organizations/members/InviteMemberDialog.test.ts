@@ -5,18 +5,21 @@ import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { parseHTML } from 'linkedom';
 import type * as DialogModule from './InviteMemberDialog';
+import { hasInviteSeatCapacity } from '@kilocode/app-shared/organizations';
 
 let InviteMemberDialog: typeof DialogModule.InviteMemberDialog;
-let hasInviteSeatCapacity: typeof DialogModule.hasInviteSeatCapacity;
+let inviteEmailErrorMessage: typeof DialogModule.inviteEmailErrorMessage;
 let INVITE_SUCCESS_MESSAGE: typeof DialogModule.INVITE_SUCCESS_MESSAGE;
 let organizationMemberInvitedCaptureProperties: typeof DialogModule.organizationMemberInvitedCaptureProperties;
 
 const mutate = jest.fn();
 let inputChange: ((event: { target: { value: string } }) => void) | undefined;
+/** Seat usage the mocked hook reports; a test overrides it to fill the org. */
+let seatUsage = { usedSeats: 0, totalSeats: 1 };
 
 jest.mock('@/app/api/organizations/hooks', () => ({
   useInviteMember: () => ({ mutate, isPending: false }),
-  useOrganizationSeatUsage: () => ({ data: { usedSeats: 0, totalSeats: 1 } }),
+  useOrganizationSeatUsage: () => ({ data: seatUsage }),
   useOrganizationWithMembers: () => ({
     data: {
       plan: 'teams',
@@ -65,7 +68,7 @@ jest.mock('@/components/ui/dropdown-menu', () => {
 beforeAll(async () => {
   ({
     InviteMemberDialog,
-    hasInviteSeatCapacity,
+    inviteEmailErrorMessage,
     INVITE_SUCCESS_MESSAGE,
     organizationMemberInvitedCaptureProperties,
   } = await import('./InviteMemberDialog'));
@@ -83,7 +86,7 @@ describe('InviteMemberDialog with required SSO', () => {
     inputChange = undefined;
   });
 
-  test('allows an owner to invite an SSO domain member', () => {
+  function mountDialog() {
     const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
     const globals = globalThis as typeof globalThis & Record<string, unknown>;
     const values = {
@@ -111,6 +114,11 @@ describe('InviteMemberDialog with required SSO', () => {
         })
       )
     );
+    return container;
+  }
+
+  test('allows an owner to invite an SSO domain member', () => {
+    const container = mountDialog();
     act(() => inputChange?.({ target: { value: 'person@example.com' } }));
     const emailInput = container.querySelector('input');
     const inviteButton = Array.from(container.querySelectorAll('button')).find(button =>
@@ -123,6 +131,59 @@ describe('InviteMemberDialog with required SSO', () => {
       { organizationId: 'org-1', email: 'person@example.com', role: 'member' },
       expect.any(Object)
     );
+  });
+
+  test('refuses an over-length address in the field and never sends it', () => {
+    const container = mountDialog();
+    // One character past the 254-character maximum, in the shape a mail system
+    // could otherwise route.
+    const oneMore = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+    act(() => inputChange?.({ target: { value: oneMore } }));
+
+    expect(container.querySelector('input')?.getAttribute('aria-invalid')).toBe('true');
+    expect(container.textContent).toContain('Email address must be 254 characters or fewer');
+    const inviteButton = Array.from(container.querySelectorAll('button')).find(button =>
+      button.textContent?.includes('Send Invitation')
+    );
+    expect(inviteButton?.disabled).toBe(true);
+    act(() => inviteButton?.click());
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  test('explains a full organization and keeps the owner-row invite blocked', () => {
+    seatUsage = { usedSeats: 2, totalSeats: 2 };
+    try {
+      const container = mountDialog();
+      act(() => inputChange?.({ target: { value: 'person@example.com' } }));
+
+      // Owners see the billing-manager escape hatch in the same sentence.
+      expect(container.textContent).toContain('All seats are in use (2/2)');
+      expect(container.textContent).toContain('You can still invite billing managers');
+      const inviteButton = Array.from(container.querySelectorAll('button')).find(button =>
+        button.textContent?.includes('Send Invitation')
+      );
+      expect(inviteButton?.disabled).toBe(true);
+      act(() => inviteButton?.click());
+      expect(mutate).not.toHaveBeenCalled();
+    } finally {
+      seatUsage = { usedSeats: 0, totalSeats: 1 };
+    }
+  });
+});
+
+describe('inviteEmailErrorMessage', () => {
+  test('accepts the 254-character boundary and names the length past it', () => {
+    const longest = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    const oneMore = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+    expect(longest).toHaveLength(254);
+    expect(oneMore).toHaveLength(255);
+    expect(inviteEmailErrorMessage(longest)).toBeNull();
+    expect(inviteEmailErrorMessage(oneMore)).toBe('Email address must be 254 characters or fewer');
+  });
+
+  test('keeps the invalid-address sentence for an address the syntax rule rejects', () => {
+    expect(inviteEmailErrorMessage('not-an-email')).toBe('Please enter a valid email address');
+    expect(inviteEmailErrorMessage('   ')).toBe('Please enter a valid email address');
   });
 });
 

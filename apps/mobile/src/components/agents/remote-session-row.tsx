@@ -32,13 +32,14 @@ import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
   composeActiveSessionVisibleMeta,
-  composeSessionProvenanceSubtitle,
   formatScheduledWake,
   formatSessionTotalCost,
   remoteMeta,
   remoteSessionEyebrowLabel,
+  remoteSessionEyebrowState,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
@@ -155,38 +156,42 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const canExit = canExitSessionFromList(session);
   const statusKind = glanceableStatusKind(session.status);
-  const { title, agentLabel, subtitle, spokenPrNumber, scheduledWake, spokenMeta } = useMemo(() => {
-    const isScheduled = session.status === 'scheduled';
-    const scheduledWakeValue =
-      isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
-    const metaTimestamp = activeSessionMetaTimestamp(session);
-    const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp, now) : null;
-    return {
-      title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
-      agentLabel: remoteSessionEyebrowLabel(session),
-      // Provenance subtitle: list rows show "branch · #N", card rows keep the
-      // branch-only subtitle. The spoken label mirrors this, with the PR phrase
-      // only on the list variant.
-      subtitle:
-        variant === 'card'
-          ? (session.gitBranch ?? null)
-          : composeSessionProvenanceSubtitle({
-              branch: session.gitBranch,
-              prNumber: session.associatedPr?.number,
-            }),
-      spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
-      scheduledWake: scheduledWakeValue,
-      spokenMeta: selectRemoteRowSpokenMeta({
-        variant,
-        scheduled: isScheduled,
+  const { title, agentLabel, agentState, subtitle, spokenPrNumber, scheduledWake, spokenMeta } =
+    useMemo(() => {
+      const isScheduled = session.status === 'scheduled';
+      const scheduledWakeValue =
+        isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
+      const metaTimestamp = activeSessionMetaTimestamp(session);
+      const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp, now) : null;
+      return {
+        title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
+        agentLabel: remoteSessionEyebrowLabel(session),
+        // Tint by what the eyebrow names, never by its string: the state word is
+        // catalog copy, so its text hashes to a different hue per locale.
+        agentState: remoteSessionEyebrowState(session),
+        // Provenance subtitle: list rows show "branch · #N", card rows keep the
+        // branch-only subtitle. The spoken label mirrors this, with the PR phrase
+        // only on the list variant.
+        subtitle:
+          variant === 'card'
+            ? (session.gitBranch ?? null)
+            : composeSessionProvenanceSubtitle({
+                branch: session.gitBranch,
+                prNumber: session.associatedPr?.number,
+              }),
+        spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
         scheduledWake: scheduledWakeValue,
-        needsInput,
-        costSpoken: formatSpokenCost(session.totalCostMicrodollars),
-        timeSpoken,
-      }),
-    };
-    // eslint-disable-next-line react/exhaustive-deps -- the titles revision and the sampled clock are real inputs: `namedSessionTitle` reads the recorded-titles store, and `formatSpokenTimeAgo` reads the clock, so both must re-derive when they tick.
-  }, [session, variant, needsInput, t, titlesRevision, now]);
+        spokenMeta: selectRemoteRowSpokenMeta({
+          variant,
+          scheduled: isScheduled,
+          scheduledWake: scheduledWakeValue,
+          needsInput,
+          costSpoken: formatSpokenCost(session.totalCostMicrodollars),
+          timeSpoken,
+        }),
+      };
+      // eslint-disable-next-line react/exhaustive-deps -- the titles revision and the sampled clock are real inputs: `namedSessionTitle` reads the recorded-titles store, and `formatSpokenTimeAgo` reads the clock, so both must re-derive when they tick.
+    }, [session, variant, needsInput, t, titlesRevision, now]);
 
   // Tray rows are always live: the eyebrow draws the status glyph from the
   // shared derivation, so the platform glyph has no slot beside it (and the
@@ -328,6 +333,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     >
       <SessionRow
         agentLabel={agentLabel}
+        agentState={agentState}
         title={title}
         subtitle={subtitle}
         meta={composeActiveSessionVisibleMeta(

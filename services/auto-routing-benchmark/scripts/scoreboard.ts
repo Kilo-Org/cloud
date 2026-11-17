@@ -94,14 +94,8 @@ async function loadLiveTable() {
   const classifierRun = classifierRuns[0];
   const [candidateRows, summaries] = await Promise.all([
     queryD1(
-      `SELECT c.*, s.p50_latency_ms AS p50LatencyMs
-      FROM routing_table_candidates c LEFT JOIN benchmark_profiles p
-        ON p.model = c.model AND p.variant = c.variant AND p.status = 'ready'
-          AND p.engine_identity = ${sqlString(computeEngineIdentity('decider'))}
-          AND p.repetitions = (SELECT decider_repetitions FROM benchmark_config WHERE id = 1)
-      LEFT JOIN model_summaries s
-        ON s.run_id = p.run_id AND s.model = p.model AND s.variant = p.variant AND s.route_key = c.route_key
-      WHERE c.run_id = ${sqlString(tableRow.run_id)} ORDER BY c.route_key, c.rank`,
+      `SELECT * FROM routing_table_candidates
+      WHERE run_id = ${sqlString(tableRow.run_id)} ORDER BY route_key, rank`,
       LiveScoreboardCandidateRowSchema
     ),
     classifierRun
@@ -116,10 +110,6 @@ async function loadLiveTable() {
       : [],
   ]);
   const assembled = rowsToRoutingTable(tableRow, candidateRows);
-  for (const row of candidateRows) {
-    const candidate = assembled.routes[row.route_key]?.[row.rank];
-    if (candidate) Object.assign(candidate, { p50LatencyMs: row.p50LatencyMs });
-  }
   const winner = classifierRun
     ? pickClassifierWinner(
         summaries,

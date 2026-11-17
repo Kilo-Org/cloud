@@ -6,7 +6,7 @@ import {
 import {
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   homeWidgetDataSchema,
   homeWidgetRefreshAt,
   homeWidgetResponseSchema,
@@ -16,11 +16,18 @@ import { z } from 'zod';
 
 import { end as endLiveUpdate, setWidgetSnapshot } from '@/glanceable-android/live-update';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isExpectedAuthFailure } from '@/lib/auth/trpc-unauthorized';
 import { isSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
+import { isAlreadyReportedNetworkError } from '@/lib/telemetry/app-error-reporting';
 import { trpcClient } from '@/lib/trpc';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
-import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
+import {
+  getGlanceableOrgConfirmationEpoch,
+  getTerminalBlankEpoch,
+  isGlanceableOrgLost,
+} from './cleanup';
 import { isGlanceableFixtureHeld } from './fixture-hold';
 import { getHomeWidgetCopy } from './home-widget-copy';
 import {
@@ -76,6 +83,66 @@ function report(error: unknown, operation: string): void {
   Sentry.captureException(error, {
     tags: { 'error.subsystem': 'home_widget', 'error.operation': operation },
   });
+}
+
+/**
+ * A widget credential the server refuses stays refused for the rest of the
+ * signed-in session. Every glanceable publish would otherwise ask again, file
+ * another event and still leave the widget unable to refresh. The pair is the
+ * signal the app already uses for "signed-in credentials changed": a new auth
+ * epoch (sign-in after sign-out) or a different account/organization scope.
+ * The refusal also covers a missing organization membership, which the
+ * glanceable layer treats as recoverable, so the latch names the org
+ * confirmation epoch it was taken at and a restored org releases it.
+ */
+let revokedCredential: {
+  scopeKey: string;
+  authEpoch: number;
+  orgConfirmationEpoch: number;
+} | null = null;
+let reportedRevocationAuthEpoch: number | null = null;
+
+/** Test seam: forget this process's credential and configuration state. */
+export function _resetHomeWidgetRefreshForTests(): void {
+  configurationEpoch = 0;
+  clearPromise = null;
+  credential = null;
+  revokedCredential = null;
+  reportedRevocationAuthEpoch = null;
+}
+
+/**
+ * The credential was refused or the request failed. A refusal is terminal: the
+ * dead credential is dropped from the widget and the session is told once. A
+ * transport failure (offline, DNS, TLS, reset, deadline, tRPC client error) is
+ * a breadcrumb the network layer already records, so it files no event; only an
+ * error the network layer does not own is a defect worth reporting.
+ */
+async function handleRefreshFailure(
+  error: unknown,
+  state: { scopeKey: string; authEpoch: number }
+): Promise<void> {
+  if (isTrpcClientError(error) && readTrpcErrorField(error, 'code') === 'UNAUTHORIZED') {
+    revokedCredential = { ...state, orgConfirmationEpoch: getGlanceableOrgConfirmationEpoch() };
+    // `clear` also drops the cached credential, so the next allowed attempt
+    // starts from a fresh query instead of the dead token.
+    await clearHomeWidgetRefresh();
+    if (reportedRevocationAuthEpoch !== state.authEpoch) {
+      reportedRevocationAuthEpoch = state.authEpoch;
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: {
+          'error.subsystem': 'home_widget',
+          'error.operation': 'widget_credential_revoked',
+        },
+      });
+    }
+    return;
+  }
+  if (isAlreadyReportedNetworkError(error)) {
+    return;
+  }
+  report(error, 'configure_native_refresh');
 }
 
 async function clearNativeRefresh(): Promise<void> {
@@ -151,6 +218,13 @@ export async function syncHomeWidgetRefresh(context: {
     isGlanceableOrgLost() ||
     isGlanceableFixtureHeld() ||
     getLastHomeWidgetData()?.snapshot.scopeKey !== scopeKey;
+  if (
+    revokedCredential?.scopeKey === scopeKey &&
+    revokedCredential.authEpoch === authEpoch &&
+    revokedCredential.orgConfirmationEpoch === getGlanceableOrgConfirmationEpoch()
+  ) {
+    return;
+  }
   try {
     epoch = Math.max(epoch, HomeWidgetRefresh.getOperationEpoch() + 1);
     configurationEpoch = epoch;
@@ -195,8 +269,11 @@ export async function syncHomeWidgetRefresh(context: {
       })
     );
   } catch (error) {
-    if (!superseded()) {
-      report(error, 'configure_native_refresh');
+    // A locked keychain and a refused session credential are expected states,
+    // not a refusal of the widget credential: nothing is latched, dropped or
+    // filed for them, and the next unlocked sync asks again.
+    if (!superseded() && !isExpectedAuthFailure(error)) {
+      await handleRefreshFailure(error, { scopeKey, authEpoch });
     }
   }
 }
@@ -239,7 +316,7 @@ export async function applyHomeWidgetResponse(
       accountEpoch: authEpoch,
       status: 'privacy',
     });
-    rememberHomeWidgetData({ snapshot, details: EMPTY_HOME_WIDGET_DETAILS });
+    rememberHomeWidgetData({ snapshot, details: emptyHomeWidgetDetails() });
     setWidgetSnapshot(snapshot);
     endLiveUpdate();
     return true;

@@ -63,9 +63,15 @@ supports only USD for seat billing.
   subscription," which includes additional statuses such as
   past-due or incomplete.
 - **Active subscription purchase**: A purchase record whose
-  `subscription_status` is not `ended`. Used for access checks and
-  trial enforcement — an organization with at least one active
-  subscription purchase is considered subscribed.
+  `subscription_status` represents a live paid subscription:
+  `active`, `trialing`, or `past_due` (the payment processor is
+  still retrying payment). Used for access checks and trial
+  enforcement — an organization with at least one active
+  subscription purchase is considered subscribed. Every other
+  stored status, including `ended`, `pending_cancel`,
+  `incomplete`, `incomplete_expired`, `canceled`, `unpaid`,
+  `paused`, and any status the system does not recognize, is not an
+  active subscription purchase.
 - **Known paid seat prices**: The set of payment processor price
   identifiers corresponding to the four seat pricing tiers (Teams
   monthly, Teams annual, Enterprise monthly, Enterprise annual).
@@ -112,7 +118,7 @@ supports only USD for seat billing.
   are exempt from trial expiration.
 - **Suppressed trial messaging**: An organization setting
   (`suppress_trial_messaging`) that, when enabled, treats the
-  organization as if it has an active subscription for trial
+  organization as if it has an active subscription purchase for trial
   enforcement purposes.
 - **Trial stages**: Progressive classifications of an
   organization's trial status based on the floored `daysRemaining`
@@ -445,8 +451,8 @@ consuming a seat.
 ### Require-Seats Flag and Subscription Enforcement
 
 1. The system MUST treat organizations with the require-seats flag
-   set to false as having an active subscription for all access
-   checks (bypassing trial and subscription requirements).
+   set to false as having an active subscription purchase for all
+   access checks (bypassing trial and subscription requirements).
 2. The system MUST set the require-seats flag to true for all new
    top-level organization signups, including Enterprise trials. When
    creating a child organization, the system MUST set the flag to false.
@@ -459,7 +465,8 @@ consuming a seat.
    when it either has require-seats disabled OR has an active
    subscription purchase.
 5. The system MUST classify an organization's status as "incomplete"
-   when it has require-seats enabled AND has no active subscription.
+   when it has require-seats enabled AND has no active subscription
+   purchase.
 
 ### Free Trial
 
@@ -493,7 +500,7 @@ consuming a seat.
 8. The system MUST evaluate trial expiration status on every
    mutation request and MUST block server-side mutations with a
    forbidden error when the trial is currently hard-expired and no
-   active subscription exists.
+   active subscription purchase exists.
 9. The system MUST exempt organizations participating in the OSS
    sponsorship program (see Definitions) from trial expiration
    (never hard-locked).
@@ -612,6 +619,17 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-11-08 -- Active subscription purchase definition
+
+- Redefined "active subscription purchase" to the stored statuses
+  that represent a live paid subscription: `active`, `trialing`,
+  and `past_due` (payment is being retried). Read every other stored
+  status as not an active subscription purchase, so trial
+  enforcement stays in force.
+- Updated the Require-Seats and Free Trial rules that reference the
+  term, and the suppressed-trial-messaging definition, to the same
+  wording.
 
 ### 2026-11-04 -- Child organization plan inheritance
 

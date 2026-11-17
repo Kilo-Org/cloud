@@ -6,12 +6,18 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 
 /**
- * Runs the headless approve task, with no Activity, when the ongoing
- * notification's Approve action is tapped.
+ * Runs the headless approve task, with no Activity, for the Approve tap that an
+ * older build's PendingIntent delivered to `ActiveAgentsApproveReceiver`.
  *
- * The config names the key the JS entry registers as `APPROVE_AGENT_TASK_KEY`
- * and passes an empty data map: the approval reads the waiting sessions itself,
- * so nothing about the ask travels through the intent beyond the tap.
+ * Current cards approve through `ApprovalGate` and
+ * `ActiveAgentsApprovalActivity` instead, so this service answers the older
+ * transport only.
+ *
+ * The config names the key the JS entry registers as `APPROVE_AGENT_TASK_KEY`,
+ * `ActiveAgentsApprove`, which differs from the `KiloActiveAgentsApprove` that
+ * `ActiveAgentsApproveWorker.TASK_NAME` starts. It passes an empty data map: the
+ * approval reads the waiting sessions itself, so nothing about the ask travels
+ * through the intent beyond the tap.
  */
 class ActiveAgentsApproveTaskService : HeadlessJsTaskService() {
   override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig =

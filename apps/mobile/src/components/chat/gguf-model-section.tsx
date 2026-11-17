@@ -169,7 +169,7 @@ export function GgufDownloadControls({
       {record === undefined && download === undefined && onDownload !== undefined && (
         <Button
           variant="outline"
-          disabled={snapshot.download !== null}
+          disabled={snapshot.download !== null || snapshot.loadFailed}
           onPress={onDownload}
           accessibilityLabel={namedWithDetail(downloadText, detail)}
         >
@@ -220,7 +220,7 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
       <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.urlHelp')}</Text>
       <Button
         variant="outline"
-        disabled={snapshot.download !== null}
+        disabled={snapshot.download !== null || snapshot.loadFailed}
         onPress={() => {
           void start();
         }}
@@ -259,6 +259,19 @@ export function GgufModelSection({
         <PackageSearch size={18} color={colors.primaryForeground} />
         <Text>{t('modelChat.catalog.browse')}</Text>
       </Button>
+      {snapshot.loadFailed && (
+        <View className="gap-2 rounded-xl border border-border p-4">
+          <Text className="font-semibold">{t('common.couldNotLoadModels')}</Text>
+          <Button
+            variant="outline"
+            onPress={() => {
+              ggufDownloadActions.retryLoad();
+            }}
+          >
+            <Text>{t('common.tryAgain')}</Text>
+          </Button>
+        </View>
+      )}
       {rows.map(row => (
         <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
           <BackendProviderChoice

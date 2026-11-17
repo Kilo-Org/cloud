@@ -39,6 +39,13 @@ import {
   repositoryFullNameSchema,
 } from '@/lib/cloud-agent/provider-branch-listing';
 import {
+  assertSuppliedRepositoryMatchesParent,
+  resolveStackedWorkspacePreparation,
+  resolveStackedWorkspaceSource,
+  type StackedWorkspaceRepository,
+} from '@/lib/cloud-agent/stacked-workspace-preparation';
+import { runWorktreeBranchOperation } from '@/lib/cloud-agent/worktree-branch-operations';
+import {
   organizationPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
@@ -58,10 +65,18 @@ import {
   baseGetEgressAuditNextOutputSchema,
   baseGetSessionMessagesPageNextSchema,
   baseGetSessionMessagesPageNextOutputSchema,
+  baseGetSessionToolPartDetailNextSchema,
+  baseGetSessionToolPartDetailNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
   baseGetPendingInteractionsNextOutputSchema,
+  baseGetStackedWorkspaceSourceNextSchema,
+  baseStackedWorkspaceSourceNextOutputSchema,
+  baseSyncWorktreeBranchNextSchema,
+  baseSyncWorktreeBranchNextOutputSchema,
+  baseRestackWorktreeBranchNextSchema,
+  baseRestackWorktreeBranchNextOutputSchema,
   baseWorktreeChangesNextSchema,
   baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
@@ -77,6 +92,9 @@ import {
   baseCloseTerminalNextOutputSchema,
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
+  previewTargetFromInput,
+  baseListPreviewServicesNextSchema,
+  baseListPreviewServicesNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
@@ -103,17 +121,39 @@ async function createCloudAgentControlToken(
 }
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { buildPreviewOpenUrl } from '@/lib/cloud-agent/preview-open-url';
+import { verifyOrgOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-worktree-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  deleteWorkspaceArtifactOutputSchema,
+  getWorkspaceArtifactDownloadUrlOutputSchema,
+  listWorkspaceArtifactsOutputSchema,
+  workspaceArtifactDeleteInputSchema,
+  workspaceArtifactDownloadInputSchema,
+  workspaceArtifactSessionInputSchema,
+} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import { sessionReadTrpcError } from '@/lib/session-trpc-errors';
+
+/**
+ * Retryable copy for a cloud-agent read that did not settle inside the mobile
+ * procedure budget. Fixed text: never the worker's own message.
+ */
+const SESSION_STATE_UNAVAILABLE_MESSAGE = 'Session state is temporarily unavailable. Try again.';
+const SESSION_MESSAGES_UNAVAILABLE_MESSAGE =
+  'Session messages are temporarily unavailable. Try again.';
+const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
+const BRANCH_LISTING_UNAVAILABLE_MESSAGE = 'Repository branches took too long to load. Try again.';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -226,6 +266,10 @@ const GetSessionMessagesPageInput = baseGetSessionMessagesPageNextSchema.extend(
   organizationId: z.uuid(),
 });
 
+const GetSessionToolPartDetailInput = baseGetSessionToolPartDetailNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const GetPendingInteractionsInput = baseGetPendingInteractionsNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -242,13 +286,43 @@ const WorktreeFileInput = baseWorktreeFileNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const StackedWorkspaceSourceInput = baseGetStackedWorkspaceSourceNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const SyncWorktreeBranchInput = baseSyncWorktreeBranchNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const RestackWorktreeBranchInput = baseRestackWorktreeBranchNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactsInput = workspaceArtifactSessionInputSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactDownloadInput = workspaceArtifactDownloadInputSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorkspaceArtifactDeleteInput = workspaceArtifactDeleteInputSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
 
-const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
-  organizationId: z.uuid(),
-});
+const CreatePreviewInput = z.intersection(
+  baseCreatePreviewNextSchema,
+  z.object({ organizationId: z.uuid() })
+);
+
+const ListPreviewServicesInput = z.intersection(
+  baseListPreviewServicesNextSchema,
+  z.object({ organizationId: z.uuid() })
+);
 
 const RefreshTerminalTicketInput = baseRefreshTerminalTicketNextSchema.extend({
   organizationId: z.uuid(),
@@ -353,10 +427,23 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubIntegrationId,
         bitbucketRepo,
         publicRepoUrl,
+        baseBranch,
+        stackOnWorktreeId,
         organizationId,
         attachments,
         ...restInput
       } = input;
+
+      const stackedParent =
+        stackOnWorktreeId === undefined
+          ? undefined
+          : await resolveStackedWorkspaceSource({
+              db,
+              client,
+              userId: ctx.user.id,
+              organizationId,
+              worktreeId: stackOnWorktreeId,
+            });
 
       // Profile resolution happens inside cloud-agent-next. Tokens are resolved
       // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
@@ -369,8 +456,50 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         bitbucketWorkspaceUuid?: string;
         bitbucketRepositoryUuid?: string;
       };
+      let repository: StackedWorkspaceRepository | undefined;
 
-      if (gitlabProject) {
+      if (stackedParent) {
+        assertSuppliedRepositoryMatchesParent({
+          supplied: {
+            githubRepo,
+            githubIntegrationId,
+            gitlabProject,
+            publicRepoUrl,
+            bitbucketRepo,
+          },
+          parent: stackedParent,
+        });
+        const parent = stackedParent.repository;
+        repository = parent;
+        if (parent.platform === 'github') {
+          gitParams = {
+            githubRepo: parent.fullName,
+            githubIntegrationId: parent.githubIntegrationId,
+            platform: PLATFORM.GITHUB,
+          };
+        } else if (parent.platform === 'gitlab') {
+          gitParams = { gitUrl: parent.canonicalUrl, platform: PLATFORM.GITLAB };
+        } else if (parent.platform === 'bitbucket') {
+          const bitbucket = stackedParent.source.providerInput.bitbucketRepo;
+          if (!bitbucket) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'That workspace has no Bitbucket repository identity to copy.',
+            });
+          }
+          gitParams = {
+            gitUrl: parent.canonicalUrl,
+            platform: PLATFORM.BITBUCKET,
+            bitbucketWorkspaceUuid: bitbucket.workspaceUuid,
+            bitbucketRepositoryUuid: bitbucket.repositoryUuid,
+          };
+        } else {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'That workspace has no provider branch to stack on.',
+          });
+        }
+      } else if (gitlabProject) {
         let projectAvailable: boolean;
         try {
           projectAvailable = await validateGitLabRepoAccessForOrganization(
@@ -402,12 +531,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+        repository = { platform: 'gitlab', fullName: gitlabProject, canonicalUrl: gitUrl };
       } else if (bitbucketRepo) {
         gitParams = {
           gitUrl: `https://bitbucket.org/${bitbucketRepo.fullName}.git`,
           platform: PLATFORM.BITBUCKET,
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
+        };
+        repository = {
+          platform: 'bitbucket',
+          fullName: bitbucketRepo.fullName,
+          canonicalUrl: `https://bitbucket.org/${bitbucketRepo.fullName}.git`,
         };
       } else if (publicRepoUrl) {
         if (!isPublicRepoUrlEnabled()) {
@@ -417,6 +552,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           });
         }
         gitParams = { gitUrl: publicRepoUrl };
+        repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
         // The runtime's repository preflight runs only when the request names
         // the integration that owns the repository, so resolve it for the
@@ -436,7 +572,29 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           githubIntegrationId: resolvedIntegrationId ?? undefined,
           platform: PLATFORM.GITHUB,
         };
+        if (githubRepo) {
+          repository = {
+            platform: 'github',
+            fullName: githubRepo,
+            canonicalUrl: `https://github.com/${githubRepo}`,
+            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+          };
+        }
       }
+
+      // Every provider read that can refuse the create runs before attachment
+      // rows are linked, so a refusal never strands uploaded objects.
+      const stackedFields = await resolveStackedWorkspacePreparation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId,
+        ...(stackOnWorktreeId !== undefined ? { stackOnWorktreeId } : {}),
+        ...(baseBranch !== undefined ? { baseBranch } : {}),
+        ...(input.upstreamBranch !== undefined ? { upstreamBranch: input.upstreamBranch } : {}),
+        ...(repository ? { repository } : {}),
+        ...(stackedParent ? { parent: stackedParent } : {}),
+      });
 
       let linkedObjectKeys: string[] = [];
       try {
@@ -453,11 +611,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          ...stackedFields,
           attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
-          clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
+          clientProvenance: isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))
+            ? 'mobile'
+            : 'browser',
         });
       } catch (error) {
         // Both dispatch paths route a worker's answer through the same helper,
@@ -564,21 +725,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      // Prompt turns carry their own model; command turns run the session's
-      // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn. If the worker
-      // can't return the session model, fall back to the balance-checked
-      // client (the safe default) rather than failing the mutation on a
-      // read-side error.
-      let modelId: string | undefined;
-      if (input.payload.type === 'prompt') {
-        modelId = input.payload.model;
-      } else {
+      let modelId = input.payload.model;
+      if (modelId === undefined) {
         try {
           modelId = (
             await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
           ).model;
         } catch {
+          // A failed fallback read must not bypass balance checks.
           modelId = undefined;
         }
       }
@@ -731,6 +885,127 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
     }),
 
+  getStackedWorkspaceSource: organizationMemberProcedure
+    .input(StackedWorkspaceSourceInput)
+    .output(baseStackedWorkspaceSourceNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      const parent = await resolveStackedWorkspaceSource({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        worktreeId: input.worktreeId,
+      });
+      return parent.source;
+    }),
+
+  syncWorktreeBranch: organizationMemberMutationProcedure
+    .input(SyncWorktreeBranchInput)
+    .output(baseSyncWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'sync',
+      });
+    }),
+
+  restackWorktreeBranch: organizationMemberMutationProcedure
+    .input(RestackWorktreeBranchInput)
+    .output(baseRestackWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'restack',
+      });
+    }),
+
+  listWorkspaceArtifacts: organizationMemberProcedure
+    .input(WorkspaceArtifactsInput)
+    .output(listWorkspaceArtifactsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+    }),
+
+  getWorkspaceArtifactDownloadUrl: organizationMemberProcedure
+    .input(WorkspaceArtifactDownloadInput)
+    .output(getWorkspaceArtifactDownloadUrlOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorkspaceArtifactDownloadUrl(
+        input.cloudAgentSessionId,
+        input.relativePath
+      );
+    }),
+
+  deleteWorkspaceArtifact: organizationMemberProcedure
+    .input(WorkspaceArtifactDeleteInput)
+    .output(deleteWorkspaceArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.deleteWorkspaceArtifact({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        relativePath: input.relativePath,
+        expectedHash: input.expectedHash,
+      });
+    }),
+
   createTerminal: organizationMemberMutationProcedure
     .input(CreateTerminalInput)
     .output(baseCreateTerminalNextOutputSchema)
@@ -774,19 +1049,78 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CreatePreviewInput)
     .output(baseCreatePreviewNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
+      const target = previewTargetFromInput(input);
+      if (target === null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A preview target is required' });
+      }
+
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyOrgOwnsPreviewWorktree(
+          db,
+          input.organizationId,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertOrganizationOwnsSession({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          cloudAgentSessionId: target.cloudAgentSessionId,
+        });
+      }
 
       const { ticket, expiresAt } = signPreviewTicket({
         userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
         port: input.port,
         organizationId: input.organizationId,
+        ...target,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
+    }),
+
+  listPreviewServices: organizationMemberProcedure
+    .input(ListPreviewServicesInput)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const target = previewTargetFromInput(input);
+      if (target === null)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing preview target' });
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyOrgOwnsPreviewWorktree(
+          db,
+          input.organizationId,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertOrganizationOwnsSession({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          cloudAgentSessionId: target.cloudAgentSessionId,
+        });
+      }
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return await createCloudAgentNextClient(authToken).listPreviewServices(
+        target.worktreeId !== undefined
+          ? { ...target, organizationId: input.organizationId }
+          : target
+      );
     }),
 
   refreshTerminalTicket: organizationMemberMutationProcedure
@@ -922,6 +1256,46 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none (organization context).
+   */
+  getWorkspaceSnapshotRecovery: organizationMemberProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot on explicit user action
+   * (organization context).
+   */
+  removeWorkspaceSnapshot: organizationMemberMutationProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
+    }),
+
+  /**
    * Cancel one queued (not yet accepted) message by id. Never interrupts the
    * active run; a missing id or the accepted current message returns
    * `{ dropped: false }`.
@@ -1053,11 +1427,76 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      return createCloudAgentNextClient(authToken).getSessionMessagesPage({
+      const client = createCloudAgentNextClient(authToken);
+
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          read: () =>
+            client.getSessionMessagesPage({
+              sessionId: input.sessionId,
+              kiloSessionId: input.kiloSessionId,
+              cursor: input.cursor,
+              limit: input.limit,
+              toolDisplay: input.toolDisplay,
+            }),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
+    }),
+
+  getBackgroundActivity: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/),
+          organizationId: z.string().uuid(),
+        })
+        .strict()
+    )
+    .output(backgroundActivityInventorySchema.nullable())
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const token = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
+    }),
+
+  /** Complete stored details for an expanded tool preview; authorized on every read. */
+  getSessionToolPartDetail: organizationMemberProcedure
+    .input(GetSessionToolPartDetailInput)
+    .output(baseGetSessionToolPartDetailNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail({
         sessionId: input.sessionId,
         kiloSessionId: input.kiloSessionId,
-        cursor: input.cursor,
-        limit: input.limit,
+        messageId: input.messageId,
+        partId: input.partId,
+        callId: input.callId,
       });
     }),
 
@@ -1079,7 +1518,20 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const workerOrganizationId =
         ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
 
-      return await client.getSession(input.cloudAgentSessionId, workerOrganizationId);
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          read: () => client.getSession(input.cloudAgentSessionId, workerOrganizationId),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
     }),
 
   getEgressAudit: organizationMemberProcedure
@@ -1263,11 +1715,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     )
     .output(ProviderBranchListingSchema)
     .query(async ({ ctx, input }) =>
-      listProviderRepositoryBranches({
-        platform: input.platform,
-        userId: ctx.user.id,
-        organizationId: input.organizationId,
-        repositoryFullName: input.repository.fullName,
+      withControlPlaneReadBudget({
+        clock: ctx,
+        message: BRANCH_LISTING_UNAVAILABLE_MESSAGE,
+        read: () =>
+          listProviderRepositoryBranches({
+            platform: input.platform,
+            userId: ctx.user.id,
+            organizationId: input.organizationId,
+            repositoryFullName: input.repository.fullName,
+          }),
       })
     ),
 });

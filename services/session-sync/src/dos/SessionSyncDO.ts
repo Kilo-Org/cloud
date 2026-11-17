@@ -1,5 +1,6 @@
 import { sha256Hex } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { getTableName, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -7,6 +8,7 @@ import { z } from 'zod';
 import migrations from '../../drizzle/migrations';
 import type { Env } from '../env';
 import { DataRateLimit } from '../data-rate-limit';
+import { session as sessionTable } from '../db/sqlite-schema';
 import { toHex } from '../hex';
 import { isOverloaded, overloaded } from '../overload';
 import {
@@ -22,13 +24,16 @@ import {
   principalSchema,
   registerRequestSchema,
   sessionIDSchema,
+  statusRequestSchema,
   utf8Bytes,
   type BlobAck,
   type ErrorCode,
   type Receipt,
   type Result,
   type SessionState,
+  type SyncError,
   type Tenant,
+  type SessionStatus,
 } from '../protocol';
 import * as batches from './session-sync/batch';
 import { getTenantStub } from './SessionSyncTenantDO';
@@ -39,6 +44,9 @@ import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 import { leaseBytes } from './session-sync/lease';
 import { diagnostic, metricsEnabled, phase, syncPhase, type DiagnosticOperation } from '../metrics';
+import * as notifications from './session-sync/notifications';
+import { publishNotification } from '../notifications/publish';
+import type { SessionNotification } from '../notifications/protocol';
 
 const PURGE_RETRY_MS = 60_000;
 export const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -51,6 +59,7 @@ class LeaseRequired extends Error {
 const target = { principal: principalSchema, sessionID: sessionIDSchema };
 const stateInput = z.strictObject(target);
 const registerInput = z.strictObject({ ...target, request: registerRequestSchema });
+const statusInput = z.strictObject({ ...target, request: statusRequestSchema });
 const batchInput = z.strictObject({ ...target, body: z.string() });
 const pageInput = z.strictObject({
   ...target,
@@ -133,23 +142,60 @@ export class SessionSyncDO extends DurableObject<Env> {
     | { tenant: Tenant; sessionID: string; creatorID?: string }
     | undefined;
   private dataRateLimit = new DataRateLimit();
+  private initialized: Promise<void> | undefined;
+  private schemaReady = false;
+  private pendingNotifications = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(() =>
-      phase(env, 'syncInitialize', 'initialize', async () => {
-        await migrate(this.db, migrations);
-        this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
-        this.relayUsed = (await ctx.storage.get<boolean>('relayUsed')) ?? false;
-        this.relayPurged = (await ctx.storage.get<boolean>('relayPurged')) ?? false;
-        this.relayPurgeRetryAt = (await ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
-        this.leaseReconcilePending =
-          (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
-        this.pendingRegistration = await ctx.storage.get('pendingRegistration');
-        await this.scheduleSweep();
-      })
+    // Migrate before the first handler only when the object already holds data,
+    // so a request that needs no stored session resolves without schema work.
+    void ctx.blockConcurrencyWhile(async () => {
+      if (this.hasStoredSchema()) await this.initialize();
+    });
+  }
+
+  /**
+   * Whether this object already holds the session schema. `initialize()` marks
+   * the answer ready, so a migrated object answers without another probe.
+   */
+  private hasStoredSchema(): boolean {
+    if (this.schemaReady) return true;
+    const name = getTableName(sessionTable);
+    return (
+      this.db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${name}`)
+        .length > 0
     );
+  }
+
+  /** Migrates once per instance and restores the durable values that methods read. */
+  private async initialize(): Promise<void> {
+    this.initialized ??= phase(this.env, 'syncInitialize', 'initialize', async () => {
+      await migrate(this.db, migrations);
+      this.schemaReady = true;
+      this.purgeRetryAt = (await this.ctx.storage.get<number>('purgeRetryAt')) ?? 0;
+      this.relayUsed = (await this.ctx.storage.get<boolean>('relayUsed')) ?? false;
+      this.relayPurged = (await this.ctx.storage.get<boolean>('relayPurged')) ?? false;
+      this.relayPurgeRetryAt = (await this.ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
+      this.leaseReconcilePending =
+        (await this.ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
+      this.pendingRegistration = await this.ctx.storage.get('pendingRegistration');
+      await this.scheduleSweep();
+    }).catch((error: unknown) => {
+      this.initialized = undefined;
+      throw error;
+    });
+    await this.initialized;
+  }
+
+  /**
+   * The typed result for a request that needs a session this object does not
+   * hold. It runs before any schema work, so the answer needs no stored data.
+   */
+  private missingSession(): { ok: false; error: SyncError } | undefined {
+    if (this.hasStoredSchema()) return undefined;
+    return fail('session_not_found', 'The session is not registered');
   }
 
   /** Runs `fn` in one storage transaction; a `SyncFailure` rolls it back. */
@@ -160,6 +206,20 @@ export class SessionSyncDO extends DurableObject<Env> {
       if (error instanceof session.SyncFailure) return { ok: false, error: error.error };
       throw error;
     }
+  }
+
+  private notify(userID: string, event: SessionNotification | undefined): void {
+    if (!event) return;
+    if (this.pendingNotifications >= 64 && event.type !== 'session.deleted') {
+      console.error('Session sync notification queue is full');
+      return;
+    }
+    this.pendingNotifications++;
+    this.ctx.waitUntil(
+      publishNotification(this.env, userID, event).finally(() => {
+        this.pendingNotifications--;
+      })
+    );
   }
 
   /** Serializes admission changes without blocking reads during tenant RPCs. */
@@ -309,7 +369,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         this.pendingRegistration = undefined;
       }
       if (!meta) return ok(null);
-      const tenant = { type: meta.tenant_type, id: meta.tenant_id } as Tenant;
+      const tenant = { type: meta.tenant_type, id: meta.tenant_id };
       const input = { tenant, sessionID: meta.session_id, bytes: 0 };
       if (meta.deleted_at !== null && (meta.tenant_lease >= 0 || this.leaseReconcilePending)) {
         const released = await this.tenantCall(() =>
@@ -343,10 +403,36 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Removes the traces of a registration the tenant refused. The intent stays
+   * when the creator index cannot be cleared, so its alarm retries the removal.
+   */
+  private async discardRegistration(
+    principal: z.infer<typeof principalSchema>,
+    sessionID: string
+  ): Promise<void> {
+    const forgotten = await this.tenantCall(() =>
+      getTenantStub(this.env, { type: 'user', id: principal.userID }).forgetCreatedSession({
+        tenant: principal.tenant,
+        sessionID,
+        bytes: 0,
+      })
+    );
+    if (!forgotten.ok) return;
+    await this.ctx.storage.delete('pendingRegistration');
+    this.pendingRegistration = undefined;
+    // The sweep only adds deadlines, so clear this intent's wakeup and let the
+    // recomputation restore any deadline other state still requires.
+    await this.ctx.storage.deleteAlarm();
+    await this.scheduleSweep();
+  }
+
   async register(input: unknown): Promise<Result<{ created: boolean; state: SessionState }>> {
     const parsed = parse(registerInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, request } = parsed.value;
+    // No other request observes a partially migrated schema.
+    await this.ctx.blockConcurrencyWhile(() => this.initialize());
     return this.serial(async () => {
       const existing = session.load(this.db);
       const prior = existing
@@ -394,11 +480,23 @@ export class SessionSyncDO extends DurableObject<Env> {
           bytes: 0,
         })
       );
-      if (!admitted.ok) return admitted;
+      if (!admitted.ok) {
+        // Only a decision from the tenant settles this registration. Any other
+        // failure may hide a committed reservation, so its intent and sweep stay.
+        if (admitted.error.code === 'tenant_budget_exceeded') {
+          await this.discardRegistration(principal, sessionID);
+        }
+        return admitted;
+      }
       const registered = this.tx(() =>
         session.register(this.db, principal, sessionID, request.sourceID, Date.now())
       );
       if (registered.ok) {
+        if (registered.value.created)
+          this.notify(
+            principal.userID,
+            notifications.snapshot(this.db, 'session.created', Date.now())
+          );
         await this.ctx.storage.delete('pendingRegistration');
         this.pendingRegistration = undefined;
         await this.scheduleSweep();
@@ -412,6 +510,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
     return this.serial(async () => {
       const authorized = this.tx(() => {
         session.live(this.db, principal, sessionID);
@@ -438,6 +538,8 @@ export class SessionSyncDO extends DurableObject<Env> {
       principal.tenant.type
     );
     if (!admitted.ok) return admitted;
+    const missing = this.missingSession();
+    if (missing) return missing;
     return syncPhase(
       this.env,
       'getState',
@@ -445,6 +547,23 @@ export class SessionSyncDO extends DurableObject<Env> {
       () => this.tx(() => session.toState(this.db, session.visible(this.db, principal, sessionID))),
       principal.tenant.type
     );
+  }
+
+  async setStatus(input: unknown): Promise<Result<SessionStatus>> {
+    const parsed = parse(statusInput, input);
+    if (!parsed.ok) return parsed;
+    const { principal, sessionID, request } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
+    return this.serial(async () => {
+      const result = this.tx(() =>
+        notifications.setStatus(this.db, principal, sessionID, request, Date.now())
+      );
+      if (!result.ok) return result;
+      this.notify(principal.userID, result.value.notification);
+      await this.scheduleSweep();
+      return ok(result.value.status);
+    });
   }
 
   /** Applies the batch in `body`, the exact UTF-8 request text. */
@@ -496,6 +615,8 @@ export class SessionSyncDO extends DurableObject<Env> {
         principal.tenant.type
       );
       if (!admitted.ok) return admitted;
+      const missing = this.missingSession();
+      if (missing) return missing;
       // Hash before the transaction: checks and writes below run synchronously.
       const digest = await phase(
         this.env,
@@ -514,17 +635,32 @@ export class SessionSyncDO extends DurableObject<Env> {
           if (!batch.ok) work.validationCode = batch.error.code;
         }
         if (!batch.ok) throw new session.SyncFailure(batch.error);
-        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now(), work);
-      });
-      if (applied.ok)
-        await phase(
-          this.env,
-          'applyBatch',
-          'schedule',
-          () => this.scheduleSweep(),
-          principal.tenant.type
+        const { receipt, meta } = batches.apply(
+          this.db,
+          principal,
+          sessionID,
+          batch.value,
+          digest,
+          Date.now(),
+          work
         );
-      return applied;
+        return {
+          receipt,
+          notification: meta
+            ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt, meta)
+            : undefined,
+        };
+      });
+      if (!applied.ok) return applied;
+      this.notify(principal.userID, applied.value.notification);
+      await phase(
+        this.env,
+        'applyBatch',
+        'schedule',
+        () => this.scheduleSweep(),
+        principal.tenant.type
+      );
+      return ok(applied.value.receipt);
     } finally {
       if (work) {
         if (work.validationAttempts > 0)
@@ -562,6 +698,8 @@ export class SessionSyncDO extends DurableObject<Env> {
       principal.tenant.type
     );
     if (!admitted.ok) return admitted;
+    const missing = this.missingSession();
+    if (missing) return missing;
     return syncPhase(
       this.env,
       'readEntities',
@@ -575,6 +713,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(blobInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
     const begun = await this.leased(principal, sessionID, 'beginBlob', () =>
       blob.begin(this.db, principal, sessionID, ref, Date.now())
     );
@@ -595,6 +735,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(attemptInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref, attempt } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
     const aborted = this.tx(() => {
       blob.abort(this.db, principal, sessionID, ref.hash, attempt);
       return null;
@@ -612,6 +754,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(attemptInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref, attempt } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
     const located = this.tx(() => blob.target(this.db, principal, sessionID, ref.hash, attempt));
     if (!located.ok) return located;
     const { key, deleted } = located.value;
@@ -664,6 +808,8 @@ export class SessionSyncDO extends DurableObject<Env> {
       principal.userID
     );
     if (!admitted.ok) return admitted;
+    const missing = this.missingSession();
+    if (missing) return missing;
     return this.tx(() => blob.locate(this.db, principal, sessionID, hash));
   }
 
@@ -675,10 +821,13 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
     const erased = await this.serial(async () =>
       this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()))
     );
     if (!erased.ok) return erased;
+    this.notify(principal.userID, erased.value.notification);
     let r2Ms = 0;
     try {
       await this.scheduleSweep();
@@ -697,6 +846,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
+    // A session this object does not hold has nothing to erase.
+    if (!this.hasStoredSchema()) return ok(null);
     const erased = await this.serial(async () => {
       const meta = session.load(this.db);
       if (!meta) {
@@ -710,6 +861,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       }
       if (meta.creator_id !== principal.userID) return ok(null);
       const result = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
+      if (result.ok) this.notify(principal.userID, result.value.notification);
       return result.ok ? ok(null) : result;
     });
     if (!erased.ok) return erased;
@@ -726,6 +878,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
+    if (!this.hasStoredSchema()) return;
     try {
       await this.serial(async () => {
         const meta = session.load(this.db);
@@ -740,6 +893,7 @@ export class SessionSyncDO extends DurableObject<Env> {
             )
           );
           if (!erased.ok) throw new Error(erased.error.message);
+          this.notify(meta.creator_id, erased.value.notification);
         }
       });
       const purged = await this.purgeRelay();

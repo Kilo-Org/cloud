@@ -21,17 +21,15 @@ describe('trigger variant validation', () => {
     profileId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
   };
 
-  it('accepts an omitted or alphabetic variant up to 50 characters on create', () => {
+  it('accepts an omitted or model-specific variant up to 50 characters on create', () => {
     expect(TriggerConfigInput.safeParse(createInput).success).toBe(true);
-    expect(TriggerConfigInput.safeParse({ ...createInput, variant: 'a'.repeat(50) }).success).toBe(
-      true
-    );
+    for (const variant of ['a'.repeat(50), 'high-effort', 'high1']) {
+      expect(TriggerConfigInput.safeParse({ ...createInput, variant }).success).toBe(true);
+    }
   });
 
-  it('rejects non-alphabetic and oversized create variants', () => {
-    expect(TriggerConfigInput.safeParse({ ...createInput, variant: 'high-effort' }).success).toBe(
-      false
-    );
+  it('rejects an empty or oversized create variant', () => {
+    expect(TriggerConfigInput.safeParse({ ...createInput, variant: '' }).success).toBe(false);
     expect(TriggerConfigInput.safeParse({ ...createInput, variant: 'a'.repeat(51) }).success).toBe(
       false
     );
@@ -40,7 +38,8 @@ describe('trigger variant validation', () => {
   it('accepts null to clear a variant on update and rejects invalid values', () => {
     expect(TriggerConfigUpdateInput.safeParse({ variant: null }).success).toBe(true);
     expect(TriggerConfigUpdateInput.safeParse({ variant: 'medium' }).success).toBe(true);
-    expect(TriggerConfigUpdateInput.safeParse({ variant: 'medium-1' }).success).toBe(false);
+    expect(TriggerConfigUpdateInput.safeParse({ variant: 'medium-1' }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.safeParse({ variant: '' }).success).toBe(false);
   });
 });
 
@@ -469,6 +468,105 @@ describe('trigger sandbox allocation routes', () => {
     } else {
       expect(body).toMatchObject({ data: { sandboxAllocation: updates.sandboxAllocation } });
     }
+  });
+});
+
+describe('trigger environment selection routes', () => {
+  const environmentId = '11111111-1111-4111-8111-111111111111';
+  const cloudAgentInput = {
+    githubRepo: 'owner/repo',
+    mode: 'code',
+    model: 'openai/gpt-4.1',
+    promptTemplate: 'Process {{body}}',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('accepts a UUID environment id or null on create and update', () => {
+    expect(TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId }).success).toBe(true);
+    expect(TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId: null }).success).toBe(
+      true
+    );
+    expect(
+      TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId: 'invalid' }).success
+    ).toBe(false);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId: null }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId: 'invalid' }).success).toBe(false);
+  });
+
+  it('passes the environment selection through trigger creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      ...cloudAgentInput,
+      environmentId,
+    });
+
+    expect(response.status).toBe(201);
+    expect(configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ environmentId })
+    );
+  });
+
+  it.each([{ environmentId }, { environmentId: null }])(
+    'passes %o through trigger updates',
+    async updates => {
+      const { env, updateConfig } = createRouteHarness(existingConfig('cloud_agent'));
+
+      const response = await requestTrigger(env, 'PUT', updates);
+
+      expect(response.status).toBe(200);
+      expect(updateConfig).toHaveBeenCalledWith(updates);
+    }
+  );
+
+  it('rejects environment selection for KiloClaw creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      promptTemplate: 'Process {{body}}',
+      environmentId,
+    });
+
+    expect(response.status).toBe(400);
+    expect(configure).not.toHaveBeenCalled();
+  });
+
+  it('accepts a null environment for KiloClaw creation and updates', async () => {
+    const create = createRouteHarness(null);
+    const response = await requestTrigger(create.env, 'POST', {
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      promptTemplate: 'Process {{body}}',
+      environmentId: null,
+    });
+    expect(response.status).toBe(201);
+    expect(create.configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ environmentId: null })
+    );
+
+    const update = createRouteHarness(existingConfig('kiloclaw_chat'));
+    const updated = await requestTrigger(update.env, 'PUT', { environmentId: null });
+    expect(updated.status).toBe(200);
+    expect(update.updateConfig).toHaveBeenCalledWith({ environmentId: null });
+  });
+
+  it('rejects environment selection for stored KiloClaw triggers', async () => {
+    const { env, updateConfig } = createRouteHarness(existingConfig('kiloclaw_chat'));
+
+    const response = await requestTrigger(env, 'PUT', { environmentId });
+
+    expect(response.status).toBe(400);
+    expect(updateConfig).not.toHaveBeenCalled();
   });
 });
 

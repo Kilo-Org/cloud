@@ -30,6 +30,32 @@ export function getToolInputPath(input: Record<string, unknown> | undefined): st
   return undefined;
 }
 
+export function getToolDisplayName(toolPart: ToolPart): string {
+  const input = toolPart.state.input;
+  return toolPart.tool === 'mcp' &&
+    typeof input.server_name === 'string' &&
+    typeof input.tool_name === 'string'
+    ? `${input.server_name}/${input.tool_name}`
+    : toolPart.tool;
+}
+
+export function getToolActivity(toolPart: ToolPart): string {
+  const input = getToolArguments(toolPart);
+  const detail = [
+    input?.command,
+    input?.pattern,
+    input?.query,
+    getToolInputPath(input),
+    input?.url,
+    input?.description,
+    input?.name,
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const tool = getToolDisplayName(toolPart);
+  if (!detail) return tool;
+  const preview = detail.replace(/\s+/g, ' ').trim();
+  return `${tool}: ${preview.length > 200 ? `${preview.slice(0, 197)}...` : preview}`;
+}
+
 export function getFilename(filePath: string): string {
   const parts = filePath.split('/');
   return parts[parts.length - 1] || filePath;

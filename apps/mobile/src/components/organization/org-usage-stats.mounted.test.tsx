@@ -24,17 +24,13 @@ const query = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgUsageStats: () => query }));
 vi.mock('@kilocode/app-shared/utils', () => ({ fromMicrodollars: (value: number) => value / 1e6 }));
 vi.mock('@/lib/format', () => ({
-  formatMoney: (value: number) => `$${value}`,
+  formatPrefixedMoney: (value: number) => `$${value}`,
   formatNumber: String,
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'AnimatedView' },
-  FadeIn: { duration: () => ({}) },
-  LinearTransition: {},
-}));
 
 beforeEach(() => {
   query.data = undefined;
@@ -44,6 +40,25 @@ beforeEach(() => {
 });
 
 describe('Organization usage availability', () => {
+  it('fills every value slot with a loading block before the first totals arrive', async () => {
+    query.isPaused = false;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1' })
+    );
+    const text = renderer.root.findAllByType('Text').map(node => node.props.children);
+    for (const key of [
+      'common.cost',
+      'organization.usageStats.requests',
+      'organization.usageStats.inputTokens',
+      'organization.usageStats.outputTokens',
+    ] as const) {
+      expect(text).toContain(i18n.t(key));
+    }
+    expect(text).not.toContain('—');
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(4);
+    unmount();
+  });
   it.each(['paused', 'failed'] as const)(
     'keeps labeled placeholders and recovery when %s',
     async state => {
@@ -83,7 +98,9 @@ describe('Organization usage availability', () => {
       createElement(OrgUsageStats, { organizationId: 'org-1' })
     );
     const text = renderer.root.findAllByType('Text').map(node => node.props.children);
-    expect(text).toEqual(expect.arrayContaining(['$2', '12', '34', '56']));
+    // The cost keeps its own left-to-right run, so its symbol cannot move
+    // behind the number in a right-to-left paragraph.
+    expect(text).toEqual(expect.arrayContaining(['\u2066$2\u2069', '12', '34', '56']));
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
     unmount();
   });

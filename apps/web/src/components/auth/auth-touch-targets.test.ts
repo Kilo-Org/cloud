@@ -56,9 +56,6 @@ const mockPasskey = {
 };
 
 jest.mock('@/components/AnimatedLogoMark', () => ({ AnimatedLogoMark: () => null }));
-jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
-  useClaudeSignInConfigured: () => true,
-}));
 
 // A CSS module is not loadable in the jest node environment; the provider
 // buttons are real, only their stylesheet name is stubbed.
@@ -327,6 +324,7 @@ describe('sign-in touch targets', () => {
       'EMAIL-INVALID-FORMAT',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',
+      'EMAIL-REQUIRED',
       'untrusted-query-error',
     ];
 
@@ -360,6 +358,7 @@ describe('sign-in touch targets', () => {
         viewerToken: 'viewer-token',
         isAppMode: true,
         requestingClient: null,
+        pendingLink: null,
         user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
       })
     );

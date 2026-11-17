@@ -216,11 +216,6 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <MailCheck />,
   },
   {
-    title: () => 'Gas Town',
-    url: '/admin/gastown',
-    icon: () => <Network />,
-  },
-  {
     title: () => 'Gateway',
     url: '/admin/gateway',
     icon: () => <Network />,

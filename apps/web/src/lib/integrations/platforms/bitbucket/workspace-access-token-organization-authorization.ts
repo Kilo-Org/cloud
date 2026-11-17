@@ -60,7 +60,13 @@ export async function requireBitbucketWorkspaceAccessTokenOrganizationManager(
       isAdmin: kilocode_users.is_admin,
     })
     .from(kilocode_users)
-    .where(and(eq(kilocode_users.id, actorUserId), isNull(kilocode_users.blocked_reason)))
+    .where(
+      and(
+        eq(kilocode_users.id, actorUserId),
+        isNull(kilocode_users.blocked_at),
+        isNull(kilocode_users.blocked_reason)
+      )
+    )
     .for('update');
   if (!actor) {
     throw new BitbucketWorkspaceAccessTokenOrganizationAuthorizationError('unauthorized');

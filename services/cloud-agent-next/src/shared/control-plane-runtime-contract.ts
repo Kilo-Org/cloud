@@ -6,6 +6,9 @@ export const WORKTREE_RUNTIME_VERSION = '1';
 export const WORKSPACE_CONFIGURATION_HEADER = 'x-kilo-workspace-configuration';
 export const WORKSPACE_CONFIGURATION_VERSION = '1';
 
+export const RUNTIME_INSTRUCTIONS_HEADER = 'x-kilo-runtime-instructions';
+export const RUNTIME_INSTRUCTIONS_VERSION = '1';
+
 export const KILO_CLI_VERSION_HEADER = 'x-kilo-cli-version';
 export const WRAPPER_VERSION_HEADER = 'x-kilo-wrapper-version';
 

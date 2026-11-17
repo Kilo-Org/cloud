@@ -1,18 +1,4 @@
-import { sessionIdSchema, storedSessionIdSchema } from '@kilocode/session-ingest-contracts';
-
-/**
- * The canonical shape a newly issued Kilo session id takes, derived from the
- * shared contract (`sessionIdSchema` in `@kilocode/session-ingest-contracts`:
- * `ses_` + 26 alphanumeric characters) instead of re-declaring it, so this guard
- * and the server contract cannot drift.
- *
- * An incoming link uses it to decide whether it names a session screen: a link
- * that carries a capture of any other shape opens nothing, so the resolver never
- * replaces the screen the person is on (see `deep-link-destination.ts`).
- */
-export function isPlausibleKiloSessionId(value: string): boolean {
-  return sessionIdSchema.safeParse(value).success;
-}
+import { storedSessionIdSchema } from '@kilocode/session-ingest-contracts';
 
 /**
  * Whether a `session-id` param can address a session the store holds. The store

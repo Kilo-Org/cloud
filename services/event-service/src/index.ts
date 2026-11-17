@@ -9,7 +9,11 @@ import {
   RequestDeadlineError,
   withDeadline,
 } from '@kilocode/event-service';
-import { extractBearerToken } from '@kilocode/worker-utils';
+import {
+  extractBearerToken,
+  isDurableObjectRetryDeadline,
+  isTransientDurableObjectFailure,
+} from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { TICKET_MINT_BUDGET_MS } from './ticket-mint-budget';
 import { configureDevLogging, logger, withLogTags } from './util/logger';
@@ -22,7 +26,7 @@ const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
 
-type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'timeout';
+type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'mint_unavailable' | 'timeout';
 
 type TicketMintResult =
   | { outcome: 'ok'; ticket: string; userId: string }
@@ -89,9 +93,19 @@ function acceptsWebSocketProtocol(header: string | undefined): boolean {
  * A ticket is `<object id>.<secret>`. The object id comes from `newUniqueId()`:
  * the first use of an `idFromName()` id waits on a worldwide check that no
  * other colo created the same name, and every ticket is a first use. That
- * extra hop is where production mints missed the 8s budget (KILO-APP-2NH).
+ * extra hop is where production mints missed the 8s budget.
+ *
+ * The mint hop is reported in three parts: a minted ticket, a rejection by the
+ * object (a defect or a refusal — retrying answers the same), and a transient
+ * platform failure (overload, isolate reset, dropped connection) that the
+ * client's reconnect-and-retry clears.
  */
-async function mintConnectionTicket(env: Env, userId: string): Promise<string | null> {
+type ConnectionTicketMint =
+  | { kind: 'minted'; ticket: string }
+  | { kind: 'rejected' }
+  | { kind: 'unavailable' };
+
+async function mintConnectionTicket(env: Env, userId: string): Promise<ConnectionTicketMint> {
   const id = env.CONNECTION_TICKET_DO.newUniqueId();
   const body = {
     userId,
@@ -100,9 +114,15 @@ async function mintConnectionTicket(env: Env, userId: string): Promise<string | 
   } satisfies TicketMintRequest;
   try {
     await env.CONNECTION_TICKET_DO.get(id).mint(body);
-    return `${id.toString()}.${body.secret}`;
-  } catch {
-    return null;
+    return { kind: 'minted', ticket: `${id.toString()}.${body.secret}` };
+  } catch (error) {
+    if (isTransientDurableObjectFailure(error) || isDurableObjectRetryDeadline(error)) {
+      logger.debug('connect-ticket: mint hop transiently unavailable', {
+        reason: error instanceof Error ? error.message : 'unknown',
+      });
+      return { kind: 'unavailable' };
+    }
+    return { kind: 'rejected' };
   }
 }
 
@@ -121,8 +141,10 @@ async function consumeConnectionTicket(env: Env, ticket: string): Promise<string
  * Authenticate the bearer and mint the ticket under one deadline. The auth read
  * and the mint share the same budget, so a stalled hop in either resolves the
  * route with `timeout` instead of hanging past the gateway's budget. A rejected
- * hop is reported as `mint_failed` — the same retryable failure the client
- * already reconnects and retries on.
+ * hop is reported as `mint_failed`; a hop that the platform dropped is
+ * `mint_unavailable`. Both are retryable by the client's reconnect-and-retry,
+ * but only the second one is a transient condition, so they answer different
+ * statuses.
  */
 async function authenticateAndMintTicket(
   env: Env,
@@ -135,12 +157,19 @@ async function authenticateAndMintTicket(
         return { outcome: 'unauthorized' } satisfies TicketMintResult;
       }
 
-      const ticket = await mintConnectionTicket(env, auth.userId);
-      if (!ticket) {
+      const minted = await mintConnectionTicket(env, auth.userId);
+      if (minted.kind === 'unavailable') {
+        return { outcome: 'mint_unavailable' } satisfies TicketMintResult;
+      }
+      if (minted.kind === 'rejected') {
         return { outcome: 'mint_failed' } satisfies TicketMintResult;
       }
 
-      return { outcome: 'ok', ticket, userId: auth.userId } satisfies TicketMintResult;
+      return {
+        outcome: 'ok',
+        ticket: minted.ticket,
+        userId: auth.userId,
+      } satisfies TicketMintResult;
     });
   } catch (err) {
     if (err instanceof RequestDeadlineError) {
@@ -170,14 +199,21 @@ app.post('/connect-ticket', async c => {
 
   if (result.outcome !== 'ok') {
     logger.debug('connect-ticket: mint failed', { outcome: result.outcome });
+    // A deadline expiry means a hop never answered, and a transient platform
+    // failure means the platform dropped it: the mint is unknown, not broken
+    // here, so both answer the retryable status and the client's
+    // reconnect-and-retry path owns it. A rejected mint stays 500 — the
+    // Durable Object did answer, and it answered with an error.
+    const status =
+      result.outcome === 'timeout' || result.outcome === 'mint_unavailable' ? 503 : 500;
     logRequestDuration({
       route: '/connect-ticket',
       method: c.req.method,
-      status: 500,
+      status,
       durationMs: Date.now() - startedAt,
       outcome: result.outcome,
     });
-    return c.json({ error: 'Ticket mint failed' }, 500);
+    return c.json({ error: 'Ticket mint failed' }, status);
   }
 
   logger.setTags({ userId: result.userId });

@@ -2,7 +2,7 @@ import { asc, and, eq } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import { LIMITS, utf8Bytes, type BatchRequest, type Principal, type Receipt } from '../../protocol';
-import { raise, toReceipt, update, writable, type Db, type ReceiptRow } from './session';
+import { raise, toReceipt, update, writable, type Db, type Meta, type ReceiptRow } from './session';
 type BatchWork = { pruneMs: number; pruneAttempts: number; pruneError?: unknown };
 
 /**
@@ -23,7 +23,7 @@ export function apply(
   digest: string,
   now: number,
   work?: BatchWork
-): Receipt {
+): { receipt: Receipt; meta?: Meta } {
   const meta = writable(db, principal, sessionID);
   if (meta.source_id !== batch.sourceID) {
     raise('source_conflict', 'The session is bound to another source');
@@ -34,7 +34,7 @@ export function apply(
     if (prior.digest !== digest) {
       raise('batch_conflict', 'The batch ID was already committed with different content');
     }
-    return toReceipt(sessionID, prior);
+    return { receipt: toReceipt(sessionID, prior) };
   }
 
   if (batch.after !== meta.position) {
@@ -122,7 +122,7 @@ export function apply(
       .run();
   }
 
-  update(db, {
+  const updated = {
     position: batch.through,
     revision,
     batches: meta.batches + 1,
@@ -130,7 +130,8 @@ export function apply(
     inline_bytes: inlineBytes,
     updated_at: now,
     last_write_at: now,
-  });
+  };
+  update(db, updated);
 
   const receipt: ReceiptRow = {
     batch_id: batch.batchID,
@@ -143,7 +144,7 @@ export function apply(
   };
   db.insert(receipts).values(receipt).run();
   prune(db, meta.batches + 1, work);
-  return toReceipt(sessionID, receipt);
+  return { receipt: toReceipt(sessionID, receipt), meta: { ...meta, ...updated } };
 }
 
 /** One accepted batch inserts one receipt; positions strictly order that tail. */

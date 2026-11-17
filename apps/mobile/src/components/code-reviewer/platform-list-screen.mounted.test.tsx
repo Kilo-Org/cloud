@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { _resetScopeNamesForTests } from '@/lib/code-reviewer-scope-name';
 import { PlatformListScreen } from './platform-list-screen';
 
 const refetchMocks = vi.hoisted(() => ({
@@ -90,6 +91,7 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/icons', () => ({
   CirclePlus: 'CirclePlus',
+  LineChart: 'LineChart',
   GitBranch: 'GitBranch',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
@@ -115,6 +117,9 @@ function findByType(root: TestRenderer.ReactTestInstance, type: string) {
 }
 
 beforeEach(() => {
+  // The remembered scope names are a module singleton: a name painted by an
+  // earlier test would title the next one's scope.
+  _resetScopeNamesForTests();
   status.error = undefined;
   router.push.mockClear();
   membership.organizations = [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }];

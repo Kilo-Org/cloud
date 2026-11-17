@@ -16,6 +16,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
+          orderBy: jest.fn(() => ({
+            limit: mockLimit,
+          })),
           limit: mockLimit,
         })),
       })),

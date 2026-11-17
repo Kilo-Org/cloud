@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
+
+import { APP_LOCAL_EXCLUDES } from './kilo-app-release-notes.mjs';
 
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 const ciWorkflowPath = '.github/workflows/kilo-app-ci.yml';
@@ -107,13 +109,29 @@ function validate(workflow) {
 
   // The changelog commit this workflow pushes re-triggers it, and the tag marks
   // the pre-changelog commit: without the exclusion every release starts the next.
-  const diffLine = check.run.split('\n').find(line => line.includes('git diff --name-only'));
-  assert.ok(diffLine, 'check-changes: the change detection diff is missing');
-  assert.match(
-    diffLine,
-    /\(exclude\)apps\/mobile\/CHANGELOG\.md/,
-    'change detection must exclude apps/mobile/CHANGELOG.md'
+  // The other entries are app-local files that cannot reach the bundle: a range
+  // of only those changes no app byte, so it must not spend an upload. The whole
+  // pathspec is read from the one diff command, so a relocation into another
+  // command would fail here instead of passing on a stale match.
+  const diffMatch = /git diff --name-only[\s\S]*?\)\n/.exec(check.run);
+  assert.ok(diffMatch, 'check-changes: the change detection diff is missing');
+  const diff = diffMatch[0];
+  const declared = [...diff.matchAll(/'(:[^']+)'/g)].map(match => match[1]);
+  assert.deepEqual(
+    [...declared].sort(),
+    [':(exclude)apps/mobile/CHANGELOG.md', ...APP_LOCAL_EXCLUDES].sort(),
+    'the release diff must skip exactly the app-local files the notes step skips'
   );
+  for (const kept of [
+    'apps/mobile/',
+    'packages/trpc/',
+    'packages/app-shared/',
+    'packages/event-service/',
+    'packages/notifications/',
+    'packages/cloud-agent-sdk/',
+  ]) {
+    assert.ok(diff.includes(`${kept} \\`), `change detection must still cover ${kept}`);
+  }
 
   // LAST_TAG feeds the notes range, so a dispatch must compute it too.
   const lastTagIndex = check.run.indexOf('LAST_TAG=$(git tag');
@@ -164,9 +182,12 @@ function validate(workflow) {
 
   // A push to main starts the kilo-app CI run and this release run from the
   // same commit, so the release consumes that run's conclusion instead of
-  // executing the suite again. The lookup is fail-closed: the step publishes
-  // reuse=false before any decision, only a push run may reuse, and only a run
-  // that concluded successfully is a validation for this commit.
+  // executing the suite again. The hourly schedule and a manual run of main
+  // stand on the tip of main, so they reuse that push run as well, but only
+  // once it has concluded. The lookup is fail-closed: the step publishes
+  // reuse=false before any decision, only a push, a schedule or a manual run of
+  // main may reuse, and only a run that concluded successfully is a validation
+  // for this commit.
   const suite = step(workflow, 'check-changes', 'suite');
   assert.ok(suite, 'check-changes: the suite reuse step (id suite) is missing');
   assert.equal(
@@ -187,10 +208,51 @@ function validate(workflow) {
     reuseDefault < suite.run.indexOf('GITHUB_EVENT_NAME'),
     'the fail-closed default must be published before the lookup'
   );
+  const gateStart = suite.run.indexOf('case "$GITHUB_EVENT_NAME" in');
+  assert.ok(gateStart >= 0, 'the suite step must gate the lookup on the event');
+  const eventGate = suite.run.slice(gateStart, suite.run.indexOf('esac', gateStart));
+  assert.match(
+    eventGate,
+    /push\) REUSE_RUNNING=true/,
+    'a push reuses the suite run it started, which may still be in flight'
+  );
+  assert.match(
+    eventGate,
+    /schedule\) REUSE_RUNNING=false/,
+    'the schedule reuses the push run of the commit it resumes at'
+  );
+  assert.match(
+    eventGate,
+    /workflow_dispatch\)\s*\n\s*if \[ "\$GITHUB_REF" != "refs\/heads\/main" \][\s\S]*?exit 0/,
+    'a manual run of another ref has no push run of its commit to reuse'
+  );
+  assert.match(
+    eventGate,
+    /\*\)\s*\n\s*echo "[^"]*"[\s\S]*?exit 0/,
+    'an event that is not a release run of main keeps the in-workflow suite'
+  );
   assert.match(
     suite.run,
-    /if \[ "\$GITHUB_EVENT_NAME" != "push" \][\s\S]*?exit 0/,
-    'only a push run has a suite run of this commit to reuse'
+    /\[ "\$STATUS" != "completed" \] && \[ "\$REUSE_RUNNING" = "false" \][\s\S]*?exit 0/,
+    'a schedule or a manual run of main reuses only a suite run that concluded'
+  );
+  // A skipped suite still reports success, and the tip of main need not be a
+  // commit that touched an app path, so the shard job is the proof that the run
+  // this path reuses executed the suite.
+  assert.match(
+    suite.run,
+    /actions\/runs\/\$ID\/jobs\?per_page=100&filter=latest/,
+    'a schedule or a manual run of main must read the jobs of the run it reuses'
+  );
+  assert.match(
+    suite.run,
+    /select\(\.name == "mobile-test \(1\/4\)"\)/,
+    'the proof must read a shard job that runs only when the suite runs'
+  );
+  assert.match(
+    suite.run,
+    /\[ "\$SHARD" != "success" \][\s\S]*?exit 0/,
+    'a run that did not execute the suite leaves the suite to this workflow'
   );
   assert.match(
     suite.run,
@@ -209,9 +271,9 @@ function validate(workflow) {
   );
 
   // The gate publishes whether the run settled the validation, and the
-  // in-workflow suite covers every case it did not: the schedule and manual
-  // paths, a lookup that cannot prove a run, and a run that ended without a
-  // pass, which includes one a later push cancelled.
+  // in-workflow suite covers every case it did not: a manual run of another
+  // ref, a lookup that cannot prove a run, and a run that ended without a
+  // pass, which includes a cancelled one.
   const reuseJob = workflow.jobs.reuse;
   assert.ok(reuseJob, 'the reuse gate job is missing');
   assert.ok(
@@ -287,6 +349,25 @@ function validate(workflow) {
     workflow.jobs.validate.if,
     /needs\.check-changes\.outputs\.reuse == 'false' \|\| needs\.reuse\.outputs\.suite == 'fallback'/,
     'the in-workflow suite must run when no run is reused or the reused run ended without a pass'
+  );
+
+  // The release reuses the push run of this commit, so the mobile workflow must
+  // let a main push it started reach a conclusion: only a superseded pull
+  // request run is cancelled, the rule ci.yml and extension-ci.yml already
+  // apply. A cancelled push run carries no verdict about its commit, so the
+  // release would run the whole suite a second time inside its own workflow.
+  const mobileWorkflow = load(
+    readFileSync(new URL(`../${ciWorkflowPath}`, import.meta.url), 'utf8')
+  );
+  assert.equal(
+    mobileWorkflow.concurrency?.group,
+    '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}',
+    'the mobile workflow must keep one concurrency group per pull request and ref'
+  );
+  assert.equal(
+    mobileWorkflow.concurrency?.['cancel-in-progress'],
+    "${{ github.event_name == 'pull_request' }}",
+    'the mobile workflow must cancel only a superseded pull request run'
   );
 
   // The cost gate is the last thing before any build: every job that builds or
@@ -484,6 +565,22 @@ function validate(workflow) {
     'the PR must not be opened when the section did not land'
   );
   assert.match(pr.run, /\bgh pr edit\b/, 'an already open PR must be refreshed, not duplicated');
+  // The lookup asks for the head repository relationship and keeps only a PR
+  // that comes from this repository before it refreshes anything.
+  assert.match(
+    pr.run,
+    /gh pr list --head "\$BRANCH"[^\n]*--json number,isCrossRepository/,
+    'the version-bump PR lookup must request the head repository relationship'
+  );
+  assert.match(
+    pr.run,
+    /\[\.\[\] \| select\(\.isCrossRepository \| not\)\]\[0\]\.number/,
+    'the version-bump PR lookup must keep only a PR from this repository'
+  );
+  assert.ok(
+    pr.run.indexOf('gh pr list') < pr.run.indexOf('gh pr edit'),
+    'the version-bump PR must be selected before it is refreshed'
+  );
   // This job checks out main, and `gh pr create` reads the head from the
   // checked-out branch when --head is absent: the API then refuses the PR with
   // "No commits between main and main" and the version bump is never offered.
@@ -505,6 +602,30 @@ function validate(workflow) {
 
 test('the release workflow gates the build on the upload cap and lands the changelog section', () => {
   validate(readWorkflow());
+});
+
+// The preflight reads the EAS CLI and the evaluated Expo config only. `eas-cli`
+// is the app's development dependency, and `app.config.ts` with
+// scripts/assert-expo-config.mjs resolves app-local modules, so the app closure
+// carries every input of the job. The job runs on the default runner, and a
+// measured run of it puts the install saving above a tenth of its wall time.
+const preflightInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the release preflight installs the app closure', () => {
+  const job = readWorkflow().jobs.preflight;
+  const installs = job.steps.filter(item => /^pnpm\b.*\binstall\b/.test(item.run ?? ''));
+  assert.deepEqual(
+    installs.map(item => item.run),
+    [preflightInstall],
+    'one install links the app closure and the root project'
+  );
+  const assertion = job.steps.find(item => item.name === 'Assert production config contract');
+  assert.match(
+    assertion.run,
+    /pnpm assert:config/,
+    'the config assertion the closure must carry still runs'
+  );
 });
 
 test('release retries preserve shipped sections on a bump branch without a PR', () => {
@@ -625,6 +746,260 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
   }
 });
 
+test('the changelog land step reports the verified head and refuses an unverified branch', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-land-'));
+  const output = join(work, 'output');
+  const runnerTemp = join(work, 'temp');
+  const branch = 'kilo-app-version-bump-1.0.13';
+  const land = step(readWorkflow(), 'changelog', 'land');
+  // The step runs the script from the checkout root, so each fixture repo needs
+  // the real script copied in at the same path.
+  const scriptSource = new URL('../scripts/kilo-app-release-notes.mjs', import.meta.url);
+  const scriptPath = 'scripts/kilo-app-release-notes.mjs';
+  const outputs = {
+    'check-changes': { version: '1.0.13' },
+    'build-and-submit': { ios_build: '43', android_build: '43' },
+  };
+  const body = land.run.replaceAll(
+    /\$\{\{\s*needs\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+    (_, job, key) => outputs[job][key]
+  );
+  const git = (cwd, args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+
+  // A repository whose main carries the app, the script and a conforming
+  // version-bump branch; `extra` adds one more commit to that branch.
+  const makeRepo = (name, extra) => {
+    const repo = join(work, name);
+    const remote = join(work, `${name}-remote.git`);
+    execFileSync('git', ['init', '-q', '--bare', remote], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '-q', remote, repo], { stdio: 'pipe' });
+    git(repo, ['config', 'user.name', 'Release Test']);
+    git(repo, ['config', 'user.email', 'release@example.invalid']);
+    git(repo, ['config', 'commit.gpgsign', 'false']);
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    mkdirSync(join(repo, 'scripts'), { recursive: true });
+    copyFileSync(scriptSource, join(repo, scriptPath));
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Kilo App Changelog\n\nprose\n');
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.12',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore: seed']);
+    git(repo, ['branch', '-M', 'main']);
+    git(repo, ['push', '-q', 'origin', 'main']);
+
+    git(repo, ['checkout', '-q', '-b', branch]);
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.13',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore(kilo-app): bump version to 1.0.13']);
+    if (extra) {
+      mkdirSync(join(repo, 'apps/mobile/src'), { recursive: true });
+      writeFileSync(join(repo, 'apps/mobile/src/a.ts'), 'export const a = 1;\n');
+      git(repo, ['add', '-A']);
+      git(repo, ['commit', '-q', '-m', 'feat(kilo-app): extra change']);
+    }
+    git(repo, ['push', '-q', 'origin', branch]);
+    git(repo, ['checkout', '-q', 'main']);
+    const tip = () => git(remote, ['rev-parse', `refs/heads/${branch}`]);
+    return { repo, remote, tip };
+  };
+
+  const runLand = repo => {
+    writeFileSync(output, '');
+    try {
+      execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          RUNNER_TEMP: runnerTemp,
+          BRANCH: branch,
+          NOTES: '- a shipped change (#91)',
+          PENDING: 'kilo-app-changelog-pending',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return { status: 0, stderr: '' };
+    } catch (error) {
+      return { status: error.status, stderr: error.stderr.toString() };
+    }
+  };
+
+  try {
+    mkdirSync(runnerTemp, { recursive: true });
+
+    const conforming = makeRepo('conforming', false);
+    const before = conforming.tip();
+    const landed = runLand(conforming.repo);
+    assert.equal(landed.status, 0, landed.stderr);
+    const published = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+    assert.equal(published.landed, 'true');
+    assert.match(published.head ?? '', /^[0-9a-f]{40}$/);
+    assert.equal(published.head, conforming.tip());
+    assert.notEqual(published.head, before);
+    const files = (published.files ?? '').split(', ');
+    assert.equal(files.length, 2, `expected two files, got ${published.files}`);
+    assert.deepEqual(
+      [...files].sort(),
+      ['apps/mobile/CHANGELOG.md', 'apps/mobile/app.config.ts'].sort()
+    );
+
+    const unverified = makeRepo('unverified', true);
+    const unverifiedTip = unverified.tip();
+    const refused = runLand(unverified.repo);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /refusing to land ## 1\.0\.13 \(build 43\)/);
+    assert.match(refused.stderr, /apps\/mobile\/src\/a\.ts/);
+    assert.doesNotMatch(readFileSync(output, 'utf8'), /^landed=true$/m);
+    assert.equal(unverified.tip(), unverifiedTip);
+    // The refused section is carried, not dropped, so the next build can write
+    // it above its own.
+    git(unverified.repo, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    const carried = git(unverified.repo, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']);
+    assert.match(carried, /## 1\.0\.13 \(build 43\)/);
+    assert.match(carried, /- a shipped change \(#91\)/);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+// A merge that touches only app-local tools or docs changes no app byte, and
+// every submission it starts spends one of the capped App Store Connect
+// uploads. The decision is the step's own shell, so run that shell on fixture
+// ranges and read what it publishes.
+test('an app-local tooling or docs range does not release', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-changes-'));
+  const repo = join(work, 'repo');
+  const output = join(work, 'output');
+  const envFile = join(work, 'env');
+  const check = step(readWorkflow(), 'check-changes', 'check');
+  const env = {
+    ...process.env,
+    GITHUB_ENV: envFile,
+    GITHUB_OUTPUT: output,
+    GITHUB_EVENT_NAME: 'push',
+  };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const write = (rel, body = 'fixture\n') => {
+    mkdirSync(join(repo, rel.slice(0, rel.lastIndexOf('/'))), { recursive: true });
+    writeFileSync(join(repo, rel), body);
+  };
+  const commit = message => {
+    git('add', '-A');
+    git('commit', '-qm', message);
+  };
+  const decide = () => {
+    writeFileSync(output, '');
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', check.run], {
+      cwd: repo,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const published = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const at = line.indexOf('=');
+          return [line.slice(0, at), line.slice(at + 1)];
+        })
+    );
+    return published.should_build;
+  };
+
+  try {
+    execFileSync('git', ['init', '-q', '-b', 'main', repo], { stdio: 'pipe' });
+    git('config', 'user.name', 'Release Test');
+    git('config', 'user.email', 'release@example.invalid');
+    write('apps/mobile/app.config.ts', "export default {\n  version: '1.2.3',\n};\n");
+    write('apps/mobile/package.json', '{}\n');
+    write('apps/mobile/src/components/composer.tsx', 'export const A = 1;\n');
+    write('apps/mobile/.oxlintrc.json', '{}\n');
+    write('apps/mobile/.oxlintrc.i18n.json', '{}\n');
+    write('apps/mobile/vitest.config.ts', 'export default {};\n');
+    write('apps/mobile/vitest.setup.ts', 'export const setup = 1;\n');
+    write('apps/mobile/scripts/assert-theme-colors.mjs', '// initial\n');
+    write('apps/mobile/e2e/github-api-stub/server.mjs', '// initial\n');
+    write('apps/mobile/AGENTS.md', '# Initial\n');
+    write('apps/mobile/README.md', '# Initial\n');
+    write('apps/mobile/CHANGELOG.md', '# Changelog\n');
+    write('packages/trpc/src/router.ts', 'export const R = 1;\n');
+    commit('Fixture app');
+    git('tag', 'kilo-app-release/1.0.0');
+    const released = git('rev-parse', 'HEAD');
+    const reset = () => git('reset', '-q', '--hard', released);
+
+    assert.equal(decide(), 'false', 'an unchanged range must not release');
+
+    for (const [rel, body] of [
+      ['apps/mobile/.oxlintrc.json', '{ "rules": { "a": 1 } }\n'],
+      ['apps/mobile/.oxlintrc.i18n.json', '{ "rules": { "a": 1 } }\n'],
+      ['apps/mobile/vitest.config.ts', 'export default { test: {} };\n'],
+      ['apps/mobile/vitest.setup.ts', 'export const setup = 2;\n'],
+      ['apps/mobile/src/components/composer.test.ts', 'export const t = 1;\n'],
+      ['apps/mobile/src/components/chat/message.mounted.test.tsx', 'export const t = 1;\n'],
+      ['apps/mobile/scripts/assert-theme-colors.mjs', '// changed\n'],
+      ['apps/mobile/e2e/github-api-stub/server.mjs', '// changed\n'],
+      ['apps/mobile/AGENTS.md', '# Changed\n'],
+      ['apps/mobile/README.md', '# Changed\n'],
+      ['apps/mobile/src/lib/lifecycle.md', '# Nested docs\n'],
+      ['apps/mobile/CHANGELOG.md', '# Changelog\n\n## next\n'],
+    ]) {
+      write(rel, body);
+      commit(`App-local: ${rel}`);
+      assert.equal(decide(), 'false', `${rel} alone must not release`);
+      reset();
+    }
+
+    write('apps/mobile/vitest.setup.ts', 'export const setup = 3;\n');
+    write('apps/mobile/AGENTS.md', '# Also changed\n');
+    write('apps/mobile/src/lib/only-tested.test.ts', 'export const t = 2;\n');
+    commit('App-local only, three families');
+    assert.equal(decide(), 'false', 'app-local files together must not release');
+    reset();
+
+    for (const [rel, body] of [
+      ['apps/mobile/src/components/composer.tsx', 'export const A = 2;\n'],
+      ['apps/mobile/package.json', '{ "dependencies": { "x": "1.0.0" } }\n'],
+      ['packages/trpc/src/router.ts', 'export const R = 2;\n'],
+      [
+        'apps/mobile/app.config.ts',
+        "export default {\n  version: '1.2.3',\n  name: 'kilo-app',\n};\n",
+      ],
+    ]) {
+      write(rel, body);
+      commit(`App change: ${rel}`);
+      assert.equal(decide(), 'true', `${rel} must release`);
+      reset();
+    }
+
+    write('apps/mobile/.oxlintrc.json', '{ "rules": { "b": 2 } }\n');
+    write('apps/mobile/src/components/composer.tsx', 'export const A = 3;\n');
+    commit('App-local beside a source change');
+    assert.equal(decide(), 'true', 'a source change releases beside an app-local one');
+    reset();
+
+    write('apps/mobile/app.config.ts', "export default {\n  version: '1.2.4',\n};\n");
+    commit('Version line only');
+    assert.equal(decide(), 'false', 'the version bump alone must not release');
+    reset();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
 test('the suite lookup reuses a passed run and otherwise runs the suite here', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'kilo-app-suite-'));
   const stubDir = join(workspace, 'bin');
@@ -634,21 +1009,33 @@ test('the suite lookup reuses a passed run and otherwise runs the suite here', (
   mkdirSync(stubDir, { recursive: true });
   // `gh` answers with the newest run of the workflow and event the lookup asks
   // for, in gojq's shape: an empty match prints the two empty fields it would
-  // emit for a null run. A failure case answers like an API error. `sleep` is
-  // stubbed out so the bounded wait for the runs list does not slow the test.
+  // emit for a null run. A jobs read answers with the shard conclusion the case
+  // gives it, which is the proof that the suite ran. A failure case answers
+  // like an API error. `sleep` is stubbed out so the bounded wait for the runs
+  // list does not slow the test.
   writeFileSync(
     join(stubDir, 'gh'),
     `#!/usr/bin/env node
 const fs = require('node:fs');
 const calls = process.env.GH_STUB_CALLS;
-const seen = fs.existsSync(calls)
-  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').filter(Boolean).length
-  : 0;
-fs.appendFileSync(calls, process.argv.slice(2).join(' ') + '\\n');
+const prior = fs.existsSync(calls)
+  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').filter(Boolean)
+  : [];
+const args = process.argv.slice(2);
+fs.appendFileSync(calls, args.join(' ') + '\\n');
+if (args.some(arg => arg.includes('/jobs?'))) {
+  if (process.env.GH_STUB_JOBS_ERROR === '1') {
+    process.stderr.write('HTTP 500: internal server error\\n');
+    process.exit(1);
+  }
+  process.stdout.write((process.env.GH_STUB_SHARD ?? 'success') + '\\n');
+  process.exit(0);
+}
 if (process.env.GH_STUB_ERROR === '1') {
   process.stderr.write('HTTP 503: service unavailable\\n');
   process.exit(1);
 }
+const seen = prior.filter(line => !line.includes('/jobs?')).length;
 const script = JSON.parse(fs.readFileSync(process.env.GH_STUB_RUNS, 'utf8'));
 const run = (script[Math.min(seen, script.length - 1)] ?? [])[0];
 process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t') + '\\n' : '\\t\\t\\n');
@@ -660,7 +1047,15 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
   const suite = step(readWorkflow(), 'check-changes', 'suite');
   const sha = '0123456789abcdef0123456789abcdef01234567';
   // `runs` is one entry per lookup: the last entry answers every later call.
-  const lookup = ({ event, runs, error }) => {
+  // `shard` is the conclusion of the shard job in the jobs read.
+  const lookup = ({
+    event,
+    ref = 'refs/heads/main',
+    runs,
+    error,
+    shard = 'success',
+    jobsError = false,
+  }) => {
     writeFileSync(runsPath, JSON.stringify(runs));
     writeFileSync(callsPath, '');
     writeFileSync(output, '');
@@ -673,9 +1068,12 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
         GITHUB_REPOSITORY: 'Kilo-Org/cloud',
         GITHUB_SHA: sha,
         GITHUB_EVENT_NAME: event,
+        GITHUB_REF: ref,
         GH_STUB_RUNS: runsPath,
         GH_STUB_CALLS: callsPath,
         GH_STUB_ERROR: error ? '1' : '0',
+        GH_STUB_SHARD: shard,
+        GH_STUB_JOBS_ERROR: jobsError ? '1' : '0',
       },
     });
     const outputs = Object.fromEntries(
@@ -734,13 +1132,101 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
     const empty = lookup({ event: 'push', runs: [[]] });
     assert.deepEqual(empty.outputs, { reuse: 'false' });
 
-    // The schedule and manual paths have no push run of this commit.
+    // A schedule stands on the tip of main, which the push that put it there
+    // validated: it reuses that concluded pass instead of running the suite.
     const scheduled = lookup({
       event: 'schedule',
-      runs: [[{ id: 42, status: 'completed', conclusion: 'success' }]],
+      runs: [[{ id: 46, status: 'completed', conclusion: 'success' }]],
     });
-    assert.deepEqual(scheduled.outputs, { reuse: 'false' });
-    assert.equal(scheduled.calls.length, 0, 'a non-push run must not look up a run');
+    assert.deepEqual(scheduled.outputs, { reuse: 'true', suite_run: '46' });
+    assert.match(
+      scheduled.calls[0],
+      new RegExp(
+        `^api repos/Kilo-Org/cloud/actions/workflows/kilo-app-ci\\.yml/runs\\?head_sha=${sha}&event=push`
+      ),
+      'the schedule must read the push run of its own commit'
+    );
+    assert.match(
+      scheduled.calls[1],
+      /^api repos\/Kilo-Org\/cloud\/actions\/runs\/46\/jobs\?/,
+      'the schedule must prove the suite ran in the run it reuses'
+    );
+    assert.equal(scheduled.calls.length, 2, 'one run read and one jobs read');
+
+    // It never waits on a suite it did not start, and it reuses nothing that
+    // is not already a pass.
+    const scheduledRunning = lookup({
+      event: 'schedule',
+      runs: [[{ id: 47, status: 'in_progress', conclusion: null }]],
+    });
+    assert.deepEqual(scheduledRunning.outputs, { reuse: 'false' });
+    assert.equal(scheduledRunning.calls.length, 1);
+
+    const scheduledFailed = lookup({
+      event: 'schedule',
+      runs: [[{ id: 48, status: 'completed', conclusion: 'cancelled' }]],
+    });
+    assert.deepEqual(scheduledFailed.outputs, { reuse: 'false' });
+
+    // A run whose suite jobs were skipped for a commit that touched no app path
+    // still reports success, and that is no validation for the app change this
+    // release submits.
+    const skipped = lookup({
+      event: 'schedule',
+      runs: [[{ id: 53, status: 'completed', conclusion: 'success' }]],
+      shard: 'skipped',
+    });
+    assert.deepEqual(skipped.outputs, { reuse: 'false' });
+    assert.equal(skipped.calls.length, 2, 'the suite proof must read the jobs');
+
+    // A jobs read that fails proves nothing either.
+    const jobsErrored = lookup({
+      event: 'schedule',
+      runs: [[{ id: 54, status: 'completed', conclusion: 'success' }]],
+      jobsError: true,
+    });
+    assert.deepEqual(jobsErrored.outputs, { reuse: 'false' });
+
+    // A manual run of main follows the same rule.
+    const dispatched = lookup({
+      event: 'workflow_dispatch',
+      ref: 'refs/heads/main',
+      runs: [[{ id: 49, status: 'completed', conclusion: 'success' }]],
+    });
+    assert.deepEqual(dispatched.outputs, { reuse: 'true', suite_run: '49' });
+
+    const dispatchedSkipped = lookup({
+      event: 'workflow_dispatch',
+      ref: 'refs/heads/main',
+      runs: [[{ id: 55, status: 'completed', conclusion: 'success' }]],
+      shard: 'skipped',
+    });
+    assert.deepEqual(dispatchedSkipped.outputs, { reuse: 'false' });
+
+    const dispatchedRunning = lookup({
+      event: 'workflow_dispatch',
+      ref: 'refs/heads/main',
+      runs: [[{ id: 50, status: 'queued', conclusion: null }]],
+    });
+    assert.deepEqual(dispatchedRunning.outputs, { reuse: 'false' });
+
+    // A manual run of another ref has no push run of its commit, and an event
+    // that is not a release run of main has nothing to reuse.
+    const dispatchedBranch = lookup({
+      event: 'workflow_dispatch',
+      ref: 'refs/heads/kilo-app-version-bump-1.2.3',
+      runs: [[{ id: 51, status: 'completed', conclusion: 'success' }]],
+    });
+    assert.deepEqual(dispatchedBranch.outputs, { reuse: 'false' });
+    assert.equal(dispatchedBranch.calls.length, 0, 'a branch dispatch must not look up a run');
+
+    const other = lookup({
+      event: 'pull_request',
+      ref: 'refs/pull/1/merge',
+      runs: [[{ id: 52, status: 'completed', conclusion: 'success' }]],
+    });
+    assert.deepEqual(other.outputs, { reuse: 'false' });
+    assert.equal(other.calls.length, 0, 'only a release run of main may reuse a run');
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
@@ -836,8 +1322,9 @@ sed -n "$((INDEX + 1))p" "$GH_STUB_RUN"
     assert.equal(settled.calls.length, 1, 'a settled pass needs one read');
 
     // A cancelled run carries no verdict about this commit: the suite runs in
-    // this workflow and the release does not fail at the gate. A merge burst
-    // produces exactly this, because the app workflow cancels its own main run.
+    // this workflow and the release does not fail at the gate. A burst of main
+    // pushes produces exactly this, because GitHub drops a run that is still
+    // pending when a third run enters its group.
     const cancelled = gate({ runs: [{ status: 'completed', conclusion: 'cancelled' }] });
     assert.equal(cancelled.status, 0, 'a cancelled reuse must not fail the release');
     assert.deepEqual(cancelled.outputs, { suite: 'fallback' });
@@ -896,6 +1383,10 @@ const mutations = {
   'change detection keeps CHANGELOG.md': workflow => {
     const check = step(workflow, 'check-changes', 'check');
     check.run = check.run.replace(" ':(exclude)apps/mobile/CHANGELOG.md'", '');
+  },
+  'change detection releases on app-local tooling': workflow => {
+    const check = step(workflow, 'check-changes', 'check');
+    check.run = check.run.replace(" ':(exclude,glob)apps/mobile/**/*.test.tsx'", '');
   },
   'LAST_TAG is computed after the manual override': workflow => {
     const check = step(workflow, 'check-changes', 'check');
@@ -956,9 +1447,31 @@ const mutations = {
     const suite = step(workflow, 'check-changes', 'suite');
     suite.run = suite.run.replace('head_sha=$GITHUB_SHA&', 'head_sha=&');
   },
-  'the suite lookup ignores the event': workflow => {
+  'the suite lookup runs for a manual run of another ref': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
-    suite.run = suite.run.replace('if [ "$GITHUB_EVENT_NAME" != "push" ]; then', 'if false; then');
+    suite.run = suite.run.replace(
+      'if [ "$GITHUB_REF" != "refs/heads/main" ]; then',
+      'if false; then'
+    );
+  },
+  'the suite lookup runs for any event': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace(/(\*\)\n\s+echo "[^"]*"\n\s+)exit 0/, '$1:');
+  },
+  'the schedule reuses a suite run still in flight': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace('schedule) REUSE_RUNNING=false', 'schedule) REUSE_RUNNING=true');
+  },
+  'the suite proof reads a job that runs for every commit': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace(
+      'select(.name == "mobile-test (1/4)")',
+      'select(.name == "mobile-changes")'
+    );
+  },
+  'the suite proof accepts a skipped shard': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace('[ "$SHARD" != "success" ]', '[ "$SHARD" = "stale" ]');
   },
   'the suite lookup reuses a run that did not pass': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
@@ -1135,6 +1648,17 @@ const mutations = {
   'the changelog opens the PR on the checked-out branch': workflow => {
     const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
     pr.run = pr.run.replace(/(gh pr create[\s\S]*?)--head "\$BRANCH" \\\n/, '$1');
+  },
+  'the changelog refreshes any PR on the branch': workflow => {
+    const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
+    pr.run = pr.run.replace(
+      `--json number,isCrossRepository \\\n  --jq '[.[] | select(.isCrossRepository | not)][0].number // empty'`,
+      "--json number --jq '.[0].number // empty'"
+    );
+  },
+  'the changelog refreshes a cross-repository PR': workflow => {
+    const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
+    pr.run = pr.run.replace('select(.isCrossRepository | not)', 'select(true)');
   },
   'the changelog drops the pending carry': workflow => {
     const write = workflow.jobs.changelog.steps.find(item =>

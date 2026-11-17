@@ -87,8 +87,11 @@ jobs:
   build:
     needs: probe
     # A probe that failed publishes no output, and then the build runs: the
-    # probe can only skip work it has proven is already done.
-    if: ${{ !cancelled() }}
+    # probe can only skip work it has proven is already done. The condition sits
+    # on the job, so a probe hit reserves no runner at all; a step condition
+    # would still pay for one. `!cancelled()` is a status check, so a failed
+    # probe reaches the build instead of skipping through an implicit success().
+    if: ${{ !cancelled() && needs.probe.outputs.exists != 'true' }}
     runs-on: macos-26
     # A cold Release build takes about 56 minutes and one needed 83. The explorer client waits 160 minutes,
     # so this limit reports its own failure first.
@@ -138,51 +141,42 @@ jobs:
           }
           NODE
           # The env is data consumed by Expo, never sourced as shell code.
-      # Only `Validate inputs` above stays unconditional. The rest of the job is the build
-      # itself, so a probe that found the object skips it: the toolchain setup steps must be
-      # skipped too, because a setup-node cache save with no installed dependency tree fails
-      # the job and would report the skipped dispatch as a failed build.
+      # Every step below belongs to a build: the job condition above already
+      # skipped a dispatch whose object the probe found.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: needs.probe.outputs.exists != 'true'
         with:
           ref: ${{ inputs.cloud_ref }}
           lfs: true
           persist-credentials: false
       - name: Prepare explorer env
-        if: needs.probe.outputs.exists != 'true'
         run: cp "$RUNNER_TEMP/explorer.env" apps/mobile/.env.local
       - name: Setup pnpm
-        if: needs.probe.outputs.exists != 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - name: Setup Node
-        if: needs.probe.outputs.exists != 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Install dependencies
-        if: needs.probe.outputs.exists != 'true'
         run: pnpm install --frozen-lockfile
       # The dispatch runs this file from main but checks out `cloud_ref`, which
       # can be any earlier commit: a checkout that predates either action still
       # has to build, so the plain command stays as its fallback.
       - name: Restore or build tRPC declarations
-        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/trpc-declarations/action.yml') != ''
+        if: hashFiles('.github/actions/trpc-declarations/action.yml') != ''
         uses: ./.github/actions/trpc-declarations
       - name: Build trpc types
-        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/trpc-declarations/action.yml') == ''
+        if: hashFiles('.github/actions/trpc-declarations/action.yml') == ''
         run: pnpm --filter @kilocode/trpc run build
       - name: Restore or build the harness SDK
-        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''
+        if: hashFiles('.github/actions/harness-sdk-build/action.yml') != ''
         uses: ./.github/actions/harness-sdk-build
       - name: Build harness SDK
-        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
+        if: hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
         run: pnpm --filter @kilocode/harness-sdk run build
       - name: Expo prebuild
-        if: needs.probe.outputs.exists != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
       - name: Disable OTA in generated native configuration
-        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           plist=apps/mobile/ios/Kilo/Supporting/Expo.plist
@@ -190,7 +184,6 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Add :EXUpdatesEnabled bool false' "$plist"
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' "$plist")" == false ]]
       - name: Build embedded Release bundle
-        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           xcodebuild \
@@ -203,7 +196,6 @@ jobs:
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
           test -s "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"
       - name: Verify linked simulator keychain entitlements
-        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           python3 <<'PY'
@@ -271,7 +263,6 @@ jobs:
           subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
           PY
       - name: Package
-        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           products="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator"
@@ -279,7 +270,6 @@ jobs:
           tar -C "$products" -czf "$RUNNER_TEMP/explorer.app.tar.gz" Kilo.app ca.crt
       # Upload runs in a separate trusted job: untrusted pinned app code never receives an OIDC credential.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: needs.probe.outputs.exists != 'true'
         with:
           name: explorer-ios-release
           path: ${{ runner.temp }}/explorer.app.tar.gz
@@ -289,8 +279,9 @@ jobs:
   upload:
     needs: [probe, build]
     # A probe that failed still ran the build, so this job publishes that artifact: only a probe
-    # that found the object skips the upload. `!cancelled()` is a status check, so a failed probe
-    # does not skip the job through an implicit success() on `needs`.
+    # that found the object skips the upload, and a build that a probe hit skipped leaves no
+    # success to publish. `!cancelled()` is a status check, so a failed probe does not skip the
+    # job through an implicit success() on `needs`.
     if: ${{ !cancelled() && needs.build.result == 'success' && needs.probe.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

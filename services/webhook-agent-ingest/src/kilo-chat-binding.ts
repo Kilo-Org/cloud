@@ -14,10 +14,6 @@ export type KiloChatBinding = Fetcher & {
   postMessageAsUser(params: PostMessageAsUserParams): Promise<PostMessageAsUserResult>;
 };
 
-/**
- * Cast helper. Centralizes the `as KiloChatBinding` cast so call sites
- * stay clean.
- */
 export function getKiloChat(env: { KILO_CHAT: unknown }): KiloChatBinding {
   return env.KILO_CHAT as KiloChatBinding;
 }

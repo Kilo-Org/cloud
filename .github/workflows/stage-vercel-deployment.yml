@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   stage:
+    # Guard: this reusable workflow stages a Vercel deployment using repo
+    # secrets. It is only ever called by guarded caller jobs, but the guard is
+    # also applied here so the workflow cannot run outside the canonical repo
+    # even if a caller skips its own guard.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: ${{ inputs.target_environment }}
@@ -92,13 +97,17 @@ jobs:
           fi
           "$VERCEL_CLI_PREFIX/bin/vercel" --version
 
+      # Each Vercel project builds its Root Directory from this repository root,
+      # so the CLI uploads the whole tree. That tree passed Vercel's 15,000-file
+      # per-deployment limit, and Vercel documents --archive=tgz as the remedy
+      # for deployments that include thousands of files.
       - name: Stage Vercel deployment
         id: deploy
         run: |
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
-            deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           else
-            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)

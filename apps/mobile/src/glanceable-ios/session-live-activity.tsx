@@ -283,6 +283,29 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const planTotal = plan === null ? 0 : plan.total;
   const planPercent = planTotal > 0 ? Math.min(1, planDone / planTotal) : 0;
 
+  // The plan count's copy as its own locale wrote it: text runs with the two
+  // counts between them, in the order the template puts them. A slot that is
+  // missing, or that lost one of the two placeholders, falls back to the
+  // English order, so a placeholder never reaches the screen. The fallback
+  // carries its own spaces, as every catalog does: the line takes no inset
+  // between runs, so a run without them would read "3of7".
+  const planSegments: ({ text: string } | { name: string })[] = (() => {
+    const parts = (COPY.planProgress ?? '').split(/\{\{(done|total)\}\}/);
+    const named = new Set(parts.filter((_, at) => at % 2 === 1));
+    if (!named.has('done') || !named.has('total')) {
+      return [{ name: 'done' }, { text: ' of ' }, { name: 'total' }];
+    }
+    return parts.map((part, at) => (at % 2 === 1 ? { name: part } : { text: part }));
+  })();
+  // The finished line's template, and the line it writes for one duration.
+  // The English pattern stands in when the slot is missing or malformed.
+  const finishedInTemplate =
+    COPY.finishedIn?.includes('{{duration}}') === true
+      ? COPY.finishedIn
+      : 'Finished in {{duration}}';
+  const finishedInText = (duration: string) =>
+    finishedInTemplate.split('{{duration}}').join(duration);
+
   // Approve answers only the exact request the card carries.
   const approving = props.approving === true && kind === 'needsInput';
   const canApprove =
@@ -300,9 +323,13 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     value: string,
     size: number,
     color: string,
-    weight: 'regular' | 'semibold' = 'regular'
+    weight: 'regular' | 'semibold' = 'regular',
+    // Only for a run drawn from a list, where React needs a stable key.
+    listKey?: string
   ) => (
-    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+    <Text key={listKey} modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>
+      {value}
+    </Text>
   );
   // A number never truncates: it keeps its content size while the labels
   // around it compress, so the counts stay readable in every language.
@@ -311,9 +338,11 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     value: string,
     size: number,
     color: string,
-    weight: 'regular' | 'semibold' = 'regular'
+    weight: 'regular' | 'semibold' = 'regular',
+    listKey?: string
   ) => (
     <Text
+      key={listKey}
       modifiers={[
         font({ size, weight }),
         lineLimit(1),
@@ -453,17 +482,34 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       </ZStack>
     );
   };
-  // The plan line: "3 of 7" and the bar, then the step in progress on its own
-  // line. The step is never repeated, so the line never shows it twice.
+  // The plan line: the localized count ("3 of 7"), and the bar, then the step
+  // in progress on its own line. The step is never repeated, so the line never
+  // shows it twice. The counts are separate runs because a number must not
+  // truncate, and the runs keep the template's own spacing, so a catalog that
+  // attaches an affix to a count ("7-dən 3") is not given a gap in its middle.
+  const planCount = (scheme: Scheme, size: number) => (
+    <HStack spacing={0}>
+      {planSegments.map((segment, at) => {
+        if ('name' in segment) {
+          return number(
+            count(segment.name === 'done' ? planDone : planTotal),
+            size,
+            scheme.fg,
+            'semibold',
+            `count-${at}`
+          );
+        }
+        return segment.text === ''
+          ? null
+          : text(segment.text, size, scheme.muted, 'regular', `run-${at}`);
+      })}
+    </HStack>
+  );
   const planLine = (scheme: Scheme, size: number) =>
     plan === null || planTotal === 0 ? null : (
       <VStack alignment="leading" spacing={4}>
         <HStack alignment="center" spacing={6}>
-          <HStack spacing={3}>
-            {number(count(planDone), size, scheme.fg, 'semibold')}
-            {text(COPY.of ?? 'of', size, scheme.muted)}
-            {number(count(planTotal), size, scheme.fg, 'semibold')}
-          </HStack>
+          {planCount(scheme, size)}
           {progressBar(scheme)}
           <Spacer minLength={0} />
         </HStack>
@@ -529,6 +575,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     const rest = minutes % 60;
     return `${count(hours)} ${COPY.hour ?? 'h'} ${count(rest)} ${COPY.minute ?? 'min'}`;
   })();
+  const finishedLine = (size: number, color: string) =>
+    finishedDuration === null ? null : text(finishedInText(finishedDuration), size, color);
   const outcomeLine = (scheme: Scheme, size: number) => {
     const outcome = props.outcome?.kind ?? null;
     if (outcome === 'pr_opened') {
@@ -546,7 +594,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     if (kind === 'idle') {
       const parts: string[] = [];
       if (finishedDuration !== null) {
-        parts.push(`${COPY.finishedIn ?? 'Finished in'} ${finishedDuration}`);
+        parts.push(finishedInText(finishedDuration));
       }
       if (props.outcome?.kind === 'pr_opened') {
         parts.push(COPY.prOpened ?? 'Pull request opened');
@@ -616,9 +664,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     if (kind === 'idle') {
       return (
         <HStack spacing={6}>
-          {finishedDuration === null
-            ? null
-            : text(`${COPY.finishedIn ?? 'Finished in'} ${finishedDuration}`, size, scheme.muted)}
+          {finishedLine(size, scheme.muted)}
           {plan === null
             ? null
             : text(`${count(planDone)}/${count(planTotal)}`, size, scheme.muted)}
@@ -810,9 +856,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     const facts = [
       plan === null || planTotal === 0 ? null : (
         <HStack key="plan" spacing={3}>
-          {number(count(planDone), size, scheme.fg, 'semibold')}
-          {text(COPY.of ?? 'of', size, scheme.muted)}
-          {number(count(planTotal), size, scheme.fg, 'semibold')}
+          {planCount(scheme, size)}
         </HStack>
       ),
       changes === null || changes.files === 0 ? null : (
@@ -857,9 +901,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       }
       return (
         <HStack spacing={6}>
-          {finishedDuration === null
-            ? null
-            : text(`${COPY.finishedIn ?? 'Finished in'} ${finishedDuration}`, size, scheme.muted)}
+          {finishedLine(size, scheme.muted)}
           {finishedDuration !== null && pr ? sep(scheme, size) : null}
           {pr ? text(COPY.prOpened ?? 'Pull request opened', size, scheme.good, 'semibold') : null}
         </HStack>

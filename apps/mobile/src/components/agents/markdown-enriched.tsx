@@ -25,11 +25,18 @@ import {
 import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
+import { rtlListItems } from './markdown-rtl-list-items';
 
 type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
   selectable: boolean;
+  /**
+   * Body line height in the library's sp units. The line box is what a native
+   * inline link exposes as its tappable target, so a caller that needs a taller
+   * link target raises it here.
+   */
+  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -37,7 +44,13 @@ type MarkdownEnrichedProps = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
-function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle {
+const BODY_LINE_HEIGHT = 24;
+
+function enrichedStyle(
+  palette: MarkdownPalette,
+  isRtl: boolean,
+  lineHeight = BODY_LINE_HEIGHT
+): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
@@ -66,7 +79,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight,
       marginTop: 0,
       marginBottom: 4,
       ...blockTextAlign,
@@ -125,7 +138,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight,
       markerColor: textColor,
       bulletColor: textColor,
     },
@@ -153,13 +166,17 @@ export function MarkdownEnriched({
   value,
   palette,
   selectable,
+  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  const markdownStyle = useMemo(() => enrichedStyle(palette, I18nManager.isRTL), [palette]);
+  const markdownStyle = useMemo(
+    () => enrichedStyle(palette, I18nManager.isRTL, lineHeight),
+    [palette, lineHeight]
+  );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.
@@ -175,11 +192,20 @@ export function MarkdownEnriched({
       ),
     [value, images, displayable, t]
   );
+  // Android resolves each paragraph from its own first strong character and
+  // gives a list no alignment, so a bullet's marker and text stay on the
+  // physical left while the heading and every other block name the interface
+  // start edge. The iOS renderer indents a list from the paragraph's own
+  // direction, so only Android needs the mark.
+  const renderedMarkdown = useMemo(
+    () => (Platform.OS === 'android' && I18nManager.isRTL ? rtlListItems(markdown) : markdown),
+    [markdown]
+  );
   return (
     <>
       <EnrichedMarkdownText
         flavor="github"
-        markdown={markdown}
+        markdown={renderedMarkdown}
         markdownStyle={markdownStyle}
         selectable={selectable}
         // A long press on a message opens the host's message details; the

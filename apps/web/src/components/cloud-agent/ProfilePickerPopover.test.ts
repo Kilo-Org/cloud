@@ -35,6 +35,12 @@ jest.mock('@/components/cloud-agent/ProfilesListDialog', () => ({
   ProfilesListDialog: () => null,
 }));
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: jest.fn() }),
+  usePathname: () => '/cloud',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const { ProfilePickerPopover } =
   require('./ProfilePickerPopover') as typeof ProfilePickerPopoverModule;
 

@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 import {
   getShareRemoteFileReason,
   shareLocalFile,
@@ -14,6 +15,16 @@ import {
 
 import { getToolFileAttachments } from './tool-card-attachments';
 import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-cache';
+
+/**
+ * The share control's own box: 28 dp clears the platform minimum target, and
+ * `SHARE_CONTROL_HIT_SLOP` lifts the touch region to the 44 dp minimum without
+ * widening the box, so the filename keeps its width. The hidden pending
+ * placeholder reuses this frame, so the name's truncation point is the same
+ * before and after the cache write lands.
+ */
+const SHARE_CONTROL_FRAME = 'min-h-8 min-w-8 shrink-0 items-center justify-center rounded';
+const SHARE_CONTROL_HIT_SLOP = 8;
 
 function FileChip({
   label,
@@ -65,7 +76,7 @@ function FileChip({
       >
         {body}
         <View
-          className="rounded p-1 opacity-0"
+          className={cn(SHARE_CONTROL_FRAME, 'opacity-0')}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
@@ -98,7 +109,8 @@ function FileChip({
     <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
       {body}
       <Pressable
-        className="rounded p-1 active:opacity-60"
+        className={cn(SHARE_CONTROL_FRAME, 'active:opacity-60')}
+        hitSlop={SHARE_CONTROL_HIT_SLOP}
         onPress={() => {
           void handleShare();
         }}

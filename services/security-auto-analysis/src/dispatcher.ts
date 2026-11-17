@@ -14,7 +14,7 @@ import {
 } from './remediation.js';
 
 const DISPATCH_OWNER_LIMIT = 100;
-const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
+export const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
 const REMEDIATION_LAUNCH_RECLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 const QUEUE_SEND_BATCH_LIMIT = 100;
 const DISPATCH_STAGE_SUCCEEDED_EVENT = 'security_auto_analysis.dispatcher_stage_succeeded';

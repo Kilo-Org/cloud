@@ -12,18 +12,25 @@ import { useNativeSession } from '@/lib/native-remote/use-native-session';
 import { NativeRemoteInventory } from './native-remote-inventory';
 import { NativeRemoteTranscript } from './native-remote-transcript';
 
-export function NativeRemoteDemo({ client }: { client: NativeRemoteClient }) {
-  // Replacing the credential-owning client also replaces drafts and selections.
-  const [owner, setOwner] = useState({ client, generation: 0 });
-  if (owner.client !== client) {
-    setOwner({ client, generation: owner.generation + 1 });
+type NativeRemoteDemoProps = {
+  client: NativeRemoteClient;
+  organizationID?: string;
+};
+
+export function NativeRemoteDemo({ client, organizationID }: NativeRemoteDemoProps) {
+  // Scope changes replace drafts and selections as well as their connections.
+  const [owner, setOwner] = useState({ client, organizationID, generation: 0 });
+  if (owner.client !== client || owner.organizationID !== organizationID) {
+    setOwner({ client, organizationID, generation: owner.generation + 1 });
   }
-  return <NativeRemoteScreen key={owner.generation} client={client} />;
+  return (
+    <NativeRemoteScreen key={owner.generation} client={client} organizationID={organizationID} />
+  );
 }
 
-function NativeRemoteScreen({ client }: { client: NativeRemoteClient }) {
+function NativeRemoteScreen({ client, organizationID }: NativeRemoteDemoProps) {
   const { t } = useTranslation();
-  const inventory = useNativeInventory(client);
+  const inventory = useNativeInventory(client, organizationID);
   const [session, setSession] = useState<NativeSessionSummary>();
   const selection = useRef(0);
   const remote = useNativeSession(client, session);

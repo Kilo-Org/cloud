@@ -83,12 +83,19 @@ export function send(ws: WebSocket, value: unknown): boolean {
 
 export function liveMetric(
   env: Pick<Env, 'SESSION_SYNC_METRICS'>,
-  point: { route: string; role: string; bytes?: number; fanout?: number; latencyMs?: number }
+  point: {
+    route: string;
+    role: string;
+    reason?: string;
+    bytes?: number;
+    fanout?: number;
+    latencyMs?: number;
+  }
 ): void {
   try {
     env.SESSION_SYNC_METRICS?.writeDataPoint({
       indexes: [point.route],
-      blobs: [point.route, point.role],
+      blobs: [point.route, point.role, point.reason ?? ''],
       doubles: [point.bytes ?? 0, point.fanout ?? 0, point.latencyMs ?? 0],
     });
   } catch {

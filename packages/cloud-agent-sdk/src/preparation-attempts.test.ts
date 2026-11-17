@@ -1,5 +1,8 @@
 import type { PreparationAttempt, PreparationStepSnapshot } from './types';
-import { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+import {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 function step(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
   return {
@@ -74,5 +77,19 @@ describe('isNoOpCompletedPreparationAttempt', () => {
   it('never treats a failed attempt as a no-op', () => {
     const failed = attempt({ status: 'failed' });
     expect(isNoOpCompletedPreparationAttempt(failed)).toBe(false);
+  });
+});
+
+describe('isPreparationCancellation', () => {
+  it('recognizes the route reason code and its user copy', () => {
+    expect(isPreparationCancellation('preparation_cancelled')).toBe(true);
+    expect(isPreparationCancellation('Environment preparation was stopped')).toBe(true);
+    expect(isPreparationCancellation('  preparation_cancelled  ')).toBe(true);
+  });
+
+  it('does not treat an ordinary preparation failure as a cancellation', () => {
+    expect(isPreparationCancellation(undefined)).toBe(false);
+    expect(isPreparationCancellation('preparation_timeout')).toBe(false);
+    expect(isPreparationCancellation('Workspace setup failed')).toBe(false);
   });
 });

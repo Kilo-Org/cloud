@@ -40,6 +40,7 @@ const config = {
   instrumentSDK: observation === 'instrumented',
   keysFile: `${root}/keys.json`,
   ...shape,
+  sourceTrafficMode: 'all-streaming-sources',
   shard: 0,
   shards: 1,
   warmSeconds: profile === 'smoke' ? 1 : 10,

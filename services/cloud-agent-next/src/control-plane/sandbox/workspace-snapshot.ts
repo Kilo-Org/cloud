@@ -2,47 +2,79 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from '../../types.js';
+import { isOrgInList } from '../../sandbox-id.js';
 import type {
   ControlPlaneCredentialSource,
   ControlPlaneRouteSpec,
 } from '../../shared/control-plane-protocol.js';
 import type { ProviderAdapter } from '../../sandbox-control/provider.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { SandboxWorkspaceSnapshotSchema } from '../../shared/sandbox-status.js';
 import type { AllocationState } from './allocation.js';
 import type { RouteDatabase, RouteRecord } from './routes.js';
 import { workspaceDiskAllocation, workspaceDiskSnapshots } from './sqlite-schema.js';
 
 export const WORKSPACE_SNAPSHOT_IDLE_MS = 60_000;
-const identitySchema = z.object({
+/** A captured workspace is restorable for 30 days. After that the descriptor is kept but unusable. */
+export const WORKSPACE_SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
+export const workspaceSnapshotIdentitySchema = z.object({
   sandboxId: z.string().min(1),
   workspaceId: cloudAgentWorktreeIdSchema,
   directory: z.string().min(1),
   userId: z.string().min(1),
   orgId: z.string().optional(),
 });
-const descriptorSchema = identitySchema.extend({
+const descriptorSchema = workspaceSnapshotIdentitySchema.extend({
   sourceAllocationId: z.string().min(1),
   snapshotId: z.string().min(1),
   baseImage: z.string().min(1),
   runtimeIdentity: z.string().min(1),
-  capturedAt: z.number().nonnegative(),
+  capturedAt: SandboxWorkspaceSnapshotSchema.shape.capturedAt,
 });
 const allocationSchema = z.object({
   allocationId: z.string().min(1),
   runtimeIdentity: z.string().min(1),
-  owner: identitySchema,
+  owner: workspaceSnapshotIdentitySchema,
   invalidationGeneration: z.number().int().nonnegative().default(0),
   idleConnectionId: z.string().optional(),
   attemptedIdleAt: z.number().optional(),
   lastMutationAt: z.number().nonnegative().default(0),
   restore: z.object({ sourceAllocationId: z.string().min(1), confirmed: z.boolean() }).optional(),
+  /**
+   * The most recent tail startup this allocation failed, so the recovery query
+   * can offer "Start fresh" only on that failure. A new preparation allocates a
+   * fresh record and clears it.
+   */
+  recovery: z
+    .object({
+      allocationId: z.string().min(1),
+      reason: z.string().min(1),
+      failedAt: z.number().nonnegative(),
+    })
+    .optional(),
 });
 const runtimeIdentitySchema = z.object({
   mode: z.enum(['preinstalled', 'downloaded']),
   image: z.enum(['all-in-one', 'runtime-free']),
 });
-export type WorkspaceSnapshotIdentity = z.infer<typeof identitySchema>;
+export type WorkspaceSnapshotDescriptor = z.infer<typeof descriptorSchema>;
+export type WorkspaceSnapshotIdentity = z.infer<typeof workspaceSnapshotIdentitySchema>;
 export type WorkspaceSnapshotAllocation = z.infer<typeof allocationSchema>;
+export type WorkspaceSnapshotSelectionReason =
+  | 'missing'
+  | 'invalid_descriptor'
+  | 'ownership_mismatch'
+  | 'runtime_mismatch'
+  | 'expired'
+  | 'image_unavailable'
+  | 'selected';
+export type WorkspaceSnapshotSelection =
+  | { kind: 'selected'; descriptor: WorkspaceSnapshotDescriptor }
+  | { kind: 'missing' }
+  | {
+      kind: 'unusable';
+      reason: Exclude<WorkspaceSnapshotSelectionReason, 'missing' | 'selected'>;
+    };
 
 export function workspaceSnapshotIdentity(
   sandboxId: string,
@@ -72,19 +104,12 @@ export function sameWorkspaceSnapshotIdentity(
 }
 
 export function workspaceSnapshotsEnabled(
-  env: Pick<Env, 'WORKSPACE_SNAPSHOT_USER_IDS' | 'WORKSPACE_SNAPSHOT_ORG_IDS'>,
+  env: Pick<Env, 'WORKSPACE_SNAPSHOT_IDS'>,
   source: Pick<ControlPlaneCredentialSource, 'userId' | 'orgId'>
 ): boolean {
-  const includes = (raw: string | undefined, id: string | undefined) =>
-    id !== undefined &&
-    id !== '*' &&
-    (raw ?? '')
-      .split(',')
-      .map(value => value.trim())
-      .includes(id);
   return (
-    includes(env.WORKSPACE_SNAPSHOT_USER_IDS, source.userId) ||
-    includes(env.WORKSPACE_SNAPSHOT_ORG_IDS, source.orgId)
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.userId) ||
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.orgId)
   );
 }
 
@@ -118,15 +143,39 @@ export function readWorkspaceSnapshot(db: RouteDatabase, workspaceId: string) {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * The stored descriptor payload without validation, so a malformed descriptor is
+ * still distinguishable from an absent one. A malformed descriptor is retained
+ * and fails selection; it never silently falls through to another startup source.
+ */
+export function readWorkspaceSnapshotRaw(db: RouteDatabase, workspaceId: string): unknown {
+  return db
+    .select()
+    .from(workspaceDiskSnapshots)
+    .where(eq(workspaceDiskSnapshots.workspace_id, workspaceId))
+    .get()?.data;
+}
+
+export function workspaceSnapshotStatus(
+  db: RouteDatabase,
+  identity: WorkspaceSnapshotIdentity | null
+): { workspaceSnapshot?: { capturedAt: number } } {
+  if (identity === null) return {};
+  const descriptor = readWorkspaceSnapshot(db, identity.workspaceId);
+  return descriptor !== null && sameWorkspaceSnapshotIdentity(descriptor, identity)
+    ? { workspaceSnapshot: { capturedAt: descriptor.capturedAt } }
+    : {};
+}
+
 export function deleteWorkspaceSnapshot(
   db: RouteDatabase,
   workspaceId?: string,
   reason = 'invalidated',
   sessionId?: string
-): void {
+): boolean {
   const disk = readWorkspaceSnapshotAllocation(db);
   const currentWorkspaceId = workspaceId ?? disk?.owner.workspaceId;
-  if (currentWorkspaceId === undefined) return;
+  if (currentWorkspaceId === undefined) return false;
   const descriptor = readWorkspaceSnapshot(db, currentWorkspaceId);
   db.delete(workspaceDiskSnapshots)
     .where(eq(workspaceDiskSnapshots.workspace_id, currentWorkspaceId))
@@ -140,6 +189,7 @@ export function deleteWorkspaceSnapshot(
       sourceAllocationId: descriptor.sourceAllocationId,
       reason,
     });
+  return descriptor !== null;
 }
 
 function runtimeIdentitySummary(raw: string) {
@@ -156,24 +206,25 @@ function compatibleRuntimeIdentity(captured: string, selected: string): boolean 
   return left !== null && right !== null && left.mode === right.mode && left.image === right.image;
 }
 
-export function selectWorkspaceSnapshot(
+/**
+ * Select the owner's workspace tail. A descriptor that exists but cannot be used
+ * is reported as `unusable` with its reason; the caller must fail the start and
+ * keep the descriptor instead of falling through to another startup source.
+ */
+export function selectWorkspaceSnapshotResult(
   db: RouteDatabase,
   identity: WorkspaceSnapshotIdentity,
   runtimeIdentity: string,
   baseImage: string | null,
   sessionId?: string
-) {
-  const raw = db
-    .select()
-    .from(workspaceDiskSnapshots)
-    .where(eq(workspaceDiskSnapshots.workspace_id, identity.workspaceId))
-    .get()?.data;
+): WorkspaceSnapshotSelection {
+  const raw = readWorkspaceSnapshotRaw(db, identity.workspaceId);
   const parsed = descriptorSchema.safeParse(raw);
   const descriptor = parsed.success ? parsed.data : null;
   const expectedRuntime = runtimeIdentitySummary(runtimeIdentity);
   const capturedRuntime =
     descriptor === null ? null : runtimeIdentitySummary(descriptor.runtimeIdentity);
-  const reason =
+  const reason: WorkspaceSnapshotSelectionReason =
     descriptor === null
       ? raw === undefined
         ? 'missing'
@@ -182,10 +233,10 @@ export function selectWorkspaceSnapshot(
         ? 'ownership_mismatch'
         : !compatibleRuntimeIdentity(descriptor.runtimeIdentity, runtimeIdentity)
           ? 'runtime_mismatch'
-          : baseImage === null
-            ? 'image_unavailable'
-            : descriptor.baseImage !== baseImage
-              ? 'image_mismatch'
+          : descriptor.capturedAt < Date.now() - WORKSPACE_SNAPSHOT_TTL_MS
+            ? 'expired'
+            : baseImage === null
+              ? 'image_unavailable'
               : 'selected';
   logControlDiagnostic('workspace_snapshot_selection', {
     sandboxId: identity.sandboxId,
@@ -209,7 +260,28 @@ export function selectWorkspaceSnapshot(
     capturedImage: capturedRuntime?.image,
     reason,
   });
-  return reason === 'selected' ? descriptor : null;
+  if (reason === 'selected') {
+    return descriptor === null ? { kind: 'missing' } : { kind: 'selected', descriptor };
+  }
+  if (reason === 'missing') return { kind: 'missing' };
+  return { kind: 'unusable', reason };
+}
+
+export function selectWorkspaceSnapshot(
+  db: RouteDatabase,
+  identity: WorkspaceSnapshotIdentity,
+  runtimeIdentity: string,
+  baseImage: string | null,
+  sessionId?: string
+): WorkspaceSnapshotDescriptor | null {
+  const selection = selectWorkspaceSnapshotResult(
+    db,
+    identity,
+    runtimeIdentity,
+    baseImage,
+    sessionId
+  );
+  return selection.kind === 'selected' ? selection.descriptor : null;
 }
 
 export function snapshotRestorePending(db: RouteDatabase, allocationId: string | null): boolean {
@@ -243,21 +315,36 @@ export function workspaceSnapshotFrame(
   };
 }
 
-export function invalidateWorkspaceSnapshot(
+/**
+ * Fence an outstanding capture attempt without removing the descriptor. Admitted
+ * work only prevents a capture that overlapped it from being published; it never
+ * discards the last consistent snapshot. The descriptor is removed only by
+ * workspace deletion, an explicit user "Start fresh", or a newer capture.
+ */
+export function fenceWorkspaceSnapshot(
   db: RouteDatabase,
   reason = 'mutation',
   sessionId?: string
 ): void {
-  deleteWorkspaceSnapshot(db, undefined, reason, sessionId);
   const disk = readWorkspaceSnapshotAllocation(db);
-  if (disk)
-    writeWorkspaceSnapshotAllocation(db, {
-      ...disk,
-      invalidationGeneration: disk.invalidationGeneration + 1,
-      idleConnectionId: undefined,
-      attemptedIdleAt: undefined,
-      lastMutationAt: Date.now(),
-    });
+  if (!disk) return;
+  const generation = disk.invalidationGeneration + 1;
+  writeWorkspaceSnapshotAllocation(db, {
+    ...disk,
+    invalidationGeneration: generation,
+    idleConnectionId: undefined,
+    attemptedIdleAt: undefined,
+    lastMutationAt: Date.now(),
+  });
+  logControlDiagnostic('workspace_snapshot_fenced', {
+    sandboxId: disk.owner.sandboxId,
+    workspaceId: disk.owner.workspaceId,
+    sessionId,
+    allocationId: disk.allocationId,
+    reason,
+    previousGeneration: disk.invalidationGeneration,
+    generation,
+  });
 }
 
 /**
@@ -321,6 +408,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
   read(): Promise<CaptureContext>;
   enqueue<T>(operation: () => Promise<T>): Promise<T>;
   eligible(route: RouteRecord): boolean;
+  stored(): Promise<void>;
 }): Promise<void> {
   const logCapture = (
     phase: string,
@@ -454,6 +542,11 @@ export async function captureIdleWorkspaceSnapshot(input: {
       .values({ workspace_id: data.workspaceId, data })
       .onConflictDoUpdate({ target: workspaceDiskSnapshots.workspace_id, set: { data } })
       .run();
+    // A recovery offer names the descriptor that failed; a newer one replaces it,
+    // so a pending "Start fresh" can never discard this capture.
+    if (current.disk?.recovery !== undefined)
+      writeWorkspaceSnapshotAllocation(input.db, { ...current.disk, recovery: undefined });
+    await input.stored();
     logControlDiagnostic('workspace_snapshot_captured', {
       sandboxId: input.sandboxId,
       workspaceId: data.workspaceId,

@@ -136,6 +136,40 @@ describe('restoreKilo2History', async () => {
     ).toEqual([id]);
   });
 
+  it.each([
+    { title: '  Restored chat  ', expected: 'Restored chat' },
+    { title: ' \n\t ', expected: undefined },
+    { title: `  ${'x'.repeat(250)}  `, expected: 'x'.repeat(200) },
+  ])('normalizes restored titles ($title)', async ({ title, expected }) => {
+    const { api, imported } = fakeApi();
+    const target = input({
+      first: {
+        ...v2Page([message(`msg_${'b'.repeat(26)}`, 1)], null),
+        info: { id: SESSION_ID, title },
+      },
+    });
+    expect(await restoreKilo2History(api, target.value)).toBe(true);
+    const info = (imported[0] as { info: { title?: string } }).info;
+    expect(info.title).toBe(expected);
+    if (expected === undefined) expect(info).not.toHaveProperty('title');
+  });
+
+  it('ignores a blank title when a later page has a useful title', async () => {
+    const { api, imported } = fakeApi();
+    const target = input({
+      first: {
+        ...v2Page([message(`msg_${'c'.repeat(26)}`, 2)], 'older'),
+        info: { id: SESSION_ID, title: '  ' },
+      },
+      older: {
+        ...v2Page([message(`msg_${'b'.repeat(26)}`, 1)], null),
+        info: { id: SESSION_ID, title: '  Earlier title  ' },
+      },
+    });
+    expect(await restoreKilo2History(api, target.value)).toBe(true);
+    expect(imported[0]).toMatchObject({ info: { title: 'Earlier title' } });
+  });
+
   it('starts at a prompt when Cloud omits the first prompt', async () => {
     const { api, imported } = fakeApi();
     const answer = message(`msg_${'b'.repeat(26)}`, 1, 'assistant');

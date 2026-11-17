@@ -1,16 +1,25 @@
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import {
   drainSseStream,
+  parseUsageWithRecovery,
   readResponseText,
   selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import type { VercelProviderMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type {
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+  VercelProviderMetaData,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
+
+jest.mock('@kilocode/web-shared/lib/getRootSpan', () => ({ sentryRootSpan: jest.fn() }));
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
 
@@ -28,46 +37,69 @@ afterEach(() => {
 });
 
 describe('drainSseStream', () => {
-  test('times SSE events and ignores keep-alive comments', async () => {
+  test('times from the first generated output until the final event', async () => {
     const events: string[] = [];
 
     const result = await drainSseStream(
       bodyArrivingAt([
         [100, ': OPENROUTER PROCESSING\n\n'],
+        [150, 'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'],
         [250, 'data: {"choices":[{"delta":{"content":"Hel'],
         [300, 'lo"}}]}\n\n'],
         [800, 'data: {"choices":[],"usage":{}}\n\n'],
         [900, 'data: [DONE]\n\n'],
       ]),
-      event => events.push(event.data),
+      event => {
+        events.push(event.data);
+        return event.data.includes('Hello');
+      },
       span,
-      20
+      20,
+      'test.time_to_first_token_ms'
     );
 
     expect(events).toEqual([
+      '{"choices":[{"delta":{"role":"assistant"}}]}',
       '{"choices":[{"delta":{"content":"Hello"}}]}',
       '{"choices":[],"usage":{}}',
       '[DONE]',
     ]);
     expect(result).toEqual({
       wasAborted: false,
+      malformedEventCount: 0,
       timing: { latency: 280, generation_time: 600 },
     });
   });
 
-  test('times a body without SSE events by its chunks', async () => {
+  test('reports no timing without generated output', async () => {
+    const result = await drainSseStream(
+      bodyArrivingAt([
+        [100, 'data: {"type":"response.created"}\n\n'],
+        [400, 'data: {"type":"response.completed"}\n\n'],
+      ]),
+      () => false,
+      span,
+      0,
+      'test.time_to_first_token_ms'
+    );
+
+    expect(result.timing).toEqual({ latency: null, generation_time: null });
+  });
+
+  test('reports no timing for a body without SSE events', async () => {
     const result = await drainSseStream(
       bodyArrivingAt([
         [100, '\n'],
         [400, '{"error":{"code":502,'],
         [450, '"message":"Bad gateway"}}'],
       ]),
-      () => {},
+      () => true,
       span,
-      0
+      0,
+      'test.time_to_first_token_ms'
     );
 
-    expect(result.timing).toEqual({ latency: 400, generation_time: 50 });
+    expect(result.timing).toEqual({ latency: null, generation_time: null });
   });
 
   test('reports no latency without a request start', async () => {
@@ -76,12 +108,264 @@ describe('drainSseStream', () => {
         [100, 'data: {}\n\n'],
         [150, 'data: [DONE]\n\n'],
       ]),
-      () => {},
+      () => true,
       span,
-      undefined
+      undefined,
+      'test.time_to_first_token_ms'
     );
 
     expect(result.timing).toEqual({ latency: null, generation_time: 50 });
+  });
+
+  test('reports time to first token on the root span from the request start', async () => {
+    const setAttribute = jest.fn();
+    jest.mocked(sentryRootSpan).mockReturnValueOnce({ setAttribute } as unknown as Span);
+
+    await drainSseStream(
+      bodyArrivingAt([
+        [100, 'data: lifecycle\n\n'],
+        [700, 'data: token\n\n'],
+        [800, 'data: token\n\n'],
+      ]),
+      event => event.data === 'token',
+      span,
+      50,
+      'test.time_to_first_token_ms'
+    );
+
+    expect(setAttribute.mock.calls).toEqual([['test.time_to_first_token_ms', 650]]);
+  });
+
+  test('counts callback failures, parses later events, and reports only ids', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+
+    const stream = bodyArrivingAt([
+      [100, 'data: first private event body\n\n'],
+      [200, 'data: second private event body\n\n'],
+      [300, 'data: valid event\n\n'],
+    ]);
+    const reader = stream.getReader();
+    const cancel = jest.spyOn(reader, 'cancel');
+    const releaseLock = jest.spyOn(reader, 'releaseLock');
+    const events: string[] = [];
+    const endSpan: Span['end'] = jest.fn();
+
+    const result = await drainSseStream(
+      { getReader: () => reader } as ReadableStream<Uint8Array>,
+      event => {
+        if (event.data !== 'valid event') throw new Error(`Invalid event: ${event.data}`);
+        events.push(event.data);
+        return true;
+      },
+      { end: endSpan } as Span,
+      0,
+      'test.time_to_first_token_ms',
+      () => ({ usageId: 'usage-id', messageId: 'message-id' })
+    );
+
+    expect(result).toEqual({
+      wasAborted: false,
+      malformedEventCount: 2,
+      timing: { latency: 300, generation_time: 0 },
+    });
+    expect(events).toEqual(['valid event']);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(releaseLock).toHaveBeenCalledTimes(1);
+    expect(endSpan).toHaveBeenCalledTimes(1);
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: {
+        usageId: 'usage-id',
+        messageId: 'message-id',
+        malformedEventCount: 2,
+        errorName: 'Error',
+      },
+    });
+    expect(captureException).not.toHaveBeenCalled();
+
+    stream.getReader().releaseLock();
+  });
+
+  test('preserves partial counts and cleans up after a read failure', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+
+    const stream = bodyArrivingAt(
+      [[100, 'data: private malformed event body\n\n']],
+      new Error('private upstream read error')
+    );
+    const reader = stream.getReader();
+    const cancel = jest.spyOn(reader, 'cancel');
+    const releaseLock = jest.spyOn(reader, 'releaseLock');
+    const endSpan: Span['end'] = jest.fn();
+
+    const result = await drainSseStream(
+      { getReader: () => reader } as ReadableStream<Uint8Array>,
+      () => {
+        throw new Error('private callback error');
+      },
+      { end: endSpan } as Span,
+      0,
+      'test.time_to_first_token_ms',
+      () => ({ usageId: 'usage-id', messageId: 'message-id' })
+    );
+
+    expect(result).toEqual({
+      wasAborted: true,
+      malformedEventCount: 1,
+      timing: { latency: null, generation_time: null },
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(releaseLock).toHaveBeenCalledTimes(1);
+    expect(endSpan).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Unable to read upstream usage stream' }),
+      {
+        tags: { source: 'usage_stream_parsing' },
+        extra: { usageId: 'usage-id', messageId: 'message-id', errorName: 'Error' },
+      }
+    );
+    expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: {
+        usageId: 'usage-id',
+        messageId: 'message-id',
+        malformedEventCount: 1,
+        errorName: 'Error',
+      },
+    });
+
+    stream.getReader().releaseLock();
+  });
+
+  test.each(['AbortError', 'ResponseAborted', 'TimeoutError'])(
+    'treats a %s read failure as aborted without reporting it',
+    async name => {
+      jest.mocked(captureException).mockClear();
+      const error = new Error('interrupted');
+      error.name = name;
+
+      const result = await drainSseStream(
+        bodyArrivingAt([[100, 'data: {}\n\n']], error),
+        () => true,
+        { end: jest.fn() } as unknown as Span,
+        0,
+        'test.time_to_first_token_ms'
+      );
+
+      expect(result.wasAborted).toBe(true);
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('parseUsageWithRecovery', () => {
+  const context = {
+    api_kind: 'chat_completions',
+    kiloUserId: 'user-id',
+    organizationId: 'organization-id',
+    provider: 'openrouter',
+    isStreaming: false,
+    usageId: 'usage-id',
+  } as MicrodollarUsageContext;
+
+  test('preserves successful stats and fills a missing message id from the header', async () => {
+    jest.mocked(captureException).mockClear();
+
+    const stats: MicrodollarUsageStats = {
+      messageId: null,
+      model: 'test-model',
+      responseContent: 'test response',
+      hasError: false,
+      inference_provider: 'test-provider',
+      upstream_id: 'upstream-id',
+      finish_reason: 'stop',
+      latency: 12,
+      moderation_latency: 3,
+      generation_time: 45,
+      streamed: false,
+      cancelled: false,
+      status_code: 201,
+      cost_mUsd: 25,
+      inputTokens: 2,
+      outputTokens: 4,
+      cacheWriteTokens: 1,
+      cacheHitTokens: 3,
+      is_byok: false,
+    };
+    const response = new Response(null, {
+      status: 201,
+      headers: { 'x-generation-id': 'header-message-id' },
+    });
+
+    await expect(parseUsageWithRecovery(response, context, () => stats)).resolves.toEqual({
+      ...stats,
+      messageId: 'header-message-id',
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  const parserFailures: { name: string; parse: () => null | Promise<null> }[] = [
+    {
+      name: 'throws with sensitive contents',
+      parse: () => {
+        throw new Error('private response body');
+      },
+    },
+    { name: 'returns null', parse: () => null },
+  ];
+
+  test.each(parserFailures)('returns zeroed stats when the parser $name', async ({ parse }) => {
+    jest.mocked(captureException).mockClear();
+
+    const response = new Response('private response body', {
+      status: 503,
+      headers: {
+        'content-type': 'application/json',
+        'x-generation-id': 'header-message-id',
+      },
+    });
+
+    await expect(parseUsageWithRecovery(response, context, parse)).resolves.toEqual({
+      messageId: 'header-message-id',
+      model: null,
+      responseContent: '',
+      hasError: true,
+      inference_provider: null,
+      upstream_id: null,
+      finish_reason: null,
+      latency: null,
+      moderation_latency: null,
+      generation_time: null,
+      streamed: false,
+      cancelled: null,
+      status_code: 503,
+      cost_mUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      is_byok: null,
+    });
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Unable to read or parse upstream usage response' }),
+      {
+        tags: { source: 'usage_response_parsing', api_kind: 'chat_completions' },
+        extra: {
+          usageId: 'usage-id',
+          kiloUserId: 'user-id',
+          organizationId: 'organization-id',
+          provider: 'openrouter',
+          messageId: 'header-message-id',
+          errorName: 'Error',
+        },
+      }
+    );
   });
 });
 

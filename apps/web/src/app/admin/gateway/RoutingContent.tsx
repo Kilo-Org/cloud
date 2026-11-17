@@ -5,12 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  DEFAULT_VERCEL_ROUTING_ENABLED,
   GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
@@ -22,7 +20,6 @@ export function RoutingContent() {
 
   const { data, isLoading } = useQuery(trpc.admin.gatewayConfig.get.queryOptions());
 
-  const [vercelEnabled, setVercelEnabled] = useState(DEFAULT_VERCEL_ROUTING_ENABLED);
   const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -30,7 +27,6 @@ export function RoutingContent() {
 
   useEffect(() => {
     if (data) {
-      setVercelEnabled(data.vercel_routing_enabled);
       setOptOutModelsValue(data.vercel_routing_opt_out_models.join('\n'));
       setNoteValue(data.note ?? '');
       setHasChanges(false);
@@ -58,7 +54,6 @@ export function RoutingContent() {
 
   function handleSave() {
     const parsed = GatewayConfigInputSchema.safeParse({
-      vercel_routing_enabled: vercelEnabled,
       vercel_routing_opt_out_models: optOutModelsValue
         .split('\n')
         .filter(model => model.trim() !== ''),
@@ -76,34 +71,18 @@ export function RoutingContent() {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
   }
 
-  const savedEnabled = data?.vercel_routing_enabled ?? DEFAULT_VERCEL_ROUTING_ENABLED;
-
   return (
     <div className="flex w-full flex-col gap-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Gateway Routing</CardTitle>
+          <CardTitle>Vercel Routing</CardTitle>
           <CardDescription>
-            When on, all free and paid traffic for models available on the Vercel AI Gateway is
-            routed to Vercel. When off, that traffic goes to OpenRouter. Models not available on
-            Vercel, opt-out models, and requests whose provider preferences Vercel cannot satisfy
-            always go to OpenRouter. On by default.
+            Non-BYOK chat traffic for models in the Vercel AI Gateway catalog goes to Vercel;
+            otherwise it goes to OpenRouter. Opt-out models, requests with a spend ceiling, and
+            provider preferences Vercel cannot satisfy always use OpenRouter.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="routing-vercel-enabled"
-              checked={vercelEnabled}
-              onCheckedChange={checked => {
-                setVercelEnabled(checked);
-                setHasChanges(true);
-              }}
-            />
-            <Label htmlFor="routing-vercel-enabled" className="cursor-pointer">
-              Route eligible traffic to Vercel
-            </Label>
-          </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
             <Textarea
@@ -125,8 +104,8 @@ export function RoutingContent() {
               className="font-mono text-sm"
             />
             <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
-              One model ID per line. Matching is exact after entries are lowercased; matching models
-              are never routed to Vercel. Changes take effect within one minute on warm instances.
+              One model ID per line, matched exactly and case-insensitively. Changes apply within
+              about a minute.
             </p>
             {validationError && (
               <pre
@@ -161,16 +140,12 @@ export function RoutingContent() {
           </div>
 
           <div className="text-muted-foreground text-sm">
-            <p>
-              Vercel routing is{' '}
-              <span className="text-foreground font-medium">{savedEnabled ? 'on' : 'off'}</span>.
-              {data?.updated_by_email && (
-                <span className="ml-1">
-                  Set by {data.updated_by_email}
-                  {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}.
-                </span>
-              )}
-            </p>
+            {data?.updated_by_email && (
+              <p>
+                Set by {data.updated_by_email}
+                {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}.
+              </p>
+            )}
             {data?.note && (
               <p className="mt-2 whitespace-pre-wrap">
                 <span className="font-medium">Previous note:</span> {data.note}

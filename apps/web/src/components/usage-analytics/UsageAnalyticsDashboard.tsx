@@ -68,6 +68,7 @@ import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
 import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
+import { ComputeUsageSection } from './ComputeUsageSection';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -375,6 +376,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: summary,
     isLoading: summaryLoading,
     isError: summaryError,
+    error: summaryFailure,
     refetch: refetchSummary,
   } = useUsageSummary({
     ...commonArgs,
@@ -449,6 +451,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: tableData,
     isLoading: tableLoading,
     isError: tableError,
+    error: tableFailure,
     refetch: refetchTable,
   } = useUsageTable({
     ...commonArgs,
@@ -524,6 +527,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     hasActiveFilters: activeFilters.length > 0,
     summary,
     tableRowCount: tableData?.rows.length,
+    // The two queries a workspace cannot show usage without decide whether a
+    // failure is the terminal "no usage source" state or an ordinary one.
+    summaryError: summaryFailure,
+    tableError: tableFailure,
     queries: [
       usageQueryOutcome({
         isLoading: summaryLoading,
@@ -853,8 +860,24 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   <SpendAlertsPanel />
                 )}
 
+                {!isSalesDemo &&
+                  (isOrgContext && effectiveOrgId === null ? (
+                    <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+                      Select one organization to inspect its compute charges.
+                    </p>
+                  ) : (
+                    <ComputeUsageSection
+                      key={`${effectiveOrgId ?? 'personal'}:${effectiveViewAs}:${dateRange.startDate}:${dateRange.endDate}`}
+                      organizationId={effectiveOrgId}
+                      view={effectiveViewAs === 'org-wide' ? 'all' : 'self'}
+                      dateRange={dateRange}
+                    />
+                  ))}
+
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />
+                ) : usageDashboardState === 'unavailable' ? (
+                  <UsageDataErrorState variant="unavailable" />
                 ) : usageDashboardState === 'pending' ? (
                   <UsageDataPendingState />
                 ) : (

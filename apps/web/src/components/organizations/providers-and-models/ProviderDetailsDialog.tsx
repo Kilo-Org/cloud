@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -21,7 +22,6 @@ import {
   PolicyPill,
   ProviderPolicyTag,
 } from '@/components/organizations/providers-and-models/PolicyPills';
-import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
 import type {
   ProviderModelRow,
   ProviderRow,
@@ -38,6 +38,7 @@ export function ProviderDetailsDialog({
   formatPriceCompact,
   onToggleProviderEnabled,
   onToggleModelAllowed,
+  onSetModelsAllowed,
   onClose,
 }: {
   open: boolean;
@@ -49,11 +50,16 @@ export function ProviderDetailsDialog({
   formatPriceCompact: (raw: string) => string;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetModelsAllowed: (modelIds: ReadonlyArray<string>, nextAllowed: boolean) => void;
   onClose: () => void;
 }) {
   const isProviderEnabled = infoProvider
     ? enabledProviderSlugs.has(infoProvider.providerSlug)
     : false;
+  const providerModelIds = infoProviderModels.map(model => model.modelId);
+  const hasModels = providerModelIds.length > 0;
+  const allModelsAllowed = providerModelIds.every(modelId => allowedModelIds.has(modelId));
+  const noModelsAllowed = providerModelIds.every(modelId => !allowedModelIds.has(modelId));
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => (nextOpen ? null : onClose())}>
@@ -123,6 +129,32 @@ export function ProviderDetailsDialog({
             </div>
           ) : null}
 
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-xs">
+              Changes apply to these models across all providers and take effect after you save.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit || !hasModels || allModelsAllowed}
+                onClick={() => onSetModelsAllowed(providerModelIds, true)}
+              >
+                Select all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit || !hasModels || noModelsAllowed}
+                onClick={() => onSetModelsAllowed(providerModelIds, false)}
+              >
+                Deselect all
+              </Button>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -158,20 +190,8 @@ export function ProviderDetailsDialog({
                       </TableCell>
                     ) : (
                       <>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={model.promptPrice}
-                            originalPrice={model.originalPromptPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={model.completionPrice}
-                            originalPrice={model.originalCompletionPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
+                        <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
+                        <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
                       </>
                     )}
                     <TableCell>

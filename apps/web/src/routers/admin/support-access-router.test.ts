@@ -1,14 +1,20 @@
 import { afterAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
+  kilocode_users,
+  organizations,
   passkey_credentials,
   session_step_up_proofs,
   support_access_grant_events,
   support_access_grants,
 } from '@kilocode/db/schema';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  SUPPORT_READ_MAX_DURATION_SECONDS,
+  SUPPORT_WRITE_MAX_DURATION_SECONDS,
+} from '@kilocode/web-shared/lib/admin/support-access';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -39,6 +45,26 @@ async function orgWithOwner() {
     0
   );
   return { owner, organization };
+}
+
+async function parentOrgWithChild() {
+  const parentOwner = await insertTestUser({ is_admin: false });
+  const childOwner = await insertTestUser({ is_admin: false });
+  const parent = await createTestOrganization(
+    `support-parent-${crypto.randomUUID()}`,
+    parentOwner.id,
+    0
+  );
+  const child = await createTestOrganization(
+    `support-child-${crypto.randomUUID()}`,
+    childOwner.id,
+    0
+  );
+  await db
+    .update(organizations)
+    .set({ parent_organization_id: parent.id })
+    .where(eq(organizations.id, child.id));
+  return { parent, child };
 }
 
 function constraintName(error: unknown): string | null {
@@ -149,6 +175,65 @@ describe('admin.supportAccess request', () => {
       'issued',
       'requested',
     ]);
+  });
+
+  test('the issued write window is capped at the write maximum', async () => {
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(requester.id);
+
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+      durationSeconds: SUPPORT_READ_MAX_DURATION_SECONDS,
+    });
+    const stored = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(stored?.requested_duration_seconds).toBe(SUPPORT_WRITE_MAX_DURATION_SECONDS);
+
+    const approved = await (
+      await stepUpCaller(approver.id)
+    ).admin.supportAccess.approve({
+      grantId: grant.id,
+    });
+    expect(approved.status).toBe('active');
+    const lifetime =
+      new Date(approved.expiresAt!).getTime() - new Date(approved.issuedAt!).getTime();
+    expect(lifetime).toBe(SUPPORT_WRITE_MAX_DURATION_SECONDS * 1000);
+
+    const requested = (await eventsFor(grant.id)).find(event => event.event_type === 'requested');
+    expect(requested?.metadata).toMatchObject({
+      durationSeconds: SUPPORT_WRITE_MAX_DURATION_SECONDS,
+    });
+  });
+
+  test('refuses to approve a grant whose requester has a block timestamp now', async () => {
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(requester.id);
+
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, requester.id));
+
+    await expect(
+      (await stepUpCaller(approver.id)).admin.supportAccess.approve({ grantId: grant.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const stored = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(stored?.status).toBe('pending');
   });
 
   test('concurrent approvals of one pending grant produce exactly one success', async () => {
@@ -623,6 +708,116 @@ describe('admin.supportAccess viewAccess', () => {
     ).resolves.toEqual({ grantRequired: true, expiresAt: null });
   });
 
+  test('an own active grant on the parent lets the admin open the child', async () => {
+    const admin = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: child.id })
+    ).resolves.toEqual({ grantRequired: false, expiresAt: grant.expiresAt });
+  });
+
+  test("another admin's active parent grant does not count for the child", async () => {
+    const holder = await insertRequester();
+    const other = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    await (
+      await stepUpCaller(holder.id)
+    ).admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      (await stepUpCaller(other.id)).admin.supportAccess.viewAccess({
+        organizationId: child.id,
+      })
+    ).resolves.toEqual({ grantRequired: true, expiresAt: null });
+  });
+
+  test('getActiveForOrganization includes a live parent grant for the child', async () => {
+    const admin = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    const active = await caller.admin.supportAccess.getActiveForOrganization({
+      organizationId: child.id,
+    });
+    expect(active.map(item => item.id)).toContain(grant.id);
+  });
+
+  test('getActiveForOrganization returns only grants that are live at the organization and its parent', async () => {
+    const viewer = await insertRequester();
+    const liveHolder = await insertRequester();
+    const orgHolder = await insertRequester();
+    const parentHolder = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const now = Date.now();
+    const at = (offsetSeconds: number) => new Date(now + offsetSeconds * 1000).toISOString();
+
+    const [live, endedOnOrg, endedOnParent] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: liveHolder.id,
+          organization_id: child.id,
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-60),
+          expires_at: at(1800),
+        },
+        {
+          actor_kilo_user_id: orgHolder.id,
+          organization_id: child.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-3600),
+          expires_at: at(-60),
+        },
+        {
+          actor_kilo_user_id: parentHolder.id,
+          organization_id: parent.id,
+          action_class: 'support_read',
+          reason: 'investigating a third customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-3600),
+          expires_at: at(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    const active = await caller.admin.supportAccess.getActiveForOrganization({
+      organizationId: child.id,
+    });
+    const listedIds = active.map(item => item.id);
+    expect(listedIds).toContain(live.id);
+    expect(listedIds).not.toContain(endedOnOrg.id);
+    expect(listedIds).not.toContain(endedOnParent.id);
+
+    const stored = await db.query.support_access_grants.findMany({
+      where: inArray(support_access_grants.id, [endedOnOrg.id, endedOnParent.id]),
+    });
+    expect(stored.map(row => row.status)).toEqual(['active', 'active']);
+  });
+
   test('an admin who is a member needs no grant', async () => {
     const admin = await insertRequester();
     const organization = await createTestOrganization(
@@ -669,5 +864,71 @@ describe('admin.supportAccess list display names', () => {
       actor: { id: admin.id, name: admin.google_user_name, email: admin.google_user_email },
       approvedBy: null,
     });
+  });
+});
+
+describe('admin.supportAccess listing status follows the grant window', () => {
+  function secondsFromNow(seconds: number): string {
+    return new Date(Date.now() + seconds * 1000).toISOString();
+  }
+
+  test('a listed grant reflects its own deadline', async () => {
+    const viewer = await insertRequester();
+    const liveHolder = await insertRequester();
+    const endedHolder = await insertRequester();
+    const lapsedRequester = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const [live, ended, lapsed] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: liveHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-60),
+          expires_at: secondsFromNow(1800),
+        },
+        {
+          actor_kilo_user_id: endedHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-600),
+          expires_at: secondsFromNow(-60),
+        },
+        {
+          actor_kilo_user_id: lapsedRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a broken organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+
+    const active = await caller.admin.supportAccess.listActive();
+    expect(active.find(item => item.id === live.id)?.status).toBe('active');
+    expect(active.find(item => item.id === ended.id)?.status).toBe('expired');
+
+    const pending = await caller.admin.supportAccess.listPending();
+    expect(pending.find(item => item.id === lapsed.id)?.status).toBe('expired');
+
+    const stored = await db.query.support_access_grants.findMany({
+      where: inArray(support_access_grants.id, [live.id, ended.id, lapsed.id]),
+    });
+    const storedStatuses = new Map(stored.map(row => [row.id, row.status]));
+    expect(storedStatuses.get(live.id)).toBe('active');
+    expect(storedStatuses.get(ended.id)).toBe('active');
+    expect(storedStatuses.get(lapsed.id)).toBe('pending');
   });
 });

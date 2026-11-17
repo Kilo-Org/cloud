@@ -75,6 +75,27 @@ describe('SandboxStatusSessionIdSchema', () => {
 });
 
 describe('sandbox status public contract', () => {
+  it('exposes only the optional workspace snapshot capture timestamp', () => {
+    const parsed = SandboxStatusSnapshotSchema.parse({
+      ...snapshot,
+      workspaceSnapshot: { capturedAt: observedAt, ...privateFields, snapshotId: 'private-handle' },
+    });
+    expect(parsed.workspaceSnapshot).toEqual({ capturedAt: observedAt });
+    expect(SandboxStatusSnapshotSchema.parse(snapshot)).not.toHaveProperty('workspaceSnapshot');
+  });
+
+  it.each([...invalidNumbers, 8_640_000_000_000_001])(
+    'rejects invalid workspace snapshot capture timestamp %s',
+    capturedAt => {
+      expect(
+        SandboxStatusSnapshotSchema.safeParse({
+          ...snapshot,
+          workspaceSnapshot: { capturedAt },
+        }).success
+      ).toBe(false);
+    }
+  );
+
   it.each(lifecycleCases)('accepts $status with $detailCode', lifecycle => {
     const input = { ...snapshot, ...lifecycle };
     expect(SandboxStatusSnapshotSchema.parse(input)).toEqual(input);

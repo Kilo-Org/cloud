@@ -30,6 +30,7 @@ const groups: ServiceGroup[] = [
   },
   { id: 'notifications', label: 'Notifications', alwaysOn: false },
   { id: 'data-export', label: 'Data Export', alwaysOn: false },
+  { id: 'session-sync', label: 'Session Sync', alwaysOn: false },
   { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
@@ -44,7 +45,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -121,12 +121,15 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
-  // A no-behavior placeholder for now (see services/scim-sync/README.md): it
-  // runs with the core stack so every local session exercises the Worker and
-  // its Durable Object binding. No dependencies and no secrets.
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
   'cloudflare-scim-sync': {
     group: 'core',
-    dependsOn: [],
+    dependsOn: ['postgres', 'nextjs'],
     dir: 'services/scim-sync',
   },
   'user-data-export': {
@@ -151,6 +154,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'nextjs',
       'cloudflare-session-ingest',
       'cloudflare-git-token-service',
+      'cloudflare-session-sync',
       'container-usage-meter',
       'notifications',
     ],
@@ -171,6 +175,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
+  },
+  'cloudflare-session-sync': {
+    group: 'session-sync',
+    dependsOn: ['postgres'],
+    dir: 'services/session-sync',
   },
   'fake-llm': {
     group: 'cloud-agent',
@@ -299,16 +308,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
-  },
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
   },
 };
 

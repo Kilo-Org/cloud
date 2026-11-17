@@ -19,6 +19,8 @@ export const allocation = sqliteTable('allocation', {
   last_activity_at: integer('last_activity_at'),
   create_deadline_at: integer('create_deadline_at'),
   first_connect_deadline_at: integer('first_connect_deadline_at'),
+  /** Create attempts the current preparing episode made; see AllocationState. */
+  create_attempt: integer('create_attempt').notNull().default(0),
   stop_attempt: integer('stop_attempt').notNull(),
   stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
   stop_at: integer('stop_at'),
@@ -43,6 +45,7 @@ export const routes = sqliteTable('routes', {
   attempt_id: text('attempt_id').notNull(),
   attempt_deadline_at: integer('attempt_deadline_at'),
   reason: text('reason'),
+  billing_failure: text('billing_failure'),
   updated_at: integer('updated_at').notNull(),
 });
 
@@ -59,4 +62,18 @@ export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
 export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', {
   id: text('id').primaryKey(),
   data: text('data', { mode: 'json' }).notNull(),
+});
+
+export const workspaceArtifacts = sqliteTable('workspace_artifacts', {
+  relative_path: text('relative_path').primaryKey(),
+  object_key: text('object_key').notNull(),
+  content_hash: text('content_hash').notNull(),
+  size_bytes: integer('size_bytes').notNull(),
+  content_type: text('content_type').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
+export const workspaceArtifactOrphans = sqliteTable('workspace_artifact_orphans', {
+  object_key: text('object_key').primaryKey(),
+  queued_at: integer('queued_at').notNull(),
 });

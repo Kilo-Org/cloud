@@ -5,7 +5,23 @@ import { z } from 'zod';
  * (`.specs/mobile-session-live-activity.md` "Card data contract"). The ingest
  * service derives it from the tool, todo, diff and error items and stores only
  * this summary, never the raw text. It never carries assistant message text.
+ *
+ * It also owns the creation-title placeholder, the machine name the backend
+ * seeds before a person names a session: every surface that decides whether a
+ * session has a name yet reads it from here.
  */
+
+/**
+ * The title the backend seeds at creation: `New session - <ISO>` for a root
+ * session and `Child session - <ISO>` for a child.
+ */
+export const DEFAULT_SESSION_TITLE_PATTERN =
+  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/** Whether the title is still the creation placeholder, or missing entirely. */
+export function isDefaultSessionTitle(title: string | null | undefined): boolean {
+  return title == null || DEFAULT_SESSION_TITLE_PATTERN.test(title);
+}
 
 export const SESSION_LIVE_STEP_VERBS = [
   'editing',
@@ -73,10 +89,12 @@ export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
  * Whether the code point is a layout format control: a code point with no glyph
- * of its own that does not shape adjacent characters either. Display text keeps
- * the code points that draw themselves and the joiners that shape their
- * neighbours, so these are removed. Compared numerically because a character
- * class naming them reads in the source as the characters themselves.
+ * of its own that does not shape adjacent characters either (directional marks
+ * and embeddings, the zero-width space, the invisible operators, and the byte
+ * order mark). Display text keeps the code points that draw themselves and the
+ * joiners that shape their neighbours, so these are removed. Compared
+ * numerically because a character class naming them reads in the source as the
+ * characters themselves.
  */
 function isFormatControl(code: number): boolean {
   return (
@@ -85,18 +103,19 @@ function isFormatControl(code: number): boolean {
     code === 0x200e ||
     code === 0x200f ||
     (code >= 0x202a && code <= 0x202e) ||
-    code === 0x2060 ||
+    (code >= 0x2060 && code <= 0x2064) ||
     (code >= 0x2066 && code <= 0x2069) ||
     code === 0xfeff
   );
 }
 
 /**
- * Display text as one line of what it draws: control characters and line breaks
- * become spaces, layout format controls are left out, and the joiners that
- * shape adjacent characters are kept. Every display surface that shows stored
- * text reads it through this, so one string cannot read two ways. White space
- * is left as it is; `sessionLiveText` collapses and bounds it.
+ * Display text as one line of what it draws: control characters (the C0 range,
+ * delete, the C1 range) and line breaks become spaces, layout format controls
+ * are left out, and the joiners that shape adjacent characters are kept. Every
+ * display surface that shows stored text reads it through this, so one string
+ * cannot read two ways. White space is left as it is; `sessionLiveText`
+ * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
   // Iterating code points keeps a surrogate pair whole while the control set is
@@ -106,7 +125,9 @@ export function sessionDisplayLine(raw: string): string {
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
       if (isFormatControl(code)) return '';
-      return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029
+        ? ' '
+        : char;
     })
     .join('');
 }
@@ -133,21 +154,25 @@ function characterSegmenter(): Intl.Segmenter | null {
 }
 
 /**
+ * The shared character reader for every cut in the workspace: display surfaces
+ * read it through `sessionLiveCut`, and byte-capped report fields read it
+ * directly after their own byte count.
+ *
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
  * a surrogate pair whole.
  */
-function characterCut(line: string, maxIndex: number): number {
+export function characterCut(line: string, maxIndex: number): number {
   const segmenter = characterSegmenter();
   if (segmenter === null) {
     const last = line.charCodeAt(maxIndex - 1);
     return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
   }
   let end = 0;
-  for (const { index } of segmenter.segment(line)) {
-    if (index > maxIndex) break;
-    end = index;
+  for (const { index, segment } of segmenter.segment(line)) {
+    if (index + segment.length > maxIndex) break;
+    end = index + segment.length;
   }
   return end;
 }

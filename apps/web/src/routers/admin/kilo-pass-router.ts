@@ -1,4 +1,4 @@
-import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
@@ -9,10 +9,17 @@ import {
   cancelAndRefundKiloPassForUser,
   type CancelAndRefundKiloPassStripeClient,
 } from '@/lib/kilo-pass/cancel-and-refund';
+import {
+  type AdminActionEntry,
+  recordAdminAction,
+  redactEmailAddressesInAuditText,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
+import { superadminProcedure } from '@/lib/trpc/admin-procedures';
 
 const BulkCancelSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
-  reason: z.string().min(1).trim(),
+  reason: z.string().trim().min(1).max(500),
   refundLatestPayment: z.boolean().default(true),
 });
 
@@ -54,12 +61,15 @@ export async function runBulkCancelAndRefundKiloPass({
   adminKiloUserId,
   stripe,
   refundLatestPayment,
+  onResult,
 }: {
   emails: readonly string[];
   reason: string;
   adminKiloUserId: string;
   stripe: CancelAndRefundKiloPassStripeClient;
   refundLatestPayment: boolean;
+  /** Called once per account as soon as its outcome is known, so a partial batch stays attributable. */
+  onResult?: (row: BulkResultRow) => Promise<void>;
 }): Promise<{
   results: BulkResultRow[];
   summary: {
@@ -73,6 +83,11 @@ export async function runBulkCancelAndRefundKiloPass({
   const uniqueEmails = dedupeEmails(emails);
   const results: BulkResultRow[] = [];
 
+  async function record(row: BulkResultRow): Promise<void> {
+    results.push(row);
+    await onResult?.(row);
+  }
+
   for (const email of uniqueEmails) {
     // `google_user_email` stores the provider email as-is (no case normalization)
     // and is case-sensitively unique. Look up case-insensitively so pasted
@@ -85,7 +100,7 @@ export async function runBulkCancelAndRefundKiloPass({
       .limit(2);
 
     if (matchingUsers.length === 0) {
-      results.push({
+      await record({
         email,
         userId: null,
         status: 'skipped_no_user',
@@ -98,7 +113,7 @@ export async function runBulkCancelAndRefundKiloPass({
     }
 
     if (matchingUsers.length > 1) {
-      results.push({
+      await record({
         email,
         userId: null,
         status: 'error',
@@ -131,7 +146,7 @@ export async function runBulkCancelAndRefundKiloPass({
             : reasonKind === 'already_canceled'
               ? 'skipped_already_canceled'
               : 'skipped_store_managed';
-        results.push({
+        await record({
           email,
           userId: user.id,
           status,
@@ -143,7 +158,7 @@ export async function runBulkCancelAndRefundKiloPass({
         continue;
       }
 
-      results.push({
+      await record({
         email,
         userId: user.id,
         status: result.status,
@@ -157,7 +172,7 @@ export async function runBulkCancelAndRefundKiloPass({
         tags: { source: 'admin.kiloPass.cancelAndRefundKiloPassBulk' },
         extra: { email, userId: user.id },
       });
-      results.push({
+      await record({
         email,
         userId: user.id,
         status: 'error',
@@ -188,20 +203,85 @@ export async function runBulkCancelAndRefundKiloPass({
   return { results, summary };
 }
 
+/**
+ * One entry per account the batch acted on. Skipped accounts are not audited: no
+ * action ran for them. A row that errored mid-way may have created a Stripe
+ * refund before the failure, so it is recorded as an attempt with an unknown
+ * outcome rather than left unattributed.
+ *
+ * `cancelled_and_refunded` does not prove a refund was created: the helper
+ * reports it whenever a refund was requested, even when there was no paid
+ * invoice, no payment intent, or Stripe had already refunded the charge. The
+ * wording keys off the refunded amount instead.
+ */
+function bulkAuditEntry(
+  row: BulkResultRow,
+  params: { batchId: string; reason: string; refundLatestPayment: boolean }
+): AdminActionEntry | null {
+  if (!row.userId) return null;
+
+  const outcome =
+    row.status === 'error'
+      ? 'attempted with unknown outcome'
+      : row.refundedAmountCents != null
+        ? 'and refunded the latest payment'
+        : params.refundLatestPayment
+          ? 'with no refundable payment'
+          : 'without a Stripe refund';
+  const message =
+    row.status === 'cancelled' || row.status === 'cancelled_and_refunded'
+      ? `Cancelled Kilo Pass ${outcome} via bulk admin cancel`
+      : row.status === 'error'
+        ? `Kilo Pass cancel ${outcome} via bulk admin cancel`
+        : null;
+  if (!message) return null;
+
+  // No provider error text: the audit table is browsable by every platform
+  // admin and the message can quote arbitrary Stripe or database values.
+  // `batchId` groups the rows one request wrote; the caller passes the reason
+  // already sanitized for recording.
+  return {
+    action: 'kilo_pass.cancel_refund',
+    target: userActionTarget(row.userId),
+    message,
+    metadata: {
+      batchId: params.batchId,
+      status: row.status,
+      reason: params.reason,
+      refundLatestPayment: params.refundLatestPayment,
+      refundedAmountCents: row.refundedAmountCents,
+      balanceResetAmountUsd: row.balanceResetAmountUsd,
+      alreadyBlocked: row.alreadyBlocked,
+    },
+  };
+}
+
 export const adminKiloPassRouter = createTRPCRouter({
-  cancelAndRefundKiloPassBulk: adminProcedure
+  cancelAndRefundKiloPassBulk: superadminProcedure
     .input(BulkCancelSchema)
     .mutation(async ({ input, ctx }) => {
+      const batchId = crypto.randomUUID();
+      // The helper writes the reason to the target user records (block reason,
+      // admin note and credit transaction description); the audit rows repeat it.
+      const reason = redactEmailAddressesInAuditText(input.reason);
       const outcome = await runBulkCancelAndRefundKiloPass({
         emails: input.emails,
-        reason: input.reason,
         adminKiloUserId: ctx.user.id,
         stripe: stripeClient,
+        reason,
         refundLatestPayment: input.refundLatestPayment,
+        onResult: async row => {
+          const entry = bulkAuditEntry(row, {
+            batchId,
+            reason,
+            refundLatestPayment: input.refundLatestPayment,
+          });
+          if (entry) await recordAdminAction(ctx, entry);
+        },
       });
 
       console.log(
-        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`
+        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} batch=${batchId} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`
       );
 
       return outcome;

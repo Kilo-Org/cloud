@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- cohesive unit suite for conversation storage round-trip with schema validation */
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createConversationErrorEvent,
   createRemoteMcpToolCall,
   createSafeToolCall,
   createToolCall,
@@ -658,5 +659,48 @@ describe('web MCP tool-call persistence round-trip', () => {
       type: 'tool-call',
       webMcpOrigin: 'https://example.com',
     });
+  });
+});
+
+describe('error event persistence round-trip', () => {
+  it('keeps the notice, its server reason and its retry through a persist -> reload cycle', () => {
+    const errorEvent = createConversationErrorEvent({
+      detail: 'Insufficient credits',
+      retry: 'compaction',
+      title: "You're out of credits.",
+    });
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            errorEvent,
+            createConversationErrorEvent({ retry: 'turn', title: 'Server busy.' }),
+          ],
+          id: 'conversation-1',
+          title: 'Failed turn',
+          updatedAt: '2026-07-01T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(toPersistedConversationStore(store));
+
+    expect(reloaded?.conversations[0]?.events).toStrictEqual([
+      {
+        detail: 'Insufficient credits',
+        id: errorEvent.id,
+        retry: 'compaction',
+        title: "You're out of credits.",
+        type: 'error',
+      },
+      {
+        id: reloaded?.conversations[0]?.events[1]?.id,
+        retry: 'turn',
+        title: 'Server busy.',
+        type: 'error',
+      },
+    ]);
   });
 });

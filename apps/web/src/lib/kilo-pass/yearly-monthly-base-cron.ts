@@ -14,10 +14,10 @@ import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   appendKiloPassAuditLog,
-  computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { updateKiloPassThresholdAfterBaseCredits } from './subscription-accounting';

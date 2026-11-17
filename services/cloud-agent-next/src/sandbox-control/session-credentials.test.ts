@@ -41,6 +41,32 @@ function localPreparation(): CredentialGrantPreparation {
   };
 }
 
+describe('contained runtime organization projection', () => {
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'projects the session org only through kilo for %s grants',
+    async provider => {
+      const input = localPreparation();
+      input.provider = provider;
+      input.source.orgId = 'org-session';
+
+      const { grant, payload } = await prepareCredentialGrant(input);
+
+      expect(grant.orgId).toBe('org-session');
+      expect(payload.kilo.organizationId).toBe(grant.orgId);
+      // The wrapper derives the runtime env from kilo.organizationId.
+      expect(payload.env).not.toHaveProperty('KILOCODE_ORGANIZATION_ID');
+    }
+  );
+
+  it('does not add an organization to a personal grant', async () => {
+    const { grant, payload } = await prepareCredentialGrant(localPreparation());
+
+    expect(grant).not.toHaveProperty('orgId');
+    expect(payload.kilo).not.toHaveProperty('organizationId');
+    expect(payload.env).not.toHaveProperty('KILOCODE_ORGANIZATION_ID');
+  });
+});
+
 describe('Vercel credentials with private control-plane upstreams', () => {
   it('keeps loopback upstreams behind the HTTPS runtime facade', async () => {
     const input = localPreparation();
@@ -59,7 +85,11 @@ describe('Vercel credentials with private control-plane upstreams', () => {
     expect(JSON.stringify(payload)).not.toContain(input.source.kiloToken);
     const policy = buildControlNetworkPolicy([grant]);
     expect(policy.allow['worker.example.com'].length).toBeGreaterThan(0);
-    expect(Object.keys(policy.allow)).toEqual(['worker.example.com', '*']);
+    expect(Object.keys(policy.allow)).toEqual([
+      'session-sync.kiloapps.io',
+      'worker.example.com',
+      '*',
+    ]);
     expect(JSON.stringify(policy)).not.toContain('localhost');
   });
 

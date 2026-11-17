@@ -2,12 +2,12 @@ import { validateReturnPath } from './validate-return-path';
 
 describe('validateReturnPath', () => {
   it('accepts a simple internal path', () => {
-    expect(validateReturnPath('/gastown/onboarding')).toBe('/gastown/onboarding');
+    expect(validateReturnPath('/integrations/github')).toBe('/integrations/github');
   });
 
   it('accepts a path with query params', () => {
-    expect(validateReturnPath('/gastown/onboarding?step=repo&orgId=123')).toBe(
-      '/gastown/onboarding?step=repo&orgId=123'
+    expect(validateReturnPath('/integrations/github?step=repo&orgId=123')).toBe(
+      '/integrations/github?step=repo&orgId=123'
     );
   });
 

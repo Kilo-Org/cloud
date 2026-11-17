@@ -1,4 +1,5 @@
 import type { ControlPlanePromptPayload } from '../../shared/control-plane-protocol.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
@@ -38,6 +39,7 @@ export type SessionMessage = {
   acceptedAt: number | null;
   settledAt: number | null;
   reason: string | null;
+  billingFailure?: CustomerBillingFailure;
   container?: CloudAgentRunContainer;
 };
 
@@ -123,7 +125,8 @@ export function settleMessages(
   messageIds: readonly string[],
   status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
   reason: string | undefined,
-  now: number
+  now: number,
+  billingFailure?: CustomerBillingFailure
 ): MessageReduction {
   const ids = new Set(messageIds);
   const changed: SessionMessage[] = [];
@@ -134,6 +137,11 @@ export function settleMessages(
       state: status,
       settledAt: now,
       reason: status === 'completed' ? null : (reason ?? null),
+      ...(status === 'failed' &&
+      (reason === 'billing_blocked' || reason === 'billing_unavailable') &&
+      billingFailure !== undefined
+        ? { billingFailure }
+        : {}),
     };
     changed.push(settled);
     return settled;
@@ -221,10 +229,10 @@ export function nextBackstopAt(
   return deadlines.length === 0 ? null : Math.min(...deadlines);
 }
 
-/** Public `cloud.message.queued` snapshot content for a stored intent. */
-export function renderTurnContent(intent: ControlPlanePromptPayload): string {
-  if (intent.turn.type === 'command') {
-    return `/${intent.turn.command}${intent.turn.arguments ? ` ${intent.turn.arguments}` : ''}`;
-  }
-  return intent.turn.prompt;
+export function renderQueuedMessageContent(message: SessionMessage): string {
+  const { turn } = message.intent;
+  if (turn.type === 'prompt') return turn.prompt;
+  // Kilo v2 commands can expand under a different id; unaccepted commands still need queue and failure controls.
+  if (message.acceptedAt !== null) return '';
+  return `/${turn.command}${turn.arguments ? ` ${turn.arguments}` : ''}`;
 }

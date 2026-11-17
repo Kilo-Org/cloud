@@ -90,10 +90,15 @@ describe('fetchModelsForProvider', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/frontend/v1/models/find?providers=Amazon+Bedrock&fmt=cards',
-      {
+      expect.objectContaining({
         method: 'GET',
-        headers: { 'HTTP-Referer': 'https://kilocode.ai', 'X-Title': 'Kilo Code' },
-      }
+        headers: {
+          accept: 'application/json',
+          'HTTP-Referer': 'https://kilocode.ai',
+          'X-Title': 'Kilo Code',
+        },
+        signal: expect.any(AbortSignal),
+      })
     );
   });
 
@@ -106,7 +111,7 @@ describe('fetchModelsForProvider', () => {
     );
 
     await expect(fetchModelsForProvider(provider)).rejects.toThrow(
-      'Failed to fetch models for provider OpenAI: 503 Service Unavailable'
+      'Fetching https://openrouter.ai/api/frontend/v1/models/find?providers=OpenAI&fmt=cards failed: 503 Service Unavailable'
     );
   });
 

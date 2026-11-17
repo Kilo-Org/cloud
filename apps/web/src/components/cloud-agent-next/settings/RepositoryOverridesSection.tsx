@@ -64,7 +64,8 @@ export function RepositoryOverridesSection({
     : (personalProfiles.data ?? []);
 
   const disabled = !canManage || save.isPending || remove.isPending;
-  const { enabled: canChooseSandbox, defaultDestination } = settings.capabilities;
+  const canChooseSandbox = settings.capabilities?.enabled;
+  const defaultDestination = settings.capabilities?.defaultDestination;
   const fixedSandbox = canChooseSandbox ? undefined : describeDefaultSandbox(defaultDestination);
   const pending = save.isPending ? save.variables : undefined;
 
@@ -115,9 +116,9 @@ export function RepositoryOverridesSection({
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 id={headingId} className="text-sm font-medium">
+        <h4 id={headingId} className="text-sm font-medium">
           Repository overrides
-        </h3>
+        </h4>
         <RepositoryPicker
           organizationId={organizationId}
           listed={repositories}
@@ -137,7 +138,10 @@ export function RepositoryOverridesSection({
               key={`draft:${draft.platform}:${draft.fullName}`}
               row={showPending(toDraftRow(draft))}
               profiles={profiles}
-              choices={getEligibleAllocationChoices(capabilitiesByPlatform[draft.platform])}
+              choices={getEligibleAllocationChoices(
+                capabilitiesByPlatform[draft.platform] ?? undefined
+              )}
+              sandboxOptionsUnavailable={settings.capabilities === null}
               fixedSandbox={fixedSandbox}
               disabled={disabled}
               action={
@@ -165,8 +169,9 @@ export function RepositoryOverridesSection({
                 row={shown}
                 profiles={profiles}
                 choices={getEligibleAllocationChoices(
-                  capabilitiesByPlatform[row.repositoryPlatform]
+                  capabilitiesByPlatform[row.repositoryPlatform] ?? undefined
                 )}
+                sandboxOptionsUnavailable={settings.capabilities === null}
                 fixedSandbox={fixedSandbox}
                 disabled={disabled}
                 action={

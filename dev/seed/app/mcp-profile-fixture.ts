@@ -5,7 +5,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
@@ -102,6 +102,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const trimmedEmail = email.trim();
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
+  assertLocalSeedDatabase('app:mcp-profile-fixture');
   const db = getSeedDb();
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,

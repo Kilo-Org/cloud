@@ -6,6 +6,8 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { handleModelValidationRequest } from './model-validation';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -16,10 +18,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+
+const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
+const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -57,6 +66,7 @@ describe('POST /api/openrouter/models/validate', () => {
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('available/model')] });
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
+    mockedListUsableCustomRouters.mockResolvedValue([]);
   });
 
   test('confirms a Kilo-eligible catalog model', async () => {
@@ -73,7 +83,10 @@ describe('POST /api/openrouter/models/validate', () => {
   test('validates against the catalog for the request country', async () => {
     await handleModelValidationRequest(request('available/model', { 'x-vercel-ip-country': 'CU' }));
 
-    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith(
+      expect.objectContaining({ countryCode: 'CU' })
+    );
+    expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0].fromDb).toBe(readDb);
   });
 
   test('does not expose details for an unavailable model', async () => {
@@ -113,6 +126,23 @@ describe('POST /api/openrouter/models/validate', () => {
     mockedGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog unavailable'));
 
     const response = await handleModelValidationRequest(request('available/model'));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Failed to validate model',
+      message: 'Error from model catalog',
+    });
+  });
+
+  test('returns a service failure when a personal router cannot be loaded', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'router-owner' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelValidationRequest(request('kilo-auto/custom/efficient'));
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({

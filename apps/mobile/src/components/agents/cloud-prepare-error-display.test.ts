@@ -101,7 +101,7 @@ describe('cloudPrepareFailureMessage', () => {
 
   it('maps PAYMENT_REQUIRED to the credits copy', () => {
     expect(cloudPrepareFailureMessage(makeError('PAYMENT_REQUIRED', 'add credits'))).toBe(
-      'Not enough credits to run Cloud Agent. Add credits and try again.'
+      'Not enough credits for this request. Add credits and try again.'
     );
   });
 
@@ -138,4 +138,15 @@ describe('cloudPrepareFailureMessage', () => {
       'Something went wrong on our end. Please try again.'
     );
   });
+
+  it.each(['source_digest_changed', 'clone_setup_failed'] as const)(
+    'explains the %s clone rejection with the retry copy',
+    code => {
+      // The copy is the one the clone form already uses for a clone that did
+      // not go through; the rejection is about the copy, not the form.
+      expect(cloudPrepareFailureMessage(makeError('CONFLICT', code))).toBe(
+        "Couldn't clone this session. Try again."
+      );
+    }
+  );
 });

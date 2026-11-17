@@ -13,6 +13,7 @@ beforeEach(() => {
   jest.spyOn(Math, 'random').mockReturnValue(1);
   jest.spyOn(console, 'info').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -76,10 +77,13 @@ it('samples admission and always reports rejection using only bounded fields and
   expect(JSON.parse(jest.mocked(console.info).mock.calls[0][0])).toEqual({
     event: 'usage_writer_admission',
     writer_caller: 'queue_vercel',
+    writer_class: 'queue',
     outcome: 'admitted',
     reason: null,
     active: 2,
+    active_non_llm: 0,
     limit: 8,
+    non_llm_limit: 2,
     pool_max: 10,
     pool: { total: 0, idle: 0, waiting: 0 },
     sample_rate: 0.01,
@@ -90,10 +94,13 @@ it('samples admission and always reports rejection using only bounded fields and
   expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toEqual({
     event: 'usage_writer_admission',
     writer_caller: 'queue',
+    writer_class: 'queue',
     outcome: 'rejected',
     reason: 'pool_waiting',
     active: 2,
+    active_non_llm: 0,
     limit: 8,
+    non_llm_limit: 2,
     pool_max: 10,
     pool: { total: 0, idle: 0, waiting: 1 },
     sample_rate: 1,
@@ -120,6 +127,11 @@ it.each(['random', 'info', 'warn'] as const)(
     });
     if (first.admitted) first.release();
     expect(gate.tryAcquire('queue', 'usage-id').admitted).toBe(true);
+    expect(console.error).toHaveBeenCalledWith(
+      '[usage-writer-admission] admission diagnostic failed; the decision stands',
+      { error_name: 'Error' }
+    );
+    expect(JSON.stringify(jest.mocked(console.error).mock.calls)).not.toContain('usage-id');
   }
 );
 
@@ -164,10 +176,13 @@ describe('acquire', () => {
     expect(logs('info').at(-1)).toEqual({
       event: 'usage_writer_admission',
       writer_caller: 'queue_vercel',
+      writer_class: 'queue',
       outcome: 'admitted',
       reason: null,
       active: 1,
+      active_non_llm: 0,
       limit: 1,
+      non_llm_limit: 1,
       pool_max: 3,
       pool: { total: 0, idle: 0, waiting: 0 },
       sample_rate: 0.01,
@@ -401,6 +416,146 @@ describe('acquire', () => {
     release(held);
     expectNoActiveSlots(gate, 1);
   });
+});
+
+describe('non_llm writer class', () => {
+  type Gate = ReturnType<typeof createQueueWriterAdmission>;
+  const nonLlm = { maxWaitMs: 250, writerClass: 'non_llm' } as const;
+  function admitted(slot: Awaited<ReturnType<Gate['acquire']>>) {
+    if (!slot.admitted) throw new Error(`expected admitted slot, got ${slot.reason}`);
+    return slot;
+  }
+  const logs = (level: 'info' | 'warn') =>
+    jest.mocked(console[level]).mock.calls.map(([line]) => JSON.parse(String(line)));
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 0 });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('holds at most two of the eight shared slots so LLM queue writes keep six', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const side = [
+      admitted(await gate.acquire('queue', 'side-1', nonLlm)),
+      admitted(await gate.acquire('queue', 'side-2', nonLlm)),
+    ];
+    await expect(gate.acquire('queue', 'side-3', nonLlm)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    expect(logs('warn').at(-1)).toMatchObject({
+      writer_caller: 'queue',
+      writer_class: 'non_llm',
+      reason: 'queue_limit',
+      active: 2,
+      active_non_llm: 2,
+      non_llm_limit: 2,
+      usage_id: 'side-3',
+    });
+    const llm = Array.from({ length: 6 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    expect(gate.tryAcquire('queue', 'llm')).toEqual({ admitted: false, reason: 'queue_limit' });
+    for (const slot of [...side, ...llm]) slot.release();
+  });
+
+  it('lets LLM queue writes take all eight slots and then rejects non_llm as well', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    for (let index = 0; index < 8; index++) admitted(gate.tryAcquire('queue', 'llm'));
+    await expect(gate.acquire('queue', 'side', { ...nonLlm, maxWaitMs: 0 })).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+  });
+
+  it('does not queue a non_llm waiter at its ceiling, leaving the FIFO to LLM writes', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const side = [
+      admitted(await gate.acquire('queue', 'side-1', nonLlm)),
+      admitted(await gate.acquire('queue', 'side-2', nonLlm)),
+    ];
+    const llm = Array.from({ length: 6 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    await expect(gate.acquire('queue', 'side-3', nonLlm)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    const waitingLlm = gate.acquire('queue', 'llm-waiter', { maxWaitMs: 250 });
+    side[0].release();
+    const granted = admitted(await waitingLlm);
+    for (const slot of [granted, side[1], ...llm]) slot.release();
+  });
+
+  it('caps queued non_llm waiters so a grant never exceeds the class ceiling', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const side = admitted(await gate.acquire('queue', 'side-1', nonLlm));
+    const llm = Array.from({ length: 7 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    const firstWaiter = gate.acquire('queue', 'side-2', nonLlm);
+    await expect(gate.acquire('queue', 'side-3', nonLlm)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    llm[0].release();
+    const granted = admitted(await firstWaiter);
+    await expect(gate.acquire('queue', 'side-4', { ...nonLlm, maxWaitMs: 0 })).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    for (const slot of [side, granted, ...llm.slice(1)]) slot.release();
+  });
+
+  it('returns a released non_llm slot to the class and the shared pool once', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const first = admitted(await gate.acquire('queue', 'side-1', nonLlm));
+    const second = admitted(await gate.acquire('queue', 'side-2', nonLlm));
+    first.release();
+    first.release();
+    const replacement = admitted(await gate.acquire('queue', 'side-3', nonLlm));
+    await expect(gate.acquire('queue', 'side-4', nonLlm)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    second.release();
+    replacement.release();
+    const llm = Array.from({ length: 8 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    for (const slot of llm) slot.release();
+  });
+
+  it('hands an LLM slot to a waiting non_llm write below its ceiling and counts it', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const llm = Array.from({ length: 8 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    jest.mocked(Math.random).mockReturnValue(0);
+    const waiting = gate.acquire('queue', 'side-1', nonLlm);
+    llm[0].release();
+    const granted = admitted(await waiting);
+    expect(logs('info').at(-1)).toMatchObject({
+      writer_class: 'non_llm',
+      outcome: 'admitted',
+      active: 8,
+      active_non_llm: 1,
+    });
+    for (const slot of [granted, ...llm.slice(1)]) slot.release();
+  });
+
+  it.each([
+    [1, 1, 1],
+    [3, 1, 1],
+    [4, 2, 1],
+    [5, 3, 2],
+    [10, 8, 2],
+    [20, 18, 2],
+  ])(
+    'gives a %s-connection pool shared limit %s and non_llm ceiling %s',
+    async (max, limit, ceiling) => {
+      const gate = createQueueWriterAdmission(pool(max));
+      for (let index = 0; index < ceiling; index++)
+        admitted(await gate.acquire('queue', 'side', { ...nonLlm, maxWaitMs: 0 }));
+      await expect(
+        gate.acquire('queue', 'side', { ...nonLlm, maxWaitMs: 0 })
+      ).resolves.toMatchObject({ admitted: false });
+      for (let index = ceiling; index < limit; index++) admitted(gate.tryAcquire('queue', 'llm'));
+      expect(gate.tryAcquire('queue', 'llm').admitted).toBe(false);
+    }
+  );
 });
 
 it.each(['queue_limit', 'pool_waiting', 'pool_busy'] as const)(

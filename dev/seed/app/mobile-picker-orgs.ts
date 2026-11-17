@@ -1,9 +1,8 @@
-import { computeDatabaseUrl } from '@kilocode/db';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email>';
 
@@ -48,15 +47,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('Provide one owned fake email matching kilo-<name>@example.com.');
   }
-  // `computeDatabaseUrl()` names the missing variable, and `getSeedDb()`
-  // connects with the same URL, so the loopback check below sees the database
-  // the seed actually writes to.
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (
-    process.env.USE_PRODUCTION_DB === 'true' ||
-    !['localhost', '127.0.0.1', '[::1]'].includes(databaseUrl.hostname) ||
-    process.env.NODE_ENV === 'production'
-  ) {
+  assertLocalSeedDatabase('app:mobile-picker-orgs');
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('This fixture requires a local development database.');
   }
   const db = getSeedDb();

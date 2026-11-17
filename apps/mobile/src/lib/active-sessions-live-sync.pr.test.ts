@@ -13,6 +13,10 @@ describe('merge enrichment - associatedPr preservation', () => {
     lastSyncedAt: '2026-01-01T00:00:00.000Z',
     reviewDecision: null,
     reviewDecisionPending: false,
+    baseRef: null,
+    stackNumber: null,
+    stackPosition: null,
+    stackSize: null,
     platform: 'github',
     observations: { checks: { total: 3, failed: 1 }, unresolvedThreads: 2, truncated: false },
   };

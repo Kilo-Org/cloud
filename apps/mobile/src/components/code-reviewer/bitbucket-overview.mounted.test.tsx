@@ -24,6 +24,8 @@ const config = vi.hoisted(() => ({
 const readiness = vi.hoisted(() => ({
   connected: true,
   ready: true as boolean | undefined,
+  integrationId: 'bitbucket-1' as string | null,
+  workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
 }));
 
@@ -61,8 +63,8 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
-vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
-  BitbucketConnectForm: () => null,
+vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({
+  BitbucketSetupRecovery: () => null,
 }));
 vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
@@ -95,7 +97,7 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/integration-urls', () => ({ getBitbucketIntegrationUrl: () => 'https://x.test' }));
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => ({ status: 'connected' }),
   useBitbucketReadiness: () => ({
@@ -103,7 +105,20 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isError: false,
     isFetching: false,
     fetchStatus: readiness.fetchStatus,
-    data: { connected: readiness.connected, ready: readiness.ready, workspace: { slug: 'ws' } },
+    data: {
+      connected: readiness.connected,
+      ready: readiness.ready,
+      integrationId: readiness.integrationId,
+      workspace: { slug: readiness.workspaceSlug },
+      missingRequiredScopes: [],
+      repositoryCache: {
+        status: readiness.ready ? 'available' : 'uninitialized',
+        repositories: [],
+        syncedAt: null,
+      },
+      canManage: true,
+      canTriggerManualReview: false,
+    },
     refetch: vi.fn(),
   }),
   useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
@@ -163,6 +178,7 @@ beforeEach(() => {
   config.refetch.mockReset();
   readiness.connected = true;
   readiness.ready = true;
+  readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
   connectivity.known = true;
   queryError.variants = [];
@@ -213,6 +229,35 @@ describe('BitbucketOverview config body', () => {
     await renderScreen();
 
     expect(queryError.variants).toEqual(['offline']);
+  });
+});
+
+describe('BitbucketOverview Automatic reviews workspace line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected workspace under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(accountLines(renderer)).toEqual(['ws']);
+  });
+
+  it('paints the label alone so the row keeps one line without a workspace slug', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    readiness.workspaceSlug = undefined;
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(accountLines(renderer)).toEqual([]);
   });
 });
 

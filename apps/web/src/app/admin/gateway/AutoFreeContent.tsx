@@ -89,21 +89,18 @@ export function AutoFreeContent() {
         <CardHeader>
           <CardTitle>Auto Free</CardTitle>
           <CardDescription>
-            Candidate models for <code>kilo-auto/free</code>, stored in the <code>auto_free</code>{' '}
-            column of <code>ai_gateway_config</code>. Each entry has a <code>model</code> ID, a
-            positive integer <code>weight</code>, and a <code>reasoning</code> config. Models must
-            be free and use the default AI SDK provider. Unavailable models are skipped per request;
-            when no configuration is stored, it is invalid, or no configured model is available,
-            requests fall back to <code>openrouter/free</code>. Changes take effect within one
-            minute on warm instances.
+            Weighted candidate models for <code>kilo-auto/free</code>. Each must be free and use the
+            default AI SDK provider, or be a public free custom LLM. Requests skip models missing
+            from the catalog or blocked for the organization, and fall back to{' '}
+            <code>openrouter/free</code> when none remain. Changes apply within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-muted-foreground text-sm">
-            {hasStoredConfig
-              ? 'Showing the stored configuration.'
-              : 'No configuration stored. Requests use the openrouter/free fallback shown below.'}
-          </p>
+          {!hasStoredConfig && (
+            <p className="text-muted-foreground text-sm">
+              No configuration stored. Requests use the fallback shown below.
+            </p>
+          )}
           <div className="border-input overflow-hidden rounded-md border">
             <Editor
               height="420px"

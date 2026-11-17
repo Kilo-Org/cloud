@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Zaman wakilin naka yana da sabuntawa",
-      "chatMessage": "Kana da sabon saƙo",
-      "instanceLifecycle": "Misalin naka yana da sabuntawa",
-      "scheduledAction": "Wani aiki da aka tsara yana da sabuntawa",
       "lowBalance": "Ma'auninka yana buƙatar kulawa",
       "spendAlert": "Kashewar ku na buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
@@ -13,30 +10,9 @@
       "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "An kammala aikin"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ya gaza: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "An katse: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Babu Suna",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,54 +24,23 @@
       "title": "Faɗakarwar kashewa",
       "body": "Kashewar {{scopeName}} ta wuce ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Sabon binciken tsaro ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} a cikin {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Sabon binciken tsaro ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Faɗakarwar SLA",
-      "body": "{{findingTitle}} a cikin {{repoFullName}}"
+      "title": "Faɗakarwar SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Ƙetare SLA",
-      "body": "{{findingTitle}} a cikin {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Wani duban tsaro yana da sabuntawa"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} a shirye",
-      "body": "Danna don fara tattaunawa."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} ya gaza farawa",
-      "body": "Farkawa ta gaza."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} za a sake kunna shi ba da daɗewa ba",
-      "body": "An tsara sake kunnawa a {{when}}."
-    },
-    "restartCancelled": {
-      "title": "An soke sake kunnawa na {{instanceName}}",
-      "body": "An soke sake kunnawar da aka tsara a baya."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} za a haɓaka shi ba da daɗewa ba",
-      "bodyWithTag": "Haɓaka zuwa {{targetImageTag}} a {{when}}.",
-      "bodyWithoutTag": "Haɓakawa da aka tsara a {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "An soke haɓakawar {{instanceName}}",
-      "body": "An soke haɓakawar da aka tsara a baya."
+      "title": "Ƙetare SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Zaman Kilo naka a shirye don sarrafawa daga wayarka"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

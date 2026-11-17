@@ -1,19 +1,37 @@
 import { z } from 'zod';
 
-/** Startup mode and image are independent, except runtime-free requires downloaded. */
-export const runtimeStartupConfigSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('preinstalled'), image: z.literal('all-in-one') }).strict(),
-  z
-    .object({
-      mode: z.literal('downloaded'),
-      image: z.enum(['all-in-one', 'runtime-free']),
-      interactiveOrgIds: z.array(z.uuid()).min(1).optional(),
-      /** New sandboxes of these orgs run the Kilo v2 release published with the v1 release. */
-      kilo2: z
-        .object({ orgIds: z.array(z.uuid()).min(1) })
-        .strict()
-        .optional(),
-    })
-    .strict(),
-]);
+const orgScopeSchema = z.union([z.literal('*'), z.array(z.uuid()).min(1)]);
+
+export const runtimeStartupConfigSchema = z
+  .object({
+    mode: z.literal('downloaded'),
+    image: z.literal('runtime-free'),
+    kilo2: z
+      .object({
+        /** `*` includes personal accounts; origin and native isolation checks still apply. */
+        orgIds: orgScopeSchema,
+        /**
+         * Accounts that select v2 from every preparing-route origin, not only
+         * `cloud-agent-web`. Native isolation checks still apply.
+         */
+        allSessionOrgIds: orgScopeSchema.optional(),
+      })
+      .strict()
+      .superRefine((value, context) => {
+        const allSessionOrgIds = value.allSessionOrgIds;
+        if (allSessionOrgIds === undefined || value.orgIds === '*') return;
+        const outsideScope =
+          allSessionOrgIds === '*'
+            ? true
+            : allSessionOrgIds.some(orgId => !value.orgIds.includes(orgId));
+        if (outsideScope)
+          context.addIssue({
+            code: 'custom',
+            message: 'All-session organizations must be inside the Kilo v2 organization scope',
+            path: ['allSessionOrgIds'],
+          });
+      })
+      .optional(),
+  })
+  .strict();
 export type RuntimeStartupConfig = z.infer<typeof runtimeStartupConfigSchema>;

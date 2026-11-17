@@ -16,9 +16,12 @@
  */
 
 import jwt from 'jsonwebtoken';
+import { kilo2ConversationMessageSchema } from '../../src/shared/kilo2-conversation.js';
 import {
   collectUntilTerminal,
   deleteSession,
+  deleteWorktree,
+  getSessionSnapshot,
   fakeDirective,
   fetchFakeRequests,
   hasPreparationForMessage,
@@ -39,6 +42,7 @@ import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { CapabilityName, ScenarioEnvironment } from './scenario-capabilities.js';
 import { FAILURE_SHARED_SCENARIOS } from './scenarios-shared-failures.js';
 import { CALLBACK_SHARED_SCENARIOS } from './scenarios-shared-callbacks.js';
+import { DRAIN_SHARED_SCENARIOS } from './scenarios-shared-drain.js';
 import { STREAMING_SHARED_SCENARIOS } from './scenarios-shared-streaming.js';
 import { CONTINUITY_SHARED_SCENARIOS } from './scenarios-shared-continuity.js';
 import { MICRO_SHARED_SCENARIOS } from './scenarios-shared-micro.js';
@@ -64,6 +68,8 @@ const CLEANUP_TIMEOUT_MS = 15_000;
  * retirement.
  */
 const DELETE_SESSION_TIMEOUT_MS = 45_000;
+/** Workspace teardown also releases runtime locations, sandboxes and session rows. */
+const WORKSPACE_DELETE_TIMEOUT_MS = 90_000;
 /** Bound for each direct HTTPS auth probe in `auth-reject`. */
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 /** Wrong secret for the bad-signature probe; never the deployed `NEXTAUTH_SECRET`. */
@@ -89,6 +95,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function nativeAssistantUpdate(name: unknown, properties: unknown) {
+  if (name !== 'conversation.message.updated') return;
+  const parsed = kilo2ConversationMessageSchema.safeParse(properties);
+  if (parsed.success && parsed.data.message.type === 'assistant') return parsed.data;
+}
+
 /**
  * Join the newest text snapshot of each **content** text part belonging to a
  * direct **assistant** child message of `parentMessageId`. A part carrying the
@@ -97,7 +109,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  * end-of-turn removal event is missing because cleanup failed. Parts are
  * selected by `part.messageID`; the parent and the role are looked up on the
  * message info, because `parentID` is a message property, not a part property.
- * Unknown event shapes are ignored.
+ * Native v2 conversation updates carry the parent and complete content snapshot
+ * together; the newest snapshot wins. Unknown event shapes are ignored.
  *
  * Removal events mirror the replay consumer
  * (`src/session/queries/events.ts`): `message.part.removed` drops the tracked
@@ -117,6 +130,24 @@ export function collectChildMessageText(events: StreamEvent[], parentMessageId: 
     const name = typeof data.type === 'string' ? data.type : data.event;
     const properties = asRecord(data.properties);
     if (!properties) continue;
+
+    const native = nativeAssistantUpdate(name, properties);
+    if (native) {
+      if (native.parentID === parentMessageId) childMessageIds.add(native.message.id);
+      else childMessageIds.delete(native.message.id);
+      textParts.set(native.message.id, {
+        messageID: native.message.id,
+        text: (native.message.content ?? [])
+          .filter(
+            part =>
+              part.type === 'text' &&
+              asRecord(part.metadata)?.['kilocode.lifecycle'] !== 'transient'
+          )
+          .map(part => part.text ?? '')
+          .join(''),
+      });
+      continue;
+    }
 
     if (name === 'message.updated') {
       const info = asRecord(properties.info);
@@ -190,6 +221,8 @@ function collectCorrelatedProgress(
     const data = asRecord(event.data);
     if (!data) continue;
     const name = typeof data.type === 'string' ? data.type : data.event;
+    const native = nativeAssistantUpdate(name, data.properties);
+    if (native?.parentID === parentMessageId) childMessageIds.add(native.message.id);
     if (name !== 'message.updated') continue;
     const info = asRecord(asRecord(data.properties)?.info);
     if (!info || info.role !== 'assistant' || info.parentID !== parentMessageId) continue;
@@ -209,6 +242,22 @@ function collectCorrelatedProgress(
     const data = asRecord(event.data);
     if (!data) continue;
     const name = typeof data.type === 'string' ? data.type : data.event;
+    const native = nativeAssistantUpdate(name, data.properties);
+    if (native) {
+      const parts = native.message.content ?? [];
+      stats.parts += parts.length;
+      if (childMessageIds.has(native.message.id)) {
+        stats.correlated += parts.length;
+        for (const part of parts) {
+          if (part.type !== 'text') continue;
+          stats.text += 1;
+          const length = part.text?.length ?? 0;
+          stats.maxTextLength = Math.max(stats.maxTextLength, length);
+          if (length > 0) stats.nonEmptyText += 1;
+        }
+      }
+      continue;
+    }
     if (name !== 'message.part.updated') continue;
     stats.parts += 1;
     const part = asRecord(asRecord(data.properties)?.part);
@@ -233,6 +282,7 @@ function collectCorrelatedProgress(
  * streaming parts included (unlike `collectChildMessageText`, which excludes
  * them as progress rather than content). Child ids are collected from the whole
  * list first, so a part emitted before its `message.updated` still counts.
+ * Native v2 assistant snapshots count their content items under the same parent check.
  *
  * This is a liveness signal for the turn's own stream, not proof the model was
  * dialed: the Kilo CLI's transient initialization part is correlated but empty,
@@ -394,6 +444,33 @@ async function runHotTurn(
   }
 }
 
+const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+
+/** Delete the workspace of a last root session; a failure is returned, not thrown. */
+async function deleteOwningWorkspace(
+  config: DriverConfig,
+  sessionId: string
+): Promise<string | null> {
+  try {
+    const { worktreeId, kiloSessionId } = await getSessionSnapshot(
+      config,
+      sessionId,
+      AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS)
+    );
+    if (!worktreeId) return 'deleteWorktree: the last root session reports no workspace';
+    if (!kiloSessionId) return 'deleteWorktree: the last root session reports no Kilo session';
+    // The fence makes the delete fail if another session joined the workspace.
+    await deleteWorktree(
+      config,
+      { worktreeId, onlyIfSoleSessionId: kiloSessionId },
+      AbortSignal.timeout(WORKSPACE_DELETE_TIMEOUT_MS)
+    );
+    return null;
+  } catch (error) {
+    return `deleteWorktree: ${errorMessage(error)}`;
+  }
+}
+
 /**
  * Cleanup for one started session. Both requests are attempted independently
  * and each is bounded; a failure is reported but never thrown, so it never
@@ -417,7 +494,14 @@ export async function cleanupRemoteSession(
   try {
     await deleteSession(config, sessionId, AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS));
   } catch (error) {
-    failures.push(`deleteSession: ${errorMessage(error)}`);
+    const message = errorMessage(error);
+    if (message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      // The last root of a hosted workspace is removed only with its workspace.
+      const failure = await deleteOwningWorkspace(config, sessionId);
+      if (failure !== null) failures.push(failure);
+    } else {
+      failures.push(`deleteSession: ${message}`);
+    }
   }
   for (const failure of failures) {
     console.error(
@@ -580,13 +664,21 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
     } catch {
       // A close failure must not replace the scenario result.
     }
-    if (session)
+    if (session) {
+      // This scenario also supports direct invocation. Preserve the native
+      // ownership proof until local container reclamation has finished.
+      await env
+        .reclaimSessions?.([
+          { sessionId: session.cloudAgentSessionId, kiloSessionId: session.kiloSessionId },
+        ])
+        .catch(error => console.warn(`cold-hot: sandbox reclaim failed: ${errorMessage(error)}`));
       await cleanupRemoteSession(
         config,
         session.cloudAgentSessionId,
         'cold-hot',
         session.kiloSessionId
       );
+    }
   }
 }
 
@@ -853,15 +945,23 @@ async function runAuthReject(
     durationMs: Date.now() - startedAt,
   });
 
-  if (!config.bearerToken) {
-    return fail('auth-reject requires config.bearerToken (deployed profile only)');
+  let modelToken: string;
+  try {
+    modelToken = config.getBearerToken ? await config.getBearerToken() : (config.bearerToken ?? '');
+  } catch (error) {
+    return fail(`threw: ${errorMessage(error)}`);
+  }
+  if (modelToken.length === 0) {
+    return fail(
+      'auth-reject requires config.getBearerToken or config.bearerToken (deployed profile only)'
+    );
   }
 
   try {
     const probes = buildAuthRejectProbes({
       fakeLlmRootUrl: config.fakeLlmUrl,
       adminToken: resolveFakeAdminToken(),
-      modelToken: config.bearerToken,
+      modelToken,
       badSignatureToken: jwt.sign(
         {
           env: 'test',
@@ -903,6 +1003,7 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
   ...STREAMING_SHARED_SCENARIOS,
   ...FAILURE_SHARED_SCENARIOS,
   ...CALLBACK_SHARED_SCENARIOS,
+  ...DRAIN_SHARED_SCENARIOS,
   ...MICRO_SHARED_SCENARIOS,
   ...QUEUE_SHARED_SCENARIOS,
   ...CONTINUITY_SHARED_SCENARIOS,

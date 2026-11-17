@@ -27,6 +27,36 @@ function broadcastActions(broadcasts: StoredEvent[]): string[] {
 }
 
 describe('createPreparationProgressRecorder', () => {
+  it('preserves snapshot capture time in live progress, persisted replay and eviction recovery', () => {
+    const eventQueries = createMemoryEventQueries();
+    const broadcasts: StoredEvent[] = [];
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    const recorder = createRecorder(eventQueries, broadcasts);
+    recorder.onProgress('environment_snapshot', 'Using environment snapshot');
+    recorder.onProgress('environment_snapshot', 'Using environment snapshot', capturedAt);
+    expect(JSON.parse(broadcasts.at(-1)?.payload ?? '{}')).toMatchObject({
+      action: 'step_progress',
+      snapshotCapturedAt: capturedAt,
+    });
+    const resumed = createRecorder(eventQueries, broadcasts);
+    const broadcastCount = broadcasts.length;
+    resumed.onProgress('environment_snapshot', 'Using environment snapshot', capturedAt);
+    expect(broadcasts).toHaveLength(broadcastCount);
+    resumed.onProgress(
+      'environment_snapshot',
+      'Using environment snapshot; a replacement build is running'
+    );
+    resumed.onProgress('sandbox_boot', 'Starting sandbox');
+    resumed.finalize({ status: 'completed' });
+    expect(readPreparationSteps(eventQueries, 'attempt-1')[0]).toMatchObject({
+      status: 'completed',
+      snapshotCapturedAt: capturedAt,
+    });
+    expect(readPreparationSteps(eventQueries, 'attempt-1')[1]).not.toHaveProperty(
+      'snapshotCapturedAt'
+    );
+  });
+
   it('starts the attempt on first progress and tracks step transitions', () => {
     const eventQueries = createMemoryEventQueries();
     const broadcasts: StoredEvent[] = [];

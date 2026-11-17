@@ -158,6 +158,13 @@ export function changedDependencyWorkspaces(before, after) {
     'overrides',
     'packageExtensions',
     'patchedDependencies',
+    // The release-age policy decides which version a fresh resolution may take,
+    // never what the lockfile pins, and CI installs with a frozen lockfile: a
+    // change to it alone cannot move any installed tree. The workspace tests
+    // that read this file as data still run, through the detector's
+    // `test_only_*` selection.
+    'minimumReleaseAge',
+    'minimumReleaseAgeExclude',
   ];
   if (
     !isDeepStrictEqual(

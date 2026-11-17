@@ -43,10 +43,12 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
   }): Promise<boolean> | boolean;
   /**
-   * Authorization gate for bot actions that can change code. Runs after the
-   * account is resolved and before any bot request is created. GitHub checks
-   * that the triggering account can write to the conversation's repository.
-   * Platforms without this hook allow every message.
+   * Conversation-level authorization gate for bot actions that can change
+   * code. Runs after the account is resolved and before any bot request is
+   * created. Only GitHub-triggered actions check the actor's write access to
+   * the conversation's repository. Chat integrations authorize GitHub repositories
+   * and GitLab projects through the organization's connection, without requiring
+   * a personal provider identity. Platforms without this hook allow every message.
    */
   authorizeBotActions?(params: {
     thread: Thread;

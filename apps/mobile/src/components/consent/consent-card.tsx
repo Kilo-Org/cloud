@@ -1,13 +1,12 @@
-import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
-import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components/ui/icons';
+import { LineChart, Shield } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConsentRow } from '@/components/consent/consent-row';
+import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,6 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
-import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -73,28 +71,37 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
+  // The catalogue key, not the copy: the card translates it at render, so the
+  // line follows an applied language instead of keeping the words of the
+  // language the action failed under.
   const [error, setError] = useState<string | null>(null);
-  // Onboarding pre-selects optional telemetry. Review mode starts off and the
-  // stored value loads over it, so a stored decline never flashes as on.
+  // Onboarding pre-selects optional telemetry; review mode starts off. The
+  // stored value loads over either default, so a stored decline never flashes
+  // as on.
   const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
-  // Review mode must not present a switch state before the stored value has
-  // loaded: the pre-load OFF looked like a completed revoke in the b911 vr5
+  // The switch must not present a state before the stored value has loaded: in
+  // review mode the pre-load OFF looked like a completed revoke in the b911 vr5
   // e3 evidence (e3-toggled-off.png showed the switch off while the realm was
-  // still consented — no toggle had landed). Until loaded, the switch slot
-  // holds a same-size placeholder, so the card never claims a choice the
-  // user has not made and a tap cannot flip the wrong way. With no userId
-  // there is nothing to load: the switch renders as before and its toggle
-  // path shows the account error.
-  const [storedValueLoaded, setStoredValueLoaded] = useState(mode !== 'review');
-  const optionalControlPending = mode === 'review' && userId !== undefined && !storedValueLoaded;
+  // still consented — no toggle had landed), and onboarding needs the read
+  // because an older consent record carries the choice it must start from.
+  // Until loaded, the switch slot holds a same-size placeholder, so the card
+  // never claims a choice the user has not made and a tap cannot flip the wrong
+  // way. With no userId there is nothing to load: the switch renders as before
+  // and its toggle path shows the account error.
+  const [storedValueLoaded, setStoredValueLoaded] = useState(false);
+  const optionalControlPending = userId !== undefined && !storedValueLoaded;
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
 
-  // Load the stored optional value in review mode only.  The active flag
-  // stops a late resolve from overwriting a value the user just toggled.
+  // Load the stored optional value. Review mode shows the accepted choice; a
+  // record from an older consent version re-opens onboarding, and its choice is
+  // what the switch must show, because an updated disclosure must never
+  // re-enable analytics for someone who turned it off. With nothing to carry,
+  // onboarding keeps its on-by-default. The active flag stops a late resolve
+  // from overwriting a value the user just toggled.
   useEffect(() => {
-    if (mode !== 'review' || !userId || loadedRef.current) {
+    if (!userId || loadedRef.current) {
       return undefined;
     }
     let active = true;
@@ -104,7 +111,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       stored => {
         if (active) {
           if (!userToggledRef.current) {
-            setOptionalToggle(stored.optional);
+            setOptionalToggle(
+              mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
+            );
             loadedRef.current = true;
           }
           setStoredValueLoaded(true);
@@ -115,14 +124,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           // The error names the unreliability, so the switch may show its
           // default; the placeholder only covers the silent loading window.
           setStoredValueLoaded(true);
-          setError(t('consent.couldNotLoadConsentSettings'));
+          setError('consent.couldNotLoadConsentSettings');
         }
       }
     );
     return () => {
       active = false;
     };
-  }, [mode, userId, t]);
+  }, [mode, userId]);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -131,7 +140,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     }
 
     if (!userId) {
-      setError(t('consent.couldNotLoadAccount'));
+      setError('consent.couldNotLoadAccount');
       return;
     }
 
@@ -141,7 +150,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       await acceptConsent(userId, optionalToggle);
       router.replace('/(app)/(tabs)' as Href);
     } catch {
-      setError(t('consent.couldNotSaveConsent'));
+      setError('consent.couldNotSaveConsent');
       setPendingAction(null);
     }
   };
@@ -152,7 +161,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
     if (mode === 'review') {
       if (!userId) {
-        setError(t('consent.couldNotLoadAccount'));
+        setError('consent.couldNotLoadAccount');
         setPendingAction(null);
         return;
       }
@@ -160,7 +169,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       try {
         await revokeConsent(userId);
       } catch {
-        setError(t('consent.couldNotRevokeConsent'));
+        setError('consent.couldNotRevokeConsent');
         setPendingAction(null);
         return;
       }
@@ -169,9 +178,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     try {
       await signOut();
     } catch {
-      setError(
-        mode === 'review' ? t('consent.revokedSignOutFailed') : t('consent.couldNotSignOut')
-      );
+      setError(mode === 'review' ? 'consent.revokedSignOutFailed' : 'consent.couldNotSignOut');
       setPendingAction(null);
     }
   };
@@ -191,7 +198,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
 
   const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+    router.push({ pathname: '/(app)/legal/[document]', params: { document: 'privacy' } });
   };
 
   const handleToggleOptional = useCallback(
@@ -210,16 +217,21 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           },
           () => {
             setOptionalToggle(!next);
-            setError(t('consent.couldNotSaveChoice'));
+            setError('consent.couldNotSaveChoice');
             setSavingOptional(false);
           }
         );
       } else if (mode === 'review') {
         setOptionalToggle(!next);
-        setError(t('consent.couldNotLoadAccount'));
+        setError('consent.couldNotLoadAccount');
+      } else {
+        // Onboarding: the switch is the user's own answer. The stored read can
+        // still land later — the account id may resolve after this render — and
+        // it must not overwrite a choice the user already made.
+        userToggledRef.current = true;
       }
     },
-    [mode, userId, t]
+    [mode, userId]
   );
 
   return (
@@ -253,23 +265,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             {t('consent.required')}
           </Text>
 
-          <View className="mt-3 gap-5">
-            <ConsentRow
-              icon={MessageSquare}
-              title={t('consent.promptsTitle')}
-              description={t('consent.promptsDescription')}
-            />
-            <ConsentRow
-              icon={User}
-              title={t('consent.accountTitle')}
-              description={t('consent.accountDescription')}
-            />
-            <ConsentRow
-              icon={Smartphone}
-              title={t('consent.diagnosticsTitle')}
-              description={t('consent.diagnosticsDescription')}
-            />
-          </View>
+          <ConsentRequiredRows />
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
             {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
@@ -345,7 +341,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error} className="text-sm" />
+          <AccessibleStatus message={error ? t(error) : null} className="text-sm" />
         </View>
         <Button
           onPress={() => {
@@ -353,7 +349,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           }}
           size="lg"
           accessibilityLabel={actions.primaryLabel}
-          disabled={pendingAction === 'secondary'}
+          // Accepting before the stored (or carried) choice has loaded would
+          // write the default over a decision the user already made.
+          disabled={pendingAction === 'secondary' || optionalControlPending}
           loading={pendingAction === 'primary'}
         >
           <Text>{actions.primaryLabel}</Text>

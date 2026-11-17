@@ -4,15 +4,14 @@ import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import pLimit from 'p-limit';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
   createdOnPlatformForFilter,
-  sidebarFolderListInput,
   sidebarListInput,
+  sidebarWorkspaceListInput,
   workspaceFoldersQueryKey,
-  worktreeDetailsBatches,
+  sidebarWorktreeDetailsBatches,
 } from '../hooks/sidebar-queries';
 import { DEFAULT_SIDEBAR_PREFERENCES } from '../sidebar-preferences';
 import type { SidebarPreferences } from '../sidebar-preferences';
@@ -69,7 +68,7 @@ async function prefetchSidebar(
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   };
   const foldersOptions = trpc.workspaceFolders.list.queryOptions({ organizationId });
-  const [list, folders] = await Promise.all([
+  const [list, , workspaceList] = await Promise.all([
     queryClient.query(
       trpc.cliSessionsV2.list.queryOptions(sidebarListInput({ updatedSince, ...filters }))
     ),
@@ -77,33 +76,28 @@ async function prefetchSidebar(
       ...foldersOptions,
       queryKey: workspaceFoldersQueryKey(foldersOptions.queryKey, userId),
     }),
-  ]);
-  const folderWorktreeIds = new Set(folders.folders.flatMap(folder => folder.worktreeIds));
-  const limit = pLimit(4);
-  const folderLists = await Promise.all(
-    [...folderWorktreeIds].flatMap(id => {
-      const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
-      if (!parsed.success) return [];
-      return [
-        limit(() => {
-          if (Date.now() >= deadlineAt) return undefined;
-          return queryClient.query(
-            trpc.cliSessionsV2.list.queryOptions(sidebarFolderListInput(parsed.data, filters))
-          );
-        }),
-      ];
-    })
-  );
-  const sessions = [list, ...folderLists].flatMap(result => result?.cliSessions ?? []);
-  await Promise.all(
-    worktreeDetailsBatches(sessions.map(session => session.cloud_agent_worktree_id)).map(
-      worktreeIds =>
-        limit(() => {
-          if (Date.now() >= deadlineAt) return;
-          return queryClient
-            .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
-            .catch(() => undefined);
+    queryClient
+      .fetchInfiniteQuery(
+        trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(sidebarWorkspaceListInput(filters), {
+          getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
         })
+      )
+      .catch(() => undefined),
+    queryClient.query(trpc.cloudAgentSettings.getWorkspaceOrder.queryOptions()),
+  ]);
+  const limit = pLimit(4);
+  const sessions = list?.cliSessions ?? [];
+  await Promise.all(
+    sidebarWorktreeDetailsBatches(
+      sessions.map(session => session.cloud_agent_worktree_id),
+      workspaceList?.pages.flatMap(page => page.workspaces) ?? []
+    ).map(worktreeIds =>
+      limit(() => {
+        if (Date.now() >= deadlineAt) return;
+        return queryClient
+          .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
+          .catch(() => undefined);
+      })
     )
   );
 }

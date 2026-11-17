@@ -130,7 +130,7 @@ describe('target builders', () => {
   test('organizationTarget/userTarget/serviceTarget use a <type>:<id> reference', () => {
     expect(organizationTarget('org-1')).toBe('organization:org-1');
     expect(userTarget('user-1')).toBe('user:user-1');
-    expect(serviceTarget('wasteland')).toBe('service:wasteland');
+    expect(serviceTarget('cloud-agent')).toBe('service:cloud-agent');
     expect(UNSCOPED_TARGET).toBe('*');
   });
 
@@ -203,6 +203,7 @@ describe('kilo admin elevation telemetry', () => {
       supportGrantId: null,
       supportActionId: null,
       inventoryId: null,
+      supportInheritedFromOrganizationId: null,
       issuanceId: null,
     });
   });
@@ -243,6 +244,56 @@ describe('kilo admin elevation telemetry', () => {
     expect(events[0]).toMatchObject({ surface: 'rest', tokenSource: 'cloud-agent' });
   });
 
+  test('a tRPC context and a request derive the same credential kind', async () => {
+    const user = defineTestUser({ is_admin: true });
+    const params = { reason: 'organization_access' as const, target: organizationTarget('org-1') };
+
+    // A hand-rolled context that sets the procedure path but no boundary-derived
+    // credential must not attribute the credential differently from the same
+    // request arriving through headers.
+    await recordKiloAdminElevation(
+      {
+        user,
+        authViaToken: true,
+        internalApiUse: true,
+        trpcPath: 'organizations.getSettings',
+        ip: null,
+      },
+      params
+    );
+    await recordKiloAdminElevationForRequest({
+      user,
+      internalApiUse: true,
+      headersList: new Headers({ authorization: 'Bearer test' }),
+      ...params,
+    });
+    await recordKiloAdminElevation(
+      {
+        user,
+        authViaToken: true,
+        delegatedWorkload: true,
+        trpcPath: 'organizations.getSettings',
+        ip: null,
+      },
+      params
+    );
+    await recordKiloAdminElevationForRequest({
+      user,
+      delegatedWorkload: true,
+      headersList: new Headers({ authorization: 'Bearer test' }),
+      ...params,
+    });
+
+    expect(
+      events.filter(event => event.kind === 'kilo_admin_elevation').map(event => event.credential)
+    ).toEqual([
+      'service_assertion',
+      'service_assertion',
+      'delegated_workload',
+      'delegated_workload',
+    ]);
+  });
+
   test('elevateViaKiloAdmin returns the grant and emits exactly one event', async () => {
     const granted = await elevateViaKiloAdmin(ctxFor(), {
       reason: 'organization_access',
@@ -277,7 +328,7 @@ describe('kilo admin elevation telemetry', () => {
     await recordKiloAdminElevationForRequest({
       user: defineTestUser({ is_admin: true, is_super_admin: true }),
       reason: 'service_token_mint',
-      target: serviceTarget('wasteland'),
+      target: serviceTarget('cloud-agent'),
     });
 
     expect(events).toHaveLength(1);
@@ -290,7 +341,7 @@ describe('kilo admin elevation telemetry', () => {
       method: null,
       ip: null,
       reason: 'service_token_mint',
-      target: 'service:wasteland',
+      target: 'service:cloud-agent',
     });
   });
 

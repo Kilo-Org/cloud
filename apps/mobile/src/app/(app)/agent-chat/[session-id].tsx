@@ -1,5 +1,5 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -23,24 +23,20 @@ import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
-import { performCopy } from '@/components/agents/use-message-copy';
+import { SessionPermanentError } from '@/components/agents/session-permanent-error';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { CenteredState } from '@/components/centered-state';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
+import { useRestoredRouteOpen } from '@/lib/hooks/use-restored-route-open';
+import { useSessionRouteBack } from '@/lib/navigation/session-route-back';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import {
-  shouldRetryNotFoundOnSpawnedRoute,
-  shouldRetryNotFoundOnYoungRoute,
-} from '@/lib/spawned-not-found-retry';
+import { shouldRetrySessionNotFound } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
@@ -48,7 +44,7 @@ export default function SessionDetailScreen() {
   const confirmation = useIdentityConfirmation();
   const {
     'session-id': rawSessionId,
-    organizationId: routeOrganizationId,
+    organizationId: rawOrganizationId,
     via,
     spawned,
     cloned,
@@ -91,37 +87,36 @@ export default function SessionDetailScreen() {
   // or a `string[]`, both of which parseParam rejects. Optional params keep
   // the existing first-element unwrapping below.
   const sessionId = parseParam(rawSessionId);
-  // Param can be string | string[] depending on how the route was opened.
+  // Param can be string | string[] depending on how the route was opened. The
+  // organization decides which procedures every request below uses, and those
+  // validate it as a UUID: a hand-built link (or a navigation that lost the
+  // param) must read as "no route scope" so the metadata read resolves the real
+  // one, instead of failing every org-scoped request with a permanent 400.
+  const routeOrganizationId = parseOrganizationScope(rawOrganizationId);
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const resumeAt = parseResumeAnchor(resumeAtRaw);
+  // Whether the relaunch repair opened this destination. It is keyed on the
+  // destination this screen renders, never on the focused route's pathname: a
+  // sheet or a share gate in front of this screen must not answer for it.
+  const restoredOpen = useRestoredRouteOpen(
+    sessionId === null ? '' : `/(app)/agent-chat/${sessionId}`
+  );
   const trpc = useTRPC();
-  const router = useRouter();
   const { t } = useTranslation();
+  // System Back answers the way the header's back control does: it pops the
+  // route the person came from, and it never leaves the app while this screen
+  // is open.
+  useSessionRouteBack();
   // The open's clock starts at route mount — before the metadata query and
   // the transcript screen — so the slow-load threshold measures from when
   // the user tapped, not from when SessionDetailContent happens to mount.
   // Keyed on the session id: a reused route instance opening a different
   // session restarts the clock.
-  //
-  // `beganOnRestoredIdentity` records whether the persisted identity hint
-  // scoped this open: credentials restored from storage, with the live
-  // account still unconfirmed. A pending fresh sign-in also has no live id,
-  // but it carries no hint scope, so it is not this case. Captured here
-  // because the live `getMe` confirms seconds later, after which the resolved
-  // scope can no longer tell the hint's scope from the live one.
-  const openStart = useRef({
-    sessionId: rawSessionId,
-    startedAt: Date.now(),
-    beganOnRestoredIdentity: owner.userId === null && owner.restored,
-  });
+  const openStart = useRef({ sessionId: rawSessionId, startedAt: Date.now() });
   if (openStart.current.sessionId !== rawSessionId) {
-    openStart.current = {
-      sessionId: rawSessionId,
-      startedAt: Date.now(),
-      beganOnRestoredIdentity: owner.userId === null && owner.restored,
-    };
+    openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
   }
   const sessionRendered = useRef<string | null>(null);
   if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
@@ -156,25 +151,19 @@ export default function SessionDetailScreen() {
         { session_id: sessionId ?? '' },
         {
           retry: (failureCount, error) => {
-            // The restored-scope path must not get the young-route retry: its
-            // terminal retirement (the hint's transcript retires the moment the
-            // live account is denied) is a deliberate account-boundary signal,
-            // and delaying it for 8s would leave the hint's scope on screen.
-            // The skip is scoped to the OPEN that began on the restored
-            // identity, not to the resolved id: after the live confirmation a
-            // cold-start-restored process resolves a non-null id, and every
-            // later open on that confirmed owner must still get the retry.
+            // One predicate answers for every open: a `NOT_FOUND` repeats
+            // within the shared 8×1s budget, whichever screen or link started
+            // the open, including an open that began on the identity restored
+            // from storage. The account boundary stays immediate because an
+            // access denial is `UNAUTHORIZED`/`FORBIDDEN`, which the predicate
+            // never retries.
             const errorCode =
               (error as { data?: { code?: string } } | null)?.data?.code ??
               (error as { code?: string } | null)?.code;
-            return (
-              shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
-              (!openStart.current.beganOnRestoredIdentity &&
-                shouldRetryNotFoundOnYoungRoute({
-                  attempt: failureCount,
-                  errorCode,
-                }))
-            );
+            return shouldRetrySessionNotFound({
+              attempt: failureCount,
+              errorCode,
+            });
           },
           // kilocode_change - C3b: TanStack Query's default retryDelay is
           // exponential backoff (1s, 2s, 4s, 8s, ... capped at 30s), which
@@ -182,10 +171,9 @@ export default function SessionDetailScreen() {
           // generous" budget the spawned-row window actually needs. Pin a
           // flat 1s cadence so 8 attempts stay close to 8 seconds elapsed,
           // matching the plan's stated timing. Only in effect while a retry is
-          // allowed at all (the `spawned=1` NOT_FOUND path, or the young-route
-          // NOT_FOUND path when the scope is not a restored identity) —
-          // everywhere else `retry` already returns `false` on the first
-          // failure, so this delay is never consulted.
+          // allowed at all (a `NOT_FOUND` within the budget) — every other code
+          // returns `false` on the first failure, so this delay is never
+          // consulted.
           retryDelay: 1000,
         }
       ),
@@ -336,7 +324,9 @@ export default function SessionDetailScreen() {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) and an id the store cannot address
     // can't be recovered by retrying, so they show a permanent state with no
-    // Retry. All of them get Back and Copy.
+    // Retry. All of them get Back and Copy. A NOT_FOUND reaches this branch only
+    // after the open spent its whole retry budget, so the read had its chance to
+    // settle before the answer became final.
     displayedProviderKey.current = null;
     // An identity failure owns its own copy. An id the store cannot address
     // never reached a read, so it answers the same denial a missing session
@@ -380,41 +370,15 @@ export default function SessionDetailScreen() {
           backFallback={AGENTS_SESSIONS_HREF}
           className="pb-1"
         />
-        <CenteredState>
-          <View className="items-center gap-3 px-6">
-            <QueryError
-              variant={variant}
-              placement="top"
-              className="px-0 pt-0"
-              title={title}
-              message={message}
-              onRetry={notFound || unauthorized ? undefined : retry}
-              isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
-            />
-            <View className="flex-row gap-3">
-              <Button
-                variant="ghost"
-                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-                onPress={() => {
-                  void performCopy(copyText);
-                }}
-              >
-                <Text>{t('common.copy')}</Text>
-              </Button>
-              <Button
-                variant="ghost"
-                onPress={() => {
-                  // POP_TO reuses the `(tabs)` route under this screen and
-                  // truncates every `agent-chat` route above it, so a composer
-                  // still on the stack under a missing session is gone with it.
-                  router.dismissTo(AGENTS_SESSIONS_HREF);
-                }}
-              >
-                <Text>{t('agentChat.session.backToSessions')}</Text>
-              </Button>
-            </View>
-          </View>
-        </CenteredState>
+        <SessionPermanentError
+          variant={variant}
+          title={title}
+          message={message}
+          retry={notFound || unauthorized ? undefined : retry}
+          isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
+          copyText={copyText}
+          restoredRouteOpen={restoredOpen && (notFound || unauthorized)}
+        />
       </View>
     );
   }

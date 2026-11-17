@@ -388,6 +388,26 @@ describe('requirePrivilegedActor', () => {
     ).rejects.toMatchObject({ message: 'API request log export access required' });
   });
 
+  it('refuses an actor whose block timestamp is set', async () => {
+    const user = await insertTestUser({ is_admin: true });
+    createdUserIds.push(user.id);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, user.id));
+
+    await expect(assertPrivilegedPermission('admin', { user })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Admin access required',
+    });
+    await expect(
+      requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'platform_read' },
+        contextFor(user)
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
   it('refuses a session whose pepper was rotated', async () => {
     const { user } = await setup();
 

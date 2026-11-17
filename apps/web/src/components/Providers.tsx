@@ -3,8 +3,6 @@
 import { Toaster } from '@/components/ui/sonner';
 import { ConfirmProvider } from '@/components/ui/confirm';
 import { TRPCContext } from '@/lib/trpc/client';
-import { GastownTRPCProvider, createGastownTRPCClient } from '@/lib/gastown/trpc';
-import { WastelandTRPCProvider, createWastelandTRPCClient } from '@/lib/wasteland/trpc';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
 import type { PropsWithChildren } from 'react';
@@ -31,23 +29,17 @@ export function Providers({
         },
       })
   );
-  const [gastownClient] = useState(() => createGastownTRPCClient());
-  const [wastelandClient] = useState(() => createWastelandTRPCClient());
 
   return (
     <>
       <QueryClientProvider client={queryClient}>
         <TRPCContext>
-          <GastownTRPCProvider trpcClient={gastownClient} queryClient={queryClient}>
-            <WastelandTRPCProvider trpcClient={wastelandClient} queryClient={queryClient}>
-              <SessionProvider>
-                <AdminStepUpRoot enabled={stepUpEnabled}>
-                  <SignInHintEmailSyncer />
-                  <ConfirmProvider>{children}</ConfirmProvider>
-                </AdminStepUpRoot>
-              </SessionProvider>
-            </WastelandTRPCProvider>
-          </GastownTRPCProvider>
+          <SessionProvider>
+            <AdminStepUpRoot enabled={stepUpEnabled}>
+              <SignInHintEmailSyncer />
+              <ConfirmProvider>{children}</ConfirmProvider>
+            </AdminStepUpRoot>
+          </SessionProvider>
         </TRPCContext>
       </QueryClientProvider>
 

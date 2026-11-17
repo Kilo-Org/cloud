@@ -232,6 +232,66 @@ describe('event-service WebSocket connection tickets', () => {
     expect(workerEntry).not.toHaveProperty('TICKET_MINT_BUDGET_MS');
   });
 
+  it('answers the retryable status when the platform drops the mint hop', async () => {
+    // A cold unique object (the first use of every ticket id) can be answered
+    // with a transient platform failure. The mint did not run, so a retry can
+    // still succeed and the client's reconnect must not be told the mint is
+    // broken.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? ({
+            mint: async () => {
+              throw new Error('Durable Object is overloaded. Too much data queued.');
+            },
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+        : realGet(id, options)
+    );
+    const token = await chatToken('user-ticket-transient-mint');
+    let res: Response;
+    try {
+      res = await SELF.fetch('https://events.test/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } finally {
+      get.mockRestore();
+    }
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+  });
+
+  it('answers 500 when the object itself rejects the mint', async () => {
+    // The object answered, so the failure is not transient: reporting it as
+    // retryable would hide a real defect behind an infinite reconnect loop.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? ({
+            mint: async () => {
+              throw new Error('Connection ticket storage is corrupt');
+            },
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+        : realGet(id, options)
+    );
+    const token = await chatToken('user-ticket-rejected-mint');
+    let res: Response;
+    try {
+      res = await SELF.fetch('https://events.test/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } finally {
+      get.mockRestore();
+    }
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+  });
+
   it('answers the retryable mint failure when the auth read never settles', async () => {
     // Stall the first unbounded hop: authenticateToken reads the signing
     // secret before it verifies the bearer, so a secret read that never
@@ -247,7 +307,9 @@ describe('event-service WebSocket connection tickets', () => {
     });
 
     const elapsed = Date.now() - startedAt;
-    expect(res.status).toBe(500);
+    // A stalled hop is not a fault here, so the route answers the retryable
+    // status the client's reconnect-and-retry path already handles.
+    expect(res.status).toBe(503);
     await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
     // It waited for the budget rather than returning early, and stayed inside
     // the client's deadline, so the client never sees the gateway's 504.

@@ -82,10 +82,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: 'gray' }),
 }));
 
-vi.mock('@/lib/organization-invoice-download', () => ({
+vi.mock('@/lib/invoice-download', () => ({
   selectInvoiceRowState: () => 'no-affordance',
   getInvoiceDownloadErrorMessage: String,
-  shareOrganizationInvoicePdf: vi.fn(),
+  shareInvoicePdf: vi.fn(),
 }));
 
 vi.mock('sonner-native', () => ({
@@ -94,7 +94,7 @@ vi.mock('sonner-native', () => ({
 
 vi.mock('@/lib/format', () => ({
   formatDate: String,
-  formatMoneyFromCents: (amount: number) => `$${amount / 100}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -146,6 +146,9 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The pull control reaches the reduced-motion policy, which loads expo-battery;
+// the list's states are what this suite drives, not the gesture's indicator.
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',

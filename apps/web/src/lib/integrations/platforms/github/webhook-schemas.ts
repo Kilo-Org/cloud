@@ -129,6 +129,22 @@ export const GitHubRepositorySchema = z.object({
   }),
 });
 
+/**
+ * GitHub's stack metadata on a pull request. Every numeric member is nullable
+ * and optional: the field is present only while the pull request belongs to a
+ * stack, and external payloads have been observed with a `stack` object whose
+ * members are null. A malformed/absent stack must not reject the whole webhook,
+ * because the PR state, review decision and session verification in the same
+ * delivery are still useful.
+ */
+export const GitHubStackSchema = z
+  .object({
+    number: z.number().nullable().optional(),
+    position: z.number().nullable().optional(),
+    size: z.number().nullable().optional(),
+  })
+  .passthrough();
+
 export const PullRequestPayloadSchema = z.object({
   action: z.string(),
   pull_request: z.object({
@@ -173,12 +189,16 @@ export const PullRequestPayloadSchema = z.object({
       sha: z.string(),
       ref: z.string(),
     }),
+    // Stack membership accompanies lifecycle events while the PR is stacked.
+    stack: GitHubStackSchema.nullable().optional(),
   }),
   repository: GitHubRepositorySchema,
   installation: z.object({
     id: z.number(),
   }),
   sender: GitHubSenderSchema.optional(),
+  // The `stacked` action carries the stack at the payload's top level.
+  stack: GitHubStackSchema.nullable().optional(),
 });
 
 // GitHub author_association values from webhook payloads

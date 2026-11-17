@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type PendingQuestion } from '@/lib/native-remote/projections';
+import { type NativePendingQuestion } from '@kilocode/cloud-agent-sdk';
 
-type QuestionField = PendingQuestion['fields'][number];
+type QuestionField = NativePendingQuestion['fields'][number];
 
 export function NativeRemoteQuestion({
   question,
@@ -14,7 +14,7 @@ export function NativeRemoteQuestion({
   reply,
   reject,
 }: {
-  question: PendingQuestion;
+  question: NativePendingQuestion;
   disabled: boolean;
   reply: (answers: string[][]) => void;
   reject: () => void;

@@ -1,4 +1,3 @@
-import { setTimeout as delay } from 'node:timers/promises';
 import * as z from 'zod';
 import { DECIDER_CASES, FRONTIER_CASES } from '../datasets/decider-cases';
 import type { OfflineSweep } from './schema';
@@ -60,6 +59,7 @@ export async function readSweepCompletion(
   let data: string[] = [];
   let output = '';
   let costUsd: number | null = null;
+  let byok = false;
   let ttftMs: number | null = null;
   let tokenUsage: SweepTokenUsage | undefined;
   let done = false;
@@ -88,12 +88,25 @@ export async function readSweepCompletion(
       output += delta.content ?? '';
     }
     if (chunk.usage) {
-      // With BYOK, `cost` is only OpenRouter's fee; the provider bills the upstream inference cost.
-      const billed =
-        chunk.usage.is_byok === true
-          ? chunk.usage.cost_details?.upstream_inference_cost
-          : chunk.usage.cost;
-      if (billed != null) costUsd = billed;
+      const usage = chunk.usage;
+      const upstream = usage.cost_details?.upstream_inference_cost;
+      const billingFrame =
+        Object.hasOwn(usage, 'cost') ||
+        (usage.cost_details != null &&
+          Object.hasOwn(usage.cost_details, 'upstream_inference_cost'));
+      // BYOK bills the router fee and provider usage separately. Billing frames
+      // are cumulative receipts, so do not sum frames or combine partial receipts.
+      const wasByok = byok;
+      if (usage.is_byok === true) byok = true;
+      if (byok) {
+        if (billingFrame) {
+          costUsd = usage.cost != null && upstream != null ? usage.cost + upstream : null;
+        } else if (!wasByok) {
+          costUsd = null;
+        }
+      } else if (billingFrame) {
+        costUsd = usage.cost ?? null;
+      }
     }
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
       tokenUsage = {
@@ -162,68 +175,59 @@ export async function requestDirectSweepCompletion(input: {
     usage: { include: true },
   });
   const started = performance.now();
-  let error: string | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (!input.budgetAvailable() || (input.beforeRequest && !(await input.beforeRequest()))) {
-      error ??= 'Sweep budget exhausted before request';
-      break;
-    }
-    let retry = false;
-    let completed: DirectSweepCompletion | null = null;
-    try {
-      const response = await (input.fetchImpl ?? fetch)(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-          method: 'POST',
-          headers: {
-            ...input.attributionHeaders,
-            Authorization: `Bearer ${input.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body,
-          signal: AbortSignal.timeout(170_000),
-        }
-      );
-      if (!response.ok) {
-        await response.body?.cancel();
-        error = `OpenRouter returned HTTP ${response.status}`;
-        retry = response.status === 429 || response.status >= 500;
-      } else {
-        const result = await readSweepCompletion(response, started);
-        completed = {
-          ...result,
-          latencyMs: performance.now() - started,
-          error:
-            result.output.length === 0
-              ? 'OpenRouter response is missing answer content'
-              : result.costUsd === null
-                ? 'usage_missing'
-                : null,
-        };
-      }
-    } catch {
-      error = 'OpenRouter transport or body read failed';
-      retry = true;
-    }
-    const outcome = completed ?? {
+  if (!input.budgetAvailable() || (input.beforeRequest && !(await input.beforeRequest()))) {
+    return {
       output: null,
       costUsd: null,
       ttftMs: null,
       latencyMs: performance.now() - started,
-      error,
+      error: 'Sweep budget exhausted before request',
     };
-    input.onAttemptComplete?.(outcome);
-    if (completed) return completed;
-    if (!retry || attempt === 2) break;
-    await delay(1_000 * 2 ** attempt);
   }
-  return {
+  let error: string | null = null;
+  let completed: DirectSweepCompletion | null = null;
+  try {
+    const response = await (input.fetchImpl ?? fetch)(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          ...input.attributionHeaders,
+          Authorization: `Bearer ${input.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: AbortSignal.timeout(170_000),
+      }
+    );
+    if (!response.ok) {
+      await response.body?.cancel();
+      error = `OpenRouter returned HTTP ${response.status}`;
+    } else {
+      const result = await readSweepCompletion(response, started);
+      completed = {
+        ...result,
+        latencyMs: performance.now() - started,
+        error:
+          result.output.length === 0
+            ? 'OpenRouter response is missing answer content'
+            : result.costUsd === null
+              ? 'usage_missing'
+              : null,
+      };
+    }
+  } catch {
+    error = 'OpenRouter transport or body read failed';
+  }
+  const outcome = completed ?? {
     output: null,
     costUsd: null,
     ttftMs: null,
     latencyMs: performance.now() - started,
     error,
   };
+  input.onAttemptComplete?.(outcome);
+  return outcome;
 }
 
 const timedEventSchema = z.object({

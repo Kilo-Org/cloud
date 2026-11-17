@@ -221,22 +221,31 @@ async function readUntracked(
   }
 }
 
+export type WorktreeCaptureGitEnvironment = {
+  /** The prepared per-worktree environment (HOME + credential helper + profile). */
+  env?: NodeJS.ProcessEnv;
+  /** Managed host arguments, e.g. GitHub proactive auth for lazy fetches. */
+  configArgs?: readonly string[];
+};
+
 export async function collectWorktreeChanges(
   directory: string,
   request: SessionGitSummaryPayload,
   runGit: typeof git = git,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  gitEnvironment?: WorktreeCaptureGitEnvironment
 ): Promise<SessionGitSummaryResult> {
-  return (await collectWorktree(directory, request, runGit, false, signal)).summary;
+  return (await collectWorktree(directory, request, runGit, false, signal, gitEnvironment)).summary;
 }
 
 export async function collectWorktreeSnapshot(
   directory: string,
   request: SessionGitSnapshotPayload,
   runGit: typeof git = git,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  gitEnvironment?: WorktreeCaptureGitEnvironment
 ): Promise<SessionGitSnapshotResult> {
-  return collectWorktree(directory, request, runGit, true, signal);
+  return collectWorktree(directory, request, runGit, true, signal, gitEnvironment);
 }
 
 async function collectWorktree(
@@ -244,7 +253,8 @@ async function collectWorktree(
   request: SessionGitSummaryPayload,
   runGit: typeof git,
   includeFiles: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  gitEnvironment?: WorktreeCaptureGitEnvironment
 ): Promise<SessionGitSnapshotResult> {
   const controller = new AbortController();
   const captureSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
@@ -269,6 +279,21 @@ async function collectWorktree(
     remainingTime();
     const payload = sessionGitSummaryPayloadSchema.parse(request);
     const root = await realpath(directory);
+    const preparedEnvironment = gitEnvironment?.env;
+    const captureEnvironment: NodeJS.ProcessEnv = {
+      ...(preparedEnvironment ?? {}),
+      PATH: preparedEnvironment?.PATH ?? process.env.PATH,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_NO_REPLACE_OBJECTS: '1',
+      GIT_LITERAL_PATHSPECS: '1',
+    };
+    // A blobless clone may lazily fetch a missing object during a diff; that
+    // request must use the prepared credential environment, so lazy fetching is
+    // only disabled for the bare environment used by unit tests.
+    if (preparedEnvironment === undefined) captureEnvironment.GIT_NO_LAZY_FETCH = '1';
+    else delete captureEnvironment.GIT_NO_LAZY_FETCH;
     async function execute(
       args: string[],
       options: {
@@ -294,6 +319,7 @@ async function collectWorktree(
           'diff.autoRefreshIndex=false',
           '-c',
           'diff.suppressBlankEmpty=false',
+          ...(gitEnvironment?.configArgs ?? []),
           ...(options.rawInput
             ? ['-c', 'core.autocrlf=false', '-c', 'core.attributesFile=/dev/null']
             : []),
@@ -304,13 +330,7 @@ async function collectWorktree(
           stdinFd: options.stdinFd,
           inheritEnv: false,
           env: {
-            PATH: process.env.PATH,
-            GIT_CONFIG_NOSYSTEM: '1',
-            GIT_CONFIG_GLOBAL: '/dev/null',
-            GIT_TERMINAL_PROMPT: '0',
-            GIT_NO_LAZY_FETCH: '1',
-            GIT_NO_REPLACE_OBJECTS: '1',
-            GIT_LITERAL_PATHSPECS: '1',
+            ...captureEnvironment,
             GIT_GLOB_PATHSPECS: undefined,
             GIT_NOGLOB_PATHSPECS: undefined,
             GIT_ICASE_PATHSPECS: undefined,

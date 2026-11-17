@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import type { AgentWorkflow, AgentWorkflowParam } from '@/src/shared/agent-workflows';
+import { formatLocalListDate } from './format-local-date';
 
 export type WorkflowSettingsView =
   | { kind: 'loading' }
@@ -21,6 +22,7 @@ export interface WorkflowSettingsListItem {
 export interface WorkflowRunDisabledReason {
   reason: 'notApproved' | 'safeModeDisabled' | 'conversationRunning';
   label: string;
+  hint: string;
 }
 
 export interface WorkflowRunRequest {
@@ -34,11 +36,8 @@ const sortByUpdatedAtDesc = <TItem extends { updatedAt: number }>(
   items: readonly TItem[]
 ): TItem[] => [...items].toSorted((left, right) => right.updatedAt - left.updatedAt);
 
-export const formatWorkflowListDate = (updatedAt: number): string =>
-  new Date(updatedAt).toISOString().slice(0, 10);
-
 export const toWorkflowSettingsListItem = (workflow: AgentWorkflow): WorkflowSettingsListItem => ({
-  dateLabel: formatWorkflowListDate(workflow.updatedAt),
+  dateLabel: formatLocalListDate(workflow.updatedAt),
   deleteAriaLabel: `Delete workflow "${workflow.name}"`,
   description: workflow.description,
   id: workflow.id,
@@ -89,15 +88,27 @@ export const deriveWorkflowRunDisabledReason = ({
   isDangerousMode: boolean;
 }): WorkflowRunDisabledReason | undefined => {
   if (!isApproved) {
-    return { label: 'Needs approval', reason: 'notApproved' };
+    return {
+      hint: 'This version is not approved yet. Ask Kilo to save the workflow again to approve it.',
+      label: 'Needs approval',
+      reason: 'notApproved',
+    };
   }
 
   if (!isDangerousMode && !allowWorkflowsInSafeMode) {
-    return { label: 'Safe mode workflows disabled', reason: 'safeModeDisabled' };
+    return {
+      hint: "Workflows can't run in safe mode until you allow them.",
+      label: 'Safe mode workflows disabled',
+      reason: 'safeModeDisabled',
+    };
   }
 
   if (activeConversationRunning) {
-    return { label: 'Conversation is running', reason: 'conversationRunning' };
+    return {
+      hint: 'Wait for the conversation to finish, then run it.',
+      label: 'Conversation is running',
+      reason: 'conversationRunning',
+    };
   }
 
   return undefined;

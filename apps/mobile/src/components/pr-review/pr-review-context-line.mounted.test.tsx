@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PrReviewContextLine } from './pr-review-context-line';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   renderWithProviders,
@@ -63,8 +64,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
 
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: routerPush, back: vi.fn() }),
+}));
+// The picker opener guards its press burst; this suite asserts the press reaches
+// the route, so the guard's push is the mock it already checks.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
+
 const Text = 'Text' as ElementType;
-const Pressable = 'Pressable' as ElementType;
 const ChevronDown = 'ChevronDown' as ElementType;
 
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
@@ -89,15 +99,6 @@ function line(ui: RenderWithProvidersResult) {
   return nodes[0] as ReactTestInstance | undefined;
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
-  }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
-}
-
 async function press(node: ReactTestInstance) {
   const onPress = node.props.onPress as () => void;
   await act(() => {
@@ -107,6 +108,8 @@ async function press(node: ReactTestInstance) {
 
 beforeEach(() => {
   auth.token = 'token';
+  routerPush.mockReset();
+  contextPickerSlot.clearAll();
   list.mockReset().mockResolvedValue([ORG_A, ORG_B]);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockResolvedValue(undefined);
@@ -137,7 +140,7 @@ describe('PrReviewContextLine', () => {
     expect(texts(ui)).toContain('For your personal account');
   });
 
-  it('switches organization through the picker sheet', async () => {
+  it('switches organization through the shared picker route', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => texts(ui).includes('For Acme'));
@@ -148,21 +151,19 @@ describe('PrReviewContextLine', () => {
     }
     await press(control);
 
-    // The sheet is open: every account row is an action button that reports
-    // whether it is the current account.
-    const rows = ui.renderer.root.findAll(
-      node =>
-        node.type === Pressable &&
-        node.props.accessibilityRole === 'button' &&
-        selectedState(node) !== undefined
-    );
-    expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
-
-    const umbrella = rows.find(row => row.props.accessibilityLabel === 'Umbrella');
-    if (!umbrella) {
-      throw new Error('the Umbrella row is missing from the picker');
+    // The control opens the shared account picker, handing the route every
+    // account with the current one marked.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/context-picker');
+    const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+    if (bridge === undefined) {
+      throw new Error('the account picker route was not handed a bridge');
     }
-    await press(umbrella);
+    expect(bridge.options).toEqual(['Personal', 'Acme', 'Umbrella']);
+    expect(bridge.currentIndex).toBe(1);
+
+    await act(() => {
+      bridge.onSelect(2);
+    });
     await waitFor(() => texts(ui).includes('For Umbrella'));
     expect(storage.write).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-b');
   });

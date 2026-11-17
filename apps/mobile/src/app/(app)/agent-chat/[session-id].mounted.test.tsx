@@ -35,6 +35,8 @@ import {
   getAuthenticatedOwner,
   markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
+import { _resetLastRouteForTests, noteRestoredRouteOpen } from '@/lib/last-route';
+import type * as SpawnedNotFoundRetry from '@/lib/spawned-not-found-retry';
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
@@ -46,7 +48,10 @@ const queryOptionsMock = vi.hoisted(() => vi.fn());
 // The route builds its narrowed foreground key from this session-scoped input.
 const cliSessionGetQueryKeyMock = vi.hoisted(() => vi.fn(() => [['cliSessionsV2', 'get']]));
 const organizations = vi.hoisted(() => [
-  { organizationId: 'org-a', organizationName: 'Session organization' },
+  {
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    organizationName: 'Session organization',
+  },
 ]);
 const createMobileManagerMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
@@ -118,6 +123,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
+  // The session route's system Back listener registers on mount. These tests
+  // never press Android Back, so the subscription stays inert.
+  BackHandler: {
+    addEventListener: () => ({ remove: () => undefined }),
+  },
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -177,6 +187,11 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: useRouterMock,
+  // The session route's Back listener runs while the route is focused, which
+  // for these tests is its mount lifetime.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    useEffect(effect, [effect]);
+  },
 }));
 
 vi.mock('@tanstack/react-query', async importOriginal => ({
@@ -337,8 +352,10 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
 });
 
-vi.mock('@/lib/spawned-not-found-retry', () => ({
-  shouldRetryNotFoundOnSpawnedRoute: () => false,
+// The route's retry decision is a pure helper with its own suite; this suite
+// drives the query options it receives, so answer with the helper as loaded.
+vi.mock('@/lib/spawned-not-found-retry', async importOriginal => ({
+  ...(await importOriginal<typeof SpawnedNotFoundRetry>()),
 }));
 
 function findByType(
@@ -536,11 +553,13 @@ beforeEach(() => {
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
-    // drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    // drop the current route and land on the destination. An object href lands
+    // on its pathname, as the real router does.
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }
@@ -576,6 +595,7 @@ beforeEach(() => {
   queryState.refetch.mockReset();
   secureStoreMock.getItemAsync.mockReset();
   secureStoreMock.getItemAsync.mockResolvedValue(null);
+  _resetLastRouteForTests();
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -640,14 +660,77 @@ describe('SessionDetailScreen invalid session-id', () => {
   });
 });
 
+describe('SessionDetailScreen relaunch restore', () => {
+  const SESSION_ID = 'ses_12345678901234567890123456';
+  const RECORDED_HREF = `/(app)/agent-chat/${SESSION_ID}`;
+
+  function mountTerminalSession(code: string) {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': SESSION_ID });
+    queryState.data = null;
+    queryState.isError = true;
+    queryState.error = { data: { code } };
+  }
+
+  it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+    'falls back to the start screen when the restored session answers %s',
+    async code => {
+      mountTerminalSession(code);
+      noteRestoredRouteOpen(RECORDED_HREF);
+
+      await mountRoute();
+
+      // The restore replaced itself, so nothing the person did not ask for
+      // stays on screen.
+      expect(navigationRoutes).toEqual(['/(app)/(tabs)/(0_home)']);
+    }
+  );
+
+  it('keeps the not-found screen for a session opened by a tap or a live link', async () => {
+    mountTerminalSession('NOT_FOUND');
+
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
+  });
+
+  it('takes the restore mark once, so a later open answers for itself', async () => {
+    mountTerminalSession('NOT_FOUND');
+    noteRestoredRouteOpen(RECORDED_HREF);
+    await mountRoute();
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(0_home)']);
+
+    navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
+  });
+
+  it('keeps the retryable failure on a restored route', async () => {
+    mountTerminalSession('INTERNAL_SERVER_ERROR');
+    noteRestoredRouteOpen(RECORDED_HREF);
+
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+  });
+});
+
 describe('SessionDetailScreen display scope', () => {
   it.each([
-    { label: 'route organization', route: 'org-a', data: null, expected: 'org-a' },
+    {
+      label: 'route organization',
+      route: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+      data: null,
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
     {
       label: 'fetched organization',
       route: undefined,
-      data: { organization_id: 'org-a' },
-      expected: 'org-a',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     },
     {
       label: 'explicit Personal',
@@ -656,6 +739,15 @@ describe('SessionDetailScreen display scope', () => {
       expected: null,
     },
     { label: 'legacy Personal', route: undefined, data: {}, expected: null },
+    {
+      // A hand-built link can carry a value the org procedures reject. It must
+      // not become the route scope: reading as absent lets the metadata read
+      // resolve the real organization instead of failing every request.
+      label: 'unusable route organization',
+      route: 'not-a-uuid',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
   ])('passes resolved $label without changing global scope', async state => {
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
@@ -725,12 +817,12 @@ describe('SessionDetailScreen display scope', () => {
 
     queryState.isError = false;
     queryState.error = null;
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(queryState.refetch).not.toHaveBeenCalled();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
       isResolved: true,
     });
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
@@ -830,13 +922,15 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     // transcript and drop the composer text under it.
     queryState.isPending = false;
     queryState.fetchStatus = 'idle';
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(1);
     expect(managers.at(-1)?.manager).toBe(mountedManager);
-    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe(
+      '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'
+    );
   });
 });
 
@@ -1095,6 +1189,42 @@ describe('SessionDetailScreen foreground refresh scope', () => {
   });
 });
 
+describe('SessionDetailScreen metadata retry', () => {
+  type Retry = (failureCount: number, error: unknown) => boolean;
+
+  function setSessionParam(): void {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+  }
+
+  function retryOption(): Retry {
+    const options: unknown = queryOptionsMock.mock.calls[0]?.[1];
+    if (typeof options !== 'object' || options === null || !('retry' in options)) {
+      throw new Error('the route passed no retry to the metadata read');
+    }
+    const { retry } = options;
+    if (typeof retry !== 'function') {
+      throw new TypeError('the metadata retry is not a function');
+    }
+    return (failureCount, error) => Boolean(Reflect.apply(retry, undefined, [failureCount, error]));
+  }
+
+  it('repeats an unsettled NOT_FOUND', async () => {
+    setSessionParam();
+    await mountRoute();
+
+    expect(retryOption()(0, { data: { code: 'NOT_FOUND' } })).toBe(true);
+  });
+
+  it('does not repeat an access denial, so the account boundary stays immediate', async () => {
+    setSessionParam();
+    await mountRoute();
+    const retry = retryOption();
+
+    expect(retry(0, { data: { code: 'UNAUTHORIZED' } })).toBe(false);
+    expect(retry(0, { data: { code: 'FORBIDDEN' } })).toBe(false);
+  });
+});
+
 function transcriptPage(sessionId: KiloSessionId, messageId: string, text: string) {
   return {
     kind: 'success',
@@ -1146,7 +1276,7 @@ function childIds({ store, manager }: ManagerProbe): string[] {
 async function startChildPage(pageKind: 'first' | 'older') {
   useLocalSearchParamsMock.mockReturnValue({
     'session-id': 'ses_12345678901234567890123456',
-    organizationId: 'org-a',
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
   });
   const renderer = await mountRoute();
   const current = managers.at(-1);
@@ -1194,7 +1324,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123457',
-          organizationId: 'org-a',
+          organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
         });
       },
     },
@@ -1203,7 +1333,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123456',
-          organizationId: 'org-b',
+          organizationId: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e',
         });
       },
     },
@@ -1332,7 +1462,9 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
       queryFn: async () => {
         const account = requestAccount;
         await Promise.resolve();
-        return account === 'A' ? { organization_id: 'org-a' } : metadata.promise;
+        return account === 'A'
+          ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+          : metadata.promise;
       },
     }));
     const client = new QueryClient({
@@ -1361,7 +1493,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(rootRequests.slice(requestsBeforeReplacement)).toEqual([]);
 
     await act(async () => {
-      metadata.resolve({ organization_id: 'org-b' });
+      metadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
@@ -1375,7 +1507,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     setSignOutActive(false);
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(rootRequests).toEqual([]);
@@ -1429,7 +1561,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     beginReplacement();
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -1449,7 +1581,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     commitAccount('A');
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
@@ -1551,7 +1683,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
   });
 
-  it.each([undefined, 'org-a'])(
+  it.each([undefined, '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'])(
     'shows the header and existing skeletons while identity is pending with organization %s',
     async organizationId => {
       useLocalSearchParamsMock.mockReturnValue({
@@ -1733,7 +1865,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
 describe.each([
   { route: 'personal', organizationId: undefined },
-  { route: 'explicit organization', organizationId: 'org-a' },
+  { route: 'explicit organization', organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
 ])('SessionDetailScreen title isolation on $route routes', ({ organizationId }) => {
   it.each(['retained replacement', 'fresh pending mount'] as const)(
     'does not restore an inherited title after %s confirms with delayed metadata',
@@ -1749,7 +1881,9 @@ describe.each([
         queryFn: async () => {
           const account = requestAccount;
           await Promise.resolve();
-          return account === 'A' ? { organization_id: 'org-a' } : routeMetadata.promise;
+          return account === 'A'
+            ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+            : routeMetadata.promise;
         },
       }));
       const client = new QueryClient({
@@ -1812,7 +1946,7 @@ describe.each([
         expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
         await act(async () => {
-          routeMetadata.resolve({ organization_id: 'org-b' });
+          routeMetadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
           await vi.advanceTimersByTimeAsync(0);
         });
       }
@@ -1918,7 +2052,7 @@ describe('SessionDetailScreen malformed part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -2005,7 +2139,7 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 

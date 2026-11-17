@@ -20,7 +20,7 @@ import { roleLabel } from './member-row';
 
 type InvitedMemberRowProps = {
   invite: InvitedOrgMember;
-  /** Caller is owner. */
+  /** Caller may revoke or resend: management role, and owner only for an owner invite. */
   canManage: boolean;
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */
@@ -118,8 +118,9 @@ export function InvitedMemberRow({
           </Text>
         )}
       </View>
+      {/* Same chip weight as MemberRow's role label; the reason lives there. */}
       <View className="rounded-full bg-muted px-2 py-0.5">
-        <Text className="text-[11px] font-medium text-muted-foreground">
+        <Text className="text-[11px] font-semibold text-muted-foreground">
           {roleLabel(invite.role)}
         </Text>
       </View>

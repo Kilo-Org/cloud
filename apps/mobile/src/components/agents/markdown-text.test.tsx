@@ -64,9 +64,11 @@ const translate = vi.hoisted(
 );
 
 vi.mock('react-native', () => rnStub);
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
-  ChevronRight: 'ChevronRight',
 }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
@@ -152,6 +154,7 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
+  markdownStyle: { paragraph: { lineHeight: number }; list: { lineHeight: number } };
   onLinkPress: (event: { url: string }) => void;
   onLinkLongPress?: (event: { url: string }) => void;
   onImagePress: (event: { url: string; altText: string }) => void;
@@ -1139,5 +1142,25 @@ describe('splitMarkdownHtmlIncremental', () => {
     for (const document of documents) {
       expect(firstDivergence(document), document).toBe('');
     }
+  });
+});
+
+describe('MarkdownText body line height', () => {
+  const value = 'See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)';
+
+  it('raises the paragraph and list body line height to the given value', async () => {
+    const renderer = await mount(<MarkdownText value={value} lineHeight={28} />);
+    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
+
+    expect(paragraph.lineHeight).toBe(28);
+    expect(list.lineHeight).toBe(28);
+  });
+
+  it('keeps the 24 dp body line height without the prop', async () => {
+    const renderer = await mount(<MarkdownText value={value} />);
+    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
+
+    expect(paragraph.lineHeight).toBe(24);
+    expect(list.lineHeight).toBe(24);
   });
 });

@@ -24,10 +24,11 @@ import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -115,7 +116,7 @@ async function injectProvider(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -471,7 +472,7 @@ describe('sandbox status badge projection (B10)', () => {
       },
     };
     peer.statusSnapshot = expected;
-    await stub.registerSession({
+    await seedRegistration(stub, {
       sandboxId,
       spec: {
         sessionId,
@@ -527,7 +528,7 @@ describe('sandbox status badge projection (B10)', () => {
       intervalStartedAt: null,
       meterInstanceId: 'sbx-meter',
     };
-    await stub.registerSession({
+    await seedRegistration(stub, {
       sandboxId,
       spec: {
         sessionId,

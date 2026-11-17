@@ -36,14 +36,15 @@ export function ActiveProfileIndicator({
 
   const layerText = (layer: ActiveProfileIndicatorLayer): string => {
     const label = t(layer.labelKey);
-    const detail = layer.detail ?? layer.detailKeys?.map(key => t(key)).join(', ');
-    return detail ? `${label}: ${detail}` : label;
+    const detail =
+      layer.detail ?? layer.detailKeys?.map(key => t(key)).join(t('common.listJoiner'));
+    return detail ? t('agentChat.newSession.profileLayerAccessibility', { label, detail }) : label;
   };
   const accessibleLabel = [
     t(state.labelKey),
     ...state.layers.map(layerText),
     t('agentChat.newSession.openSettingsToReview'),
-  ].join('. ');
+  ].join(t('common.sentenceJoiner'));
 
   return (
     <Pressable

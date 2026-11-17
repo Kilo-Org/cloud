@@ -84,6 +84,64 @@ export function snapshotInsets(
   return { insets, known };
 }
 
+/**
+ * Whether a converted node scrolls its children. A scrolled list reports its
+ * container frames already clipped to the pane that draws them, so it is the
+ * one place where a container's frame and its children's frames are in
+ * different spaces.
+ */
+function scrollsChildren(entry: ProbeNode): boolean {
+  return (
+    entry.scrollAxes !== undefined ||
+    entry.tag.endsWith('ScrollView') ||
+    entry.tag === 'RecyclerView'
+  );
+}
+
+/**
+ * A snapshot reports a scrolled list's container frames clipped to the pane
+ * that draws them, while the text inside a row keeps the frame of the whole
+ * row. A text run then measures outside the row that owns it, and
+ * `touch-overlap` reports two tap owners where the platform has one.
+ *
+ * Mark every box inside a scrolling pane as one that clips what it draws, so
+ * the layout model derives a visible frame for those children instead of the
+ * raw snapshot rect. Each node keeps its own `rect`: the overflow rules still
+ * see a plain card that really does paint outside itself, and the size rules
+ * still measure a control's platform frame rather than the sliver of a pane
+ * that shows it.
+ */
+function markScrolledBoxes(
+  converted: Writable<ProbeNode>,
+  parent: ProbeNode | undefined,
+  insideScroller: boolean
+): boolean {
+  const inside = insideScroller || (parent !== undefined && scrollsChildren(parent));
+  if (inside) {
+    converted.style = { ...converted.style, overflow: 'hidden' };
+    // The drawn frame is the one the parent's box holds. `rect` stays the
+    // platform frame for the size rules; `layoutRect` is what the overflow
+    // rules compare, so it takes the parent's clip and a scrolled row's
+    // content-space child no longer reads as a child that paints outside.
+    const clip = parent?.layoutRect ?? parent?.rect;
+    if (clip !== undefined) {
+      const left = Math.max(converted.rect[0], clip[0]);
+      const top = Math.max(converted.rect[1], clip[1]);
+      const right = Math.min(converted.rect[0] + converted.rect[2], clip[0] + clip[2]);
+      const bottom = Math.min(converted.rect[1] + converted.rect[3], clip[1] + clip[3]);
+      const clipped: [number, number, number, number] = [
+        round(left),
+        round(top),
+        round(Math.max(0, right - left)),
+        round(Math.max(0, bottom - top)),
+      ];
+      const same = clipped.every((value, index) => value === round(converted.rect[index] ?? 0));
+      if (!same) converted.layoutRect = clipped;
+    }
+  }
+  return inside;
+}
+
 export function agentDeviceToProbeDump(json: string): ProbeDump {
   const data = (JSON.parse(json) as { data?: AgentSnapshot } | null)?.data;
   const density = data?.androidSnapshot?.pixelDensity;
@@ -107,6 +165,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
   const nodes: Writable<ProbeNode>[] = [
     { parent: -1, tag: 'View', rect: [0, 0, window.width, window.height] },
   ];
+  const scrolled = new Map<number, boolean>();
   for (const node of kept) {
     let parent = node.parentIndex ?? undefined;
     while (parent !== undefined && !newIndex.has(parent)) {
@@ -118,6 +177,10 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       tag: uiautomatorTag(node.type ?? ''),
       rect: [round(x / density), round(y / density), round(w / density), round(h / density)],
     };
+    scrolled.set(
+      newIndex.get(node.index) ?? 0,
+      markScrolledBoxes(converted, nodes[converted.parent], scrolled.get(converted.parent) ?? false)
+    );
     const label = node.label ?? undefined;
     if (node.kind === 'text') {
       if (label) converted.text = label;

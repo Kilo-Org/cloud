@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 
@@ -7,7 +7,8 @@ import { captureException, startSpan } from '@sentry/nextjs';
 const posthogClient = PostHogClient();
 
 /**
- * Generic server action to check if a PostHog feature flag is enabled (boolean flags)
+ * Server helper to check if a PostHog feature flag is enabled (boolean flags).
+ * Call it from server components, route handlers, or other server modules.
  * @param flagName - The name of the PostHog feature flag to check
  * @param distinctId - Optional distinct ID for the feature flag request (defaults to 'server-config-fetch')
  * @returns Boolean indicating if the flag is enabled, or false if not found/error
@@ -49,13 +50,14 @@ export async function isFeatureFlagEnabledOrDevelopment(
  */
 export async function isReleaseToggleEnabled(
   flagName: string,
-  distinctId: string = 'server-config-fetch'
+  distinctId: string = 'server-config-fetch',
+  personProperties?: Record<string, string>
 ): Promise<boolean> {
   try {
     const flagValue = await startSpan(
       { name: flagName, op: 'posthog-feature-flag-boolean' },
       async () => {
-        return await posthogClient.getFeatureFlag(flagName, distinctId);
+        return await posthogClient.getFeatureFlag(flagName, distinctId, { personProperties });
       }
     );
     return flagValue === true;
@@ -63,7 +65,7 @@ export async function isReleaseToggleEnabled(
     console.error('Error checking boolean feature flag:', flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_boolean_enabled' },
-      extra: { flagName, distinctId },
+      extra: { flagName },
     });
     return false;
   }

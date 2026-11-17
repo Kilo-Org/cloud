@@ -107,7 +107,7 @@ describe('deriveCloudSessionForkFields', () => {
     });
   });
 
-  it('drops a malformed runtime variant instead of failing the fork', () => {
+  it('carries a model-specific runtime variant such as thinking-v2', () => {
     const result = deriveCloudSessionForkFields({
       session: CLOUD_SESSION,
       runtime: runtime({ variant: 'thinking-v2' }),
@@ -118,7 +118,7 @@ describe('deriveCloudSessionForkFields', () => {
       fields: {
         mode: 'code',
         model: 'kilocode/claude-sonnet-4',
-        variant: undefined,
+        variant: 'thinking-v2',
         autoCommit: false,
         repository: { kind: 'github', fullName: 'kilocode/kilo' },
       },
@@ -698,7 +698,7 @@ describe('continueInNewCloudSession configuration forwarding', () => {
     );
   });
 
-  it('omits a malformed runtime variant from the create request', async () => {
+  it('carries a model-specific runtime variant into the create request', async () => {
     const { getRuntimeState, createSession } = depsFor(runtime({ variant: 'thinking-v2' }));
 
     const result = await continueInNewCloudSession({
@@ -708,8 +708,6 @@ describe('continueInNewCloudSession configuration forwarding', () => {
     });
 
     expect(result).toEqual({ ok: true, kiloSessionId: 'ses_cccccccccccccccccccccccc' });
-    expect(createSession).not.toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'thinking-v2' })
-    );
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ variant: 'thinking-v2' }));
   });
 });

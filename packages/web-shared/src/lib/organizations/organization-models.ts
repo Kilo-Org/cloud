@@ -26,6 +26,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
 import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
@@ -76,7 +77,7 @@ export async function getAvailableModelsForOrganization(
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
-    getEnhancedOpenRouterModels({ countryCode }),
+    getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),
     getAllowedDirectByokCatalogModelIds(organizationId, policy),
   ]);
@@ -113,8 +114,12 @@ export async function getAvailableModelsForOrganization(
   if (chatGptOwner) {
     availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
   }
+  availableModels = await tagClaudeBillingByokModels(
+    { kind: 'organization', organizationId },
+    availableModels
+  );
 
-  const snapshot = await getEnkryptBenchmarks();
+  const snapshot = await getEnkryptBenchmarks({ fromDb });
   return {
     ...responseData,
     data: publishEnkryptModels(

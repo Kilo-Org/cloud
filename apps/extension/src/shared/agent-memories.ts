@@ -78,8 +78,47 @@ const singleLinePreview = (value: string, maxLength: number): string => {
   return collapsed.slice(0, maxLength);
 };
 
-const memorySearchCorpus = (memory: AgentMemory): string =>
-  `${memory.text} ${memory.note ?? ''} ${memory.pageTitle} ${memory.pageUrl}`.toLowerCase();
+const MEMORY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
+const MIN_SHARED_PREFIX_LENGTH = 4;
+
+const tokenizeMemoryText = (value: string): string[] =>
+  value.toLowerCase().match(MEMORY_TOKEN_PATTERN) ?? [];
+
+const sharedPrefixLength = (left: string, right: string): number => {
+  const limit = Math.min(left.length, right.length);
+  let index = 0;
+
+  while (index < limit && left[index] === right[index]) {
+    index += 1;
+  }
+
+  return index;
+};
+
+const memoryTokenMatches = (queryToken: string, storedToken: string): boolean =>
+  storedToken.startsWith(queryToken) ||
+  (queryToken.length >= MIN_SHARED_PREFIX_LENGTH &&
+    sharedPrefixLength(queryToken, storedToken) >= MIN_SHARED_PREFIX_LENGTH);
+
+export const parseMemorySearchTokens = (query: string): string[] => tokenizeMemoryText(query);
+
+/** Token matches, so "reply preferences" finds "replies" and "prefers". */
+export const memoryMatchesSearchTokens = (
+  tokens: readonly string[],
+  memory: AgentMemory
+): boolean => {
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const storedTokens = tokenizeMemoryText(
+    `${memory.text} ${memory.note ?? ''} ${memory.pageTitle} ${memory.pageUrl}`
+  );
+
+  return tokens.every(token =>
+    storedTokens.some(storedToken => memoryTokenMatches(token, storedToken))
+  );
+};
 
 const sortByCreatedAtDesc = <TItem extends { createdAt: number }>(
   items: readonly TItem[]
@@ -140,18 +179,13 @@ export const searchAgentMemories = (
   memories: readonly AgentMemory[],
   query: string
 ): AgentMemory[] => {
-  const tokens = collapseWhitespace(query.toLowerCase())
-    .split(' ')
-    .filter(token => token.length > 0);
+  const tokens = parseMemorySearchTokens(query);
 
   if (tokens.length === 0) {
     return [];
   }
 
-  const matches = memories.filter(memory => {
-    const corpus = memorySearchCorpus(memory);
-    return tokens.every(token => corpus.includes(token));
-  });
+  const matches = memories.filter(memory => memoryMatchesSearchTokens(tokens, memory));
 
   return sortByCreatedAtDesc(matches).slice(0, MEMORY_SEARCH_RESULT_COUNT);
 };

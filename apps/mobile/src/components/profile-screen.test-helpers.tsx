@@ -19,7 +19,6 @@ const keys = vi.hoisted(() => ({
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
-const nativeRemoteFlag = vi.hoisted(() => ({ enabled: false }));
 const idleState = vi.hoisted(() => ({
   storedCallback: undefined as (() => void) | undefined,
   cancel: vi.fn(),
@@ -42,7 +41,6 @@ const connectivityState = vi.hoisted(() => ({
 export {
   authState,
   connectivityState,
-  nativeRemoteFlag,
   getProfileAgentScopeMock,
   idleState,
   keys,
@@ -68,7 +66,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 beforeEach(() => {
-  nativeRemoteFlag.enabled = false;
+  vi.stubGlobal('__DEV__', false);
   vi.stubGlobal('requestIdleCallback', captureIdle);
   vi.stubGlobal('cancelIdleCallback', idleState.cancel);
 });
@@ -82,7 +80,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: routerPush }),
+  useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
 
 vi.mock('expo-application', () => ({
@@ -107,10 +105,6 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ signOut: signOutFn, token: authState.token }),
-}));
-
-vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlag: () => nativeRemoteFlag.enabled,
 }));
 
 vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: 'http://localhost:8817' }));
@@ -194,14 +188,18 @@ vi.mock('@/components/ui/icons', () => ({
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
+  Plug: 'Plug',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Users: 'Users',
+  Workflow: 'Workflow',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
@@ -215,6 +213,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

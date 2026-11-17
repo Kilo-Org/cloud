@@ -2,13 +2,23 @@ jest.mock('@/lib/organizations/organization-auth', () => ({
   getAuthorizedOrgContext: jest.fn(),
   getAuthorizedOrgContextOrSupport: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/admin/support-access', () => ({
-  isSupportAccessEnabled: jest.fn(),
+jest.mock('@/lib/organizations/organization-name', () => ({
+  getLiveOrganizationName: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/admin/support-access', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/support-access') as Record<
+    string,
+    unknown
+  >;
+  return { ...actual, isSupportAccessEnabled: jest.fn() };
+});
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   signInUrlWithCallbackPath: jest.fn(),
 }));
 jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
+jest.mock('./SupportAccessRequestDialog', () => ({
+  SupportAccessRequestDialog: () => null,
+}));
 jest.mock('./OrganizationTrialWrapper', () => {
   const ReactActual = jest.requireActual('react') as typeof React;
   return {
@@ -37,7 +47,9 @@ import type {
   getAuthorizedOrgContextOrSupport,
 } from '@/lib/organizations/organization-auth';
 import type * as OrganizationAuth from '@/lib/organizations/organization-auth';
+import type * as OrganizationName from '@/lib/organizations/organization-name';
 import type * as SupportAccess from '@kilocode/web-shared/lib/admin/support-access';
+import type * as NextNavigation from 'next/navigation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { OrganizationByPageLayout as Layout } from './OrganizationByPageLayout';
 
@@ -52,9 +64,15 @@ const {
 const { isSupportAccessEnabled: mockIsSupportAccessEnabled } = jest.requireMock<
   typeof SupportAccess
 >('@kilocode/web-shared/lib/admin/support-access');
+const { getLiveOrganizationName: mockGetLiveOrganizationName } = jest.requireMock<
+  typeof OrganizationName
+>('@/lib/organizations/organization-name');
+const { redirect: mockRedirect } = jest.requireMock<typeof NextNavigation>('next/navigation');
 const mockAuth = jest.mocked(mockGetAuthorizedOrgContext);
 const mockSupportAuth = jest.mocked(mockGetAuthorizedOrgContextOrSupport);
 const mockSupportEnabled = jest.mocked(mockIsSupportAccessEnabled);
+const mockOrganizationName = jest.mocked(mockGetLiveOrganizationName);
+const mockRedirectFn = jest.mocked(mockRedirect);
 let OrganizationByPageLayout: typeof Layout;
 
 beforeAll(async () => {
@@ -109,6 +127,8 @@ describe('OrganizationByPageLayout', () => {
       expiresAt: '2030-01-01T00:00:00.000Z',
       supportActionId: 'action-1',
       inventoryId: null,
+      inheritedFromOrganizationId: null,
+      inheritedFromOrganizationName: null,
     };
     mockSupportAuth.mockResolvedValue({
       success: true,
@@ -153,5 +173,143 @@ describe('OrganizationByPageLayout', () => {
     expect(html).toContain('data-role="owner"');
     expect(html).toContain('owner:true');
     expect(html).not.toContain('Support read access');
+  });
+
+  describe('support access denial', () => {
+    type AuthResult = Awaited<ReturnType<typeof getAuthorizedOrgContext>>;
+
+    function denied(params: {
+      status: number;
+      reason: SupportAccess.SupportAccessReason | null;
+      isPlatformAdmin: boolean;
+    }): AuthResult {
+      return {
+        success: false,
+        nextResponse: { status: params.status },
+        denial: params,
+      } as unknown as AuthResult;
+    }
+
+    const render = jest.fn(() => React.createElement('div', null, 'organization content'));
+
+    beforeEach(() => {
+      mockOrganizationName.mockResolvedValue('Customer Org');
+    });
+
+    it('renders Access needed with a request action for an admin without a grant', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockSupportAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_grant_required', isPlatformAdmin: true })
+      );
+
+      const html = renderToStaticMarkup(
+        await OrganizationByPageLayout({ params, render, supportRead: true })
+      );
+
+      expect(mockRedirectFn).not.toHaveBeenCalled();
+      expect(mockOrganizationName).toHaveBeenCalledWith('org-1');
+      expect(render).not.toHaveBeenCalled();
+      expect(html).toContain('Access needed');
+      expect(html).toContain('Request access');
+      expect(html).toContain('Customer Org');
+      expect(html).not.toContain('Open organization dashboard');
+      expect(html).not.toContain('href="/organizations/org-1"');
+    });
+
+    it('explains an expired grant', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockSupportAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_grant_expired', isPlatformAdmin: true })
+      );
+
+      const html = renderToStaticMarkup(
+        await OrganizationByPageLayout({ params, render, supportRead: true })
+      );
+
+      expect(html).toContain('expired');
+      expect(html).toContain('Request access');
+    });
+
+    it('explains a revoked grant', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockSupportAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_grant_revoked', isPlatformAdmin: true })
+      );
+
+      const html = renderToStaticMarkup(
+        await OrganizationByPageLayout({ params, render, supportRead: true })
+      );
+
+      expect(html).toContain('was revoked');
+      expect(html).toContain('Request access');
+    });
+
+    it('does not offer a request for a page that is never available through support', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_access_not_allowlisted', isPlatformAdmin: true })
+      );
+
+      const html = renderToStaticMarkup(await OrganizationByPageLayout({ params, render }));
+
+      expect(mockRedirectFn).not.toHaveBeenCalled();
+      expect(html).toContain('available through support access');
+      expect(html).not.toContain('Request access');
+      expect(html).toContain('href="/organizations/org-1"');
+      expect(html).toContain('href="/admin/organizations/org-1"');
+    });
+
+    it('shows a retry message when the grant lookup failed', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockSupportAuth.mockResolvedValue(
+        denied({ status: 503, reason: 'support_grant_lookup_failed', isPlatformAdmin: true })
+      );
+
+      const html = renderToStaticMarkup(
+        await OrganizationByPageLayout({ params, render, supportRead: true })
+      );
+
+      expect(html).toContain('Refresh the page to try again');
+      expect(html).not.toContain('Request access');
+      expect(html).not.toContain('Open organization dashboard');
+    });
+
+    it('redirects a non-admin to the profile page', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_grant_required', isPlatformAdmin: false })
+      );
+      mockRedirectFn.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(OrganizationByPageLayout({ params, render })).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirectFn).toHaveBeenCalledWith('/profile');
+      expect(render).not.toHaveBeenCalled();
+    });
+
+    it('keeps the profile redirect when support access is disabled', async () => {
+      mockSupportEnabled.mockReturnValue(false);
+      mockAuth.mockResolvedValue(
+        denied({ status: 403, reason: 'support_grant_required', isPlatformAdmin: true })
+      );
+      mockRedirectFn.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(OrganizationByPageLayout({ params, render })).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirectFn).toHaveBeenCalledWith('/profile');
+    });
+
+    it('keeps the profile redirect for a missing organization', async () => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockAuth.mockResolvedValue(denied({ status: 404, reason: null, isPlatformAdmin: true }));
+      mockRedirectFn.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(OrganizationByPageLayout({ params, render })).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirectFn).toHaveBeenCalledWith('/profile');
+    });
   });
 });

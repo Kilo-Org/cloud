@@ -86,6 +86,10 @@ export function buildSessionAttachPayload(
     directory,
     ...(branch ? { branch } : {}),
     ...(branchMode ? { branchMode } : {}),
+    ...(metadata.repository?.baseBranch === undefined
+      ? {}
+      : { baseBranch: metadata.repository.baseBranch }),
+    ...(metadata.repository?.baseSha === undefined ? {} : { baseSha: metadata.repository.baseSha }),
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),

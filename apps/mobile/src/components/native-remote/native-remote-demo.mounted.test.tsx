@@ -1,7 +1,7 @@
 import {
   button,
   flush,
-  inventoryEvent,
+  inventoryPending,
   mount,
   press,
   text,
@@ -45,6 +45,29 @@ describe('native remote demo', () => {
     expect(text(renderer.root)).toContain('Owned host');
   });
 
+  it('connects presence in the selected organization and retires selections on a scope change', async () => {
+    const fixture = nativeRemoteFixture();
+    const renderer = await mount(fixture.client, 'org-owned');
+    expect(fixture.api.connectPresence).toHaveBeenLastCalledWith(expect.any(Function), 'org-owned');
+    await press(renderer, 'ses-first');
+    const oldSession = fixture.connection('ses-first');
+    await act(async () => {
+      renderer.update(<NativeRemoteDemo client={fixture.client} organizationID="org-next" />);
+      await flush();
+    });
+    expect(fixture.presence.close).toHaveBeenCalledOnce();
+    expect(oldSession.close).toHaveBeenCalledOnce();
+    expect(fixture.api.connectPresence).toHaveBeenLastCalledWith(expect.any(Function), 'org-next');
+    expect(
+      renderer.root.findAllByProps({ accessibilityLabel: 'nativeRemote.prompt' })
+    ).toHaveLength(0);
+    await act(async () => {
+      renderer.update(<NativeRemoteDemo client={fixture.client} />);
+      await flush();
+    });
+    expect(fixture.api.connectPresence).toHaveBeenLastCalledWith(expect.any(Function), undefined);
+  });
+
   it('creates on an online host using the uncontrolled directory field and opens its session', async () => {
     const fixture = nativeRemoteFixture();
     const renderer = await mount(fixture.client);
@@ -79,7 +102,15 @@ describe('native remote demo', () => {
         ...readySession,
         runnerConnected: false,
         messages: [
-          { id: 'stream', role: 'assistant', seq: 2, content: 'Live delta', incomplete: true },
+          {
+            message: {
+              id: 'msg_stream',
+              type: 'assistant',
+              time: { created: 2 },
+              content: [{ type: 'text', text: 'Live delta' }],
+            },
+            seq: 2,
+          },
         ],
       });
     });
@@ -108,7 +139,7 @@ describe('native remote demo', () => {
     const renderer = await mount(fixture.client);
     await press(renderer, 'ses-first');
     await act(() => {
-      fixture.publishSession('ses-first', { ...readySession, events: [inventoryEvent()] });
+      fixture.publishSession('ses-first', { ...readySession, pending: inventoryPending() });
     });
     const connection = fixture.connection('ses-first');
     await press(renderer, 'agentChat.permissionCard.allowOnce');

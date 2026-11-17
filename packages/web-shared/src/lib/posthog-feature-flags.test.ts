@@ -89,7 +89,19 @@ describe('isReleaseToggleEnabled', () => {
     mockGetFeatureFlag.mockResolvedValueOnce(true);
 
     await expect(isReleaseToggleEnabled('kiloclaw', 'user-1')).resolves.toBe(true);
-    expect(mockGetFeatureFlag).toHaveBeenCalledWith('kiloclaw', 'user-1');
+    expect(mockGetFeatureFlag).toHaveBeenCalledWith('kiloclaw', 'user-1', {
+      personProperties: undefined,
+    });
+  });
+
+  test('passes person properties to the SDK for targeted release toggles', async () => {
+    mockGetFeatureFlag.mockResolvedValueOnce(true);
+    await expect(
+      isReleaseToggleEnabled('employee-feature', 'employee', { email: 'employee@kilocode.ai' })
+    ).resolves.toBe(true);
+    expect(mockGetFeatureFlag).toHaveBeenCalledWith('employee-feature', 'employee', {
+      personProperties: { email: 'employee@kilocode.ai' },
+    });
   });
 
   test('returns false when PostHog flag value is boolean false', async () => {

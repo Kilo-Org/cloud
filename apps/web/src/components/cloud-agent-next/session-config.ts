@@ -192,6 +192,40 @@ export function ensureSelectedCustomOption(
   return [...custom, { value: selected, label: selected, description: '' }];
 }
 
+export type SendSelection = {
+  mode: string;
+  model: string;
+  variant: string | undefined;
+};
+
+/**
+ * A runtime agent's model pin wins because the worker materializes that agent
+ * with its own model. Variants are model-specific and stay with their model.
+ * Without a pin, the current picker model and variant take precedence over
+ * session metadata.
+ */
+export function resolveSendSelection(
+  config:
+    | Pick<CloudAgentSessionConfig, 'mode' | 'model' | 'variant' | 'runtimeAgents'>
+    | null
+    | undefined,
+  currentModel?: { model: string | undefined; variant: string | undefined }
+): SendSelection {
+  const selectedAgent = config?.runtimeAgents?.find(agent => agent.slug === config?.mode);
+  const agentModel = selectedAgent?.model?.trim() || undefined;
+  const agentVariant = agentModel ? selectedAgent?.variant?.trim() || undefined : undefined;
+
+  return {
+    mode: normalizeAlias(config?.mode) || 'code',
+    model: agentModel ?? currentModel?.model ?? config?.model ?? '',
+    variant: agentModel
+      ? agentVariant
+      : currentModel?.model !== undefined
+        ? currentModel.variant
+        : (config?.variant ?? undefined),
+  };
+}
+
 export function filterSessionCustomModeOptions(
   options: CustomModeOption[],
   runtimeAgents: CloudAgentSessionConfig['runtimeAgents']

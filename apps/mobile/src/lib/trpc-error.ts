@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
+import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
 
 import { isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 
@@ -25,6 +26,22 @@ const ShapedErrorSchema = z.looseObject({
   }),
 });
 const TopLevelCodeSchema = z.looseObject({ code: z.string() });
+const NamedErrorSchema = z.looseObject({ name: z.string() });
+
+/**
+ * True when the error is a tRPC client error: one named `TRPCClientError`, or
+ * one carrying a `data` / `shape.data` envelope. A bare top-level `code` is not
+ * enough — filesystem, transport and domain errors carry one too — so a caller
+ * that acts on a server verdict must not read it from an unrelated error.
+ */
+export function isTrpcClientError(error: unknown): boolean {
+  const named = NamedErrorSchema.safeParse(error);
+  return (
+    (named.success && named.data.name === 'TRPCClientError') ||
+    DirectErrorSchema.safeParse(error).success ||
+    ShapedErrorSchema.safeParse(error).success
+  );
+}
 
 /**
  * Extracts a field from an unknown tRPC error. Reads `data[field]` first,
@@ -67,6 +84,19 @@ const TERMINAL_TRPC_CODES = [
 /** True only for tRPC codes the user cannot recover from by retrying. */
 export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
+}
+
+/**
+ * True when the error's tRPC message names the unconfigured usage source
+ * (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`). The wire carries only the code and
+ * message, so the string is the one signal a client has; the constant is
+ * matched by identity with the one the server imported.
+ *
+ * The condition is terminal: with no usage source configured, no future read
+ * can succeed, so a screen that acts on it must show its no-retry state.
+ */
+export function isUsageSourceUnavailable(error: unknown): boolean {
+  return isUsageSourceNotConfigured(readTrpcErrorField(error, 'message'));
 }
 
 /** Whether asking the server again can plausibly succeed for this failure. */

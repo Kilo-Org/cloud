@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { upsertDirectoryUser } from '@/lib/scim/directory-sync';
-import { DirectoryUserUpsertSchema } from '@/lib/scim/directory-sync-contracts';
+import { DirectoryUserUpsertSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
 
 /** Creates a Stripe customer and writes to the primary, so it runs beside it. */
@@ -15,11 +15,12 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * Binds a WorkOS directory user to a Kilo user, creating one if no existing
  * account matches. Idempotent.
  *
- * There is no DELETE. A directory user leaving a directory is not an account
- * deletion: `softDeleteUser` anonymizes the account, rotates credentials, and
- * refuses outright when a live subscription or KiloClaw instance exists. A
- * `dsync.user.deleted` event removes the user's directory memberships instead,
- * through the memberships route.
+ * There is no DELETE here. A directory user leaving a directory is not an
+ * account deletion: `softDeleteUser` anonymizes the account, rotates
+ * credentials, and refuses outright when a live subscription or KiloClaw
+ * instance exists. A `dsync.user.deleted`, and an update reporting the user
+ * `inactive`, revoke the user's directory memberships instead, through
+ * `users/[externalId]/memberships`.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const unauthorized = authorizeInternalApiRequest(request);

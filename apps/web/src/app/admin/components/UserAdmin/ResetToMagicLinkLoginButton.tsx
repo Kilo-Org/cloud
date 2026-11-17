@@ -25,9 +25,12 @@ export default function ResetToMagicLinkLoginButton({ userId }: { userId: string
   const resetToMagicLinkMutation = useMutation(
     trpc.admin.users.resetToMagicLinkLogin.mutationOptions({
       onSuccess: () => {
-        toast.success('Account reset to magic link login!');
+        toast.success('Account reset to magic link login and signed out everywhere');
         setDialogOpen(false);
         router.refresh();
+      },
+      onError: error => {
+        toast.error('Account reset failed', { description: error.message });
       },
     })
   );
@@ -43,9 +46,10 @@ export default function ResetToMagicLinkLoginButton({ userId }: { userId: string
         <DialogHeader>
           <DialogTitle>Reset to magic link login</DialogTitle>
           <DialogDescription>
-            Are you sure you want to reset this account to magic link login? This will remove all
-            connected authentication providers (Google, GitHub, etc.) and the user will only be able
-            to log in via magic link email.
+            Are you sure you want to reset this account to magic link login? This removes all
+            connected authentication providers (Google, GitHub, etc.) and every passkey, and signs
+            the account out of every browser, API token, mobile app and device session. The user
+            will only be able to log in via magic link email.
           </DialogDescription>
         </DialogHeader>
 

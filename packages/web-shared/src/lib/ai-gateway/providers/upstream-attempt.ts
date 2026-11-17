@@ -32,9 +32,10 @@ import {
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -42,8 +43,8 @@ import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/req
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-type SendUpstreamAttemptInput = {
-  providerContext: GetProviderProviderResult;
+export type SendUpstreamAttemptInput = {
+  providerContext: ProviderRoute;
   requestedModel: string;
   request: GatewayRequest;
   fraudHeaders: FraudDetectionHeaders;
@@ -58,10 +59,12 @@ type SendUpstreamAttemptInput = {
   vercelRequestId?: string | null;
   costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
   dataRegion: OrganizationDataRegion | null;
+  /** What remains of `UPSTREAM_DURATION_BUDGET_MS` for this attempt. */
+  upstreamDurationBudgetMs: number;
 };
 
-type SendUpstreamAttemptResult =
-  | { type: 'invalid-openrouter-model' }
+export type SendUpstreamAttemptResult =
+  | { type: 'unknown-gateway-model' }
   | { type: 'error'; response: NextResponse }
   | {
       type: 'success';
@@ -69,6 +72,18 @@ type SendUpstreamAttemptResult =
       toolsAvailable: string[];
       toolsUsed: string[];
     };
+
+/** Whether the request's gateway lists the model. Other providers are not checked. */
+async function gatewayServesModel(provider: Provider, requestedModel: string) {
+  switch (provider.type) {
+    case 'openrouter':
+      return isValidOpenRouterModelId(requestedModel);
+    case 'vercel':
+      return isValidVercelModelId(requestedModel);
+    default:
+      return true;
+  }
+}
 
 /** Sends one upstream attempt and mutates the request with provider-specific transforms. */
 export async function sendUpstreamAttempt({
@@ -87,7 +102,15 @@ export async function sendUpstreamAttempt({
   vercelRequestId,
   costLimit,
   dataRegion,
+  upstreamDurationBudgetMs,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
+  if (
+    !isAutoSmallFreeModel(requestedModel) &&
+    !(await gatewayServesModel(providerContext.provider, requestedModel))
+  ) {
+    return { type: 'unknown-gateway-model' };
+  }
+
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
     providerContext.provider,
@@ -123,15 +146,6 @@ export async function sendUpstreamAttempt({
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
   }
 
-  if (
-    (providerContext.provider.type === 'openrouter' ||
-      providerContext.provider.type === 'vercel') &&
-    !isAutoSmallFreeModel(requestedModel) &&
-    !(await isValidOpenRouterModelId(requestedModel))
-  ) {
-    return { type: 'invalid-openrouter-model' };
-  }
-
   const result = await upstreamRequest({
     chatApi: request.kind,
     search,
@@ -142,6 +156,7 @@ export async function sendUpstreamAttempt({
     signal,
     vercelRequestId,
     reasoningEffort: getReasoningEffort(request),
+    durationBudgetMs: upstreamDurationBudgetMs,
   });
   if (result.type === 'error') return result;
 
@@ -167,11 +182,12 @@ export async function sendUpstreamAttempt({
 
 /**
  * Keeps the stored Claude billing connection in step with Anthropic's answer.
- * A `user_profile_not_billable` response means the connection can no longer
- * bill, so later requests fail without an upstream call; the other refusals
- * leave it usable and are recorded for the owner to explain. A billed request
- * that succeeds clears the record. Best-effort: a database failure never
- * changes the upstream response the caller already has.
+ * A `user_profile_not_billable` or `user_profile_billing_not_authorized`
+ * response means the connection can no longer bill, so later requests fail
+ * without an upstream call; the other refusals leave it usable and are recorded
+ * for the owner to explain. A billed request that succeeds clears the record.
+ * Best-effort: a database failure never changes the upstream response the
+ * caller already has.
  */
 async function recordClaudeBillingRefusalResponse(
   response: Response,

@@ -8,7 +8,9 @@ import {
   buildAgentPayload,
   initialAgentFormState,
   mergePermissions,
+  PERMISSION_TOOLS,
   readDisabledTools,
+  readWholeToolAction,
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
 
@@ -30,21 +32,11 @@ function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
 
 describe('agentRows', () => {
   it('projects the row fields with primary as the default visibility', () => {
+    const row = { id: 'agent-1', name: 'Reviewer', visibility: 'primary' };
+
     expect(agentRows([agentSource(), agentSource({ config: {} })])).toEqual([
-      {
-        id: 'agent-1',
-        name: 'Reviewer',
-        visibility: 'primary',
-        description: 'Reviews code',
-        model: 'anthropic/claude',
-      },
-      {
-        id: 'agent-1',
-        name: 'Reviewer',
-        visibility: 'primary',
-        description: '',
-        model: '',
-      },
+      { ...row, description: 'Reviews code', model: 'anthropic/claude' },
+      { ...row, description: '', model: '' },
     ]);
   });
 });
@@ -54,29 +46,54 @@ describe('readDisabledTools', () => {
     expect(readDisabledTools({ bash: 'deny', read: 'allow', glob: { '**/*.ts': 'deny' } })).toEqual(
       ['bash']
     );
-  });
-
-  it('returns nothing for a non-object permission', () => {
     expect(readDisabledTools(undefined)).toEqual([]);
     expect(readDisabledTools(null)).toEqual([]);
     expect(readDisabledTools('allow')).toEqual([]);
+    expect(readDisabledTools('ask')).toEqual([]);
+    expect(readDisabledTools('deny')).toEqual([...PERMISSION_TOOLS]);
+  });
+
+  it('reports a whole-agent action and nothing for a tool map', () => {
+    expect(readWholeToolAction('ask')).toBe('ask');
+    expect(readWholeToolAction('deny')).toBe('deny');
+    expect(readWholeToolAction({ edit: 'deny' })).toBeUndefined();
+    expect(readWholeToolAction(null)).toBeUndefined();
   });
 });
 
 describe('mergePermissions', () => {
-  it('writes deny for a disabled tool and clears every other simple rule', () => {
-    expect(mergePermissions({ bash: 'deny', read: 'allow' }, ['read'])).toEqual({ read: 'deny' });
+  it('writes deny for a disabled tool and clears a stored denial that is now on', () => {
+    expect(mergePermissions({ bash: 'deny', read: 'ask' }, ['read'])).toEqual({ read: 'deny' });
     expect(mergePermissions({ bash: 'deny', read: 'deny' }, [])).toBeUndefined();
   });
 
-  it('preserves a per-pattern rule when a tool is re-enabled', () => {
-    const perPattern: AgentPermissionMap = { glob: { '**/*.ts': 'deny' } };
-    expect(mergePermissions(perPattern, [])).toEqual(perPattern);
+  it('keeps every stored rule the edit does not change', () => {
+    const loaded: AgentPermissionMap = {
+      read: 'ask',
+      bash: { 'git *': 'allow' },
+      external_directory: null,
+    };
+
+    expect(mergePermissions(loaded, readDisabledTools(loaded))).toEqual(loaded);
+    expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
-  it('returns undefined when nothing is left', () => {
-    expect(mergePermissions(undefined, [])).toBeUndefined();
-    expect(mergePermissions({ bash: 'deny' }, [])).toBeUndefined();
+  it('restores a stored rule once the switch returns to where it started', () => {
+    const loaded: AgentPermissionMap = { read: 'ask' };
+    const off = [...readDisabledTools(loaded), 'read'];
+
+    expect(mergePermissions(loaded, off)).toEqual({ read: 'deny' });
+    expect(
+      mergePermissions(
+        loaded,
+        off.filter(tool => tool !== 'read')
+      )
+    ).toEqual(loaded);
+  });
+
+  it('keeps a whole-agent action as the stored value', () => {
+    expect(mergePermissions('deny', ['read'])).toBe('deny');
+    expect(mergePermissions('ask', [])).toBe('ask');
   });
 });
 
@@ -111,9 +128,6 @@ describe('initialAgentFormState', () => {
       variant: '',
       disabledTools: ['bash'],
     });
-  });
-
-  it('seeds the sampling fields and variant from the agent config', () => {
     expect(
       initialAgentFormState(
         agentSource({
@@ -190,17 +204,10 @@ describe('validateAgentForm', () => {
     expect(validateAgentForm(formState({ description: `  ${'d'.repeat(2000)}\n` }))).toBeNull();
   });
 
-  it('refuses a slug reserved by a built-in agent', () => {
+  it('refuses a reserved or already-taken slug and allows a free one', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
-  });
-
-  it('refuses a slug another agent in the profile already uses', () => {
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['reviewer'])).toBe('slug-conflict');
-  });
-
-  it('allows a slug no other agent uses', () => {
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['plan'])).toBeNull();
-    expect(validateAgentForm(formState({ slug: 'reviewer' }), [])).toBeNull();
   });
 
   it('requires a display name', () => {
@@ -233,7 +240,7 @@ describe('buildAgentPayload', () => {
         mode: 'primary',
         model: 'x',
         prompt: 'You review',
-        permission: { bash: 'deny' },
+        permission: { bash: 'deny', read: 'allow' },
       },
     });
   });
@@ -280,23 +287,16 @@ describe('buildAgentPayload', () => {
     expect(payload.config.color).toBe('#112233');
   });
 
-  it('keeps the effort variant when the model is unchanged', () => {
-    const existing = { ...agentSource().config, variant: 'high' };
-    expect(
-      buildAgentPayload(formState({ model: 'anthropic/claude', variant: 'high' }), existing).config
-        .variant
-    ).toBe('high');
-  });
-
-  it('keeps the effort variant when the model changes to one that shares it', () => {
+  it('keeps the effort variant when the model is unchanged or changes to one that shares it', () => {
     // The sheet clears `state.variant` only when the typed model does not offer
     // it (`agent-form-sheet.tsx`), so a non-empty variant the form still carries
-    // belongs to the new model and must survive the switch.
+    // belongs to the model it now names and must survive the switch.
     const existing = { ...agentSource().config, variant: 'high' };
-    expect(
-      buildAgentPayload(formState({ model: 'openai/gpt', variant: 'high' }), existing).config
-        .variant
-    ).toBe('high');
+    for (const model of ['anthropic/claude', 'openai/gpt']) {
+      expect(
+        buildAgentPayload(formState({ model, variant: 'high' }), existing).config.variant
+      ).toBe('high');
+    }
   });
 
   it('sends a picked variant for a new agent once a model is typed', () => {

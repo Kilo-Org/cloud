@@ -16,8 +16,6 @@ import {
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   CreateBYOKKeyInputSchema,
@@ -44,6 +42,7 @@ import {
 import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
+  getSystemOneModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -58,13 +57,25 @@ import {
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
+  isGatewayUserByokEligibleModel,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  getVercelModelIdOverrides,
+  mapModelIdToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  findVercelOnlyModels,
+  getVendorNamesByModelPrefix,
+  getVercelOnlyModelName,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import type { NonChatVercelModelType } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -75,6 +86,7 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
@@ -176,7 +188,7 @@ async function toBYOKApiKeyResponse(
   const serveCatalogModels = servesCatalogModels(settings);
   return {
     ...key,
-    provider_name: key.provider_id,
+    provider_name: getByokProviderDisplayName(key.provider_id),
     serve_catalog_models: serveCatalogModels,
     supports_catalog_mode: supportsCatalog,
     // An enabled key can always leave catalog mode, even after its provider loses its mappings.
@@ -235,14 +247,14 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
-      'No Vercel model metadata in the database, use the admin panel at ' +
+      'No Vercel model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
   if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
-      'No OpenRouter model metadata in the database, use the admin panel at ' +
+      'No OpenRouter model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
@@ -256,21 +268,80 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     result[providerId].push(model.name + ' (' + model.id + ')');
   };
 
-  for (const openRouterModel of Object.values(openRouterModelMetadata)) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
-    for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
-      addSupportedModel(providerId, openRouterModel);
+  const addGatewayModel = async (model: { id: string; name: string }) => {
+    for (const providerId of await getModelGatewayUserByokProviders(model.id)) {
+      addSupportedModel(providerId, model);
     }
-    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
-    if (!vercelModel) continue;
-    if (vercelModel.type !== 'language') continue;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== 'language') return;
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag
       );
       if (!providerId) continue;
-      addSupportedModel(providerId, openRouterModel);
+      addSupportedModel(providerId, model);
     }
+  };
+
+  // System One models are listed with their label below.
+  const systemOneModelIds = new Set(getSystemOneModelIds(openRouterModelMetadata));
+  const openRouterModels = Object.values(openRouterModelMetadata);
+  for (const openRouterModel of openRouterModels) {
+    if (isAutoSmallFreeModel(openRouterModel.id) || systemOneModelIds.has(openRouterModel.id)) {
+      continue;
+    }
+    await addGatewayModel(openRouterModel);
+  }
+
+  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
+  const vercelOnlyModels = findVercelOnlyModels({
+    openRouterModelIds: Object.keys(openRouterModelMetadata),
+    openRouterModels,
+    vercelMetadata: vercelModelMetadata,
+    overrides: await getVercelModelIdOverrides(),
+  });
+  for (const vercelOnlyModel of vercelOnlyModels) {
+    await addGatewayModel({
+      id: vercelOnlyModel.id,
+      name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
+    });
+  }
+
+  // Embeddings and System One use the OpenRouter key, the Vercel AI Gateway key, and provider keys
+  // sent through Vercel, but only for OpenRouter catalog ids Vercel serves under the mapped id.
+  // Direct BYOK keys never serve them. Transcriptions use only the OpenRouter key.
+  const addNonChatModel = async (
+    model: { id: string; name: string },
+    endpoint: { label: string; vercelType?: NonChatVercelModelType }
+  ) => {
+    if (!isGatewayUserByokEligibleModel(model.id)) return;
+    const labelled = { id: model.id, name: `${model.name}, ${endpoint.label}` };
+    addSupportedModel('openrouter', labelled);
+    if (!endpoint.vercelType) return;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== endpoint.vercelType) return;
+    addSupportedModel('vercel-ai-gateway', labelled);
+    for (const vercelEndpoint of vercelModel.endpoints) {
+      const providerId = getVercelUserByokProviderIdForEndpoint(
+        vercelEndpoint.provider_name ?? vercelEndpoint.tag
+      );
+      if (providerId) addSupportedModel(providerId, labelled);
+    }
+  };
+  for (const modelId of systemOneModelIds) {
+    if (modelId.startsWith('~')) continue;
+    const model = openRouterModelMetadata[modelId];
+    await addNonChatModel(
+      { id: modelId, name: model?.name ?? modelId },
+      { label: 'System One', vercelType: 'evaluation' }
+    );
+  }
+  for (const model of (await getKiloEmbeddingModelCatalogFromDatabase())?.models ?? []) {
+    await addNonChatModel(model, { label: 'embeddings', vercelType: 'embedding' });
+  }
+  const transcriptionModels = await getOpenRouterTranscriptionModels().catch(() => null);
+  for (const model of transcriptionModels?.data ?? []) {
+    await addNonChatModel(model, { label: 'transcription' });
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
@@ -334,6 +405,25 @@ export const byokRouter = createTRPCRouter({
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return Promise.all(
         inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
+    }),
+
+  /**
+   * The providers a key can be added for, in the add form's order. Resolved on
+   * the server so every client offers the same list and validation: the mobile
+   * picker and the web select read this one query instead of each carrying a
+   * copy of the provider table.
+   */
+  listProviders: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.array(z.object({ id: UserByokProviderIdSchema, name: z.string() })))
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const experimentalByokEnabled = await isExperimentalByokEnabled(input.organizationId);
+      return ADD_BYOK_PROVIDERS.filter(
+        provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
       );
     }),
 
@@ -417,8 +507,6 @@ export const byokRouter = createTRPCRouter({
       await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
-      // Encrypt the API key
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const keyId = crypto.randomUUID();
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
@@ -439,7 +527,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
-          encrypted_api_key: encrypted,
           encrypted_api_key_envelope: envelope,
           created_by: ctx.user.id,
         })
@@ -514,7 +601,6 @@ export const byokRouter = createTRPCRouter({
       );
       validateUserByokCredential(existingKey.provider_id, api_key);
 
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
         context: getByokKmsContext(existingKey),
@@ -522,7 +608,7 @@ export const byokRouter = createTRPCRouter({
       });
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted, encrypted_api_key_envelope: envelope })
+        .set({ encrypted_api_key_envelope: envelope })
         .where(eq(byok_api_keys.id, id))
         .returning(BYOK_KEY_COLUMNS);
 
@@ -686,7 +772,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
-          encrypted_api_key: byok_api_keys.encrypted_api_key,
           encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
         })

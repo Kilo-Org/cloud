@@ -1,5 +1,5 @@
 import { type TFunction } from 'i18next';
-import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import { isPreparationCancellation, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -23,6 +23,8 @@ const STEP_LABEL_KEYS = {
   branch: 'agentChat.preparation.stepBranch',
   devcontainer_setup: 'agentChat.preparation.stepDevcontainerSetup',
   setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  session_setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  start_commands: 'agentChat.computeStatus.runningCommands',
   workspace_restore: 'agentChat.preparation.stepWorkspaceRestore',
   workspace_backup: 'agentChat.preparation.stepWorkspaceBackup',
   sandbox_provision: 'agentChat.preparation.stepSandboxProvision',
@@ -43,15 +45,18 @@ const STEP_LABEL_KEYS = {
 const MESSAGE_KEYS = {
   'Preparing environment': 'agentChat.preparation.preparingEnvironment',
   'Creating sandbox': 'agentChat.preparation.detailCreatingSandbox',
-  'Starting sandbox': 'agentChat.preparation.stepSandboxBoot',
+  'Starting sandbox': 'agentChat.preparation.detailStartingSandbox',
   'Retrying without a snapshot': 'agentChat.preparation.stepSnapshotFallback',
-  'Cloning repository': 'agentChat.preparation.stepCloning',
+  'Cloning repository': 'agentChat.preparation.detailCloningRepository',
   'Updating repository': 'agentChat.preparation.detailUpdatingRepository',
   'Checking out branch': 'agentChat.preparation.detailCheckingOutBranch',
   'Running setup commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running build commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running session setup': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running start commands': 'agentChat.computeStatus.runningCommands',
   'Saving repository for faster starts': 'agentChat.preparation.detailSavingRepository',
   'Starting Kilo runtime': 'agentChat.preparation.detailStartingKiloRuntime',
-  'Starting Kilo': 'agentChat.preparation.stepKiloServer',
+  'Starting Kilo': 'agentChat.preparation.detailStartingKilo',
   'Preparing Kilo session': 'agentChat.preparation.detailPreparingKiloSession',
   'Waiting for the previous sandbox to stop':
     'agentChat.preparation.detailWaitingForPreviousSandbox',
@@ -63,7 +68,7 @@ const MESSAGE_KEYS = {
   'Starting sandbox without a snapshot':
     'agentChat.preparation.detailStartingSandboxWithoutSnapshot',
   'Setting up workspace': 'agentChat.preparation.detailSettingUpWorkspace',
-  'Setting up branch': 'agentChat.preparation.stepBranch',
+  'Setting up branch': 'agentChat.preparation.detailSettingUpBranch',
   'Restoring session': 'agentChat.preparation.detailRestoringSession',
   'Importing session': 'agentChat.newSession.importingSession',
   'Warm workspace reused': 'agentChat.preparation.detailWarmWorkspaceReused',
@@ -113,8 +118,10 @@ const RESTORE_REPORT_PATTERN =
   /^Session restore incomplete: (\d+) of (\d+) files were not restored \(([^)]*)\)\.?(?: Missing: (.*))?$/u;
 const RESTORE_MORE_PATTERN = /^(.*) and (\d+) more$/u;
 const CLONE_RETRY_PATTERN = /^Retrying clone \(attempt (\d+) of (\d+)\)$/u;
-const SETUP_COMMAND_FAILED_PATTERN = /^Setup command (\d+) failed$/u;
-const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
+/** Every command kind reuses the setup-command copy until the catalogs gain kind-specific sentences. */
+const SETUP_COMMAND_FAILED_PATTERN = /^(?:Setup|Build|Session setup|Start) command (\d+) failed$/u;
+const SETUP_COMMAND_TIMED_OUT_PATTERN =
+  /^(?:Setup|Build|Session setup|Start) command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
 
@@ -172,6 +179,9 @@ export function preparationDetailText(detail: string, t: TFunction): string {
  * failure title.
  */
 export function preparationErrorText(error: string, t: TFunction): string {
+  if (isPreparationCancellation(error)) {
+    return t('agentChat.session.stopped');
+  }
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
 }
 

@@ -50,11 +50,12 @@ async function organizationToken(
     organizationId?: string;
     organizationRole?: 'owner' | 'member' | 'billing_manager';
     expiresInSeconds?: number;
+    pepper?: string | null;
   } = {}
 ): Promise<string> {
   const { token } = await signKiloToken({
     userId: USER_ID,
-    pepper: null,
+    pepper: options.pepper ?? null,
     secret: TEST_SECRET,
     expiresInSeconds: options.expiresInSeconds ?? 60,
     audience: options.audience,
@@ -94,6 +95,28 @@ describe('validateKiloToken', () => {
       kiloUserId: USER_ID,
       organizationId: ORGANIZATION_ID,
       organizationRole: 'member',
+      apiTokenPepper: null,
+    });
+  });
+
+  it('returns the token pepper claim unchanged', async () => {
+    const token = await organizationToken({
+      audience: AI_ATTRIBUTION_AUDIENCE,
+      pepper: 'pepper-current',
+    });
+
+    await expect(validateKiloToken(`Bearer ${token}`, TEST_SECRET)).resolves.toMatchObject({
+      success: true,
+      apiTokenPepper: 'pepper-current',
+    });
+  });
+
+  it('returns no pepper for a token that carries no claim', async () => {
+    const token = signPayload(policyPayload({ aud: AI_ATTRIBUTION_AUDIENCE }));
+
+    await expect(validateKiloToken(`Bearer ${token}`, TEST_SECRET)).resolves.toMatchObject({
+      success: true,
+      apiTokenPepper: undefined,
     });
   });
 
@@ -256,12 +279,38 @@ describe('authMiddleware', () => {
     expect(checkIdentity).toHaveBeenCalledWith(env, {
       kiloUserId: USER_ID,
       organizationId: ORGANIZATION_ID,
+      apiTokenPepper: null,
     });
     expect(response.status).toBe(403);
     expect(downstreamCalls()).toBe(0);
     await expect(response.json()).resolves.toEqual({
       success: false,
       error: 'Access denied',
+    });
+  });
+
+  it('refuses a stale credential with 401 and never reaches the handler', async () => {
+    const checkIdentity = jest.fn(async () => 'credential_stale' as const);
+    const { app, downstreamCalls } = buildApp(checkIdentity);
+    const token = await organizationToken({
+      audience: AI_ATTRIBUTION_AUDIENCE,
+      pepper: 'pepper-previous',
+    });
+    const env = { NEXTAUTH_SECRET: { get: async () => TEST_SECRET } } as Env;
+
+    const response = await app.request(
+      '/attributions/whoami',
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(downstreamCalls()).toBe(0);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Invalid or expired token',
     });
   });
 

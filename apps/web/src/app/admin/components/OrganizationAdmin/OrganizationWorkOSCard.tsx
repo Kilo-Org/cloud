@@ -29,11 +29,6 @@ type OrganizationWorkOSCardProps = {
   organizationId: string;
 };
 
-type WorkOSDomain = {
-  domain: string;
-  state: string;
-};
-
 function useOrganizationSSOConfig(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.sso.getConfig.queryOptions({ organizationId }));
@@ -69,6 +64,13 @@ function useDeleteSSOConfig() {
       onSuccess: (data, variables) => {
         void queryClient.invalidateQueries({
           queryKey: trpc.organizations.sso.getConfig.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+        // The delete also releases the organization's SSO domain, which this card reads from the
+        // organization record.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.withMembers.queryKey({
             organizationId: variables.organizationId,
           }),
         });
@@ -250,7 +252,8 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     if (
       await confirm({
         title: 'Delete the SSO configuration?',
-        description: 'This permanently removes the WorkOS SSO configuration and cannot be undone.',
+        description:
+          "This permanently removes the WorkOS SSO configuration and releases this organization's SSO domain. This cannot be undone.",
         confirmLabel: 'Delete configuration',
         destructive: true,
       })
@@ -304,19 +307,23 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
             </div>
 
             <div className="space-y-2">
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  WorkOS Organization ID
-                </label>
-                <p className="font-mono text-sm">{ssoConfig.id}</p>
-              </div>
+              {ssoConfig.kind === 'configuration' && (
+                <>
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      WorkOS Organization ID
+                    </label>
+                    <p className="font-mono text-sm">{ssoConfig.workosOrganization.id}</p>
+                  </div>
 
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Organization Name
-                </label>
-                <p className="text-sm">{ssoConfig.name}</p>
-              </div>
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      Organization Name
+                    </label>
+                    <p className="text-sm">{ssoConfig.workosOrganization.name}</p>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="text-muted-foreground text-sm font-medium">Domain Verified</label>
@@ -340,41 +347,44 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
                 </p>
               </div>
 
-              {ssoConfig.domains && ssoConfig.domains.length > 0 && (
-                <div>
-                  <label className="text-muted-foreground text-sm font-medium">
-                    Configured Domains
-                  </label>
-                  <ul className="space-y-1 text-sm">
-                    {ssoConfig.domains.map((domain: WorkOSDomain) => (
-                      <li key={domain.domain} className="flex items-center gap-2">
-                        <span>{domain.domain}</span>
-                        <span
-                          className={`rounded px-2 py-1 text-xs ${
-                            domain.state === 'verified'
-                              ? 'bg-green-100 text-green-800'
-                              : domain.state === 'pending'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {domain.state}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {ssoConfig.kind === 'configuration' &&
+                ssoConfig.workosOrganization.domains.length > 0 && (
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      Configured Domains
+                    </label>
+                    <ul className="space-y-1 text-sm">
+                      {ssoConfig.workosOrganization.domains.map(domain => (
+                        <li key={domain.domain} className="flex items-center gap-2">
+                          <span>{domain.domain}</span>
+                          <span
+                            className={`rounded px-2 py-1 text-xs ${
+                              domain.state === 'verified'
+                                ? 'bg-green-100 text-green-800'
+                                : domain.state === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {domain.state}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               <div>
                 <div className="flex items-center gap-2">
                   <label className="text-muted-foreground text-sm font-medium">
                     Organization SSO Domain
                   </label>
-                  <SsoDomainEditButton
-                    organizationId={organizationId}
-                    currentDomain={organization?.sso_domain}
-                  />
+                  {ssoConfig.kind === 'configuration' && (
+                    <SsoDomainEditButton
+                      organizationId={organizationId}
+                      currentDomain={organization?.sso_domain}
+                    />
+                  )}
                 </div>
                 <p className="text-sm">
                   {organization?.sso_domain ? (
@@ -388,16 +398,18 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
 
             {/* Admin Controls */}
             <div className="space-y-4 border-t pt-4">
-              <Button
-                onClick={handleDeleteSSO}
-                disabled={deleteConfig.isPending}
-                variant="destructive"
-                size="sm"
-                className="w-full"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleteConfig.isPending ? 'Deleting...' : 'Delete SSO Configuration'}
-              </Button>
+              {ssoConfig.kind === 'configuration' && (
+                <Button
+                  onClick={handleDeleteSSO}
+                  disabled={deleteConfig.isPending}
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleteConfig.isPending ? 'Deleting...' : 'Delete SSO Configuration'}
+                </Button>
+              )}
 
               {/* Debug Info */}
               <details>

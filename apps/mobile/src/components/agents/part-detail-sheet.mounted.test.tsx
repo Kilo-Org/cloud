@@ -53,6 +53,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
+  Keyboard: { dismiss: vi.fn() },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -531,6 +532,39 @@ describe('PartDetailSheet mounted', () => {
     });
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    await unmount(renderer);
+  });
+
+  it('keeps the text mode while the sheet leaves and resets it when the dismissal reports', async () => {
+    const part = makeBashPart('bash-1', 'echo hi');
+    const renderer = await mountSheet(part);
+    await act(async () => {
+      await Promise.resolve();
+      pressRadio(renderer.root, 'Scroll');
+    });
+    expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    // visible -> false only starts the native leave animation: the sheet
+    // keeps showing this presentation's mode while it leaves.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(sheetElement(part, false));
+    });
+    expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onDismiss') as () => void)();
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    // The next presentation starts fresh on Wrap.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(sheetElement(part, true));
+    });
+    expect(radioSelected(renderer.root, 'Wrap')).toBe(true);
 
     await unmount(renderer);
   });

@@ -12,6 +12,8 @@ import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentNextFailuresRouter } from '@/routers/cloud-agent-next-failures-router';
+import { appShellRouter } from '@/routers/app-shell-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
@@ -52,6 +54,7 @@ import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 import { personalVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
+import { computeBillingRouter } from '@/routers/compute-billing-router';
 export const rootRouter = createTRPCRouter({
   vercelCompute: personalVercelComputeRouter,
   test: testRouter,
@@ -65,6 +68,7 @@ export const rootRouter = createTRPCRouter({
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
   todos: todosRouter,
+  appShell: appShellRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   platformIntegrations: platformIntegrationsRouter,
@@ -73,6 +77,7 @@ export const rootRouter = createTRPCRouter({
   dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentNextFailures: cloudAgentNextFailuresRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
@@ -105,6 +110,7 @@ export const rootRouter = createTRPCRouter({
   userExports: userExportsRouter,
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
+  computeBilling: computeBillingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

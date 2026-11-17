@@ -76,6 +76,7 @@ async function anySessionExists(userId: string): Promise<boolean> {
 type LeafDeleteResult =
   | { kind: 'deleted' }
   | { kind: 'conflict' }
+  | { kind: 'worktree_deleting' }
   | { kind: 'failed'; outcome: DeletionHandlerOutcome };
 
 async function deleteLeafSession(
@@ -100,7 +101,12 @@ async function deleteLeafSession(
   });
   if ('outcome' in result) return { kind: 'failed', outcome: result.outcome };
 
-  if (result.response.status === 409) return { kind: 'conflict' };
+  if (result.response.status === 409) {
+    const body = await readJsonUnknown(result.response);
+    return isRecord(body) && body.error === 'worktree_deleting'
+      ? { kind: 'worktree_deleting' }
+      : { kind: 'conflict' };
+  }
   if (!result.response.ok && result.response.status !== 404) {
     return { kind: 'failed', outcome: classifyResponse(result.response) };
   }
@@ -201,6 +207,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
 
     let firstFailure: DeletionHandlerOutcome | null = null;
     let sawConflict = false;
+    let worktreeRefusals = 0;
     for (const result of results) {
       if (result.kind === 'deleted') {
         progress = incrementProcessed(progress);
@@ -210,11 +217,25 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
         sawConflict = true;
         continue;
       }
+      if (result.kind === 'worktree_deleting') {
+        worktreeRefusals += 1;
+        continue;
+      }
       if (!firstFailure) firstFailure = result.outcome;
     }
 
     if (firstFailure) return withProgress(firstFailure, progress);
-    if (sawConflict) {
+    // A batch the worktree guard refused entirely made no progress, so it takes
+    // the bounded retry path and reaches attention if that deletion stalls.
+    if (worktreeRefusals === results.length) {
+      return {
+        kind: 'retry',
+        errorCode: 'session_worktree_deleting',
+        httpStatusClass: '4xx',
+        progress,
+      };
+    }
+    if (sawConflict || worktreeRefusals > 0) {
       return { kind: 'continue', progress };
     }
   }

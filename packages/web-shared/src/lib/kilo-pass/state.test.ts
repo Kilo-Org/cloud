@@ -264,6 +264,7 @@ describe('getKiloPassStateForUser', () => {
       expect.objectContaining({
         status: 'canceled',
         resumesAt: null,
+        endedAt: '2025-09-10T00:00:00.000Z',
       })
     );
   });

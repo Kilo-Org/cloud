@@ -29,6 +29,7 @@ import {
 } from '../../src/lib/app-actions/app-action-contract';
 
 const IOS_DIRECTORY = './ios/';
+const APP_INTENTS_DIRECTORY = './ios/AppIntents/';
 const ANDROID_MAIN = './android/src/main/';
 const ANDROID_KOTLIN = `${ANDROID_MAIN}java/expo/modules/kiloappactions/`;
 
@@ -36,7 +37,7 @@ function readSource(path: string): string {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 }
 
-const intentsSource = readSource(`${IOS_DIRECTORY}KiloAppIntents.swift`);
+const intentsSource = readSource(`${APP_INTENTS_DIRECTORY}KiloAppIntents.swift`);
 const bridgeSource = readSource(`${IOS_DIRECTORY}KiloAppActionBridge.swift`);
 const iosModuleSource = readSource(`${IOS_DIRECTORY}KiloAppActionsModule.swift`);
 const manifestSource = readSource(`${ANDROID_MAIN}AndroidManifest.xml`);
@@ -51,6 +52,9 @@ const IOS_SOURCES: readonly NamedSource[] = [
   ['KiloAppIntents.swift', intentsSource],
   ['KiloAppActionBridge.swift', bridgeSource],
   ['KiloAppActionsModule.swift', iosModuleSource],
+  ['KiloSessionEntity.swift', readSource(`${APP_INTENTS_DIRECTORY}KiloSessionEntity.swift`)],
+  ['KiloSessionCatalog.swift', readSource(`${IOS_DIRECTORY}KiloSessionCatalog.swift`)],
+  ['KiloVisibleSession.swift', readSource(`${APP_INTENTS_DIRECTORY}KiloVisibleSession.swift`)],
 ];
 
 const ANDROID_SOURCES: readonly NamedSource[] = [
@@ -210,11 +214,27 @@ describe('the same four actions on both platforms', () => {
 });
 
 describe('the same native identifiers on both platforms', () => {
-  it('declares one App Intent per action id, and no fifth', () => {
+  /**
+   * The intents that are not one of the four contract actions, and why each is
+   * iOS-only. `OpenNamedSessionIntent` is the additive session picker the owner
+   * asked for: it opens the same `open-session` target through the same
+   * `KiloAppActionTarget.open`, adds no slug and no payload, and leaves the
+   * four existing intents — and every shortcut saved against them — untouched.
+   * Android keeps its four exported entry points; its assistant surface is not
+   * part of that change.
+   */
+  const IOS_ONLY_INTENTS = ['OpenNamedSessionIntent'];
+
+  it('declares one App Intent per action id, plus the iOS-only session picker', () => {
     for (const id of APP_ACTION_IDS) {
       expect(intentsSource, `${id} has no App Intent`).toContain(`struct ${id}Intent: AppIntent {`);
     }
-    expect(intentsSource.match(/: AppIntent \{/g)).toHaveLength(APP_ACTION_IDS.length);
+    for (const name of IOS_ONLY_INTENTS) {
+      expect(intentsSource, `${name} is not declared`).toContain(`struct ${name}: AppIntent {`);
+    }
+    expect(intentsSource.match(/: AppIntent \{/g)).toHaveLength(
+      APP_ACTION_IDS.length + IOS_ONLY_INTENTS.length
+    );
   });
 
   it('lists exactly one AppShortcut per action in the AppShortcutsProvider', () => {

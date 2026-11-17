@@ -11,6 +11,7 @@ import {
   scopeGrants as scopeGrantsTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { workerOrganizationMembershipReader } from '../../src/control-plane/sandbox/organization-membership.js';
 import {
   failExpiredRoutes,
   onRouteFailed,
@@ -28,6 +29,7 @@ import type {
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneRouteSpec,
+  type ControlPlaneRouteView,
 } from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
@@ -35,11 +37,13 @@ import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
   createFakeCredentialBroker,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import { waitFor } from './wait-for.js';
 
 const SANDBOX_ID = 'sbx__control_v2_routes';
@@ -156,6 +160,9 @@ function configuredPrepareInput(
       ...input.spec,
       directory,
       setupCommands,
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
@@ -208,6 +215,19 @@ function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: stri
     return rows[0] ?? null;
   });
 }
+
+/** The stored grant's expiry, so a test can prove no re-issue replaced it. */
+function grantExpiry(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    const id = rows[0]?.grant;
+    if (id === null || id === undefined) throw new Error('route has no grant');
+    return readScopeGrant(db, id)?.expiresAt ?? null;
+  });
+}
+
+/** Grant scopes with a pending renewal retry. */
 
 async function setAllocationField(
   stub: DurableObjectStub<SandboxControlV2>,
@@ -266,7 +286,7 @@ async function setup(
   const stub = sandboxNamespace.getByName(SANDBOX_ID);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker);
+    installFakeSandboxEnv(instance, broker);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -279,7 +299,11 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean; runtimeHarness?: string } = {}
+  options: {
+    workspaceConfiguration?: boolean;
+    runtimeInstructions?: boolean;
+    runtimeHarness?: string;
+  } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -287,7 +311,12 @@ async function connectAndHello(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, ...options });
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    runtimeInstructions: true,
+    ...options,
+  });
   const reply = await wrapper.hello({ wrapperId, allocationId });
   expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return { wrapper, credential, allocationId };
@@ -829,6 +858,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
   });
 
@@ -850,7 +882,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const stub = sandboxNamespace.getByName(SANDBOX_ID);
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
+      installFakeSandboxEnv(instance, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -1211,6 +1243,44 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
   });
 
+  it('fails the preparing route once the create attempt budget is spent', async () => {
+    const provider = createFakeProvider({ failCreates: 2 });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    const deadline = (await readRouteRow(stub, SESSION))?.attempt_deadline_at;
+    expect(deadline).toBeGreaterThan(Date.now());
+
+    // Attempt 1 fails, spends the retry pause, and the tick starts the retry.
+    await waitFor(async () => expect(provider.createCalls).toBe(1));
+    await setAllocationField(stub, { create_deadline_at: Date.now() - 1 });
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect(provider.createCalls).toBe(2);
+    });
+    // Attempt 2 fails too: the budget is spent, so the episode stops even though
+    // the attempt deadline still had time left.
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(provider.createCalls).toBe(2);
+    });
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'sandbox_create_failed',
+      })
+    );
+    const route = await readRouteRow(stub, SESSION);
+    expect(route).toMatchObject({ state: 'failed', reason: 'sandbox_create_failed' });
+    expect(route?.attempt_deadline_at).toBe(0);
+    // Budget spent and route failed: the stopped allocation starts no create.
+    expect(await readAlarm(stub)).toBeNull();
+    expect(provider.createCalls).toBe(2);
+  });
+
   it('sends every attachment its own workspace configuration', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
@@ -1222,9 +1292,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
+    expect(first.spec).not.toHaveProperty('runtimeInstructions');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
@@ -1249,6 +1323,38 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(changed.spec).not.toHaveProperty('setupCommands');
     expect(changed.spec).not.toHaveProperty('env');
   });
+
+  it.each([false, true])(
+    'omits profile instructions for pre-deploy wrappers (workspace configuration: %s)',
+    async workspaceConfiguration => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+      const { wrapper } = await connectAndHello(provider, 'wr_old', {
+        workspaceConfiguration,
+        runtimeInstructions: false,
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(workspaceConfiguration ? 'session.attach' : 'session.prepare');
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        expect(frame.spec).not.toHaveProperty('runtimeInstructions');
+        if (frame.type === 'session.attach') {
+          expect(frame.workspace).not.toHaveProperty('runtimeInstructions');
+        }
+        const row = await readRouteRow(stub, SESSION);
+        expect(JSON.parse(row?.spec ?? '{}').runtimeInstructions).toEqual([
+          { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+        ]);
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
 
   it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
     const root = 'workspace_12345678-1234-4234-8234-123456789abc';
@@ -1319,6 +1425,195 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect((await wrapper.next())?.type).toBe('session.prompt');
   });
 
+  it('retires a ready route when its owner is not a current member', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    // The route is ready with a grant that is due, and the membership answer
+    // changes.
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    // The sandbox reads the membership itself: the prompt is answered
+    // not_ready, the route releases, and the stored route is removed.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
+    expect((await wrapper.next())?.type).toBe('session.release');
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A released route stays released for a later prompt.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'not_ready'
+    );
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    wrapper.close();
+  });
+
+  it('retries a renewal whose organization membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        throw new Error('membership read unavailable');
+      };
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    // The issuance reads the membership once more, so a single unanswered read
+    // keeps the grant in place.
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    // A membership read that does not answer keeps the route ready on its
+    // grant, and the next send asks for a new grant.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    const before = await grantExpiry(stub, SESSION);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(2 * TIMERS.organizationMembershipReadAttempts);
+    expect(await grantExpiry(stub, SESSION)).toBe(before);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    wrapper.close();
+  });
+
+  it('requires a current membership to prepare an organization route', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+
+    const view = await stub.prepare(prepareInput(SESSION));
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // Without a grant the preparation fails and no sandbox starts.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('recovers a preparation whose first membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('membership read unavailable');
+        return true;
+      };
+    });
+
+    // The issuance reads again, and the preparation proceeds.
+    expect((await stub.prepare(prepareInput(SESSION))).state).not.toBe('failed');
+    expect(reads).toBe(2);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'preparing' });
+  });
+
+  it('reports an unavailable membership read when its reader throws', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    // This worker binds no Hyperdrive, so the production default reader throws.
+    // An unanswered membership read ends the issuance with its own denial.
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      const production = workerOrganizationMembershipReader(instance.env);
+      instance.organizationMembershipFor = async (userId, organizationId) => {
+        reads += 1;
+        return production(userId, organizationId);
+      };
+    });
+
+    const stages: unknown[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') stages.push(bounded.stage);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    let view: ControlPlaneRouteView;
+    try {
+      view = await stub.prepare(prepareInput(SESSION));
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // The denial names its own cause after the issuance exhausts its reads.
+    expect(stages).toEqual(['organization_membership_unavailable']);
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('keeps personal routes independent of organization membership', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        return false;
+      };
+    });
+    const personal = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        userId: 'user_123',
+        kiloSessionId: kiloSessionIdFor(SESSION),
+        kiloToken: NATIVE_KILO_TOKEN,
+        repository: { type: 'github' as const, repo: 'acme/widgets' },
+        scopeId: SESSION,
+      },
+    };
+
+    expect((await stub.prepare(personal)).state).not.toBe('failed');
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(0);
+    wrapper.close();
+  });
+
   it('replays the workspace configuration when the wrapper is replaced', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
@@ -1329,6 +1624,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const first = await wrapper.next();
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.workspace).toBeDefined();
+    expect(first.workspace.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
@@ -1338,6 +1636,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       sandboxId: SANDBOX_ID,
       credential,
       workspaceConfiguration: true,
+      runtimeInstructions: true,
     });
     try {
       expect(
@@ -1357,7 +1656,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   });
 
-  it('keeps the full legacy session.prepare spec without the capability', async () => {
+  it('keeps the full legacy session.prepare spec without workspace configuration support', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
     await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
@@ -1367,6 +1666,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(frame?.type).toBe('session.prepare');
     if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(frame.spec.setupCommands).toEqual(['echo shared']);
+    expect(frame.spec.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });
@@ -1401,6 +1703,72 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(reprepareFrame).toMatchObject({ type: 'session.prepare' });
     if (reprepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(reprepareFrame.spec.attemptId).toBe(after?.attempt_id);
+  });
+
+  it('carries the latest saved worktree recovery into a wrapper restart', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const initial = prepareInput(SESSION);
+    initial.spec = {
+      ...initial.spec,
+      worktreeRecovery: {
+        files: [{ path: 'old.txt', status: 'added', patch: 'old patch' }],
+      },
+    };
+    await stub.prepare(initial);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const latest = {
+      files: [{ path: 'src/latest.ts', status: 'modified' as const, patch: 'latest patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: latest };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(row).not.toBeNull();
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(latest);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
+    const frame = await wrapper2.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(latest);
+    wrapper2.close();
+    wrapper.close();
+  });
+
+  it('adopts a later saved worktree recovery while the route is still preparing', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const prepared = {
+      files: [{ path: 'old.txt', status: 'added' as const, patch: 'old patch' }],
+    };
+    const initial = prepareInput(SESSION);
+    initial.spec = { ...initial.spec, worktreeRecovery: prepared };
+    await stub.prepare(initial);
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+
+    const late = {
+      files: [{ path: 'src/late.ts', status: 'modified' as const, patch: 'late patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: late };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(late);
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1');
+    const frame = await wrapper.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(late);
+    wrapper.close();
   });
 
   it('re-notifies ready for the same wrapperId after a reconnect', async () => {
@@ -1541,6 +1909,300 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
     expect(provider.stopCalls).toEqual([provider.refs[0]]);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('cancels every chat in the workspace and stops the physical sandbox', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready');
+    });
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toEqual([provider.refs[0]]));
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(peer.workspaceStops.every(entry => entry.payload.stopEpoch === 1)).toBe(true);
+    expect(peer.routeUpdatesFor(SESSION_NEXT).some(update => update.state === 'lost')).toBe(false);
+  });
+
+  it('replays a dropped workspace_stopped from the alarm until acknowledged', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    peer.workspaceStopOnline = false;
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(peer.workspaceStops).toEqual([]);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const pending = await runInDurableObject(stub, (_instance, state) =>
+      Array.from(state.storage.kv.list<unknown>({ prefix }))
+    );
+    expect(pending).toHaveLength(2);
+    expect(await readAlarm(stub)).not.toBeNull();
+
+    await runInDurableObject(stub, (_instance, state) => {
+      for (const [key, value] of state.storage.kv.list<{ dueAt: number }>({ prefix })) {
+        state.storage.kv.put(key, { ...value, dueAt: 0 });
+      }
+    });
+    peer.workspaceStopOnline = true;
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('does not let an old acknowledgement clear a newer workspace stop', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = peer.forSession.bind(peer);
+    peer.forSession = sessionId => {
+      const target = original(sessionId);
+      if (sessionId !== SESSION) return target;
+      return {
+        ...target,
+        onWorkspaceStopped: async payload => {
+          started.resolve();
+          await release.promise;
+          return target.onWorkspaceStopped(payload);
+        },
+      };
+    };
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await started.promise;
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const key = `${prefix}${SESSION}`;
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(key, {
+        payload: { requestedAt: Date.now() + 10, stopEpoch: 2, attemptId: 'attempt-newer' },
+        dueAt: 0,
+      });
+    });
+    release.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toHaveLength(1);
+
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.at(-1)?.payload).toMatchObject({
+        stopEpoch: 2,
+        attemptId: 'attempt-newer',
+      })
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('deletes malformed pending workspace stops instead of replaying them', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(`${prefix}fractional-epoch`, {
+        payload: { requestedAt: 1, stopEpoch: 1.5, attemptId: 'attempt-fractional' },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}overlong-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: 'a'.repeat(129) },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}empty-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: '' },
+        dueAt: 0,
+      });
+    });
+
+    await runAlarm(stub);
+
+    expect(peer.workspaceStops).toEqual([]);
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('treats a malformed stored workspace stop as unset', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_workspace_stop', { epoch: 2.5, at: -1 })
+    );
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(Number.isInteger(result.stopAt)).toBe(true);
+  });
+
+  it('refuses stale work after a workspace stop but lets new intent restart it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const stoppedAt = Date.now();
+    const { stopEpoch, stopAt } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    await expect(
+      stub.prepare({
+        ...prepareInput(SESSION_NEXT),
+        stopEpoch: 0,
+        intentAt: stoppedAt,
+      })
+    ).resolves.toEqual({ state: 'unknown', stopEpoch, stopAt });
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch,
+      intentAt: stoppedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+  });
+
+  it('accepts a private restart while the sibling never observed the stop', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const stoppedAt = Date.now();
+    const { stopEpoch } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    // A message created after Stop is new intent even when this chat still
+    // carries the old epoch because the stop notification was lost.
+    const view = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: 0,
+      intentAt: Date.now() + 5,
+    });
+    expect(view.state).toBe('preparing');
+    expect(stopEpoch).toBe(1);
+  });
+
+  it('keeps a retried Stop idempotent so it cannot cancel a newer attempt', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const requestedAt = Date.now();
+    const first = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: first.stopEpoch,
+      intentAt: requestedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+
+    // The same accepted Stop arrives again (retry after a lost response).
+    await expect(stub.cancelWorkspace({ sessionId: SESSION, requestedAt })).resolves.toEqual(first);
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+  });
+
+  it('retires preparation that started after requestedAt but before the Stop ran', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const requestedAt = Date.now() - 10;
+    await stub.prepare(prepareInput(SESSION));
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+
+    expect(result.stopAt).toBeGreaterThan(requestedAt);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+  });
+
+  it('does not prepare a cancelled workspace when a wrapper connects afterwards', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launchEnv = provider.launchEnvs[0];
+    const credential = launchEnv?.SANDBOX_CONTROL_CREDENTIAL;
+    const allocationId = launchEnv?.CONTROL_PLANE_ALLOCATION_ID;
+    if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A wrapper that opens its socket after Stop finds no route to prepare.
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_late', allocationId });
+    if (reply?.type === 'welcome') expect(await wrapper.next(100)).toBeNull();
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.stopGates[0]?.('terminal'));
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('leaves an independently placed workspace sandbox untouched', async () => {
+    const provider = createFakeProvider();
+    const otherProvider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const otherStub = sandboxNamespace.getByName(`${SANDBOX_ID}_other`);
+    const otherPeer = new FakeSessionPeer();
+    await runInDurableObject(otherStub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
+      Object.assign(instance, {
+        createProviderAdapter: () => otherProvider.adapter,
+        provider: otherProvider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => otherPeer.forSession(sessionId),
+      });
+    });
+    await stub.prepare(prepareInput(SESSION));
+    await otherStub.prepare(prepareInput(SESSION_THIRD));
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect((await readRouteRow(otherStub, SESSION_THIRD))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+    expect(otherProvider.stopCalls).toEqual([]);
   });
 
   it.each([
@@ -2112,7 +2774,64 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'unknown' },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
+  });
+
+  it('interrupts native preparation before its probe completes and waits only for destroy', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const native = await pendingNativeStart();
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      });
+      return { startSource: 'image' };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopCalls.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const { stub } = await setup(provider);
+    try {
+      await stub.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await readState(stub)).kind).toBe('creating');
+
+      await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+      await stub.prepare({ ...prepareInput(SESSION), stopEpoch: 1 });
+
+      // The readiness read is still blocked. Destroy must already have started.
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      expect((await readState(stub)).kind).toBe('stopping');
+      expect(native.container.starts).toBe(1);
+      expect(provider.createCalls).toBe(1);
+
+      native.releaseDestroy();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(native.container.starts).toBe(2);
+      const replacement = await readState(stub);
+      expect(replacement.providerRef).toBe(provider.refs[1]);
+
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
+      expect(native.container.starts).toBe(2);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).toContain('launch_interrupted');
+      expect(diagnostics).not.toContain('create_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+    }
   });
 
   it('returns at once and stores a new route when prepare runs during stopping', async () => {
@@ -2406,6 +3125,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
     expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
   });

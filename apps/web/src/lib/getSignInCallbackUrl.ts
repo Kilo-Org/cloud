@@ -15,6 +15,9 @@ export function stripHost(url: string): string {
 }
 
 export function isValidCallbackPath(path: string): boolean {
+  if (path === '/api/auth/pending-link/complete') {
+    return true;
+  }
   if (
     path.startsWith('/users/accept-invite') ||
     path.startsWith('/get-started') ||

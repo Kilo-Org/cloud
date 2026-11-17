@@ -113,6 +113,7 @@ export function classifyControlPlaneFailure(
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':
+    case 'sandbox_create_failed':
       return PRE_DISPATCH_SANDBOX_CONNECT;
     case 'agent_unavailable':
       return dispatchState === 'accepted'
@@ -128,11 +129,13 @@ export function classifyControlPlaneFailure(
       return POST_DISPATCH_WRAPPER_DISCONNECTED;
     case 'no_progress':
     case 'no_outcome':
+    case 'completion_unconfirmed':
       return POST_DISPATCH_WRAPPER_NO_OUTPUT;
     case 'prompt_failed':
       return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;
     case 'sandbox_stopped':
     case 'execution_limit':
+    case 'preparation_cancelled':
       // Spec §10 maps both to interruption/system_interrupt. The report schema
       // permits an interruption classification only on an interrupted run, so
       // the report writer reports a run carrying this classification as

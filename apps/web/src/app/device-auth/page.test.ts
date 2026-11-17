@@ -20,6 +20,7 @@ jest.mock('@/lib/device-auth/device-auth-viewer-token', () => ({
 }));
 
 jest.mock('@/lib/device-auth/device-auth', () => ({
+  getDeviceAuthPendingLink: jest.fn(async () => null),
   getDeviceAuthRequest: jest.fn(),
   isDeviceAuthRequestExpired: jest.fn(),
 }));
@@ -34,12 +35,12 @@ const requestedClient = {
 
 const mockedRedirect = jest.mocked(redirect);
 const mockedGetUserFromAuthOrRedirect = jest.mocked(getUserFromAuthOrRedirect);
-const { getDeviceAuthRequest, isDeviceAuthRequestExpired } = jest.requireMock(
-  '@/lib/device-auth/device-auth'
-) as {
-  getDeviceAuthRequest: jest.Mock;
-  isDeviceAuthRequestExpired: jest.Mock;
-};
+const { getDeviceAuthPendingLink, getDeviceAuthRequest, isDeviceAuthRequestExpired } =
+  jest.requireMock('@/lib/device-auth/device-auth') as {
+    getDeviceAuthPendingLink: jest.Mock;
+    getDeviceAuthRequest: jest.Mock;
+    isDeviceAuthRequestExpired: jest.Mock;
+  };
 
 describe('DeviceAuthPage missing code handling', () => {
   beforeEach(() => {
@@ -97,6 +98,26 @@ describe('DeviceAuthPage requesting client', () => {
     })) as { props: { requestingClient: unknown } };
 
     expect(element.props.requestingClient).toBeNull();
+  });
+
+  test('hands the approval page the pending link the request carries', async () => {
+    getDeviceAuthRequest.mockResolvedValue(requestedClient);
+    isDeviceAuthRequestExpired.mockReturnValue(false);
+    getDeviceAuthPendingLink.mockResolvedValue({
+      provider: 'github',
+      email: 'octo@example.com',
+      displayName: 'octocat',
+    });
+
+    const element = (await DeviceAuthPage({
+      searchParams: Promise.resolve({ code: 'ABCD-1234' }),
+    })) as { props: { pendingLink: unknown } };
+
+    expect(element.props.pendingLink).toEqual({
+      provider: 'github',
+      email: 'octo@example.com',
+      displayName: 'octocat',
+    });
   });
 
   test('hands no client for a request that can no longer be approved', async () => {

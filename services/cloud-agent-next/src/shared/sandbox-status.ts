@@ -121,6 +121,8 @@ export const SandboxRuntimeMetadataSchema = z.object({
 
 export type SandboxRuntimeMetadata = z.infer<typeof SandboxRuntimeMetadataSchema>;
 
+export const SandboxWorkspaceSnapshotSchema = z.object({ capturedAt: timestampSchema });
+
 export const SandboxStatusSnapshotSchema = z
   .object({
     status: SandboxLifecycleStatusSchema,
@@ -130,6 +132,7 @@ export const SandboxStatusSnapshotSchema = z
     ),
     detailCode: SandboxStatusDetailCodeSchema,
     runtime: SandboxRuntimeMetadataSchema.optional(),
+    workspaceSnapshot: SandboxWorkspaceSnapshotSchema.optional(),
     inactivityTimeoutMs: z
       .number()
       .finite()

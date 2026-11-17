@@ -3,8 +3,10 @@ import { jest } from '@jest/globals';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type * as ProfilesManagerModule from './ProfilesManager';
+import type { ProfileSummary } from '@/hooks/useCloudAgentProfiles';
 
 const mockCanManage = jest.fn<() => { data?: { canManage: boolean }; error?: Error }>();
+const mockProfiles = jest.fn<() => { data: ProfileSummary[] }>(() => ({ data: [] }));
 
 jest.mock('@/hooks/useCloudAgentSettings', () => ({
   useCloudAgentSettings: () => mockCanManage(),
@@ -12,7 +14,7 @@ jest.mock('@/hooks/useCloudAgentSettings', () => ({
 
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useCombinedProfiles: () => ({ data: { orgProfiles: [], personalProfiles: [] } }),
-  useProfiles: () => ({ data: [] }),
+  useProfiles: () => mockProfiles(),
   useCombinedProfileMutations: () => ({}),
   useProfileMutations: () => ({}),
 }));
@@ -30,6 +32,40 @@ function renderManager(organizationId: string | undefined = 'org-1'): string {
 }
 
 describe('ProfilesManager creation permissions', () => {
+  afterEach(() => {
+    mockProfiles.mockReturnValue({ data: [] });
+  });
+
+  it('shows profile names without abbreviated collection counts', () => {
+    mockCanManage.mockReturnValue({});
+    mockProfiles.mockReturnValue({
+      data: [
+        {
+          id: 'profile-1',
+          name: 'My Profile',
+          description: null,
+          isDefault: false,
+          createdAt: '2026-04-29T00:00:00.000Z',
+          updatedAt: '2026-04-29T00:00:00.000Z',
+          varCount: 2,
+          commandCount: 0,
+          mcpServerCount: 1,
+          skillCount: 6,
+          agentCount: 0,
+          kiloCommandCount: 0,
+          instructionCount: 0,
+        },
+      ],
+    });
+
+    const markup = renderManager('');
+
+    expect(markup).toContain('My Profile');
+    expect(markup).not.toContain('2v');
+    expect(markup).not.toContain('1m');
+    expect(markup).not.toContain('6s');
+  });
+
   it('allows organization creation for managers', () => {
     mockCanManage.mockReturnValue({ data: { canManage: true } });
 

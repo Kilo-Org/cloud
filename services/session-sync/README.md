@@ -125,6 +125,57 @@ deferred parts, and no part newer than that frontier. Otherwise it is incomplete
 not a truncated complete message. Large immutable single parts remain private blobs.
 These are producer/reader semantics; the service stores opaque bounded JSON.
 
+The shared SDK exposes canonical history through
+`NativeSyncClient.getSnapshot(sessionID, organizationID?, signal?)`. Its `NativeSnapshot`
+retains revision, source position, portable entities/blob references, and ordered
+`{seq, message, partOrdinals?, incomplete?}` entries. `message` is the full reconstructed
+native value, not a reduced chat view: files, costs/tokens, errors and unmodeled native
+metadata remain available. Native message values are validated using the existing
+`@kilocode/session-ingest-contracts` Kilo2 message schema without stripping native fields.
+The portable session reuses the Kilo2 session fields but carries `origin.directory`
+instead of the excluded local `location` binding. The raw snapshot preserves that shape;
+projection supplies `location.directory` from origin only to label shared display data.
+Origin is never a runtime root, authorization claim, or filesystem grant.
+
+`projectNativeSnapshot(snapshot)` feeds complete canonical messages through the same
+`readKilo2Messages` projector as Cloud Agent history. It returns the native session,
+revision/source position, shared display messages, and explicit `incompleteMessageIDs`.
+Incomplete entries retain their original native envelope but are never rendered as
+complete empty answers. A valid uploaded empty session projects to an empty message list;
+if the session entity has not arrived, projection fails with `session_metadata_missing`
+instead of inventing session metadata. Missing/deleted service errors still propagate.
+Sparse sync ordinals remain reconstruction metadata, not shared display part IDs.
+
+Native user files may contain `uri: "media:<sha256>"` instead of inline `data`;
+tool results carry file content by URI. The shared schemas accept both native
+forms without inventing inline bytes. `getSnapshot` resolves required private
+attachment bytes through the same organization-scoped grant as its JSON reads.
+Only an asset mapping matching the owning entity, exact JSON pointer, original
+reference, MIME and content address can authorize that download. Downloads use
+the fixed session blob route, check advertised byte length, share the snapshot's
+deadlines/cancellation/revision recovery, and deduplicate bytes by blob hash.
+No native local path, raw media URI or credential-bearing service URL is exposed
+as an attachment URL. The sidecar `assetURLs` contains actual downloaded bytes as
+data URLs keyed by `kilo2AssetKey(displayFileID, originalURI, mime)`; canonical native
+messages and asset entities remain unchanged. Missing/mismatched mappings fail
+explicitly rather than silently dropping a file or making an unauthenticated fetch.
+
+The shared projector exposes every completed/errored native tool image/document
+as an ordinary message FilePart, so specialized tool cards cannot hide files and
+the existing file renderer handles images, PDFs and MCP documents for every tool.
+The projector has one native-file display authority: ordinary FileParts, not a
+parallel `state.attachments` mirror that could duplicate images in generic cards.
+Exact tool file content remains available in the canonical native message.
+Errored results retain their failure status. Unresolved live private references
+stay pending native snapshot recovery; a prior revision's resolved URL cannot
+satisfy a different content-addressed URI.
+Mutable local-path references require reauthorization after an authoritative update.
+
+This snapshot adapter does not turn sync positions into Cloud event cursors,
+replace native live replay, or imply transport/auth/runtime equivalence.
+The existing `connectSession` live view remains transport-specific; client integration
+must keep its reset, incomplete/recovery and pending-interaction behavior explicit.
+
 This is a clean pre-release protocol cutover: the default-on native client has
 not been released and both production DO namespaces were verified empty before
 this change. No legacy envelope migration or dual-writing compatibility path is needed.
@@ -149,6 +200,23 @@ The baseline uses one SQLite-backed Durable Object per tenant and session.
 Use the repository's Drizzle durable-sqlite schema and migration conventions.
 Keep current entities and producer receipts in SQLite.
 Keep large bodies and assets in private R2 objects scoped to the session.
+
+Session Sync does not write transcripts or catalog rows to PostgreSQL's
+`cli_sessions_v2`. It uses PostgreSQL only for account and credential checks.
+Cloud Agent independently registers ownership metadata in `cli_sessions_v2` and
+stores native v2 history in its own Session Durable Object.
+The [hosted history consolidation design](docs/native-history-consolidation.md)
+is proposed, not implemented. Uploading a hosted copy does not change Cloud Agent's
+history authority or enable downloading, restoration, migration, or remote control.
+
+CLI v2 in Cloud Agent uses its existing native upload journal. Its opaque runtime
+handle exchanges through the binding-only `SessionSyncAuthorization` entrypoint in
+Cloud Agent. Each upload checks the current runtime grant and owned native session.
+Only registration, batch/blob uploads, and receipt inspection are permitted.
+Transcript/blob downloads, discovery, deletion, tickets, and commands remain denied.
+Human/device exchange and its account checks remain unchanged.
+Publish the Cloud Agent authorization entrypoint before deploying the Session Sync
+binding that references it. This requires no PostgreSQL migration.
 
 Normalize or version stored data at the boundary.
 Do not persist an entire growing assistant message after every token.
@@ -321,6 +389,10 @@ as registration retries; an already-created session adopts that admission instea
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.
+A denied first registration of a new session removes its intent, its wakeup, and its
+creator index entry before it answers, so a refused identifier leaves no admission
+residue for the alarm to retry. An unconfirmed refusal cleanup keeps the intent, and
+that alarm removes the remaining index entry.
 
 ### Account erasure and idle retention
 
@@ -469,6 +541,85 @@ Never replay an ambiguous external tool effect automatically.
 
 ## Live delivery, commands, and presence
 
+### User session notifications
+
+Session notifications report committed storage changes independently of remote
+control, runner sockets, and per-session subscriptions. The later Cloud Agent web
+integration can use these notifications to invalidate session lists and status.
+No web UI consumer is added here.
+
+| Method | Path | Input / result |
+|---|---|---|
+| POST | `/v1/notifications/ticket` | A human/device sync grant → `{ticket,expiresAt}` |
+| GET | `/v1/notifications` | WebSocket upgrade with a `session-notifications` viewer ticket |
+| PUT | `/v1/sessions/:id/status` | `{version:1,sourceID,after,status}` → `{value,version,updatedAt}` |
+
+Use the same `kilo-session-ticket.<ticket>` WebSocket subprotocol as live sockets.
+Bearer tickets also work for server clients. Query credentials are rejected.
+The service checks tickets again inside `SessionNotificationsDO`, which is keyed
+by authenticated user. Each socket receives only that user's sessions in its
+ticket's tenant. Organization membership never grants another creator's events.
+Open separate connections for separate tenant scopes.
+
+The service immediately sends `{version:1,type:"hello",body:{expiresAt,reauthAt,
+reconnectAfterMs,resetRequired:true}}`. It then broadcasts:
+
+```json
+{
+  "version": 1,
+  "type": "session.updated",
+  "session": {
+    "sessionID": "ses_synthetic",
+    "tenant": {"type": "user", "id": "synthetic-user"},
+    "revision": 1,
+    "position": 7,
+    "title": "Updated title",
+    "status": {"value": "question", "version": 2, "updatedAt": 1794500000000},
+    "createdAt": 1794400000000,
+    "updatedAt": 1794500000000,
+    "deletedAt": null
+  },
+  "changedAt": 1794500000000
+}
+```
+
+Event types are `session.created`, `session.updated`, `session.status.updated`,
+and `session.deleted`. Creation follows successful registration. Each newly
+committed batch emits `session.updated`, including title changes. Batch retries
+do not emit again. Rejected or rolled-back writes never emit. Deletion includes
+explicit deletion, account erasure, and idle retention; repeated deletion does
+not emit again. Events contain bounded metadata, never transcript or question
+contents. `title` is omitted when the native session entity is absent or stored
+as a blob; consumers fetch the canonical snapshot in that case. Inline titles
+are limited to 1,024 characters in notifications.
+
+Native sync does not infer execution status from transcript entities or the
+remote-control relay. Producers must explicitly write status using the new
+endpoint; existing producers do not yet do this automatically. The write checks
+the session creator, tenant, source binding, and live Cloud Agent upload authority
+where applicable. `after` is the last observed **status version**, starting at
+zero, not a transcript source position. A changed status increments that version;
+same-status writes and exact last-transition retries are no-ops. A stale version
+returns `position_conflict` with the current status version. Status accepts bounded
+lowercase tokens such as `busy`, `question`, `permission`, `retry`, and `idle`.
+`GET /v1/sessions/:id` exposes the last committed status, or null before the first
+status write or when stored status is invalid. Notifications also use null for
+invalid stored status. Status writes do not change transcript revision or position.
+
+Notifications are best-effort invalidation hints, not a durable event log.
+Delivery failure cannot reject a committed upload. Delivery can be missing,
+duplicated, or reordered; consumers refetch authoritative data and use transcript
+revision/status version to reject stale results. Refresh the creator index and
+canonical session state on every connection and periodically while connected.
+The stream has no replay cursor and retains no offline events. Each session
+allows 64 pending notification tasks plus one deletion task. The first tombstone
+can use the extra task; repeated deletion emits no event. Each user has at most 100
+notification sockets, with 120 client frames per minute per socket and an 8 KiB
+input-frame limit. Socket attachments survive hibernation; alarms close expired
+tickets. Send `{type:"reauth",ticket}` before expiry; user, tenant, and audience
+cannot change. `{type:"ping"}` receives a `pong` control frame. Clients cannot
+publish notifications or execute commands through this stream.
+
 The cloud is a thin relay: it authenticates, stamps sender/time/sequence, applies
 limits, keeps a short event replay ring, and stores opaque command payloads. It
 does not interpret approvals, aborts, slash commands, run IDs, or sync positions.
@@ -521,7 +672,15 @@ Runner input: `{channel:"events",type,body?}` (missing body defaults to null). T
 `{type:"subscribe",afterSeq}`. Available events replay in order; a gap, expired
 tail, unknown future cursor, or lost ring produces `reset_required` and pauses
 event delivery. Refetch the durable snapshot, then explicitly resubscribe from
-the supplied boundary.
+the supplied boundary. A socket that is already subscribed replays only the
+entries above the highest sequence it has received, so a repeated `subscribe`
+sends the `subscribed` control frame alone; a client that needs an earlier
+cursor reconnects instead. The `subscribed` body is `{seq,cursor}`: `seq` is the
+current event sequence and `cursor` is the position the replay continued from,
+so a client can detect that its requested cursor was advanced. The received
+position is held in memory only and is not written to the socket attachment:
+after hibernation the replay floor already starts at the stored sequence
+ceiling, so a persisted position could never change replay.
 The `hello` control frame includes the current event sequence, runner connectivity,
 ticket lifetime, and a jittered `reconnectAfterMs`.
 
@@ -534,7 +693,9 @@ rate budget, and mailbox as socket submission.
 
 `queued` means never handed to a runner; `delivered` means handed to one, not
 executed or acknowledged. Unacked payloads redeliver oldest-first on reconnect
-until ack or TTL. Ack deletes the payload. TTL removes any remaining payload,
+until ack or TTL. Each replay re-sends the stored frame; the first hand-off records
+the transition, and later replays of an unchanged delivered row write nothing.
+Ack deletes the payload. TTL removes any remaining payload,
 marks only never-delivered items `expired`, and preserves `delivered` once handed
 off. Semantic execution outcomes are runner events. Finished status tombstones
 last up to 24 hours and may be evicted to maintain bounds; unknown/evicted IDs
@@ -560,7 +721,9 @@ One hibernatable runner socket per CLI process advertises via
 `startedAt` is Unix milliseconds, `gitBranch` is string or null, capabilities and
 sessions are string arrays. Advertisements are bounded; no heartbeat means
 offline after 90 seconds. Presence viewer `{type:"subscribe"}` receives `instances`
-snapshots, including removals. Records include `{instanceID,tenant,advertisement,
+snapshots, including removals. Snapshots are change-driven: a new or changed
+advertisement, an online-state change, or an instance leaving produces one snapshot,
+and `lastHeartbeatAt` is the value at that snapshot. Records include `{instanceID,tenant,advertisement,
 online,lastHeartbeatAt}`. Same-user/tenant/instance reconnect replaces the previous
 socket with code 4009; presence 4009 may retry, unlike session-relay 4009.
 No disconnected-instance history is retained. Ads are held
@@ -588,6 +751,21 @@ envelope with body `{commandID,instanceID,payload}`; the controller gets
 instances reject with `instance_offline` (HTTP 409). No mailbox or command payload
 is stored. Runner-owned types include `create_session`, `list_directories`,
 `list_models`, and `list_agents`; session commands remain on SessionRelayDO.
+
+Native `list_models` accepts `{cursor?:number}` with a nonnegative integer offset.
+Its successful result is `{models:[{id,providerID,name,limit,variants}],nextCursor:number|null}`;
+`limit` retains context/input/output token limits and `variants` contains `{id}` entries.
+The runner pages encoded model entries within 48 KiB, leaving room for the command
+outcome and relay envelope. Consumers use `listNativeModels(connection, instanceID)`
+to validate and collect every page until `nextCursor:null`; missing/malformed pages,
+unknown outcomes and nonadvancing cursors are errors, never truncated catalogs.
+
+The development web preview is available at `/native-remote` for personal presence
+and `/organizations/:id/native-remote` for organization presence. Both routes remain
+server-gated to development. Mobile waits for its existing organization selection to
+restore before connecting presence; changing scope closes old presence/session
+connections and resets selections and drafts. Creator-index session discovery still
+spans all tenants and is not an organization authorization check.
 
 Runner reply `{type:"reply",commandID,body?}` routes only to the originating
 controller as control `reply {commandID,instanceID,payload}`. Routing metadata
@@ -620,10 +798,40 @@ decision. The SyncDO tombstone retains intent until purge is acknowledged.
 Sessions never authorized for live access skip relay creation and purge.
 
 Relay/presence Analytics Engine points index the normalized live operation, with
-blobs `[route,role]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
-are excluded. HTTP request points retain the schema documented above.
+blobs `[route,role,reason?]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
+are excluded. Presence fan-out points carry the cause of the fan-out in the reason blob.
+HTTP request points retain the schema documented above.
 
 ### Local end-to-end proof
+
+The repository launcher supports the optional `session-sync` group:
+
+```sh
+pnpm dev:start --no-attach agents session-sync
+```
+
+For the service alone, select `cloudflare-session-sync`. The launcher configures
+worktree-specific ports, the local authentication database, and development secrets.
+Read the actual service port with `pnpm dev:status --json`.
+Local Durable Object and R2 data stay under this service's `.wrangler/state/`.
+
+The native CLI keeps its fixed sync destination. Cloudflare sandbox outbound handling
+forwards that origin to the local `SESSION_SYNC` service binding instead of production.
+The local service checks handles through `CLOUD_AGENT_SYNC_AUTH`, bound to this
+worktree's Cloud Agent Worker. Local credentials never need production access.
+
+After selecting the local v2 organization as described in
+`services/cloud-agent-next/kilo2-runtime/README.md`, run this producer proof from the
+repository root with a funded synthetic local account:
+
+```sh
+E2E_USER_EMAIL=<local-test-email> E2E_ORG_ID=<local-test-organization> \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/session-sync-local.ts
+```
+
+It verifies cold/warm native turns, private large-content uploads, and denial of
+hosted transcript downloads and deletion. The readback uses a separate local
+human credential for verification only; no download path is added to Cloud Agent.
 
 On an isolated work VM, install workspace dependencies and run
 `node scripts/live-e2e.mjs` from this service directory. It launches real
@@ -823,22 +1031,50 @@ using checked source anchors. It changes no SDK file or public API. Report it
 separately from the ordinary `plain` run. Its extra parsing/observer work is part
 of its measured overhead.
 
-`local2x` offers 6,250 presence connections, 626 watched sessions at 10 Hz,
-626 actual SDK viewers, and 1,250 scheduled checkpoints/second. This covers
-twice the largest 3,125-session/313-viewer production generator shard.
-`raw2x` is the separate raw-reader baseline; `sdk625` exercises 625 actual
-SDK viewers at 20 Hz as an additional stress case.
-The full shape remains 100,000 sessions, 10,000 watched at 10 Hz, and one
-actual SDK viewer per watched session. Raw mirrors are not part of that shape.
+Population fields are independent: `sessions` registers sessions and presence;
+`streamingSources` opens runner sockets and offers 512-byte events at `eventHz`;
+`watched` counts distinct viewer-backed sessions, not producers; `sdkViewers`
+counts actual `NativeSyncClient` instances. SDK and raw viewers cover exactly
+the watched subset (raw mirrors add connections, not distinct sessions).
+All viewer-backed sessions must belong to the streaming-source subset.
+
+`sourceTrafficMode: "all-streaming-sources"` explicitly enables a synthetic
+service-ingress overload: every declared source sends even without a viewer watch
+signal. The watched subset must still receive real watch signals. This does not
+change the real CLI's watch-driven suppression or claim that unwatched traffic is
+its normal behavior. Producer-only sources have durable checkpoint reconciliation,
+not consumer-delivery evidence.
+
+`local2x` offers 6,250 presence connections **and 6,250 streaming sources** at
+10 Hz (62,500 events/second), 626 watched sessions/actual SDK viewers, and 1,250
+scheduled checkpoints/second. It is twice one 3,125-source/313-viewer shard of
+the 32-shard full shape; the changed emitter workload requires fresh per-process
+and combined-host qualification, not reuse of the previous watched-only result.
+`raw2x` is the same source load with 626 raw readers instead of SDK instances;
+`sdk625` exercises 625 sources and actual SDK viewers at 20 Hz. `smoke` deliberately
+has 12 sources but only four watched sessions (two SDK and two raw), so qualification
+exercises unwatched producer traffic too.
+
+`full` declares 100,000 concurrently streaming sources at 10 Hz, 10,000 watched
+sessions and 10,000 actual SDK viewers, with no raw mirrors. Offered ingress is
+1,000,000 events/second: 55,000,000 total scheduled sends, including 45,000,000
+measured sends. The 10,000 viewers have 4,500,000 measured arrivals/applies.
+The remaining 90,000 sources have **no viewer delivery claim**. A separate
+100,000-viewer/full-viewing scenario is not configured or proven by this profile.
+No capacity is proven until a newly authorized exact-workload run passes;
+planning, offline regressions and local relay qualification are not capacity proof.
 
 Each 512-byte event body carries its session/sequence identity, scheduled time,
 and producer-send time. A five-byte unique text token carries transcript
 correctness; independent padding supplies the remaining wire bytes. This is
 not a claim that every byte is user-visible text. Durable message values are
 2–8 KiB and contain the exact committed token prefix plus `sourceSequence`.
-Five-second checkpoints and a final checkpoint return durable receipts.
-The producer retries the exact final batch to reconcile its receipt, then
-checks durable state and entity content. A local socket send is not an ACK.
+All registered sessions receive five-second checkpoints and a final checkpoint
+with durable receipts. Every streaming source must emit every warm/measured slot,
+and its final durable `sourceSequence` must equal its exact sent prefix, including
+sources with no viewers. The producer retries the exact final batch to reconcile
+its receipt, then checks durable state and entity content for every session.
+A local socket send is not an ACK or proof of transient delivery.
 
 Per-event listeners inspect sequence metadata without reading growing text.
 Full projected transcript hashes are compared at the fixed drain boundary.
@@ -949,6 +1185,10 @@ and distributes one shared absolute window. It rejects stale/missing samples,
 early generator exits, and population drops. A failed node writes task-local
 stop markers to its peers. Clock-offset evidence and its uncertainty must be
 retained before interpreting cross-host latency.
+Readiness and measured samples independently require exact presence, streaming
+runner, watched, SDK-instance and total viewer counts. Reports keep ingress offered
+rate/sends separate from viewer arrivals and SDK callbacks; durable prefix coverage
+includes all sources, not just watched ones.
 
 `perf-budget.mjs <budget-plan.json>` prices gross quantities without allowances:
 registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
@@ -964,6 +1204,14 @@ and save its passing output as the forecast; the planner copies that forecast's
 cap into its approval request. Parent GO must explicitly match that exact hashed
 forecast cap: a $100 GO cannot expand a $50 forecast. Analytics lag is not an
 invoice guarantee.
+Each budget stage must explicitly bind `streamingSources`, `sourceTrafficMode`,
+`watched`, `sdkViewers`, `viewerConnections` and `eventHz`. Inbound WebSocket
+allowances must cover **all** source sends, plus other incoming protocol traffic;
+ticket allowances include presence + streaming runners + viewers (and renewals).
+The new full stage is `100k-streaming-10k-sdk-10hz-512b-10warm-45measure-10drain`;
+old watched-only budgets/approvals cannot authorize it. Current provider pricing
+and cumulative prior spending remain required external inputs; neither is inferred
+from local regression success or this documentation.
 
 Arm `perf-teardown.mjs arm <target-manifest.json>` as a **finite independent job
 on the owned control VM**, separate from generator VMs, before opening cloud
@@ -1015,6 +1263,62 @@ relay reset. Presence commands retain unknown outcomes on timeout; delivery stat
 is not execution success. Permission, question, and abort commands require a live
 runner and its current incarnation/run identity. `/clear` only clears the local view.
 
+### Shared native conversation display
+
+`NativeSessionState.messages` contains canonical `NativeSnapshotMessage` entries
+(`message`, source `seq`, optional source-part ordinals and reconstruction
+`incomplete` state), rather than a reduced role/text representation. The native
+session metadata and last revision-consistent snapshot position remain available
+on the same state. `readNativeConversation` projects complete canonical values
+through the existing Cloud `readKilo2Messages` pipeline while retaining the raw
+native values for metadata, usage and detail consumers. The web native-session
+surface renders that display model with `CloudReadOnlyThread`; mobile's native
+session hook passes it to the existing `MessageBubble` component. Neither adds a
+parallel transcript renderer.
+Mobile also mounts the existing `PartDetailSheetHost` around those messages, so
+compact tool cards can open their input/output/error details and an open sheet
+continues to resolve the current live part rather than a stale captured value.
+
+The native live reducer retains model/provider metadata, text and reasoning order,
+files, tool input/progress/terminal states, errors, retry state, costs, tokens and
+completion boundaries. Permission and question inventories live outside the
+bounded diagnostic event history, so truncating that history cannot discard an
+unanswered interaction or resurrect one already settled. An authoritative runner
+inventory replaces the pending controls, including when that inventory is empty.
+
+An initial upload may legitimately contain no canonical session entity yet.
+Missing metadata therefore enters the same bounded native snapshot recovery as
+incomplete parts; later live frames remain in ordered replay while metadata catches
+up. A frame that exposes a missing tool or part is itself retained before its relay
+cursor is accepted. Recovery keeps its snapshot revision/position requirement and
+native part identity until authoritative state covers the gap. Neither an unchanged
+snapshot nor a newer unrelated snapshot proves that a missing tool/result arrived.
+Exhausted recovery remains an explicit error, not a complete empty transcript.
+
+Native stored-media and tool-file references retain their original canonical
+values. The native reader resolves only authorized asset mappings using the same
+tenant-scoped grant, renewal and cancellation path as snapshot requests, and passes
+resolved display URLs separately through `assetURLs`. Keys bind the display file
+identity, native URI and MIME. Replacing non-content-addressed local file results
+invalidates previously resolved bytes until a newer authoritative snapshot
+reauthorizes them. Unresolved live attachments remain visibly incomplete; they do
+not crash the transcript or silently expose local paths as fetchable display URLs.
+
+Snapshot fetching, relay cursors, replay and recovery remain native-owned.
+`session.moved` requires an authoritative canonical snapshot because its event does
+not contain the previous native location/project binding. The SDK records the
+expected canonical message identity in `pendingSnapshotMessageIDs` and retries
+revision-pinned snapshots within the existing recovery bound. A stale snapshot
+cannot clear that pending identity. Clients expose the incomplete state until the
+canonical message arrives, or an explicit recovery error if the bound is exhausted.
+The previous location is never invented from `origin.directory`. The existing
+Cloud projector does not render location-switch notices, but the exact canonical
+message and its metadata remain available through the shared source.
+
+The browser extension currently has no native-sync inventory or session entry.
+Its existing Cloud Agent v2 sessions already use the shared SDK conversation
+pipeline; this integration does not introduce a new native-remote extension entry.
+
 Each socket generation owns its frame queue, snapshot reads, and incomplete-transcript
 recovery. Reconnect and close cancel those reads and release queued/replay payloads;
 late results cannot publish or change the accepted relay cursor. A snapshot has a
@@ -1037,12 +1341,19 @@ Specific authorization, deletion, and command failures appear alongside the inte
 warning. An individual oversized frame reports its size limit separately from a
 combined backlog overflow.
 
-The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
-PostHog flag `native-remote-web` is enabled. Its same-origin
-`POST /api/native-remote/token` authenticates the web session and issues a five-minute
-Kilo credential with credential exchange disabled; session-sync enforces all creator ACLs independently of the
-flag. `NEXT_PUBLIC_SESSION_SYNC_URL` optionally selects an isolated local Worker
-(`http://localhost:8817`); otherwise the production destination is used.
+The intentionally minimal web demo is `/native-remote` in development mode.
+Its server page returns the not-found page outside development; a feature flag
+cannot enable it in a deployed environment. The same-origin
+`POST /api/native-remote/token` also requires development mode before authenticating
+the web session and issuing a five-minute Kilo credential with credential exchange
+disabled. Session-sync enforces all creator ACLs independently of the preview.
+The preview defaults to the isolated local Worker at `http://localhost:8817`;
+`NEXT_PUBLIC_SESSION_SYNC_URL` selects another development relay. Its connection
+permissions are included in the web CSP only in development. The CLI and SDK
+production endpoints are unchanged.
+The mobile preview also requires a development bundle (`__DEV__`) and an explicit
+`EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
+nor its route, regardless of remote feature flags.
 Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
 and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only
 when the Worker environment is `development`. Browser and React Native WebSockets
@@ -1076,3 +1387,9 @@ Account deletion and 90-day idle retention are implemented through durable alarm
 jobs. Tenant quotas and bounded cleanup are enforced. SQLite point-in-time recovery
 is retained by the platform for 30 days; R2 has no backup. Rollout monitoring remains
 an operational prerequisite. The CLI uses this production destination by default.
+
+## Shared native history design
+
+[The consolidation design](docs/native-history-consolidation.md) defines a proposed hosted history boundary.
+It covers write authority, workload grants, replay, retention, deletion, migration, and rollback.
+It does not authorize storage migration or change the current production backend.

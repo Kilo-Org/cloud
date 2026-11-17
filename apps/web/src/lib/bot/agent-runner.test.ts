@@ -11,6 +11,7 @@ import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-age
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
+  getGitLabInstanceUrlForUser,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization,
@@ -240,6 +241,7 @@ beforeEach(() => {
   mockGetGitHubIntegrationById.mockResolvedValue({
     ...runParams().platformIntegration,
     id: 'github-association-1',
+    platform_installation_id: 'installation-1',
     repositories: githubRepositories,
   });
   jest.mocked(getGitLabRepositoryContext).mockResolvedValue({
@@ -254,6 +256,7 @@ beforeEach(() => {
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
+  jest.mocked(getGitLabInstanceUrlForUser).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
 

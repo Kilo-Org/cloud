@@ -38,12 +38,20 @@ import {
   mcpConfigFromTarget,
   mcpIdentityKey,
   mcpTargetFromConfig,
-  normalizeMinVersion,
   normalizePackageIdentifier,
   normalizeRemoteMcpUrl,
   type McpTarget,
 } from '@/lib/organizations/guardrails/mcp-identity';
-import { MAX_MCP_IDENTITY_KEY_LENGTH } from '@/lib/organizations/guardrails/guardrails-policy';
+import {
+  classifyLegacyMinVersion,
+  MAX_SEMVER_LENGTH,
+  minimumVersionForSpec,
+  normalizeVersionSpec,
+} from '@/lib/organizations/guardrails/version-spec';
+import {
+  MAX_MCP_IDENTITY_KEY_LENGTH,
+  normalizeGuardrailConfig,
+} from '@/lib/organizations/guardrails/guardrails-policy';
 import { requireGuardrailsOrganization } from '@/lib/organizations/require-guardrails-organization';
 import { isUniqueViolation } from '@/lib/db-errors';
 
@@ -54,7 +62,7 @@ const McpCatalogSourceSchema = z.enum(['kilo_marketplace', 'mcp_registry']);
 
 const GuardrailNameSchema = z.string().trim().min(1).max(MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH);
 const GuardrailDescriptionSchema = z.string().trim().max(500);
-const MinVersionInputSchema = z.string().max(64).nullable().optional();
+const VersionSpecInputSchema = z.string().max(MAX_SEMVER_LENGTH).nullable().optional();
 
 const GuardrailIdInputSchema = OrganizationIdInputSchema.extend({ guardrailId: z.uuid() });
 
@@ -63,7 +71,9 @@ const AddFromRegistryInputSchema = OrganizationIdInputSchema.extend({
   source: McpCatalogSourceSchema,
   sourceId: z.string().min(1).max(300),
   identityKey: z.string().min(1).max(500),
-  minVersion: MinVersionInputSchema,
+  versionSpec: VersionSpecInputSchema,
+  /** Transitional alias for clients deployed before version ranges. */
+  minVersion: VersionSpecInputSchema,
 });
 
 const AddCustomInputSchema = OrganizationIdInputSchema.extend({
@@ -78,7 +88,9 @@ const AddCustomInputSchema = OrganizationIdInputSchema.extend({
       identifier: z.string().max(300),
     }),
   ]),
-  minVersion: MinVersionInputSchema,
+  versionSpec: VersionSpecInputSchema,
+  /** Transitional alias for clients deployed before version ranges. */
+  minVersion: VersionSpecInputSchema,
 });
 
 const AddInputSchema = z.discriminatedUnion('source', [
@@ -97,8 +109,8 @@ function serializeGuardrail(row: OrganizationGuardrail) {
     name: row.name,
     description: row.description,
     status: row.status,
-    config: row.config,
     source: row.source,
+    config: normalizeGuardrailConfig(row.config),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -119,11 +131,57 @@ function targetFromCustomInput(input: z.infer<typeof AddCustomInputSchema>['targ
   return { kind: 'package', ecosystem: input.ecosystem, identifier: identifier.value };
 }
 
-function minVersionForTarget(target: McpTarget, minVersion: string | null | undefined) {
-  if (target.kind === 'remote') return null;
-  const normalized = normalizeMinVersion(minVersion);
-  if (!normalized.ok) badRequest(normalized.reason);
-  return normalized.value;
+type VersionSpecRequest = { versionSpec?: string | null; minVersion?: string | null };
+
+type RequestedVersionSpec = {
+  provided: boolean;
+  value: string | null;
+  /** The trimmed legacy `minVersion`, when the request used that alias. */
+  legacyMinVersion: string | null;
+};
+
+function requestedVersionSpec(input: VersionSpecRequest): RequestedVersionSpec {
+  if (input.versionSpec !== undefined) {
+    const normalized = normalizeVersionSpec(input.versionSpec);
+    if (!normalized.ok) badRequest(normalized.reason);
+    return { provided: true, value: normalized.value, legacyMinVersion: null };
+  }
+  if (input.minVersion !== undefined) {
+    const legacyMinVersion = input.minVersion?.trim() ?? '';
+    if (legacyMinVersion === '') return { provided: true, value: null, legacyMinVersion };
+    const legacy = classifyLegacyMinVersion(legacyMinVersion);
+    if (legacy.kind === 'invalid') badRequest('Enter a version such as 1.2.3.');
+    return {
+      provided: true,
+      value: legacy.kind === 'range' ? legacy.value : null,
+      legacyMinVersion,
+    };
+  }
+  return { provided: false, value: null, legacyMinVersion: null };
+}
+
+/**
+ * A pre-range admin bundle resubmits the floor it was shown on every edit.
+ * Resubmitting that unchanged floor keeps the stored range instead of
+ * replacing it with a single minimum.
+ */
+function resubmitsCurrentFloor(
+  request: RequestedVersionSpec,
+  config: OrganizationGuardrailConfig
+): boolean {
+  return (
+    config.kind === 'package' &&
+    request.legacyMinVersion !== null &&
+    request.legacyMinVersion !== '' &&
+    request.legacyMinVersion === config.min_version
+  );
+}
+
+function versionSpecForTarget(target: McpTarget, request: RequestedVersionSpec) {
+  if (target.kind !== 'remote') return request.value;
+  if (request.provided && request.value !== null)
+    badRequest('Remote servers don’t have allowed versions.');
+  return null;
 }
 
 /** Never truncated, because it is derived from the server's identity. */
@@ -251,11 +309,12 @@ function auditEntry(ctx: { user: Actor }, organizationId: string) {
   };
 }
 
-function configWithMinVersion(
-  config: OrganizationGuardrailConfig,
-  minVersion: string | null
+/** Stores the range together with the floor that pre-range clients still read. */
+function configForTarget(
+  target: McpTarget,
+  versionSpec: string | null
 ): OrganizationGuardrailConfig {
-  return mcpConfigFromTarget(mcpTargetFromConfig(config), minVersion);
+  return mcpConfigFromTarget(target, versionSpec, minimumVersionForSpec(versionSpec));
 }
 
 async function createGuardrail(params: {
@@ -266,7 +325,7 @@ async function createGuardrail(params: {
   name: string;
   description: string | null;
   source: OrganizationGuardrailSource;
-  minVersion: string | null;
+  versionSpec: string | null;
   auditVerb: 'Added' | 'Approved';
 }) {
   const identityKey = identityKeyForAllowList(params.target);
@@ -286,7 +345,7 @@ async function createGuardrail(params: {
         identity_key: identityKey,
         name: params.name,
         description: params.description,
-        config: mcpConfigFromTarget(params.target, params.minVersion),
+        config: configForTarget(params.target, params.versionSpec),
         source: params.source,
         created_by_kilo_user_id: params.ctx.user.id,
       })
@@ -437,7 +496,12 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
           ...item,
           variants: item.variants.map(variant =>
             variant.eligible
-              ? { ...variant, alreadyAdded: addedKeys.has(variant.identityKey) }
+              ? {
+                  ...variant,
+                  // Pre-range admin bundles prefill `versionHint` as a minimum version.
+                  versionHint: minimumVersionForSpec(variant.versionSpecHint),
+                  alreadyAdded: addedKeys.has(variant.identityKey),
+                }
               : variant
           ),
         })),
@@ -447,6 +511,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
   add: organizationAdminMutationProcedure.input(AddInputSchema).mutation(async ({ input, ctx }) => {
     await requireGuardrailsOrganization(input.organizationId);
     const resolved = await resolveAddInput(input);
+    const versionRequest = requestedVersionSpec(input);
     return await createGuardrail({
       ctx,
       organizationId: input.organizationId,
@@ -455,7 +520,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
       name: resolved.name,
       description: resolved.description,
       source: resolved.source,
-      minVersion: minVersionForTarget(resolved.target, input.minVersion),
+      versionSpec: versionSpecForTarget(resolved.target, versionRequest),
       auditVerb: 'Added',
     });
   }),
@@ -465,14 +530,17 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
       GuardrailIdInputSchema.extend({
         name: GuardrailNameSchema.optional(),
         description: GuardrailDescriptionSchema.nullable().optional(),
-        minVersion: MinVersionInputSchema,
+        versionSpec: VersionSpecInputSchema,
+        minVersion: VersionSpecInputSchema,
         target: AddCustomInputSchema.shape.target.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await requireGuardrailsOrganization(input.organizationId);
       const guardrail = await findGuardrail(input.organizationId, input.guardrailId);
-      let config = guardrail.config;
+      const existingConfig = normalizeGuardrailConfig(guardrail.config);
+      const versionRequest = requestedVersionSpec(input);
+      let config: OrganizationGuardrailConfig | undefined;
       let identityKey = guardrail.identity_key;
       let defaultName: string | null = null;
       if (input.target) {
@@ -480,7 +548,24 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
           badRequest('Only custom MCP servers can be changed.');
         }
         const target = targetFromCustomInput(input.target);
-        config = mcpConfigFromTarget(target, minVersionForTarget(target, input.minVersion));
+        const keepVersionSpec =
+          !versionRequest.provided || resubmitsCurrentFloor(versionRequest, existingConfig);
+        const versionSpec = keepVersionSpec
+          ? target.kind === 'package' && existingConfig.kind === 'package'
+            ? existingConfig.version_spec
+            : null
+          : versionSpecForTarget(target, versionRequest);
+        const preserveInvalid =
+          keepVersionSpec &&
+          existingConfig.kind === 'package' &&
+          existingConfig.version_spec_invalid === true;
+        config = preserveInvalid
+          ? mcpConfigFromTarget(
+              target,
+              guardrail.config.kind === 'package' ? guardrail.config.version_spec : null,
+              guardrail.config.kind === 'package' ? (guardrail.config.min_version ?? null) : null
+            )
+          : configForTarget(target, versionSpec);
         identityKey = identityKeyForAllowList(target);
         defaultName = defaultCustomName(target);
         if (identityKey !== guardrail.identity_key) {
@@ -502,12 +587,16 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
             });
           }
         }
-      } else if (input.minVersion !== undefined) {
-        if (guardrail.config.kind === 'remote')
-          badRequest('Remote servers don’t have a minimum version.');
-        const normalized = normalizeMinVersion(input.minVersion);
-        if (!normalized.ok) badRequest(normalized.reason);
-        config = configWithMinVersion(guardrail.config, normalized.value);
+      } else if (
+        versionRequest.provided &&
+        !resubmitsCurrentFloor(versionRequest, existingConfig)
+      ) {
+        if (existingConfig.kind === 'remote') {
+          if (versionRequest.value !== null)
+            badRequest('Remote servers don’t have allowed versions.');
+        } else {
+          config = configForTarget(mcpTargetFromConfig(existingConfig), versionRequest.value);
+        }
       }
       let updated: OrganizationGuardrail;
       try {
@@ -519,7 +608,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
               description:
                 input.description === undefined ? guardrail.description : input.description || null,
               identity_key: identityKey,
-              config,
+              config: config ?? guardrail.config,
             })
             .where(eq(organization_guardrails.id, guardrail.id))
             .returning();
@@ -692,7 +781,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         source: match
           ? { registry: match.item.source, id: match.item.sourceId }
           : { registry: 'custom', id: null },
-        minVersion: null,
+        versionSpec: null,
         auditVerb: 'Approved',
       });
       return { guardrail, matchedRegistry: match ? match.item.source : null };

@@ -1,6 +1,10 @@
 import {
+  CONTROL_PLANE_COMMAND_FAILURE_OUTPUT_MAX_LENGTH,
+  CONTROL_PLANE_COMMAND_TEXT_MAX_LENGTH,
   CONTROL_PLANE_SETUP_EVENTS,
+  type ControlPlaneCommandFailure,
   type ControlPlaneRouteSpec,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
 } from '../../../src/shared/control-plane-protocol.js';
 import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
@@ -121,10 +125,18 @@ export type CloneInput = {
 
 export type SetupCommandsInput = {
   commands: readonly string[];
+  /** Which list these commands came from; reported on every setup event. */
+  kind: ControlPlaneSetupCommandKind;
   directory: string;
   env: Record<string, string>;
   redact: (text: string) => string;
   signal: AbortSignal;
+  /**
+   * When true, a failing command is recorded and the next command runs; the
+   * returned failures are reported non-fatally. When false (default), the first
+   * failure throws and fails the caller, as an environment build requires.
+   */
+  continueOnFailure?: boolean;
   /** Receives each command's start, redacted output and end. */
   onEvent: (event: ControlPlaneSetupEvent) => void;
   /** Safe identifiers appended to the failure log line; never values. */
@@ -139,8 +151,14 @@ export type RepositoryPreparation = {
     signal: AbortSignal
   ) => Promise<ExecResult>;
   cloneRepository: (input: CloneInput) => Promise<void>;
-  runSetupCommands: (input: SetupCommandsInput) => Promise<void>;
+  runSetupCommands: (input: SetupCommandsInput) => Promise<ControlPlaneCommandFailure[]>;
   headCommit: (directory: string, env: Record<string, string>) => Promise<string>;
+};
+
+const SETUP_COMMAND_LABEL: Record<ControlPlaneSetupCommandKind, string> = {
+  build: 'Setup command',
+  session_setup: 'Session setup command',
+  start: 'Start command',
 };
 
 export function createRepositoryPreparation(
@@ -263,29 +281,45 @@ export function createRepositoryPreparation(
     }
   }
 
-  async function runSetupCommands(input: SetupCommandsInput): Promise<void> {
-    const { commands, directory, env, redact, signal, onEvent, logContext } = input;
+  async function runSetupCommands(
+    input: SetupCommandsInput
+  ): Promise<ControlPlaneCommandFailure[]> {
+    const { commands, kind, directory, env, redact, signal, onEvent, logContext } = input;
+    const label = SETUP_COMMAND_LABEL[kind];
+    const failures: ControlPlaneCommandFailure[] = [];
     // Spec §9: a setup failure must show the command output, so each command's
     // start, output and end are reported, not only written to the wrapper log.
     for (const [index, command] of commands.entries()) {
       signal.throwIfAborted();
       const commandNumber = index + 1;
+      const commandText = redact(command).slice(0, CONTROL_PLANE_COMMAND_TEXT_MAX_LENGTH);
       onEvent({
         type: CONTROL_PLANE_SETUP_EVENTS.started,
-        properties: { command: commandNumber, commandCount: commands.length },
+        properties: {
+          command: commandNumber,
+          commandCount: commands.length,
+          kind,
+          commandText,
+        },
       });
+      let outputTail = '';
       const output = createOutputRedactor(
         text => redact(cleanTerminalOutput(text)),
         text => {
           if (signal.aborted) return;
           const cleaned = text.trim();
           if (!cleaned) return;
-          log(`control-plane setup command ${commandNumber} produced output`);
+          log(`control-plane ${kind} command ${commandNumber} produced output`);
+          const chunk = `${cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT - 1)}\n`;
+          outputTail = `${outputTail}${chunk}`.slice(
+            -CONTROL_PLANE_COMMAND_FAILURE_OUTPUT_MAX_LENGTH
+          );
           onEvent({
             type: CONTROL_PLANE_SETUP_EVENTS.output,
             properties: {
               command: commandNumber,
-              output: `${cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT - 1)}\n`,
+              kind,
+              output: chunk,
             },
           });
         }
@@ -293,16 +327,40 @@ export function createRepositoryPreparation(
       const startedAt = Date.now();
       const result = await runSetup(command, directory, env, output.onOutput, signal);
       output.flush();
+      const elapsedMs = result.elapsedMs ?? Date.now() - startedAt;
       if (result.exitCode !== 0) {
         const timedOut = result.terminationReason !== undefined;
         log(
-          `control-plane setup command failed ${logContext} index=${index + 1} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${Date.now() - startedAt} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
+          `control-plane ${kind} command failed ${logContext} index=${commandNumber} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${elapsedMs} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
         );
-        const message = `Setup command ${commandNumber} ${timedOut ? 'timed out' : 'failed'}`;
+        const message = `${label} ${commandNumber} ${timedOut ? 'timed out' : 'failed'}`;
         onEvent({
           type: CONTROL_PLANE_SETUP_EVENTS.finished,
-          properties: { command: commandNumber, exitCode: result.exitCode, safeError: message },
+          properties: {
+            command: commandNumber,
+            kind,
+            exitCode: result.exitCode,
+            ...(result.terminationReason === undefined
+              ? {}
+              : { terminationReason: result.terminationReason }),
+            safeError: message,
+          },
         });
+        const failure: ControlPlaneCommandFailure = {
+          kind,
+          index: commandNumber,
+          commandText,
+          exitCode: result.exitCode,
+          ...(result.terminationReason === undefined
+            ? {}
+            : { terminationReason: result.terminationReason }),
+          elapsedMs,
+          ...(outputTail === '' ? {} : { outputTail }),
+        };
+        if (input.continueOnFailure === true) {
+          failures.push(failure);
+          continue;
+        }
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
           subtype: timedOut ? 'setup_command_timeout' : 'setup_command_failed',
@@ -312,9 +370,10 @@ export function createRepositoryPreparation(
       }
       onEvent({
         type: CONTROL_PLANE_SETUP_EVENTS.finished,
-        properties: { command: commandNumber, exitCode: 0 },
+        properties: { command: commandNumber, kind, exitCode: 0 },
       });
     }
+    return failures;
   }
 
   async function headCommit(directory: string, env: Record<string, string>): Promise<string> {

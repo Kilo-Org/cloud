@@ -117,6 +117,9 @@ function makeRequest(params: {
   repo?: string;
   organizationId?: string;
   secFetchSite?: string | null;
+  /** `null` omits the header, as a browser navigation without one would. */
+  origin?: string | null;
+  host?: string;
 }): NextRequest {
   const url = new URL('https://kilo.test/cloud-agent-fork/review-md');
   if (params.platform) url.searchParams.set('platform', params.platform);
@@ -126,6 +129,8 @@ function makeRequest(params: {
   const headers = new Headers();
   const secFetchSite = params.secFetchSite === undefined ? 'same-origin' : params.secFetchSite;
   if (secFetchSite !== null) headers.set('sec-fetch-site', secFetchSite);
+  if (params.origin) headers.set('origin', params.origin);
+  if (params.host) headers.set('host', params.host);
 
   return new NextRequest(url.toString(), { headers });
 }
@@ -231,12 +236,113 @@ describe('GET /cloud-agent-fork/review-md', () => {
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('rejects a cross-site request before reading repositories', async () => {
+  it('starts the conversion for a deliberate direct navigation', async () => {
     const response = await getRoute(
-      makeRequest({ platform: 'github', repo: 'owner/repo', secFetchSite: 'cross-site' })
+      makeRequest({ platform: 'github', repo: 'owner/repo', secFetchSite: 'none' })
+    );
+
+    expect(mockPersonalPrepareSession).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(303);
+  });
+
+  it.each(['same-site', 'cross-site'] as const)(
+    'refuses a %s navigation before reading repositories',
+    async secFetchSite => {
+      const response = await getRoute(
+        makeRequest({ platform: 'github', repo: 'owner/repo', secFetchSite })
+      );
+
+      expectErrorRedirect(response, 'invalid_conversion_request');
+      expect(mockCreateTRPCContext).not.toHaveBeenCalled();
+      expect(mockPersonalListGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses a request that carries neither Origin nor Sec-Fetch-Site', async () => {
+    const response = await getRoute(
+      makeRequest({ platform: 'github', repo: 'owner/repo', secFetchSite: null })
     );
 
     expectErrorRedirect(response, 'invalid_conversion_request');
-    expect(mockPersonalListGitHubRepositories).not.toHaveBeenCalled();
+    expect(mockCreateTRPCContext).not.toHaveBeenCalled();
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('accepts an Origin that names the addressed host', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: null,
+        origin: 'https://kilo.test',
+        host: 'kilo.test',
+      })
+    );
+
+    expect(mockPersonalPrepareSession).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(303);
+  });
+
+  it.each(['same-site', 'cross-site'] as const)(
+    'refuses a host-matching Origin beside a %s Fetch Metadata report',
+    async secFetchSite => {
+      const response = await getRoute(
+        makeRequest({
+          platform: 'github',
+          repo: 'owner/repo',
+          secFetchSite,
+          origin: 'https://kilo.test',
+          host: 'kilo.test',
+        })
+      );
+
+      expectErrorRedirect(response, 'invalid_conversion_request');
+      expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses an Origin that names another host', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: 'same-origin',
+        origin: 'https://other.test',
+        host: 'kilo.test',
+      })
+    );
+
+    expectErrorRedirect(response, 'invalid_conversion_request');
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses an opaque Origin even when Sec-Fetch-Site reports this origin', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: 'same-origin',
+        origin: 'null',
+        host: 'kilo.test',
+      })
+    );
+
+    expectErrorRedirect(response, 'invalid_conversion_request');
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses an Origin when the request names no addressed host', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: 'same-origin',
+        origin: 'https://kilo.test',
+      })
+    );
+
+    expectErrorRedirect(response, 'invalid_conversion_request');
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
   });
 });

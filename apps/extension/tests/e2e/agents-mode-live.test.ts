@@ -2,7 +2,9 @@
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
+import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { getExtensionStorage } from './tab-selection-e2e-helpers';
 
 const runLive = process.env['EXTENSION_LOCAL_BACKEND_E2E'] === '1';
 test.skip(!runLive, 'local backend only');
@@ -38,7 +40,7 @@ const signInWithLocalDeviceAuth = async ({
       break;
     }
 
-    await expect(sidePanel.getByText('Failed to start sign in. Try again.')).toBeVisible();
+    await expect(sidePanel.getByRole('alert')).toBeVisible();
   }
 
   const code = codeText?.trim();
@@ -72,8 +74,11 @@ const signInWithLocalDeviceAuth = async ({
   await authPage.goto(
     `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
   );
-  await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
-  await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
+  // The post-login redirect can swallow the Authorize click; retry until the panel logs in.
+  await expect(async () => {
+    await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 10_000 });
+    await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
   await authPage.close();
 };
 
@@ -126,11 +131,14 @@ const failIfReadOnly = async (sidePanel: Page): Promise<void> => {
  */
 const reopenRunningSession = async ({
   sidePanel,
+  kiloSessionId,
   nonce,
   sessionTitle,
   platformLabel,
 }: {
   sidePanel: Page;
+  /** The session this run created, when the flow could capture it. */
+  kiloSessionId: string | undefined;
   nonce: string;
   sessionTitle: string;
   platformLabel: 'Cloud agent' | 'CLI';
@@ -145,7 +153,31 @@ const reopenRunningSession = async ({
     .filter({ has: sidePanel.locator(`svg[aria-label="${platformLabel}"]`) });
   await expect.poll(() => platformRows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
 
-  const titleRow = sessionTitle === '' ? undefined : platformRows.filter({ hasText: sessionTitle });
+  /*
+   * The list row and the session view carry different titles: the row holds the
+   * title the row was created with, the view the agent's own title, seconds
+   * apart. Selecting by title therefore opened an unrelated session, so a run
+   * that knows its id selects the row that owns it.
+   */
+  const idRow =
+    kiloSessionId === undefined
+      ? undefined
+      : sidePanel.locator(`[data-session-id="${kiloSessionId}"]`);
+  if (idRow !== undefined) {
+    // The list refetches when it mounts again, so the own row can arrive late.
+    await expect
+      .poll(() => idRow.count(), { timeout: 30_000 })
+      .toBeGreaterThan(0)
+      .catch(() => null);
+  }
+  const idRowCount = idRow === undefined ? 0 : await idRow.count().catch(() => 0);
+
+  // 'Session' is the view's placeholder before the session metadata loads.
+  // It matches unrelated rows, so treat it as unknown and take the newest row.
+  const titleRow =
+    sessionTitle === '' || sessionTitle === 'Session'
+      ? undefined
+      : platformRows.filter({ hasText: sessionTitle });
   const titleRowCount = titleRow === undefined ? 0 : await titleRow.count().catch(() => 0);
   // A stale title falls back to the newest running row, then the newest row.
   const runningRows = platformRows.filter({
@@ -153,7 +185,9 @@ const reopenRunningSession = async ({
   });
   const runningRowCount = await runningRows.count().catch(() => 0);
   let rowToOpen = platformRows.first();
-  if (titleRow !== undefined && titleRowCount > 0) {
+  if (idRow !== undefined && idRowCount > 0) {
+    rowToOpen = idRow.first();
+  } else if (titleRow !== undefined && titleRowCount > 0) {
     rowToOpen = titleRow.first();
   } else if (runningRowCount > 0) {
     rowToOpen = runningRows.first();
@@ -275,10 +309,12 @@ const queueFollowUp = async ({
  */
 const runOpenSessionPhases = async ({
   sidePanel,
+  kiloSessionId,
   nonce,
   platformLabel,
 }: {
   sidePanel: Page;
+  kiloSessionId: string | undefined;
   nonce: string;
   platformLabel: 'Cloud agent' | 'CLI';
 }): Promise<void> => {
@@ -288,7 +324,7 @@ const runOpenSessionPhases = async ({
   await expect(stopButton).toBeVisible({ timeout: 90_000 });
 
   const sessionTitle = await readSessionTitle(sidePanel);
-  await reopenRunningSession({ nonce, platformLabel, sessionTitle, sidePanel });
+  await reopenRunningSession({ kiloSessionId, nonce, platformLabel, sessionTitle, sidePanel });
 
   const reopenedStop = sidePanel.getByRole('button', { name: 'Stop' });
   await expect(reopenedStop).toBeVisible({ timeout: 90_000 });
@@ -351,7 +387,13 @@ const runExistingCloudSessionFallback = async ({
   await queueFollowUp({ nonce, sidePanel });
 
   const sessionTitle = await readSessionTitle(sidePanel);
-  await reopenRunningSession({ nonce, platformLabel: 'Cloud agent', sessionTitle, sidePanel });
+  await reopenRunningSession({
+    kiloSessionId: undefined,
+    nonce,
+    platformLabel: 'Cloud agent',
+    sessionTitle,
+    sidePanel,
+  });
 
   await proveSessionRunning({ phase: 'reopened', sidePanel, unavailableReason });
 
@@ -416,6 +458,78 @@ const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
   return null;
 };
 
+const extensionAuthStorageSchema = z.object({
+  kiloAuth: z.object({ token: z.string().min(1) }),
+});
+
+/** The extension's own API bearer token, read from its storage. */
+const readExtensionToken = async (sidePanel: Page): Promise<string> => {
+  const stored = extensionAuthStorageSchema.safeParse(
+    await getExtensionStorage(sidePanel, ['kiloAuth'])
+  );
+
+  if (!stored.success) {
+    throw new Error('the extension stored no kiloAuth token the session lists can use');
+  }
+
+  return stored.data.kiloAuth.token;
+};
+
+/** Session ids the user already has, from both lists the Agents view reads. */
+const listSessionIds = async (
+  context: BrowserContext,
+  token: string
+): Promise<ReadonlySet<string>> => {
+  if (token === '') {
+    throw new Error('no API token was available to list sessions with');
+  }
+
+  const ids = new Set<string>();
+  const paths = [
+    'activeSessions.list?input=%7B%22includeCloudAgentSessions%22%3Atrue%2C%22organizationId%22%3Anull%7D',
+    'cliSessionsV2.list?input=%7B%22includeChildren%22%3Afalse%2C%22limit%22%3A10%2C%22orderBy%22%3A%22updated_at%22%2C%22organizationId%22%3Anull%7D',
+  ];
+  for (const path of paths) {
+    const response = await context.request.get(`${localBackendUrl}/api/trpc/${path}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok()) {
+      throw new Error(`listing sessions failed with ${response.status()} for ${path}`);
+    }
+
+    const body = await response.text();
+    for (const [, id] of body.matchAll(/"(?:id|session_id)":"(ses_[A-Za-z0-9]+)"/gu)) {
+      if (id !== undefined) {
+        ids.add(id);
+      }
+    }
+  }
+  return ids;
+};
+
+/** Wait for the id a CLI create added to the user's lists. */
+const waitForCreatedSessionId = async (
+  context: BrowserContext,
+  token: string,
+  before: ReadonlySet<string>
+): Promise<string> => {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- polling the create's server-side row
+    const current = await listSessionIds(context, token);
+    for (const id of current) {
+      if (!before.has(id)) {
+        return id;
+      }
+    }
+    // eslint-disable-next-line no-await-in-loop -- polls between list reads
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 1000);
+    });
+  }
+  throw new Error('the CLI create added no session row the list reads can see');
+};
+
 test('live local backend: remote CLI agent covers start, reopen, queue, and stop', async () => {
   const fixture = await startFixtureServer({ title: 'Kilo live agents session target' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -434,6 +548,8 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     });
 
     const nonce = `p${process.pid}-${Date.now().toString(36)}`;
+    const token = await readExtensionToken(sidePanel);
+    const idsBeforeCreate = await listSessionIds(context, token);
 
     // Start: spawn onto the connected CLI instance.
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
@@ -457,7 +573,13 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 30_000 });
 
-    await runOpenSessionPhases({ nonce, platformLabel: 'CLI', sidePanel });
+    const createdKiloSessionId = await waitForCreatedSessionId(context, token, idsBeforeCreate);
+    await runOpenSessionPhases({
+      kiloSessionId: createdKiloSessionId,
+      nonce,
+      platformLabel: 'CLI',
+      sidePanel,
+    });
   } finally {
     await context.close();
     await fixture.close();
@@ -484,6 +606,20 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
 
     const nonce = `p${process.pid}-${Date.now().toString(36)}`;
 
+    // The form returns the session id from prepareSession.
+    // Reopening then selects the row that owns this run, not a title match.
+    const createdKiloSessionIds: string[] = [];
+    sidePanel.on('response', async response => {
+      if (!response.url().includes('cloudAgentNext.prepareSession')) {
+        return;
+      }
+      const text = await response.text().catch(() => '');
+      const id = /"kiloSessionId":"(ses_[A-Za-z0-9]+)"/u.exec(text)?.[1];
+      if (id !== undefined) {
+        createdKiloSessionIds.push(id);
+      }
+    });
+
     // Start: prepare a cloud session through the form.
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
     await sidePanel.getByLabel('What would you like to do?').fill(longPrompt(nonce));
@@ -499,7 +635,13 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
         .then(() => true)
         .catch(() => false);
       if (started) {
-        await runOpenSessionPhases({ nonce, platformLabel: 'Cloud agent', sidePanel });
+        await expect.poll(() => createdKiloSessionIds.length > 0, { timeout: 10_000 }).toBe(true);
+        await runOpenSessionPhases({
+          kiloSessionId: createdKiloSessionIds[0],
+          nonce,
+          platformLabel: 'Cloud agent',
+          sidePanel,
+        });
         return;
       }
     }

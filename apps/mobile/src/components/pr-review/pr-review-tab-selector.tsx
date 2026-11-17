@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { formatNumber } from '@/lib/format';
+import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
 import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
@@ -62,6 +63,7 @@ export function PrReviewTabSelector({
           <Pressable
             key={tab.id}
             {...tabEntryA11y({ selected: active, disabled })}
+            hitSlop={PR_REVIEW_TAB_HIT_SLOP}
             disabled={disabled}
             onPress={() => {
               if (active) {
@@ -72,10 +74,12 @@ export function PrReviewTabSelector({
             }}
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              // Dark has no neutral above the row's `bg-secondary`, and
-              // `bg-card` is darker than it there, so the selected pill is
-              // raised with a translucent white surface instead.
-              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-[#FFFFFF1A]',
+              // Dark paints `bg-card` below the row's `bg-secondary`, so the
+              // selected pill takes the palette's elevated neutral fill
+              // instead: the same raised-surface step a filled neutral control
+              // uses, so the pill stays the neutral raised surface light mode
+              // shows rather than a tinted accent that pulls the eye.
+              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
               disabled && 'opacity-60'
             )}
           >

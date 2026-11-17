@@ -33,9 +33,20 @@ async function flushAfterCallbacks() {
   afterCallbacks = [];
 }
 
+const INGEST_USAGE_URL = 'https://ingest.synthetic.invalid/usage';
+const INGEST_EXA_USAGE_URL = 'https://ingest.synthetic.invalid/exa-usage';
+const PUBLISH_SECRET = 'synthetic-publish-secret';
+
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   EXA_API_KEY: 'test-exa-key',
+  USAGE_INGEST_URL: undefined,
+  USAGE_INGEST_PUBLISH_SECRET: undefined,
 }));
+
+const config = jest.requireMock<{
+  USAGE_INGEST_URL: string | undefined;
+  USAGE_INGEST_PUBLISH_SECRET: string | undefined;
+}>('@kilocode/web-shared/lib/config.server');
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/exa-usage');
@@ -83,6 +94,8 @@ describe('POST /api/exa/[...path]', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     globalThis.fetch = mockedFetch;
+    config.USAGE_INGEST_URL = undefined;
+    config.USAGE_INGEST_PUBLISH_SECRET = undefined;
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
@@ -152,6 +165,60 @@ describe('POST /api/exa/[...path]', () => {
       const sentBody = JSON.parse(mockedFetch.mock.calls[0][1]?.body as string);
       expect(sentBody).toEqual({ query: 'test' });
       expect(sentBody).not.toHaveProperty('stream');
+    });
+  });
+
+  describe('request body validation', () => {
+    it('keeps a function duration that covers the direct write and the queue fallback', async () => {
+      const { maxDuration } = await import('./route');
+      expect(maxDuration).toBe(300);
+    });
+
+    it.each([
+      ['null', null],
+      ['an array', []],
+      ['a string', 'query=test'],
+      ['a number', 1],
+      ['a boolean', true],
+    ])('rejects %s with 400 before calling Exa', async (_label, body) => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search', body) as never);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid request body' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('rejects malformed JSON with 400 before calling Exa', async () => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const request = new Request('http://localhost:3000/api/exa/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      });
+      const response = await POST(request as never);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('propagates a body read failure that is not a JSON parse error', async () => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const request = makeRequest('/search', { query: 'test' });
+      request.text = () => Promise.reject(new TypeError('body stream failed'));
+
+      await expect(POST(request as never)).rejects.toThrow('body stream failed');
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
     });
   });
 
@@ -345,6 +412,7 @@ describe('POST /api/exa/[...path]', () => {
             chargedToBalance: false,
             freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
           },
+          { deadlineMs: expect.any(Number) },
         ],
       ]);
     });
@@ -368,7 +436,8 @@ describe('POST /api/exa/[...path]', () => {
           expect.objectContaining({
             id: usageId,
             occurredAt: occurredAt.toISOString(),
-          })
+          }),
+          expect.anything()
         );
       } finally {
         randomUUIDSpy.mockRestore();
@@ -400,6 +469,7 @@ describe('POST /api/exa/[...path]', () => {
             chargedToBalance: true,
             freeAllowanceMicrodollars: 10_000_000,
           },
+          { deadlineMs: expect.any(Number) },
         ],
       ]);
     });
@@ -416,7 +486,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: orgId })
+        expect.objectContaining({ organizationId: orgId }),
+        expect.anything()
       );
     });
 
@@ -516,7 +587,8 @@ describe('POST /api/exa/[...path]', () => {
         expect.objectContaining({
           featureId: 'kiloclaw',
           type: 'deep',
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -537,7 +609,10 @@ describe('POST /api/exa/[...path]', () => {
       );
       await flushAfterCallbacks();
 
-      expect(mockedRecordExaUsage).toHaveBeenCalledWith(expect.objectContaining({ type: 'deep' }));
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'deep' }),
+        expect.anything()
+      );
       expect(mockedRecordExaUsage.mock.calls[0][0]).not.toHaveProperty('featureId');
     });
 
@@ -621,8 +696,10 @@ describe('POST /api/exa/[...path]', () => {
             type: 'database',
             code: '23505',
           },
+          fallback: 'not_configured',
         }
       );
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
       expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
       expect(mockedCaptureException).toHaveBeenCalledWith(writeError, expect.any(Object));
@@ -731,6 +808,276 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('usage queue fallback', () => {
+    const usageId = '6d1f3c2a-8b4e-4f7a-9c3d-2e5b7a9f1c04';
+    let consoleError: jest.SpyInstance;
+    let consoleWarn: jest.SpyInstance;
+    let ingestStatus: number;
+
+    function fetchCallsTo(url: string) {
+      return mockedFetch.mock.calls.filter(([input]) => String(input) === url);
+    }
+
+    function failureLine(): Record<string, unknown> {
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError.mock.calls[0][0]).toBe(
+        '[exa] usage record failed; charge may be unrecorded'
+      );
+      return consoleError.mock.calls[0][1];
+    }
+
+    async function proxySearch() {
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+    }
+
+    beforeEach(() => {
+      config.USAGE_INGEST_URL = INGEST_USAGE_URL;
+      config.USAGE_INGEST_PUBLISH_SECRET = PUBLISH_SECRET;
+      ingestStatus = 202;
+      consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(usageId);
+      setUserAuth();
+      mockedFetch.mockImplementation(async input => {
+        if (String(input).startsWith('https://ingest.synthetic.invalid/')) {
+          return new Response(null, { status: ingestStatus });
+        }
+        return makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } });
+      });
+    });
+
+    afterEach(() => {
+      consoleError.mockRestore();
+      consoleWarn.mockRestore();
+      jest.restoreAllMocks();
+    });
+
+    it('keeps publishing after a failed direct write when the retired selector is false', async () => {
+      Object.assign(config, { EXA_USAGE_QUEUE_FALLBACK_ENABLED: false });
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(failureLine()).toMatchObject({ stage: 'record_write', fallback: 'queued' });
+    });
+
+    it('never publishes after a successful direct write', async () => {
+      await proxySearch();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(mockedCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('publishes the identical record once after a failed direct write', async () => {
+      const writeError = new Error('write failed');
+      mockedRecordExaUsage.mockRejectedValue(writeError);
+
+      await proxySearch();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      const directRecord = mockedRecordExaUsage.mock.calls[0][0];
+      expect(directRecord.id).toBe(usageId);
+      const publishes = fetchCallsTo(INGEST_EXA_USAGE_URL);
+      expect(publishes).toHaveLength(1);
+      const [, init] = publishes[0];
+      expect(init).toMatchObject({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${PUBLISH_SECRET}`,
+        },
+      });
+      expect(JSON.parse(String(init?.body))).toStrictEqual(directRecord);
+      expect(ExaUsageRecordSchema.parse(JSON.parse(String(init?.body)))).toStrictEqual(
+        directRecord
+      );
+      expect(failureLine()).toStrictEqual({
+        exa_path: '/search',
+        payer_kind: 'personal',
+        charged_to_balance: false,
+        cost_microdollars: 7000,
+        stage: 'record_write',
+        error: { type: 'unknown' },
+        fallback: 'queued',
+      });
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledWith(writeError, expect.any(Object));
+    });
+
+    it('skips the direct write and publishes when only the publication reserve remains', async () => {
+      let elapsed = 0;
+      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      const { POST } = await import('./route');
+
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      elapsed = 290_000;
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(failureLine()).toStrictEqual({
+        exa_path: '/search',
+        payer_kind: 'personal',
+        charged_to_balance: false,
+        cost_microdollars: 7000,
+        stage: 'write_skipped',
+        error: { type: 'unknown' },
+        fallback: 'queued',
+      });
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('attempts the direct write when the publisher is unconfigured and only the reserve remains', async () => {
+      config.USAGE_INGEST_URL = undefined;
+      let elapsed = 0;
+      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      mockedRecordExaUsage.mockResolvedValue('recorded');
+      const { POST } = await import('./route');
+
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      elapsed = 290_000;
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('publishes when the direct write outlives its deadline', async () => {
+      jest.useFakeTimers();
+      try {
+        let elapsed = 0;
+        jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+        mockedRecordExaUsage.mockReturnValue(new Promise<'recorded'>(() => {}));
+        const { POST } = await import('./route');
+
+        await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+        elapsed = 200_000;
+        const flushed = flushAfterCallbacks();
+        await jest.advanceTimersByTimeAsync(55_000);
+        await flushed;
+
+        expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+        expect(mockedRecordExaUsage).toHaveBeenCalledWith(expect.anything(), {
+          deadlineMs: 55_000,
+        });
+        expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+        expect(failureLine()).toMatchObject({ stage: 'record_write', fallback: 'queued' });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it.each([
+      ['an unparseable', '0.007'],
+      ['a negative', -0.007],
+    ])('never publishes for %s cost total', async (_label, total) => {
+      mockedFetch.mockImplementation(async () =>
+        makeUpstreamResponse({ results: [], costDollars: { total } })
+      );
+
+      await proxySearch();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      const line = failureLine();
+      expect(line.stage).toBe('cost_parse');
+      expect(line).not.toHaveProperty('fallback');
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['a missing secret', { USAGE_INGEST_PUBLISH_SECRET: undefined }],
+      ['a missing ingest URL', { USAGE_INGEST_URL: undefined }],
+      ['an ingest URL that is not the /usage path', { USAGE_INGEST_URL: INGEST_EXA_USAGE_URL }],
+      ['an ingest URL with a query', { USAGE_INGEST_URL: `${INGEST_USAGE_URL}?x=1` }],
+      ['a plain-HTTP ingest URL', { USAGE_INGEST_URL: 'http://ingest.synthetic.invalid/usage' }],
+    ])('skips without a network call for %s', async (_label, overrides) => {
+      Object.assign(config, overrides);
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(failureLine()).toMatchObject({ stage: 'record_write', fallback: 'not_configured' });
+      expect(consoleWarn).toHaveBeenCalledWith(
+        'usage enqueue unavailable',
+        expect.objectContaining({
+          usageId,
+          usage_kind: 'exa_usage',
+          reason: 'publisher_not_configured',
+        })
+      );
+    });
+
+    it('treats an ingress 400 as terminal and logs it', async () => {
+      ingestStatus = 400;
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(failureLine()).toMatchObject({
+        stage: 'record_write',
+        fallback: 'rejected',
+        fallback_reason: 'http_400',
+      });
+    });
+
+    it('logs a refused publish without writing directly again', async () => {
+      ingestStatus = 403;
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(failureLine()).toMatchObject({
+        fallback: 'publish_failed',
+        fallback_reason: 'http_403',
+      });
+    });
+
+    it('logs only the error name when the publisher rejects unexpectedly', async () => {
+      consoleWarn.mockImplementation(() => {
+        throw new TypeError('warn sink failed with secret-detail');
+      });
+      config.USAGE_INGEST_PUBLISH_SECRET = undefined;
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      const line = failureLine();
+      expect(line).toMatchObject({
+        fallback: 'publish_failed',
+        fallback_reason: 'unexpected_rejection',
+        fallback_error_name: 'TypeError',
+      });
+      expect(JSON.stringify(line)).not.toContain('secret-detail');
+    });
+
+    it('keeps record values and secrets out of the failure line', async () => {
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+
+      await proxySearch();
+
+      const logged = JSON.stringify(consoleError.mock.calls);
+      expect(logged).not.toContain(usageId);
+      expect(logged).not.toContain('user-123');
+      expect(logged).not.toContain(PUBLISH_SECRET);
+      expect(logged).not.toContain('secret-query-text');
     });
   });
 });

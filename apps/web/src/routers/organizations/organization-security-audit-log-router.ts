@@ -25,6 +25,7 @@ import {
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { csvLiteral } from '@/lib/admin-csv';
 import {
+  canCallerReadStaffAuditActors,
   logSecurityAudit,
   maskKiloAdminActors,
 } from '@/lib/security-agent/services/audit-log-service';
@@ -124,8 +125,8 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
         resultLogs.reverse();
       }
 
-      const isKiloAdmin = ctx.user.google_user_email.endsWith('@kilocode.ai');
-      const maskedLogs = maskKiloAdminActors(resultLogs, isKiloAdmin);
+      const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
+      const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
 
       const hasNext = hasMore;
       const hasPrevious = !!after || (!!before && logs.length > 0);
@@ -216,8 +217,8 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
       metadata: { format, rowCount: logs.length, startTime, endTime },
     });
 
-    const isKiloAdmin = ctx.user.google_user_email.endsWith('@kilocode.ai');
-    const maskedLogs = maskKiloAdminActors(logs, isKiloAdmin);
+    const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
+    const maskedLogs = maskKiloAdminActors(logs, callerReadsStaffActors);
 
     if (format === 'csv') {
       const header =

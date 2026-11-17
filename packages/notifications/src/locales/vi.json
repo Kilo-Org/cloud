@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Phiên tác nhân của bạn có bản cập nhật",
-      "chatMessage": "Bạn có một tin nhắn mới",
-      "instanceLifecycle": "Phiên bản của bạn có bản cập nhật",
-      "scheduledAction": "Một hành động đã lên lịch có bản cập nhật",
       "lowBalance": "Số dư của bạn cần được chú ý",
       "spendAlert": "Chi tiêu của bạn cần được chú ý",
       "securityFinding": "Một phát hiện bảo mật cần được chú ý",
@@ -13,30 +10,9 @@
       "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tác vụ đã hoàn tất"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Thất bại: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Bị gián đoạn: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Không có tiêu đề",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,54 +24,23 @@
       "title": "Cảnh báo chi tiêu",
       "body": "Chi tiêu của {{scopeName}} đã vượt ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Phát hiện bảo mật mới ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} trong {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Phát hiện bảo mật mới ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Cảnh báo SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
+      "title": "Cảnh báo SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vi phạm SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Một bài kiểm tra bảo mật có bản cập nhật"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} đã sẵn sàng",
-      "body": "Chạm để bắt đầu trò chuyện."
-    },
-    "startFailed": {
-      "title": "Không thể khởi động {{instanceName}}",
-      "body": "Khởi động thất bại."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} sẽ sớm khởi động lại",
-      "body": "Đã lên lịch khởi động lại vào lúc {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Đã hủy khởi động lại {{instanceName}}",
-      "body": "Lần khởi động lại đã lên lịch trước đó đã bị hủy."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} sẽ sớm nâng cấp",
-      "bodyWithTag": "Nâng cấp lên {{targetImageTag}} vào lúc {{when}}.",
-      "bodyWithoutTag": "Đã lên lịch nâng cấp vào lúc {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Đã hủy nâng cấp {{instanceName}}",
-      "body": "Lần nâng cấp đã lên lịch trước đó đã bị hủy."
+      "title": "Vi phạm SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Phiên Kilo của bạn đã sẵn sàng để điều khiển từ điện thoại"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -21,12 +21,26 @@ import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { isKilocodeRow, type SessionEventQueries } from './event-queries.js';
 import { events } from './sqlite-schema.js';
 import {
+  projectToolPartForDisplay,
+  TOOL_OUTPUT_PREVIEW_BYTES,
+  type ToolDisplayMode,
+} from '../../shared/tool-display-projection.js';
+import {
   readConversationSource,
   readKilo2MessagesPage,
   type Kilo2MessagesPage,
 } from './conversation-history.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
+import type { QueuedMessageSnapshot } from '../../websocket/stream.js';
 
 export const MAX_SESSION_PAGE_BYTES = 4 * 1024 * 1024;
+/**
+ * Soft budget for preview pages. A page stops adding messages past it and
+ * returns a continuation cursor; one message alone may still use the hard cap.
+ */
+export const MAX_SESSION_PREVIEW_PAGE_BYTES = 1024 * 1024;
+/** Room reserved for a tool's detail marker when estimating a projected part. */
+const TOOL_DETAIL_MARKER_ALLOWANCE_BYTES = 16 * 1024;
 const MAX_CURSOR_LENGTH = 2048;
 const encoder = new TextEncoder();
 const nativeInfoSchema = z.object({ id: z.string().min(1).max(256) }).passthrough();
@@ -46,6 +60,8 @@ export const sessionHistoryPageInputSchema = z
     limit: z.number().int().min(1).max(100).default(50),
     kiloSessionId: sessionIdSchema.optional(),
     expectedRootKiloSessionId: sessionIdSchema.optional(),
+    /** `preview` bounds completed tool bodies; the tool-detail read returns them whole. */
+    toolDisplay: z.enum(['full', 'preview']).default('full'),
   })
   .strict();
 
@@ -92,6 +108,17 @@ function parseItem<T>(raw: string | null | undefined, schema: z.ZodType<T>): T |
   }
 }
 
+/**
+ * Rows the WebSocket `connected` event replays on connect. The first history
+ * page carries them so a client that opens without a socket still shows the
+ * run's preparation rows and its queued or failed turns. Older pages must not
+ * repeat them.
+ */
+export type SessionSnapshotRows = {
+  preparationAttempts?: PreparationAttempt[];
+  queuedMessages?: QueuedMessageSnapshot[];
+};
+
 type V1SessionMessagesPage = {
   kind: 'success';
   source: { version: 'v1' };
@@ -101,10 +128,16 @@ type V1SessionMessagesPage = {
   omittedItemCount: number;
   updateCursor: number;
   totalCostMicrodollars: number;
-};
+} & SessionSnapshotRows;
 
 export type SessionMessagesPage = V1SessionMessagesPage | Kilo2MessagesPage;
 
+/**
+ * Reads one stored history page under `MAX_SESSION_PAGE_BYTES`. `reservedBytes`
+ * is the size the caller appends to the page after it is built (the first
+ * page's stream rows), so the readers' hard limits leave that room free and
+ * the whole response stays inside the bound.
+ */
 export function readSessionMessagesPage(input: {
   db: DrizzleSqliteDODatabase;
   storage: DurableObjectStorage;
@@ -117,6 +150,9 @@ export function readSessionMessagesPage(input: {
   metadata: SessionMetadata | null;
   parentID?: string;
   omittedItemCount?: number;
+  toolDisplay?: ToolDisplayMode;
+  /** Size the caller appends after the page is built; the page keeps it free. */
+  reservedBytes?: number;
 }): SessionMessagesPage {
   const source = readConversationSource(input);
   if (source) return readKilo2MessagesPage(input, source);
@@ -144,6 +180,10 @@ export function readSessionMessagesPage(input: {
     totalCostMicrodollars: input.queries.getTotalCostMicrodollars(sessionId, kiloSessionId),
   };
   const size = (value: unknown) => encoder.encode(JSON.stringify(value)).byteLength;
+  const preview = input.toolDisplay === 'preview';
+  const pageLimit = MAX_SESSION_PAGE_BYTES - (input.reservedBytes ?? 0);
+  const softBudget = preview ? MAX_SESSION_PREVIEW_PAGE_BYTES : MAX_SESSION_PAGE_BYTES;
+  const partBytesSql = preview ? previewPartBytes() : storedPartBytes();
   const envelopeBytes = () =>
     size({
       ...page,
@@ -162,7 +202,7 @@ export function readSessionMessagesPage(input: {
     .from(events)
     .where(sessionWhere)
     .get()?.bytes;
-  if (sessionBytes !== undefined && sessionBytes < MAX_SESSION_PAGE_BYTES - envelopeBytes()) {
+  if (sessionBytes !== undefined && sessionBytes < pageLimit - envelopeBytes()) {
     const info = parseItem(
       db
         .select({ value: sql<string>`json_extract(${events.payload}, '$.properties.info')` })
@@ -180,7 +220,7 @@ export function readSessionMessagesPage(input: {
   } else if (sessionBytes !== undefined) {
     page.omittedItemCount += 1;
   }
-  if (envelopeBytes() > MAX_SESSION_PAGE_BYTES) {
+  if (envelopeBytes() > pageLimit) {
     page.info = {
       id: kiloSessionId,
       ...(input.parentID === undefined ? {} : { parentID: input.parentID }),
@@ -252,6 +292,9 @@ export function readSessionMessagesPage(input: {
     .limit(limit + 1)
     .all();
   let consumed: HistoryCursor | undefined;
+  let turnBoundary:
+    | { messageCount: number; cursor: HistoryCursor; omittedItemCount: number }
+    | undefined;
   let hasMore = candidates.length > limit;
   for (const candidate of candidates.slice(0, limit)) {
     const key: HistoryCursor = {
@@ -300,19 +343,19 @@ export function readSessionMessagesPage(input: {
     const parts = db
       .select({
         count: count(),
-        bytes: sql<number>`coalesce(sum(length(cast(json_extract(${events.payload}, '$.properties.part') as blob))), 0)`,
+        bytes: sql<number>`coalesce(sum(${partBytesSql}), 0)`,
       })
       .from(events)
       .where(partWhere)
       .get();
     const partCount = parts?.count ?? 0;
     const messageBytes = candidate.bytes + (parts?.bytes ?? 0) + Math.max(0, partCount - 1) + 22;
-    if (page.messages.length > 0 && bytes + messageBytes + 1 > MAX_SESSION_PAGE_BYTES) {
+    if (page.messages.length > 0 && bytes + messageBytes + 1 > softBudget) {
       hasMore = true;
       break;
     }
     consumed = key;
-    if (candidate.bytes + bytes + 22 > MAX_SESSION_PAGE_BYTES) {
+    if (candidate.bytes + bytes + 22 > pageLimit) {
       page.omittedItemCount += 1 + partCount;
       continue;
     }
@@ -330,7 +373,7 @@ export function readSessionMessagesPage(input: {
     }
     const message: V1SessionMessagesPage['messages'][number] = { info, parts: [] };
     let messageSize = size(message);
-    if (bytes + messageSize + 1 > MAX_SESSION_PAGE_BYTES) {
+    if (bytes + messageSize + 1 > pageLimit) {
       page.omittedItemCount += 1 + partCount;
       continue;
     }
@@ -342,7 +385,7 @@ export function readSessionMessagesPage(input: {
         .select({
           id: events.id,
           entityId: sql<string>`${events.entity_id}`,
-          bytes: sql<number>`length(cast(json_extract(${events.payload}, '$.properties.part') as blob))`,
+          bytes: partBytesSql,
         })
         .from(events)
         .where(and(partWhere, gt(events.entity_id, partCursor)))
@@ -355,7 +398,7 @@ export function readSessionMessagesPage(input: {
       let projected = bytes + messageSize + 1;
       for (const row of batch) {
         projected += row.bytes + 1;
-        if (projected > MAX_SESSION_PAGE_BYTES) break;
+        if (projected > pageLimit) break;
         fitting.push(row.id);
       }
       const values = new Map(
@@ -365,14 +408,15 @@ export function readSessionMessagesPage(input: {
               .select({
                 id: events.id,
                 value: sql<string>`json_extract(${events.payload}, '$.properties.part')`,
+                revision: events.mutation_cursor,
               })
               .from(events)
               .where(inArray(events.id, fitting))
               .all()
-              .map(row => [row.id, row.value])
+              .map(row => [row.id, row])
       );
       for (const row of batch) {
-        if (bytes + messageSize + row.bytes + 2 > MAX_SESSION_PAGE_BYTES) {
+        if (bytes + messageSize + row.bytes + 2 > pageLimit) {
           page.omittedItemCount += partCount - readParts;
           full = true;
           break;
@@ -381,13 +425,22 @@ export function readSessionMessagesPage(input: {
         if (!values.has(row.id)) break;
         partCursor = row.entityId;
         readParts += 1;
-        const part = parseItem(values.get(row.id), partSchema);
-        if (part === undefined || part.messageID !== info.id || part.sessionID !== kiloSessionId) {
+        const value = values.get(row.id);
+        const stored = parseItem(value?.value, partSchema);
+        if (
+          stored === undefined ||
+          stored.messageID !== info.id ||
+          stored.sessionID !== kiloSessionId
+        ) {
           page.omittedItemCount += 1;
           continue;
         }
+        const part =
+          preview && value?.revision != null
+            ? (projectToolPartForDisplay(stored, value.revision) as typeof stored)
+            : stored;
         const partBytes = size(part) + (message.parts.length === 0 ? 0 : 1);
-        if (bytes + messageSize + partBytes + 1 > MAX_SESSION_PAGE_BYTES) {
+        if (bytes + messageSize + partBytes + 1 > pageLimit) {
           page.omittedItemCount += partCount - readParts + 1;
           full = true;
           break;
@@ -398,8 +451,38 @@ export function readSessionMessagesPage(input: {
     }
     page.messages.push(message);
     bytes += messageSize + 1;
+    if (preview && info.role === 'user') {
+      turnBoundary = {
+        messageCount: page.messages.length,
+        cursor: key,
+        omittedItemCount: page.omittedItemCount,
+      };
+    }
+  }
+  if (hasMore && turnBoundary) {
+    page.messages.length = turnBoundary.messageCount;
+    consumed = turnBoundary.cursor;
+    page.omittedItemCount = turnBoundary.omittedItemCount;
   }
   if (hasMore && consumed !== undefined) page.nextCursor = encodeCursor(consumed);
   page.messages.reverse();
   return page;
+}
+
+function storedPartBytes() {
+  return sql<number>`length(cast(json_extract(${events.payload}, '$.properties.part') as blob))`;
+}
+
+/**
+ * Estimate of a part's projected size, computed without reading its payload.
+ * Reserve a detail marker only when the output needs shortening. Input and
+ * metadata can also change, so the page checks the actual projected size.
+ */
+function previewPartBytes() {
+  const stored = storedPartBytes();
+  const outputBytes = sql<number>`length(cast(json_extract(${events.payload}, '$.properties.part.state.output') as blob))`;
+  const output = sql<number>`length(cast(json_quote(json_extract(${events.payload}, '$.properties.part.state.output')) as blob))`;
+  // JSON escaping can expand a preview byte to a six-byte `\u` sequence.
+  const outputPreview = TOOL_OUTPUT_PREVIEW_BYTES * 6 + 2;
+  return sql<number>`case when json_extract(${events.payload}, '$.properties.part.type') = 'tool' and json_extract(${events.payload}, '$.properties.part.state.status') = 'completed' and json_type(${events.payload}, '$.properties.part.state.output') = 'text' and ${outputBytes} > ${TOOL_OUTPUT_PREVIEW_BYTES} then ${stored} - ${output} + min(${output}, ${outputPreview}) + ${TOOL_DETAIL_MARKER_ALLOWANCE_BYTES} else ${stored} end`;
 }

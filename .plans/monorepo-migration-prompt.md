@@ -71,7 +71,7 @@ The restructure renamed paths as follows. For `cloudflare-*` workers, the
 | `kilo-app/` | `apps/mobile/` |
 | `cloud-agent/` | `services/cloud-agent/` |
 | `cloud-agent-next/` | `services/cloud-agent-next/` |
-| `cloudflare-gastown/` | `services/gastown/` |
+| `cloudflare-gastown/` | _(removed; Gastown no longer exists in the repo)_ |
 | `cloudflare-deploy-infra/` | `services/deploy-infra/` |
 | `cloudflare-o11y/` | `services/o11y/` |
 | `cloudflare-<name>/` | `services/<name>/` |
@@ -100,7 +100,6 @@ names. When running `pnpm --filter`, always use the name from the workspace's
 | `apps/mobile/` | `kilo-app` |
 | `apps/storybook/` | `@kilocode/storybook` |
 | `services/o11y/` | `cloudflare-o11y` |
-| `services/gastown/` | `cloudflare-gastown` |
 
 ## 3. Create migration branch
 

@@ -1,13 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
+  EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
+  VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
+  OrganizationBrowserAllowedOriginSchema,
   OrganizationSettingsSchema,
-  StoredModelSchema,
+  normalizeOrganizationBrowserOrigin,
 } from './schema-types';
-import type { StoredModel } from './schema-types';
+import type { GatewayModel } from './schema-types';
 
 describe('CodeReviewCouncilConfigSchema', () => {
   const specialist = (id: string) => ({
@@ -58,6 +61,21 @@ describe('OpenRouterProvider', () => {
   });
 });
 
+describe('EnkryptInputGuardrailSettingsSchema', () => {
+  it.each([false, true])('strips legacy scan_tool_results: %s', scan_tool_results => {
+    const settings = {
+      enabled: true,
+      detectors: { injection_attack: { enabled: true, action: 'block' } },
+      group_id: '00000000-0000-4000-8000-000000000003',
+    };
+
+    const parsed = EnkryptInputGuardrailSettingsSchema.parse({ ...settings, scan_tool_results });
+
+    expect(parsed).toEqual(settings);
+    expect(parsed).not.toHaveProperty('scan_tool_results');
+  });
+});
+
 describe('OrganizationSettingsSchema org_auto_model', () => {
   it('accepts bounded route maps and a fallback model', () => {
     const result = OrganizationSettingsSchema.safeParse({
@@ -96,6 +114,27 @@ describe('OrganizationSettingsSchema org_auto_model', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('VercelModelsSchema', () => {
+  it('drops malformed description fields without rejecting the model', () => {
+    const result = VercelModelsSchema.parse({
+      data: [
+        {
+          id: 'vendor/model',
+          name: 'Model',
+          type: 'language',
+          context_window: '128k',
+          modalities: { input: ['text'] },
+          pricing: { input: 1 },
+          deprecated_at: 'soon',
+          reasoning_options: [{ type: 'effort', values: ['low'] }, { values: ['high'] }],
+        },
+      ],
+    });
+
+    expect(result.data[0]).toEqual({ id: 'vendor/model', name: 'Model', type: 'language' });
   });
 });
 
@@ -227,6 +266,19 @@ describe('ModelsSchema', () => {
 
     expect(result.data.map(model => model.type)).toEqual([...types, undefined]);
   });
+
+  it('includes model reasoning metadata', () => {
+    const reasoning = {
+      mandatory: false,
+      supported_efforts: ['high', 'medium', 'low', 'none'],
+    } satisfies GatewayModel['reasoning'];
+
+    const result = ModelsSchema.parse({
+      data: [{ id: 'openai/gpt-5.2', name: 'OpenAI: GPT-5.2', reasoning }],
+    });
+
+    expect(result.data[0].reasoning).toEqual(reasoning);
+  });
 });
 
 describe('OpenRouterPricing', () => {
@@ -241,18 +293,58 @@ describe('OpenRouterPricing', () => {
   });
 });
 
-describe('StoredModelSchema', () => {
-  it('includes model reasoning metadata', () => {
-    const storedModel: StoredModel = {
-      id: 'openai/gpt-5.2',
-      name: 'OpenAI: GPT-5.2',
-      reasoning: {
-        mandatory: false,
-        supported_efforts: ['high', 'medium', 'low', 'none'],
-      },
-      endpoints: [],
-    };
+describe('OrganizationBrowserAllowedOriginSchema', () => {
+  it.each([
+    'https://example.com',
+    'https://example.com/',
+    'http://example.com',
+    'http://localhost:3000',
+    'https://app.example.com:8443',
+  ])('accepts the origin %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(true);
+  });
 
-    expect(StoredModelSchema.parse(storedModel).reasoning).toEqual(storedModel.reasoning);
+  it.each([
+    'example.com',
+    'https://example.com/path',
+    'https://example.com?query=1',
+    'https://example.com#section',
+    'https://user:password@example.com',
+    'ftp://example.com',
+    'https://',
+    '',
+  ])('rejects %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(false);
+  });
+
+  it('normalizes a trailing slash to the bare origin', () => {
+    expect(normalizeOrganizationBrowserOrigin('https://Example.com:443/')).toBe(
+      'https://example.com'
+    );
+    expect(normalizeOrganizationBrowserOrigin('https://example.com/path')).toBeNull();
+  });
+});
+
+describe('OrganizationSettingsSchema browser control', () => {
+  it('keeps the browser control policy', () => {
+    const parsed = OrganizationSettingsSchema.parse({
+      browserControl: 'playwright_only',
+      browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+    });
+
+    expect(parsed.browserControl).toBe('playwright_only');
+    expect(parsed.browserAllowedOrigins).toEqual(['https://example.com', 'http://localhost:3000']);
+  });
+
+  it('rejects an unknown browser control mode', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({ browserControl: 'ask' });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects an allowed origin with a path', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({
+      browserAllowedOrigins: ['https://example.com/checkout'],
+    });
+    expect(parsed.success).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -30,8 +31,9 @@ export function NativeRemoteTranscript({
   remote: NativeRemoteSession;
 }) {
   const { t } = useTranslation();
-  const { state, pending, canControl } = remote;
+  const { state, conversation, pending, canControl } = remote;
   const commandStatus = state?.commands[remote.commandID];
+  const loading = !state || conversation?.loading;
   return (
     <View className="gap-3 border-t border-border pt-4">
       <Text accessibilityRole="header" selectable className="font-mono text-sm">
@@ -43,11 +45,19 @@ export function NativeRemoteTranscript({
           runner: state?.runnerConnected ? t('common.online') : t('chat.botStatus.offline'),
         })}
       </Text>
-      {!state || state.connection === 'connecting' ? (
-        <Skeleton className="h-80 rounded-md" />
-      ) : (
-        <NativeRemoteMessages messages={state.messages} />
-      )}
+      {loading && <Skeleton className="h-80 rounded-md" />}
+      {!loading &&
+        conversation?.session &&
+        (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
+          <NativeRemoteMessages messages={conversation.messages} />
+        )}
+      {pending.unreadablePermissions.length > 0 ? (
+        // No consent card for these: the app never read the request's scope, so
+        // offering allow/deny would decide a permission nobody parsed. The
+        // notice points the user at the CLI, which can still answer it. The
+        // screen already pads this column, so the notice drops its own margin.
+        <PermissionUnreadableNotice inset={false} />
+      ) : null}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
           <Text>{permission.action}</Text>
@@ -95,9 +105,9 @@ export function NativeRemoteTranscript({
         />
       ))}
       <NativeRemoteComposer remote={remote} />
-      {remote.error || state?.error ? (
+      {remote.error || conversation?.error ? (
         <Text accessibilityRole="alert" className="text-destructive">
-          {remote.error || state?.error}
+          {remote.error || conversation?.error}
         </Text>
       ) : null}
       {commandStatus ? (

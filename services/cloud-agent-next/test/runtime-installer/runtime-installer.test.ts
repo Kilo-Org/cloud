@@ -80,12 +80,26 @@ const server = http.createServer(async (request, response) => {
 
 before(async () => {
   if (!process.env.RUNTIME_INSTALLER_TEST_IMAGE) {
+    const wrapper = spawnSync('pnpm', ['run', 'build:wrapper'], {
+      cwd: serviceRoot,
+      stdio: 'inherit',
+    });
+    assert.equal(wrapper.status, 0, 'wrapper build');
     const build = spawnSync(
       'docker',
-      ['build', '--platform', 'linux/amd64', '-t', image, '-f', 'Dockerfile.containers', '.'],
+      [
+        'build',
+        '--platform',
+        'linux/amd64',
+        '-t',
+        image,
+        '-f',
+        'Dockerfile.containers.runtime-free',
+        '.',
+      ],
       { cwd: serviceRoot, stdio: 'inherit' }
     );
-    assert.equal(build.status, 0, 'Dockerfile.containers build');
+    assert.equal(build.status, 0, 'Dockerfile.containers.runtime-free build');
   }
   await new Promise<void>(resolve => server.listen(0, '0.0.0.0', resolve));
   const address = server.address();
@@ -167,6 +181,10 @@ function run(
     `SANDBOX_CONTROL_CREDENTIAL=${credential}`,
     '--env',
     'SANDBOX_CONTROL_URL=ws://unused.local',
+    '--env',
+    'CLOUD_AGENT_SENTRY_DSN=https://test-public-key@sentry.invalid/1',
+    '--env',
+    'CLOUD_AGENT_SENTRY_ENVIRONMENT=runtime-installer-test',
     ...(options.poison
       ? [
           '--env',
@@ -285,6 +303,8 @@ void test('restore-like A files never run again when B replaces the selected run
   );
   await assert.rejects(fs.access(path.join(root, 'workspace/poisoned')));
   assert.equal(observed.env.SANDBOX_CONTROL_CREDENTIAL, credential);
+  assert.equal(observed.env.CLOUD_AGENT_SENTRY_DSN, 'https://test-public-key@sentry.invalid/1');
+  assert.equal(observed.env.CLOUD_AGENT_SENTRY_ENVIRONMENT, 'runtime-installer-test');
   assert.equal(observed.env.NODE_OPTIONS, undefined);
 });
 

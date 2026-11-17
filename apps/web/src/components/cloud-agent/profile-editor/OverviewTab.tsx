@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Star, Trash2 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -199,6 +200,25 @@ export function OverviewTab({
           return trimmed;
         }}
       />
+
+      <div className="rounded-lg border p-3">
+        <div className="text-sm font-medium">Last used</div>
+        <div className="text-muted-foreground mt-0.5 text-xs">
+          {profile.lastUsedAt ? (
+            <time
+              dateTime={profile.lastUsedAt}
+              title={new Date(profile.lastUsedAt).toLocaleString()}
+            >
+              {formatDistanceToNow(new Date(profile.lastUsedAt), { addSuffix: true })}
+            </time>
+          ) : (
+            'No recorded usage'
+          )}
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Based on activity in sessions using this profile. Older sessions may not be recorded.
+        </p>
+      </div>
 
       {/* Default toggle */}
       <div className="flex items-center justify-between rounded-lg border p-3">

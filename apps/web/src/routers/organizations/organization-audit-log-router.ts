@@ -8,6 +8,10 @@ import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, lt, gt, desc, asc, count, min, max, ilike, gte, lte, inArray } from 'drizzle-orm';
 import { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import {
+  canCallerReadStaffAuditActors,
+  maskKiloAdminActors,
+} from '@/lib/security-agent/services/audit-log-service';
 
 const PAGE_SIZE = 100;
 
@@ -99,22 +103,9 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const hasMore = logs.length > PAGE_SIZE;
       const resultLogs = hasMore ? logs.slice(0, PAGE_SIZE) : logs;
 
-      // Mask Kilo Code admin information unless the requesting user is a Kilo admin
-      const isRequestingUserKiloAdmin = ctx.user.google_user_email.endsWith('@kilocode.ai');
-      const maskedLogs = isRequestingUserKiloAdmin
-        ? resultLogs
-        : resultLogs.map(log => {
-            // Check if the actor is a Kilo admin
-            if (log.actor_email && log.actor_email.endsWith('@kilocode.ai')) {
-              return {
-                ...log,
-                actor_id: '00000000-0000-0000-0000-000000000000',
-                actor_email: 'admin@kilocode.ai',
-                actor_name: 'Kilo Admin',
-              };
-            }
-            return log;
-          });
+      // Staff actor details follow the caller's platform permission.
+      const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
+      const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
 
       // Determine pagination flags
       const hasNext = hasMore; // Has older events

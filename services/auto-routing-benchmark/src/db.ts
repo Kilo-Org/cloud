@@ -15,6 +15,7 @@ import type {
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
+import { POLICY_SETTINGS } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
   and,
@@ -72,7 +73,7 @@ type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 // below the 100-variable ceiling while still batching the delete plus inserts.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 5;
 
-const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 8;
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 7;
 
 // Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
 // 100-variable ceiling; the profile drain claims batches of up to 33 entries,
@@ -180,22 +181,28 @@ const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
   user_max_concurrency: 40,
 };
 
+// The seven fixed policy columns are legacy: nothing in this worker reads them
+// back, but they are NOT NULL and the previously deployed worker still reads
+// them, so every save writes the canonical fixed policy value.
+const ROLLBACK_SAFE_LEGACY_FIXED_POLICY = {
+  frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
+  switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
+  best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
+  low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
+  classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
+  decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixed,
+  classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
+};
+
 export async function replaceConfig(
   db: D1Database,
   config: {
     min_accuracy: number;
     accuracy_noise_band?: number;
-    frontier_min_accuracy_delta?: number;
-    switch_cost_factor: number;
-    best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
-    low_confidence_threshold?: number | null;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
-    classifier_repetitions: number;
-    decider_repetitions: number;
-    classifier_max_p95_latency_ms: number | null;
     policy_overrides?: PolicySettingOverrides | null;
     updated_at: string;
     updated_by: string | null;
@@ -212,11 +219,16 @@ export async function replaceConfig(
         id: router === 'efficient' ? 1 : 2,
         ...config,
         ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+        ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
         router,
       })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: { ...config, ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS },
+        set: {
+          ...config,
+          ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+          ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+        },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
@@ -2033,6 +2045,7 @@ export function routingTableToRows(
     published_at: publishedAt,
     generated_at: table.generatedAt,
     min_accuracy: table.minAccuracy,
+    accuracy_noise_band: table.accuracyNoiseBand ?? null,
     switch_cost_factor: table.switchCostFactor,
     best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
     production_token_profile: table.productionTokenProfile ?? null,
@@ -2062,6 +2075,8 @@ export function routingTableToRows(
         variant: variantToStorage(variantKey),
         pricing: c.pricing ?? null,
         estimated_request_cost_usd: c.estimatedRequestCostUsd ?? null,
+        p50_latency_ms: c.p50LatencyMs ?? null,
+        p50_ttft_ms: c.p50TtftMs ?? null,
       });
     });
   }
@@ -2088,6 +2103,8 @@ export function rowsToRoutingTable(
       ...(row.cases != null ? { cases: row.cases } : {}),
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
+      ...(row.p50_latency_ms != null ? { p50LatencyMs: row.p50_latency_ms } : {}),
+      ...(row.p50_ttft_ms != null ? { p50TtftMs: row.p50_ttft_ms } : {}),
       ...(row.pricing != null || row.estimated_request_cost_usd != null
         ? { pricing: row.pricing ?? null }
         : {}),
@@ -2103,6 +2120,9 @@ export function rowsToRoutingTable(
     version: tableRow.run_id,
     generatedAt: tableRow.generated_at,
     minAccuracy: tableRow.min_accuracy,
+    ...(tableRow.accuracy_noise_band != null
+      ? { accuracyNoiseBand: tableRow.accuracy_noise_band }
+      : {}),
     switchCostFactor: tableRow.switch_cost_factor,
     bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
     ...(tableRow.production_token_profile != null ||
@@ -2145,6 +2165,7 @@ export async function saveRoutingTable(
           published_at: tableRow.published_at,
           generated_at: tableRow.generated_at,
           min_accuracy: tableRow.min_accuracy,
+          accuracy_noise_band: tableRow.accuracy_noise_band,
           switch_cost_factor: tableRow.switch_cost_factor,
           best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
           production_token_profile: tableRow.production_token_profile,

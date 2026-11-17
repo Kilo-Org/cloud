@@ -14,6 +14,7 @@ const limitMock = jest.fn();
 const chain: Record<string, jest.Mock> = {
   from: jest.fn((): unknown => chain),
   leftJoin: jest.fn((): unknown => chain),
+  leftJoinLateral: jest.fn((): unknown => chain),
   where: jest.fn((): unknown => chain),
   orderBy: jest.fn((): unknown => chain),
   limit: limitMock,
@@ -37,9 +38,11 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
-jest.mock('@/routers/cli-sessions-v2-router', () => {
+jest.mock('@/lib/session-associated-pr', () => {
   const { z } = jest.requireActual('zod');
+  const actual = jest.requireActual('@/lib/session-associated-pr');
   return {
+    sessionAssociatedPr: actual.sessionAssociatedPr,
     associatedPrSchema: z.object({}).passthrough(),
     // Mirror the real gate: only a session whose own stored link GitHub has
     // verified renders an associatedPr; no link or an unverified link renders
@@ -52,14 +55,13 @@ jest.mock('@/routers/cli-sessions-v2-router', () => {
       session.pr_url === null || session.pr_link_verified_at === null
         ? null
         : { number: session.pr_number, verified: true },
-    sessionPrJoinPredicate: undefined,
   };
 });
 
 import { CLOUD_AGENT_CANDIDATE_LIMIT, listActiveSessions } from './active-sessions-list';
 
 beforeEach(() => {
-  for (const method of ['from', 'leftJoin', 'where', 'orderBy']) {
+  for (const method of ['from', 'leftJoin', 'leftJoinLateral', 'where', 'orderBy']) {
     chain[method].mockClear();
   }
   selectMock.mockClear();

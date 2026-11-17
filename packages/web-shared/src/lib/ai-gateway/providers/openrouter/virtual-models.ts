@@ -4,7 +4,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 /**
  * Snapshot home for gateway models that no inference provider lists, such as
@@ -71,7 +71,7 @@ function toVirtualSnapshotModel(model: CatalogModel): OpenRouterModel {
 export function injectVirtualModels(params: {
   providerModelData: ProviderModels;
   catalogModels: CatalogModel[];
-  storedModels: Record<string, StoredModel>;
+  storedModels: GatewayModelMap;
   unavailableModelIds: ReadonlySet<string>;
 }): void {
   const { providerModelData, catalogModels, storedModels, unavailableModelIds } = params;

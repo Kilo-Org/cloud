@@ -67,7 +67,7 @@ async function session() {
   const value = result.cookies.get(sessionCookie)?.value;
   expect(value).toBeDefined();
   mockCookieValues.set(sessionCookie, value ?? '');
-  mockCookieValues.set('turnstile_jwt', signed({ guid, ip, watchwoodIp: ip }));
+  mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
   return data.safety_identifier as string;
 }
 
@@ -221,21 +221,19 @@ describe('Watchwood signup assessment', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it.each(['missing', 'forged', 'expired', 'ip_mismatch', 'legacy'])(
+  it.each(['missing', 'forged', 'expired', 'ip_mismatch', 'missing_ip'])(
     'requires a valid matching Turnstile context: %s',
     async mode => {
       const identity = await session();
       if (mode === 'missing') mockCookieValues.delete('turnstile_jwt');
-      if (mode === 'legacy') mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
+      if (mode === 'missing_ip')
+        mockCookieValues.set('turnstile_jwt', signed({ guid, iat: Math.floor(Date.now() / 1000) }));
       if (mode === 'forged')
-        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip, watchwoodIp: ip }, 'wrong-key'));
+        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip }, 'wrong-key'));
       if (mode === 'expired')
-        mockCookieValues.set(
-          'turnstile_jwt',
-          jwt.sign({ guid, ip, watchwoodIp: ip }, secret, { expiresIn: -1 })
-        );
+        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip }, secret, { expiresIn: -1 }));
       if (mode === 'ip_mismatch')
-        mockCookieValues.set('turnstile_jwt', signed({ guid, ip, watchwoodIp: '192.0.2.11' }));
+        mockCookieValues.set('turnstile_jwt', signed({ guid, ip: '192.0.2.11' }));
       const result = await assessWatchwoodSignup(
         request({ token: browserToken, safety_identifier: identity })
       );
@@ -248,7 +246,7 @@ describe('Watchwood signup assessment', () => {
   it('uses the trusted Vercel address when Turnstile forwarding metadata differs', async () => {
     process.env.VERCEL = '1';
     const identity = await session();
-    mockCookieValues.set('turnstile_jwt', signed({ guid, ip: '192.0.2.11', watchwoodIp: ip }));
+    mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
     await assessWatchwoodSignup(
       request(
         { token: browserToken, safety_identifier: identity },
@@ -264,7 +262,7 @@ describe('Watchwood signup assessment', () => {
   it('refuses a solved Turnstile context replayed from another trusted address', async () => {
     process.env.VERCEL = '1';
     const identity = await session();
-    mockCookieValues.set('turnstile_jwt', signed({ guid, ip, watchwoodIp: ip }));
+    mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
 
     const result = await assessWatchwoodSignup(
       request(
@@ -495,7 +493,7 @@ describe('Watchwood signup attribution', () => {
       if (mode === 'turnstile')
         mockCookieValues.set(
           'turnstile_jwt',
-          signed({ guid: 'dc22a990-f425-479f-b3ab-d48b16d7c02c', ip, watchwoodIp: ip })
+          signed({ guid: 'dc22a990-f425-479f-b3ab-d48b16d7c02c', ip })
         );
       expect(await readWatchwoodSignupAssessment()).toMatchObject({ status: 'invalid_context' });
     }

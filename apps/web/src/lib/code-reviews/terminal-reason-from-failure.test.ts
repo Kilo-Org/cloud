@@ -34,6 +34,15 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it.each(['base_branch_changed', 'base_branch_missing', 'base_branch_stale'] as const)(
+    'classifies %s as a repository checkout failure',
+    subtype => {
+      expect(terminalReasonFromCloudAgentFailure({ code: 'workspace_setup_failed', subtype })).toBe(
+        'repository_checkout_failed'
+      );
+    }
+  );
+
   it('maps the codes behind the largest uncategorized buckets', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'assistant_error' })).toBe(
       'assistant_failed'

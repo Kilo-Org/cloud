@@ -24,6 +24,10 @@ import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platfo
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
 
 type CallbackState = { owner: string; returnTo?: string };
 type CallbackPhase =
@@ -125,6 +129,24 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
       tokens,
       availableWorkspaces,
     });
+
+    if (owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: owner.id,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          membershipScope: 'direct',
+          action: 'organization.bitbucket.update',
+          message: 'Bitbucket: OAuth connection created',
+          metadata: {
+            operation: 'oauth_connect',
+            integrationId: storedIntegration.integrationId,
+          },
+        }
+      );
+    }
+
     if (storedIntegration.status === 'connected') {
       scheduleBitbucketRepositoryCachePrime({
         owner,

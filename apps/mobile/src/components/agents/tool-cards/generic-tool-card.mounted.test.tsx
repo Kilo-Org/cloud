@@ -7,7 +7,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GenericToolCardBody } from './generic-tool-card';
 
+// The field value's alignment comes from `ltrValueTextStyle`, which reads the
+// interface direction; hoisted so a test can flip it per render.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
 vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
   Pressable: 'Pressable',
   TextInput: MockTextInput,
   View: 'View',
@@ -76,6 +81,25 @@ function makeMcpErrorPart(): ToolPart {
         arguments: { title: 'Fix the sheet', team: 'ENG' },
       },
       error: 'boom',
+      time: { start: 0, end: 1 },
+    },
+  };
+}
+
+function makeSendFilePart(): ToolPart {
+  return {
+    id: 'file-1',
+    sessionID: 'session-1',
+    messageID: 'message-1',
+    type: 'tool',
+    callID: 'call-file',
+    tool: 'send_file',
+    state: {
+      status: 'completed',
+      input: { filePath: '/workspace/report.txt' },
+      output: 'File report.txt delivered to the app.',
+      title: 'Sent report.txt',
+      metadata: {},
       time: { start: 0, end: 1 },
     },
   };
@@ -172,13 +196,26 @@ describe('GenericToolCardBody mounted', () => {
     const renderer = await renderBody(makeQuestionPart());
 
     const values = textValues(renderer.root);
-    expect(values).toContain('header');
+    expect(values).toContain('Header');
     expect(values).toContain('E2E');
-    expect(values).toContain('question');
+    expect(values).toContain('Question');
     expect(values).toContain('Which fields should the sheet show?');
-    expect(values).toContain('options');
+    expect(values).toContain('Options');
     expect(values).toContain('Continue — Continue the E2E scenario');
     expect(values.some(value => value.includes('"questions"'))).toBe(false);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('labels a known tool argument instead of showing its raw key', async () => {
+    const renderer = await renderBody(makeSendFilePart());
+
+    const values = textValues(renderer.root);
+    expect(values).toContain('File path');
+    expect(values).toContain('/workspace/report.txt');
+    expect(values).not.toContain('filePath');
 
     act(() => {
       renderer.unmount();
@@ -259,6 +296,44 @@ describe('GenericToolCardBody mounted', () => {
     expect(values).toContain('list_teams');
     expect(values).toContain('arguments');
     expect(values).toContain('{}');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  // The value below an Arabic label must not drop to the far left: the label
+  // sits on the start edge, and the value shares it while keeping the path's
+  // own left-to-right order.
+  it('puts the argument value on the label start edge in a right-to-left interface', async () => {
+    i18nManager.isRTL = true;
+    try {
+      const renderer = await renderBody(makeSendFilePart());
+      const value = findByType(renderer.root, 'TextInput').find(
+        node => node.props.value === '/workspace/report.txt'
+      );
+
+      expect(value?.props.style).toEqual({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+        textAlign: 'right',
+      });
+
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      i18nManager.isRTL = false;
+    }
+  });
+
+  it('leaves the argument value at its natural left edge in a left-to-right interface', async () => {
+    const renderer = await renderBody(makeSendFilePart());
+    const value = findByType(renderer.root, 'TextInput').find(
+      node => node.props.value === '/workspace/report.txt'
+    );
+
+    expect(value?.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
 
     act(() => {
       renderer.unmount();

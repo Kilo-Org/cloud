@@ -11,7 +11,6 @@ import {
   canExitSessionFromList,
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
-  composeSessionProvenanceSubtitle,
   expandPlatformFilter,
   formatGitUrlProject,
   formatMeta,
@@ -23,11 +22,14 @@ import {
   remoteAgentLabel,
   remoteMeta,
   remoteSessionEyebrowLabel,
+  remoteSessionEyebrowState,
   repoNameFromGitUrl,
-  sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
+  storedSessionEyebrowState,
 } from './session-list-helpers';
+import { sectionAwareTimeMeta } from './session-row-time-meta';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -197,16 +199,20 @@ describe('formatMeta (moved helper, regression guard)', () => {
 });
 
 describe('sectionAwareTimeMeta', () => {
-  // 2026-10-30T16:00Z is a Friday; the rows below land on the calendar days the
-  // Agents list buckets as Today/Yesterday/a weekday, so each heading is the one
-  // that section really renders above the row.
-  const NOW = new Date('2026-10-30T16:00:00.000Z').getTime();
+  // 2026-10-30T19:00Z is a Friday. The rows below land on the calendar days the
+  // Agents list buckets as Today/Yesterday/a weekday in UTC, so each heading is
+  // the one that section really renders above the row. The zone is passed in so
+  // the suite never depends on the machine it runs on.
+  const NOW = new Date('2026-10-30T19:00:00.000Z').getTime();
+  const ZONE = 'UTC';
   const HOUR = 60 * 60 * 1000;
 
   function clockOf(iso: string): string {
-    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
-      new Date(iso)
-    );
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: ZONE,
+    }).format(new Date(iso));
   }
 
   it('shows the clock time of the row timestamp when the relative label restates the heading', () => {
@@ -214,49 +220,117 @@ describe('sectionAwareTimeMeta', () => {
     // The premise: the relative label is the section heading itself.
     expect(formatMeta(iso, NOW)).toBe('YESTERDAY');
 
-    expect(sectionAwareTimeMeta(iso, 'Yesterday', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: clockOf(iso),
       clock: clockOf(iso),
+      spoken: clockOf(iso),
     });
   });
 
   it('matches a heading already in the eyebrow casing, and every locale casing', async () => {
     const iso = new Date(NOW - 27 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', NOW).clock).toBe(clockOf(iso));
+    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', { nowMs: NOW, timeZone: ZONE }).clock).toBe(
+      clockOf(iso)
+    );
 
     // German heads the section "Gestern" while RelativeTimeFormat says "gestern".
     await i18n.changeLanguage('de');
     expect(formatMeta(iso, NOW)).toBe('GESTERN');
-    expect(sectionAwareTimeMeta(iso, 'Gestern', NOW).clock).not.toBeNull();
+    expect(
+      sectionAwareTimeMeta(iso, 'Gestern', { nowMs: NOW, timeZone: ZONE }).clock
+    ).not.toBeNull();
+  });
+
+  it('counts calendar days, so a 47-hour-old row is not "yesterday"', () => {
+    // The shape the History list showed: read on local Tuesday 20:52, a session
+    // from local Sunday 21:00 is 47 h 52 m old, so the elapsed-time word is
+    // "yesterday" while the heading above it names Sunday.
+    const now = new Date('2026-11-10T20:52:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    expect(formatMeta(iso, now)).toBe('YESTERDAY');
+
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: ZONE })).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+      spoken: '2 days ago',
+    });
+  });
+
+  it('still reaches the clock time for a row the calendar really places yesterday', () => {
+    // 26 hours old, but the previous local date: the day word agrees with the
+    // heading, so the row shows its clock instead of repeating the section.
+    const now = new Date('2026-11-10T12:00:00.000Z').getTime();
+    const iso = new Date('2026-11-09T10:00:00.000Z').toISOString();
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: now, timeZone: ZONE })).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+      spoken: clockOf(iso),
+    });
+  });
+
+  it('names the day the given zone shows, not the one the runtime started in', () => {
+    // Sunday 21:00 UTC is Monday 11:00 in Kiritimati, and the clock reads
+    // Tuesday 23:00 there, so the row is the previous local date and its
+    // heading is that day's weekday. In UTC the same row is two dates back, so
+    // the label cannot name yesterday under a weekday heading.
+    const now = new Date('2026-11-10T09:00:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    expect(
+      sectionAwareTimeMeta(iso, 'Monday', { nowMs: now, timeZone: 'Pacific/Kiritimati' })
+    ).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: 'UTC' }).spoken).toBe(
+      '2 days ago'
+    );
   });
 
   it('keeps the relative label under a heading it does not repeat', () => {
     const today = new Date(NOW - 3 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(today, 'Today', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(today, 'Today', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: '3 HOURS AGO',
       clock: null,
+      spoken: '3 hours ago',
     });
 
     const midWeek = new Date(NOW - 51 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: '2 DAYS AGO',
       clock: null,
+      spoken: '2 days ago',
     });
   });
 
-  it('keeps the relative label on a row with no section (share sheet)', () => {
-    const iso = new Date(NOW - 27 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(iso, null, NOW)).toEqual({ visible: 'YESTERDAY', clock: null });
-    expect(sectionAwareTimeMeta(iso, undefined, NOW)).toEqual({
+  it('keeps the elapsed-time label on a row with no section (Home card, share sheet)', () => {
+    // Scope: only rows under a date heading read the calendar. A 47-hour-old
+    // row with no heading keeps the label every other surface renders.
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    const nowMs = new Date('2026-11-10T20:52:00.000Z').getTime();
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE })).toEqual({
       visible: 'YESTERDAY',
       clock: null,
+      spoken: 'yesterday',
     });
+    expect(sectionAwareTimeMeta(iso, undefined, { nowMs, timeZone: ZONE })).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    // And it is exactly what `formatMeta` draws, not merely a similar word.
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE }).visible).toBe(
+      formatMeta(iso, nowMs)
+    );
   });
 
   it('omits the meta for an unparseable timestamp instead of inventing a clock', () => {
-    expect(sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', NOW)).toEqual({
+    expect(
+      sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', { nowMs: NOW, timeZone: ZONE })
+    ).toEqual({
       visible: '',
       clock: null,
+      spoken: '',
     });
   });
 });
@@ -497,6 +571,19 @@ describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     );
   });
 
+  it('labels a stored session of unknown origin without a live status', () => {
+    const neutral = i18n.t('common.unknown');
+    const live = i18n.t('agents.sessionList.live');
+    // The backend's `'unknown'` sentinel is the reachable unrecorded origin;
+    // the empty string is the same class through a data anomaly. `platformLabel`'s
+    // own tests cover null and undefined with their nullable signature.
+    for (const created_on_platform of ['', 'unknown']) {
+      const label = storedSessionEyebrowLabel({ git_url: null, created_on_platform });
+      expect(label).toBe(neutral);
+      expect(label).not.toBe(live);
+    }
+  });
+
   it('shows the decoded repository name for a percent-encoded git_url', () => {
     expect(
       storedSessionEyebrowLabel({
@@ -573,6 +660,74 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
   });
 });
 
+describe('storedSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the placeholder for an origin the row cannot name', () => {
+    for (const created_on_platform of ['', 'unknown']) {
+      expect(storedSessionEyebrowState({ git_url: null, created_on_platform })).toBe('unknown');
+    }
+  });
+
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(
+      storedSessionEyebrowState({ git_url: null, created_on_platform: 'cloud-agent-web' })
+    ).toBe('platform');
+    expect(storedSessionEyebrowState({ git_url: null, created_on_platform: 'cli' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    // The repository names the row's context, not the session: with the
+    // session title leading, the label and its strip take the muted pair
+    // instead of a saturated ramp entry.
+    expect(
+      storedSessionEyebrowState({
+        git_url: 'https://github.com/org/my-repo.git',
+        created_on_platform: 'cloud-agent-web',
+      })
+    ).toBe('repository');
+    // A git URL whose project segment is empty renders the label fallback, so
+    // the tint falls back with it.
+    expect(
+      storedSessionEyebrowState({ git_url: 'git@github.com:/', created_on_platform: 'cli' })
+    ).toBe('platform');
+  });
+});
+
+describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the live state for every unrecorded origin the label renders as LIVE', async () => {
+    for (const createdOnPlatform of [undefined, '', 'unknown']) {
+      expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform })).toBe('live');
+    }
+    // The word is catalog copy: the tint keys off the state, not its text.
+    await i18n.changeLanguage('de');
+    expect(remoteSessionEyebrowLabel({ gitUrl: null, createdOnPlatform: undefined })).toBe(
+      i18n.t('agents.sessionList.live')
+    );
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: undefined })).toBe('live');
+    await i18n.changeLanguage('en');
+  });
+
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: 'cli' })).toBe('platform');
+    expect(remoteSessionEyebrowState({ gitUrl: '', createdOnPlatform: 'cloud-agent-web' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBe(
+      'repository'
+    );
+  });
+});
+
 describe('eyebrow casing follows the active locale (Turkish i → İ)', () => {
   it('uppercases the stored-session repo name with the locale', async () => {
     await i18n.changeLanguage('tr');
@@ -635,7 +790,7 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  it('keeps metadata clauses separate from the outer Arabic conjunction', async () => {
+  it('separates metadata clauses with the catalog’s own comma, never a conjunction', async () => {
     await i18n.changeLanguage('ar');
     expect(
       selectRemoteRowSpokenMeta({
@@ -646,7 +801,7 @@ describe('selectRemoteRowSpokenMeta', () => {
         costSpoken: null,
         timeSpoken: 'activity',
       })
-    ).toBe('wake, activity');
+    ).toBe('wake\u060C activity');
   });
 
   it('keeps cost and activity alongside a scheduled wake', () => {

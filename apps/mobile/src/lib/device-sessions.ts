@@ -5,35 +5,39 @@ import { i18n } from '@/i18n';
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
 
 /**
- * Derive a short, human-readable label from the raw `user_agent` HTTP header
- * stored on the session row.
+ * Title one session row from the client the server classified for it.
  *
- * Browser requests always lead with the `Mozilla/5.0` compatibility token, so
- * those collapse to "Web browser". Mobile sessions title themselves with the
- * localized app name: the app sends `Kilo-Code/<version> (android|ios)`, and
- * rows minted before that header existed recorded OkHttp's default
- * `okhttp/<version>` on Android. Other clients keep their first product token
- * (the CLI's `Kilo-Code/1.2.3 (darwin; arm64)` → "Kilo-Code", `axios/1.7.0` →
- * "axios"), and a missing or empty header falls back to "Unknown device".
+ * The server reads the recorded `user_agent` header once and returns the kind
+ * with the row, so the app never parses a header itself. An app session also
+ * carries the platform it runs on, the CLI and a browser keep one name each,
+ * and any other client is titled by the product token the server extracted
+ * (`axios/1.7.0` → "axios") — or "Unknown device" when the row recorded no
+ * header at all.
+ *
+ * `device_auth_request_id` is not a CLI marker: the app's own browser sign-in
+ * sets it too. The client kind therefore comes from the recorded user agent.
  */
-export function deviceSessionLabel(userAgent: string | null | undefined): string {
-  const trimmed = userAgent?.trim() ?? '';
-  if (!trimmed) {
-    return i18n.t('kiloclaw.devicePairing.unknownDevice');
-  }
-  if (trimmed.startsWith('Mozilla/')) {
-    return i18n.t('deviceSessions.webBrowser');
-  }
-  // `Kilo-Code/<version> (android|ios)` names the app; the platform annotation
-  // separates it from the CLI's `(darwin; arm64)` shape. OkHttp's default
-  // names the Android app on rows created before the header shipped.
-  if (
-    /^okhttp(?:[/\s]|$)/i.test(trimmed) ||
-    /^Kilo-Code\/[^\s(]*\s*\((?:android|ios)[;)]/i.test(trimmed)
-  ) {
+export function deviceSessionLabel(
+  session: Pick<DeviceSession, 'kind' | 'platform' | 'clientName'>
+): string {
+  if (session.kind === 'app') {
+    if (session.platform === 'android') {
+      return i18n.t('deviceSessions.kiloAppAndroid');
+    }
+    if (session.platform === 'ios') {
+      return i18n.t('deviceSessions.kiloAppIos');
+    }
+    // An app row always names its platform today; the unqualified app name
+    // keeps the label defined if the server ever reports another one.
     return i18n.t('deviceSessions.kiloApp');
   }
-  return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
+  if (session.kind === 'cli') {
+    return i18n.t('deviceSessions.kiloCli');
+  }
+  if (session.kind === 'browser') {
+    return i18n.t('deviceSessions.webBrowser');
+  }
+  return session.clientName ?? i18n.t('deviceSessions.unknownDevice');
 }
 
 /**

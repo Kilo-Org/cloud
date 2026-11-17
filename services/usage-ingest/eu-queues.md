@@ -7,13 +7,21 @@
 | Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch6/parallelism2/cap225 (up to 450 writer calls) |
 | Staging | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` / `usage-ingest-processing-dlq-staging-eu` | Processing, batch2/parallelism2/cap200 (at most400 writer calls) |
 
+Each environment also binds its old global pair as the
+[stall hedge](README.md#stall-hedge-to-the-global-queue) target
+(`usage-ingest-processing` / `usage-ingest-processing-dlq` in production,
+`usage-ingest-processing-staging` / `usage-ingest-processing-dlq-staging` in staging),
+consumed by the same Worker at cap 25 (50 more writer calls). Hedged copies are stored
+outside the EU jurisdiction; EU was a latency experiment, not a residency requirement.
+
 Production uses batch6/parallelism2/cap225; staging policy is unchanged at
 batch2/parallelism2/cap200. The production cap `225` is a bounded single-knob
 trial; batch, fill timeout, parallelism, retries and staging are unchanged.
 Complete the production merge gate below before merge or deployment. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production
-workflow runs every 20 minutes and selects eligible CI-green main: it will create or
+workflow starts when a main CI run completes and has an hourly catch-up poll; it
+selects eligible CI-green main and will create or
 reuse the EU pair, detach the old consumer if present and deploy the new bindings. Do not
 assume a separate manual deployment will provide a later approval gate.
 
@@ -49,9 +57,25 @@ selected usage-ingest Worker. It reads production's top-level config or staging'
 config, verifies existing queues have explicit `jurisdiction: "eu"`, and creates
 only missing members with that API field (DLQ first, with detail readback). Names
 alone do not prove jurisdiction. Unknown/wrong jurisdiction, incomplete/ambiguous
-lookup or API failures stop upload; reruns reuse compatible resources.
+lookup or API failures stop upload; reruns reuse compatible resources. The helper
+also raises the selected DLQ's message retention to the maximum and reads it back;
+see [Retention](README.md#retention).
 
-Preparation verifies the selected source's consumer ownership before detaching
+When the config declares the hedge (a `USAGE_INGEST_HEDGE_QUEUE` producer on the
+environment's global source plus a second consumer on it that dead-letters into the
+global DLQ, exactly), preparation treats the global pair as the hedge pair rather than
+an obsolete source. It inspects all four queues before any write, verifies consumer
+ownership on both sources, creates a missing global DLQ (maximum retention) and then
+a missing global source without a jurisdiction, reads each back, raises the global
+DLQ's retention like the EU DLQ's, and detaches nothing. A foreign consumer on the
+hedge queue stops deployment. Cloudflare requires a DLQ to share its source queue's
+jurisdiction, so the hedge cannot use the EU DLQ. Any other hedge shape fails the
+config check before API access. The legacy two-producer, one-consumer shape below
+keeps its behaviour, so historical source revisions still deploy. That compatibility
+is not a safe rollback once the hedge has been on: a legacy-shaped deployment detaches
+the global consumer without checking the hedge queue's backlog (see removal below).
+
+Without the hedge, preparation verifies the selected source's consumer ownership before detaching
 only the obsolete source attachment owned by the selected Worker. All supplied
 script-name aliases must match; service metadata must match its default Worker
 environment. It reads back detachment. Missing/already-detached obsolete queues
@@ -74,9 +98,21 @@ before `pnpm --filter cloudflare-usage-ingest exec wrangler deploy --experimenta
 Staging keeps `pnpm --filter cloudflare-usage-ingest queues:prepare` before its
 existing deployment commands. The helper requires an already injected
 `CLOUDFLARE_API_TOKEN`; it does not load credentials/dotenv or log token/body values.
-Actual token permissions must support Queue reads/create/consumer removal and
+Actual token permissions must support Queue reads/create/update/consumer removal and
 normal Worker deployment; account admin UI access is not required. See
 [consumer API permissions](https://developers.cloudflare.com/api/resources/queues/subresources/consumers/methods/delete/).
+
+## Stall hedge removal
+
+Remove the hedge with a forward PR, not a revert: set `USAGE_INGEST_HEDGE_MODE` to
+`off` and deploy, wait until the hedge queue is empty, then remove the hedge consumer,
+binding and variables in a new PR; preparation then detaches the global consumer as
+the legacy shape does. A plain revert, or deploying a source revision from before the
+hedge, restores the unconditional detach and could leave hedge copies unprocessed,
+some of which may be the only accepted copy of an event. The same happens when the
+removal PR deploys before the hedge queue has drained: preparation does not check the
+backlog before detaching. The global routing rollback below needs the hedge removed
+first.
 
 ## Cutover and routing rollback
 
@@ -102,6 +138,8 @@ mode/capacity and any later processing/drain ownership; receipt mode is not an
 accounting rollback once processing has been enabled separately.
 
 Update log queue-field filters and GraphQL/queue backlog/DLQ IDs for the selected
-pair; distinguish global/EU during transition and restore global targets on rollback.
+pair, including o11y's `DEAD_LETTER_QUEUE_NAME` (see the
+[dead-letter alert](README.md#dead-letter-alert)); distinguish global/EU during
+transition and restore global targets on rollback.
 EU jurisdiction restricts queue data location, not Worker placement or measured
 latency. See [Cloudflare's jurisdiction contract](https://developers.cloudflare.com/queues/configuration/data-location/).

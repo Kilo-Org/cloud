@@ -32,7 +32,7 @@ export type NativeInventory = {
   ) => Promise<NativeSessionSummary | undefined>;
 };
 
-export function useNativeInventory(client: NativeRemoteClient) {
+export function useNativeInventory(client: NativeRemoteClient, organizationID?: string) {
   const [presence, setPresence] = useState<NativePresenceState>({
     connection: 'connecting',
     instances: [],
@@ -113,14 +113,14 @@ export function useNativeInventory(client: NativeRemoteClient) {
       if (state.connection === 'connected') {
         void load();
       }
-    });
+    }, organizationID);
     presenceRef.current = connection;
     return () => {
       lifetime.current = generation + 1;
       presenceRef.current = null;
       connection.close();
     };
-  }, [client, load]);
+  }, [client, load, organizationID]);
 
   async function create(instance: NativePresenceState['instances'][number], directory: string) {
     const generation = lifetime.current;

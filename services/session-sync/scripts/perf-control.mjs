@@ -3,7 +3,7 @@ import { fork } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { readConfig } from './perf-common.mjs';
+import { readConfig, populationMatches } from './perf-common.mjs';
 
 export function assertGeneratorExits(statuses) {
   const failures = statuses.filter(status => status.code !== 0 || status.signal || status.error);
@@ -99,6 +99,22 @@ async function control() {
       const watchedCount = [...sources.values()].filter(
         s => s.index < owning.watched && s.index % owning.shards === result.shard
       ).length;
+      const streamingCount = [...sources.values()].filter(
+        s => s.index < owning.streamingSources && s.index % owning.shards === result.shard
+      ).length;
+      if (
+        result.role === 'producer' &&
+        [...sources.values()].some(
+          s =>
+            s.index % owning.shards === result.shard &&
+            (s.counter !==
+              (s.index < owning.streamingSources
+                ? (owning.warmSeconds + owning.measuredSeconds) * owning.eventHz
+                : 0) ||
+              s.committed !== s.counter)
+        )
+      )
+        issues.push(`producer/${result.shard}:source_schedule_or_durable_prefix`);
       if (
         result.role === 'producer' &&
         (result.checkpoints !==
@@ -147,9 +163,12 @@ async function control() {
         !measured.length ||
         measured.some(row =>
           result.role === 'producer'
-            ? row.presence !== result.sessions.length ||
-              row.runners !== watchedCount ||
-              row.watched !== watchedCount
+            ? !populationMatches(row, {
+                presence: result.sessions.length,
+                runners: streamingCount,
+                streamingSources: streamingCount,
+                watched: watchedCount,
+              })
             : row.viewers !== result.sessions.length
         )
       )
@@ -159,7 +178,7 @@ async function control() {
     const producers = results.filter(result => result.role === 'producer');
     const sum = (rows, field) => rows.reduce((count, row) => count + row[field], 0);
     const expected =
-      [...sources.values()].filter(s => s.index < config.watched).length *
+      [...sources.values()].filter(s => s.index < config.streamingSources).length *
       config.eventHz *
       config.measuredSeconds;
     const offered = sum(producers, 'measuredSent');
@@ -175,6 +194,19 @@ async function control() {
       sdkModuleHash: config.sdkModuleHash,
       instrumentSDK: config.instrumentSDK,
       measuredSeconds: config.measuredSeconds,
+      sourceTrafficMode: config.sourceTrafficMode,
+      sessions: sources.size,
+      streamingSources: [...sources.values()].filter(s => s.index < config.streamingSources).length,
+      watched: [...sources.values()].filter(s => s.index < config.watched).length,
+      sdkViewers: results
+        .filter(result => result.role === 'sdk')
+        .reduce((n, result) => n + result.sessions.length, 0),
+      viewerConnections: results
+        .filter(result => result.role !== 'producer')
+        .reduce((n, result) => n + result.sessions.length, 0),
+      offeredEventsPerSecond:
+        [...sources.values()].filter(s => s.index < config.streamingSources).length *
+        config.eventHz,
       expectedMeasuredEvents: expected,
       measuredProducerSends: offered,
       producerRate: offered / config.measuredSeconds,
@@ -193,10 +225,10 @@ async function control() {
       sourceUnsentEvents:
         config.eventHz *
           (config.warmSeconds + config.measuredSeconds) *
-          [...sources.values()].filter(s => s.index < config.watched).length -
+          [...sources.values()].filter(s => s.index < config.streamingSources).length -
         sum(producers, 'sent'),
       durableCommittedPrefixEvents: [...sources.values()]
-        .filter(s => s.index < config.watched)
+        .filter(s => s.index < config.streamingSources)
         .reduce((sum, s) => sum + s.committed, 0),
       liveAcknowledgement:
         'RemoteSocket.send is local enqueue, not a server ACK. Per-viewer source reconciliation and durable receipt coverage are separate evidence.',

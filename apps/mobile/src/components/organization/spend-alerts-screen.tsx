@@ -38,10 +38,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatList, formatMoney, formatNumber } from '@/lib/format';
+import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
@@ -131,6 +132,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     return (
       <OrganizationBoundary
         title={t('notifications.channel.spend')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationId}
       />
     );
@@ -145,7 +147,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('notifications.channel.spend')} />
+        <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
         <QueryError
           className="bg-background"
           message={t('spendAlerts.loadError')}
@@ -162,7 +164,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
@@ -285,7 +287,7 @@ function SpendAlertsForm({
   const spend7d = spend?.spend7dMicrodollars ?? 0;
   const hasSpend = spend24h > 0 || spend7d > 0;
   const spendValue = hasSpend
-    ? formatMoney(fromMicrodollars(spend24h), i18n.language)
+    ? formatPrefixedMoney(fromMicrodollars(spend24h), i18n.language)
     : t('spendAlerts.noSpend');
 
   const windowOptions: readonly { value: WindowOption; label: string }[] = [
@@ -416,7 +418,7 @@ function SpendAlertsForm({
       )}
 
       <Button disabled={!canSave} loading={save.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </>
   );
@@ -428,7 +430,11 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={scopeLabel} value={scopeName} selectable />
+        {/* The owner of the alert is a name, not an identifier: it paints in the
+            sans face, like the row label and the empty amount below it, while
+            the amount keeps the code face because that is the value someone
+            copies. The name stays selectable all the same. */}
+        <KvRow label={scopeLabel} value={scopeName} valueFace="text" selectable />
         {/* A selectable value is exempt from the row's one-line clamp (Android's
             selection path re-applies selection and drops it), so only the amount
             — the value someone copies — is selectable. The empty placeholder is
@@ -438,6 +444,10 @@ function SpendAlertsForm({
           label={t('spendAlerts.spend24h')}
           value={spendValue}
           valueFace={hasSpend ? 'mono' : 'text'}
+          // An amount's symbol is neutral to the paragraph's direction, so the
+          // run carries its own left-to-right order; the empty placeholder is a
+          // sentence and keeps the paragraph's.
+          valueDirection={hasSpend ? 'ltr' : undefined}
           selectable={hasSpend}
           last
         />
@@ -716,7 +726,7 @@ function SpendAlertsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView className="flex-1" contentContainerClassName="px-4 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         {/* The scope group holds two KvRows now (the scope owner and the 24 h

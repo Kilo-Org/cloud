@@ -32,6 +32,7 @@ import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol
 import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveSecret } from '../auth.js';
@@ -177,6 +178,13 @@ export async function preflightRuntimeAuthorizationRecovery(
     resourceKind: 'cloud-agent-next',
     resourceId: metadata.identity.sessionId,
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
+    onBindingRejected: reason =>
+      logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', reason),
+  }).catch((error: unknown) => {
+    if (error instanceof RuntimeAuthorizationRevokedError) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+    }
+    throw error;
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
   const result = await withDORetry(
@@ -248,14 +256,6 @@ export function preflightAndQueuePromptMessage(
   procedure: string
 ): Promise<QueueAckResponse> {
   return preflightAndAdmitPromptMessage(input, ctx, procedure, queueControlPlaneMessage);
-}
-
-export async function queueMessage(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse> {
-  await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  return queueControlPlaneMessage(input, ctx);
 }
 
 /**

@@ -22,7 +22,9 @@ Run package-scoped commands from the repo root:
 pnpm --filter kilo-extension verify
 pnpm --filter kilo-extension build
 pnpm --filter kilo-extension build:firefox
+pnpm --filter kilo-extension e2e:build:chrome
 pnpm --filter kilo-extension e2e:chrome
+pnpm --filter kilo-extension e2e:chrome:shard --shard=1/2
 pnpm --filter kilo-extension e2e:firefox
 pnpm --filter kilo-extension zip
 pnpm --filter kilo-extension zip:firefox
@@ -39,7 +41,7 @@ runtime via `import.meta.env`:
 - `VITE_SESSION_INGEST_WS_URL` — WebSocket URL for session ingest. Read by `src/shared/cloud-agent-config.ts`.
 - `VITE_POSTHOG_API_KEY` — PostHog public project API key. Absent → analytics disabled. Read by `src/shared/analytics.ts`.
 
-Analytics E2E specs need the key at BUILD time: targeted manual runs must rebuild with `VITE_POSTHOG_API_KEY=e2e-test-key pnpm --filter kilo-extension build` first (the `e2e:chrome` script does this itself; without the key analytics is compiled out and every event wait fails).
+Analytics E2E specs need the key at BUILD time: targeted manual runs must rebuild with `VITE_POSTHOG_API_KEY=e2e-test-key pnpm --filter kilo-extension build` first (the `e2e:build:chrome` script does this itself, and `e2e:chrome` runs it; without the key analytics is compiled out and every event wait fails). `e2e:chrome:shard` runs the suite against the bundle already in `.output/chrome-mv3` and never rebuilds, so run `e2e:build:chrome` before a shard run.
 
 Under heavy machine load `e2e:firefox` can die mid-run with `UnsupportedOperationError: newSession` (geckodriver cannot spawn the next per-scenario Firefox). Retry the command; never patch product code or the harness for this.
 

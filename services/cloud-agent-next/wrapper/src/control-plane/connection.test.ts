@@ -6,6 +6,8 @@ import {
   WORKTREE_RUNTIME_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
+  RUNTIME_INSTRUCTIONS_HEADER,
+  RUNTIME_INSTRUCTIONS_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
@@ -189,6 +191,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
       WORKSPACE_CONFIGURATION_VERSION
     );
+    expect(socket.options?.headers?.[RUNTIME_INSTRUCTIONS_HEADER]).toBe(
+      RUNTIME_INSTRUCTIONS_VERSION
+    );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',
@@ -200,7 +205,11 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       redactsNamedSecrets: true,
       installsSkillsSh: true,
       startCommands: true,
+      worktreeGit: true,
+      transferGrants: true,
     });
+    socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    expect(connection.supportsTransferGrants()).toBe(true);
   });
 });
 
@@ -331,6 +340,7 @@ describe('acknowledged heartbeat', () => {
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
+      expect(connection.supportsTransferGrants()).toBe(false);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -925,9 +935,9 @@ async function connect(
 }
 
 describe('control-plane turn cap and accepted backstop', () => {
-  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
-    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+  it('derives the 12-hour 5-minute accepted backstop from the 12-hour cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(43_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(43_500_000);
 
     const margin =
       CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
@@ -937,9 +947,9 @@ describe('control-plane turn cap and accepted backstop', () => {
     );
 
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    expect(scaled.wrapper.turnHardCapMs).toBe(432_000);
     // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
-    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(732_000);
     expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
     expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
   });
@@ -1015,6 +1025,7 @@ describe('createControlPlaneConnection', () => {
     });
     try {
       await waitFor(() => connected === 1);
+      expect(connection.supportsTransferGrants()).toBe(true);
       await waitFor(() => sandbox.helloFrames.length === 1);
       expect(sandbox.helloFrames[0]).toEqual({
         type: 'hello',
@@ -1026,6 +1037,8 @@ describe('createControlPlaneConnection', () => {
         redactsNamedSecrets: true,
         installsSkillsSh: true,
         startCommands: true,
+        worktreeGit: true,
+        transferGrants: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

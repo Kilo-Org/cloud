@@ -44,6 +44,10 @@ const inheritedEnv = [
   'CONTROL_LOG_UPLOAD_URL',
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
+  'CLOUD_AGENT_SENTRY_DSN',
+  'CLOUD_AGENT_SENTRY_ENVIRONMENT',
+  'SANDBOX_TRANSFER_URL',
+  'SANDBOX_TRANSFER_GRANT',
   'CONTROL_WORKLOAD_CGROUP',
   'CONTROL_WORKLOAD_LIMIT_MB',
   CONTROL_PLANE_NATIVE_LOGS_ENV,
@@ -380,7 +384,6 @@ export function renderRuntimeBootstrap(input: {
   const environment = [
     '/usr/bin/env',
     '-i',
-    // Match the native image environment that preinstalled startup inherits.
     'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
     'HOME=/root',
     'LANG=en_US.UTF-8',

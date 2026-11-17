@@ -2,12 +2,14 @@
 import { createElement } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
+import { waitFor } from '@/test/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import {
   createQueryProbe,
+  deferred,
   flushQueryUpdates as flush,
   makeCached,
   makeConnection,
@@ -170,8 +172,12 @@ describe('live Agents list across a transient socket empty', () => {
     await act(async () => {
       connection.__fireSystem({ event: 'cli.disconnected', data: { connectionId: 'c1' } });
       await flush();
-      await flush();
     });
+    // Settled marker: `hasAcceptedSuccess` only becomes true once the empty
+    // answer to the confirmation fetch is the accepted revision. It is false
+    // right after the socket write empties the cache (the last accepted answer
+    // still listed `a1`), so this cannot pass before the answer lands.
+    await waitFor(() => live().hasAcceptedSuccess);
     // The wire state really did empty the cache — this is the update that
     // blanked the surface.
     expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
@@ -203,5 +209,131 @@ describe('live Agents list across a transient socket empty', () => {
     expect(ids()).toEqual([]);
     expect(live().hasAcceptedSuccess).toBe(true);
     expect(liveSessionContent(readyContext, live())).toBe('empty');
+  });
+
+  it('keeps the confirmed rows when a manual write empties the cache', async () => {
+    // First answer delivers the running row. The manual write empties the
+    // cache while the server's last answer still listed the row, and the
+    // hook's confirmation fetch is left in flight so the test can hold the
+    // unconfirmed window.
+    state.request.mockResolvedValueOnce({ sessions: [liveRow] });
+    const confirmation = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValueOnce(confirmation.promise);
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      await flush();
+    });
+    // The cache really is empty while the server's last answer listed the row.
+    expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
+    expect(ids()).toEqual(['a1']);
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(live().isFetching).toBe(true);
+
+    // The confirmation fetch settles with the row and the surface keeps it.
+    await act(async () => {
+      confirmation.resolve({ sessions: [liveRow] });
+      await flush();
+    });
+    // Settled marker: the row answer was accepted, so the emptiness is no
+    // longer unconfirmed. It is false while the write-empty window is open, so
+    // this cannot pass before the answer lands.
+    await waitFor(() => live().hasAcceptedSuccess);
+    expect(ids()).toEqual(['a1']);
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
+  });
+
+  it('keeps the confirmed rows when the confirmation answer fails', async () => {
+    state.request
+      .mockResolvedValueOnce({ sessions: [liveRow] })
+      .mockRejectedValue(new Error('worker unavailable'));
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      await flush();
+    });
+    expect(ids()).toEqual(['a1']);
+
+    // Settled marker: the failed confirmation answer records the hook's
+    // terminal error. It is null while the confirmation fetch is in flight, so
+    // this cannot pass before the answer lands.
+    await waitFor(() => live().terminalError !== null);
+    // A failed answer cannot confirm the emptiness either: the rows stay, and
+    // the section reports its retryable failure beside them instead of the
+    // zero state.
+    expect(ids()).toEqual(['a1']);
+    expect(live().terminalError?.kind).toBe('retryable');
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
+  });
+
+  it('accepts the emptiness once an accepted answer confirms it', async () => {
+    state.request.mockResolvedValueOnce({ sessions: [liveRow] });
+    const confirmation = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValueOnce(confirmation.promise);
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      await flush();
+    });
+    // Still held: the emptiness is unconfirmed.
+    expect(ids()).toEqual(['a1']);
+    expect(live().hasAcceptedSuccess).toBe(false);
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
+
+    await act(async () => {
+      confirmation.resolve({ sessions: [] });
+      await flush();
+    });
+    // Settled marker: the accepted answer is the empty list, so the emptiness
+    // is confirmed. It is false while the answer is held, so this cannot pass
+    // before the answer lands.
+    await waitFor(() => live().hasAcceptedSuccess);
+    // The confirming answer is the accepted empty list, so the section accepts
+    // the zero state; the existing reconnect window still holds the rows for
+    // its grace period, and its release is covered by the render-hold tests.
+    expect(live().hasAcceptedSuccess).toBe(true);
+  });
+
+  it('never reports nothing after a remount while the emptiness is unconfirmed', async () => {
+    state.request.mockResolvedValue({ sessions: [liveRow] });
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    // The redirect the finding reports: the app resets to Home while the cache
+    // is empty, and the mount that follows is a fresh hook instance with no
+    // retained rows. Its own fetch is held open so the test observes the state
+    // a real gap (slow network, socket reconnect) leaves on screen.
+    const answer = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValue(answer.promise);
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      unmount();
+      await flush();
+    });
+    expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
+
+    await render();
+    // The fresh instance starts from the completed answer's ids: unresolved,
+    // never the zero state.
+    expect(live().hasAcceptedSuccess).toBe(false);
+    expect(liveSessionContent(readyContext, live())).toBe('pending');
+
+    // Its answer lists the row again, so the card returns.
+    await act(async () => {
+      answer.resolve({ sessions: [liveRow] });
+      await flush();
+    });
+    // Settled marker: the fresh instance's answer was accepted, so its empty
+    // window is closed. It is false from mount until that answer lands, so
+    // this cannot pass before the answer lands.
+    await waitFor(() => live().hasAcceptedSuccess);
+    expect(ids()).toEqual(['a1']);
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
   });
 });

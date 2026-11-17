@@ -10,6 +10,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   runtime_cli_probe_failed: 'Runtime CLI validation failed',
   runtime_supervisor_missing: 'Runtime supervisor is missing',
   preparation_timeout: 'Environment preparation timed out',
+  preparation_cancelled: 'Environment preparation was stopped',
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
   repository_access_failed:
@@ -22,6 +23,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Container limit reached. Stop an existing container before starting another.',
   account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
   agent_restarted: 'The agent restarted',
@@ -29,6 +31,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   agent_unresponsive: 'Kilo was not responding and was restarted',
   no_progress: 'The turn made no progress',
   no_outcome: 'The turn did not complete',
+  completion_unconfirmed:
+    'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',

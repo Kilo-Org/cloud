@@ -242,6 +242,84 @@ describe('webhook agent client sandbox allocation forwarding', () => {
   });
 });
 
+describe('webhook agent client environment forwarding', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('serializes omitted, configured, and cleared environment values', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ data: { triggerId: 'trigger', inboundUrl: 'https://inbound' } }),
+            { status: 200 }
+          )
+      );
+
+    await createWorkerTrigger('user-1', undefined, 'trigger', { promptTemplate: 'Run task' });
+    await createWorkerTrigger('user-1', undefined, 'trigger', {
+      promptTemplate: 'Run task',
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    });
+    await createWorkerTrigger('user-1', undefined, 'trigger', {
+      promptTemplate: 'Run task',
+      environmentId: null,
+    });
+    await updateWorkerTrigger('user-1', undefined, 'trigger', { environmentId: null });
+    await updateWorkerTrigger('user-1', undefined, 'trigger', { isActive: true });
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).not.toHaveProperty(
+      'environmentId'
+    );
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body))).toMatchObject({
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[2]?.[1]?.body))).toEqual({
+      promptTemplate: 'Run task',
+      environmentId: null,
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[3]?.[1]?.body))).toEqual({
+      environmentId: null,
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[4]?.[1]?.body))).not.toHaveProperty(
+      'environmentId'
+    );
+  });
+
+  it('returns environment selection from worker configuration responses', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            triggerId: 'trigger',
+            namespace: 'user/user-1',
+            userId: 'user-1',
+            orgId: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            isActive: true,
+            targetType: 'cloud_agent',
+            githubRepo: 'owner/repo',
+            mode: 'code',
+            model: 'model',
+            promptTemplate: 'Run task',
+            webhookAuthConfigured: false,
+            activationMode: 'webhook',
+            environmentId: '11111111-1111-4111-8111-111111111111',
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    await expect(getWorkerTrigger('user-1', undefined, 'trigger')).resolves.toMatchObject({
+      found: true,
+      config: { environmentId: '11111111-1111-4111-8111-111111111111' },
+    });
+  });
+});
+
 describe('scheduled trigger invocation', () => {
   afterEach(() => {
     jest.restoreAllMocks();

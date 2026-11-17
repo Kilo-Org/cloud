@@ -73,6 +73,7 @@ class FakeCloud implements FixtureCloud {
   >();
   sessions = new Map<string, { userId: string; profileId: string | null }>();
   workspaceSessions = new Map<string, string>();
+  workspaceSeeds: (string | undefined)[] = [];
   gates: string[] = [];
   private profileSeq = 0;
   private workspaceSeq = 0;
@@ -104,8 +105,10 @@ class FakeCloud implements FixtureCloud {
     profileId: string;
     gitUrl: string;
     scope: string;
+    seedPrompt?: string;
   }): Promise<HostedResources> {
     this.calls.push(`createWorkspace:${input.gitUrl}:${input.scope}`);
+    this.workspaceSeeds.push(input.seedPrompt);
     if (this.options.failCreateWorkspace) throw new Error('workspace creation failed');
     const id = ++this.workspaceSeq;
     const workspaceId = `worktree_${id}`;
@@ -188,12 +191,17 @@ class FakeCloud implements FixtureCloud {
   async close(): Promise<void> {}
 }
 
-function prepareRequest(lane: 'local' | 'cloud', descriptorPath: string): ProviderPrepareRequest {
+function prepareRequest(
+  lane: 'local' | 'cloud',
+  descriptorPath: string,
+  scenarioId?: ProviderPrepareRequest['scenarioId']
+): ProviderPrepareRequest {
   return {
     schemaVersion: SCHEMA_VERSION,
     operation: 'prepare',
     runId: RUN_ID,
     lane,
+    ...(scenarioId === undefined ? {} : { scenarioId }),
     fakeLlmScope: SCOPE,
     descriptorPath,
     projectDir: '/tmp/project',
@@ -281,6 +289,31 @@ describe('prepareFixture', () => {
       'native-session',
       'fake-llm-scope',
     ]);
+  });
+
+  it.each(['session.open', undefined] as const)(
+    'seeds the hosted workspace for a %s scenario',
+    async scenarioId => {
+      const cloud = new FakeCloud();
+      const descriptorPath = await tempDescriptorPath();
+      await prepareFixture({
+        request: prepareRequest('cloud', descriptorPath, scenarioId),
+        cloud,
+        gitUrl: 'https://github.com/octocat/Hello-World.git',
+      });
+      expect(cloud.workspaceSeeds).toEqual([`__e2e_scope__:${SCOPE}\n__fake__:idle`]);
+    }
+  );
+
+  it('creates an empty hosted workspace for prompt.stream', async () => {
+    const cloud = new FakeCloud();
+    const descriptorPath = await tempDescriptorPath();
+    await prepareFixture({
+      request: prepareRequest('cloud', descriptorPath, 'prompt.stream'),
+      cloud,
+      gitUrl: 'https://github.com/octocat/Hello-World.git',
+    });
+    expect(cloud.workspaceSeeds).toEqual([undefined]);
   });
 
   it('refuses a non-clonable Cloud repository URL', async () => {

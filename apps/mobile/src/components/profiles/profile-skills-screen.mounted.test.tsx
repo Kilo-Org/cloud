@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one mounted case per skills screen state: loading, error, empty, rows, edit, add, validation, refused saves, and delete */
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -20,6 +21,7 @@ import {
 } from '@/components/profiles/profile-skills-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { MAX_PROFILE_SKILLS, SKILL_NAME_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -54,10 +56,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -94,7 +98,12 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  // The screen hands its action to the manage slot, so the stub renders what it
+  // is given: the read-only sentence replaces the button in the same subtree.
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.description, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -109,6 +118,7 @@ describe('ProfileSkillsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -151,6 +161,54 @@ describe('ProfileSkillsScreen', () => {
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No skills yet');
     pressEmptyAction(renderer);
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('read-only: the empty state names who may act in place of the add control', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No skills yet');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
+    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+
+    unmount();
+  });
+
+  it('resolving: the empty state renders neither the sentence nor an action', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
 
     unmount();
   });
@@ -330,7 +388,7 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('refuses a create at the skill cap inside the sheet, without a request', async () => {
+  it('names the skill cap above a disabled add', async () => {
     h.query.data = testSkills(
       Array.from({ length: MAX_PROFILE_SKILLS }, (_, index) =>
         testSkill({ id: `skill-${index}`, name: `skill-${index}` })
@@ -341,22 +399,38 @@ describe('ProfileSkillsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     const limitCopy = i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS });
 
-    // The list names the cap under the add control, before any authoring.
+    // The list names the cap above the add control, before any authoring.
     expect(String(lineWith(renderer.root, limitCopy).props.className)).toContain('text-warn');
-
-    pressAddButton(renderer.root);
-    changeText(renderer.root, 'Skill name', 'one-more');
-    changeText(renderer.root, 'Skill content', 'Body');
-    pressSheetDone(renderer.root);
-
-    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
-    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    const footer = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === limitCopy)
     );
-    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
-    expect(findField(renderer.root, 'Skill name').props.disabled).toBe(false);
+    const noticeIndex = footer.findIndex(
+      node => String(node.type) === 'Text' && node.props.children === limitCopy
+    );
+    const addIndex = footer.findIndex(node => String(node.type) === 'Button');
+    expect(noticeIndex).toBeGreaterThanOrEqual(0);
+    expect(noticeIndex).toBeLessThan(addIndex);
+
+    // At the cap the add control is disabled, so the sheet cannot open from it.
+    expect(footer[addIndex]?.props.disabled).toBe(true);
 
     unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = testSkills(
+      Array.from({ length: MAX_PROFILE_SKILLS - 1 }, (_, index) =>
+        testSkill({ id: `skill-${index}`, name: `skill-${index}` })
+      )
+    );
+    const belowCap = await mountScreen();
+    expect(findOne(belowCap.renderer.root, 'Button').props.disabled).toBe(false);
+    expect(findAll(belowCap.renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      limitCopy
+    );
+
+    belowCap.unmount();
   });
 
   it('names the cap when the server refuses a create the list did not predict', async () => {
@@ -481,11 +555,10 @@ describe('ProfileSkillsScreen', () => {
     pressSheetDone(renderer.root);
     expect(h.mutations.createCustomSkill.mutateAsync).toHaveBeenCalledTimes(1);
 
+    // The save is still in flight, so the guard closes without asking: the
+    // request already left and there is nothing unsaved to discard.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -513,11 +586,9 @@ describe('ProfileSkillsScreen', () => {
     changeText(renderer.root, 'Skill content', 'Body');
     pressSheetDone(renderer.root);
 
+    // The save is still in flight, so the guard closes without asking.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -672,6 +743,102 @@ describe('ProfileSkillsScreen', () => {
     }
 
     expect(h.confirm).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+});
+
+/** The name the fixture row holds; the dialog must isolate exactly this run. */
+const SKILL_NAME = 'code-review';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileSkillsScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    h.query.data = testSkills([testSkill({ name: SKILL_NAME })]);
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the skill would do.
+  it('asks for consent with the skill name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.skillDeleteTitle', { name: isolateLtrBidiText(SKILL_NAME) }),
+      message: i18n.t('profiles.skillDeleteMessage'),
+      confirmLabel: i18n.t('profiles.skillDeleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(SKILL_NAME);
+    expect(request.message).not.toBe(SKILL_NAME);
+
+    unmount();
+  });
+
+  // A skill name is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the skill name in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${SKILL_NAME}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that skill', async () => {
+    h.mutations.deleteSkill.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteSkill.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteSkill.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteSkill.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      skillId: 'skill-1',
+    });
 
     unmount();
   });

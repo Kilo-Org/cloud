@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { security_audit_log } from '@kilocode/db/schema';
+import { organization_memberships, security_audit_log } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -86,6 +86,80 @@ async function seedOrganizationAuditRow(
   return { owner, organization };
 }
 
+const STAFF_ACTOR = {
+  actor_id: 'staff-actor',
+  actor_email: 'engineer@kilocode.ai',
+  actor_name: 'Staff Engineer',
+};
+
+const CUSTOMER_ACTOR = {
+  actor_id: 'customer-actor',
+  actor_email: 'owner@example.test',
+  actor_name: 'Customer Owner',
+};
+
+const MASKED_ACTOR = {
+  actor_id: '00000000-0000-0000-0000-000000000000',
+  actor_email: 'admin@kilocode.ai',
+  actor_name: 'Kilo Admin',
+};
+
+async function seedOrganizationWithAuditEntries() {
+  const founder = await insertTestUser();
+  const organization = await createTestOrganization(
+    `Audit visibility ${crypto.randomUUID()}`,
+    founder.id,
+    0
+  );
+
+  await db.insert(security_audit_log).values([
+    {
+      owned_by_organization_id: organization.id,
+      action: SecurityAuditLogAction.ConfigUpdated,
+      resource_type: 'security_config',
+      resource_id: 'staff-resource',
+      ...STAFF_ACTOR,
+    },
+    {
+      owned_by_organization_id: organization.id,
+      action: SecurityAuditLogAction.ConfigUpdated,
+      resource_type: 'security_config',
+      resource_id: 'customer-resource',
+      ...CUSTOMER_ACTOR,
+    },
+  ]);
+
+  return organization;
+}
+
+async function addBillingManager(organizationId: string, kiloUserId: string) {
+  await db.insert(organization_memberships).values({
+    organization_id: organizationId,
+    kilo_user_id: kiloUserId,
+    role: 'billing_manager',
+  });
+}
+
+type ListedLog = {
+  resource_id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  actor_name: string | null;
+};
+
+function actorsByResource(logs: ListedLog[]) {
+  return Object.fromEntries(
+    logs.map(log => [
+      log.resource_id,
+      { actor_id: log.actor_id, actor_email: log.actor_email, actor_name: log.actor_name },
+    ])
+  );
+}
+
+function exportedActorsByResource(data: string) {
+  return actorsByResource(JSON.parse(data) as ListedLog[]);
+}
+
 describe('organizations.securityAuditLog.export', () => {
   afterEach(cleanupDbForTest);
 
@@ -147,5 +221,92 @@ describe('organizations.securityAuditLog.export', () => {
     const entry = entries.find(row => row.action === SecurityAuditLogAction.ConfigUpdated);
     expect(entry?.actor_email).toBe('analyst@example.test');
     expect(entry?.actor_name).toBe('Analyst');
+  });
+});
+
+describe('organizations.securityAuditLog actor details follow the account permission', () => {
+  afterEach(cleanupDbForTest);
+
+  it('requires the platform admin permission for an organization billing member', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const billingMember = await insertTestUser({
+      google_user_email: 'billing-manager@kilocode.ai',
+    });
+    await addBillingManager(organization.id, billingMember.id);
+
+    const caller = await createCallerForUser(billingMember.id);
+    const { logs } = await caller.organizations.securityAuditLog.list({
+      organizationId: organization.id,
+    });
+    const actors = actorsByResource(logs);
+    expect(actors['staff-resource']).toEqual(MASKED_ACTOR);
+    expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+
+    const exported = await caller.organizations.securityAuditLog.export({
+      organizationId: organization.id,
+      format: 'json',
+    });
+    expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(MASKED_ACTOR);
+
+    const csv = await caller.organizations.securityAuditLog.export({
+      organizationId: organization.id,
+      format: 'csv',
+    });
+    expect(csv.data).toContain('"admin@kilocode.ai"');
+    expect(csv.data).not.toContain('"engineer@kilocode.ai"');
+  });
+
+  it('reads actor details when the account has the platform admin permission', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator@example.test',
+      is_admin: true,
+    });
+    await addBillingManager(organization.id, admin.id);
+
+    const caller = await createCallerForUser(admin.id);
+    const { logs } = await caller.organizations.securityAuditLog.list({
+      organizationId: organization.id,
+    });
+    const actors = actorsByResource(logs);
+    expect(actors['staff-resource']).toEqual(STAFF_ACTOR);
+    expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+
+    const exported = await caller.organizations.securityAuditLog.export({
+      organizationId: organization.id,
+      format: 'json',
+    });
+    expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(STAFF_ACTOR);
+
+    const csv = await caller.organizations.securityAuditLog.export({
+      organizationId: organization.id,
+      format: 'csv',
+    });
+    expect(csv.data).toContain('"engineer@kilocode.ai"');
+    expect(csv.data).not.toContain('"admin@kilocode.ai"');
+  });
+
+  it('requires an unblocked account for a blocked admin', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const blockedAdmin = await insertTestUser({
+      google_user_email: 'blocked-administrator@example.test',
+      is_admin: true,
+      blocked_reason: 'blocked for test',
+    });
+    await addBillingManager(organization.id, blockedAdmin.id);
+
+    const caller = await createCallerForUser(blockedAdmin.id);
+    const { logs } = await caller.organizations.securityAuditLog.list({
+      organizationId: organization.id,
+    });
+    const actors = actorsByResource(logs);
+    expect(actors['staff-resource']).toEqual(MASKED_ACTOR);
+    expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+
+    const exported = await caller.organizations.securityAuditLog.export({
+      organizationId: organization.id,
+      format: 'json',
+    });
+    expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(MASKED_ACTOR);
   });
 });

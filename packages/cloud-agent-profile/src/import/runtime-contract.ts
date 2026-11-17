@@ -1,4 +1,7 @@
 import * as z from 'zod';
+import { BUILTIN_AGENT_SLUGS } from '../contracts/agents';
+import { overLimitMessage, overTotalMessage } from '../contracts/limit-copy';
+import { skillCompanionFileIssues } from '../contracts/skill-companion-files';
 
 /**
  * Field constraints for the session (runtime) delivery contract, mirrored from
@@ -33,55 +36,36 @@ export const RUNTIME_LIMITS = {
   MAX_RUNTIME_KILO_COMMAND_DESCRIPTION: 2_000,
 } as const;
 
-/** Built-in mode slugs recognized by the CLI. */
-export const RUNTIME_BUILTIN_AGENT_SLUGS = new Set<string>([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
-
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
+/** Built-in mode slugs recognized by the CLI; the same reserved set as the profile contract. */
+export const RUNTIME_BUILTIN_AGENT_SLUGS = new Set<string>(BUILTIN_AGENT_SLUGS);
 
 const RuntimeSkillFilesContractSchema = z
-  .record(
-    z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH),
-    z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE)
-  )
-  .refine(
-    files => Object.keys(files).length <= RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES,
-    `A skill may have at most ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
-  )
+  .record(z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH), z.string())
   .superRefine((files, ctx) => {
-    let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!SKILL_FILE_PATH_PATTERN.test(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path.startsWith('/') || path.includes('..') || path.includes('//')) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path === 'SKILL.md' || path.toLowerCase() === 'skill.md') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'SKILL.md must be passed as rawMarkdown, not inside files',
-        });
-        return;
-      }
-      total += content.length;
-    }
-    if (total > RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
-      });
-    }
+    skillCompanionFileIssues(
+      files,
+      {
+        maxFiles: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES,
+        maxFileSize: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE,
+        maxTotalSize: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+        tooManyFiles: `A skill may have at most ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`,
+        pathInvalidCharacters: path => `Skill file path rejected: ${path}`,
+        pathRejected: path => `Skill file path rejected: ${path}`,
+        manifestInFiles: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        fileTooLarge: () =>
+          overLimitMessage(
+            'Skill companion file',
+            RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE
+          ),
+        totalTooLarge: total =>
+          overTotalMessage(
+            'Skill companion files',
+            total,
+            RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL
+          ),
+      },
+      message => ctx.addIssue({ code: 'custom', message })
+    );
   });
 
 export const RuntimeSkillContractSchema = z.object({
@@ -90,7 +74,13 @@ export const RuntimeSkillContractSchema = z.object({
     .min(1)
     .max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_NAME_LENGTH)
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
-  rawMarkdown: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN),
+  rawMarkdown: z
+    .string()
+    .min(1)
+    .max(
+      RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN,
+      overLimitMessage('Skill markdown', RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN)
+    ),
   files: RuntimeSkillFilesContractSchema.optional(),
 });
 
@@ -99,6 +89,30 @@ const PermissionConfigContractSchema = z.union([
   PermissionActionContractSchema,
   z.record(z.string(), z.unknown()),
 ]);
+
+/**
+ * Every agent config field the runtime contract accepts. The schema below is
+ * built from this map, and the import derives its allowed field sets from the
+ * same keys, so a field added here is a field the import can carry.
+ */
+const RUNTIME_AGENT_CONFIG_SHAPE = {
+  prompt: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_PROMPT).optional(),
+  description: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
+  mode: z.enum(['subagent', 'primary', 'all']).optional(),
+  model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
+  variant: z.string().max(50).optional(),
+  temperature: z.number().optional(),
+  top_p: z.number().optional(),
+  steps: z.number().int().positive().optional(),
+  hidden: z.boolean().optional(),
+  disable: z.boolean().optional(),
+  color: z.string().max(50).optional(),
+  permission: PermissionConfigContractSchema.optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
+} satisfies z.ZodRawShape;
+
+/** The agent config keys of {@link RUNTIME_AGENT_CONFIG_SHAPE}. */
+export const RUNTIME_AGENT_CONFIG_KEYS = Object.keys(RUNTIME_AGENT_CONFIG_SHAPE);
 
 export const RuntimeAgentContractSchema = z.object({
   slug: z
@@ -111,34 +125,31 @@ export const RuntimeAgentContractSchema = z.object({
     }),
   name: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_NAME_LENGTH),
   config: z
-    .object({
-      prompt: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_PROMPT).optional(),
-      description: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
-      mode: z.enum(['subagent', 'primary', 'all']).optional(),
-      model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
-      variant: z.string().max(50).optional(),
-      temperature: z.number().optional(),
-      top_p: z.number().optional(),
-      steps: z.number().int().positive().optional(),
-      hidden: z.boolean().optional(),
-      disable: z.boolean().optional(),
-      color: z.string().max(50).optional(),
-      permission: PermissionConfigContractSchema.optional(),
-      options: z.record(z.string(), z.unknown()).optional(),
-    })
+    .object(RUNTIME_AGENT_CONFIG_SHAPE)
     .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
       message: 'variant requires a model — variants are model-specific',
       path: ['variant'],
     }),
 });
 
-export const RuntimeKiloCommandContractSchema = z.object({
+/**
+ * Every kilo command field the runtime contract accepts. The schema below is
+ * built from this map, and the import derives its allowed field sets from the
+ * same keys, so a field added here is a field the import can carry.
+ */
+const RUNTIME_KILO_COMMAND_SHAPE = {
   name: z
     .string()
     .min(1)
     .max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH)
     .regex(/^[a-z][a-z0-9-]*$/, 'Command name must start with a letter and be a slug'),
-  template: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE),
+  template: z
+    .string()
+    .min(1)
+    .max(
+      RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE,
+      overLimitMessage('Command template', RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE)
+    ),
   description: z
     .string()
     .max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_DESCRIPTION)
@@ -147,7 +158,12 @@ export const RuntimeKiloCommandContractSchema = z.object({
   agent: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_SLUG_LENGTH).nullable().optional(),
   model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
   subtask: z.boolean().optional(),
-});
+} satisfies z.ZodRawShape;
+
+/** The kilo command keys of {@link RUNTIME_KILO_COMMAND_SHAPE}, including `name`. */
+export const RUNTIME_KILO_COMMAND_KEYS = Object.keys(RUNTIME_KILO_COMMAND_SHAPE);
+
+export const RuntimeKiloCommandContractSchema = z.object(RUNTIME_KILO_COMMAND_SHAPE);
 
 export const RuntimeAgentsContractSchema = z
   .array(RuntimeAgentContractSchema)

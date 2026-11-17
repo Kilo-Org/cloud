@@ -146,7 +146,7 @@ function githubPrPayload(overrides: Record<string, unknown> = {}): Record<string
     merged_at: null,
     title: 'Feature Z',
     head: { sha: 'head-sha', ref: 'feature/z', repo: { full_name: 'kilo/repo' } },
-    base: { repo: { full_name: 'kilo/repo' } },
+    base: { ref: 'main', repo: { full_name: 'kilo/repo' } },
     updated_at: '2026-01-01T00:00:00Z',
     created_at: '2025-12-31T23:00:00Z',
     ...overrides,
@@ -284,6 +284,10 @@ describe('fetchPullRequestByNumber', () => {
       baseRepoFullName: 'kilo/repo',
       headRepoFullName: 'kilo/repo',
       headRef: 'feature/z',
+      baseRef: 'main',
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
     expect(mockPullsGet).toHaveBeenCalledWith({ owner: 'kilo', repo: 'repo', pull_number: 7 });
     expect(mockPaginate).not.toHaveBeenCalled();
@@ -308,6 +312,24 @@ describe('fetchPullRequestByNumber', () => {
       expect(mockPullsGet).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('maps the GitHub stack metadata and base ref onto flat fields', async () => {
+    mockPullsGet.mockResolvedValue({
+      data: githubPrPayload({
+        base: { ref: 'feature/stack-base', repo: { full_name: 'kilo/repo' } },
+        stack: { number: 2, position: 1, size: 3 },
+      }),
+    });
+
+    const result = await fetchPullRequestByNumber(fetchParams);
+
+    expect(result).toMatchObject({
+      baseRef: 'feature/stack-base',
+      stackNumber: 2,
+      stackPosition: 1,
+      stackSize: 3,
+    });
+  });
 
   it('reports an empty head repo when the head repository is gone (deleted fork)', async () => {
     mockPullsGet.mockResolvedValue({

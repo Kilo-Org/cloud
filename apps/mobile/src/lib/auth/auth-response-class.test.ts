@@ -102,6 +102,59 @@ describe('classifyAuthResponse', () => {
     });
   });
 
+  it('keeps an intermediary 403 on the refresh route retryable so the session survives', () => {
+    // The refresh route has no 403 branch, so a 403 is an edge firewall or WAF
+    // answering in front of it. Its body is not one the route writes, so it
+    // proves nothing about the stored pair: the rotation retries later instead
+    // of ending a session whose credentials may be perfectly healthy.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: { code: '403' } },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+    expect(classifyAuthResponse({ path: '/api/auth/native/refresh', status: 403 })).toEqual({
+      kind: 'retry',
+      status: 403,
+      retryAfterMs: undefined,
+    });
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        retryAfterHeader: '15',
+        body: '<html>blocked</html>',
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: 15_000 });
+  });
+
+  it('keeps a refresh 403 carrying the route refusal body terminal', () => {
+    // A body the route itself writes is the route refusing, whatever the status
+    // an intermediary may have rewritten it to.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'SESSION_REVOKED' },
+      })
+    ).toEqual({ kind: 'terminal', status: 403, clearCredential: false });
+  });
+
+  it('treats a 403 carrying the 400-only INVALID_REQUEST body as an intermediary refusal', () => {
+    // The refresh route writes `INVALID_REQUEST` only alongside a 400 (its
+    // frozen contract has no other use for the code), so a 403 carrying it is
+    // an edge or gateway answering with the same generic word. Matching it
+    // would end a session the route never refused.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'INVALID_REQUEST' },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+  });
+
   it.each([400, 403, 404, 409, 425])(
     'classifies a 4xx with no retry guidance (%i) as terminal and never retries it',
     status => {
@@ -142,7 +195,6 @@ describe('terminal failure reporting', () => {
     reportAuthTerminalFailure('/api/auth/native/token', 401);
 
     expect(events).toHaveLength(1);
-    expect(events[0]?.level).toBe('error');
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
   });
 
@@ -158,29 +210,68 @@ describe('terminal failure reporting', () => {
     expect(events).toHaveLength(2);
   });
 
-  it('files the stored credential expiry as a warning and every other terminal refusal as an error', () => {
+  it('files a refused attempt credential as a warning, not a defect', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    // native/token takes no bearer: its 401 refuses the code, ticket or ID
+    // token the attempt presented, which a mistyped code produces.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': '/api/auth/native/token',
+      'http.status': 401,
+    });
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
+  });
+
+  it('files a refused passkey ceremony as a warning', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/passkey/authenticate', 401);
+
+    expect(events.map(event => event.level)).toEqual(['warning']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/passkey/authenticate', '401'],
+    ]);
+  });
+
+  it('files the stored credential expiry as a warning', () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
       events.push(event);
     });
 
     reportAuthTerminalFailure('/api/auth/native/refresh', 401);
-    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
-    reportAuthTerminalFailure('/api/auth/native/token', 401);
 
-    // The expiry is the expected end of a session; the other two name defects.
-    expect(events.map(event => event.level)).toEqual(['warning', 'error', 'error']);
-    // Same event identity either way: one route and status keeps one issue.
-    expect(events[0]?.tags).toEqual({
-      'error.subsystem': 'auth',
-      'auth.outcome': 'terminal',
-      'auth.route': '/api/auth/native/refresh',
-      'http.status': 401,
-    });
+    expect(events.map(event => event.level)).toEqual(['warning']);
     expect(events.map(event => event.fingerprint)).toEqual([
       ['auth-terminal', '/api/auth/native/refresh', '401'],
+    ]);
+  });
+
+  it('keeps every terminal status other than a 401 at error', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 400);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
+
+    expect(events.map(event => event.level)).toEqual(['error', 'error']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/token', '400'],
       ['auth-terminal', '/api/auth/native/refresh', '400'],
-      ['auth-terminal', '/api/auth/native/token', '401'],
     ]);
   });
 

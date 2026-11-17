@@ -38,6 +38,7 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 
 // Selection is enabled and Vercel BYOC credentials are configured.
 const selectionEnv = Object.assign({} as Env, {
+  CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
   SANDBOX_SELECTION_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
   VERCEL_TEAM_ID: 'team-id',
@@ -50,7 +51,9 @@ const selectionEnv = Object.assign({} as Env, {
 });
 const env = selectionEnv as Env;
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
-const disabledEnv = {} as Env;
+const disabledEnv = {
+  CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
+} as unknown as Env;
 
 const v1 = {
   environmentId: '123e4567-e89b-12d3-a456-426614174099',
@@ -173,6 +176,39 @@ describe('resolveSavedSandboxAllocation', () => {
     });
 
     await expect(resolve()).resolves.toBe('cloudflare-containers-standard-4');
+  });
+
+  it('applies a saved size from billing enrollment without the selection allowlist', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn().mockResolvedValue('paid');
+
+    await expect(
+      resolve({
+        env: {
+          CONTAINER_USAGE_METER: { getBillingMode },
+        } as unknown as Env,
+      })
+    ).resolves.toBe('cloudflare-containers-standard-4');
+    expect(getBillingMode).toHaveBeenCalledWith({
+      service: 'cloud-agent-next-sandbox-containers-standard4',
+      subject: { type: 'org', id: owner.orgId },
+    });
+  });
+
+  it('skips an unpaid saved size and keeps the paid context default', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-containers-standard-3',
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn(async ({ service }: { service: string }) =>
+      service === 'cloud-agent-next-sandbox-containers-standard4' ? 'paid' : 'shadow'
+    );
+
+    await expect(
+      resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+    ).resolves.toBe('cloudflare-containers-standard-4');
   });
 
   it.each(['github', 'gitlab', 'bitbucket'] as const)(
@@ -313,9 +349,38 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(resolve()).resolves.toBeUndefined();
   });
 
-  it('does not read settings when the owner cannot select a sandbox', async () => {
+  it.each([{}, { contextAllocation: 'retired-allocation' }])(
+    'does not check billing when no selectable saved setting exists: %j',
+    async candidates => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue(candidates);
+      const getBillingMode = vi.fn().mockRejectedValue(new Error('unavailable'));
+
+      await expect(
+        resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+      ).resolves.toBeUndefined();
+      expect(getBillingMode).not.toHaveBeenCalled();
+    }
+  );
+
+  it('skips a saved size when the owner cannot select a sandbox', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+
     await expect(resolve({ env: disabledEnv })).resolves.toBeUndefined();
-    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expect(disabledEnv.CONTAINER_USAGE_METER.getBillingMode).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a billing failure instead of dropping a selectable saved size', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn().mockRejectedValue(new Error('unavailable'));
+
+    await expect(
+      resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(getBillingMode).toHaveBeenCalledTimes(4);
   });
 
   it('reads only the context setting for a Bitbucket repository', async () => {
@@ -388,9 +453,7 @@ describe('resolveSavedSandboxAllocation', () => {
       });
 
       expect(allocation).toBe('vercel-small');
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).toThrowError(
+      expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).toThrowError(
         expect.objectContaining({
           code: 'BAD_REQUEST',
           message: expect.stringContaining('Vercel sandbox'),
@@ -496,7 +559,6 @@ describe('withSavedSandboxAllocation', () => {
       assertEnvironmentSupportsSandbox({
         environment: v2,
         allocation: requestedSandboxAllocation(resolved),
-        contained: true,
       })
     ).toThrowError(expect.objectContaining({ code: 'BAD_REQUEST' }));
   });
@@ -535,14 +597,9 @@ describe('assertEnvironmentSupportsSandbox', () => {
     ['isolated Cloudflare containers', 'cloudflare-containers-standard-3'],
     ['larger isolated Cloudflare containers', 'cloudflare-containers-standard-4'],
     ['a Cloudflare sandbox', 'cloudflare-single'],
-  ] as const)(
-    'lets a V2 environment start on %s with contained credentials',
-    (_name, allocation) => {
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).not.toThrow();
-    }
-  );
+  ] as const)('lets a V2 environment start on %s', (_name, allocation) => {
+    expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).not.toThrow();
+  });
 
   it.each([
     ['the shared sandbox', 'cloudflare-shared', 'shared sandbox'],
@@ -551,24 +608,11 @@ describe('assertEnvironmentSupportsSandbox', () => {
   ] as const)(
     'fails a V2 environment on %s with a specific reason',
     (_name, allocation, reason) => {
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).toThrowError(
+      expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).toThrowError(
         expect.objectContaining({ code: 'BAD_REQUEST', message: expect.stringContaining(reason) })
       );
     }
   );
-
-  it('fails a V2 environment whose credentials would be direct', () => {
-    expect(() =>
-      assertEnvironmentSupportsSandbox({ environment: v2, allocation: undefined, contained: false })
-    ).toThrowError(
-      expect.objectContaining({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('contained credentials'),
-      })
-    );
-  });
 
   it.each([
     undefined,
@@ -577,11 +621,7 @@ describe('assertEnvironmentSupportsSandbox', () => {
     'cloudflare-containers-standard-3',
   ] as const)('never restricts a V1 environment or no environment (allocation %s)', allocation => {
     for (const environment of [v1, undefined]) {
-      for (const contained of [true, false]) {
-        expect(() =>
-          assertEnvironmentSupportsSandbox({ environment, allocation, contained })
-        ).not.toThrow();
-      }
+      expect(() => assertEnvironmentSupportsSandbox({ environment, allocation })).not.toThrow();
     }
   });
 });

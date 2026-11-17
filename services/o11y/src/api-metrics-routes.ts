@@ -4,6 +4,20 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import { writeApiMetricsDataPoint } from './o11y-analytics';
 import { requireAdmin } from './admin-middleware';
 
+const PROVIDER_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
+const PROVIDER_NAME_MAX_LENGTH = 64;
+
+/**
+ * A provider id in the canonical form the gateway uses: lowercase alphanumerics
+ * separated by `.`, `_` or `-`, with a bounded length.
+ */
+export const ProviderNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PROVIDER_NAME_MAX_LENGTH)
+  .regex(PROVIDER_NAME_PATTERN, 'contains characters that are not allowed in a provider name');
+
 export const ApiMetricsParamsSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.string().min(1).optional(),
@@ -11,7 +25,7 @@ export const ApiMetricsParamsSchema = z.object({
   isStreaming: z.boolean(),
   userByok: z.boolean(),
   mode: z.string().min(1).optional(),
-  provider: z.string().min(1),
+  provider: ProviderNameSchema,
   inferenceProvider: z.string().optional().default(''),
   requestedModel: z.string().min(1),
   resolvedModel: z.string().min(1),

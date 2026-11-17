@@ -243,6 +243,9 @@ async function spawnCloudAgentSession(
       user: { id: ticketUserId },
       modelId: model,
       organizationId: kilocodeOrganizationId,
+      // An organization's Discord run carries a bot id, so routing tries the
+      // organization's shared-services connection first.
+      includeSharedServicesConnection: owner.type === 'org',
     });
     client = createCloudAgentNextClientForModel(authToken, eligibility);
   } catch (error) {

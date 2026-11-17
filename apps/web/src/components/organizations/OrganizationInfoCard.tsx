@@ -45,6 +45,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -166,9 +167,6 @@ function Inner(props: InnerProps) {
     deleted_at,
     auto_top_up_enabled,
   } = info;
-  // The member variant omits the Stripe customer id, so read it only on the
-  // admin-and-above variant. The field is rendered only in the admin dashboard.
-  const stripe_customer_id = info.callerRole === 'member' ? null : info.stripe_customer_id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
@@ -189,6 +187,11 @@ function Inner(props: InnerProps) {
   const expiringCreditGroups = useExpiringCredits(id);
 
   const handleSave = async () => {
+    // The button is disabled for a name without visible characters, but the
+    // field's Enter key reaches this handler directly.
+    if (!hasVisibleText(editedName)) {
+      return;
+    }
     if (editedName.trim() === name) {
       setIsEditing(false);
       return;
@@ -339,7 +342,7 @@ function Inner(props: InnerProps) {
                 size="sm"
                 variant="ghost"
                 onClick={handleSave}
-                disabled={updateOrganizationName.isPending || !editedName.trim()}
+                disabled={updateOrganizationName.isPending || !hasVisibleText(editedName)}
                 className="h-8 w-8 p-0"
               >
                 <Check className="h-4 w-4 text-green-400" />
@@ -494,24 +497,6 @@ function Inner(props: InnerProps) {
                 </Button>
               </div>
             </div>
-            {stripe_customer_id && (
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Stripe Customer ID
-                </label>
-                <p className="font-mono text-sm">
-                  {stripe_customer_id}
-                  <a
-                    href={`https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${stripe_customer_id}`}
-                    target="_blank"
-                    className="ml-1 inline-flex items-center rounded-full bg-purple-900 px-2 py-1 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-800"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    View in Stripe
-                  </a>
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-muted-foreground text-sm font-medium">Seats Required</label>
               <div className="mt-1 flex items-center gap-2">

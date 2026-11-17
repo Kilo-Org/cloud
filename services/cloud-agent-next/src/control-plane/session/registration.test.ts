@@ -9,6 +9,8 @@ import {
   controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteSpecSchema,
 } from '../../shared/control-plane-protocol.js';
+import { matchesKiloPermissionPattern } from '../../shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
@@ -56,6 +58,29 @@ function metadata(overrides: Record<string, unknown> = {}) {
 }
 
 const selection = { provider: 'cloudflare' as const };
+
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
 
 describe('workspace tail snapshot authority', () => {
   it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
@@ -304,6 +329,28 @@ describe('egress policy registration', () => {
 });
 
 describe('migrated origin permissions', () => {
+  // A profile agent that permits every bash command and edit, so each case shows
+  // the session command policy and the agent restriction both applying.
+  const unrestrictedAgent = {
+    slug: 'reviewer',
+    name: 'Reviewer',
+    config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+  };
+
+  function resolveBashPermission(
+    session: Record<string, string>,
+    agent: Record<string, string>,
+    command: string
+  ): string | undefined {
+    let action: string | undefined;
+    // The CLI installs the session rules first and appends the agent's rules,
+    // and a call resolves by the last matching rule.
+    for (const [pattern, verdict] of [...Object.entries(session), ...Object.entries(agent)]) {
+      if (matchesKiloPermissionPattern(command, pattern)) action = verdict;
+    }
+    return action;
+  }
+
   it.each(['standard', 'lite', undefined] as const)(
     'defers GitHub publisher identity %s to credential resolution',
     appType => {
@@ -364,7 +411,7 @@ describe('migrated origin permissions', () => {
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
-        bash: { git: 'allow' },
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
       });
       expect(spec.permission?.bash).toMatchObject(
         createdOnPlatform === 'security-remediation'
@@ -375,10 +422,13 @@ describe('migrated origin permissions', () => {
               curl: 'deny',
             }
           : {
-              'git push': 'deny',
+              'git *': 'deny',
+              'git diff': 'allow',
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({
@@ -392,6 +442,120 @@ describe('migrated origin permissions', () => {
       ).toBe(true);
     }
   );
+
+  it('narrows a profile agent permission map to the code-review command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The session policy covers every pattern the agent permitted, so the entry
+    // carries no allowance and the session map governs the agent.
+    expect(permission).toBeUndefined();
+    const guardBash = spec.permission?.bash as Record<string, string>;
+    expect(resolveBashPermission(guardBash, {}, 'npm test')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git push')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git log --oneline')).toBe('allow');
+  });
+
+  it('composes the stored agent against the review publisher refusals', () => {
+    const input = metadata({
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+      },
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { bash: { 'gh pr diff *': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const sessionBash = spec.permission?.bash as Record<string, string>;
+    const agentBash = (
+      spec.runtimeAgents?.[0]?.config.permission as
+        | Record<string, Record<string, string>>
+        | undefined
+    )?.bash;
+    // The stored entry carries a publisher refusal, so it is not wider than the
+    // entry the runtime writes against the session policy plus those refusals.
+    const publisherRules = Object.keys(buildGitHubReviewBashRules());
+    expect(Object.keys(agentBash ?? {}).some(pattern => publisherRules.includes(pattern))).toBe(
+      true
+    );
+    // The session policy alone allows the read pattern to swallow the comment
+    // write, which the stored entry refuses solely through the publisher rules.
+    const command = 'gh pr diff 1 | gh pr comment 2 -b x';
+    expect(resolveBashPermission(sessionBash, {}, command)).toBe('allow');
+    expect(resolveBashPermission(sessionBash, agentBash ?? {}, command)).toBe('deny');
+    const entryWithoutPublisherRules = Object.fromEntries(
+      Object.entries(agentBash ?? {}).filter(([pattern]) => !publisherRules.includes(pattern))
+    );
+    expect(resolveBashPermission(sessionBash, entryWithoutPublisherRules, command)).toBe('allow');
+  });
+
+  it('narrows a pattern-map agent allow against the guard flat denial', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { edit: { '*': 'allow', 'notes.txt': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission?.edit).toBe('deny');
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The session states its policy as one flat action, so it covers every
+    // pattern and the agent entry carries no allowance.
+    expect(permission).toBeUndefined();
+    expect(resolveBashPermission({ '*': 'deny' }, {}, 'npm test')).toBe('deny');
+  });
+
+  it('bounds an agent entry by the permission map the session runs with', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { cron_create: 'allow', suggest: 'allow' } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The map the route runs with states these tools, so the agent entry that
+    // allowed them is not stored.
+    expect(permission ?? {}).not.toHaveProperty('cron_create');
+    expect(permission ?? {}).not.toHaveProperty('suggest');
+  });
+
+  it('keeps a profile agent permission map unchanged without a command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'cloud-agent-web';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission).toBeUndefined();
+    expect(spec.runtimeAgents).toEqual([unrestrictedAgent]);
+    expect(JSON.stringify(spec.runtimeAgents)).toBe(JSON.stringify([unrestrictedAgent]));
+  });
 });
 
 describe('runtime authorization admission', () => {
@@ -721,6 +885,9 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
           envVars: { USER_SETTING: 'private-profile-env' },
           encryptedSecrets: { DATABASE_URL: envelope },
           runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
+          runtimeInstructions: [
+            { name: 'profile-proof', content: 'SYNTHETIC_PROFILE_INSTRUCTION' },
+          ],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
         },
@@ -735,6 +902,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
       { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
     ]);
     expect(registration.spec.runtimeAgents).toBeUndefined();
+    expect(registration.spec.runtimeInstructions).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.spec.permission).toMatchObject({
@@ -1076,6 +1244,9 @@ describe('buildControlPlaneSessionRegistration session directory', () => {
 
 describe('profile runtime delivery', () => {
   const profile = {
+    runtimeInstructions: [
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ],
     runtimeSkills: [
       {
         name: 'review',
@@ -1093,7 +1264,7 @@ describe('profile runtime delivery', () => {
     kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
   };
 
-  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands'] as const)(
+  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands', 'runtimeInstructions'] as const)(
     'delivers %s with compatibility isolation',
     key => {
       const registration = buildControlPlaneSessionRegistration(

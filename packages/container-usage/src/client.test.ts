@@ -272,6 +272,24 @@ describe('ContainerUsageClient', () => {
     });
     expect(recordStop).toHaveBeenCalledOnce();
   });
+
+  it('sends the capacity marker and surfaces a container limit without retrying', async () => {
+    const message =
+      'container_limit_reached: The user has reached its limit of 3 concurrent containers.';
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: { code: 'container_limit_reached', message },
+    });
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+    });
+
+    await expect(
+      client.recordStart({ ...context, startEpochMs: 123, enforceCapacity: true })
+    ).rejects.toMatchObject({ code: 'container_limit_reached', message });
+    expect(recordStart).toHaveBeenCalledOnce();
+    expect(recordStart.mock.calls[0]?.[0]).toMatchObject({ enforceCapacity: true });
+  });
 });
 
 describe('isNonRetryableSkuAdmissionError', () => {

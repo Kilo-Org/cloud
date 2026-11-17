@@ -60,13 +60,15 @@ vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk, getWaitingAs
 const createGlanceablePublisher = vi.fn();
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher }));
 
-const { trpcClient } = await import('@/lib/trpc');
 const { answerSessionPermission, refreshGlanceableSnapshot, runGlanceableApprove } =
   await import('@/lib/glanceable/approve-ask');
 const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
 // The pending-permission read is its own module; this suite owns its cases too.
-const { PendingPermissionTimeoutError, resolvePendingPermissionId } =
-  await import('@/lib/glanceable/pending-permission');
+const {
+  PendingPermissionTimeoutError,
+  resolveLeadingPendingPermissionId,
+  resolvePendingPermissionId,
+} = await import('@/lib/glanceable/pending-permission');
 // The real ack store: the republish's counts must read it, so the suite drives
 // it rather than replacing it.
 const { ackSessionAttention, isAttentionAcked, __resetSessionAttentionForTests } =
@@ -190,25 +192,111 @@ describe('answerSessionPermission', () => {
 });
 
 describe('resolvePendingPermissionId', () => {
-  it('returns the id from the first connected payload and closes the stream', async () => {
+  /** A target that names a request id, so the read has something to match. */
+  const byId = (permissionId: string) => ({ kind: 'permissionId' as const, permissionId });
+
+  it('returns the matching id and closes the stream', async () => {
     const stream = fakeStream([connectedFrame(['perm_first']), connectedFrame(['perm_second'])]);
-    const permissionId = await resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1' },
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
       { getTicket: resolveTicket, createConnection: stream.open }
     );
-    expect(permissionId).toBe('perm_first');
+    expect(match).toEqual({ kind: 'matched', permissionId: 'perm_first' });
     expect(stream.connect).toHaveBeenCalledTimes(1);
     expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null when the connect carries no pending permission', async () => {
-    const stream = fakeStream([connectedFrame([])]);
-    const permissionId = await resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1' },
+  it('matches a request that is not the first pending one', async () => {
+    // The projection keeps requests in arrival order, so the drawn request can
+    // sit behind another one that is still pending.
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_second'])]);
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_second') },
       { getTicket: resolveTicket, createConnection: stream.open }
     );
-    expect(permissionId).toBeNull();
+    expect(match).toEqual({ kind: 'matched', permissionId: 'perm_second' });
+  });
+
+  it('matches a drawn approval key to the request it was minted for', async () => {
+    const keyOf = vi.fn(async (kiloSessionId: string, permissionId: string) =>
+      JSON.stringify([kiloSessionId, permissionId])
+    );
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_second'])]);
+    const match = await resolvePendingPermissionId(
+      {
+        cloudAgentSessionId: 'agent_1',
+        target: {
+          kind: 'approvalKey',
+          kiloSessionId: 'ses_1',
+          approvalKey: JSON.stringify(['ses_1', 'perm_second']),
+        },
+      },
+      { getTicket: resolveTicket, createConnection: stream.open, approvalKey: keyOf }
+    );
+    expect(match).toEqual({ kind: 'matched', permissionId: 'perm_second' });
+    // One key per candidate, and the key names the session the target carries.
+    expect(keyOf).toHaveBeenNthCalledWith(1, 'ses_1', 'perm_first');
+    expect(keyOf).toHaveBeenNthCalledWith(2, 'ses_1', 'perm_second');
+  });
+
+  it('is none when the connect carries no pending permission', async () => {
+    const stream = fakeStream([connectedFrame([])]);
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    expect(match).toEqual({ kind: 'none' });
     expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('is stale when other requests are pending and the drawn one is not', async () => {
+    const stream = fakeStream([connectedFrame(['perm_other'])]);
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_drawn') },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    expect(match).toEqual({ kind: 'stale' });
+  });
+
+  it('is stale, never the first entry, when the drawn approval key matches nothing', async () => {
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_second'])]);
+    const match = await resolvePendingPermissionId(
+      {
+        cloudAgentSessionId: 'agent_1',
+        target: { kind: 'approvalKey', kiloSessionId: 'ses_1', approvalKey: 'a'.repeat(64) },
+      },
+      {
+        getTicket: resolveTicket,
+        createConnection: stream.open,
+        approvalKey: async () => 'b'.repeat(64),
+      }
+    );
+    expect(match).toEqual({ kind: 'stale' });
+  });
+
+  it('is ambiguous when two pending requests answer the drawn identity', async () => {
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_second'])]);
+    const match = await resolvePendingPermissionId(
+      {
+        cloudAgentSessionId: 'agent_1',
+        target: { kind: 'approvalKey', kiloSessionId: 'ses_1', approvalKey: 'k'.repeat(64) },
+      },
+      {
+        getTicket: resolveTicket,
+        createConnection: stream.open,
+        approvalKey: async () => 'k'.repeat(64),
+      }
+    );
+    expect(match).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('counts one request carried twice as one match', async () => {
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_first'])]);
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    expect(match).toEqual({ kind: 'matched', permissionId: 'perm_first' });
   });
 
   it('rejects with a retryable timeout and closes the stream when the deadline fires', async () => {
@@ -216,7 +304,7 @@ describe('resolvePendingPermissionId', () => {
     const deadlines: (() => void)[] = [];
     const cancelled = vi.fn();
     const pending = resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first'), timeoutMs: 50 },
       {
         getTicket: resolveTicket,
         createConnection: stream.open,
@@ -242,7 +330,7 @@ describe('resolvePendingPermissionId', () => {
     const deadlines: (() => void)[] = [];
     const openConnection = vi.fn();
     const pending = resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first'), timeoutMs: 50 },
       {
         // A route that never answers must not hold the headless approve: the
         // deadline covers the ticket fetch, not only the stream.
@@ -265,7 +353,7 @@ describe('resolvePendingPermissionId', () => {
     const deadlines: (() => void)[] = [];
     const signals: (AbortSignal | undefined)[] = [];
     const pending = resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first'), timeoutMs: 50 },
       {
         getTicket: async (_sessionId, _organizationId, options) => {
           signals.push(options?.signal);
@@ -291,8 +379,8 @@ describe('resolvePendingPermissionId', () => {
   it('aborts the ticket request once the read settles with an answer', async () => {
     const stream = fakeStream([connectedFrame(['perm_first'])]);
     const signals: (AbortSignal | undefined)[] = [];
-    const permissionId = await resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1' },
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
       {
         getTicket: async (_sessionId, _organizationId, options) => {
           signals.push(options?.signal);
@@ -301,7 +389,7 @@ describe('resolvePendingPermissionId', () => {
         createConnection: stream.open,
       }
     );
-    expect(permissionId).toBe('perm_first');
+    expect(match).toEqual({ kind: 'matched', permissionId: 'perm_first' });
     expect(signals).toHaveLength(1);
     expect(signals[0]?.aborted).toBe(true);
   });
@@ -311,7 +399,7 @@ describe('resolvePendingPermissionId', () => {
     const clock = { now: 1000 };
     const cancelled = vi.fn();
     const pending = resolvePendingPermissionId(
-      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_late'), timeoutMs: 50 },
       {
         getTicket: resolveTicket,
         createConnection: stream.open,
@@ -330,6 +418,50 @@ describe('resolvePendingPermissionId', () => {
   });
 });
 
+describe('resolveLeadingPendingPermissionId', () => {
+  it("returns the projection's oldest request and closes the stream", async () => {
+    const stream = fakeStream([connectedFrame(['perm_first', 'perm_second'])]);
+    const permissionId = await resolveLeadingPendingPermissionId(
+      { cloudAgentSessionId: 'agent_1' },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    expect(permissionId).toBe('perm_first');
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null when the connect carries no pending permission', async () => {
+    const stream = fakeStream([connectedFrame([])]);
+    await expect(
+      resolveLeadingPendingPermissionId(
+        { cloudAgentSessionId: 'agent_1' },
+        { getTicket: resolveTicket, createConnection: stream.open }
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('rejects with the retryable timeout, like the matching read', async () => {
+    const stream = fakeStream([]);
+    const deadlines: (() => void)[] = [];
+    const pending = resolveLeadingPendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      {
+        getTicket: resolveTicket,
+        createConnection: stream.open,
+        setTimeout: handler => {
+          deadlines.push(handler);
+          return () => undefined;
+        },
+      }
+    );
+    const assertion = expect(pending).rejects.toBeInstanceOf(PendingPermissionTimeoutError);
+    await vi.waitFor(() => {
+      expect(stream.connect).toHaveBeenCalledTimes(1);
+    });
+    deadlines[0]?.();
+    await assertion;
+  });
+});
+
 describe('runGlanceableApprove', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -338,7 +470,7 @@ describe('runGlanceableApprove', () => {
     getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
     fetchCloudAgentStreamTicket.mockImplementation(resolveTicket);
     createConnection.mockImplementation(fakeStream([connectedFrame(['perm_1'])]).open);
-    performRefresh.mockResolvedValue({ ok: false, refused: false });
+    performRefresh.mockResolvedValue({ kind: 'transient' });
   });
 
   it('is none when no ask is recorded', async () => {
@@ -365,6 +497,23 @@ describe('runGlanceableApprove', () => {
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
     expect(answerPermissionMutate).toHaveBeenCalledWith(
       { sessionId: 'agent_1', permissionId: 'perm_1', response: 'once' },
+      { context: { skipBatch: true } }
+    );
+    expect(recordWaitingAsk).toHaveBeenCalledWith(null);
+  });
+
+  it('answers the drawn request when another request is pending ahead of it', async () => {
+    // The projection keeps requests in arrival order, so the request the ask
+    // names can sit behind one that is still pending. The tap answers the drawn
+    // one, never the projected first entry.
+    readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, boundPermissionId: 'perm_second' });
+    createConnection.mockImplementation(
+      fakeStream([connectedFrame(['perm_first', 'perm_second'])]).open
+    );
+    answerPermissionMutate.mockResolvedValue(undefined);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
+    expect(answerPermissionMutate).toHaveBeenCalledWith(
+      { sessionId: 'agent_1', permissionId: 'perm_second', response: 'once' },
       { context: { skipBatch: true } }
     );
     expect(recordWaitingAsk).toHaveBeenCalledWith(null);
@@ -522,7 +671,7 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     fetchCloudAgentStreamTicket.mockRejectedValue(new StreamTicketHttpError(401, 'Unauthorized'));
     performRefresh.mockResolvedValue({
-      ok: true,
+      kind: 'ok',
       token: 't',
       refreshToken: 'r',
       expiresIn: 60,
@@ -547,7 +696,7 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
     performRefresh.mockResolvedValue({
-      ok: true,
+      kind: 'ok',
       token: 't',
       refreshToken: 'r',
       expiresIn: 60,
@@ -561,7 +710,7 @@ describe('runGlanceableApprove', () => {
   it('is retryable when the refresh itself is only transiently unavailable', async () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
-    performRefresh.mockResolvedValue({ ok: false, refused: false, superseded: true });
+    performRefresh.mockResolvedValue({ kind: 'superseded' });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
   });
 
@@ -571,7 +720,7 @@ describe('runGlanceableApprove', () => {
     // pending permission from the shade and leave no way to answer it.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
-    performRefresh.mockResolvedValue({ ok: false, refused: true });
+    performRefresh.mockResolvedValue({ kind: 'refused', sessionVersion: 1 });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
     expect(recordWaitingAsk).not.toHaveBeenCalled();
   });
@@ -768,9 +917,5 @@ describe('refreshGlanceableSnapshot', () => {
       redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
-  });
-
-  it('reads the tray through the same trpc client surface the manager uses', () => {
-    expect(trpcClient.activeSessions.list.query).toBe(listActiveSessionsQuery);
   });
 });

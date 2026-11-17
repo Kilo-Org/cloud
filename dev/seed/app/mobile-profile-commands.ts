@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_environment_profile_commands,
   agent_environment_profiles,
@@ -11,7 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email>';
 
@@ -71,16 +70,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('Provide one owned fake email matching kilo-<name>@example.com.');
   }
-  // `getSeedDb()` connects with `computeDatabaseUrl()`, which prefers
-  // `POSTGRES_URL_PRODUCTION` when `USE_PRODUCTION_DB=true`; check the URL that
-  // connection actually uses and refuse the production switch outright, as the
-  // neighbouring mobile seeds do.
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (
-    process.env.USE_PRODUCTION_DB === 'true' ||
-    process.env.SKIP_STRIPE_API !== 'true' ||
-    !['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)
-  ) {
+  assertLocalSeedDatabase('app:mobile-profile-commands');
+  if (process.env.SKIP_STRIPE_API !== 'true') {
     throw new Error(
       'This fixture requires an isolated loopback database and SKIP_STRIPE_API=true.'
     );

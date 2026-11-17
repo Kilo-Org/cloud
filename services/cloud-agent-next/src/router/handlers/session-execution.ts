@@ -1,6 +1,6 @@
 /**
- * Legacy V2 execution handlers — thin proxies over the shared `queueMessage`
- * helper.
+ * Legacy V2 execution handlers — thin proxies over the shared
+ * `preflightAndQueuePromptMessage` admission helper.
  *
  * `initiateFromKilocodeSessionV2` queues the first message on a session that
  * was registered via `prepareSession`. Callers do not pass a prompt, so the
@@ -23,7 +23,6 @@ import type { SessionId } from '../../types/ids.js';
 import {
   preflightAndQueuePromptMessage,
   preflightRuntimeAuthorizationRecovery,
-  queueMessage,
 } from '../../session/queue-message.js';
 import {
   admitPreparedInitialMessage,
@@ -126,6 +125,11 @@ export function createSessionExecutionV2Handlers() {
               arguments: commandPayload.arguments,
               attachments: input.attachments,
             };
+            agent = {
+              mode: commandPayload.mode,
+              model: commandPayload.model,
+              variant: commandPayload.variant,
+            };
           } else if (promptPayload) {
             turn = {
               type: 'prompt',
@@ -157,14 +161,11 @@ export function createSessionExecutionV2Handlers() {
             botId: ctx.botId,
             authToken: ctx.authToken,
           };
-          const ack =
-            turn.type === 'prompt'
-              ? await preflightAndQueuePromptMessage(
-                  queuedMessage,
-                  admissionContext,
-                  'sendMessageV2'
-                )
-              : await queueMessage(queuedMessage, admissionContext);
+          const ack = await preflightAndQueuePromptMessage(
+            queuedMessage,
+            admissionContext,
+            'sendMessageV2'
+          );
           return withLegacyExecutionId(ack);
         });
       }),

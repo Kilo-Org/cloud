@@ -2,6 +2,7 @@ import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { pool } from '@kilocode/web-shared/lib/drizzle';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import type { UsageRecordWriteOutcome } from './processUsage.types';
 
@@ -41,7 +42,6 @@ export async function observeUsageRecordCompletion(
       const sampleRate = level === 'info' ? completionSuccessSampleRate() : 1;
       if (sampleRate === 1 || Math.random() < sampleRate) {
         const createdAt = Date.parse(usage.created_at);
-        const region = process.env.VERCEL_REGION;
         console[level](
           JSON.stringify({
             level,
@@ -55,7 +55,7 @@ export async function observeUsageRecordCompletion(
             ...(Number.isFinite(createdAt)
               ? { event_age_ms: Math.max(0, Date.now() - createdAt) }
               : {}),
-            execution_region: region === 'fra1' || region === 'sfo1' ? region : 'unknown',
+            execution_region: getVercelExecutionRegion(),
           })
         );
       }
@@ -68,25 +68,18 @@ export async function observeUsageRecordCompletion(
 /**
  * Diagnostics for the Frankfurt-local usage write.
  *
- * `POST /api/internal/usage/record` shows a strongly bimodal latency profile —
- * p50 around 5ms against a p95 near 50s — while the database is idle: zero
- * blocked sessions, sub-second oldest transaction, and only a handful of
- * `log_lock_waits` entries per hour. Supavisor is equally idle, reporting
- * `client_waiting: 0` against a pool size of 320. So the time is being spent
- * inside the Node process, and nothing currently emitted can say where.
+ * `POST /api/internal/usage/record` records validation, queue admission (when
+ * applicable), and awaited write phase durations. Its `usage_record_timing` line
+ * includes total duration, the usage ID and outcome, in-process `pg` pool gauges
+ * before and after the write, the sampled peak waiting count, pool capacity, and
+ * process-lifetime event-loop delay. Pool gauges describe this runtime, not
+ * Supavisor or fleet-wide capacity; event-loop delay is not request-scoped.
  *
- * The two candidate explanations need different fixes, so they have to be
- * separated by measurement rather than argument:
- *
- * - Waiting on the in-process `pg` pool, which is capped at 10 connections per
- *   instance. `/api/cron/db-pool-metrics` reports Supavisor's counters, not this
- *   pool's, so its saturation is currently invisible. `waitingCount` settles it.
- * - Event-loop starvation, which would inflate every phase including ones that do
- *   no I/O at all. The delay histogram settles that one.
- *
- * Detailed phase/pool diagnostics are read-only and allocation-light. Their emission is gated on
- * a duration threshold plus a small random sample, and replaces a log line that
- * serialized ~30KB of interpolated SQL per failure, so net log volume falls.
+ * The endpoint emits detailed timing for completed writes taking at least one
+ * second, plus a 1% baseline sample of faster writes. These phase/pool diagnostics
+ * are separate from `usage_record_completion` and its configurable success sample
+ * rate. They measure local writer work, not queue delivery or full HTTP latency.
+ * Timing emission must not change the write result or cause a retry.
  */
 
 /**

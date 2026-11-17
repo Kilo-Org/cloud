@@ -6,7 +6,7 @@ import { useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useConfirm } from '@/components/ui/confirm';
-import { dbSessionsAtom, deleteSessionFromStoreAtom } from '../store/db-session-atoms';
+import { dbSessionsAtom } from '../store/db-session-atoms';
 import {
   createSessionDeletionFlow,
   invalidateSessionQueries,
@@ -26,7 +26,6 @@ export function useSessionDeletion({ organizationId, onDeleted }: UseSessionDele
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const setDbSessions = useSetAtom(dbSessionsAtom);
-  const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
   const { mutateAsync: deleteSessionMutation } = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions()
   );
@@ -93,7 +92,6 @@ export function useSessionDeletion({ organizationId, onDeleted }: UseSessionDele
               queryClient,
               trpc,
               setDbSessions,
-              deleteSessionFromStore,
             }),
           invalidateQueries: () => invalidateSessionQueries({ queryClient, trpc }),
           notifyDeleted: event => onDeletedRef.current?.(event),
@@ -112,7 +110,6 @@ export function useSessionDeletion({ organizationId, onDeleted }: UseSessionDele
     [
       confirm,
       deleteSessionMutation,
-      deleteSessionFromStore,
       deleteWorktreeMutation,
       dropOperationKey,
       getOperationKey,

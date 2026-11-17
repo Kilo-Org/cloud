@@ -30,6 +30,7 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useManager } from './CloudAgentProvider';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
+import { readWorktreeSnapshotMeta } from './worktree-meta';
 import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -512,8 +513,8 @@ function WorktreeChanges({
     },
     retry: false,
   });
-  const attemptedOpeningRefresh = useRef(false);
   const { mutate } = refresh;
+  const attemptedOpeningRefresh = useRef(false);
   useEffect(() => {
     if (!open) {
       attemptedOpeningRefresh.current = false;
@@ -525,6 +526,7 @@ function WorktreeChanges({
   }, [open, saved.isFetchedAfterMount, saved.isFetching, mutate]);
 
   const snapshot = saved.data?.snapshot;
+  const snapshotMeta = readWorktreeSnapshotMeta(snapshot);
   const sections = groupWorktreeChangesByScope(snapshot?.files ?? []);
   const messages = worktreeChangesMessages({
     snapshot,
@@ -688,6 +690,12 @@ function WorktreeChanges({
             </div>
           )}
           <div role="status" aria-live="polite">
+            {snapshotMeta.baseRefFallback && (
+              <p>
+                Base branch <code>{snapshotMeta.baseRefFallback.requested}</code> no longer exists;
+                comparing with <code>{snapshotMeta.baseRefFallback.used}</code>.
+              </p>
+            )}
             {messages.notice && <p>{messages.notice}</p>}
             {snapshot?.truncated && <p>Partial summary · some files omitted.</p>}
           </div>

@@ -15,14 +15,17 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import type * as DbModule from '@kilocode/db';
+import type { SQL } from 'drizzle-orm';
 import { signKiloToken, clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type * as AccountAccessModule from '@kilocode/worker-utils/account-access';
 import type { OrganizationMemberBalanceRow } from '@kilocode/worker-utils/account-access';
+import type * as OrganizationMembershipModule from '@kilocode/worker-utils/organization-membership';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type * as ClassifierConfigModule from './classifier-config';
 import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import type * as ModelClassifierModule from './model-classifier';
+import { clearEmailDomainBlacklistCache } from './caller-auth';
 import { clearCustomRouterTableCache } from './custom-router-decision';
 import { clearClassificationHotCache } from './decision-cache';
 import { clearOrganizationPolicyCache } from './organization-policy';
@@ -31,11 +34,15 @@ import { app } from './index';
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
-const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
+const findEffectiveOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
 const dbRows = vi.hoisted(() => ({
   user: [] as unknown[],
   organization: [] as unknown[],
+  blacklistedDomains: [] as string[],
+  blacklistLookupError: null as Error | null,
+  // The domains each blacklisted_domains lookup asked about.
+  blacklistLookups: [] as string[][],
 }));
 
 vi.mock('./custom-router-store', async importOriginal => ({
@@ -69,21 +76,39 @@ vi.mock('./classifier-config', async importOriginal => ({
 
 vi.mock('@kilocode/worker-utils/account-access', async importOriginal => ({
   ...(await importOriginal<typeof AccountAccessModule>()),
-  findOrganizationMemberRole,
   findOrganizationMemberBalanceRow,
+}));
+
+vi.mock('@kilocode/worker-utils/organization-membership', async importOriginal => ({
+  ...(await importOriginal<typeof OrganizationMembershipModule>()),
+  findEffectiveOrganizationMemberRole,
 }));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
+  const { PgDialect } = await import('drizzle-orm/pg-core');
+  const dialect = new PgDialect();
+  // Answers `domain in (...)` against the configured blocked domains.
+  const blacklistLookup = async (condition: SQL) => {
+    const domains = dialect.sqlToQuery(condition).params.map(String);
+    dbRows.blacklistLookups.push(domains);
+    if (dbRows.blacklistLookupError) throw dbRows.blacklistLookupError;
+    return domains
+      .filter(domain => dbRows.blacklistedDomains.includes(domain))
+      .map(domain => ({ domain }));
+  };
   return {
     ...actual,
     getWorkerDb: () => ({
       select: () => ({
         from: (table: unknown) => ({
-          where: () => ({
-            limit: async () =>
-              table === actual.kilocode_users ? dbRows.user : dbRows.organization,
-          }),
+          where: (condition: SQL) => {
+            if (table === actual.blacklisted_domains) return blacklistLookup(condition);
+            return {
+              limit: async () =>
+                table === actual.kilocode_users ? dbRows.user : dbRows.organization,
+            };
+          },
         }),
       }),
     }),
@@ -189,8 +214,6 @@ const env = {
   AUTO_ROUTING_DECISION_SECRET: { get: async () => DECISION_SECRET },
   KILO_WEB_API_BASE_URL: 'https://web.example.test',
   KILO_AI_GATEWAY_BASE_URL: 'https://gateway.example.test',
-  UPSTASH_REDIS_REST_URL: { get: async () => 'https://redis.example.test' },
-  UPSTASH_REDIS_REST_TOKEN: { get: async () => 'redis-read-token' },
   HYPERDRIVE: { connectionString: 'postgres://worker' },
   AUTO_ROUTING_CONFIG: { get: async () => null, put: async () => {}, delete: async () => {} },
   BENCHMARK_SERVICE: { fetch: benchmarkFetch },
@@ -310,6 +333,10 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
     auto_top_up_enabled: false,
     next_credit_expiration_at: null,
     created_at: '2026-01-01T00:00:00.000Z',
+    payerRootOrganizationId: 'org-1',
+    payerRootCreatedAt: '2026-01-01T00:00:00.000Z',
+    payerMicrodollarsUsed: 0,
+    payerTotalMicrodollarsAcquired: 10_000_000,
     ...overrides,
   } satisfies OrganizationMemberBalanceRow;
 }
@@ -335,28 +362,14 @@ async function errorCode(res: Response) {
   return body.error.code;
 }
 
+async function errorResponse(res: Response) {
+  return (await res.json()) as { error: { code: string; message: string } };
+}
+
 const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] = [];
 let gatewayFailuresLeft = 0;
 let gatewayFailureStatus = 503;
-let blacklistedDomainsConfig: string | null = null;
-let blacklistedDomainsUpdatedAt: string | null = null;
-let redisAvailable = true;
-
-function blacklistConfig(domains: string[], updatedAt: string | null = null) {
-  return JSON.stringify({
-    domains,
-    updated_at: updatedAt,
-    updated_by: null,
-    updated_by_email: null,
-  });
-}
-
-function redisReads() {
-  return fetchMock.mock.calls
-    .filter(([input]) => requestUrl(input).includes('redis'))
-    .map(([, init]) => (JSON.parse(init?.body as string) as string[])[1]);
-}
 
 function gatewayCalls() {
   return fetchMock.mock.calls.filter(([input]) =>
@@ -373,6 +386,7 @@ beforeEach(() => {
   clearCustomRouterTableCache();
   clearClassificationHotCache();
   clearOrganizationPolicyCache();
+  clearEmailDomainBlacklistCache();
   backgroundTasks.length = 0;
   platformModes.clear();
   getPlatformMode.mockClear();
@@ -380,10 +394,7 @@ beforeEach(() => {
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
-  blacklistedDomainsConfig = null;
-  blacklistedDomainsUpdatedAt = null;
-  redisAvailable = true;
-  fetchMock.mockReset().mockImplementation(async (input, init) => {
+  fetchMock.mockReset().mockImplementation(async input => {
     const url = requestUrl(input);
     if (url.startsWith('https://gateway.example.test')) {
       if (gatewayFailuresLeft > 0) {
@@ -391,18 +402,6 @@ beforeEach(() => {
         return new Response('down', { status: gatewayFailureStatus });
       }
       return Response.json({ deniedModelIds: gatewayDeniedModelIds });
-    }
-    // Like serverless-redis-http: only the command form is served.
-    if (url === 'https://redis.example.test' && init?.method === 'POST') {
-      if (!redisAvailable) return new Response('unavailable', { status: 503 });
-      const [command, key] = JSON.parse(init.body as string) as string[];
-      if (command === 'GET' && key === 'admin:blacklisted-domains') {
-        return Response.json({ result: blacklistedDomainsConfig });
-      }
-      if (command === 'GET' && key === 'admin:blacklisted-domains:updated-at') {
-        return Response.json({ result: blacklistedDomainsUpdatedAt });
-      }
-      return Response.json({ error: 'unexpected command' }, { status: 400 });
     }
     return new Response('not found', { status: 404 });
   });
@@ -417,9 +416,12 @@ beforeEach(() => {
     },
   ];
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
+  dbRows.blacklistedDomains = [];
+  dbRows.blacklistLookupError = null;
+  dbRows.blacklistLookups = [];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
-  findOrganizationMemberRole.mockReset().mockResolvedValue('member');
+  findEffectiveOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
     cost: 0.000002,
@@ -440,6 +442,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await drainBackgroundTasks();
+  clearEmailDomainBlacklistCache();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -717,47 +720,82 @@ describe('public custom router decide', () => {
   });
 
   it('refuses a user in a blocked email domain', async () => {
-    blacklistedDomainsConfig = blacklistConfig(['example.com']);
+    dbRows.blacklistedDomains = ['example.com'];
     const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(decide.status).toBe(403);
     expect(await errorCode(decide)).toBe('forbidden');
     const plan = await post(CUSTOM_ROUTER_EVAL_PLAN_PATH, { routerId: ROUTER_ID });
     expect(plan.status).toBe(403);
+    expect(dbRows.blacklistLookups[0]).toEqual(['example.com', 'com']);
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
-  it('fails closed with a retryable error before the blocked-domain list has ever loaded', async () => {
-    redisAvailable = false;
-    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
-    expect(res.status).toBe(500);
-    expect(res.headers.get('retry-after')).toBe('5');
-    expect(await errorCode(res)).toBe('internal_error');
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-  });
-
-  it('keeps enforcing the last loaded blocked-domain list when Redis later fails', async () => {
-    blacklistedDomainsConfig = blacklistConfig(['example.com']);
-    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
-    redisAvailable = false;
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+  it('refuses a user in a subdomain of a blocked email domain', async () => {
+    dbRows.blacklistedDomains = ['example.com'];
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_reason: null,
+        google_user_email: 'dev@Mail.Example.com',
+        total_microdollars_acquired: 5_000_000,
+        microdollars_used: 1_000_000,
+      },
+    ];
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(res.status).toBe(403);
-    expect(
-      fetchMock.mock.calls.filter(([input]) => requestUrl(input).includes('redis'))
-    ).toHaveLength(2);
+    expect(await errorCode(res)).toBe('forbidden');
   });
 
-  it('rechecks only the updated_at key while the blocked-domain list is unchanged', async () => {
-    blacklistedDomainsUpdatedAt = '2026-10-22T13:30:00.000Z';
-    blacklistedDomainsConfig = blacklistConfig(['example.com'], blacklistedDomainsUpdatedAt);
-    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
-    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
-    expect(redisReads()).toEqual([
-      'admin:blacklisted-domains',
-      'admin:blacklisted-domains:updated-at',
-    ]);
+  it('refuses a user whose block timestamp is set', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_at: '2026-01-15T12:00:00.000Z',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 0,
+      },
+    ];
+    const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(decide.status).toBe(403);
+    expect(await errorCode(decide)).toBe('forbidden');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('admits a user whose email domain is not blocked', async () => {
+    dbRows.blacklistedDomains = ['notexample.com', 'mail.example.com'];
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(dbRows.blacklistLookups).toEqual([['example.com', 'com']]);
+  });
+
+  it('maps a failed blocked-domain lookup to a retryable internal error and retries it on the next request', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    dbRows.blacklistLookupError = new Error('connection terminated');
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: { code: 'internal_error', message: 'Account checks are temporarily unavailable' },
+    });
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(JSON.parse(String(consoleWarn.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'auto_routing_blacklisted_domains_read_failed',
+      error: 'connection terminated',
+    });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+
+    dbRows.blacklistLookupError = null;
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(dbRows.blacklistLookups).toHaveLength(2);
+  });
+
+  it('looks up the blocked-domain status of a user once per minute', async () => {
+    for (let i = 0; i < 3; i++) {
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    }
+    expect(dbRows.blacklistLookups).toHaveLength(1);
   });
 
   it('fails with custom_router_unavailable when no entry is servable', async () => {
@@ -789,7 +827,10 @@ describe('public custom router decide', () => {
       })
     );
     expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'org', id: ORG_ID }, 'team');
-    expect(findOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), ORG_ID, USER_ID);
+    expect(findEffectiveOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: USER_ID,
+      organizationId: ORG_ID,
+    });
     const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
     expect(verified.ok && verified.payload.organizationId).toBe(ORG_ID);
   });
@@ -809,12 +850,14 @@ describe('public custom router decide', () => {
   });
 
   it('denies an organization context the user is not a member of', async () => {
-    findOrganizationMemberRole.mockResolvedValue(null);
+    findEffectiveOrganizationMemberRole.mockResolvedValue(null);
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
       'X-KiloCode-OrganizationId': ORG_ID,
     });
     expect(res.status).toBe(403);
-    expect(await errorCode(res)).toBe('forbidden');
+    expect(await errorResponse(res)).toEqual({
+      error: { code: 'forbidden', message: 'Not a member of the organization' },
+    });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
@@ -1017,7 +1060,7 @@ describe('client eval proxy', () => {
     findCustomRouterById.mockResolvedValue(
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
-    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('billing_manager');
     findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
@@ -1066,7 +1109,7 @@ describe('client eval proxy', () => {
 
   it('rejects an upload when the owning organization has no balance', async () => {
     findCustomRouterById.mockResolvedValue(customRouter({ ownerType: 'org', ownerId: ORG_ID }));
-    findOrganizationMemberRole.mockResolvedValue('admin');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('admin');
     dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
     const res = await post(
       CUSTOM_ROUTER_EVAL_PLAN_PATH,
@@ -1090,11 +1133,35 @@ describe('client eval proxy', () => {
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
+  it('runs an eval plan for an owner inherited from the live parent organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findEffectiveOrganizationMemberRole.mockResolvedValue('owner');
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(findEffectiveOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: USER_ID,
+      organizationId: ORG_ID,
+    });
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
+  });
+
   it('runs an eval plan for an organization billing manager funded by the organization', async () => {
     findCustomRouterById.mockResolvedValue(
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
-    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('billing_manager');
     findOrganizationMemberBalanceRow.mockResolvedValue(null);
     dbRows.user = [spentBalanceUser()];
     benchmarkFetch.mockResolvedValueOnce(Response.json({}));

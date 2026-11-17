@@ -8,7 +8,8 @@ import {
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
   _resetHomeWidgetDataForTests,
   _setHomeWidgetStoreForTests,
@@ -1496,7 +1497,7 @@ describe('buildGlanceableViewProps', () => {
     const snapshot = snapshotFor([{ status: 'permission' }], 0);
     const props = buildGlanceableViewProps(snapshot, {}, key => key, {
       snapshot,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+      details: { ...emptyHomeWidgetDetails(), approvalKey: 'a'.repeat(64) },
     });
     expect(props.actions).toEqual({ approve: true, newAgent: true });
     expect(props.statusLine).toBeNull();
@@ -1539,7 +1540,7 @@ describe('buildGlanceableViewProps', () => {
     const snapshot = snapshotFor([{ status: 'permission' }], 0);
     const props = buildGlanceableViewProps(snapshot, {}, key => key, {
       snapshot,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+      details: { ...emptyHomeWidgetDetails(), approvalKey: 'a'.repeat(64) },
     });
     expect(props.newestTitle).toBe('glanceable.couldNotApprove');
     expect(props.actions).toEqual({ approve: true, newAgent: true });
@@ -1849,9 +1850,11 @@ describe('iosSink stray sweep', () => {
     const gate = Promise.withResolvers<null>();
     _setSecureStoreForTests({
       setItemAsync: secureStoreMock.setItemAsync,
-      getItemAsync: async () => {
+      getItemAsync: async (key: string) => {
         await gate.promise;
-        return null;
+        // The probe answers, so the empty mirror is a real answer rather than an
+        // unreadable keychain.
+        return key === WIDGET_STORE_CLASS_MARKER.key ? WIDGET_STORE_CLASS_MARKER.value : null;
       },
     });
 

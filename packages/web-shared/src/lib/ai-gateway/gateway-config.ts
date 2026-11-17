@@ -1,8 +1,6 @@
 import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-export const DEFAULT_VERCEL_ROUTING_ENABLED = true;
-
 export const NOTE_MAX_LENGTH = 500;
 
 export const VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH = 200;
@@ -11,14 +9,13 @@ export const VERCEL_ROUTING_OPT_OUT_MODELS_MAX_COUNT = 200;
 const note = z.string().max(NOTE_MAX_LENGTH);
 
 /**
- * Saved configurations from before the switch only contain the obsolete
- * percentage fields, so a missing value parses as the compiled default.
+ * Saved configurations from before the field existed carry no list, so a
+ * missing value parses as an empty one.
  */
-const vercelRoutingEnabled = z.boolean().default(DEFAULT_VERCEL_ROUTING_ENABLED);
+const storedVercelRoutingOptOutModels = z.array(z.string().min(1)).default([]);
 
 export const GatewayConfigSchema = z.object({
-  vercel_routing_enabled: vercelRoutingEnabled,
-  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
+  vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -27,19 +24,15 @@ export const GatewayConfigSchema = z.object({
 
 export type GatewayConfig = z.infer<typeof GatewayConfigSchema>;
 
-export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
-  vercel_routing_enabled: DEFAULT_VERCEL_ROUTING_ENABLED,
-  vercel_routing_opt_out_models: [],
+export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = GatewayConfigSchema.parse({
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
-  note: null,
-};
+});
 
 /** Schema for parsing the routing settings on the hot path. */
 export const GatewayRoutingConfigSchema = z.object({
-  vercel_routing_enabled: vercelRoutingEnabled,
-  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
+  vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
 });
 
 /**
@@ -55,7 +48,6 @@ const vercelRoutingOptOutModels = z
 
 /** Schema for the admin set-mutation input. */
 export const GatewayConfigInputSchema = z.object({
-  vercel_routing_enabled: z.boolean(),
   vercel_routing_opt_out_models: vercelRoutingOptOutModels,
   note: note.nullable(),
 });
@@ -71,8 +63,8 @@ const storedOrganizationIds = z.array(z.string().transform(id => id.toLowerCase(
  */
 export const OrganizationFeaturesSchema = z.object({
   experimental_byok: storedOrganizationIds,
+  enkrypt_output_guardrail: storedOrganizationIds,
   gateway_settings: storedOrganizationIds,
-  request_logs: storedOrganizationIds,
 });
 
 export type OrganizationFeatures = z.infer<typeof OrganizationFeaturesSchema>;
@@ -85,15 +77,15 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
     label: 'Direct Amazon Bedrock and Google Vertex AI BYOK',
     description: 'Lets the organization add direct Amazon Bedrock and Google Vertex AI keys.',
   },
-  gateway_settings: {
-    label: 'Gateway settings',
+  enkrypt_output_guardrail: {
+    label: 'Enkrypt output guardrails',
     description:
-      'Lets the organization turn off OpenRouter or the Vercel AI Gateway, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.',
   },
-  request_logs: {
-    label: 'Request logs',
+  gateway_settings: {
+    label: 'Advanced policies',
     description:
-      "Shows organization owners, admins, and billing managers a Request Logs page with the organization's latest gateway requests and how each was routed.",
+      'Lets an enterprise organization turn off OpenRouter and pin requests paid with Kilo credits to a Vercel AI Gateway inference region, on the Advanced policies tab of its Providers & Models page. The policies stop applying if the organization leaves the enterprise plan.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 
@@ -121,6 +113,6 @@ const organizationIdsInput = z
 /** Schema for the admin organization-features mutation input. */
 export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
+  enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
-  request_logs: organizationIdsInput,
 }) satisfies z.ZodType<OrganizationFeatures, unknown>;

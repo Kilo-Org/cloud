@@ -30,7 +30,7 @@ import {
 } from '@kilocode/db/schema';
 import { ilike, inArray } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
 const ORG_PREFIX = '[seed:org-dashboard]';
@@ -242,6 +242,8 @@ async function addKiloPass(userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function run(): Promise<SeedResult> {
+  assertLocalSeedDatabase('app:org-dashboard');
+
   console.log('Cleaning up existing seed data...');
   await cleanup();
 

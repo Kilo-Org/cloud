@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_configs,
   kilocode_users,
@@ -10,7 +9,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email>';
 
@@ -21,22 +20,6 @@ const ORGANIZATION_ID = 'b007c8bf-ad4d-4651-b5e1-d20989d0dc71';
 
 /** The organization's own owner. The caller is only a member of it. */
 const OWNER_EMAIL = 'security-notifications-owner@example.com';
-
-/** Refuses to touch anything but a loopback database, whatever the env says. */
-function assertLocalDatabaseTarget(): void {
-  if (process.env.USE_PRODUCTION_DB === 'true') {
-    throw new Error(
-      'The Security Agent notifications seed refuses to run with USE_PRODUCTION_DB=true.'
-    );
-  }
-
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)) {
-    throw new Error(
-      `The Security Agent notifications seed refuses ${databaseUrl.hostname}; point it at a local database.`
-    );
-  }
-}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-security-agent-notifications ${usage}`);
@@ -102,7 +85,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('Provide one owned fake email matching <name>@example.com.');
   }
 
-  assertLocalDatabaseTarget();
+  assertLocalSeedDatabase('app:mobile-security-agent-notifications');
   const db = getSeedDb();
   const memberId = await ensureUser(email, 'Security notifications member');
   const ownerId = await ensureUser(OWNER_EMAIL, 'Security notifications owner');

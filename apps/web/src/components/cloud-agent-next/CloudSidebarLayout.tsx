@@ -22,6 +22,7 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import type { CachedSessionSnapshotPage } from '@kilocode/cloud-agent-sdk';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -30,16 +31,13 @@ import { CloudAgentSettingsButton } from './settings/CloudAgentSettingsButton';
 import {
   dbSessionToStoredSession,
   deriveForegroundSessionStatus,
+  groupSidebarWorkspaces,
   mergeWorktreeChatSessions,
   useSidebarSessions,
   type SidebarWorktreeDetails,
 } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import {
-  apiSessionToDbSession,
-  dbSessionsAtom,
-  deleteSessionFromStoreAtom,
-} from './store/db-session-atoms';
+import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
 import {
   getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
@@ -98,6 +96,7 @@ import {
   sendLocalSessionRequest,
 } from './local-sessions/local-session-request';
 import { localSessionsStorageKey } from './local-sessions/local-session-storage';
+import { transcriptCacheKey, transcriptCacheScope } from './session-transcript-cache';
 
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
@@ -235,8 +234,13 @@ export function CloudSidebarLayout(props: CloudSidebarLayoutProps) {
         session.organizationId,
         attempt
       );
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+      const worktreeId = cloudAgentWorktreeIdSchema.safeParse(session.worktreeId);
+      if (worktreeId.success) {
+        void queryClient.invalidateQueries(
+          trpc.cliSessionsV2.list.queryFilter({ worktreeId: worktreeId.data }),
+          { cancelRefetch: false }
+        );
+      }
       return serverId;
     },
     [queryClient, trpc, trpcClient]
@@ -307,6 +311,7 @@ function CloudSidebarLayoutContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
+  const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -314,6 +319,8 @@ function CloudSidebarLayoutContent({
     null
   );
   const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
+  // Keep the display name through the dialog's close animation.
+  const [worktreeDeletionName, setWorktreeDeletionName] = useState('');
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -362,15 +369,14 @@ function CloudSidebarLayoutContent({
     [platformFilter]
   );
 
-  const folderWorktreeIds = useMemo(
-    () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),
-    [workspaceFolders.folders]
-  );
   const {
     sessions: listedSessions,
     cachedSessions: listedCachedSessions,
     worktreeDetails,
     loadingWorktreeIds,
+    workspaceRows,
+    workspaceOrder,
+    workspaceRowsTruncated,
     isLoading: isLoadingSessions,
     refetchSessions,
     renameSessionLocally,
@@ -380,7 +386,6 @@ function CloudSidebarLayoutContent({
     searchQuery,
     createdOnPlatform,
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
-    folderWorktreeIds,
   });
   // Chats this client created show from the first frame, until the server lists
   // them. They follow the sidebar's filters, as the server's list does.
@@ -419,6 +424,10 @@ function CloudSidebarLayoutContent({
         ? loadingWorktreeIds
         : loadingWorktreeIds.filter(id => !(id in sidebarWorktreeDetails) || id in worktreeDetails),
     [loadingWorktreeIds, sidebarWorktreeDetails, worktreeDetails]
+  );
+  const sidebarWorkspaceGroups = useMemo(
+    () => groupSidebarWorkspaces(sessions, sidebarWorktreeDetails, workspaceRows),
+    [sessions, sidebarWorktreeDetails, workspaceRows]
   );
   const sidebarWorkspaceFolders = {
     ...workspaceFolders,
@@ -497,8 +506,8 @@ function CloudSidebarLayoutContent({
     );
     return parsedWorktreeId.success ? parsedWorktreeId.data : null;
   }, [cachedSessions, currentSessionId, fetchedSessionData, organizationId, worktreeIdFromParams]);
-  const { data: worktreeSessionsData } = useQuery(
-    trpc.cliSessionsV2.list.queryOptions(
+  const { data: worktreeSessionsData } = useQuery({
+    ...trpc.cliSessionsV2.list.queryOptions(
       selectedWorktreeId
         ? {
             organizationId: organizationId ?? null,
@@ -507,8 +516,9 @@ function CloudSidebarLayoutContent({
             orderBy: 'updated_at',
           }
         : skipToken
-    )
-  );
+    ),
+    staleTime: 5000,
+  });
   const worktreeChats = useMemo(() => {
     if (!selectedWorktreeId) return [];
 
@@ -584,9 +594,12 @@ function CloudSidebarLayoutContent({
     worktreeSessionsData?.cliSessions,
   ]);
 
+  // The project filter offers the repositories of the sessions this view lists,
+  // so it reads the same scope those sessions are listed under: `null` is the
+  // personal scope, and an id is that organization's scope.
   const { data: recentReposData } = useQuery({
     ...trpc.cliSessionsV2.recentRepositories.queryOptions({
-      organizationId,
+      organizationId: organizationId ?? null,
       updatedSince: repoUpdatedSince,
     }),
     staleTime: 60_000,
@@ -603,7 +616,6 @@ function CloudSidebarLayoutContent({
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
   const setDbSessions = useSetAtom(dbSessionsAtom);
-  const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
@@ -796,6 +808,15 @@ function CloudSidebarLayoutContent({
         return false;
       }
 
+      const sourceConfig =
+        fetchedSessionData?.kiloSessionId === serverSourceId
+          ? sessionConfig
+          : queryClient.getQueryData<CachedSessionSnapshotPage>(
+              transcriptCacheKey(
+                transcriptCacheScope(currentUserId, organizationId ?? null),
+                serverSourceId
+              )
+            )?.sessionConfig;
       const kiloSessionId = createLocalSession({
         organizationId: organizationId ?? null,
         worktreeId,
@@ -806,7 +827,16 @@ function CloudSidebarLayoutContent({
           knownChats.find(chat => chat.worktreeId === worktreeId && chat.repository)?.repository ||
           '',
         branch: source?.branch ?? getWorktreeBranch(worktreeId, knownChats),
-        composer,
+        composer:
+          composer ??
+          (sourceConfig
+            ? {
+                mode: sourceConfig.mode,
+                model: sourceConfig.model,
+                variant: sourceConfig.variant ?? null,
+                runtimeAgents: sourceConfig.runtimeAgents,
+              }
+            : null),
         firstMessage: null,
       });
       if (placement === 'replace' && worktreeId === selectedWorktreeId) {
@@ -824,12 +854,16 @@ function CloudSidebarLayoutContent({
     [
       cachedSessions,
       createLocalSession,
+      currentUserId,
+      fetchedSessionData,
       focusComposerForSession,
       openSessionInternal,
       openWorktreeChats,
       organizationId,
+      queryClient,
       replaceChatTab,
       selectedWorktreeId,
+      sessionConfig,
       worktreeChats,
     ]
   );
@@ -970,10 +1004,16 @@ function CloudSidebarLayoutContent({
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
+        queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
       ]);
     },
     [organizationId, queryClient, renameWorktree, trpc]
   );
+
+  const handleRequestWorktreeDelete = useCallback((worktreeId: string, name: string) => {
+    setWorktreePendingDeletion(worktreeId);
+    setWorktreeDeletionName(name);
+  }, []);
 
   const handleConfirmWorktreeDelete = useCallback(() => {
     const worktreeId = worktreePendingDeletion;
@@ -999,7 +1039,6 @@ function CloudSidebarLayoutContent({
           queryClient,
           trpc,
           setDbSessions,
-          deleteSessionFromStore,
         });
         navigateAfterWorkspaceDeletion(worktreeId, deletedSessionIds);
         await invalidateSessionQueries({ queryClient, trpc });
@@ -1022,7 +1061,6 @@ function CloudSidebarLayoutContent({
       }
     })();
   }, [
-    deleteSessionFromStore,
     deleteWorktree,
     deletingSessionWorktreeIds,
     deletingWorktreeIds,
@@ -1037,6 +1075,13 @@ function CloudSidebarLayoutContent({
   const deletingWorktreeIdList = useMemo(
     () => [...new Set([...deletingWorktreeIds, ...deletingSessionWorktreeIds])],
     [deletingSessionWorktreeIds, deletingWorktreeIds]
+  );
+  const stackedChildCount = useMemo(
+    () =>
+      worktreePendingDeletion
+        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion).length
+        : 0,
+    [workspaceRows, worktreePendingDeletion]
   );
   const toggleMobileSidebar = useCallback(() => setMobileSheetOpen(prev => !prev), []);
   const sidebarContext = useMemo(
@@ -1106,9 +1151,12 @@ function CloudSidebarLayoutContent({
               onRenameSession={handleRenameSession}
               worktreeDetails={sidebarWorktreeDetails}
               loadingWorktreeIds={sidebarLoadingWorktreeIds}
+              workspaceGroups={sidebarWorkspaceGroups}
+              workspaceOrder={workspaceOrder}
+              workspaceRowsTruncated={workspaceRowsTruncated}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
-              onDeleteWorktree={setWorktreePendingDeletion}
+              onDeleteWorktree={handleRequestWorktreeDelete}
               deletingWorktreeIds={deletingWorktreeIdList}
               onCreateWorktreeChat={handleCreateWorktreeChat}
               isInSheet
@@ -1146,9 +1194,12 @@ function CloudSidebarLayoutContent({
             onRenameSession={handleRenameSession}
             worktreeDetails={sidebarWorktreeDetails}
             loadingWorktreeIds={sidebarLoadingWorktreeIds}
+            workspaceGroups={sidebarWorkspaceGroups}
+            workspaceOrder={workspaceOrder}
+            workspaceRowsTruncated={workspaceRowsTruncated}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
-            onDeleteWorktree={setWorktreePendingDeletion}
+            onDeleteWorktree={handleRequestWorktreeDelete}
             deletingWorktreeIds={deletingWorktreeIdList}
             onCreateWorktreeChat={handleCreateWorktreeChat}
             activeSessions={activeSessions}
@@ -1189,10 +1240,15 @@ function CloudSidebarLayoutContent({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete worktree?</AlertDialogTitle>
+            <AlertDialogTitle className="wrap-anywhere">
+              Delete worktree “{worktreeDeletionName}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,
               and cleans up its sandbox resources. Other worktrees are not affected.
+              {stackedChildCount > 0
+                ? ` ${stackedChildCount} stacked ${stackedChildCount === 1 ? 'workspace is' : 'workspaces are'} based on this branch. Deleting this workspace does not delete its branch.`
+                : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,10 +1,13 @@
 import { logger } from '../logger.js';
 import {
+  githubBrokerRejectionProvenanceSchema,
+  type GitHubBrokerRejectionProvenance,
   githubRepositoryAuthorizationResultSchema,
   type GitHubRepositoryAuthorizationFailureReason,
 } from '@kilocode/worker-utils/github-authorization';
 import type {
   BitbucketTokenFailureReason,
+  GetGitLabTokenFailureReason,
   GitAuthorConfig,
   GitTokenService,
   ManagedGitHubFallbackReason,
@@ -61,6 +64,7 @@ export type ResolvedGitHubToken = {
 };
 
 export type ResolveGitHubTokenError = {
+  rejectionProvenance?: GitHubBrokerRejectionProvenance;
   reason:
     | GitHubRepositoryAuthorizationFailureReason
     | 'capability_configuration_error'
@@ -335,10 +339,14 @@ export async function issueCloudAgentGitHubSessionCapability(
   try {
     const result = await env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability(params);
     if (!result.success) {
+      const provenance = githubBrokerRejectionProvenanceSchema.safeParse(
+        result.rejectionProvenance
+      );
       return {
         success: false,
         error: {
           reason: result.reason,
+          ...(provenance.success ? { rejectionProvenance: provenance.data } : {}),
           message: `GitHub managed auth lookup failed (${result.reason})`,
         },
       };
@@ -398,9 +406,30 @@ export type ResolvedCloudAgentGitLabCapability = {
   glabIsOAuth2: boolean;
 };
 
+export type ManagedGitLabTokenFailureReason =
+  | GetGitLabTokenFailureReason
+  | 'service_not_configured'
+  | 'rpc_error';
+
 export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
-  | { success: false; reason: string };
+  | { success: false; reason: ManagedGitLabTokenFailureReason };
+
+/**
+ * A failure the token service reports about its own state, not about the
+ * caller's access: the credential cannot be resolved until the service or the
+ * provider credential recovers.
+ */
+export function isServiceSideManagedGitLabTokenFailure(
+  reason: ManagedGitLabTokenFailureReason
+): boolean {
+  return (
+    reason === 'service_not_configured' ||
+    reason === 'rpc_error' ||
+    reason === 'database_not_configured' ||
+    reason === 'token_refresh_failed'
+  );
+}
 
 export type ManagedBitbucketTokenFailureReason =
   | BitbucketTokenFailureReason

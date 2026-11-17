@@ -1,3 +1,5 @@
+import { constants } from 'node:fs';
+import fsp from 'node:fs/promises';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
@@ -22,6 +24,11 @@ import {
   type ControlFileLogUploader,
 } from '../control/file-log-uploader.js';
 import { logToFile } from '../utils.js';
+import {
+  createWrapperSentryReporter,
+  type WrapperSentryContext,
+  type WrapperSentryReporter,
+} from '../sentry.js';
 import { createControlPlaneConnection, type ControlPlaneConnection } from './connection.js';
 import {
   cleanupStaleKiloPidfiles,
@@ -36,18 +43,64 @@ import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from '.
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
+import { createControlPlaneWorktreeGit, type PreparedGitContext } from './worktree-git.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
+import { createControlPlanePreviewServices } from './preview-services.js';
 import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
 import { readKiloCliVersion } from './runtime-versions.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
+import { createTransferGrantRequests } from './transfer-grant-requests.js';
+import { createSandboxTransferClient } from '../control/sandbox-transfer-client.js';
+import {
+  WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS,
+  WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+} from '../../../src/shared/workspace-artifacts.js';
+import {
+  createWorkspaceArtifactSync,
+  WORKSPACE_ARTIFACT_ROOT,
+  WORKSPACE_ARTIFACT_STATE_PATH,
+  type WorkspaceArtifactSync,
+} from './workspace-artifacts.js';
+import { transferUrlForWrapperInstance } from './wrapper-identity.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
 } from '../../../src/shared/sandbox-provider.js';
+import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function transferGrantHasArtifactsScope(grant: string): boolean {
+  const encoded = grant.split('.')[1];
+  if (encoded === undefined) return false;
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (typeof payload !== 'object' || payload === null) return false;
+    const scopes = (payload as { scopes?: unknown }).scopes;
+    return Array.isArray(scopes) && scopes.includes('workspace_artifacts');
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureWorkspaceArtifactRoot(
+  root: string = WORKSPACE_ARTIFACT_ROOT
+): Promise<boolean> {
+  try {
+    await fsp.mkdir(root, { recursive: true });
+    await fsp.access(root, constants.W_OK);
+    return true;
+  } catch (error) {
+    logToFile(`workspace artifact root is unavailable: ${messageOf(error)}`);
+    return false;
+  }
+}
 
 export type ControlPlaneExitEvent =
   | 'shutdown'
@@ -76,9 +129,14 @@ export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | n
 }
 
 export type ControlPlaneProcess = {
-  once(event: 'SIGTERM' | 'uncaughtException', listener: () => void): unknown;
+  once(event: 'SIGTERM' | 'uncaughtException', listener: (error: unknown) => void): unknown;
   on(event: 'unhandledRejection', listener: (reason: unknown) => void): unknown;
 };
+
+type ControlPlaneSentryContext = Pick<
+  WrapperSentryContext,
+  'allocationId' | 'providerInstanceId' | 'wrapperInstanceId'
+>;
 
 export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
@@ -88,6 +146,8 @@ export type ControlPlaneLifecycleDeps = {
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
   log?: (message: string) => void;
+  sentry?: WrapperSentryReporter;
+  sentryContext?: ControlPlaneSentryContext;
   /** Stops owned Kilo runtimes before the process exits. */
   stop?: () => Promise<void>;
 };
@@ -121,11 +181,13 @@ export function createControlPlaneLifecycle(
   async function shutdown(
     exitCode: number,
     reason: string,
-    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed'
+    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed',
+    flushSentry = false
   ): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
+    const sentryFlush = flushSentry ? deps.sentry?.flush() : undefined;
     deps.connection.close();
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
@@ -136,24 +198,46 @@ export function createControlPlaneLifecycle(
     });
     await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
     await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    if (sentryFlush) await settle(() => sentryFlush);
     deps.exit(exitCode);
   }
 
-  function handleExitEvent(event: ControlPlaneExitEvent, reason: string): void {
+  function handleExitEvent(event: ControlPlaneExitEvent, reason: string, error?: unknown): void {
     const exitCode = controlPlaneExitPolicy(event);
     if (exitCode === null) {
       log(`control-plane wrapper ignored ${reason}`);
       return;
     }
+    if (shuttingDown) return;
+    if (event === 'uncaught_exception') {
+      deps.sentry?.capture(error, {
+        ...deps.sentryContext,
+        operation: 'uncaught_exception',
+        exitCode,
+      });
+    }
     // SIGTERM is a stop, not a wrapper failure: the wrapper cannot tell the
     // supervisor's forwarded TERM from a stray one, and the supervisor's
     // `wrapper_restart` or `supervisor_exit` line records which it was.
-    void shutdown(exitCode, reason, event === 'sigterm' ? 'stopping' : 'failed');
+    void shutdown(
+      exitCode,
+      reason,
+      event === 'sigterm' ? 'stopping' : 'failed',
+      event === 'uncaught_exception'
+    );
   }
 
   proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));
-  proc.once('uncaughtException', () => handleExitEvent('uncaught_exception', 'uncaught exception'));
+  proc.once('uncaughtException', error =>
+    handleExitEvent('uncaught_exception', 'uncaught exception', error)
+  );
   proc.on('unhandledRejection', reason => {
+    if (!shuttingDown) {
+      deps.sentry?.capture(reason, {
+        ...deps.sentryContext,
+        operation: 'unhandled_rejection',
+      });
+    }
     // Closed native record: the free-text reason stays in the file log only.
     deps.onNativeDiagnostic?.('wrapper.lifecycle', {
       phase: 'failed',
@@ -186,16 +270,20 @@ export function createControlPlaneSessionHost(options: {
     | 'onDeadline'
     | 'onActivityChange'
     | 'onMemoryHold'
+    | 'onFeedInterrupted'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
   isWorkspaceBusy?(): boolean;
+  /** True while the turn-end artifact flush is running. */
+  isFlushingArtifacts?(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
     onEvent: event => turns?.observeKiloEvent(event),
     onHarnessActivity: event => turns?.observeActivity(event),
     onActivityChange: key => turns?.refreshActivity(key),
+    onFeedInterrupted: (id, key) => turns?.onFeedInterrupted(id, key),
     onDeadline: (identity, reason, retry, key, stopped) =>
       turns?.onNativeDeadline(identity, reason, retry, key, stopped),
     onRestart: info => turns?.onRuntimeRestart(info),
@@ -208,7 +296,11 @@ export function createControlPlaneSessionHost(options: {
     runtimes,
     turns: manager,
     getHeartbeat: () => ({
-      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      active:
+        options.isPreparing() ||
+        runtimes.needsCompute() ||
+        manager.hasPendingWork() ||
+        (options.isFlushingArtifacts?.() ?? false),
       workspaceBusy: options.isWorkspaceBusy?.() ?? false,
       degraded: runtimes.suspected(),
     }),
@@ -226,9 +318,12 @@ export type ControlPlaneFrameDispatcherDeps = {
   turns: { current?: TurnManager };
   terminals: { current?: ControlPlaneTerminalRuntime };
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
+  worktreeGit?: { current?: ReturnType<typeof createControlPlaneWorktreeGit> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  previewServices?: { current?: ReturnType<typeof createControlPlanePreviewServices> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
+  transferGrants?: { current?: ReturnType<typeof createTransferGrantRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -238,6 +333,9 @@ export function createControlPlaneFrameDispatcher(
 ): (frame: ControlPlaneWrapperFrame) => void {
   return function onFrame(frame: ControlPlaneWrapperFrame): void {
     switch (frame.type) {
+      case 'worktree.git':
+        void deps.worktreeGit?.current?.handle(frame);
+        return;
       case 'session.attach': {
         const preparation = deps.preparation.current;
         if (preparation === undefined) return;
@@ -310,8 +408,14 @@ export function createControlPlaneFrameDispatcher(
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
         return;
+      case 'preview.list':
+        void deps.previewServices?.current?.handle(frame);
+        return;
       case 'history.result':
         deps.historyRequests?.current?.handle(frame);
+        return;
+      case 'transfer.grant.result':
+        deps.transferGrants?.current?.handle(frame);
         return;
       case 'terminal.create':
       case 'terminal.resize':
@@ -328,32 +432,79 @@ export function createControlPlaneFrameDispatcher(
   };
 }
 
-/**
- * Process entry for the control-plane wrapper. Runs forever until `shutdown`
- * frame, SIGTERM or an uncaught exception; a disconnect never exits.
- */
-export async function runControlPlaneWrapper(
-  env: Record<string, string | undefined> = process.env
+async function main(
+  env: Record<string, string | undefined>,
+  sentry: WrapperSentryReporter,
+  sentryContext: ControlPlaneSentryContext
 ): Promise<ControlPlaneLifecycle | undefined> {
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
-  const projector = createControlDiagnosticProjector({
-    enabled: nativeControlPlaneLogsEnabled(env),
-  });
-  const diagnostics = createControlDiagnostics({ uploadUrl, uploadGrant, projector });
-  const fileLogs = createControlFileLogUploader({
-    uploadUrl,
-    uploadGrant,
-    wrapperLogPath: env.WRAPPER_LOG_PATH,
-    onDiagnostic: diagnostics.onDiagnostic,
-    projector,
-  });
   const url = env.SANDBOX_CONTROL_URL;
   const credential = env.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
+  // The runtime bootstrap exports inherited names as empty strings when the
+  // launch did not set them, so an empty transfer configuration is absent.
+  const transferUrl = env.SANDBOX_TRANSFER_URL || undefined;
+  const transferGrant = env.SANDBOX_TRANSFER_GRANT || undefined;
+  // The launch identity is reused by the supervisor for every restart, so the
+  // process identity must be generated here and used for both `hello` and the
+  // transfer path and grant. The launch-time identity stays only in the path
+  // string we rewrite below.
+  const wrapperInstanceId = crypto.randomUUID();
+  const currentTransferUrl =
+    transferUrl === undefined
+      ? undefined
+      : transferUrlForWrapperInstance(transferUrl, wrapperInstanceId);
+  const artifactsEnabled =
+    transferUrl !== undefined &&
+    transferGrant !== undefined &&
+    transferGrantHasArtifactsScope(transferGrant);
+  // The grant requester answers over the connection created below, so every
+  // transfer client reaches it through a holder.
+  const transferGrantsRef: {
+    current?: ReturnType<typeof createTransferGrantRequests>;
+  } = {};
+  const transferRenewal = (): Promise<{ grant: string; expiresAt: number }> => {
+    const requests = transferGrantsRef.current;
+    return requests === undefined
+      ? Promise.reject(new Error('transfer grants are unavailable'))
+      : requests.requestGrant();
+  };
+  const logClient =
+    currentTransferUrl !== undefined && transferUrl !== undefined && transferGrant !== undefined
+      ? createSandboxTransferClient({
+          baseUrl: currentTransferUrl,
+          renewGrant: transferRenewal,
+          // Older Workers cannot renew, and uploads before the first welcome
+          // still use the launch-time route and grant.
+          fallback: { baseUrl: transferUrl, grant: transferGrant },
+          attempts: 1,
+          log: logToFile,
+        })
+      : undefined;
+  const projector = createControlDiagnosticProjector({
+    enabled: nativeControlPlaneLogsEnabled(env),
+  });
+  const diagnostics = createControlDiagnostics({
+    uploadUrl,
+    uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
+    projector,
+  });
+  const fileLogs = createControlFileLogUploader({
+    uploadUrl,
+    uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
+    wrapperLogPath: env.WRAPPER_LOG_PATH,
+    environment: env,
+    onDiagnostic: diagnostics.onDiagnostic,
+    projector,
+  });
   delete env.SANDBOX_CONTROL_CREDENTIAL;
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
+  delete env.SANDBOX_TRANSFER_URL;
+  delete env.SANDBOX_TRANSFER_GRANT;
   delete env.CONTROL_WRAPPER_INSTANCE_ID;
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
@@ -378,6 +529,7 @@ export async function runControlPlaneWrapper(
   const timers = resolveControlPlaneTimers(env);
   // Keep the tool/workload cgroup placement for the Kilo server chain.
   const workload = initializeControlWorkload({ env, report: diagnostics.onDiagnostic });
+  const artifactsReady = artifactsEnabled && (await ensureWorkspaceArtifactRoot());
   // The connection's shutdown callback needs the lifecycle that owns the same
   // connection, so route it through a holder assigned after construction.
   const shutdownRef: { current?: (reason: string | undefined) => void } = {};
@@ -392,6 +544,10 @@ export async function runControlPlaneWrapper(
   const worktreeChangesRef: {
     current?: ReturnType<typeof createControlPlaneWorktreeChanges>;
   } = {};
+  // Branch operations (Sync/Restack) answer over the same connection.
+  const worktreeGitRef: {
+    current?: ReturnType<typeof createControlPlaneWorktreeGit>;
+  } = {};
   // Terminal requests also answer over the same connection, so the adapter
   // reaches it through a holder.
   const terminalsRef: { current?: ReturnType<typeof createControlPlaneTerminals> } = {};
@@ -403,13 +559,26 @@ export async function runControlPlaneWrapper(
   const kiloRequestsRef: {
     current?: ReturnType<typeof createControlPlaneKiloRequests>;
   } = {};
+  const previewServicesRef: {
+    current?: ReturnType<typeof createControlPlanePreviewServices>;
+  } = {};
   // Wrapper-initiated Cloud history reads answer over the same connection.
   const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
+  const transferClientRef: { current?: ReturnType<typeof createSandboxTransferClient> } = {};
+  const artifactSyncRef: { current?: WorkspaceArtifactSync } = {};
+  const artifactDiagnostic = (message: string): void => {
+    logToFile(message);
+    diagnostics.onDiagnostic('control.event', {
+      category: 'other',
+      detail: message.slice(0, 128),
+    });
+  };
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
     runtime: {
       timers,
       ...(sandboxProvider ? { sandboxProvider } : {}),
+      artifacts: artifactsReady,
       log: logToFile,
       workload,
       onNativeDiagnostic: projector,
@@ -419,9 +588,17 @@ export async function runControlPlaneWrapper(
       log: logToFile,
       onDiagnostic: diagnostics.onDiagnostic,
       onNativeDiagnostic: projector,
+      flushArtifacts: () => {
+        const sync = artifactSyncRef.current;
+        if (sync === undefined) return;
+        void sync.flush(WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS).catch(error => {
+          logToFile(`workspace artifact flush failed: ${messageOf(error)}`);
+        });
+      },
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
     isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
+    isFlushingArtifacts: () => artifactSyncRef.current?.isFlushing() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -433,6 +610,7 @@ export async function runControlPlaneWrapper(
     allocationId,
     runtimeHarness: harness.kind,
     runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
+    wrapperId: wrapperInstanceId,
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,
@@ -442,21 +620,59 @@ export async function runControlPlaneWrapper(
       turns: turnsRef,
       terminals: terminalsRef,
       worktreeChanges: worktreeChangesRef,
+      worktreeGit: worktreeGitRef,
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
+      previewServices: previewServicesRef,
       historyRequests: historyRequestsRef,
+      transferGrants: transferGrantsRef,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
     onShutdown: reason => shutdownRef.current?.(reason),
-    onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
+    onConnected: () => {
+      const canRenew = connection.supportsTransferGrants();
+      transferClientRef.current?.setConnected(canRenew);
+      logClient?.setConnected(canRenew);
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true });
+    },
     onDisconnected: reason => {
       historyRequestsRef.current?.disconnected();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.setConnected(false);
+      logClient?.setConnected(false);
       logToFile(`control-plane disconnected: ${reason}`);
     },
   });
   const historyRequests = createHistoryRequests({ send: frame => connection.send(frame) });
   historyRequestsRef.current = historyRequests;
+  sentryContext.wrapperInstanceId = connection.wrapperId;
+  const transferGrants = createTransferGrantRequests({
+    send: frame => connection.send(frame),
+  });
+  transferGrantsRef.current = transferGrants;
+  if (artifactsReady && currentTransferUrl !== undefined) {
+    const client = createSandboxTransferClient({
+      baseUrl: `${currentTransferUrl.replace(/\/$/, '')}/artifacts`,
+      renewGrant: () => transferGrants.requestGrant(),
+      timeoutMs: WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+      log: logToFile,
+    });
+    transferClientRef.current = client;
+    artifactSyncRef.current = createWorkspaceArtifactSync({
+      root: WORKSPACE_ARTIFACT_ROOT,
+      statePath: WORKSPACE_ARTIFACT_STATE_PATH,
+      allocationId,
+      client,
+      timers: {
+        setTimeout: (handler, ms) => setTimeout(handler, ms),
+        clearTimeout: handle => clearTimeout(handle),
+      },
+      log: logToFile,
+      onDiagnostic: artifactDiagnostic,
+    });
+  }
+  artifactSyncRef.current?.start();
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
     wrapperId: connection.wrapperId,
@@ -484,14 +700,39 @@ export async function runControlPlaneWrapper(
     // Route preparation output (progress/ready/failed) out over the connection.
     emit: frame => connection.send(frame),
     readHistoryPage: request => historyRequests.readPage(request),
+    readRecentHistory: request => historyRequests.readRecent(request),
     log: logToFile,
     inheritedEnv: env,
     spawnSetup: createSetupSpawn(workload),
   });
+  // The runtime holds the exact prepared environment: per-worktree HOME, the
+  // pinned credential helper and the profile values. Never the raw wrapper env.
+  const preparedGitContext = (sessionId: string): PreparedGitContext | null => {
+    const route = preparationRef.current?.preparedRoute(sessionId);
+    if (route === undefined || route === null) return null;
+    const runtime = runtimes.get(route.runtimeKey);
+    if (runtime === undefined) return null;
+    const spec = turnsRef.current?.routeSpec(sessionId);
+    return {
+      directory: route.directory,
+      env: runtime.env,
+      ...(spec === undefined ? {} : { spec }),
+    };
+  };
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),
     isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
     roots: sessionId => preparationRef.current?.preparedRoute(sessionId)?.roots,
+    gitContext: preparedGitContext,
+    log: logToFile,
+  });
+  worktreeGitRef.current = createControlPlaneWorktreeGit({
+    emit: frame => connection.send(frame),
+    isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
+    gitContext: preparedGitContext,
+    hasActiveTurnInDirectory: directory =>
+      turnsRef.current?.hasActiveTurnInDirectory(directory) ?? false,
+    resumeDirectory: directory => turnsRef.current?.resumeDirectory(directory),
     log: logToFile,
   });
   worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({
@@ -511,6 +752,13 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
     clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
+    log: logToFile,
+  });
+  previewServicesRef.current = createControlPlanePreviewServices({
+    emit: frame => connection.send(frame),
+    ...(sandboxProvider === undefined
+      ? {}
+      : { excludedPorts: reservedPreviewPorts(sandboxProvider) }),
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({
@@ -556,9 +804,14 @@ export async function runControlPlaneWrapper(
     diagnostics,
     fileLogs,
     onNativeDiagnostic: projector,
+    sentry,
+    sentryContext,
     exit: code => process.exit(code),
     log: logToFile,
     stop: async () => {
+      await artifactSyncRef.current?.stop();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.stop();
       nativeStatus.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
@@ -573,6 +826,38 @@ export async function runControlPlaneWrapper(
   nativeStatus.start();
   lifecycle.start();
   return lifecycle;
+}
+
+/**
+ * Process entry for the control-plane wrapper. Runs forever until `shutdown`
+ * frame, SIGTERM or an uncaught exception; a disconnect never exits.
+ */
+export async function runControlPlaneWrapper(
+  env: Record<string, string | undefined> = process.env,
+  sentry?: WrapperSentryReporter
+): Promise<ControlPlaneLifecycle | undefined> {
+  sentry ??= await createWrapperSentryReporter({
+    env: {
+      CLOUD_AGENT_SENTRY_DSN: env.CLOUD_AGENT_SENTRY_DSN,
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+    },
+    log: message => {
+      logToFile(message);
+      console.error(message);
+    },
+  });
+  const sentryContext: ControlPlaneSentryContext = {
+    allocationId: env[CONTROL_PLANE_ALLOCATION_ID_ENV],
+    providerInstanceId: env.PROVIDER_INSTANCE_ID,
+    wrapperInstanceId: env.CONTROL_WRAPPER_INSTANCE_ID,
+  };
+  try {
+    return await main(env, sentry, sentryContext);
+  } catch (error) {
+    sentry.capture(error, { ...sentryContext, operation: 'startup', exitCode: 1 });
+    await sentry.flush();
+    throw error;
+  }
 }
 
 if (import.meta.main) {

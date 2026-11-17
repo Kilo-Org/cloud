@@ -1,6 +1,6 @@
 import type { ActiveSession } from '@/lib/active-sessions-list';
 import { listActiveSessions } from '@/lib/active-sessions-list';
-import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications/schemas';
 import type { SQL } from 'drizzle-orm';
@@ -9,7 +9,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 jest.mock('@/lib/active-sessions-list', () => ({
   listActiveSessions: jest.fn(),
 }));
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
   readCloudAgentWidgetApprovalKey: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: { select: jest.fn() } }));
@@ -294,7 +294,9 @@ describe('buildGlanceableDeliveryForUser', () => {
         return Object.assign(rows, { limit: async (_count: number) => rows });
       };
       // The followed session read joins the pull request cache.
-      return { from: () => ({ where, leftJoin: () => ({ where }) }) };
+      return {
+        from: () => ({ where, leftJoin: () => ({ where }), leftJoinLateral: () => ({ where }) }),
+      };
     }) as never);
   });
 
@@ -482,6 +484,10 @@ describe('buildGlanceableDeliveryForUser', () => {
             reviewDecisionPending: false,
             observations: null,
             platform: 'github',
+            baseRef: null,
+            stackNumber: null,
+            stackPosition: null,
+            stackSize: null,
           },
         },
       ],

@@ -199,11 +199,19 @@ async function requireExportableOrganization(
   }
 }
 
-function requireWebSession(authViaToken: boolean | undefined): void {
-  if (authViaToken) {
+/**
+ * Exports belong to a person, so a first-party signed-in session is required: a
+ * web session, or the mobile app's own device session, which is the same person
+ * on the phone rather than a credential handed to something else. A bare bearer
+ * token (a cloud-agent API token, say) is refused, so no automated credential
+ * can enumerate or start an export on someone's behalf. The artifact itself
+ * still needs the emailed step-up code, which no session can substitute for.
+ */
+function requireSignedInSession(ctx: Pick<TRPCContext, 'authViaToken' | 'deviceSessionId'>): void {
+  if (ctx.authViaToken && !ctx.deviceSessionId) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'A web session is required for data exports',
+      message: 'A signed-in session is required for data exports',
     });
   }
 }
@@ -427,7 +435,7 @@ function downloadCodeError(result: Exclude<ReserveDownloadCodeResult, 'ok'>): TR
 
 export const userExportsRouter = createTRPCRouter({
   uiAccess: baseProcedure.query(async ({ ctx }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     return {
       enabled: await isCloudDataExportUIEnabled(ctx.user.google_user_email),
       email: ctx.user.google_user_email,
@@ -435,7 +443,7 @@ export const userExportsRouter = createTRPCRouter({
   }),
 
   request: baseProcedure.mutation(async ({ ctx }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     const row = await createExportRequest({ kiloUserId: ctx.user.id, organizationId: null });
     return serialize(row);
   }),
@@ -443,7 +451,7 @@ export const userExportsRouter = createTRPCRouter({
   requestOrganization: baseProcedure
     .input(OrganizationExportSchema)
     .mutation(async ({ ctx, input }) => {
-      requireWebSession(ctx.authViaToken);
+      requireSignedInSession(ctx);
       // Throws UNAUTHORIZED for members and billing managers, NOT_FOUND for an
       // organization that has been soft-deleted. Re-checked at download, because a role
       // can be revoked, or the organization deleted, while an export is generating.
@@ -457,12 +465,12 @@ export const userExportsRouter = createTRPCRouter({
 
   /** Organizations the caller may export, for rendering the organization buttons. */
   exportableOrganizations: baseProcedure.query(async ({ ctx }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     return { organizations: await exportableOrganizations(ctx.user.id) };
   }),
 
   list: baseProcedure.input(ListInputSchema).query(async ({ ctx, input }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     // Two independent reasons an export is visible.
     //
     // Anything the caller requested, whatever its subject. Whoever pressed the button
@@ -522,7 +530,7 @@ export const userExportsRouter = createTRPCRouter({
    * inbox.
    */
   requestDownloadCode: baseProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     await requireDownloadableExport(ctx, input.exportId);
     const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
 
@@ -553,7 +561,7 @@ export const userExportsRouter = createTRPCRouter({
 
   /** Step 2 of the download: redeem the emailed code for one signed URL. */
   createDownload: baseProcedure.input(DownloadInputSchema).mutation(async ({ ctx, input }) => {
-    requireWebSession(ctx.authViaToken);
+    requireSignedInSession(ctx);
     await requireDownloadableExport(ctx, input.exportId);
     const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
 
@@ -585,4 +593,4 @@ export const userExportsRouter = createTRPCRouter({
   }),
 });
 
-export const __test__ = { requireWebSession, serialize, downloadCodeError };
+export const __test__ = { requireSignedInSession, serialize, downloadCodeError };

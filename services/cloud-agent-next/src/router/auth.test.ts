@@ -125,6 +125,7 @@ describe('scoped Cloud Agent Worker authorization', () => {
     githubRepo: 'acme/widgets',
     model: 'kilo/test-model',
     autoInitiate: true,
+    operationKey: '33333333-3333-4333-8333-333333333333',
   };
   const scopedRouter = t.router({
     prepareSession: internalApiProtectedProcedure

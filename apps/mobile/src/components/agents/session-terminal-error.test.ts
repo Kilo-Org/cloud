@@ -144,12 +144,14 @@ const indicatorFor = (message: string) => ({
   error: null,
   statusIndicator: { type: 'error' as const, message },
   messageCount: 0,
+  hasFailedPreparation: false,
 });
 
 const codedIndicatorFor = (message: string, code: SdkStatusMessageCode) => ({
   error: null,
   statusIndicator: { type: 'error' as const, message, code },
   messageCount: 0,
+  hasFailedPreparation: false,
 });
 
 describe('resolveSessionTerminalError', () => {
@@ -159,13 +161,76 @@ describe('resolveSessionTerminalError', () => {
         error: 'boom',
         statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
         messageCount: 1,
+        hasFailedPreparation: false,
       })
     ).toBeNull();
   });
 
+  // A run whose sandbox preparation failed has no messages at all: the failed
+  // group is its own failure statement, with the stage and reason, and the
+  // question row keeps the Retry and Copy the page-load card would replace.
+  it('returns null when a failed preparation row is all the open has', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
+        messageCount: 0,
+        hasFailedPreparation: true,
+      })
+    ).toBeNull();
+    expect(
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: true,
+      })
+    ).toBeNull();
+  });
+
+  it('keeps today’s result when the preparation row has not failed', () => {
+    // A running or completed preparation is still a load in progress or a loaded
+    // run, so the card answers exactly as it did before the field existed.
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      retryWith: 'session',
+      detail: 'Connection lost. Please retry in a moment.',
+    });
+    expect(
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Failed to load session details',
+      retryable: true,
+      retryWith: 'session',
+      detail: 'boom',
+    });
+  });
+
   it('returns null when there is no error and no error indicator', () => {
     expect(
-      resolveSessionTerminalError({ error: null, statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toBeNull();
   });
 
@@ -175,13 +240,19 @@ describe('resolveSessionTerminalError', () => {
         error: null,
         statusIndicator: { type: 'info', message: 'Session stopped' },
         messageCount: 0,
+        hasFailedPreparation: false,
       })
     ).toBeNull();
   });
 
   it('shows translated copy for the error atom and keeps the original for Copy', () => {
     expect(
-      resolveSessionTerminalError({ error: 'boom', statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toEqual({
       variant: 'server',
       title: "Couldn't load this session",
@@ -200,7 +271,12 @@ describe('resolveSessionTerminalError', () => {
     // same way every time: the reader gets the permanent not-available state
     // instead of a Retry that cannot succeed.
     expect(
-      resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: message,
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toMatchObject({ retryable: false, detail: message });
   });
 
@@ -210,9 +286,60 @@ describe('resolveSessionTerminalError', () => {
         error: SESSION_HISTORY_FAILURES.retryable_failure.message,
         statusIndicator: null,
         messageCount: 0,
+        hasFailedPreparation: false,
       })
     ).toMatchObject({ retryable: true });
   });
+
+  it.each([
+    {
+      message: 'You are not authorized to use the Cloud Agent.',
+      variant: 'permission',
+      title: 'Access denied',
+      copy: "You don't have permission to view this.",
+    },
+    {
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      variant: 'server',
+      title: "Couldn't load this session",
+      copy: 'Not enough credits for this request. Add credits and try again.',
+    },
+    {
+      message: 'Selected model is unavailable for Cloud Agent. Choose another available model.',
+      variant: 'server',
+      title: "Couldn't load this session",
+      copy: "This model isn't available for Cloud Agent. Choose another model and try again.",
+    },
+    {
+      message: 'This session is no longer available.',
+      variant: 'not-found',
+      title: 'Not found',
+      copy: 'This item may have been removed or is no longer available.',
+    },
+  ] as const)(
+    'offers no Retry for a permanent transport failure: $message',
+    ({ message, variant, title, copy }) => {
+      // The transport forwards the server's own failure text onto the error atom.
+      // A denial, an empty wallet, an unusable model and a session the server no
+      // longer has all answer a second open the same way, so the reader gets the
+      // class copy that names what to change instead of a Retry.
+      expect(
+        resolveSessionTerminalError({
+          error: message,
+          statusIndicator: null,
+          messageCount: 0,
+          hasFailedPreparation: false,
+        })
+      ).toEqual({
+        variant,
+        title,
+        message: copy,
+        retryable: false,
+        retryWith: 'session',
+        detail: message,
+      });
+    }
+  );
 
   it('never shows the English transport message to the reader', () => {
     const resolved = resolveSessionTerminalError(
@@ -286,6 +413,7 @@ describe('resolveSessionTerminalError', () => {
             code: 'agent-connection-lost',
           },
           messageCount: 0,
+          hasFailedPreparation: false,
         })
       ).toEqual({
         variant: 'server',
@@ -304,6 +432,7 @@ describe('resolveSessionTerminalError', () => {
         error: null,
         statusIndicator: null,
         messageCount: 0,
+        hasFailedPreparation: false,
         connectionLost: true,
       })
     ).toEqual({
@@ -326,6 +455,7 @@ describe('resolveSessionTerminalError', () => {
           code: 'agent-connection-lost',
         },
         messageCount: 2,
+        hasFailedPreparation: false,
         connectionLost: true,
       })
     ).toBeNull();
@@ -421,13 +551,13 @@ describe('sessionStatusErrorMessage', () => {
     ['Unauthorized: Unauthorized', 'The response failed.'],
     [
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // The DO's safe projection is the producer for a real credits failure; it
     // writes the phrase lowercase.
     [
       'Assistant request failed: insufficient credits',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // Both SDK status strings for a failed delivery reach the delivery copy:
     // session-manager's exhaustion indicator and the cloud status written for
@@ -456,7 +586,7 @@ describe('sessionStatusErrorMessage', () => {
     [
       'insufficient-credits',
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     [
       'previous-task-in-progress',
@@ -523,6 +653,10 @@ describe('sessionStatusErrorMessage', () => {
     ['Commit failed'],
     ['Kilo was not responding and was restarted'],
     ['The turn made no progress'],
+    ['The turn did not complete'],
+    [
+      'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
+    ],
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {
@@ -576,7 +710,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
 
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts), so the status line must not state the same
-  // failure a second time in either of its two copies.
+  // failure a second time in any of its copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
     side: 'assistant',

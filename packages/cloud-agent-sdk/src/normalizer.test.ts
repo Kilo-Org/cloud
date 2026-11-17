@@ -1,6 +1,7 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
 import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
+  preparingDataSchema,
   REMOTE_COMMAND_MAX_COMMANDS,
   REMOTE_COMMAND_MAX_HINTS,
   SESSION_QUEUE_MAX_IDS,
@@ -1596,37 +1597,76 @@ describe('normalize', () => {
       });
     });
 
-    it.each([{ startedRevision: 2, parentStepId: 'phase:setup_commands:2' }, {}])(
-      'preserves optional preparation snapshot metadata %j',
-      metadata => {
-        const stepSnapshot = {
-          id: 'command:install',
-          key: 'setup_commands',
-          kind: 'setup_command',
-          label: 'Install dependencies',
-          status: 'completed',
-          startedAt: 1000,
-          completedAt: 2000,
+    it.each([
+      { startedRevision: 2, parentStepId: 'phase:setup_commands:2' },
+      { snapshotCapturedAt: 1_790_000_000_000 },
+      {},
+    ])('preserves optional preparation snapshot metadata %j', metadata => {
+      const stepSnapshot = {
+        id: 'command:install',
+        key: 'setup_commands',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        status: 'completed',
+        startedAt: 1000,
+        completedAt: 2000,
+        revision: 5,
+        ...metadata,
+      };
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'setup_commands',
+          message: 'Preparation snapshot',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
           revision: 5,
-          ...metadata,
-        };
+          timestamp: 2000,
+          action: 'step_snapshot',
+          stepId: stepSnapshot.id,
+          stepSnapshot,
+        })
+      );
+      expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
+      if (result?.type !== 'preparing') throw new Error('Expected preparing event');
+      expect(result.stepSnapshot).toEqual(stepSnapshot);
+    });
+
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves optional live snapshot capture time %j',
+      snapshotCapturedAt => {
         const result = normalize(
           createRaw('preparing', {
-            step: 'setup_commands',
-            message: 'Preparation snapshot',
+            step: 'environment_snapshot',
+            message: 'Using environment snapshot',
             version: 2,
             attemptId: 'attempt-1',
             triggerMessageId: 'msg-1',
-            revision: 5,
+            revision: 3,
             timestamp: 2000,
-            action: 'step_snapshot',
-            stepId: stepSnapshot.id,
-            stepSnapshot,
+            action: 'step_progress',
+            stepId: 'phase:environment_snapshot',
+            detail: 'Using environment snapshot',
+            ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
           })
         );
-        expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
-        if (result?.type !== 'preparing') throw new Error('Expected preparing event');
-        expect(result.stepSnapshot).toEqual(stepSnapshot);
+        expect(result).toMatchObject({ type: 'preparing', action: 'step_progress' });
+        if (snapshotCapturedAt === undefined)
+          expect(result).not.toHaveProperty('snapshotCapturedAt');
+        else expect(result).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+      }
+    );
+
+    it.each([-1, 0.5, Infinity, NaN, 8_640_000_000_000_001, '2026-10-24'])(
+      'rejects invalid capture time %j',
+      snapshotCapturedAt => {
+        expect(
+          preparingDataSchema.safeParse({
+            step: 'environment_snapshot',
+            message: 'Snapshot',
+            snapshotCapturedAt,
+          }).success
+        ).toBe(false);
       }
     );
 
@@ -2021,6 +2061,43 @@ describe('normalize', () => {
     );
   });
 
+  describe('cloud.workspace.artifacts.changed', () => {
+    it('normalizes an execution-independent service event with the Cloud envelope identity', () => {
+      const result = normalize({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'cloud.workspace.artifacts.changed',
+        timestamp: '2026-09-02T00:00:00.000Z',
+        data: { revision: 4 },
+      });
+      expect(result).toEqual({
+        type: 'workspace.artifacts.changed',
+        cloudSessionId: 'agent-1',
+        revision: 4,
+      });
+      if (!result) throw new Error('Expected workspace artifacts event');
+      expect(isChatEvent(result)).toBe(false);
+    });
+
+    it.each([
+      {},
+      { revision: 0 },
+      { revision: '1' },
+      { revision: NaN },
+      { revision: 1, extra: true },
+    ])('rejects invalid data %p', data =>
+      expect(normalize(createRaw('cloud.workspace.artifacts.changed', data))).toBeNull()
+    );
+
+    it.each(['cloud.workspace.artifacts.changed', 'workspace.artifacts.changed'])(
+      'does not accept %s as a Kilo event',
+      type => {
+        expect(normalize(createKilocode(type, { revision: 1 }))).toBeNull();
+        expect(normalizeCliEvent(type, { revision: 1 })).toBeNull();
+      }
+    );
+  });
+
   describe('connected', () => {
     it('preserves bounded ancillary bootstrap omissions beside the authoritative retry snapshot', () => {
       const sessionStatus = { type: 'retry', attempt: 2, message: 'Retrying', next: 42 };
@@ -2318,30 +2395,50 @@ describe('normalize', () => {
 
   describe('cloud.message.queued', () => {
     it('normalizes with messageId, executionId, delivery', () => {
-      const result = normalize(
-        createRaw('cloud.message.queued', {
-          messageId: 'msg_1',
-          executionId: 'exe_1',
-          content: 'hi',
-          delivery: 'queued',
-        })
-      );
+      const raw = createRaw('cloud.message.queued', {
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+        content: 'hi',
+        delivery: 'queued',
+      });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_1',
         executionId: 'exe_1',
         content: 'hi',
+        createdAt: Date.parse(raw.timestamp),
       });
     });
 
     it('normalizes with only messageId', () => {
-      const result = normalize(createRaw('cloud.message.queued', { messageId: 'msg_2' }));
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_2' });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_2',
         executionId: undefined,
         content: undefined,
+        createdAt: Date.parse(raw.timestamp),
       });
+    });
+
+    it('uses the persisted envelope time, not a timestamp supplied in content', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', createdAt: 999 });
+      expect(normalize({ ...raw, timestamp: '2026-09-01T00:00:00.000Z' })).toMatchObject({
+        createdAt: Date.parse('2026-09-01T00:00:00.000Z'),
+      });
+    });
+
+    it('keeps an unreadable timestamp unconfirmed without dropping the queued event', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', content: 'hi' });
+      const event = normalize({ ...raw, timestamp: 'unreadable' });
+      expect(event).toMatchObject({
+        type: 'cloud.message.queued',
+        messageId: 'msg_1',
+        content: 'hi',
+      });
+      expect(event).not.toHaveProperty('createdAt');
     });
 
     it('returns null when messageId is missing', () => {
@@ -2438,6 +2535,43 @@ describe('normalize', () => {
   });
 
   describe('cloud.message.failed', () => {
+    it('retains valid billing details only for a billing-blocked message', () => {
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure,
+          })
+        )
+      ).toMatchObject({ billingFailure });
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'connection_lost',
+            billingFailure,
+          })
+        )
+      ).not.toHaveProperty('billingFailure');
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure: { ...billingFailure, payer: {} },
+          })
+        )
+      ).toMatchObject({ type: 'cloud.message.failed', messageId: 'msg' });
+    });
+
     it('retains explicit non-acceptance without requiring delivery', () => {
       expect(
         normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted: false }))

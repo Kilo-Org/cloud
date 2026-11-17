@@ -29,6 +29,9 @@ describe('buildUpstreamBody', () => {
   });
 
   it.each([
+    ['amazon/titan-embed-text-v1', 1536],
+    ['nvidia/nemotron-3-embed-1b:free', 2048],
+    ['liquid/lfm-2.5-embedding-350m:free', 1024],
     ['mistralai/codestral-embed-2505', 1536],
     ['mistralai/mistral-embed-2312', 1024],
     ['openai/text-embedding-ada-002', 1536],
@@ -47,7 +50,26 @@ describe('buildUpstreamBody', () => {
     });
   });
 
+  it('should strip client providerOptions', () => {
+    expect(
+      buildUpstreamBody({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        provider: { ignore: ['azure'] },
+        providerOptions: { gateway: { only: ['azure'] } },
+      })
+    ).toEqual({
+      model: 'openai/text-embedding-3-small',
+      input: 'hello',
+      provider: { ignore: ['azure'] },
+    });
+  });
+
   it.each([
+    ['cohere/embed-5-fast', 2048],
+    ['amazon/titan-embed-text-v2', 1024],
+    ['mongodb/voyage-code-4', 1024],
+    ['google/gemini-embedding-2', 3072],
     ['openai/text-embedding-3-small', 1536],
     ['google/gemini-embedding-001', 3072],
   ])('should keep catalog dimensions for model %s without a fixed policy', (model, dimensions) => {

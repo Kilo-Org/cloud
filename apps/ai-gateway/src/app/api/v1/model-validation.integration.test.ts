@@ -51,14 +51,16 @@ import { NextRequest } from 'next/server';
 import { POST as personalValidator } from './models/validate/route';
 import { POST as organizationValidator } from './organizations/[id]/models/validate/route';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { auto_routing_custom_routers } from '@kilocode/db/schema';
 
 jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
   logger: { withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
 }));
 import jwt from 'jsonwebtoken';
-import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -205,6 +207,76 @@ describe('cloud-agent model validation through real web authentication', () => {
   );
 
   test.each(['runtime_authorized_session_create', 'send'])(
+    'personal custom router passes %s with a signed runtime credential',
+    async procedure => {
+      const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_user_id: user.id,
+        slug: 'efficient',
+        name: 'Efficient',
+        base_router: 'efficient',
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'public/model' }],
+        default_entry_key: 'gateway:public/model',
+      });
+
+      await expect(
+        assertKiloModelAvailable({
+          env,
+          submittedModel: 'kilo-auto/custom/efficient',
+          originalToken: await runtimeToken(user),
+          procedure,
+        })
+      ).resolves.toBeUndefined();
+    }
+  );
+
+  test.each(['foreign', 'anonymous', 'missing'] as const)(
+    '%s caller cannot select an unavailable personal custom router',
+    async scenario => {
+      const owner = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      const foreign = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_user_id: owner.id,
+        slug: 'efficient',
+        name: 'Efficient',
+        base_router: 'efficient',
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'public/model' }],
+        default_entry_key: 'gateway:public/model',
+      });
+      currentHeaders = new Headers();
+      if (scenario !== 'anonymous') {
+        const token = jwt.sign(
+          {
+            version: KILO_TOKEN_VERSION,
+            kiloUserId: scenario === 'foreign' ? foreign.id : owner.id,
+            apiTokenPepper:
+              scenario === 'foreign' ? foreign.api_token_pepper : owner.api_token_pepper,
+            env: process.env.NODE_ENV,
+          },
+          NEXTAUTH_SECRET
+        );
+        currentHeaders.set('authorization', `Bearer ${token}`);
+      }
+
+      const response = await personalValidator(
+        new NextRequest(`${backend}/api/openrouter/models/validate`, {
+          method: 'POST',
+          headers: currentHeaders,
+          body: JSON.stringify({
+            modelId:
+              scenario === 'missing' ? 'kilo-auto/custom/missing' : 'kilo-auto/custom/efficient',
+          }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+    }
+  );
+
+  test.each(['runtime_authorized_session_create', 'send'])(
     'organization private model passes %s with a signed runtime credential',
     async procedure => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
@@ -225,7 +297,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         org.id,
         { type: 'member', kiloUserId: user.id, allowNonMember: true },
         'member',
-        { countryCode: null }
+        { countryCode: null, fromDb: readDb }
       );
     }
   );
@@ -321,7 +393,7 @@ describe('cloud-agent model validation through real web authentication', () => {
     getAvailableModelsForOrganization.mockResolvedValue({ data: [{ id: privateModel }] });
     const bearer = jwt.sign(
       {
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         kiloUserId: user.id,
         apiTokenPepper: user.api_token_pepper,
         env: process.env.NODE_ENV,

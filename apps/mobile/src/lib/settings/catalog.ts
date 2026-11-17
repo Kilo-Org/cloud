@@ -131,7 +131,7 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
   },
   {
     name: 'hideBalance',
-    description: 'Hide the account balance on the profile screen.',
+    description: 'Hide credit balances on the profile screens and the organization hub.',
     read: getHideBalance,
     write: setHideBalance,
   },

@@ -26,12 +26,21 @@ export function useProfileOwnerLabel(): (owner: ProfileSectionKey) => string {
   };
 }
 
+/**
+ * The heading above one group of rows. Every group on a profile surface reads
+ * it, so the owner groups and the settings group that follows them share one
+ * text style.
+ */
+export function ProfileSectionHeading({ children }: Readonly<{ children: string }>) {
+  return (
+    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+      {children}
+    </Text>
+  );
+}
+
 /** The heading above one owner's group of profile rows. */
 export function ProfileOwnerHeading({ owner }: Readonly<{ owner: ProfileSectionKey }>) {
   const ownerLabel = useProfileOwnerLabel();
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {ownerLabel(owner)}
-    </Text>
-  );
+  return <ProfileSectionHeading>{ownerLabel(owner)}</ProfileSectionHeading>;
 }

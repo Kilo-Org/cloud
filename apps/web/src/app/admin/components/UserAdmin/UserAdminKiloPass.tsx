@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import CheckKiloPassButton from './CheckKiloPassButton';
 import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
@@ -27,6 +28,8 @@ function formatUsd(value: number | string | null | undefined): string {
   if (num == null || isNaN(num)) return '$0.00';
   return `$${num.toFixed(2)}`;
 }
+
+const MAX_REASON_LENGTH = 500;
 
 export function UserAdminKiloPass({ userId }: { userId: string }) {
   const trpc = useTRPC();
@@ -37,6 +40,8 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const queryClient = useQueryClient();
+  const { isSuperadmin, isPermissionResolved, isError } = useAdminPermissions();
+  const canAct = isPermissionResolved && isSuperadmin;
 
   const cancelMutation = useMutation(
     trpc.admin.users.cancelAndRefundKiloPass.mutationOptions({
@@ -170,10 +175,26 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
           </div>
         </div>
         {canCancel && (
-          <div>
-            <Button size="sm" variant="destructive" onClick={() => setCancelDialogOpen(true)}>
+          <div className="space-y-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={!canAct}
+            >
               Nuke Pass
             </Button>
+            {isError ? (
+              <p className="text-muted-foreground text-xs">
+                The permission check failed. Reload the page to try again.
+              </p>
+            ) : !isPermissionResolved ? (
+              <p className="text-muted-foreground text-xs">Checking permissions…</p>
+            ) : !isSuperadmin ? (
+              <p className="text-muted-foreground text-xs">
+                Superadmin access is required to cancel and refund a Kilo Pass subscription.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -319,6 +340,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             <Label htmlFor="cancel-reason">Reason (required)</Label>
             <Textarea
               id="cancel-reason"
+              maxLength={MAX_REASON_LENGTH}
               value={cancelReason}
               onChange={e => setCancelReason(e.target.value)}
               placeholder="Enter the reason for this action..."
@@ -334,7 +356,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             </Button>
             <Button
               variant="destructive"
-              disabled={cancelMutation.isPending || cancelReason.trim().length === 0}
+              disabled={cancelMutation.isPending || cancelReason.trim().length === 0 || !canAct}
               onClick={() => cancelMutation.mutate({ userId, reason: cancelReason.trim() })}
             >
               {cancelMutation.isPending ? 'Processing...' : 'Confirm'}

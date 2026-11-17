@@ -34,6 +34,14 @@ export type {
 } from '@kilocode/session-ingest-contracts';
 
 /**
+ * A part as a storage reader sees it. `createReadonlyPartView` re-routes
+ * writes to nowhere at runtime, so the view's top-level fields are declared
+ * `readonly` — writing to a returned part is a compile error, passing one
+ * where `Part` is expected still typechecks.
+ */
+export type ReadonlyPart = Readonly<Part>;
+
+/**
  * Payload sent to a cloud agent session transport — either a chat prompt or a
  * slash command. Pairs with the SDK transport send types.
  */
@@ -49,6 +57,9 @@ export type SendMessagePayload =
       type: 'command';
       command: string;
       arguments: string;
+      mode?: string;
+      model?: string;
+      variant?: string;
     };
 
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
@@ -259,6 +270,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number | undefined;
   safeError?: string | undefined;
   command?: string | undefined;
   commandIndex?: number | undefined;
@@ -277,6 +290,33 @@ export type PreparationAttempt = {
   safeError?: string | undefined;
   revision: number;
   steps: PreparationStepSnapshot[];
+};
+
+/**
+ * One of the run's queued or failed turns, as the `connected` event replays it.
+ * `terminalFailure` is the settled failure a client shows in place of the
+ * message: the page's copy lets an opened session paint the question row and
+ * its failure without a socket.
+ */
+export type QueuedMessageSnapshot = {
+  messageId: string;
+  content: string;
+  timestamp: number;
+  delivery?: 'queued' | 'sent' | undefined;
+  turnType?: 'command' | undefined;
+  completedAt?: number | undefined;
+  terminalFailure?:
+    | {
+        messageId: string;
+        status?: string | undefined;
+        delivery?: 'queued' | 'sent' | undefined;
+        accepted?: boolean | undefined;
+        error?: string | undefined;
+        reason?: string | undefined;
+        billingFailure?: unknown;
+        timestamp: number;
+      }
+    | undefined;
 };
 
 /** Full service state — all non-chat state in one place. */
@@ -346,7 +386,12 @@ export type SessionSnapshotPage = {
   updateCursor?: number;
   totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
-  preparationAttempts?: readonly PreparationAttempt[];
+  preparationAttempts?: readonly PreparationAttempt[] | undefined;
+  /**
+   * The run's queued and failed turns the socket replays on connect, so a page
+   * opened without a socket still shows the question row and its failure.
+   */
+  queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
 };
 
 export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;

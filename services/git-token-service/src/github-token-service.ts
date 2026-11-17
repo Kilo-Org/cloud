@@ -2,6 +2,7 @@ import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { createHash } from 'node:crypto';
 import * as z from 'zod';
+import type { GitHubBrokerRejectionProvenance } from '@kilocode/worker-utils/github-authorization';
 
 type Token = z.infer<typeof Token>;
 const Token = z.object({
@@ -80,7 +81,8 @@ const GitHubTokenErrorSchema = z.object({
 export class GitHubTokenGenerationError extends Error {
   constructor(
     readonly status: number | undefined,
-    readonly reason?: 'no_installation_found' | 'repository_not_installed'
+    readonly reason?: 'no_installation_found' | 'repository_not_installed',
+    readonly rejectionProvenance?: GitHubBrokerRejectionProvenance
   ) {
     super('Failed to generate GitHub installation token');
     this.name = 'GitHubTokenGenerationError';
@@ -164,6 +166,29 @@ export class GitHubTokenService {
       this.getCredentials(appType),
       [repoName],
       permissions
+    );
+    await this.cacheToken(cacheKey, token, expiresAt);
+    return token;
+  }
+
+  async getTokenForRepositoryIds(
+    installationId: string,
+    repositoryIds: number[],
+    appType: GitHubAppType = 'standard'
+  ): Promise<string> {
+    const numericId = this.validateInstallationId(installationId);
+    const ids = [...new Set(repositoryIds)].sort((left, right) => left - right);
+    if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0))
+      throw new GitHubTokenGenerationError(undefined);
+    const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
+    const cached = await this.getCachedToken(cacheKey);
+    if (cached) return cached;
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      this.getCredentials(appType),
+      undefined,
+      undefined,
+      ids
     );
     await this.cacheToken(cacheKey, token, expiresAt);
     return token;
@@ -297,7 +322,8 @@ export class GitHubTokenService {
     installationId: number,
     credentials: GitHubAppCredentials,
     repositoryNames?: string[],
-    permissions?: RepositoryPermissions
+    permissions?: RepositoryPermissions,
+    repositoryIds?: number[]
   ): Promise<Token> {
     try {
       const auth = createAppAuth({
@@ -310,6 +336,7 @@ export class GitHubTokenService {
         type: 'installation',
         repositoryNames,
         ...(permissions ? { permissions } : {}),
+        ...(repositoryIds ? { repositoryIds } : {}),
       });
       return {
         token: result.token,
@@ -335,7 +362,11 @@ export class GitHubTokenService {
           reason,
         })
       );
-      throw new GitHubTokenGenerationError(status, reason);
+      throw new GitHubTokenGenerationError(
+        status,
+        reason,
+        status === 404 ? 'installation_token_http404' : undefined
+      );
     }
   }
 

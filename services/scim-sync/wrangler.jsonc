@@ -10,6 +10,9 @@
   // wrangler/miniflare catalog bump.
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
+  // The generated `drizzle/migrations.js` barrel imports each `.sql` file, so
+  // they have to bundle as text.
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   // No public URL. `/status` reaches the Durable Object, and an unauthenticated
   // caller on a `*.workers.dev` hostname could create the instance and drive
   // billable Durable Object requests. With no `routes` or service binding
@@ -47,11 +50,13 @@
     // interval would keep the Durable Object from hibernating and bill
     // continuously for its 128 MB allocation.
     "SCIM_POLL_INTERVAL_SECONDS": "60",
-    // Optional `after` cursor. Empty omits `after`, and the Events API returns
-    // the oldest retained events first, not current ones. Nothing is
-    // persisted, so every poll re-reads this value and re-logs the same events
-    // until it is changed and redeployed; the last event ID is logged so it
-    // can be copied forward.
+    // Optional `after` cursor, and the operator's reset action. The stored
+    // cursor normally wins; this value wins only when it differs from the
+    // `seed_cursor` the stored one was committed under, so changing it and
+    // redeploying resets the stream while an unchanged value never overrides
+    // live state. Empty omits `after`, which returns the oldest retained
+    // events. It can only be an event ID: `after` and `range_start` are
+    // mutually exclusive in the Events API.
     "WORKOS_EVENT_CURSOR": "",
   },
   // One key pair per WorkOS environment. The Events API is scoped to whichever
@@ -62,6 +67,15 @@
       "binding": "WORKOS_API_KEY",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "WORKOS_API_KEY",
+    },
+    // `x-internal-api-key` for the app's `/api/internal/scim/*` endpoints.
+    // A missing or wrong value is an operator problem rather than a bad
+    // event, so the loop classifies the resulting 401 as `unavailable` and
+    // retries indefinitely instead of parking the stream.
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
     },
     {
       "binding": "WORKOS_CLIENT_ID",
@@ -96,8 +110,8 @@
   //
   // It polls the WorkOS *Staging* directory stream and applies to the staging
   // Kilo app. Pointing it at the production WorkOS keys would make two
-  // deployments consume one stream, and once the write path lands they would
-  // both apply the same events: the cursor is configuration, not a lease.
+  // deployments consume one stream, and both would apply the same events: the
+  // cursor is per-deployment state, not a lease.
   // ============================================
   "env": {
     "staging": {
@@ -119,6 +133,11 @@
           "binding": "WORKOS_CLIENT_ID",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "WORKOS_CLIENT_ID_STAGING",
+        },
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_STAGING",
         },
       ],
       "durable_objects": {

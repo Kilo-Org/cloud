@@ -2,11 +2,11 @@
  * Internal API endpoint: scheduled-action notification side effects.
  *
  * Called by the kiloclaw worker's notice-sweep cron for the `email`
- * channel. The sweep dispatches `mobile_push` directly via the
- * NOTIFICATIONS service binding (worker-to-worker) and treats `webapp`
- * as a no-op (the banner reads its state from `kiloclaw.getStatus`),
- * so this endpoint only handles email today. The shape is generic
- * enough that future channels can be wired here without API churn.
+ * channel. The sweep treats `webapp` as a no-op (the banner reads its
+ * state from `kiloclaw.getStatus`) and skips the retired `mobile_push`
+ * channel without sending, so this endpoint only handles email today.
+ * The shape is generic enough that future channels can be wired here
+ * without API churn.
  *
  * URL: POST /api/internal/kiloclaw/scheduled-action-side-effects
  * Auth: X-Internal-Secret header.
@@ -105,7 +105,7 @@ function adminMessageSection(noticeBody: string): RawHtml {
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br />');
   return new RawHtml(
-    `<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
+    `<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">${escaped}</p>`
   );
 }
 
@@ -133,9 +133,9 @@ export async function POST(req: NextRequest) {
   const body = parsed.data;
 
   // Only the email channel is dispatched through this endpoint. The
-  // sweep routes mobile_push to the NOTIFICATIONS service binding
-  // directly and treats webapp as a no-op, so any non-email request
-  // is a routing bug. Return 400 (not 200 'skipped') so the sweep
+  // sweep skips the retired mobile_push channel without sending and
+  // treats webapp as a no-op, so any non-email request is a routing
+  // bug. Return 400 (not 200 'skipped') so the sweep
   // marks the row failed with a legible error_message instead of
   // recording a phantom 'sent' for a notification that never went
   // out.

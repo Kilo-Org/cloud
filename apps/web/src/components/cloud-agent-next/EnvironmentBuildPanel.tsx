@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { environmentSnapshotName } from '../../../../../services/cloud-agent-next/src/shared/environment-snapshot-name';
+import { formatSnapshotTime } from './snapshot-display';
 import {
   useEnvironmentBuildLogs,
   useEnvironmentBuildMutations,
@@ -41,6 +41,7 @@ type EnvironmentBuildPanelProps = {
   environmentId: string;
   canManage: boolean;
   hasUnsavedChanges: boolean;
+  active?: boolean;
 };
 
 /**
@@ -52,8 +53,13 @@ export function EnvironmentBuildPanel({
   environmentId,
   canManage,
   hasUnsavedChanges,
+  active = true,
 }: EnvironmentBuildPanelProps) {
-  const statusQuery = useEnvironmentBuildStatus(environmentId, { organizationId, poll: true });
+  const statusQuery = useEnvironmentBuildStatus(environmentId, {
+    organizationId,
+    enabled: active,
+    poll: active,
+  });
   const status = statusQuery.data;
   const action = buildAction(status, { canManage, hasUnsavedChanges });
 
@@ -246,7 +252,7 @@ function BuildStatusDetail({
           <div className="min-w-0 space-y-1">
             <p className="flex flex-wrap items-center gap-1.5">
               <time dateTime={new Date(published.capturedAt).toISOString()}>
-                {environmentSnapshotName(published.capturedAt)}
+                {formatSnapshotTime(published.capturedAt)}
               </time>
               {published.stale !== null && <Badge variant="secondary">Stale</Badge>}
             </p>

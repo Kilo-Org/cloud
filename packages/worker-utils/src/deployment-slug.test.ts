@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   generateBranchSlug,
+  generateBranchSlugFromSeed,
   generateDeploymentSlug,
   generateEphemeralDeploymentSlug,
   slugSchema,
@@ -82,6 +83,26 @@ describe('generateBranchSlug', () => {
       expect(new Set(slugs.map(slug => slug.split('-')[1])).size).toBe(256);
     } finally {
       getRandomValues.mockRestore();
+    }
+  });
+});
+
+describe('generateBranchSlugFromSeed', () => {
+  it('is deterministic and uses the same readable branch format', async () => {
+    const slug = await generateBranchSlugFromSeed('worktree_123');
+    expect(slug).toBe('clear-paddle-o3w');
+    expect(await generateBranchSlugFromSeed('worktree_123')).toBe(slug);
+    expect(slug).toMatch(/^[a-z]{1,10}-[a-z]{1,10}-[a-z0-9]{3}$/);
+    expect(slugSchema.safeParse(slug).success).toBe(true);
+  });
+
+  it('selects different words and suffixes across seeds', async () => {
+    const slugs = await Promise.all(
+      Array.from({ length: 20 }, (_, index) => generateBranchSlugFromSeed(`worktree_${index}`))
+    );
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (let part = 0; part < 3; part++) {
+      expect(new Set(slugs.map(slug => slug.split('-')[part])).size).toBeGreaterThan(1);
     }
   });
 });

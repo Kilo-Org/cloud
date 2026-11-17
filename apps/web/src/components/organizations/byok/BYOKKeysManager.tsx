@@ -44,102 +44,31 @@ import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
-  VercelUserByokInferenceProviderIdSchema,
-  AzureCredentialsSchema,
-  BedrockCredentialsSchema,
   DirectVertexCredentialsSchema,
-  VertexCredentialsSchema,
   isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
-  type GatewayUserByokProviderId,
-  type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
+  checkStructuredCredential,
+  getStructuredCredentialKind,
+  structuredCredentialSchema,
+} from '@kilocode/app-shared/byok-credentials';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
+import {
+  ADD_BYOK_PROVIDERS,
+  BYOK_PROVIDERS,
+  DIRECT_BYOK_PROVIDERS_LIST,
+  getByokProviderDisplayName,
+} from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
-// Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
-// clause forces new entries here whenever a provider is added to
-// VercelUserByokInferenceProviderIdSchema. The `openai` entry names the pasted
-// API key: the personal BYOK page also renders the "Sign in with ChatGPT"
-// connection card, so a bare 'OpenAI' there and here would be two different
-// things with one name.
-export const VERCEL_BYOK_PROVIDER_NAMES = {
-  anthropic: 'Anthropic',
-  azure: 'Azure Foundry',
-  bedrock: 'AWS Bedrock',
-  cohere: 'Cohere',
-  deepseek: 'DeepSeek',
-  openai: 'OpenAI API key',
-  inception: 'Inception',
-  fireworks: 'Fireworks',
-  gmicloud: 'GMI Cloud',
-  google: 'Google AI Studio',
-  minimax: 'MiniMax',
-  mistral: 'Mistral AI',
-  moonshotai: 'Moonshot AI',
-  nebius: 'Nebius Token Factory',
-  novita: 'Novita',
-  perplexity: 'Perplexity',
-  vertex: 'Google Vertex AI',
-  xai: 'SpaceXAI',
-  xiaomi: 'Xiaomi (pay as you go)',
-  zai: 'Z.ai (pay as you go)',
-} satisfies Record<VercelUserByokInferenceProviderId, string>;
-
-const VERCEL_BYOK_PROVIDERS = [
-  ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
-];
-
-const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
-  id,
-  name,
-}));
-
-const GATEWAY_BYOK_PROVIDER_NAMES = {
-  'vercel-ai-gateway': 'Vercel AI Gateway',
-  openrouter: 'OpenRouter',
-} satisfies Record<GatewayUserByokProviderId, string>;
-
-const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
-  ([id, name]) => ({ id, name })
-);
-
-const BYOK_PROVIDERS = [
-  ...DIRECT_BYOK_PROVIDERS_LIST,
-  ...VERCEL_BYOK_PROVIDERS,
-  ...GATEWAY_BYOK_PROVIDERS_LIST,
-].toSorted((a, b) => a.name.localeCompare(b.name));
-const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
-  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
-);
-
-function getProviderDisplayName(providerId: string) {
-  const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
-  return provider?.name || providerId;
-}
-
-type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
-
-/** Providers whose credential is a JSON object rather than a single API key. */
-export function getStructuredCredentialKind(providerId: string): StructuredCredentialKind | null {
-  switch (providerId) {
-    case VercelUserByokInferenceProviderIdSchema.enum.azure:
-      return 'azure';
-    case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
-    case DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']:
-      return 'bedrock';
-    case VercelUserByokInferenceProviderIdSchema.enum.vertex:
-    case DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']:
-      return 'vertex';
-    default:
-      return null;
-  }
-}
+export {
+  getStructuredCredentialKind,
+  type StructuredCredentialKind,
+} from '@kilocode/app-shared/byok-credentials';
 
 /**
  * The object of a key-row action ("Anthropic API key"). A display name that
@@ -512,15 +441,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     if (!value) return null;
     const kind = getStructuredCredentialKind(providerId);
     const schema =
-      kind === 'azure'
-        ? AzureCredentialsSchema
-        : kind === 'bedrock'
-          ? BedrockCredentialsSchema
-          : kind === 'vertex'
-            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
-              ? DirectVertexCredentialsSchema
-              : VertexCredentialsSchema
-            : null;
+      providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
+        ? DirectVertexCredentialsSchema
+        : structuredCredentialSchema(providerId);
     if (!schema) return null;
     let parsed: unknown;
     try {
@@ -528,19 +451,23 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     } catch {
       return 'Invalid JSON. Enter a valid JSON object.';
     }
-    const result = schema.safeParse(parsed);
-    if (!result.success) {
-      if (kind === 'azure') {
-        return result.error.issues.some(issue => issue.path[0] === 'modelMappings')
-          ? 'Each model mapping must include gatewayModelSlug and customModelId.'
-          : 'Enter JSON with apiKey and resourceName.';
-      }
-      if (kind === 'bedrock') {
-        return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
-      }
-      return `Invalid Google Vertex credentials:\n${z.prettifyError(result.error)}`;
+    // The mobile key form runs this same check over the fields it collects, so
+    // the two surfaces refuse exactly the same credentials.
+    const check = checkStructuredCredential(providerId, parsed, schema);
+    if (check.ok) return null;
+    if (check.problem.code === 'not-an-object') {
+      return 'Invalid JSON. Enter a valid JSON object.';
     }
-    return null;
+    if (check.problem.code === 'invalid-model-mapping') {
+      return 'Each model mapping must include gatewayModelSlug and customModelId.';
+    }
+    if (check.problem.code === 'invalid-auth') {
+      return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
+    }
+    if (kind === 'vertex' && check.error) {
+      return `Invalid Google Vertex credentials:\n${z.prettifyError(check.error)}`;
+    }
+    return 'Enter JSON with apiKey and resourceName.';
   };
 
   const closeDialog = () => {
@@ -602,13 +529,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     key: { id: string; provider_id: string },
     serve_catalog_models: boolean
   ) => {
-    const providerName = getProviderDisplayName(key.provider_id);
+    const providerName = getByokProviderDisplayName(key.provider_id);
     const prefix = `${key.provider_id}/`;
     const confirmed = await confirm(
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For eligible OpenAI requests, linked ChatGPT billing takes precedence; BYOK fallback follows the ordinary key priority order.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
@@ -635,7 +562,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const reordered = keyIds.with(index, swappedId).with(target, movedId);
     const movedKey = keys?.find(key => key.id === movedId);
     setReorderAnnouncement(
-      `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
+      `${apiKeyObjectLabel(getByokProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
     );
     setPendingFocus({ keyId: movedId, index: target, direction });
     reorderMutation.mutate(
@@ -741,9 +668,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           {canReorder ? (
             <p className="text-muted-foreground mb-4 text-sm">
               Priority 1 is tried first. Each request uses the highest key in this list that can
-              serve its model, skipping disabled keys and keys whose provider does not offer it. A
-              connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
-              using Kilo catalog model IDs is ranked above the key that would otherwise serve.
+              serve its model, skipping disabled keys and keys whose provider does not offer it.
+              Eligible OpenAI requests use linked ChatGPT billing first. BYOK fallback follows the
+              key priority order shown here.
               {organizationId ? ' This key order applies to all organization members.' : ''}
             </p>
           ) : null}
@@ -806,7 +733,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
                               <KeyPriorityControls
                                 keyId={key.id}
-                                providerName={getProviderDisplayName(key.provider_id)}
+                                providerName={getByokProviderDisplayName(key.provider_id)}
                                 position={index + 1}
                                 count={listedKeyIds.length}
                                 saving={reorderMutation.isPending}
@@ -822,12 +749,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             )}
                           >
                             <div className="break-words">
-                              {getProviderDisplayName(key.provider_id)}
+                              {getByokProviderDisplayName(key.provider_id)}
                             </div>
                             {isManaged ? (
                               <p className="text-muted-foreground mt-1 text-xs">
                                 {getCodingPlanManagedKeyLabel(
-                                  getProviderDisplayName(key.provider_id)
+                                  getByokProviderDisplayName(key.provider_id)
                                 )}
                               </p>
                             ) : null}
@@ -838,7 +765,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 provider loses every catalog mapping. */}
                             {key.supports_catalog_mode || key.serve_catalog_models ? (
                               <CatalogModeSetting
-                                providerName={getProviderDisplayName(key.provider_id)}
+                                providerName={getByokProviderDisplayName(key.provider_id)}
                                 enabled={key.serve_catalog_models}
                                 canChange={key.can_change_catalog_mode}
                                 isOrganizationKey={!!organizationId}
@@ -867,7 +794,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     handleToggleEnabled(key.id, isEnabled)
                                   }
                                   disabled={setEnabledMutation.isPending}
-                                  aria-label={`Toggle ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  aria-label={`Toggle ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                 />
                               ) : null}
                               <span
@@ -890,7 +817,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 }
                                 disabled={testMutation.isPending}
                                 title="Test API key"
-                                aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                aria-label={`Test ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                               >
                                 <FlaskConical className="size-4" />
                               </Button>
@@ -901,7 +828,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     size="sm"
                                     onClick={() => handleEdit(key.id)}
                                     disabled={updateMutation.isPending}
-                                    aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                    aria-label={`Update ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                   >
                                     <Edit className="size-4" />
                                   </Button>
@@ -909,10 +836,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     variant="secondary"
                                     size="sm"
                                     onClick={() =>
-                                      handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                                      handleDelete(
+                                        key.id,
+                                        getByokProviderDisplayName(key.provider_id)
+                                      )
                                     }
                                     disabled={deleteMutation.isPending}
-                                    aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                    aria-label={`Delete ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                   >
                                     <Trash2 className="size-4" />
                                   </Button>
@@ -1287,13 +1217,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <AlertDescription>
                           <p>
                             Once saved, this key is used for the supported models above that none of
-                            your provider keys cover. If you add both a Vercel AI Gateway key and an
-                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                            your provider keys cover, including embedding and System One models. If
+                            you add both a Vercel AI Gateway key and an OpenRouter key, the Vercel
+                            AI Gateway key is used for models it serves.
+                            {selectedProvider === 'openrouter'
+                              ? ' Transcription requests use only an OpenRouter key.'
+                              : ''}
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
                               Organization model and provider restrictions apply to requests that
-                              use this key.
+                              use this key. The organization&apos;s Advanced policies, such as an
+                              inference region, do not.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1306,13 +1241,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If several of your keys can
-                          serve the same model, the one highest in your key list is used.
+                          requests one of the supported models above, including embedding and System
+                          One models served through the Vercel AI Gateway. If several of your keys
+                          can serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
                             Organization-configured model and provider restrictions apply. The key
-                            is not used when the provider allow-list excludes this provider.
+                            is not used when the provider allow-list excludes this provider. The
+                            organization&apos;s Advanced policies, such as an inference region, do
+                            not apply to requests that use the key.
                           </p>
                         ) : null}
                       </AlertDescription>
@@ -1347,7 +1285,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       {listedKeys && listedKeys.length > 0 ? (
         <BYOKRoutingPreview
           organizationId={organizationId}
-          getProviderName={getProviderDisplayName}
+          getProviderName={getByokProviderDisplayName}
         />
       ) : null}
     </div>

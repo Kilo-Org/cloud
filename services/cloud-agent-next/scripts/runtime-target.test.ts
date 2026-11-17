@@ -1,5 +1,12 @@
 import { it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
+import { parse } from 'jsonc-parser';
 import { selectRuntimeTarget, renderRuntimeTarget } from './runtime-target.js';
+import {
+  buildE2eWorkerConfig,
+  buildLocalE2eWorkerConfig,
+} from '../test/e2e/deploy/render-e2e-worker-config.mjs';
 
 const startup = { mode: 'downloaded', image: 'runtime-free' } as const;
 const release = {
@@ -14,7 +21,7 @@ const baseline = () => ({
     {
       class_name: 'SandboxContainers',
       scheduling_policy: 'durable_object',
-      images: { app: { dockerfile: './Dockerfile.containers' } },
+      images: { 'runtime-free': { dockerfile: './Dockerfile.containers.runtime-free' } },
     },
   ],
   env: {
@@ -24,7 +31,7 @@ const baseline = () => ({
         {
           class_name: 'SandboxContainers',
           scheduling_policy: 'durable_object',
-          images: { app: { dockerfile: './Dockerfile.containers' } },
+          images: { 'runtime-free': { dockerfile: './Dockerfile.containers.runtime-free' } },
         },
       ],
     },
@@ -39,7 +46,7 @@ it('renders the selected runtime-free digest and retains unrelated target settin
     startup,
     release,
   });
-  expect(output.containers?.[0].images?.app).toEqual({ dockerfile: './Dockerfile.containers' });
+  expect(output.containers?.[0].images?.app).toBeUndefined();
   expect(output.containers?.[0].images?.['runtime-free']).toEqual({ image: release.baseImage });
   expect(output.vars).toMatchObject({
     EXISTING: 'keep',
@@ -51,7 +58,9 @@ it('renders the selected runtime-free digest and retains unrelated target settin
     binding: 'RUNTIME_RELEASE_BUCKET',
     bucket_name: release.bucket,
   });
-  expect(original.containers[0].images.app).toEqual({ dockerfile: './Dockerfile.containers' });
+  expect(original.containers[0].images['runtime-free']).toEqual({
+    dockerfile: './Dockerfile.containers.runtime-free',
+  });
 });
 it('isolated rendering leaves production selection and vars untouched', () => {
   const output = renderRuntimeTarget({
@@ -70,51 +79,22 @@ it('isolated rendering leaves production selection and vars untouched', () => {
     containers: [{ images: { 'runtime-free': { image: release.baseImage } } }],
   });
 });
-it('supports independent image rollback, then mode rollback', () => {
-  const imageRollback = renderRuntimeTarget({
-    config: baseline(),
-    environment: 'production',
-    startup: { mode: 'downloaded', image: 'all-in-one' },
-    release,
-  });
-  expect(imageRollback.vars?.RUNTIME_STARTUP_MODE).toBe('downloaded');
-  expect(imageRollback.containers?.[0].images?.app).toEqual({
-    dockerfile: './Dockerfile.containers',
-  });
-  const modeRollback = renderRuntimeTarget({
-    config: baseline(),
-    environment: 'production',
-    startup: { mode: 'preinstalled', image: 'all-in-one' },
-  });
-  expect(modeRollback.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
-  expect(modeRollback.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBeUndefined();
-  expect(modeRollback.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
-  expect(modeRollback.containers?.[0].images?.['runtime-free']).toBeUndefined();
+it.each([
+  { mode: 'downloaded', image: 'all-in-one' },
+  { mode: 'preinstalled', image: 'all-in-one' },
+])('rejects retired deployment selection %s', startup => {
+  expect(() => selectRuntimeTarget({ default: startup, targets: {} }, 'production')).toThrow();
 });
-it('renders scoped startup without replacing the baseline image', () => {
-  const config = baseline();
-  const output = renderRuntimeTarget({
-    config,
-    environment: 'production',
-    startup: { ...startup, interactiveOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'] },
-    release,
-  });
-  expect(output.vars).toMatchObject({
-    RUNTIME_INTERACTIVE_ORG_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-  });
-  expect(output.containers?.[0].images).toEqual({
-    app: { dockerfile: './Dockerfile.containers' },
-    'runtime-free': { image: release.baseImage },
-  });
+it.each([
+  { ids: [] },
+  { ids: ['*'] },
+  { ids: ['not-an-org-id'] },
+  { ids: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'] },
+])('rejects obsolete interactive org scope $ids', ({ ids: interactiveOrgIds }) => {
+  expect(() =>
+    selectRuntimeTarget({ default: { ...startup, interactiveOrgIds }, targets: {} }, 'production')
+  ).toThrow();
 });
-it.each([{ ids: [] }, { ids: ['*'] }, { ids: ['not-an-org-id'] }])(
-  'rejects invalid interactive org scope $ids',
-  ({ ids: interactiveOrgIds }) => {
-    expect(() =>
-      selectRuntimeTarget({ default: { ...startup, interactiveOrgIds }, targets: {} }, 'production')
-    ).toThrow();
-  }
-);
 it('renders the published Kilo v2 release for its organization scope', () => {
   const kilo2 = {
     orgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56', '11111111-1111-4111-8111-111111111111'],
@@ -130,6 +110,7 @@ it('renders the published Kilo v2 release for its organization scope', () => {
     RUNTIME_KILO2_ORG_IDS: kilo2.orgIds.join(','),
     RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
   });
+  expect(output.vars).not.toHaveProperty('RUNTIME_KILO2_ALL_SESSION_ORG_IDS');
   expect(
     renderRuntimeTarget({
       config: baseline(),
@@ -159,6 +140,79 @@ it('renders the published Kilo v2 release for its organization scope', () => {
     })
   ).toThrow('configuration drift');
 });
+it('enables Kilo v2 for all web accounts and every origin for the Kilo organization', () => {
+  const catalog = JSON.parse(
+    readFileSync(new URL('../runtime-targets.json', import.meta.url), 'utf8')
+  );
+  const kilo2 = {
+    orgIds: '*',
+    allSessionOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+  };
+  expect(selectRuntimeTarget(catalog, 'dev').kilo2).toEqual(kilo2);
+  for (const environment of ['production', 'isolated']) {
+    const selected = selectRuntimeTarget(catalog, environment);
+    expect(selected.kilo2).toEqual(kilo2);
+    const output = renderRuntimeTarget({
+      config: baseline(),
+      environment,
+      startup: selected,
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    });
+    const target = environment === 'production' ? output : output.env?.isolated;
+    expect(target).toMatchObject({
+      vars: {
+        RUNTIME_KILO2_ORG_IDS: '*',
+        RUNTIME_KILO2_ALL_SESSION_ORG_IDS: kilo2.allSessionOrgIds.join(','),
+        RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
+      },
+    });
+  }
+});
+it('renders an all-session scope only inside the Kilo v2 organization scope', () => {
+  const orgIds = ['9d278969-5453-4ae3-a51f-a8d2274a7b56', '11111111-1111-4111-8111-111111111111'];
+  const rendered = (allSessionOrgIds: '*' | string[]) =>
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2: { orgIds, allSessionOrgIds } },
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars;
+  expect(rendered([orgIds[0]])).toMatchObject({
+    RUNTIME_KILO2_ALL_SESSION_ORG_IDS: orgIds[0],
+  });
+  for (const allSessionOrgIds of [
+    '*',
+    ['22222222-2222-4222-8222-222222222222'],
+    [orgIds[0], '22222222-2222-4222-8222-222222222222'],
+  ])
+    expect(() =>
+      selectRuntimeTarget(
+        { default: { ...startup, kilo2: { orgIds, allSessionOrgIds } }, targets: {} },
+        'production'
+      )
+    ).toThrow('inside the Kilo v2 organization scope');
+  expect(
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2: { orgIds: '*', allSessionOrgIds: '*' } },
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars
+  ).toMatchObject({ RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '*' });
+});
+it('rejects manual all-session org settings in Wrangler vars', () => {
+  expect(() =>
+    renderRuntimeTarget({
+      config: {
+        ...baseline(),
+        vars: { RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' },
+      },
+      environment: 'production',
+      startup,
+      release,
+    })
+  ).toThrow('configuration drift');
+});
 it('rejects manual cohort settings and secondary image drift', () => {
   const scopedVars = { ...baseline(), vars: { RUNTIME_INTERACTIVE_ORG_IDS: '*' } };
   expect(() =>
@@ -176,7 +230,7 @@ it('rejects manual Worker settings and image drift before rendering', () => {
     renderRuntimeTarget({ config: varsDrift, environment: 'production', startup, release })
   ).toThrow('configuration drift');
   const imageDrift = baseline();
-  imageDrift.containers[0].images.app.dockerfile = './other';
+  imageDrift.containers[0].images['runtime-free'].dockerfile = './other';
   expect(() =>
     renderRuntimeTarget({ config: imageDrift, environment: 'production', startup, release })
   ).toThrow('configuration drift');
@@ -191,7 +245,7 @@ it('rejects an invalid startup pair in the target catalog', () => {
 });
 
 it('an unlisted constructor environment inherits the default rather than the prototype', () => {
-  const fallback = { mode: 'preinstalled', image: 'all-in-one' };
+  const fallback = { mode: 'downloaded', image: 'runtime-free' };
   expect(selectRuntimeTarget({ default: fallback, targets: {} }, 'constructor')).toEqual(fallback);
 });
 it('rejects a misspelled mode in the catalog before publication lookup', () => {
@@ -201,4 +255,42 @@ it('rejects a misspelled mode in the catalog before publication lookup', () => {
       'production'
     )
   ).toThrow();
+});
+
+it('keeps verified downloaded runtime selection in deployed E2E configuration', () => {
+  const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  const prepared = renderRuntimeTarget({
+    config: source,
+    environment: 'production',
+    startup,
+    release,
+  });
+  const output = buildE2eWorkerConfig(prepared, {
+    workerUrl: 'https://e2e.example.test',
+    kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
+  });
+  expect(output.vars).toMatchObject({
+    RUNTIME_STARTUP_MODE: 'downloaded',
+    NATIVE_RUNTIME_IMAGE: 'runtime-free',
+    RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
+  });
+  expect(output.containers[0].images).toEqual({
+    'runtime-free': { image: release.baseImage, dockerfile: undefined },
+  });
+  expect(output.r2_buckets).toContainEqual({
+    binding: 'RUNTIME_RELEASE_BUCKET',
+    bucket_name: release.bucket,
+  });
+});
+
+it('rebases only the runtime-free base for local HTTP E2E startup', () => {
+  const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  const output = buildLocalE2eWorkerConfig(source);
+  expect(output.env.dev.containers[0].images).toEqual({
+    'runtime-free': { dockerfile: '../Dockerfile.containers.runtime-free' },
+  });
+  expect(output.env.dev.r2_buckets).toContainEqual({
+    binding: 'RUNTIME_RELEASE_BUCKET',
+    bucket_name: 'cloud-agent-runtime-dev',
+  });
 });

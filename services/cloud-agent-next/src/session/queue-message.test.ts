@@ -38,7 +38,6 @@ import {
   preflightAndQueuePromptMessage,
   preflightRuntimeAuthorizationRecovery,
   projectAdmissionToPublicAck,
-  queueMessage,
   throwAdmissionError,
   type QueueMessageInput,
 } from './queue-message.js';
@@ -79,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('preflightAndQueuePromptMessage', () => {
-  it('runs stored-session, runtime-authorization and model preflight before the send RPC', async () => {
+  it('runs stored-session, runtime-authorization and model preflight before the send RPC and projects a queued acknowledgment', async () => {
     const send = makeSend({ type: 'ok' });
     const env = makeEnv({ send }) as Env;
 
@@ -94,9 +93,19 @@ describe('preflightAndQueuePromptMessage', () => {
         'send'
       )
     ).resolves.toMatchObject({
+      cloudAgentSessionId: 'workspace_existing',
+      status: 'started',
+      streamUrl: '/stream?cloudAgentSessionId=workspace_existing',
       delivery: 'queued',
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
     });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        turn: { type: 'prompt', prompt: 'follow up' },
+      })
+    );
 
     expect(preflightSessionRuntime).toHaveBeenCalledWith({
       env,
@@ -116,36 +125,6 @@ describe('preflightAndQueuePromptMessage', () => {
     );
     expect(send).toHaveBeenCalledOnce();
   });
-});
-
-describe('queueMessage', () => {
-  it('admits through the V2 send RPC and projects a queued acknowledgment', async () => {
-    const send = makeSend({ type: 'ok' });
-    const env = makeEnv({ send }) as Env;
-
-    const response = await queueMessage(
-      {
-        ...promptInput,
-        turn: { type: 'prompt', prompt: 'hello' },
-      },
-      { env, userId: 'user_abc' }
-    );
-
-    expect(response).toMatchObject({
-      cloudAgentSessionId: 'workspace_existing',
-      status: 'started',
-      delivery: 'queued',
-      streamUrl: '/stream?cloudAgentSessionId=workspace_existing',
-    });
-    expect(response.messageId).toMatch(/^msg_/);
-    expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messageId: response.messageId,
-        turn: { type: 'prompt', prompt: 'hello' },
-        agent: { mode: 'code', model: 'test/model' },
-      })
-    );
-  });
 
   it.each(['prompt', 'command'] as const)(
     'reuses an omitted %s ID across a lost send response',
@@ -160,7 +139,7 @@ describe('queueMessage', () => {
         return { type: 'ok' as const };
       });
 
-      const response = await queueMessage(
+      const response = await preflightAndQueuePromptMessage(
         {
           cloudAgentSessionId: 'workspace_existing',
           turn:
@@ -168,7 +147,8 @@ describe('queueMessage', () => {
               ? { type, prompt: 'hello' }
               : { type, command: 'review', arguments: '--all' },
         },
-        { env: makeEnv({ send }) as Env, userId: 'user_abc' }
+        { env: makeEnv({ send }) as Env, userId: 'user_abc' },
+        'send'
       );
 
       expect(attempts).toBe(2);
@@ -177,26 +157,10 @@ describe('queueMessage', () => {
     }
   );
 
-  it('forwards the caller messageId when provided', async () => {
-    const send = makeSend({ type: 'ok' });
-
-    await queueMessage(
-      {
-        ...promptInput,
-        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'hello' },
-      },
-      { env: makeEnv({ send }) as Env, userId: 'user_a' }
-    );
-
-    expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn' })
-    );
-  });
-
   it('forwards the composed canonical message payload to the Durable Object', async () => {
     const send = makeSend({ type: 'ok' });
 
-    await queueMessage(
+    await preflightAndQueuePromptMessage(
       {
         cloudAgentSessionId: 'workspace_payload',
         turn: {
@@ -210,7 +174,8 @@ describe('queueMessage', () => {
         agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
         finalization: { autoCommit: true, condenseOnComplete: false },
       },
-      { env: makeEnv({ send }) as Env, userId: 'user_payload', botId: 'bot_payload' }
+      { env: makeEnv({ send }) as Env, userId: 'user_payload', botId: 'bot_payload' },
+      'send'
     );
 
     expect(send).toHaveBeenCalledWith({
@@ -228,17 +193,25 @@ describe('queueMessage', () => {
     const send = makeSend({ type: 'session-not-found' });
 
     await expect(
-      queueMessage(promptInput, { env: makeEnv({ send }) as Env, userId: 'u' })
+      preflightAndQueuePromptMessage(
+        promptInput,
+        { env: makeEnv({ send }) as Env, userId: 'u' },
+        'send'
+      )
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
   });
 
   it('maps a V2 queue-full send to the retryable 429 PENDING_QUEUE_FULL', async () => {
     const send = makeSend({ type: 'queue-full' });
 
-    const error = await queueMessage(promptInput, {
-      env: makeEnv({ send }) as Env,
-      userId: 'user_abc',
-    }).catch(error => error);
+    const error = await preflightAndQueuePromptMessage(
+      promptInput,
+      {
+        env: makeEnv({ send }) as Env,
+        userId: 'user_abc',
+      },
+      'send'
+    ).catch(error => error);
 
     expect(error).toMatchObject({
       code: 'TOO_MANY_REQUESTS',
@@ -252,7 +225,11 @@ describe('queueMessage', () => {
     const send = makeSend({ type: 'ok' });
 
     await expect(
-      queueMessage(promptInput, { env: makeEnv({ send }) as Env, userId: 'user_abc' })
+      preflightAndQueuePromptMessage(
+        promptInput,
+        { env: makeEnv({ send }) as Env, userId: 'user_abc' },
+        'send'
+      )
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
     expect(send).not.toHaveBeenCalled();
   });

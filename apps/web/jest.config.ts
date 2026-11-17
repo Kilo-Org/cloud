@@ -32,6 +32,9 @@ const config: Config = {
     '^@kilocode/worker-utils$': '<rootDir>/../../packages/worker-utils/src/index.ts',
     '^@kilocode/app-shared/(.*)$': '<rootDir>/../../packages/app-shared/src/$1',
     '^@kilocode/web-shared/(.*)$': '<rootDir>/../../packages/web-shared/src/$1',
+    '^@cloud-agent-shared/(.*)$': '<rootDir>/../../services/cloud-agent-next/src/shared/$1',
+    '^@cloud-agent-shared$':
+      '<rootDir>/../../services/cloud-agent-next/src/shared/slash-commands.ts',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
@@ -43,7 +46,6 @@ const config: Config = {
     '<rootDir>/../../services/cloud-agent-next/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
-    '<rootDir>/../../services/gastown/',
     '<rootDir>/../../services/gmail-push/',
     '<rootDir>/../../services/security-auto-analysis/',
     '<rootDir>/../../services/kiloclaw/',
@@ -63,6 +65,7 @@ const config: Config = {
   maxWorkers: process.env.JEST_MAX_WORKERS ? process.env.JEST_MAX_WORKERS : '50%',
 
   globalSetup: '<rootDir>/src/tests/setup/globalSetup.ts',
+  setupFiles: ['<rootDir>/src/tests/setup/domGlobals.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/workerSetup.ts'],
 
   silent: process.env.JEST_SILENT === 'true',

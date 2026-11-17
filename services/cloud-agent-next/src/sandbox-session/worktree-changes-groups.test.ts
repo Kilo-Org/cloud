@@ -260,20 +260,25 @@ const API = {
 };
 
 describe('worktreeChangesContext', () => {
-  function metadata(environment: unknown, upstreamBranch: string | undefined): SessionMetadata {
+  function metadata(
+    environment: unknown,
+    upstreamBranch: string | undefined,
+    baseBranch?: string
+  ): SessionMetadata {
     return {
       identity: { sessionId: 'workspace_1', userId: 'user_1' },
       auth: { kiloSessionId: 'ses_1' },
       workspace: { sandboxId: 'sandbox_1' },
-      repository: { type: 'github', repo: 'acme/web', upstreamBranch },
+      repository: { type: 'github', repo: 'acme/web', upstreamBranch, baseBranch },
       environment,
     } as unknown as SessionMetadata;
   }
 
-  it('compares a V1 route with its requested branch', () => {
-    expect(worktreeChangesContext(metadata(undefined, 'release'), '/workspace/app')?.baseRef).toBe(
-      'refs/remotes/origin/release'
-    );
+  it('compares a V1 route with its base branch, not its working branch', () => {
+    expect(
+      worktreeChangesContext(metadata(undefined, 'kilo/layer', 'release'), '/workspace/app')
+        ?.baseRef
+    ).toBe('refs/remotes/origin/release');
   });
 
   it('leaves the base of a V2 route to the wrapper, which picks one for each repository', () => {

@@ -53,9 +53,10 @@ export function EmptyState({
   placement = 'center',
   refreshControl,
   compact,
+  title,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} placement={placement} compact={compact} />;
+  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
   return placement === 'center' ? (
     <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
   ) : (
@@ -122,6 +123,11 @@ function EmptyStateBody({
           variant="large"
           className={cn('text-center', compact ? compactTitleClassName : undefined)}
           accessibilityRole={titleAccessibilityRole}
+          // A centered title is short and often narrower than the words allow:
+          // Android's default greedy wrap leaves the last word alone on its own
+          // line (the compact connect-gate title did). Balanced splits the title
+          // into even lines instead. Android-only; iOS ignores the prop.
+          textBreakStrategy="balanced"
         >
           {title}
         </Text>

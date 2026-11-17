@@ -1,3 +1,5 @@
+import { humanizeToken } from '@/lib/admin/queue-format';
+
 export type DeletionAttentionHint = {
   title: string;
   action: string;
@@ -320,6 +322,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Session cleanup was not confirmed',
     action: 'Retry. If the sessions are already gone, Mark done with evidence.',
   },
+  session_worktree_deleting: {
+    title: 'A worktree deletion keeps refusing session deletes',
+    action:
+      'Check the hosted worktree deletion for these sessions. Once it finishes or is repaired, Retry. If the sessions are already gone, Mark done with evidence.',
+  },
   teardown_incomplete: {
     title: 'Teardown tasks are not finished',
     action: 'Finish or Mark done the remaining teardown tasks, then Retry anonymize.',
@@ -402,13 +409,9 @@ export function deletionAttentionHint(
     };
   }
   return {
-    title: humanizeCode(code),
+    title: humanizeToken(code),
     action: UNKNOWN_ACTION,
   };
-}
-
-function humanizeCode(code: string): string {
-  return code.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
 }
 
 export function deletionManualSearchHref(params: {

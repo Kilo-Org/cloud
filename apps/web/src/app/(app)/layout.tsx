@@ -9,6 +9,7 @@ import { AdminOmnibox } from '@/components/admin-omnibox';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
 import { PlatformPresenceMount } from './components/PlatformPresenceMount';
+import { LegacySessionDatabasePurge } from '@/components/LegacySessionDatabasePurge';
 import { CustomerSourceSurvey } from '@/components/CustomerSourceSurvey';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <PageTitleProvider>
         <EventServiceProvider>
           <PlatformPresenceMount />
+          <LegacySessionDatabasePurge />
           {/*
             The SSR-resolved user is seeded here so every consumer that renders
             during hydration (the sidebar footer and the customer-source survey)

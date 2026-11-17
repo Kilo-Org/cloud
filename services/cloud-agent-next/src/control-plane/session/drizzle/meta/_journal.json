@@ -43,6 +43,13 @@
       "when": 1793703383444,
       "tag": "0005_native_history_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794258033433,
+      "tag": "0006_confused_shiva",
+      "breakpoints": true
     }
   ]
 }

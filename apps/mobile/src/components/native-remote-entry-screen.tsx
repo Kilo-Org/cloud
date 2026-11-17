@@ -2,24 +2,43 @@ import { NativeSyncClient } from '@kilocode/cloud-agent-sdk';
 import { Redirect } from 'expo-router';
 import { useMemo } from 'react';
 import { NativeRemoteDemo } from '@/components/native-remote/native-remote-demo';
-import { useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { SESSION_SYNC_URL } from '@/lib/config';
 import { nativeRemoteCredential } from '@/lib/native-remote-credential';
+import { useOrganization } from '@/lib/organization-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
-function OwnedNativeRemoteDemo({ epoch, baseUrl }: { epoch: number; baseUrl: string }) {
+function OwnedNativeRemoteDemo({
+  epoch,
+  baseUrl,
+  organizationID,
+}: {
+  epoch: number;
+  baseUrl: string;
+  organizationID: string | undefined;
+}) {
   const client = useMemo(
     () => new NativeSyncClient({ baseUrl, getCredential: () => nativeRemoteCredential(epoch) }),
     [baseUrl, epoch]
   );
-  return <NativeRemoteDemo client={client} />;
+  return <NativeRemoteDemo client={client} organizationID={organizationID} />;
 }
 
 export function NativeRemoteEntryScreen() {
-  const enabled = useFeatureFlag('native-remote-mobile', false);
   const { token, authEpoch, isSigningOut } = useAuth();
-  if (!enabled || !SESSION_SYNC_URL || !token || isSigningOut) {
+  const { organizationId, isLoaded } = useOrganization();
+  if (!__DEV__ || !SESSION_SYNC_URL || !token || isSigningOut) {
     return <Redirect href="/" />;
   }
-  return <OwnedNativeRemoteDemo key={authEpoch} epoch={authEpoch} baseUrl={SESSION_SYNC_URL} />;
+  if (!isLoaded) {
+    return <Skeleton className="m-4 h-48" />;
+  }
+  return (
+    <OwnedNativeRemoteDemo
+      key={authEpoch}
+      epoch={authEpoch}
+      baseUrl={SESSION_SYNC_URL}
+      organizationID={organizationId ?? undefined}
+    />
+  );
 }

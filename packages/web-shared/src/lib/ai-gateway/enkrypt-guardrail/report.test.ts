@@ -9,7 +9,6 @@ import { guardrailSettings } from './report';
 describe('guardrailSettings', () => {
   it('reports each detector and its action, with only the size of authored text', () => {
     const settings = guardrailSettings({
-      scanToolResults: false,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
@@ -28,7 +27,6 @@ describe('guardrailSettings', () => {
 
     expect(settings).toEqual({
       status: 'ready',
-      scan_tool_results: false,
       detectors: [
         { detector: 'injection_attack', action: 'block' },
         { detector: 'pii', action: 'log', pii_entities: ['pii', 'secrets'] },
@@ -45,7 +43,6 @@ describe('guardrailSettings', () => {
 
   it('counts policy rules without their text', () => {
     const settings = guardrailSettings({
-      scanToolResults: true,
       status: 'ready',
       detectors: {
         policy_violation: {
@@ -81,9 +78,8 @@ describe('guardrailSettings', () => {
   });
 
   it('reports an invalid configuration without detectors', () => {
-    expect(guardrailSettings({ scanToolResults: true, status: 'invalid' })).toEqual({
+    expect(guardrailSettings({ status: 'invalid' })).toEqual({
       status: 'invalid',
-      scan_tool_results: true,
       detectors: [],
     });
   });

@@ -8,7 +8,7 @@
     "predev": "CI=1 wrangler d1 migrations apply auto-routing-benchmark --local",
     "dev": "wrangler dev",
     "types": "wrangler types --include-runtime=false --strict-vars=false",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p scripts/tsconfig.json",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing-benchmark/src",
     "db:generate": "drizzle-kit generate",
     "scoreboard": "tsx scripts/scoreboard.ts",
@@ -17,7 +17,8 @@
     "sweep:offline": "tsx scripts/offline-sweep.ts",
     "screen:candidates": "tsx scripts/screen-candidates.ts",
     "smoke:scheduler": "tsx scripts/scheduler-smoke.ts",
-    "test": "vitest run && pnpm run test:deploy",
+    "test": "vitest run && pnpm run test:deploy && pnpm run test:python",
+    "test:python": "tmp=$(mktemp -d) && python3 -m venv \"$tmp/venv\" && \"$tmp/venv/bin/pip\" install --quiet -r repo-study/requirements.txt && (cd scripts && \"$tmp/venv/bin/python\" -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants) && (cd repo-study && \"$tmp/venv/bin/python\" -m unittest test_text_tariffs); status=$?; rm -rf \"$tmp\"; exit $status",
     "test:deploy": "tsx --test scripts/deploy.test.mjs"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jsonc-parser": "3.3.1",
+    "miniflare": "5.20260918.0-alpha",
     "typescript": "catalog:",
     "vitest": "catalog:vitest5",
     "wrangler": "catalog:"

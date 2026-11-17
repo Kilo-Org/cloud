@@ -109,6 +109,7 @@ export function startDeviceAuthPoll(params: {
             refreshToken: parsed.refreshToken,
             expiresIn: parsed.expiresIn,
             previousVerificationUrl: previous.verificationUrl,
+            pendingLink: parsed.pendingLink,
           })
         );
         return;

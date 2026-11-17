@@ -1,4 +1,4 @@
-import { flush, inventoryEvent, mount, press, text, type } from './native-remote-test-utils';
+import { flush, inventoryPending, mount, press, text, type } from './native-remote-test-utils';
 import { type NativeInstanceReply, type NativeSessionSummary } from '@kilocode/cloud-agent-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from '@/test/renderer';
@@ -35,7 +35,17 @@ describe('native remote lifecycle fencing', () => {
     await act(async () => {
       fixture.publishSession('ses-second', {
         ...readySession,
-        messages: [{ id: 'new', role: 'assistant', content: 'New session', seq: 1 }],
+        messages: [
+          {
+            message: {
+              id: 'msg_new',
+              type: 'assistant',
+              time: { created: 1 },
+              content: [{ type: 'text', text: 'New session' }],
+            },
+            seq: 1,
+          },
+        ],
       });
       fixture.publishSession('ses-first', readySession);
       pending.reject(new Error('Late error'));
@@ -101,38 +111,31 @@ describe('native remote lifecycle fencing', () => {
     const fixture = nativeRemoteFixture();
     const renderer = await mount(fixture.client);
     await press(renderer, 'ses-first');
-    const inventory = inventoryEvent();
     await act(() => {
       fixture.publishSession('ses-first', {
         ...readySession,
-        events: [
-          {
-            ...inventory,
-            body: {
-              pending: {
-                permissions: [],
-                questions: [
-                  {
-                    requestID: 'question',
-                    fields: [
-                      {
-                        key: 'choices',
-                        type: 'multiselect',
-                        title: 'Options',
-                        custom: true,
-                        options: [
-                          { value: 'first', label: 'First option' },
-                          { value: 'second', label: 'Second option' },
-                        ],
-                      },
-                      { key: 'details', type: 'text', title: 'Details' },
-                    ],
-                  },
-                ],
-              },
+        pending: {
+          ...inventoryPending(),
+          questions: [
+            {
+              id: 'question',
+              metadata: { kind: 'question' },
+              fields: [
+                {
+                  key: 'choices',
+                  type: 'multiselect',
+                  title: 'Options',
+                  custom: true,
+                  options: [
+                    { value: 'first', label: 'First option' },
+                    { value: 'second', label: 'Second option' },
+                  ],
+                },
+                { key: 'details', type: 'text', title: 'Details' },
+              ],
             },
-          },
-        ],
+          ],
+        },
       });
     });
     await press(renderer, 'First option');

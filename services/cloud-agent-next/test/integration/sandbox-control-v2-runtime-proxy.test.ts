@@ -38,7 +38,7 @@ import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
@@ -217,7 +217,7 @@ async function installSandbox(
   const sandboxStub = sandboxes.getByName(sandboxId);
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
@@ -1139,6 +1139,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sandboxStub.status({ sessionId })).toEqual({
         sessionId,
         view: { state: 'failed', attemptId: expect.any(String), reason: 'workspace_setup_failed' },
+        workspacePreparing: false,
+        workspaceStopEpoch: 0,
+        workspaceStopAt: 0,
       });
     });
     // No prepare reaches the wrapper: the attempt failed before the frame.
@@ -1272,6 +1275,9 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
             attemptId: expect.any(String),
             reason: 'workspace_setup_failed',
           },
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
         });
       });
       return connected;
@@ -1325,6 +1331,9 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
             attemptId: expect.any(String),
             reason: 'workspace_setup_failed',
           },
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
         });
       });
       return connected;

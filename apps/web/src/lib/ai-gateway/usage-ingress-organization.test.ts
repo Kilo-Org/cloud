@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, expect, test } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {}, readDb: {} }));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual<object>('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: jest.fn(),
+jest.mock('@kilocode/worker-utils/organization-membership', () => ({
+  ...jest.requireActual<object>('@kilocode/worker-utils/organization-membership'),
+  hasEffectiveOrganizationAccess: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
@@ -35,7 +35,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import jwt from 'jsonwebtoken';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import {
   extractUsageContextInfo,
@@ -53,7 +53,7 @@ const user = {
   is_admin: false,
 } as User;
 const send = jest
-  .fn<Promise<void>, [UsageRecordRequest, { contentType: 'json' }]>()
+  .fn<Promise<void>, [LlmUsageQueueMessage, { contentType: 'json' }]>()
   .mockResolvedValue(undefined);
 // Load the actual Worker handler without importing its runtime globals into the Next.js typecheck.
 const { handleFetch } = jest.requireActual<{
@@ -107,7 +107,7 @@ const context: MicrodollarUsageContext = {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(findUserById).mockResolvedValue(user);
-  jest.mocked(isOrganizationMember).mockResolvedValue(true);
+  jest.mocked(hasEffectiveOrganizationAccess).mockResolvedValue(true);
   send.mockClear();
   provider.mockClear();
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -183,7 +183,7 @@ test.each(['', ' ', 'not-an-organization-id'])(
     expect(provider).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
-    expect(isOrganizationMember).not.toHaveBeenCalled();
+    expect(hasEffectiveOrganizationAccess).not.toHaveBeenCalled();
   }
 );
 
@@ -206,13 +206,16 @@ test.each([undefined, organizationId])(
       metadata: { user_prompt_prefix: header ? null : 'synthetic' },
     });
     if (header)
-      expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), header, user.id);
-    else expect(isOrganizationMember).not.toHaveBeenCalled();
+      expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: user.id,
+        organizationId: header,
+      });
+    else expect(hasEffectiveOrganizationAccess).not.toHaveBeenCalled();
   }
 );
 
 test('a valid organization ID still requires membership', async () => {
-  jest.mocked(isOrganizationMember).mockResolvedValue(false);
+  jest.mocked(hasEffectiveOrganizationAccess).mockResolvedValue(false);
   const result = await authenticateThenPublish(organizationId);
   expect(result.auth.authFailedResponse?.status).toBe(403);
   expect(provider).not.toHaveBeenCalled();
@@ -223,7 +226,10 @@ test('a signed organization takes precedence over an empty mutable header', asyn
   const result = await authenticateThenPublish('', organizationId);
   expect(result.publication).toEqual({ kind: 'accepted' });
   expect(send.mock.calls[0][0]).toMatchObject({ core: { organization_id: organizationId } });
-  expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
+  expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+    kiloUserId: user.id,
+    organizationId,
+  });
 });
 
 test('an empty signed organization cannot downgrade to a valid header or personal context', async () => {
@@ -253,7 +259,10 @@ test('a signed organization is retained when the mutable header is absent', asyn
   const result = await authenticateThenPublish(undefined, organizationId);
   expect(result.publication).toEqual({ kind: 'accepted' });
   expect(send.mock.calls[0][0]).toMatchObject({ core: { organization_id: organizationId } });
-  expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
+  expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+    kiloUserId: user.id,
+    organizationId,
+  });
 });
 
 test('ingress still rejects a malformed organization identity without enqueueing', async () => {
@@ -299,11 +308,16 @@ test('unrelated nonempty malformed organization context retains baseline anonymo
   expect(result.caller.kind).toBe('anonymous');
 });
 
-test('blocked-user failures retain baseline anonymous policy', async () => {
+test('a refused request is rejected during admission', async () => {
   jest.mocked(findUserById).mockResolvedValue({ ...user, blocked_reason: 'synthetic-block' });
   const result = await authenticateThenPublish('', undefined, true, true);
   expect(result.auth.authFailedResponse?.status).toBe(403);
-  expect(result.caller.kind).toBe('anonymous');
+  expect(result.auth.authorizationRefused).toBe(true);
+  expect(result.caller.kind).toBe('rejected');
+  if (result.caller.kind !== 'rejected') return;
+  expect(result.caller.response).toBe(result.auth.authFailedResponse);
+  expect(provider).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
 });
 
 test('claim and header names cannot forge the internal rejection discriminator', async () => {
@@ -312,10 +326,19 @@ test('claim and header names cannot forge the internal rejection discriminator',
     undefined,
     true,
     true,
-    { rejectionReason: 'empty_organization_context', credentialsRejected: false },
-    { rejectionReason: 'empty_organization_context', credentialsRejected: 'false' }
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: false,
+      authorizationRefused: false,
+    },
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: 'false',
+      authorizationRefused: 'false',
+    }
   );
   expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.auth).not.toHaveProperty('authorizationRefused');
   expect(result.caller.kind).toBe('signed-in');
   expect(result.publication).toEqual({ kind: 'accepted' });
 });

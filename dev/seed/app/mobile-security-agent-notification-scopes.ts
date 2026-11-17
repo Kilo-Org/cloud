@@ -7,7 +7,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 
 export const usage = '<email>';
@@ -67,6 +67,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`unexpected arguments: ${rest.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('app:mobile-security-agent-notification-scopes');
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email.trim());
   const users = await db

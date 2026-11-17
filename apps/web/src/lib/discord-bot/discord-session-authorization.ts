@@ -8,8 +8,12 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Owner } from '@/lib/integrations/core/types';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
+
+const parentOrganizations = alias(organizations, 'parent_organizations');
 
 /**
  * Organization roles whose members may start a Cloud Agent session from a
@@ -90,9 +94,9 @@ export async function authorizeDiscordSessionRequester(
 
   const [user] = await db
     .select({
-      blockedAt: kilocode_users.blocked_at,
-      blockedReason: kilocode_users.blocked_reason,
-      personalAccountDisabled: kilocode_users.personal_account_disabled,
+      blocked_at: kilocode_users.blocked_at,
+      blocked_reason: kilocode_users.blocked_reason,
+      personal_account_disabled: kilocode_users.personal_account_disabled,
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, kiloUserId))
@@ -102,7 +106,7 @@ export async function authorizeDiscordSessionRequester(
     return { authorized: false, reason: 'unlinked_account', discordUserId };
   }
 
-  if (user.blockedAt || user.blockedReason || user.personalAccountDisabled) {
+  if (isBlockedAccount(user) || user.personal_account_disabled) {
     return { authorized: false, reason: 'account_unavailable', discordUserId };
   }
 
@@ -156,16 +160,28 @@ async function isOrganizationSessionMember(
     return false;
   }
 
+  // A parent organization that is not live confers no inherited authority: the
+  // membership join carries the parent's `deleted_at IS NULL`, so a missing or
+  // soft-deleted parent row leaves no inherited role.
   const [inheritedMembership] = await db
     .select({ role: organization_memberships.role })
-    .from(organization_memberships)
-    .where(
+    .from(organizations)
+    .innerJoin(
+      parentOrganizations,
       and(
-        eq(organization_memberships.organization_id, parentOrganizationId),
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, parentOrganizations.id),
         eq(organization_memberships.kilo_user_id, kiloUserId),
         inArray(organization_memberships.role, SESSION_PARENT_ORGANIZATION_ROLES)
       )
     )
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
 
   return inheritedMembership !== undefined;

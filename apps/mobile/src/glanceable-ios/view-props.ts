@@ -7,7 +7,8 @@ import {
   buildHomeWidgetData,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
+  glanceableSessionTitle,
   type HomeWidgetData,
   type HomeWidgetPresentation,
   type HomeWidgetSessionRow,
@@ -189,9 +190,9 @@ export function buildGlanceableViewProps(
     flags.signedOut || flags.orgInvalid
       ? {
           snapshot: { ...snapshot, status: flags.signedOut ? 'signed_out' : 'privacy' },
-          details: EMPTY_HOME_WIDGET_DETAILS,
+          details: emptyHomeWidgetDetails(),
         }
-      : (homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS }),
+      : (homeData ?? { snapshot, details: emptyHomeWidgetDetails() }),
     now
   );
   return {
@@ -237,12 +238,17 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
   if (home === undefined) {
     return widgetProps;
   }
-  // UserDefaults rejects null even inside the nested Home-only payload: its
-  // own nullable fields and each scheduled row's wake.
+  // The shared title rule runs here, so a session with no user-facing name
+  // loses its title; UserDefaults then rejects each remaining null.
   return Object.assign(widgetProps, {
     home: {
-      ...withoutNulls(home),
-      scheduledAgents: home.scheduledAgents.map(row => withoutNulls(row)),
+      ...withoutNulls({ ...home, primaryTitle: glanceableSessionTitle(home.primaryTitle) }),
+      waitingAgents: home.waitingAgents.map(row =>
+        withoutNulls({ ...row, title: glanceableSessionTitle(row.title) })
+      ),
+      scheduledAgents: home.scheduledAgents.map(row =>
+        withoutNulls({ ...row, title: glanceableSessionTitle(row.title) })
+      ),
     },
   });
 }
@@ -341,7 +347,7 @@ export function buildExpiredWidgetProps(
       },
       {},
       translate,
-      { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
+      { snapshot, details: emptyHomeWidgetDetails() },
       Date.parse(snapshot.expiresAt)
     )
   );
@@ -391,7 +397,7 @@ export function widgetTimelineFrames(
   if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
     return null;
   }
-  const data = homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+  const data = homeData ?? { snapshot, details: emptyHomeWidgetDetails() };
   const now = Date.now();
   // WidgetKit renders the newest entry at or before `now` and never rewinds, so
   // a frame whose date has already passed sits behind the current one and only

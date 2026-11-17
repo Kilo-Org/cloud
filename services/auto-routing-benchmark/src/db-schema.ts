@@ -34,6 +34,12 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   router: text('router').$type<AutoRouter>().notNull().default('efficient').unique(),
   min_accuracy: real('min_accuracy').notNull(),
   accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+  // Legacy policy-knob columns (frontier_min_accuracy_delta, switch_cost_factor,
+  // best_accuracy_switch_threshold, low_confidence_threshold,
+  // classifier_repetitions, decider_repetitions, classifier_max_p95_latency_ms):
+  // no longer read, and replaceConfig writes the canonical fixed policy value on
+  // save. The benchmark_runs and routing_tables copies are separate and still
+  // written from the resolved policy.
   frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
@@ -348,6 +354,7 @@ export const routingTables = sqliteTable('routing_tables', {
   published_at: text('published_at').notNull(),
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
+  accuracy_noise_band: real('accuracy_noise_band'),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   production_token_profile: text('production_token_profile', {
@@ -379,6 +386,8 @@ export const routingTableCandidates = sqliteTable(
     variant: text('variant').notNull().default(''),
     pricing: text('pricing', { mode: 'json' }).$type<CandidatePricing>(),
     estimated_request_cost_usd: real('estimated_request_cost_usd'),
+    p50_latency_ms: real('p50_latency_ms'),
+    p50_ttft_ms: real('p50_ttft_ms'),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

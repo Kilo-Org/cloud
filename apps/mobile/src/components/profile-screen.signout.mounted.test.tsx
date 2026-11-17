@@ -1,6 +1,6 @@
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
@@ -49,12 +49,18 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps the screen focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+}));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
-vi.mock('@/lib/analytics/posthog', () => ({ useFeatureFlag: () => false }));
 vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -137,14 +143,18 @@ vi.mock('@/components/ui/icons', () => ({
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
+  Plug: 'Plug',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Sparkles: 'Sparkles',
   Smartphone: 'Smartphone',
   Trash2: 'Trash2',
+  Users: 'Users',
+  Workflow: 'Workflow',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
@@ -158,6 +168,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -170,9 +181,11 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
 
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
+    vi.stubGlobal('__DEV__', false);
     signOutFn.mockReset();
     alertFn.mockReset();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   /**
    * Calls one of a mounted element's own props inside `act`. The test renderer

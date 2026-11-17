@@ -16,6 +16,8 @@ import { OrganizationAdminKiloPass } from './OrganizationAdminKiloPass';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationAdminIntegrations } from './OrganizationAdminIntegrations';
+import { OrganizationAdminSupportAccessPrompt } from './OrganizationAdminSupportAccessPrompt';
+import { OrganizationAdminStripeLink } from './OrganizationAdminStripeLink';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -52,14 +54,17 @@ function OrganizationDetailAdminPage({
 
 export function OrganizationAdminDashboard({ organizationId }: { organizationId: string }) {
   return (
-    // in admin, admins are always owners of every organization
     <OrganizationContextProvider value={{ userRole: 'owner', isKiloAdmin: true }}>
       <OrganizationDetailAdminPage organizationId={organizationId}>
         <div className="flex w-full flex-col gap-y-8">
           <div className="w-full max-w-[1000px]">
+            <OrganizationAdminSupportAccessPrompt organizationId={organizationId} />
+          </div>
+          <div className="w-full max-w-[1000px]">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <div className="space-y-4">
                 <OrganizationInfoCard organizationId={organizationId} showAdminControls />
+                <OrganizationAdminStripeLink organizationId={organizationId} />
                 <OrganizationAdminIntegrations organizationId={organizationId} />
                 <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>

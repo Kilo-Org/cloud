@@ -1,15 +1,6 @@
 import { z } from 'zod';
 
-export const instanceLifecycleEventSchema = z.enum(['ready', 'start_failed']);
-export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema>;
-
-export const scheduledActionEventSchema = z.enum([
-  'scheduled_restart_notice',
-  'scheduled_restart_cancelled',
-  'scheduled_version_change_notice',
-  'scheduled_version_change_cancelled',
-]);
-export type ScheduledActionEvent = z.infer<typeof scheduledActionEventSchema>;
+import { nonEmptyStringSchema } from './non-empty-string';
 
 // 1:1 map to SecurityAuditLogAction (packages/db/src/schema-types.ts):
 // analysis_completed -> FindingAnalysisCompleted,
@@ -36,3 +27,16 @@ export const SECURITY_LIFECYCLE_EVENTS = [
 
 export const securityLifecycleEventSchema = z.enum(SECURITY_LIFECYCLE_EVENTS);
 export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
+
+// The payload one security-lifecycle event carries, whatever envelope transports
+// it: the visible push in `push-data.ts` and the internal dispatch request in
+// `rpc-schemas.ts` differ only by their envelope (`type` vs `kind` plus
+// `recipientUserIds`). Declared once so a field cannot be added to one path and
+// silently dropped by the other.
+export const securityLifecyclePayloadShape = {
+  event: securityLifecycleEventSchema,
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
+  remediationId: nonEmptyStringSchema.optional(),
+  prUrl: nonEmptyStringSchema.optional(),
+};

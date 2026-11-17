@@ -96,6 +96,18 @@ describe('sandbox status subscription', () => {
     dispose();
   });
 
+  it('forwards capture and invalidation updates without a lifecycle change', async () => {
+    const dispose = subscribe();
+    await Promise.resolve();
+    const captured = { ...snapshot, workspaceSnapshot: { capturedAt: 0 } };
+    config.onEvent(frame(captured));
+    expect(onSnapshot).toHaveBeenLastCalledWith(captured);
+    config.onEvent(frame(snapshot));
+    expect(onSnapshot).toHaveBeenLastCalledWith(snapshot);
+    expect(onSnapshot).toHaveBeenCalledTimes(2);
+    dispose();
+  });
+
   it('ignores callbacks and pending tickets after switching sessions or pausing', async () => {
     const dispose = subscribe();
     await Promise.resolve();

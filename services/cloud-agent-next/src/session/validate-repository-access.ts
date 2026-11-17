@@ -5,8 +5,10 @@ import {
   type EnvironmentReferenceRepository,
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
+import { parseGitLabCloneUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { PersistenceEnv } from '../persistence/types.js';
 import {
+  isServiceSideManagedGitLabTokenFailure,
   isTemporaryManagedBitbucketTokenFailure,
   authorizeCloudAgentGitHubRepo,
   resolveManagedBitbucketToken,
@@ -19,7 +21,7 @@ import type { SessionRepositoryRequest } from './session-requests.js';
 type AccessContext = { env: PersistenceEnv; userId: string; orgId?: string };
 
 export async function assertRepositoryAccessBeforeSessionCreation(
-  input: AccessContext & { repository: SessionRepositoryRequest }
+  input: AccessContext & { createdOnPlatform?: string; repository: SessionRepositoryRequest }
 ): Promise<void> {
   if (input.repository.type === 'github' && input.repository.githubIntegrationId) {
     await assertGitHubAccess(input, {
@@ -27,6 +29,11 @@ export async function assertRepositoryAccessBeforeSessionCreation(
       expectedIntegrationId: input.repository.githubIntegrationId,
       accessPurpose: input.repository.githubAccessPurpose ?? 'workflow',
     });
+    return;
+  }
+
+  if (input.repository.type === 'gitlab') {
+    await assertGitLabAccess(input, input.repository.url);
     return;
   }
 
@@ -98,6 +105,11 @@ async function assertBitbucketAccess(
  * Ordinary GitLab sessions check integration access here. Capability issuance
  * validates the instance and binds the project path; GitLab enforces project
  * access when the token is used. Code-review sessions require a project-exact token.
+ *
+ * The token for an ordinary origin comes from the caller's integration, which
+ * resolves without matching the clone URL. The URL is matched against the
+ * resolved instance here, so the request is answered with the reason the
+ * credential attachment requires.
  */
 async function assertGitLabAccess(
   input: AccessContext & { createdOnPlatform?: string },
@@ -111,11 +123,18 @@ async function assertGitLabAccess(
   });
   if (!result.success) {
     throw new TRPCError({
-      code:
-        result.reason === 'service_not_configured' || result.reason === 'rpc_error'
-          ? 'SERVICE_UNAVAILABLE'
-          : 'BAD_REQUEST',
+      code: isServiceSideManagedGitLabTokenFailure(result.reason)
+        ? 'SERVICE_UNAVAILABLE'
+        : 'BAD_REQUEST',
       message: `GitLab repository authorization failed (${result.reason})`,
+    });
+  }
+
+  const repository = parseGitLabCloneUrl(cloneUrl, result.instanceUrl);
+  if (!repository.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `GitLab repository authorization failed (${repository.reason})`,
     });
   }
 }
@@ -147,16 +166,18 @@ async function assertMemberAccess(
 }
 
 /**
- * The repository the launch check above authorizes: a pinned GitHub repository
- * and a Bitbucket repository. Every other launch repository is checked as a
- * member, so that every member of a V2 environment is authorized. An unpinned
- * GitHub launch is not checked again with its pin; that check is the pinned one.
+ * The repository the launch check above authorizes: a pinned GitHub repository,
+ * a GitLab repository and a Bitbucket repository. Every other launch repository
+ * is checked as a member, so that every member of a V2 environment is
+ * authorized. An unpinned GitHub launch is not checked again with its pin; that
+ * check is the pinned one.
  */
 function launchIdentityAuthorizedByLaunchCheck(
   repository: SessionRepositoryRequest
 ): EnvironmentRepositoryIdentity | undefined {
   const covered =
     (repository.type === 'github' && repository.githubIntegrationId !== undefined) ||
+    repository.type === 'gitlab' ||
     repository.type === 'bitbucket';
   return covered ? launchRepositoryIdentity(repository) : undefined;
 }

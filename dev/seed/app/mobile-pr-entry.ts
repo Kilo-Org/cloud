@@ -1,9 +1,8 @@
-import { computeDatabaseUrl } from '@kilocode/db';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 const USER_ID = 'user_pr_entry_ux_20261030';
 const EMAIL = 'pr-entry-ux-20261030@example.com';
@@ -31,12 +30,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.length > 0) {
     throw new Error('The mobile PR entry seed takes no arguments.');
   }
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (
-    process.env.USE_PRODUCTION_DB === 'true' ||
-    process.env.SKIP_STRIPE_API !== 'true' ||
-    !['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)
-  ) {
+  assertLocalSeedDatabase('app:mobile-pr-entry');
+  if (process.env.SKIP_STRIPE_API !== 'true') {
     throw new Error(
       'The mobile PR entry seed requires an isolated loopback database and disabled Stripe.'
     );

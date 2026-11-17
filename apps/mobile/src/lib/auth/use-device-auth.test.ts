@@ -42,6 +42,14 @@ vi.mock('@/lib/auth/pending-external-auth', () => ({
   clearPendingExternalAuth: vi.fn(),
 }));
 
+// The app-shell helper composes the SSO URL with the real base URL; only its
+// launch path reaches the native browser module this project cannot load.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
+// `app-shell-handoff` also imports the tRPC client, whose module loads the Expo
+// runtime; this suite starts sign-ins over `fetch` and never mints.
+vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
@@ -457,10 +465,76 @@ describe('useDeviceAuth hook', () => {
 
     expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledTimes(1);
     const url = new URL(vi.mocked(openAuthSessionAsync).mock.calls[0]?.[0] ?? '');
-    expect(url.searchParams.get('sso')).toBe('true');
+    expect(url.pathname).toBe('/app-shell/sign-in');
     expect(url.searchParams.get('email')).toBe('user@example.com');
-    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123&app=1');
+    // The approval page the server named is the callback, path and query kept.
+    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123');
+    expect(url.searchParams.has('sso')).toBe(false);
     expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
+  });
+
+  it('ties the device code to the pending link a browser sign-in resolves', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin', undefined, 'link-token');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe(JSON.stringify({ pendingLinkToken: 'link-token' }));
+  });
+
+  it('sends the device code request without a body when no link is pending', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init).not.toHaveProperty('body');
+  });
+
+  it('reports a refused pending link as expired instead of a start error', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(Response.json({ error: 'PENDING_LINK_EXPIRED' }, { status: 400 }));
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin', undefined, 'link-token');
+    });
+
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.error).toBeUndefined();
+    expect(resultRef.current?.expiredPendingLinkToken).toBe('link-token');
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+  });
+
+  it('keeps any other 400 a start error', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(Response.json({ error: 'INVALID_REQUEST' }, { status: 400 }));
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin', undefined, 'link-token');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
+    });
+    expect(resultRef.current?.expiredPendingLinkToken).toBeUndefined();
   });
 
   it('opens a plain browser for a non-product auth host (no consent alert)', async () => {

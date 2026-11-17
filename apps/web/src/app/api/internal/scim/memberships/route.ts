@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { addDirectoryMembership, removeDirectoryMembership } from '@/lib/scim/directory-sync';
-import { DirectoryMembershipSchema } from '@/lib/scim/directory-sync-contracts';
+import { DirectoryMembershipSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
 
 /** Writes to the PostgreSQL primary, so it must run beside it. */

@@ -8,9 +8,11 @@
  * same ends. Pure: all IO is injected.
  */
 
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildSessionLiveActivityContentState,
+  isFinishedSessionCardStatus,
   type PushData,
   sessionCardStaleAtSeconds,
   sessionLiveActivityRelevance,
@@ -52,10 +54,7 @@ export const sessionCardSourceSchema = z.object({
       status: z.string(),
       statusUpdatedAt: z.string().nullable(),
       scheduledAt: z.string().nullable(),
-      approvalKey: z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
-        .nullable(),
+      approvalKey: approvalKeySchema,
       /** The small derived summary the ingest service stored, or null. */
       summary: sessionLiveSummarySchema.nullable().optional(),
       /** The command of the request Approve answers, trimmed; null without one. */
@@ -182,14 +181,14 @@ function rowFacts(sessionId: string, row: NonNullable<SessionCardSource['row']>)
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
     scheduledAt: row.scheduledAt,
-    currentStep: row.summary?.step ?? null,
-    plan: row.summary?.plan ?? null,
-    changes: row.summary?.changes ?? null,
-    permissionCommand: row.permissionCommand ?? null,
-    lastActivityAt: row.lastActivityAt ?? null,
-    costMicrodollars: row.costMicrodollars ?? null,
+    currentStep: row.summary?.step ?? undefined,
+    plan: row.summary?.plan ?? undefined,
+    changes: row.summary?.changes ?? undefined,
+    permissionCommand: row.permissionCommand ?? undefined,
+    lastActivityAt: row.lastActivityAt ?? undefined,
+    costMicrodollars: row.costMicrodollars ?? undefined,
     failure: row.summary?.failure?.kind ?? null,
-    startedAt: row.startedAt ?? null,
+    startedAt: row.startedAt ?? undefined,
     prOpened: row.prOpened ?? false,
   };
 }
@@ -255,7 +254,7 @@ export function planSessionCardSend(params: {
     statusSinceFallback: previous?.statusKind === statusKind ? previous.statusSince : updatedAt,
     previous,
   });
-  if (content.statusKind === 'idle' || content.statusKind === 'failed') {
+  if (isFinishedSessionCardStatus(content.statusKind)) {
     return {
       content,
       send: {

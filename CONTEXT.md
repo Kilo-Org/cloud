@@ -44,6 +44,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
+| **Promotional model** | A Kilo-defined model that Kilo serves straight from an upstream provider and bills as Kilo credits or free; implemented as a custom LLM (`custom_llm2`) and made public or granted to organizations or groups | Referring to these models in user-facing UI, including request logs and BYOK routing, where its payer is Kilo credits or free | Custom model, custom LLM, custom model credential (user-facing); "custom LLM" stays correct in platform admin UI and code |
 | **Custom router** | An owner's named router with an owner-selected benchmark difficulty, routing mode, and pool of gateway and client models | Referring to owner-configured auto routing | Efficient model pool, custom mode |
 | **Platform router** | An auto router whose model pool is selected by the platform and whose routing mode is selected by users or organizations | Referring to Efficient or Frontier platform routing | Fixed-mode router, owner-configured platform pool |
 | **Routing mode** | The ranking objective: best accuracy per dollar or best accuracy | Referring to how a router ranks eligible models | Model pool, benchmark difficulty |
@@ -255,6 +256,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 | SLA reminder | Does not distinguish warning before deadline from breach at/after deadline | Use **SLA Warning Notification** or **SLA Breach Notification** |
 | Kilo Pass subscription | Can mean current personal Kilo Pass subscription or future org Kilo Pass purchase | Use **Kilo Pass org agreement** for org-owned terms and personal Kilo Pass subscription for the existing user product |
 | assigned pass | Can imply a user receives a personal credit wallet | Use **Kilo Pass allocation** for org pass distribution and **Purchased pass capacity** for bought capacity |
+| custom model | Users read it as a model they configured themselves, but the platform admin defines it | Use **Promotional model** in user-facing UI; keep "custom LLM" for platform admin UI and code |
 | admin | Can mean customer organization role or internal Kilo operator | Use "organization owner" or "billing manager" for customer roles; use "platform admin" for internal manual-commercial operations |
 
 ## Context Boundaries

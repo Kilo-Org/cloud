@@ -6,11 +6,26 @@ import {
   buildBuiltinAgentEntries,
   buildKiloCommandsConfiguration,
 } from '../../../src/shared/runtime-profile-config.js';
+import {
+  isCommandGuardPermissionMap,
+  narrowProfileAgents,
+  permissionRulesOf,
+  type PermissionMap,
+} from '../../../src/shared/profile-permission-policy.js';
+import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
+import { buildGitHubReviewBashRules } from '../github-review-publish-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
+import { writeRuntimeInstructions } from '../runtime-instructions.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
-  'runtimeSkills' | 'runtimeAgents' | 'builtinAgents' | 'kiloCommands'
+  | 'runtimeSkills'
+  | 'runtimeAgents'
+  | 'builtinAgents'
+  | 'kiloCommands'
+  | 'runtimeInstructions'
+  | 'permission'
+  | 'githubReviewTarget'
 >;
 
 export type RuntimeProfileMaterializer = {
@@ -74,10 +89,39 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
+/**
+ * The permission map the written entries are composed against: the map the
+ * route runs with, which is the platform baseline with the session command
+ * policy on top. A session without a command guard states no command policy,
+ * so it keeps its entries as written. A review session also carries the
+ * publisher refusals the runtime writes into the same map.
+ */
+function composedPermissionMap(profile: RuntimeProfile): PermissionMap | undefined {
+  const permission = profile.permission;
+  if (permission === undefined || !isCommandGuardPermissionMap(permission)) return undefined;
+  const enforced: PermissionMap = { ...CONTROL_PLANE_SANDBOX_PERMISSION, ...permission };
+  if (profile.githubReviewTarget === undefined) return enforced;
+  return {
+    ...enforced,
+    bash: { ...permissionRulesOf(enforced['bash']), ...buildGitHubReviewBashRules() },
+  };
+}
+
+/**
+ * Apply the permission map the session runs with to the profile once, before
+ * it is keyed: the platform baseline with the session command policy on top.
+ */
+export function applySessionPermissionPolicy(profile: RuntimeProfile): RuntimeProfile {
+  const permission = composedPermissionMap(profile);
+  if (permission === undefined || profile.runtimeAgents === undefined) return profile;
+  return { ...profile, runtimeAgents: narrowProfileAgents(permission, profile.runtimeAgents) };
+}
+
 export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
   return JSON.stringify(
     stableValue({
       runtimeSkills: profile.runtimeSkills ?? [],
+      runtimeInstructions: profile.runtimeInstructions ?? [],
       runtimeAgents: profile.runtimeAgents ?? [],
       builtinAgents: profile.builtinAgents ?? {},
       kiloCommands: profile.kiloCommands ?? [],
@@ -94,8 +138,11 @@ export function createRuntimeProfileMaterializer(): RuntimeProfileMaterializer {
   const profiles = new Map<string, MaterializedProfile>();
 
   return {
-    async materialize(home, profile, options) {
+    async materialize(home, offered, options) {
       options?.signal?.throwIfAborted();
+      // Apply the session command policy once, so the key describes the entries
+      // that are written and a session without that policy keeps its identity.
+      const profile = applySessionPermissionPolicy(offered);
       const configKey = runtimeProfileConfigKey(profile);
       let entry = profiles.get(home);
       if (entry?.state === 'aborting') entry = undefined;
@@ -186,7 +233,10 @@ export async function materializeRuntimeProfile(
   const previous = profileWrites.get(home) ?? Promise.resolve();
   const write = previous
     .catch(() => undefined)
-    .then(() => stageRuntimeProfile(home, profile, options));
+    .then(async () => {
+      await stageRuntimeProfile(home, profile, options);
+      await writeRuntimeInstructions(home, profile.runtimeInstructions, { replaceExisting: true });
+    });
   profileWrites.set(home, write);
   try {
     await write;
@@ -260,11 +310,16 @@ async function commitRuntimeProfileConfig(
 }
 
 async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<boolean> {
+  // A profile agent's permission map applies together with the session policy,
+  // so write the reconciled map against the permission map this route runs with.
+  // A retained workspace configuration and a stored older route both read
+  // through this function, so every path writes the same effective entry.
+  const { runtimeAgents } = applySessionPermissionPolicy(profile);
   const agents = {
     ...buildBuiltinAgentEntries(profile.builtinAgents),
-    ...(profile.runtimeAgents?.length
+    ...(runtimeAgents?.length
       ? Object.fromEntries(
-          profile.runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
+          runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
         )
       : {}),
   };

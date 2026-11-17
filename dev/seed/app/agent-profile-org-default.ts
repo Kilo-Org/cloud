@@ -6,7 +6,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
@@ -64,6 +64,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const trimmedEmail = email.trim();
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
+  assertLocalSeedDatabase('app:agent-profile-org-default');
   const db = getSeedDb();
 
   // Reset only this fixture's rows: the profiles, the membership, the

@@ -1,9 +1,15 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { reloadAppAsync } from 'expo';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, type TextInput, View, type ViewStyle } from 'react-native';
+import {
+  I18nManager,
+  type TextInput,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -11,9 +17,9 @@ import { toast } from 'sonner-native';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
+import { LanguageSearchField } from '@/components/language-search-field';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Search, SearchX } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
+import { SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { type LanguagePickerItem, languagePickerItems } from '@/i18n/language-rows';
@@ -21,6 +27,7 @@ import { LANGUAGE_ENDONYMS, type SupportedLanguage } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
+import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
 import {
   getLanguagePreference,
   getResolvedLanguage,
@@ -33,13 +40,24 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 // the list fills the sheet's body. The list stays transparent: the route's
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
 // second opaque layer would cover the sheet's own themed surface.
-const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
+const listFlexStyle = { flex: 1 } satisfies ViewStyle,
+  listPadStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
+// A query that matches nothing leaves the no-match state as the list's only
+// content, and the sheet body is far taller than it. Without this the content
+// box shrinks to the state's own height, so the state's own centring collapses
+// and the message hugs the top of a blank sheet. The box then fills the body and
+// centres the state in it. Rows keep the box at its own height, so the first row
+// starts at the list's first pixel; a search field that leads the list is
+// content too, and must stay at the top, so that list keeps the plain style.
+const emptyListContentContainerStyle = {
+  ...listPadStyle,
+  flexGrow: 1,
+  justifyContent: 'center',
 } satisfies ViewStyle;
 
-type RestartFailure = 'reload-failed' | 'restart-skipped';
+// `restart-guarded` cannot arrive from a manual pick — the pick never reads the
+// attempt record — and is handled like `restart-skipped` for safety.
+type RestartFailure = 'reload-failed' | 'restart-skipped' | 'restart-guarded';
 
 export function LanguagePickerSheet({
   onClose,
@@ -55,6 +73,11 @@ export function LanguagePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  // A sheet shorter than its header plus one row (a short window, and the
+  // keyboard takes more of it) cannot show a pinned search field and a result
+  // row at the same time. The search field then leads the scrolling list
+  // instead of pinning under the title row.
+  const searchInList = searchPickerHeaderInList({ windowHeight: useWindowDimensions().height });
   const [selected, setSelected] = useState<LanguagePreference>('device');
   const [applied, setApplied] = useState<LanguagePreference>('device');
   const [appliedLanguage, setAppliedLanguage] = useState<SupportedLanguage>('en');
@@ -70,6 +93,13 @@ export function LanguagePickerSheet({
   // `value`), so an emptied field is cleared through this ref rather than by
   // remounting the input.
   const searchInputRef = useRef<TextInput>(null);
+  // The typed term, kept out of the controlled path but readable when the field
+  // is mounted again. A window resize that crosses the short-window threshold
+  // moves the field between the pinned header and the list header, which mounts
+  // a new native input: without this the field would come back empty while the
+  // list stayed filtered by the query it no longer shows.
+  const searchTextRef = useRef('');
+  const listRef = useRef<FlashListRef<LanguagePickerItem>>(null);
   const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
   const disablePrevention = usePreventRemove(
@@ -99,6 +129,7 @@ export function LanguagePickerSheet({
       // same behaviour — a reopened sheet starts empty — without recreating the
       // view.
       searchInputRef.current?.clear();
+      searchTextRef.current = '';
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -120,6 +151,14 @@ export function LanguagePickerSheet({
     () => languagePickerItems(query, appliedLanguage, applied === 'device'),
     [query, appliedLanguage, applied]
   );
+  const listIsEmpty = items.length === 0 && !searchInList;
+  // A query change draws a shorter list under the kept offset, so reset the
+  // scroll to the top; the header field cannot move into a body swap without
+  // losing the draft, so `repository-rows-list`'s reset is the answer here.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [query]);
+
   // The list's memoized cells compare `renderItem` and `extraData` by identity
   // before re-rendering a row (see the security-agent finding list). `selected`
   // and the in-flight `busy` state therefore have to travel through `extraData`:
@@ -137,22 +176,25 @@ export function LanguagePickerSheet({
   // the busy state change, and memoized `LanguagePickerRow`s re-render only
   // when their own flag moved.
   const renderItem = useCallback(
-    ({ item, index }: { item: LanguagePickerItem; index: number }) => (
-      <LanguagePickerRow
-        item={item}
-        first={index === 0}
-        showDivider={items[index + 1]?.kind !== 'section'}
-        selected={
-          item.kind === 'device'
-            ? selected === 'device'
-            : item.kind === 'language' && selected === item.row.tag
-        }
-        disabled={busy}
-        deviceEndonym={deviceEndonym}
-        isRtl={isRtl}
-        onSelect={handleSelectRow}
-      />
-    ),
+    ({ item, index }: { item: LanguagePickerItem | undefined; index: number }) =>
+      // A stale index past the end of the rows (the model picker's renderItem
+      // carries the same guard for the same reason).
+      item ? (
+        <LanguagePickerRow
+          item={item}
+          first={index === 0}
+          showDivider={items[index + 1]?.kind !== 'section'}
+          selected={
+            item.kind === 'device'
+              ? selected === 'device'
+              : item.kind === 'language' && selected === item.row.tag
+          }
+          disabled={busy}
+          deviceEndonym={deviceEndonym}
+          isRtl={isRtl}
+          onSelect={handleSelectRow}
+        />
+      ) : null,
     [items, selected, busy, deviceEndonym, isRtl, handleSelectRow]
   );
 
@@ -181,10 +223,11 @@ export function LanguagePickerSheet({
         break;
       }
       case 'reload-failed':
-      case 'restart-skipped': {
-        // Both leave the language saved without a relaunch; offer the sheet's
-        // retry so the user can ask for the restart again. The outcome names
-        // the step that failed, so Retry resumes from there.
+      case 'restart-skipped':
+      case 'restart-guarded': {
+        // All three leave the language saved without a relaunch; offer the
+        // sheet's retry so the user can ask for the restart again. The outcome
+        // names the step that failed, so Retry resumes from there.
         setBusy(false);
         setRestarting(false);
         setRestartFailure(outcome.kind);
@@ -214,16 +257,15 @@ export function LanguagePickerSheet({
   };
 
   // A failed reload already forced the direction, so Retry only reloads again.
-  // A skipped restart never forced it: the attempt record could not be
-  // written, which is exactly the state the automatic relaunch refuses to run
-  // from. Reloading there would come back in the previous direction with no
-  // record, so Retry re-runs the apply path instead and the record write is
-  // retried before anything reloads.
+  // Both skipped kinds re-run the apply (a guarded automatic follow is not
+  // reachable here, but the same recovery is right): a skipped restart never
+  // forced the direction, so reloading would come back with the previous one, and
+  // re-running the apply retries the record write before anything reloads.
   const retryRestart = async () => {
     if (busy) {
       return;
     }
-    if (restartFailure === 'restart-skipped') {
+    if (restartFailure === 'restart-skipped' || restartFailure === 'restart-guarded') {
       setRestartFailure(null);
       await handleDone();
       return;
@@ -284,6 +326,21 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
+  // The field lives in `@/components/language-search-field`: the pill chrome
+  // and the shared single-line `Input`, extracted to keep this sheet within
+  // its max-lines budget.
+  const searchField = (
+    <LanguageSearchField
+      searchInList={searchInList}
+      editable={!busy}
+      inputRef={searchInputRef}
+      draftRef={searchTextRef}
+      onChangeText={text => {
+        searchTextRef.current = text;
+        setQuery(text);
+      }}
+    />
+  );
   return (
     <PickerSheet
       title={t('common.language')}
@@ -294,56 +351,43 @@ export function LanguagePickerSheet({
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}
-      headerContent={
-        // Filled pill with a leading magnifier, the one search-field shape the
-        // repository and share pickers use. The outlined box this replaced made
-        // the same control look like two different controls across pickers. The
-        // field itself is the shared single-line `Input`: it owns the height
-        // floor, the one line box for the placeholder and the value, and the RTL
-        // content alignment, so the pill owns only the chrome and this field
-        // keeps only its flex share and text size.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            ref={searchInputRef}
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // focus effect clears the live field through the ref, so a reopen
-            // starts empty.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!busy}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
-      }
+      headerInBody={searchInList}
+      headerContent={searchField}
     >
-      {items.length === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title={t('language.noMatches')}
-          description={t('agents.sessionList.tryDifferentSearch')}
-        />
-      ) : (
-        <FlashList
-          nestedScrollEnabled
-          style={listStyle}
-          contentContainerStyle={listContentContainerStyle}
-          data={items}
-          extraData={rowExtraData}
-          keyExtractor={item => item.key}
-          {...SEARCHABLE_PICKER_LIST_PROPS}
-          ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-          renderItem={renderItem}
-        />
-      )}
+      {/*
+        One list for both states. The search field is uncontrolled (see its
+        `ref` above), so a branch that re-parents it between the list header and
+        an empty-state wrapper remounts the native input: a query that matched
+        nothing would close the keyboard and drop the typed text. The empty
+        state is the list's own empty component, which leaves the field in
+        place; `placement="static"` keeps it out of a scroller of its own, so the
+        list's content box owns where it sits (see
+        `emptyListContentContainerStyle`).
+      */}
+      <FlashList<LanguagePickerItem>
+        nestedScrollEnabled
+        ref={listRef}
+        style={listFlexStyle}
+        contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
+        data={items}
+        extraData={rowExtraData}
+        // The `undefined` guards cover FlashList indexing `data` past its end
+        // for a discarded render (see the model picker's comment).
+        keyExtractor={(item: LanguagePickerItem | undefined, index) => item?.key ?? String(index)}
+        maintainVisibleContentPosition={{ disabled: true }}
+        {...SEARCHABLE_PICKER_LIST_PROPS}
+        ListHeaderComponent={searchInList ? searchField : undefined}
+        ListEmptyComponent={
+          <EmptyState
+            placement="static"
+            icon={SearchX}
+            title={t('language.noMatches')}
+            description={t('agents.sessionList.tryDifferentSearch')}
+          />
+        }
+        ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
+        renderItem={renderItem}
+      />
     </PickerSheet>
   );
 }

@@ -9,6 +9,16 @@ vi.mock('@/lib/font-scale/native-font-scale', () => ({
   subscribeToFontScale: () => null,
 }));
 
+// `expo-localization` imports the `expo` runtime, so the Node test projects
+// cannot load it either. The app's root provider tree reads the device locale
+// list to follow a device language change, so an English device answers the
+// default and nothing else is needed. A suite that needs another locale
+// registers its own mock, which wins.
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US' }],
+  useLocales: () => [{ languageTag: 'en-US' }],
+}));
+
 /** The subset of keyboard state the app reads through `useKeyboardState`. */
 type KeyboardStateSnapshot = {
   height: number;
@@ -61,6 +71,7 @@ vi.mock('expo-background-task', () => ({
 vi.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'KeyboardProvider',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  KeyboardAwareScrollView: 'KeyboardAwareScrollView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
@@ -77,6 +88,16 @@ vi.mock('react-native-keyboard-controller', () => ({
 vi.mock('@/components/keyboard-motion-provider', () => ({
   KeyboardMotionProvider: 'KeyboardMotionProvider',
   useKeyboardMotionProgress: () => ({ value: 0 }),
+  useKeyboardMotionHeight: () => ({ value: 0 }),
+}));
+
+// `KeyboardFollowPane` reads the keyboard's shared values and reanimated's
+// `useAnimatedStyle`. Hosts that mount `ChatComposer` outside the pane only need
+// the answer to "am I inside one"; a test that wants the inside path registers
+// its own mock, which wins.
+vi.mock('@/components/keyboard-follow-pane', () => ({
+  KeyboardFollowPane: 'KeyboardFollowPane',
+  useInsideKeyboardFollowPane: () => false,
 }));
 
 // `react-native-enriched-markdown` and `react-native-webview` are native views.

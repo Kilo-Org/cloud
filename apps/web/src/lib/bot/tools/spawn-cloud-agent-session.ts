@@ -23,6 +23,10 @@ import {
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import {
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -135,6 +139,11 @@ export default async function spawnCloudAgentSession(
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
 
+  const githubAccessPurpose =
+    options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
+      ? 'agent'
+      : 'workflow';
+
   if (args.githubRepo) {
     const targetAuthorization = await authorizeGitHubRepository({
       platformIntegration,
@@ -164,19 +173,25 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
 
-    // Resolve the project through the account's GitLab connection first, as
-    // the GitHub branch of this tool does.
     let projectResolved: boolean;
     try {
-      projectResolved =
-        owner.type === 'org'
-          ? await validateGitLabRepoAccessForOrganization(
-              owner.id,
-              gitLabActorUserId,
-              args.gitlabProject
-            )
-          : await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      if (owner.type === 'org') {
+        normalizeGitLabInstanceUrl(await getGitLabInstanceUrlForOrganization(owner.id));
+        projectResolved = await validateGitLabRepoAccessForOrganization(
+          owner.id,
+          gitLabActorUserId,
+          args.gitlabProject
+        );
+      } else {
+        projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      }
     } catch (error) {
+      if (error instanceof GitLabInstanceUrlError) {
+        return {
+          response:
+            "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+        };
+      }
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },
         extra: { botRequestId, ownerType: owner.type },
@@ -239,10 +254,6 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    const githubAccessPurpose =
-      options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
-        ? 'agent'
-        : 'workflow';
     const repository = await resolveGitHubRepositoryForOwner(
       owner,
       args.githubRepo,

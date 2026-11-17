@@ -183,18 +183,6 @@ function discoverServerComponents(): { file: string; route: string }[] {
     });
 }
 
-function workerAdminProcedureNames(worker: 'gastown' | 'wasteland'): string[] {
-  const file = path.join(REPO_ROOT, `services/${worker}/src/trpc/router.ts`);
-  const source = fs.readFileSync(file, 'utf8');
-  return [...source.matchAll(/^\s*([A-Za-z0-9_]+):\s*adminProcedure\b/gm)].map(
-    match => match[1] as string
-  );
-}
-
-function workerAdminRoute(worker: 'gastown' | 'wasteland', name: string): string {
-  return `${worker}.${name}`;
-}
-
 const procedures = rootRouter._def.procedures as Record<string, ProcedureDef>;
 const discoveredProcedures = Object.entries(procedures).map(([procedurePath, def]) => ({
   path: procedurePath,
@@ -399,47 +387,6 @@ describe('privileged inventory covers discovered route handlers', () => {
     }
 
     expect(missing).toEqual([]);
-  });
-});
-
-describe('privileged inventory covers Worker admin gates', () => {
-  test.each(['gastown', 'wasteland'] as const)('%s admin procedures are classified', worker => {
-    const names = workerAdminProcedureNames(worker);
-    expect(names.length).toBeGreaterThan(0);
-
-    for (const name of names) {
-      expect(
-        findPrivilegedInventoryEntry({ surface: 'worker', route: workerAdminRoute(worker, name) })
-      ).toBeDefined();
-    }
-  });
-
-  test('the Worker admin procedure list is reviewed as a snapshot', () => {
-    const mapping = (['gastown', 'wasteland'] as const)
-      .flatMap(worker =>
-        workerAdminProcedureNames(worker).map(name => {
-          const route = workerAdminRoute(worker, name);
-          const entry = findPrivilegedInventoryEntry({ surface: 'worker', route });
-          return `${route} -> ${entry?.id ?? 'NONE'}`;
-        })
-      )
-      .sort();
-
-    expect(mapping).toMatchSnapshot('worker-admin-procedures');
-  });
-
-  test('the discovered token-mint entry points are classified', () => {
-    const tokenRoutes = discoverRESTRoutes()
-      .filter(route => /^\/api\/(gastown|wasteland)\/token$/.test(route.route))
-      .map(route => route.route)
-      .sort();
-
-    expect(tokenRoutes).toEqual(['/api/gastown/token', '/api/wasteland/token']);
-    for (const route of tokenRoutes) {
-      expect(
-        findPrivilegedInventoryEntry({ surface: 'rest', route, access: 'write' })
-      ).toBeDefined();
-    }
   });
 });
 

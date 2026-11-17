@@ -63,6 +63,8 @@ import { generateControlToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
 const REMEDIATION_LAUNCH_MAX_ATTEMPTS = 3;
+// The dispatcher cron runs every minute, so a contended row is not selected again at once.
+const REMEDIATION_CONTENDED_DEFERRAL_SECONDS = 60;
 const REMEDIATION_PREPARE_SESSION_TIMEOUT_MS = 60_000;
 const REMEDIATION_PRELAUNCH_RECOVERY_LIMIT = 100;
 const REMEDIATION_PRELAUNCH_FAILURE_CODE = 'PRELAUNCH_TIMEOUT';
@@ -941,6 +943,32 @@ async function claimAttemptForLaunch(db: WorkerDb, attemptId: string, jobId: str
   return rows.rows[0] ?? null;
 }
 
+export async function deferContendedRemediationAttempt(
+  db: WorkerDb,
+  attemptId: string
+): Promise<void> {
+  await db.execute<{ id: string }>(sql`
+    UPDATE security_remediation_attempts AS attempt
+    SET
+      next_retry_at = now() + make_interval(secs => ${REMEDIATION_CONTENDED_DEFERRAL_SECONDS}),
+      updated_at = now()
+    WHERE attempt.id = ${attemptId}::uuid
+      AND attempt.status = 'queued'
+      AND coalesce(attempt.next_retry_at, '-infinity'::timestamptz) <= now()
+      AND EXISTS (
+        SELECT 1
+        FROM security_remediation_attempts AS active
+        WHERE active.id <> attempt.id
+          AND active.status IN ('launching', 'running')
+          AND (
+            (attempt.owned_by_organization_id IS NOT NULL AND active.owned_by_organization_id = attempt.owned_by_organization_id)
+            OR (attempt.owned_by_user_id IS NOT NULL AND active.owned_by_user_id = attempt.owned_by_user_id)
+            OR active.repo_full_name = attempt.repo_full_name
+          )
+      )
+  `);
+}
+
 function nextRetryAt(attemptCount: number): string {
   const baseDelayMs = 30_000 * 2 ** Math.max(0, attemptCount - 1);
   const cappedDelayMs = Math.min(10 * 60 * 1000, baseDelayMs);
@@ -1470,7 +1498,10 @@ export async function processRemediationAttempt(params: {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const jobId = randomUUID();
   const attempt = await claimAttemptForLaunch(db, params.attemptId, jobId);
-  if (!attempt) return 'skipped';
+  if (!attempt) {
+    await deferContendedRemediationAttempt(db, params.attemptId);
+    return 'skipped';
+  }
 
   let finding: SecurityFindingRecord | null = null;
   let owner: QueueOwner | null = null;
@@ -2753,25 +2784,48 @@ export async function discoverQueuedRemediationAttempts(
   db: WorkerDb,
   limit: number
 ): Promise<string[]> {
-  const rows = await db
-    .select({ id: security_remediation_attempts.id })
-    .from(security_remediation_attempts)
-    .where(
-      and(
-        eq(security_remediation_attempts.status, 'queued'),
-        lte(
-          sql`coalesce(${security_remediation_attempts.next_retry_at}, '-infinity'::timestamptz)`,
-          sql`now()`
+  const rows = await db.execute<{ id: string }>(sql`
+    WITH due AS (
+      SELECT
+        attempt.id,
+        attempt.priority,
+        attempt.queued_at,
+        CASE
+          WHEN attempt.owned_by_organization_id IS NOT NULL
+            THEN 'org:' || attempt.owned_by_organization_id::text
+          ELSE 'user:' || attempt.owned_by_user_id
+        END AS owner_key
+      FROM security_remediation_attempts AS attempt
+      WHERE attempt.status = 'queued'
+        AND coalesce(attempt.next_retry_at, '-infinity'::timestamptz) <= now()
+        AND NOT EXISTS (
+          SELECT 1
+          FROM security_remediation_attempts AS active
+          WHERE active.id <> attempt.id
+            AND active.status IN ('launching', 'running')
+            AND (
+              (attempt.owned_by_organization_id IS NOT NULL AND active.owned_by_organization_id = attempt.owned_by_organization_id)
+              OR (attempt.owned_by_user_id IS NOT NULL AND active.owned_by_user_id = attempt.owned_by_user_id)
+            )
         )
-      )
+    ),
+    ranked AS (
+      SELECT
+        due.id,
+        due.priority,
+        due.queued_at,
+        row_number() OVER (
+          PARTITION BY due.owner_key
+          ORDER BY due.priority, due.queued_at, due.id
+        ) AS owner_rank
+      FROM due
     )
-    .orderBy(
-      asc(security_remediation_attempts.priority),
-      asc(security_remediation_attempts.queued_at),
-      asc(security_remediation_attempts.id)
-    )
-    .limit(limit);
-  return rows.map(row => row.id);
+    SELECT ranked.id
+    FROM ranked
+    ORDER BY ranked.owner_rank, ranked.priority, ranked.queued_at, ranked.id
+    LIMIT ${limit}
+  `);
+  return rows.rows.map(row => row.id);
 }
 
 export async function consumeRemediationAttemptBatch(

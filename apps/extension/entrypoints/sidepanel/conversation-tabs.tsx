@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { compactingConversationIdsAtom, runningConversationIdsAtom } from './agent-chat-atoms';
 import { getStoredConversationTitle } from './agent-conversation-storage';
@@ -21,6 +22,26 @@ export const ConversationTabs = ({
 }): JSX.Element => {
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const activeTabRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    const activeTab = activeTabRef.current;
+
+    if (strip === null || activeTab === null) {
+      return;
+    }
+
+    const stripBounds = strip.getBoundingClientRect();
+    const tabBounds = activeTab.getBoundingClientRect();
+
+    if (tabBounds.left < stripBounds.left) {
+      strip.scrollLeft += tabBounds.left - stripBounds.left;
+    } else if (tabBounds.right > stripBounds.right) {
+      strip.scrollLeft += tabBounds.right - stripBounds.right;
+    }
+  }, [activeConversationId, conversations.length]);
 
   return (
     <div className="border-b border-border bg-surface-raised">
@@ -28,6 +49,7 @@ export const ConversationTabs = ({
         <div
           aria-label="Conversation tabs"
           className="agent-conversation-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+          ref={stripRef}
           role="tablist"
         >
           {conversations.map(conversation => {
@@ -45,6 +67,7 @@ export const ConversationTabs = ({
                     : 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-border text-foreground-muted hover:border-border-strong hover:text-foreground'
                 }
                 key={conversation.id}
+                ref={isActive ? activeTabRef : undefined}
               >
                 <button
                   aria-selected={isActive}

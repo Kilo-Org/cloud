@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { kilocode_users, security_findings } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
@@ -51,6 +51,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`unexpected arguments: ${rest.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('app:security-agent-findings');
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email.trim());
   const users = await db

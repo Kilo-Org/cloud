@@ -1,5 +1,10 @@
 import type { Organization } from '@kilocode/db/schema';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganizationBilling,
+  hasInviteSeatCapacity,
+  inviteConsumesSeat,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+} from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
   organization_invitations,
@@ -9,6 +14,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -35,7 +41,10 @@ import {
   sendOrgSubscriptionEmail,
 } from '@kilocode/web-shared/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
-import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationRole,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationPlanSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
@@ -69,10 +78,12 @@ const SubscriptionMetadataSchema = z.object({
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
 
 export async function getOrganizationSeatUsage(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  txn?: DrizzleTransaction
 ): Promise<{ used: number; total: number }> {
+  const reader = txn ?? db;
   const [activeMembers, pendingInvitations, organization] = await Promise.all([
-    db
+    reader
       .select({ value: count() })
       .from(organization_memberships)
       .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
@@ -83,7 +94,7 @@ export async function getOrganizationSeatUsage(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    reader
       .select({ value: count() })
       .from(organization_invitations)
       .where(
@@ -94,11 +105,86 @@ export async function getOrganizationSeatUsage(
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
       ),
-    getOrganizationById(organizationId),
+    reader
+      .select({
+        plan: organizations.plan,
+        requireSeats: organizations.require_seats,
+        seatCount: organizations.seat_count,
+      })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1),
   ]);
   const used = (activeMembers[0]?.value ?? 0) + (pendingInvitations[0]?.value ?? 0);
-  const total = organization?.seat_count || 0;
+  const total = organization[0]?.seatCount || 0;
   return { used, total };
+}
+
+/**
+ * Serializes everything one organization's invitations do: the duplicate
+ * lookup, the seat check and the insert. A caller takes it first, so two
+ * concurrent invites for the same address cannot both pass the duplicate
+ * lookup (there is no unique constraint on `(organization_id, email)`), and
+ * neither can take the last free seat twice.
+ *
+ * `pg_advisory_xact_lock` blocks the second transaction until the first
+ * commits, and the lock releases at commit or rollback. It is advisory rather
+ * than a row lock on `organizations`, so it orders only invitations and leaves
+ * unrelated writes to that row alone.
+ */
+export async function lockOrganizationInvites(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id']
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':invite', 0))`
+  );
+}
+
+/**
+ * Refuses an invitation that would take a seat the organization does not have,
+ * using the same rule the invite dialogs show (`hasInviteSeatCapacity`). A
+ * billing manager takes no seat, so that role is never gated.
+ *
+ * The caller must already hold {@link lockOrganizationInvites}, which is what
+ * makes the read-then-insert safe against a concurrent invite.
+ *
+ * This gates invitations only. Adding a membership directly — SCIM directory
+ * sync (`directory-sync.ts`), SSO sign-in (`user/sso.ts`), the admin add-member
+ * route, a sales-demo seed, or the subscription's owner grant — has never
+ * enforced a seat limit and still does not, so those paths can take the last
+ * seat without this lock. Widening that is a separate behaviour change.
+ */
+export async function assertInviteSeatCapacity(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  role: OrganizationRole
+): Promise<void> {
+  if (!inviteConsumesSeat(role)) {
+    return;
+  }
+  const [organization] = await tx
+    .select({
+      plan: organizations.plan,
+      requireSeats: organizations.require_seats,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!organization) {
+    throw new Error('Organization not found');
+  }
+  const { used, total } = await getOrganizationSeatUsage(organizationId, tx);
+  if (
+    !hasInviteSeatCapacity({
+      plan: organization.plan,
+      requireSeats: organization.requireSeats,
+      usedSeats: used,
+      totalSeats: total,
+    })
+  ) {
+    throw new Error(ORGANIZATION_INVITE_SEAT_LIMIT_REACHED);
+  }
 }
 
 /**

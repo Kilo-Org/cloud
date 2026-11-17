@@ -1,4 +1,4 @@
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
 // Worker-runtime tests for the deployed fake LLM: the Worker entry, the

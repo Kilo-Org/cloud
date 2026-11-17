@@ -21,6 +21,7 @@ export function PickerSheet({
   headerContent,
   expired = false,
   scrollable = true,
+  headerInBody = false,
   disabled = false,
   onHardwareBack,
   doneDisabled = false,
@@ -39,7 +40,11 @@ export function PickerSheet({
   cancelLabel?: string;
   children?: ReactNode;
   headerContent?: ReactNode;
-  /** Set when the caller's data source (picker bridge) is gone — renders the standard "Options expired" empty state instead of children. */
+  /**
+   * Set when the caller's data source (picker bridge) is gone — renders the
+   * standard "Options expired" empty state instead of children. An expired
+   * shell that has a Cancel disables Done: there is nothing left to commit.
+   */
   expired?: boolean;
   /**
    * Set to false when children manage their own scrolling (e.g. a FlatList
@@ -47,6 +52,14 @@ export function PickerSheet({
    * the header instead of nesting them in a ScrollView.
    */
   scrollable?: boolean;
+  /**
+   * Set when the caller renders `headerContent` as the first item of its own
+   * scrolling body instead of pinning it under the title row. A sheet whose
+   * presented height is smaller than the pinned header plus one row (a short
+   * window, and the keyboard takes more of it) keeps the title row and its
+   * actions, and lets everything else scroll.
+   */
+  headerInBody?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
   /**
@@ -150,10 +163,13 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
-          doneDisabled={doneDisabled}
+          // An expired shell holds nothing to commit: Done would promise a
+          // selection that cannot exist, so the leading Cancel becomes the one
+          // way out. A shell with no Cancel keeps Done as its only exit.
+          doneDisabled={doneDisabled || (expired && onCancel !== undefined)}
           topInset={topInset}
         />
-        {headerContent}
+        {!headerInBody && headerContent}
       </View>
       {scrollable && !expired ? (
         // "handled" is the shell's own rule for the sheets that live in it: a

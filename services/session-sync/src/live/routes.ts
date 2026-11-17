@@ -232,12 +232,18 @@ live.get('/sessions', async c => {
       return error('invalid_request', 'Invalid session cursor');
     }
   }
-  const result = await getTenantStub(c.env, { type: 'user', id: auth.userID }).listCreatedSessions({
-    limit: limit.data,
-    before,
-  });
+  const [listed, presence] = await Promise.allSettled([
+    getTenantStub(c.env, { type: 'user', id: auth.userID }).listCreatedSessions({
+      limit: limit.data,
+      before,
+    }),
+    getPresenceStub(c.env, auth.userID).list(),
+  ]);
+  if (listed.status === 'rejected') throw listed.reason;
+  const result = listed.value;
   if (!result.ok) return json(errorBody(result.error), ERROR_STATUS[result.error.code]);
-  const instances = await getPresenceStub(c.env, auth.userID).list();
+  if (presence.status === 'rejected') throw presence.reason;
+  const instances = presence.value;
   return json({
     version: 1,
     items: result.value.items.map(item => ({

@@ -1,0 +1,378 @@
+import { createElement, type ElementType } from 'react';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+
+import '@/i18n';
+import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import { act, type ReactTestRenderer } from '@/test/renderer';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+import { ProfileEditScreen } from './profile-edit-screen';
+import type * as ReactQuery from '@tanstack/react-query';
+
+type Links = { linkedinUrl: string | null; githubUrl: string | null };
+
+type MutationOptions = {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+};
+
+type ScreenState = {
+  invalidate: Mock;
+  links: Links;
+  error: boolean;
+  mutations: MutationOptions[];
+  mutate: Mock;
+  back: Mock;
+  focused: boolean;
+  headerBack: (() => void) | undefined;
+  toastError: Mock;
+  toastSuccess: Mock;
+};
+
+const state = vi.hoisted((): ScreenState => ({
+  links: { linkedinUrl: null, githubUrl: null },
+  error: false,
+  mutations: [] as MutationOptions[],
+  mutate: vi.fn(),
+  invalidate: vi.fn(),
+  back: vi.fn(),
+  focused: true,
+  headerBack: undefined,
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  // Nothing dispatches a hardware Back in this harness, so the subscription only
+  // has to answer the hook's cleanup.
+  BackHandler: {
+    addEventListener: () => ({
+      remove: () => {
+        // no listener was registered
+      },
+    }),
+  },
+}));
+vi.mock('expo-router', () => {
+  // Stable objects, like the real hooks: a new identity per render would re-run
+  // the effects `usePopOnce` registers on them. The screen's own Back press asks
+  // whether there is history to pop; this harness always has some.
+  const router = { back: state.back, canGoBack: () => true };
+  const navigation = {
+    isFocused: () => state.focused,
+    addListener: () => () => {
+      // the mocked navigator never emits `blur`
+    },
+    // This route alone, with no scene below it: a dismissal names no reveal
+    // scene and its window settles as it always did.
+    getState: () => ({ index: 0, routes: [{ key: 'route-this' }] }),
+    getParent: () => undefined,
+  };
+  return { useRouter: () => router, useNavigation: () => navigation };
+});
+vi.mock('@tanstack/react-query', async importOriginal => {
+  // The provider and client stay real so renderWithProviders works; only the
+  // hooks the screen calls are replaced.
+  const actual = await importOriginal<typeof ReactQuery>();
+  return {
+    ...actual,
+    useQuery: () => ({
+      data: state.links,
+      isPending: false,
+      isError: state.error,
+      isFetching: false,
+      refetch: vi.fn(),
+    }),
+    useQueryClient: () => ({ invalidateQueries: state.invalidate }),
+    useMutation: (options: MutationOptions) => {
+      state.mutations.push(options);
+      return { mutate: state.mutate, isPending: false };
+    },
+  };
+});
+vi.mock('sonner-native', () => ({ toast: { error: state.toastError, success: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: state.toastSuccess, error: vi.fn() },
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    user: {
+      getProfileLinks: { queryOptions: () => ({}), queryKey: () => [] },
+      updateProfile: { mutationOptions: (options: MutationOptions) => options },
+    },
+  }),
+}));
+vi.mock('@/components/screen-header', () => ({
+  // The real header runs its `onBack` for a Back press; keep that callback so a
+  // test can deliver the press.
+  ScreenHeader: (props: { onBack?: () => void }) => {
+    state.headerBack = props.onBack;
+    return 'ScreenHeader';
+  },
+}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+
+const FIELD = 'FormField' as ElementType;
+const BUTTON = 'Button' as ElementType;
+
+let renderer: ReactTestRenderer | undefined = undefined;
+
+async function mount() {
+  const view = await renderWithProviders(createElement(ProfileEditScreen));
+  renderer = view.renderer;
+  return view.renderer.root;
+}
+
+function field(root: ReactTestRenderer['root'], label: string) {
+  const found = root.findAll(node => Object.is(node.type, FIELD) && node.props.label === label);
+  const [only] = found;
+  if (!only || found.length !== 1) {
+    throw new Error(`expected one ${label} field, found ${found.length}`);
+  }
+  return only;
+}
+
+/** Type into the GitHub field, as a reader editing the link would. */
+function typeGithub(root: ReactTestRenderer['root'], value: string): void {
+  act(() => {
+    (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(value);
+  });
+}
+
+function saveButton(root: ReactTestRenderer['root']) {
+  const found = root.findAll(
+    node => Object.is(node.type, BUTTON) && node.props.className !== undefined
+  );
+  const last = found.at(-1);
+  if (!last) {
+    throw new Error('missing Save button');
+  }
+  return last;
+}
+
+function press(root: ReactTestRenderer['root']): void {
+  act(() => {
+    (saveButton(root).props.onPress as () => void)();
+  });
+}
+
+/**
+ * The reader's Back on this screen's header. The real header dispatches through
+ * `useHeaderBack`: a declared `onBack` is the handler, and without one it pops
+ * with `router.back()` of its own. Both arms are reproduced here, so a screen
+ * that leaves the header to pop by itself is measured, not excused.
+ */
+function pressHeaderBack(): void {
+  const onBack = state.headerBack;
+  act(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    state.back();
+  });
+}
+
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  resetLeaveSettle();
+  state.links = { linkedinUrl: null, githubUrl: null };
+  state.error = false;
+  state.mutations = [];
+  state.focused = true;
+  state.headerBack = undefined;
+  state.mutate.mockClear();
+  state.invalidate.mockClear();
+  state.back.mockClear();
+  state.toastError.mockClear();
+  state.toastSuccess.mockClear();
+});
+
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+});
+
+describe('ProfileEditScreen', () => {
+  it('fills the fields with the saved links', async () => {
+    state.links = {
+      linkedinUrl: 'https://www.linkedin.com/in/ada',
+      githubUrl: 'https://github.com/ada',
+    };
+    const root = await mount();
+
+    expect(field(root, 'LinkedIn URL').props.defaultValue).toBe('https://www.linkedin.com/in/ada');
+    expect(field(root, 'GitHub URL').props.defaultValue).toBe('https://github.com/ada');
+  });
+
+  it('submits only the edited link and returns on success', async () => {
+    const root = await mount();
+
+    act(() => {
+      (field(root, 'LinkedIn URL').props.onChangeText as (value: string) => void)(
+        'https://www.linkedin.com/in/ada'
+      );
+    });
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledWith({ linkedin_url: 'https://www.linkedin.com/in/ada' });
+
+    act(() => {
+      state.mutations[0]?.onSuccess?.();
+    });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pop the screen beneath when the reader left before the save settled', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+    expect(state.mutate).toHaveBeenCalledWith({ github_url: 'https://github.com/ada' });
+    expect(state.back).not.toHaveBeenCalled();
+
+    // The reader's Back reached the navigator, so this screen is already leaving.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
+    expect(state.back).not.toHaveBeenCalled();
+  });
+
+  it('pops once for a save, and never for a repeated settle or a no-change Save', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // Back to the saved value: Save submits nothing, and must not pop either.
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)('');
+    });
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the save completes before the reader presses Back', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The mutation settles first: the completion pops the editor and opens the
+    // leave window.
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The reader's Back still reaches this header during that pop, because the
+    // header stays the touch owner until the transition ends.
+    pressHeaderBack();
+
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the header Back precedes the save completion', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The reader leaves through the header while the save is in flight.
+    pressHeaderBack();
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The navigator applied that Back, so this route is no longer focused when
+    // the save settles.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a link that is not a URL without a round trip', async () => {
+    const root = await mount();
+
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)('github.com/ada');
+    });
+    press(root);
+
+    expect(state.mutate).not.toHaveBeenCalled();
+    expect(field(root, 'GitHub URL').props.error).toBe(
+      'Enter a URL that starts with http:// or https://'
+    );
+  });
+
+  it('clears a link by submitting null', async () => {
+    state.links = { linkedinUrl: null, githubUrl: 'https://github.com/ada' };
+    const root = await mount();
+
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)('');
+    });
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledWith({ github_url: null });
+  });
+
+  it('returns without a request when nothing changed', async () => {
+    const root = await mount();
+
+    press(root);
+
+    expect(state.mutate).not.toHaveBeenCalled();
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the server message when a save is refused', async () => {
+    const root = await mount();
+    act(() => {
+      (field(root, 'LinkedIn URL').props.onChangeText as (value: string) => void)(
+        'https://www.linkedin.com/in/ada'
+      );
+    });
+    press(root);
+
+    act(() => {
+      state.mutations[0]?.onError?.(new Error('Could not update profile'));
+    });
+
+    expect(state.toastError).toHaveBeenCalledWith('Could not update profile');
+    expect(state.back).not.toHaveBeenCalled();
+  });
+
+  it('offers a retry when the saved links cannot be read', async () => {
+    state.error = true;
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+});

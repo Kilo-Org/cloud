@@ -38,7 +38,8 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/repo-picker-filter.ts': 'repo search folding',
   'lib/todos/todo-model.ts': 'repository full-name comparison',
   'lib/use-new-session-repos.ts': 'repo key normalization',
-  'lib/organization-invoice-download.ts': 'filename comparison',
+  'lib/cloud-environments/environment-selection.ts': 'remembered-choice key normalization',
+  'lib/invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/document-preview.ts': 'document MIME and file-extension normalization',
   'lib/agent-profile-forms.ts': 'environment-variable key normalization',
@@ -49,6 +50,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
   'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
   'lib/chat/hf-quant-size.ts': 'quantization-family normalization for a size table',
+  'lib/credits/store-products-loader.ts': 'store failure report token normalization',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
@@ -59,6 +61,8 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/pr-review/provider-pr-url.ts': 'URL scheme/host comparison',
   'components/login/idle-auth.tsx': 'email normalization',
   'components/organization/invite-member-sheet.tsx': 'email normalization',
+  'components/organization/group-form.tsx': 'member search folding',
+  'components/organization/org-mode-form-model.ts': 'mode-slug normalization',
   'components/share/share-destination-list.tsx': 'search folding',
   'components/pr-review/discussion/comment-row.tsx': 'login comparison',
   'components/pr-review/discussion/pr-review-discussion-list.tsx': 'login comparison',
@@ -80,8 +84,8 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/profile-agents-model.ts': 'agent-slug comparison',
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
-  'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
   'lib/url-authority.ts': 'URL scheme and hostname normalization',
+  'lib/code-reviewer-council.ts': 'council label dedupe comparison',
 };
 
 /** The `.toUpperCase(` / `.toLowerCase(` call the class is about. */

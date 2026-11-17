@@ -13,6 +13,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -92,17 +93,29 @@ const logoutCleanupStoreEnvelopeSchema = z.object({
 /**
  * A read that feeds a read-modify-write keeps "nothing stored" and "could not
  * read" apart, so a mutation aborts instead of persisting a list derived from
- * a store it never read. `unreadable` is a valid payload this build cannot
- * interpret (an unknown store version): it is kept for the build that wrote
- * it. `corrupt` is a payload that is not valid JSON, so nothing in it is
+ * a store it never read.
+ *
+ * `unreadable` is the read itself failing: a failed keychain read or a locked
+ * device. It says nothing about what the store holds, and a later read can
+ * still return the records.
+ *
+ * `unsupported` is a valid payload this build cannot interpret: an unknown
+ * store version, or neither known shape. Its records stay unreadable for this
+ * build, so it is kept for the build that wrote it.
+ *
+ * `corrupt` is a payload that is not valid JSON, so nothing in it is
  * recoverable and the next write may replace it.
  */
 export type LogoutCleanupStoreRead =
   | { readonly status: 'records'; readonly records: LogoutCleanupRecord[] }
   | { readonly status: 'unreadable' }
+  | { readonly status: 'unsupported' }
   | { readonly status: 'corrupt' };
 
 type ParsedJson = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
+
+/** What parsing a stored string can report; a failed read never reaches here. */
+type ParsedStoreRead = Exclude<LogoutCleanupStoreRead, { status: 'unreadable' }>;
 
 function parseJson(raw: string): ParsedJson {
   try {
@@ -112,7 +125,7 @@ function parseJson(raw: string): ParsedJson {
   }
 }
 
-function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
+function parseStoredRecords(raw: string | null): ParsedStoreRead {
   if (raw === null) {
     return { status: 'records', records: [] };
   }
@@ -125,7 +138,7 @@ function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
     // An unknown store version may carry entries this build cannot interpret;
     // rewriting it would drop them.
     if (envelope.data.version !== LOGOUT_CLEANUP_STORE_VERSION) {
-      return { status: 'unreadable' };
+      return { status: 'unsupported' };
     }
     // Validate per entry: one malformed record must not discard the rest.
     const records: LogoutCleanupRecord[] = [];
@@ -140,7 +153,7 @@ function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
   const legacy = legacyLogoutCleanupRecordSchema.safeParse(parsed.value);
   return legacy.success
     ? { status: 'records', records: [fromLegacyRecord(legacy.data)] }
-    : { status: 'unreadable' };
+    : { status: 'unsupported' };
 }
 
 function fromLegacyRecord(
@@ -169,14 +182,16 @@ function dedupeByOwner(records: readonly LogoutCleanupRecord[]): LogoutCleanupRe
 }
 
 /**
- * Reads the stored records for a read-modify-write. A failed keychain read, an
- * unparseable payload, or an unknown store version is `unreadable`: a caller
- * must then leave the key alone rather than persist a list derived from a
- * store it never read. A malformed entry inside the current version is
- * discarded on its own so the valid records survive.
+ * Reads the stored records for a read-modify-write. A failed keychain read or a
+ * locked device is `unreadable`, and an unknown store version or an
+ * unrecognized payload is `unsupported`: a caller must leave the key alone
+ * rather than persist a list derived from a store it never read or cannot
+ * decode. A malformed entry inside the current version is discarded on its own
+ * so the valid records survive.
  *
- * An unreadable or corrupt payload is reported once per process and state, so
- * one unchanged store state is one event rather than one per read.
+ * An unsupported or corrupt payload is reported once per process and state, so
+ * one unchanged store state is one event rather than one per read. A failed
+ * read is reported by the secure-store read path instead.
  */
 export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> {
   const stored = await readStoredValueForUpdate(LOGOUT_CLEANUP_TOMBSTONE_KEY);
@@ -190,7 +205,7 @@ export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> 
   return read;
 }
 
-/** Read-only view of the pending records; an unreadable store reads as none. */
+/** Read-only view of the pending records; an unreadable or unsupported store reads as none. */
 export async function readLogoutCleanupRecords(): Promise<LogoutCleanupRecord[]> {
   const read = await readLogoutCleanupStore();
   return read.status === 'records' ? read.records : [];
@@ -258,7 +273,7 @@ async function chainLogoutCleanupRecords(
 ): Promise<void> {
   await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
     const read = await readLogoutCleanupStore();
-    if (read.status === 'unreadable') {
+    if (read.status === 'unreadable' || read.status === 'unsupported') {
       // Nothing safe to modify: keep the payload for the build that wrote it.
       return;
     }
@@ -439,7 +454,7 @@ async function runActivityCleanup(
     // adds obligations that its deletion or partial-success rewrite cannot see.
     await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
       const read = await readLogoutCleanupStore();
-      if (read.status === 'unreadable') {
+      if (read.status === 'unreadable' || read.status === 'unsupported') {
         // Nothing safe to modify: keep the payload for the build that wrote it.
         return;
       }
@@ -462,12 +477,15 @@ async function runActivityCleanup(
     });
   } catch (error) {
     // Never throw: a failed unregister or record write must not block the
-    // account or org switch.
-    Sentry.captureException(error, {
-      tags: {
-        'error.subsystem': 'auth',
-        'error.operation': 'unregister_activity_tokens',
-      },
-    });
+    // account or org switch. A locked device refusing the record write is that
+    // device state, not a defect, and the record stays for the next attempt.
+    if (!isKeychainInteractionRefused(error)) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'auth',
+          'error.operation': 'unregister_activity_tokens',
+        },
+      });
+    }
   }
 }

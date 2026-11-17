@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_configs,
   kilocode_users,
@@ -11,7 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email> [--count <n>]';
 
@@ -104,20 +103,6 @@ function longListSelection(repositories: { id: number }[]): number[] {
 /** Fixed so a rerun replaces the same organization, integration and configs. */
 const ORGANIZATION_ID = '5d0f6b21-8f3c-4a19-9a74-2c6e1b0d8f53';
 
-/** Refuses to touch anything but a loopback database, whatever the env says. */
-function assertLocalDatabaseTarget(): void {
-  if (process.env.USE_PRODUCTION_DB === 'true') {
-    throw new Error('The repository picker seed refuses to run with USE_PRODUCTION_DB=true.');
-  }
-
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)) {
-    throw new Error(
-      `The repository picker seed requires a loopback database host; received ${databaseUrl.hostname}.`
-    );
-  }
-}
-
 /**
  * `--count <n>` (or `--count=<n>`) swaps the two-row snapshot for a long one;
  * absent keeps the pair. Any other argument is a usage error, so a typo cannot
@@ -188,7 +173,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const repositories = count === null ? REPOSITORIES : longListSnapshot(count);
 
-  assertLocalDatabaseTarget();
+  assertLocalSeedDatabase('app:mobile-repository-picker');
   const db = getSeedDb();
   const userId = `dev-seed:mobile-repository-picker:${email}`;
   const [existing] = await db

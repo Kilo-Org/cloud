@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the surface, role-gate and validation cases share the sheet's mounted harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,11 +10,15 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
 import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
+import {
+  type OrganizationBoundaryFixture,
+  resetOrganizationBoundary,
+} from './member-limit-sheet.mounted.test-helpers';
 
-const boundary = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
+const boundary = vi.hoisted((): OrganizationBoundaryFixture => ({
+  organizationId: null,
   role: 'owner',
-  org: null as { organizationId: string } | null,
+  org: null,
   isResolving: false,
 }));
 const query = vi.hoisted(() => ({
@@ -37,6 +42,9 @@ const query = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
+  // The invite sheet's dismissal reads this through `usePopOnce`; this suite
+  // never drives Android Back, so a focused route with no events is enough.
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   // None of these surfaces needs a focus effect to run, and the invite sheet
   // resets its form on every focus after mount, so running one per render
   // would loop.
@@ -112,10 +120,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 
 beforeEach(() => {
-  boundary.organizationId = 'org-1';
-  boundary.org = { organizationId: 'org-1' };
-  boundary.role = 'owner';
-  boundary.isResolving = false;
+  resetOrganizationBoundary(boundary);
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;
@@ -189,6 +194,38 @@ describe('organization sheet surfaces', () => {
       const { renderer, unmount } = await renderWithProviders(element);
       expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+      unmount();
+    }
+  );
+});
+
+describe('MemberLimitSheet role gate', () => {
+  function deniedEmptyState(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+    // `PermissionDenied` is not mocked here, so its description reaches the
+    // stubbed `EmptyState` as a prop.
+    return propsOf(renderer.root.find(node => String(node.type) === 'EmptyState'));
+  }
+
+  it('opens the limit form for an admin, who manages members like the web card', async () => {
+    boundary.role = 'admin';
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Button').length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it.each([{ role: 'member' }, { role: 'billing_manager' }])(
+    'denies a $role with the shared role copy',
+    async ({ role }) => {
+      boundary.role = role;
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      expect(deniedEmptyState(renderer).description).toBe(
+        i18n.t('organization.memberLimit.permissionDenied')
+      );
+      expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(0);
       unmount();
     }
   );

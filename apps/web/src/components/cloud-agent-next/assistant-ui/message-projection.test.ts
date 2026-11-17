@@ -79,23 +79,34 @@ describe('Cloud message projection', () => {
   it('retains stable rows and parts during streaming, and invalidates only changed metadata', () => {
     const project = createCloudMessageProjector();
     const a = assistant('a', {}, [text('p1', 'a')]);
+    const prompt: StoredMessage = {
+      info: {
+        id: 'user-2',
+        role: 'user',
+        sessionID: 'ses-fixture',
+        time: { created: 2 },
+        agent: 'code',
+        model: { providerID: 'fixture', modelID: 'fixture' },
+      },
+      parts: [],
+    };
     const b = assistant('b', { parentID: 'user-2', time: { created: 3 } }, [text('p2', 'b')]);
-    const initial = project({ messages: [a, b], isStreaming: true });
-    expect(project({ messages: [a, b], isStreaming: true })[0]).toBe(initial[0]);
+    const initial = project({ messages: [a, prompt, b], isStreaming: true });
+    expect(project({ messages: [a, prompt, b], isStreaming: true })[0]).toBe(initial[0]);
     const updated = { ...b, parts: [text('p2', 'b', 'streamed')] };
-    const streamed = project({ messages: [a, updated], isStreaming: true });
+    const streamed = project({ messages: [a, prompt, updated], isStreaming: true });
     expect(streamed[0]).toBe(initial[0]);
-    expect(streamed[1].message.status).toEqual({ type: 'running' });
+    expect(streamed[2].message.status).toEqual({ type: 'running' });
     const delivery = { status: 'queued' } as const;
     const changed = project({
-      messages: [a, updated],
+      messages: [a, prompt, updated],
       isStreaming: true,
       pendingMessages: new Map([['a', delivery]]),
     });
     expect(changed[0]).not.toBe(streamed[0]);
     expect(changed[0].presentation.deliveryState).toBe(delivery);
     expect(changed[0].message.content[0]).toBe(streamed[0].message.content[0]);
-    expect(changed[1]).toBe(streamed[1]);
+    expect(changed[2]).toBe(streamed[2]);
   });
 
   it('keeps preparations and commits as decorations and grouping barriers', () => {

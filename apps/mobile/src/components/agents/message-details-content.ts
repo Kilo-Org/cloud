@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -6,7 +6,7 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 
 import { collectCopyableText, messageTextParts } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
-import { selectMessageFailure } from './message-failure-state';
+import { type MessageDeliveryStatement, selectMessageFailure } from './message-failure-state';
 import { resolveMessageDisplayModel } from './message-model-label';
 import { isPartStreaming } from './part-types';
 import { friendlyModelName } from './session-model-display';
@@ -45,7 +45,7 @@ type MessageDetailsContent = {
 export function getMessageDetailsContent(
   message: StoredMessage,
   modelOptions: SessionModelOption[],
-  deliveryState?: MessageDeliveryState
+  deliveryState?: MessageDeliveryStatement
 ): MessageDetailsContent {
   const roleLabel =
     message.info.role === 'user'

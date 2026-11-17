@@ -4,6 +4,7 @@ import {
   inviteEmailError,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
+import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 import { i18n } from '@/i18n';
 
 const invalidCopy = i18n.t('organization.inviteMember.emailError');
@@ -26,6 +27,24 @@ describe('inviteEmailError', () => {
   it('accepts an ordinary address, including the trimmed form', () => {
     expect(inviteEmailError('first.last+tag@sub.example.co.uk')).toBeNull();
     expect(inviteEmailError('  dev@example.com \n')).toBeNull();
+  });
+
+  it('accepts the longest address a mail system delivers and rejects one character more', () => {
+    // 64-character local part, then three 63-character labels: 254 characters,
+    // the RFC 5321 path maximum the procedure's `.max(254)` mirrors.
+    const longest = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    expect(longest).toHaveLength(254);
+    expect(inviteEmailError(longest)).toBeNull();
+
+    const oneMore = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+    expect(oneMore).toHaveLength(255);
+    expect(inviteEmailError(oneMore)).toBe(invalidCopy);
+  });
+
+  it('rejects an address whose local part is far past the length maximum', () => {
+    // The shape the sheet used to enable Send for: well-formed enough for the
+    // syntax rule, longer than any address a mail system can deliver.
+    expect(inviteEmailError(`${'a'.repeat(2004)}@example.com`)).toBe(invalidCopy);
   });
 });
 
@@ -64,6 +83,19 @@ describe('inviteErrorCopy', () => {
     expect(
       inviteErrorCopy(Object.assign(new Error('Invite conflict'), { data: { code: 'CONFLICT' } }))
     ).toEqual({ field: 'form', message: i18n.t('organization.inviteMember.alreadyInvited') });
+  });
+
+  it('names a seat rejection, so a race with another invite still explains itself', () => {
+    const error = Object.assign(new Error(ORGANIZATION_INVITE_SEAT_LIMIT_REACHED), {
+      data: {
+        code: 'PRECONDITION_FAILED',
+        message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+      },
+    });
+    expect(inviteErrorCopy(error)).toEqual({
+      field: 'form',
+      message: i18n.t('organization.inviteMember.noSeatsAvailable'),
+    });
   });
 
   it('falls back to the generic line for every other failure', () => {

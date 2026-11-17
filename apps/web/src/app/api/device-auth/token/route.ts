@@ -41,6 +41,7 @@ export const POST = withRestTiming('/api/device-auth/token', async (request: Req
           ...(result.expiresIn ? { expiresIn: result.expiresIn } : {}),
           userId: result.userId,
           userEmail: result.userEmail,
+          ...(result.pendingLink ? { pendingLink: result.pendingLink } : {}),
         },
         { status: 200 }
       );

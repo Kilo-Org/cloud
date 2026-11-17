@@ -4,35 +4,31 @@ import {
   isTerminalGlanceableStatus,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   type HomeWidgetData,
   homeWidgetDataSchema,
   type HomeWidgetDetails,
 } from '@kilocode/app-shared/home-widget';
 
-import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+import {
+  type GatedSecureStore,
+  readGatedValueForUpdate,
+  widgetSecureStore,
+  writeGatedValue,
+} from '@/lib/auth/secure-store-gated';
 
-const HOME_WIDGET_DATA_KEY = 'home-widget-data';
+import { HOME_WIDGET_DATA_KEY } from './widget-store';
 
-type HomeWidgetStore = {
-  getItemAsync(key: string): Promise<string | null>;
-  setItemAsync(key: string, value: string): Promise<void>;
-};
-
-let storeForTests: HomeWidgetStore | null = null;
+let storeForTests: GatedSecureStore | null = null;
 let lastData: HomeWidgetData | null = null;
-let details: HomeWidgetDetails = EMPTY_HOME_WIDGET_DETAILS;
+let details: HomeWidgetDetails = emptyHomeWidgetDetails();
 let confirmedAt: number | null = null;
 let epoch = 0;
 let writes: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
-function store(): HomeWidgetStore {
-  if (storeForTests !== null) {
-    return storeForTests;
-  }
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load
-  return require('expo-secure-store') as HomeWidgetStore;
+function store(): GatedSecureStore {
+  return storeForTests ?? widgetSecureStore();
 }
 
 function changed(): void {
@@ -41,14 +37,15 @@ function changed(): void {
   }
 }
 
-/** Each write waits for the previous one so the mirror never lands out of order. */
+/**
+ * Each write waits for the previous one so the mirror never lands out of order.
+ * A write the keychain refuses — only before the device's first unlock since
+ * boot, for an item written `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` — leaves the
+ * in-memory record authoritative, and the next publish mirrors it again.
+ */
 async function writeAfter(previous: Promise<void> | null, raw: string): Promise<void> {
   await previous;
-  try {
-    await store().setItemAsync(HOME_WIDGET_DATA_KEY, raw);
-  } catch (error) {
-    reportSecureStoreFailure('write', error);
-  }
+  await writeGatedValue(store, HOME_WIDGET_DATA_KEY, raw);
 }
 
 function mirror(data: HomeWidgetData | null): void {
@@ -78,7 +75,7 @@ export function subscribeHomeWidgetData(listener: () => void): () => void {
 export function clearHomeWidgetData(): void {
   epoch += 1;
   lastData = null;
-  details = EMPTY_HOME_WIDGET_DETAILS;
+  details = emptyHomeWidgetDetails();
   confirmedAt = null;
   mirror(null);
   changed();
@@ -89,7 +86,7 @@ export function rememberHomeWidgetData(data: HomeWidgetData): boolean {
   const snapshot = data.snapshot;
   if (isTerminalGlanceableStatus(snapshot.status)) {
     epoch += 1;
-    details = EMPTY_HOME_WIDGET_DETAILS;
+    details = emptyHomeWidgetDetails();
     lastData = { snapshot, details };
     mirror(lastData);
     changed();
@@ -127,10 +124,10 @@ export function rememberHomeWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): 
 
 export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot): HomeWidgetData {
   if (isTerminalGlanceableStatus(snapshot.status)) {
-    return { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    return { snapshot, details: emptyHomeWidgetDetails() };
   }
   if (lastData !== null && isTerminalGlanceableStatus(lastData.snapshot.status)) {
-    return { snapshot: lastData.snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    return { snapshot: lastData.snapshot, details: emptyHomeWidgetDetails() };
   }
   const retained = lastData?.snapshot.scopeKey === snapshot.scopeKey ? lastData : null;
   if (retained !== null) {
@@ -155,7 +152,7 @@ export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot)
     details:
       snapshot.status === 'happy' || snapshot.status === 'empty'
         ? details
-        : EMPTY_HOME_WIDGET_DETAILS,
+        : emptyHomeWidgetDetails(),
   };
 }
 
@@ -175,27 +172,26 @@ export async function restoreHomeWidgetData(scopeKey: string | null): Promise<vo
     return;
   }
   const startedAtEpoch = epoch;
-  try {
-    const raw = await store().getItemAsync(HOME_WIDGET_DATA_KEY);
-    if (raw === null || epoch !== startedAtEpoch) {
-      return;
-    }
-    const stored = parseStoredHomeWidgetData(raw);
-    if (
-      stored === null ||
-      stored.snapshot.scopeKey !== scopeKey ||
-      (stored.snapshot.status !== 'happy' &&
-        stored.snapshot.status !== 'empty' &&
-        stored.snapshot.status !== 'privacy')
-    ) {
-      return;
-    }
-    lastData = stored;
-    details = stored.details;
-    changed();
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
+  // A device that has not been unlocked since boot, and a read that failed, both
+  // read as unreadable rather than as no record: the Home surface draws from
+  // memory until a confirmed fetch mirrors a new one.
+  const read = await readGatedValueForUpdate(store, HOME_WIDGET_DATA_KEY);
+  if (read.status === 'unreadable' || read.value === null || epoch !== startedAtEpoch) {
+    return;
   }
+  const stored = parseStoredHomeWidgetData(read.value);
+  if (
+    stored === null ||
+    stored.snapshot.scopeKey !== scopeKey ||
+    (stored.snapshot.status !== 'happy' &&
+      stored.snapshot.status !== 'empty' &&
+      stored.snapshot.status !== 'privacy')
+  ) {
+    return;
+  }
+  lastData = stored;
+  details = stored.details;
+  changed();
 }
 
 export function hasSameHomeWidgetDetails(a: HomeWidgetDetails, b: HomeWidgetDetails): boolean {
@@ -214,14 +210,19 @@ export function hasSameHomeWidgetDetails(a: HomeWidgetDetails, b: HomeWidgetDeta
   );
 }
 
-export function _setHomeWidgetStoreForTests(next: HomeWidgetStore | null): void {
+export function _setHomeWidgetStoreForTests(next: GatedSecureStore | null): void {
   storeForTests = next;
+}
+
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushHomeWidgetMirrorForTests(): Promise<void> {
+  await writes;
 }
 
 export function _resetHomeWidgetDataForTests(): void {
   epoch += 1;
   lastData = null;
-  details = EMPTY_HOME_WIDGET_DETAILS;
+  details = emptyHomeWidgetDetails();
   confirmedAt = null;
   storeForTests = null;
   listeners.clear();

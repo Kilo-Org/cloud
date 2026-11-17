@@ -122,10 +122,10 @@ vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   },
   useFetchToCompletion: () => ({
     run: vi.fn(),
-    isRunning: false,
+    feedback: { status: 'idle' },
     loadedFiles: 0,
     totalFiles: null,
-    error: null,
+    failure: null,
   }),
 }));
 vi.mock('@/lib/pr-review/diff/use-pr-diff-list-scroll', () => ({

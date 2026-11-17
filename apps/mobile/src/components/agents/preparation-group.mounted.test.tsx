@@ -17,6 +17,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  Square: 'Square',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -77,6 +78,44 @@ function textValues(root: TestRenderer.ReactTestInstance): unknown[] {
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => node.props.children);
 }
+
+describe('PreparationGroup command failures', () => {
+  it('names a start command by its command text, not the setup-command wording', async () => {
+    const phase = phaseStep({
+      id: 'start',
+      key: 'start_commands',
+      label: 'start commands',
+      status: 'completed',
+    });
+    const command = phaseStep({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      label: 'Start command 1',
+      command: 'pnpm dev:start',
+      commandIndex: 0,
+      parentStepId: 'start',
+      status: 'failed',
+      exitCode: 1,
+      safeError: 'Start command 1 failed',
+    });
+    const renderer = await mountGroup({
+      ...attemptWithStep(phase),
+      status: 'completed',
+      completedAt: 13_400,
+      steps: [phase, command],
+    });
+
+    const texts = textValues(renderer.root);
+    expect(texts).toContain('pnpm dev:start');
+    expect(texts).not.toContain('Setup command 1');
+    expect(texts).toContain('Exit code: 1');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
 
 describe('PreparationGroup phase label', () => {
   it('renders the catalog name for the phase key, not the server label', async () => {
@@ -211,6 +250,22 @@ describe('PreparationGroup incomplete restore', () => {
     mounted.unmount();
   });
 
+  it('reads a preparation cancellation as a stopped session at every level', async () => {
+    const mounted = await mount(
+      restoreAttempt({
+        status: 'failed',
+        safeError: 'preparation_cancelled',
+        steps: [incompleteStep({ status: 'failed', safeError: 'preparation_cancelled' })],
+      })
+    );
+    expect(mounted.group().props.accessibilityLabel).toBe('Session stopped');
+    expect(mounted.renderedTextValues()).toContain('Session stopped');
+    expect(mounted.renderedTextValues()).not.toContain('preparation_cancelled');
+    expect(mounted.renderer.root.findAllByType('AlertCircle')).toHaveLength(0);
+    expect(mounted.renderer.root.findAllByType('Square')).toHaveLength(2);
+    mounted.unmount();
+  });
+
   it('keeps the running title while the attempt prepares', async () => {
     const running = await mount(restoreAttempt({ status: 'running' }));
     expect(running.group().props.accessibilityLabel).toBe('Preparing environment');
@@ -239,8 +294,8 @@ describe('PreparationGroup incomplete restore', () => {
       )[0];
     expect(row('Workspace setup')?.findAllByType('Check')).toHaveLength(1);
     expect(row('Workspace setup')?.findAllByType('AlertCircle')).toHaveLength(0);
-    expect(row('Starting sandbox')?.findAllByType('AlertCircle')).toHaveLength(1);
-    expect(row('Starting sandbox')?.findAllByType('Check')).toHaveLength(0);
+    expect(row('Sandbox start')?.findAllByType('AlertCircle')).toHaveLength(1);
+    expect(row('Sandbox start')?.findAllByType('Check')).toHaveLength(0);
     mounted.unmount();
   });
 

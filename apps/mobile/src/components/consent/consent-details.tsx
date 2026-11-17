@@ -1,4 +1,3 @@
-import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +12,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { PRIVACY_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
@@ -249,7 +247,7 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   };
 
   const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+    router.push({ pathname: '/(app)/legal/[document]', params: { document: 'privacy' } });
   };
 
   return (
@@ -285,6 +283,13 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
                 </View>
               </View>
             }
+          />
+
+          <Section
+            title={t('consent.featureFlagsTitle')}
+            what={t('consent.featureFlagsWhat')}
+            why={t('consent.featureFlagsWhy')}
+            who={t('consent.featureFlagsWho')}
           />
 
           <Text className="mt-6 text-sm font-semibold text-foreground">

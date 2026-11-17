@@ -196,6 +196,7 @@ export const LiveScoreboardTableRowSchema = z.object({
   published_at: z.string(),
   generated_at: z.string(),
   min_accuracy: z.number(),
+  accuracy_noise_band: nullableRate.optional().transform(value => value ?? null),
   switch_cost_factor: z.number(),
   best_accuracy_switch_threshold: z.number(),
   production_token_profile: storedJsonSchema
@@ -233,11 +234,12 @@ export const LiveScoreboardCandidateRowSchema = z.object({
     .nullish()
     .transform(value => value ?? null),
   estimated_request_cost_usd: nullableMetric.optional().transform(value => value ?? null),
+  p50_latency_ms: nullableMetric.optional().transform(value => value ?? null),
+  p50_ttft_ms: nullableMetric.optional().transform(value => value ?? null),
   cases: z
     .number()
     .int()
     .nonnegative()
     .nullish()
     .transform(value => value ?? null),
-  p50LatencyMs: nullableMetric,
 });

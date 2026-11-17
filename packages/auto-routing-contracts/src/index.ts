@@ -1,12 +1,17 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
 import { OwnerTypeSchema } from './owner';
-import { ReasoningEffortSchema } from './reasoning';
+import {
+  ReasoningEffortSchema,
+  refineVariantExclusivity,
+  ReasoningComplexitySchema,
+  VariantSchema,
+} from './reasoning';
 import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
-  customRouterCandidateModel,
+  refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
@@ -47,9 +52,7 @@ export const RoutingConstraintsSchema = z.object({
 });
 export type RoutingConstraints = z.infer<typeof RoutingConstraintsSchema>;
 
-export function isVirtualAutoModelId(model: string): boolean {
-  return model.trim().toLowerCase().startsWith('kilo-auto/');
-}
+export { isVirtualAutoModelId } from './virtual-auto-model';
 
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
@@ -95,7 +98,7 @@ export const ClassifierOutputSchema = z
     taskType: ClassifierTaskTypeSchema,
     subtaskType: ClassifierSubtaskTypeSchema,
     contextComplexity: z.enum(['small', 'medium', 'large']),
-    reasoningComplexity: z.enum(['low', 'medium', 'high']),
+    reasoningComplexity: ReasoningComplexitySchema,
     riskLevel: z.enum(['low', 'medium', 'high']),
     executionMode: z.enum([
       'answer_only',
@@ -120,12 +123,7 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-/**
- * Reader precedence for decision variant identity: prefer `variant`; when
- * absent, a valid legacy `reasoningEffort` string may be interpreted as the
- * legacy variant key. New writers emit `variant` only; old writers emitted
- * `reasoningEffort` only. Both non-null is malformed.
- */
+/** Variant precedence: {@link refineVariantExclusivity}. */
 export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
@@ -135,7 +133,7 @@ export const AutoRoutingDecisionSchema = z
     source: z.literal('benchmark'),
     tableVersion: z.string().nullable(),
     // Canonical catalog variant key the chosen model was benchmarked with.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the chosen model was benchmarked with; retained for
     // rolling deploy reads. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -157,16 +155,8 @@ export const AutoRoutingDecisionSchema = z
     fallback: z.boolean().optional(),
   })
   .superRefine((decision, ctx) => {
-    if (decision.variant != null && decision.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Decision must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineVariantExclusivity(decision, ctx, 'Decision');
+    refineEntryModelMatch(decision, ctx);
     if (
       decision.fallback !== true &&
       (decision.taskType === null ||

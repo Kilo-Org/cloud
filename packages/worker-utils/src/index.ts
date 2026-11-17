@@ -3,6 +3,11 @@ export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
 export type { DORetryConfig, DORetryScope } from './do-retry.js';
 
+export {
+  isTransientDurableObjectFailure,
+  isDurableObjectRetryDeadline,
+} from './durable-object-failure.js';
+
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
 
 export { withTimeout } from './timeout.js';
@@ -56,8 +61,6 @@ export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-n
 export {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
-  GASTOWN_AUDIENCE,
-  WASTELAND_AUDIENCE,
   KILO_CHAT_AUDIENCE,
   EVENT_SERVICE_AUDIENCE,
   NOTIFICATIONS_AUDIENCE,
@@ -66,6 +69,8 @@ export {
   SESSION_INGEST_AUDIENCE,
   AI_ATTRIBUTION_AUDIENCE,
   HTML_DEPLOY_AUDIENCE,
+  PAGES_AUDIENCE,
+  PAGES_DEV_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -161,22 +166,15 @@ export type {
   VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 
-export { createKiloAuthMiddleware } from './kilo-auth-middleware.js';
-export type {
-  KiloAuthEnv,
-  KiloAuthMiddlewareOptions,
-  KiloAuthOrgMembership,
-  KiloAuthVariables,
-  ResolveSecret,
-  SecretBinding,
-} from './kilo-auth-middleware.js';
-
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
 
 export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
+
+export { getVercelExecutionRegion } from './vercel-execution-region.js';
+export type { VercelExecutionRegion } from './vercel-execution-region.js';
 
 export { normalizeGitUrl } from './normalize-git-url.js';
 
@@ -262,7 +260,10 @@ export type {
 export {
   activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
+  findEffectiveOrganizationMemberRole,
+  hasEffectiveOrganizationAccess,
   hasOrganizationAccess,
+  inheritedParentMembershipJoinCondition,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -270,6 +271,10 @@ export {
   parentOrganizationMembershipsTable,
   personalOrActiveOrganizationCondition,
   personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
+export type {
+  OrganizationColumns,
+  OrganizationMembershipColumns,
 } from './organization-membership.js';
 
 export {

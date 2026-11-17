@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { recordLlmUsage } from '@kilocode/worker-utils/usage-writer-client';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { POST } from './route';
@@ -186,6 +186,58 @@ it('returns the unchanged 429 body when no slot frees within the wait', async ()
   expect((await POST(request('queue'))).status).toBe(200);
 });
 
+it('classifies a rejected body read as a bounded read failure, not a schema failure', async () => {
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+  const secretive = request('queue');
+  jest
+    .spyOn(secretive, 'json')
+    .mockRejectedValue(new SyntaxError('sensitive body text must not leak into logs'));
+  const response = await POST(secretive);
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+  expect(acquire).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
+
+  const logs = [console.log, console.info, console.warn, console.error].flatMap(
+    log => jest.mocked(log).mock.calls
+  );
+  const reads = logs.filter(
+    ([line]) => line === 'usage record request body could not be read as JSON'
+  );
+  expect(reads).toHaveLength(1);
+  expect(reads[0][1]).toEqual({ error_name: 'SyntaxError' });
+  const schemaFailures = logs.filter(([line]) => line === 'usage record request failed validation');
+  expect(schemaFailures).toHaveLength(0);
+  expect(JSON.stringify(logs)).not.toContain('sensitive');
+});
+
+it.each([
+  new Error('sensitive non-SyntaxError message must not leak into logs'),
+  new TypeError('sensitive type error body must not leak'),
+])('never logs a raw message for a non-SyntaxError body-read rejection (%s)', async error => {
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+  const secretive = request('queue');
+  jest.spyOn(secretive, 'json').mockRejectedValue(error);
+  const response = await POST(secretive);
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+  expect(acquire).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
+
+  const logs = [console.log, console.info, console.warn, console.error].flatMap(
+    log => jest.mocked(log).mock.calls
+  );
+  const reads = logs.filter(
+    ([line]) => line === 'usage record request body could not be read as JSON'
+  );
+  expect(reads).toHaveLength(1);
+  expect(reads[0][1]).toEqual({ error_name: error.name });
+  expect(JSON.stringify(logs)).not.toContain(error.message);
+  expect(JSON.stringify(logs)).not.toContain('sensitive');
+  const schemaFailures = logs.filter(([line]) => line === 'usage record request failed validation');
+  expect(schemaFailures).toHaveLength(0);
+});
+
 it('keeps auth and validation ahead of admission even when the pool is overloaded', async () => {
   writerPool.waitingCount = 1;
   const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
@@ -277,7 +329,7 @@ it('composes actual route429 with the queue writer client without acknowledgemen
   writerPool.waitingCount = 1;
   const fetchWriter: typeof fetch = async (url, init) =>
     POST(new NextRequest(new Request(url, init)));
-  const outcome = await recordUsage(
+  const outcome = await recordLlmUsage(
     payload,
     {
       url: 'http://localhost/api/internal/usage/record',
@@ -310,8 +362,10 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
   expect(admission.map(line => line.outcome)).toEqual(['admitted', 'rejected']);
   expect(Object.keys(admission[0]).sort()).toEqual([
     'active',
+    'active_non_llm',
     'event',
     'limit',
+    'non_llm_limit',
     'outcome',
     'pool',
     'pool_max',
@@ -319,6 +373,7 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
     'sample_rate',
     'slot_wait_ms',
     'writer_caller',
+    'writer_class',
   ]);
   expect(admission[1]).toEqual({
     ...admission[0],

@@ -6,12 +6,16 @@ import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import {
+  providerPreferencesSchema,
+  type providerPrivacySchema,
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
+  providerOptionsNotSupportedResponse,
   storeAndPreviousResponseIdIsNotSupported,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -89,13 +93,7 @@ export function parseLlmProxyRequest(
   }
 
   if (request.body.providerOptions !== undefined) {
-    const error = 'The providerOptions field is not supported. Use provider instead.';
-    return reject(
-      NextResponse.json(
-        { error, error_type: ProxyErrorType.unsupported_field, message: error },
-        { status: 400 }
-      )
-    );
+    return reject(providerOptionsNotSupportedResponse());
   }
 
   if (!hasModelId(request)) return reject(modelDoesNotExistResponse());
@@ -114,7 +112,7 @@ export function parseLlmProxyRequest(
     }
   }
 
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(request.body.provider);
+  const requestPrivacy = providerPreferencesSchema.optional().safeParse(request.body.provider);
   if (!requestPrivacy.success) return reject(invalidRequestResponse());
 
   if (!ipAddress) {

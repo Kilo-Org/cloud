@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one case per attachment shape in the sheet's image-failure matrix */
 import '@/i18n';
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { act, createElement } from 'react';
@@ -17,6 +18,7 @@ vi.mock('./tool-card-image-cache', () => ({
   useToolCardImageUri: (id: string) => cache.get(id),
 }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Modal: 'Modal',
   View: 'View',
   ScrollView: 'ScrollView',
@@ -138,6 +140,15 @@ function failImage(renderer: Renderer) {
 }
 function unavailable(root: Instance) {
   return nodes(root, 'Text').filter(node => node.props.children === 'Image unavailable');
+}
+function reportDismissed(renderer: Renderer) {
+  const node = nodes(renderer.root, 'BottomSheet')[0];
+  if (!node) {
+    throw new Error('sheet was not rendered');
+  }
+  act(() => {
+    (node.props.onDismiss as () => void)();
+  });
 }
 
 beforeEach(() => {
@@ -288,6 +299,8 @@ describe('PartDetailSheet image failures', () => {
       update({ ...part, id: 'part-2' });
     } else {
       update(part, false);
+      expect(unavailable(renderer.root)).toHaveLength(1);
+      reportDismissed(renderer);
       update(part);
     }
     expect(nodes(renderer.root, 'CenteredState')).toHaveLength(0);

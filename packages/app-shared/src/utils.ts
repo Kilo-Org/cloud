@@ -52,6 +52,30 @@ export function timestampMs(value: string | null | undefined): number | null {
   return Number.isFinite(at) ? at : null;
 }
 
+/**
+ * ISO 8601 form of one epoch-millisecond instant.
+ *
+ * The one conversion from a stored instant already read as milliseconds (for
+ * example a `timestampMs` result) to the ISO string the payloads carry, so the
+ * precision and format of every published time come from one place.
+ */
+export function epochMsToIso(at: number): string {
+  return new Date(at).toISOString();
+}
+
+/**
+ * ISO 8601 form of one backend time, or null when it is missing or does not
+ * parse.
+ *
+ * The one conversion from a stored time to the ISO string the widget, push and
+ * session-card payloads carry, so a value that does not parse is absent in the
+ * same way on every surface instead of each caller inventing its own fallback.
+ */
+export function timestampToIso(value: string | null | undefined): string | null {
+  const at = timestampMs(value);
+  return at === null ? null : epochMsToIso(at);
+}
+
 /** Returns the first non-empty string, or '' when none is set. */
 export function firstNonEmpty(...values: (string | null | undefined)[]): string {
   for (const value of values) {
@@ -67,12 +91,9 @@ export function fromMicrodollars(microdollars: number): number {
 }
 
 export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // One owner of the en-US USD presentation: Intl derives USD's 2 minor-unit
+  // digits by default, so cents in, dollars out, same string.
+  return formatCents(amount * 100);
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {

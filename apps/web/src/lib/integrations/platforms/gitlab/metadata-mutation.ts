@@ -1,4 +1,5 @@
 import 'server-only';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
@@ -71,4 +72,17 @@ export async function mutateGitLabMetadataInTransaction(
     );
 
   return updatedMetadata;
+}
+
+/**
+ * Applies a GitLab metadata patch in its own transaction.
+ * Use it when the patch is the caller's only integration write; a caller that
+ * writes other integration state must use `mutateGitLabMetadataInTransaction`
+ * with that write's transaction instead.
+ */
+export async function mutateGitLabMetadata(
+  integrationId: string,
+  patchInput: GitLabMetadataPatchInput
+): Promise<Record<string, unknown>> {
+  return db.transaction(tx => mutateGitLabMetadataInTransaction(tx, integrationId, patchInput));
 }

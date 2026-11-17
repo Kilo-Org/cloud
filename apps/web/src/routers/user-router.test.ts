@@ -2284,6 +2284,34 @@ describe('user router - device sessions', () => {
     ).rejects.toThrow();
   });
 
+  it('lists and revokes a session whose id is not a versioned UUID', async () => {
+    // A `uuid` column accepts any 8-4-4-4-12 hex value; this one carries a
+    // version-0 nibble, so the version-strict RFC validator would refuse it.
+    const versionlessSessionId = '1f0d3a52-6a0b-0c4e-0a51-0d1e2b3c4a05';
+    await db.insert(device_sessions).values({
+      id: versionlessSessionId,
+      kilo_user_id: owner.id,
+      user_agent: 'Kilo-Code/1.2.3 (ios)',
+      last_seen_at: '2026-04-25 10:00:00+00',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+
+    const listed = await caller.user.listDeviceSessions();
+    expect(listed.some(row => row.id === versionlessSessionId)).toBe(true);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: versionlessSessionId })
+    ).resolves.toBeDefined();
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, versionlessSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('user_revoked');
+  });
+
   it('revokes the current device session with the logout reason', async () => {
     const caller = await createCallerForUser(owner.id, {
       deviceSessionId: revokeCurrentSessionId,

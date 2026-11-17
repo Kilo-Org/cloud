@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "آپ کے ایجنٹ سیشن میں اپڈیٹ ہے",
-      "chatMessage": "آپ کے پاس نیا پیغام ہے",
-      "instanceLifecycle": "آپ کی مثال میں اپڈیٹ ہے",
-      "scheduledAction": "شیڈول شدہ عمل میں اپڈیٹ ہے",
       "lowBalance": "آپ کے بیلنس پر توجہ کی ضرورت ہے",
       "spendAlert": "آپ کے خرچ پر توجہ کی ضرورت ہے",
       "securityFinding": "سیکیورٹی کے معاملے پر توجہ کی ضرورت ہے",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · بلا عنوان",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -34,54 +24,23 @@
       "title": "خرچ الرٹ",
       "body": "{{scopeName}} کا خرچ ${{amountUsd}} سے تجاوز کر گیا"
     },
-    "securityFindingNew": {
-      "title": "نیا سیکیورٹی معاملہ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} میں {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "نیا سیکیورٹی معاملہ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA انتباہ",
-      "body": "{{findingTitle}} میں {{repoFullName}}"
+      "title": "SLA انتباہ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA خلاف ورزی",
-      "body": "{{findingTitle}} میں {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "سیکیورٹی چیک میں اپڈیٹ ہے"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} تیار ہے",
-      "body": "چیٹ شروع کرنے کے لیے تھپتھپائیں۔"
-    },
-    "startFailed": {
-      "title": "{{instanceName}} شروع کرنے میں ناکام",
-      "body": "شروع ناکام۔"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} جلد دوبارہ شروع ہوگا",
-      "body": "{{when}} پر دوبارہ شروع کرنے کے لیے شیڈول ہے۔"
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} دوبارہ شروع منسوخ",
-      "body": "پہلے شیڈول شدہ دوبارہ شروع منسوخ کر دیا گیا ہے۔"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} جلد اپ گریڈ ہوگا",
-      "bodyWithTag": "{{targetImageTag}} پر {{when}} کو اپ گریڈ کریں۔",
-      "bodyWithoutTag": "{{when}} پر شیڈول شدہ اپ گریڈ۔"
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} اپ گریڈ منسوخ",
-      "body": "پہلے شیڈول شدہ اپ گریڈ منسوخ کر دیا گیا ہے۔"
+      "title": "SLA خلاف ورزی"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "آپ کا Kilo سیشن آپ کے فون سے کنٹرول کرنے کے لیے تیار ہے"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -199,4 +199,18 @@ describe('PersonalCreditHistoryScreen', () => {
     expect(texts(renderer)).not.toContain("Couldn't load credit activity.");
     unmount();
   });
+
+  it('keeps the profile tab as the Back destination when there is no history', async () => {
+    state.purchases.entries = [purchase()];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // A restored route can open with nothing to pop, so the header itself
+    // carries the tab root as the destination its Back lands on.
+    expect(nodesOfType(renderer, 'ScreenHeader')[0]?.props.backFallback).toBe(
+      '/(app)/(tabs)/(3_profile)'
+    );
+    unmount();
+  });
 });

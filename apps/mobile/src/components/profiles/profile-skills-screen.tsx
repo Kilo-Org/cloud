@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- profile-editor skills: section body, sheet and delete flow share one screen */
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -124,7 +126,8 @@ function SkillsSkeleton() {
 export function ProfileSkillsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{ profileId: string; organizationId?: string; backFallback: Href }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileSkills(profileId, organizationId);
@@ -296,9 +299,6 @@ export function ProfileSkillsScreen({
           />
         ))}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={handleStartAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
           {atSkillCap ? (
             <AccessibleStatus
               message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
@@ -306,6 +306,9 @@ export function ProfileSkillsScreen({
               className="text-sm"
             />
           ) : null}
+          <Button disabled={atSkillCap} onPress={handleStartAdd}>
+            <Text>{t('profiles.addSkill')}</Text>
+          </Button>
         </ProfileManageSlot>
       </>
     );
@@ -317,6 +320,7 @@ export function ProfileSkillsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.skillsTitle')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

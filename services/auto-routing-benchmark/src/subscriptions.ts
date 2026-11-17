@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   benchmarkPairKey,
   resolveBenchmarkIdentity,
+  resolveEffectivePolicy,
   type AutoRouter,
   type BenchmarkConfig,
   type BenchmarkPair,
@@ -248,7 +249,7 @@ async function admitSubscriptionPairs(
           pair.model,
           pair.variant ?? '',
           computeEngineIdentity('decider', config.router),
-          config.deciderRepetitions,
+          resolveEffectivePolicy(config).deciderRepetitions,
           now,
           now,
           owner.ownerType === 'platform' ? 1 : 0,
@@ -361,7 +362,7 @@ export async function servingSubscriptionSnapshot(
     {
       router: config.router,
       engineIdentity: computeEngineIdentity('decider', config.router),
-      repetitions: config.deciderRepetitions,
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     },
     candidates
   );

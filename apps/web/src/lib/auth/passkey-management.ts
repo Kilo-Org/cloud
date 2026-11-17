@@ -1,13 +1,14 @@
 import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, lt, ne, sql, type SQL } from 'drizzle-orm';
 import {
   device_sessions,
   kilocode_users,
   passkey_management_authorizations,
 } from '@kilocode/db/schema';
 import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 
 /** The one passkey-management action a grant authorizes. */
 export type PasskeyManagementOperation = 'enroll' | 'rename' | 'remove';
@@ -28,6 +29,41 @@ const AUTHORIZATION_TOKEN_BYTES = 32;
  */
 function hashAuthorizationToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * The one definition of a grant token: the bytes, their encoding, the digest
+ * the row stores, and the lifetime. Both minting paths build a grant through
+ * it, so a grant they issue always carries the digest redemption looks for.
+ */
+function createPasskeyManagementGrantToken(): {
+  token: string;
+  tokenHash: string;
+  expiresAt: string;
+  expiresIn: number;
+} {
+  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+
+  return {
+    token,
+    tokenHash: hashAuthorizationToken(token),
+    expiresAt: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+  };
+}
+
+/**
+ * The account's current pepper, correlated to the account in the same
+ * statement, so a concurrent update cannot pair one account with another's
+ * pepper. Account recovery rotates it.
+ */
+function accountWebSessionPepper(userId: string): SQL {
+  return sql`(SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${userId})`;
+}
+
+/** A grant minted under one pepper authorizes nothing under another. */
+function pepperMatchesAccount(userId: string): SQL {
+  return sql`${passkey_management_authorizations.web_session_pepper} IS NOT DISTINCT FROM ${accountWebSessionPepper(userId)}`;
 }
 
 /**
@@ -61,15 +97,10 @@ function authorizationMatches(params: {
       : [eq(passkey_management_authorizations.passkey_challenge_id, params.challengeId)]),
     // Account recovery rotates the pepper on the user row. A grant minted
     // under the previous one authorizes nothing afterwards.
-    sql`${passkey_management_authorizations.web_session_pepper} IS NOT DISTINCT FROM (
-      SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users}
-      WHERE ${kilocode_users.id} = ${params.userId}
-    )`,
+    pepperMatchesAccount(params.userId),
     sql`EXISTS (
       SELECT 1 FROM ${device_sessions}
-      WHERE ${device_sessions.id} = ${params.deviceSessionId}
-        AND ${device_sessions.kilo_user_id} = ${params.userId}
-        AND ${device_sessions.revoked_at} IS NULL
+      WHERE ${liveDeviceSessionCondition({ deviceSessionId: params.deviceSessionId, userId: params.userId })}
     )`
   );
 }
@@ -91,18 +122,18 @@ export async function mintPasskeyManagementAuthorization(params: {
   deviceSessionId: string;
   operation: PasskeyManagementOperation;
 }): Promise<MintedPasskeyManagementAuthorization> {
-  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+  const grant = createPasskeyManagementGrantToken();
 
   const [row] = await db
     .insert(passkey_management_authorizations)
     .values({
-      token_hash: hashAuthorizationToken(token),
+      token_hash: grant.tokenHash,
       kilo_user_id: params.userId,
       device_session_id: params.deviceSessionId,
       operation: params.operation,
       state: 'issued',
-      web_session_pepper: sql`(SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${params.userId})`,
-      expires_at: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+      web_session_pepper: accountWebSessionPepper(params.userId),
+      expires_at: grant.expiresAt,
     })
     .returning({ id: passkey_management_authorizations.id });
 
@@ -112,9 +143,9 @@ export async function mintPasskeyManagementAuthorization(params: {
 
   return {
     id: row.id,
-    token,
+    token: grant.token,
     operation: params.operation,
-    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+    expiresIn: grant.expiresIn,
   };
 }
 
@@ -161,7 +192,7 @@ export async function createPasskeyManagementSsoRequest(params: {
       operation: params.operation,
       state: 'pending',
       sso_organization_id: params.ssoOrganizationId,
-      web_session_pepper: sql`(SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${params.userId})`,
+      web_session_pepper: accountWebSessionPepper(params.userId),
       expires_at: new Date(Date.now() + PASSKEY_MANAGEMENT_SSO_REQUEST_TTL_MS).toISOString(),
     })
     .returning({
@@ -249,10 +280,7 @@ export async function approvePasskeyManagementSsoRequest(params: {
         eq(passkey_management_authorizations.sso_organization_id, params.ssoOrganizationId),
         eq(passkey_management_authorizations.state, 'pending'),
         sql`${passkey_management_authorizations.expires_at} > NOW()`,
-        sql`${passkey_management_authorizations.web_session_pepper} IS NOT DISTINCT FROM (
-          SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users}
-          WHERE ${kilocode_users.id} = ${params.userId}
-        )`
+        pepperMatchesAccount(params.userId)
       )
     )
     .returning({ operation: passkey_management_authorizations.operation });
@@ -277,18 +305,17 @@ export async function collectPasskeyManagementSsoGrant(params: {
   userId: string;
   deviceSessionId: string;
 }): Promise<CollectedPasskeyManagementGrant | null> {
-  const token = randomBytes(AUTHORIZATION_TOKEN_BYTES).toString('base64url');
+  const grant = createPasskeyManagementGrantToken();
 
   const collected = await db.transaction(async tx => {
     const [session] = await tx
       .select({ id: device_sessions.id })
       .from(device_sessions)
       .where(
-        and(
-          eq(device_sessions.id, params.deviceSessionId),
-          eq(device_sessions.kilo_user_id, params.userId),
-          isNull(device_sessions.revoked_at)
-        )
+        liveDeviceSessionCondition({
+          deviceSessionId: params.deviceSessionId,
+          userId: params.userId,
+        })
       )
       .limit(1)
       .for('share');
@@ -301,8 +328,8 @@ export async function collectPasskeyManagementSsoGrant(params: {
       .update(passkey_management_authorizations)
       .set({
         state: 'issued',
-        token_hash: hashAuthorizationToken(token),
-        expires_at: new Date(Date.now() + PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS).toISOString(),
+        token_hash: grant.tokenHash,
+        expires_at: grant.expiresAt,
       })
       .where(
         and(
@@ -311,10 +338,7 @@ export async function collectPasskeyManagementSsoGrant(params: {
           eq(passkey_management_authorizations.device_session_id, params.deviceSessionId),
           eq(passkey_management_authorizations.state, 'approved'),
           sql`${passkey_management_authorizations.expires_at} > NOW()`,
-          sql`${passkey_management_authorizations.web_session_pepper} IS NOT DISTINCT FROM (
-            SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users}
-            WHERE ${kilocode_users.id} = ${params.userId}
-          )`
+          pepperMatchesAccount(params.userId)
         )
       )
       .returning({ operation: passkey_management_authorizations.operation });
@@ -327,9 +351,9 @@ export async function collectPasskeyManagementSsoGrant(params: {
   }
 
   return {
-    token,
+    token: grant.token,
     operation: collected.operation,
-    expiresIn: Math.floor(PASSKEY_MANAGEMENT_AUTHORIZATION_TTL_MS / 1000),
+    expiresIn: grant.expiresIn,
   };
 }
 
@@ -389,11 +413,10 @@ export async function hasActiveNativeDeviceSession(params: {
     .select({ id: device_sessions.id })
     .from(device_sessions)
     .where(
-      and(
-        eq(device_sessions.id, params.deviceSessionId),
-        eq(device_sessions.kilo_user_id, params.userId),
-        isNull(device_sessions.revoked_at)
-      )
+      liveDeviceSessionCondition({
+        deviceSessionId: params.deviceSessionId,
+        userId: params.userId,
+      })
     )
     .limit(1);
   return row !== undefined;
@@ -481,11 +504,10 @@ export async function consumePasskeyManagementAuthorization(
     .select({ id: device_sessions.id })
     .from(device_sessions)
     .where(
-      and(
-        eq(device_sessions.id, params.deviceSessionId),
-        eq(device_sessions.kilo_user_id, params.userId),
-        isNull(device_sessions.revoked_at)
-      )
+      liveDeviceSessionCondition({
+        deviceSessionId: params.deviceSessionId,
+        userId: params.userId,
+      })
     )
     .limit(1)
     .for('share');

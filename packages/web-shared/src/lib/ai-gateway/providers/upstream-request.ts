@@ -56,6 +56,12 @@ type UpstreamFetchFailureFamily =
  */
 export const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
 
+/**
+ * What a route's `maxDuration` must keep beyond its upstream budget for the
+ * deferred usage work described above.
+ */
+export const UPSTREAM_POST_RESPONSE_HEADROOM_MS = 200 * 1000;
+
 function formatSeconds(ms: number): string {
   return `${Number((ms / 1000).toFixed(1))}s`;
 }
@@ -213,6 +219,15 @@ function classifyUpstreamFetchFailure({
   }
 }
 
+function isTimeoutFailure(failureFamily: UpstreamFetchFailureFamily): boolean {
+  return (
+    failureFamily === 'request_timeout' ||
+    failureFamily === 'headers_timeout' ||
+    failureFamily === 'connect_timeout' ||
+    failureFamily === 'read_timeout'
+  );
+}
+
 /**
  * The client going away also aborts our upstream fetch, so the abort has to be
  * attributed to the client rather than reported as an upstream fault. The body
@@ -242,10 +257,7 @@ function upstreamFetchFailureResponse(
   reasoningEffort: string | null
 ) {
   const error = withRequestId(
-    failureFamily === 'request_timeout' ||
-      failureFamily === 'headers_timeout' ||
-      failureFamily === 'connect_timeout' ||
-      failureFamily === 'read_timeout'
+    isTimeoutFailure(failureFamily)
       ? `The upstream provider did not send response headers before the gateway timeout.${getReasoningEffortTimeoutSuggestion(reasoningEffort)}`
       : 'The upstream provider closed the connection before sending a response.',
     vercelRequestId
@@ -271,7 +283,7 @@ async function buildSignedBedrockRequest({
   url: string;
   method: string;
   headers: Headers;
-  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  body: object;
   credentials: CustomLlmAwsBedrockCredentials;
 }) {
   const serializedBody = JSON.stringify(body);
@@ -288,31 +300,62 @@ async function buildSignedBedrockRequest({
   };
 }
 
-export async function upstreamRequest({
-  chatApi,
-  search,
-  method,
-  body,
-  extraHeaders,
-  provider,
-  signal,
-  vercelRequestId,
-  reasoningEffort,
-  durationBudgetMs,
-}: {
-  chatApi: GatewayChatApiKind;
-  search: string;
+export type UpstreamFetchResult =
+  | { type: 'success'; response: Response }
+  | {
+      type: 'error';
+      response: NextResponse;
+      /**
+       * Set when the fetch itself failed, so the request may have reached the provider. Absent
+       * when the URL policy refused the request or its redirect.
+       */
+      fetchFailure?: { timedOut: boolean };
+    };
+
+type UpstreamFetchInput = {
+  provider: Pick<
+    Provider,
+    'type' | 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy' | 'awsBedrock'
+  >;
   method: string;
-  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
-  extraHeaders: Record<string, string>;
-  provider: Provider;
+  /** Sent as JSON, or as multipart when it is `FormData`, which lets fetch set the boundary. */
+  body: object;
+  extraHeaders?: Record<string, string>;
+  /** The incoming request signal: a client that goes away aborts the upstream call too. */
   signal?: AbortSignal;
   /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
   vercelRequestId?: string | null;
-  reasoningEffort: string | null;
-  /** At most `UPSTREAM_DURATION_BUDGET_MS`; less when an earlier attempt of the invocation spent part of it. */
+  reasoningEffort?: string | null;
+  /**
+   * Hard cap on the call, from the fetch through the last body byte. It must leave the route's
+   * `maxDuration` room for the deferred usage work; see `UPSTREAM_DURATION_BUDGET_MS`.
+   */
   durationBudgetMs: number;
-}): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
+};
+
+async function sendUpstreamFetch({
+  provider,
+  apiUrl,
+  path,
+  resolveUrl,
+  method,
+  body,
+  extraHeaders = {},
+  signal,
+  vercelRequestId,
+  reasoningEffort = null,
+  durationBudgetMs,
+}: UpstreamFetchInput & {
+  /** Reported with fetch failures, along with `path`. */
+  apiUrl: string;
+  path: string;
+  resolveUrl: () => string;
+}): Promise<UpstreamFetchResult> {
+  const isMultipartBody = body instanceof FormData;
+  if (isMultipartBody && (provider.secureProxy || provider.awsBedrock)) {
+    throw new Error(`Provider ${provider.type} cannot send a multipart upstream body`);
+  }
+
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
@@ -326,14 +369,13 @@ export async function upstreamRequest({
   } else if (!provider.awsBedrock) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
-  headers.set('Content-Type', 'application/json');
+  if (!isMultipartBody) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   Object.entries(extraHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
-
-  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
-  const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
 
   const fetchStartedAt = performance.now();
   let headersReceivedAfterMs: number | null = null;
@@ -358,9 +400,7 @@ export async function upstreamRequest({
     : timeoutController.signal;
 
   try {
-    const targetUrl = provider.disableUrlSuffix
-      ? appendQueryString(apiUrl, search)
-      : `${apiUrl}${path}${search}`;
+    const targetUrl = resolveUrl();
 
     const outgoing = provider.secureProxy
       ? buildSecureProxyRequest({
@@ -378,7 +418,11 @@ export async function upstreamRequest({
             body,
             credentials: provider.awsBedrock,
           })
-        : { url: targetUrl, headers, body: JSON.stringify(body) };
+        : {
+            url: targetUrl,
+            headers,
+            body: body instanceof FormData ? body : JSON.stringify(body),
+          };
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
@@ -435,6 +479,10 @@ export async function upstreamRequest({
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.
     const clientDisconnected = signal?.aborted === true;
+    // An aborted fetch rejects with the signal's abort reason. Next.js aborts the request signal
+    // with its own `ResponseAborted` error, so the error name alone misses client aborts; the
+    // reason does not, and a duration budget that fired first leaves its timeout as the reason.
+    const abortedByClient = clientDisconnected && error === signal.reason;
     // Stays `undefined` when diagnostic enrichment below throws before classifying.
     let failureFamily: UpstreamFetchFailureFamily | undefined;
     try {
@@ -444,7 +492,9 @@ export async function upstreamRequest({
       const causeCode = getCauseCode(cause);
       const causeName = getCauseName(cause);
       const causeMessage = getCauseMessage(cause);
-      failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      failureFamily = abortedByClient
+        ? 'abort'
+        : classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.type,
         targetHost: getProviderTargetHost(apiUrl),
@@ -489,8 +539,72 @@ export async function upstreamRequest({
             vercelRequestId,
             reasoningEffort
           ),
+      fetchFailure: { timedOut: failureFamily !== undefined && isTimeoutFailure(failureFamily) },
     };
   }
+}
+
+/**
+ * Sends one request to `provider.apiUrl` + `path` with the provider's auth and attribution
+ * headers, the URL policy, and a duration budget. A failed fetch becomes a classified error
+ * response instead of a throw: 499 when the client went away, otherwise 503.
+ */
+export async function fetchUpstream({
+  path,
+  ...input
+}: UpstreamFetchInput & {
+  /** Such as `/embeddings`. */
+  path: string;
+}): Promise<UpstreamFetchResult> {
+  return await sendUpstreamFetch({
+    ...input,
+    apiUrl: input.provider.apiUrl,
+    path,
+    resolveUrl: () => `${input.provider.apiUrl}${path}`,
+  });
+}
+
+export async function upstreamRequest({
+  chatApi,
+  search,
+  method,
+  body,
+  extraHeaders,
+  provider,
+  signal,
+  vercelRequestId,
+  reasoningEffort,
+  durationBudgetMs,
+}: {
+  chatApi: GatewayChatApiKind;
+  search: string;
+  method: string;
+  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  extraHeaders: Record<string, string>;
+  provider: Provider;
+  signal?: AbortSignal;
+  /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
+  vercelRequestId?: string | null;
+  reasoningEffort: string | null;
+  /** At most `UPSTREAM_DURATION_BUDGET_MS`; less when an earlier attempt of the invocation spent part of it. */
+  durationBudgetMs: number;
+}): Promise<UpstreamFetchResult> {
+  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
+  const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
+  return await sendUpstreamFetch({
+    provider,
+    apiUrl,
+    path,
+    resolveUrl: () =>
+      provider.disableUrlSuffix ? appendQueryString(apiUrl, search) : `${apiUrl}${path}${search}`,
+    method,
+    body,
+    extraHeaders,
+    signal,
+    vercelRequestId,
+    reasoningEffort,
+    durationBudgetMs,
+  });
 }
 
 export async function fetchGeneration(messageId: string, provider: Provider) {

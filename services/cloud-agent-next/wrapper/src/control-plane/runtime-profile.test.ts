@@ -7,6 +7,8 @@ import path from 'node:path';
 import { kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
 import { prepareKiloFilesystem } from './kilo-runtime.js';
+import { buildGitHubReviewBashRules } from '../github-review-publish-config.js';
+import { matchesKiloPermissionPattern } from '../../../src/shared/profile-permission-policy.js';
 import {
   createRuntimeProfileMaterializer,
   materializeRuntimeProfile,
@@ -93,6 +95,15 @@ const nextProfile = {
   runtimeAgents: [{ slug: 'next-agent', name: 'Next agent', config: {} }],
   kiloCommands: [{ name: 'next-command', template: 'Next command' }],
 };
+
+type AgentEntries = Record<string, Record<string, unknown>>;
+
+async function readAgentEntries(home: string): Promise<AgentEntries> {
+  const config = JSON.parse(await fs.readFile(profileConfigPath(home), 'utf8')) as {
+    agent: AgentEntries;
+  };
+  return config.agent;
+}
 
 async function expectPreviousProfile(home: string, previousConfig: string): Promise<void> {
   expect(await fs.readFile(path.join(home, '.kilocode/skills/previous/SKILL.md'), 'utf8')).toBe(
@@ -691,6 +702,206 @@ describe('legacy skill writing', () => {
       );
       expect(existsSync(path.join(skillDir, 'x'.repeat(201)))).toBe(false);
       expect(existsSync(path.join(home, '.kilocode/skills/outside.txt'))).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('runtime profile session policy scope', () => {
+  const agent = {
+    slug: 'reviewer',
+    name: 'Reviewer',
+    config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+  };
+
+  it('writes the agent entry as given when the session states no command policy', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { question: 'deny' },
+        runtimeAgents: [agent],
+      });
+      expect((await readAgentEntries(home)).reviewer?.permission).toEqual(agent.config.permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('shares one materialization across a question-only and a policy-free session', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      await materializer.materialize(home, {
+        permission: { question: 'deny' },
+        runtimeAgents: [agent],
+      });
+      // A sibling without any permission map sees the same written entries.
+      await materializer.materialize(home, { runtimeAgents: [agent] });
+      expect((await readAgentEntries(home)).reviewer?.permission).toEqual(agent.config.permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('composes the publisher rules a review session writes into the same map', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      const publicationAllow = 'gh api repos/*/issues/*/comments --input*';
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny', bash: { [publicationAllow]: 'allow' } },
+        githubReviewTarget: {
+          repo: 'acme/widgets',
+          pullRequestNumber: 42,
+          appType: 'standard',
+          botUserId: '42',
+        },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { bash: { [publicationAllow]: 'allow' } } },
+          },
+        ],
+      });
+      const written = (await readAgentEntries(home)).reviewer?.permission as Record<
+        string,
+        Record<string, string>
+      >;
+      const bash = written.bash ?? {};
+      expect(bash[publicationAllow]).toBe('allow');
+      const publisherRule = Object.keys(buildGitHubReviewBashRules()).find(pattern =>
+        matchesKiloPermissionPattern(publicationAllow, pattern)
+      );
+      expect(publisherRule).toBeDefined();
+      // The publisher rule is written after the allowance, so it decides the
+      // command the allowance covers.
+      const keys = Object.keys(bash);
+      expect(keys.indexOf(publisherRule ?? '')).toBeGreaterThan(keys.indexOf(publicationAllow));
+      let verdict: string | undefined;
+      for (const [pattern, action] of Object.entries(bash)) {
+        if (
+          matchesKiloPermissionPattern(
+            'gh api repos/acme/widgets/issues/7/comments --input payload.json',
+            pattern
+          )
+        ) {
+          verdict = action;
+        }
+      }
+      expect(verdict).toBe('deny');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('runtime profile permission narrowing', () => {
+  it('writes an agent entry bounded by the session policy', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny', bash: { '*': 'deny', 'git log *': 'allow' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      const permission = entries.reviewer?.permission as Record<string, unknown> | undefined;
+      expect(permission?.edit).not.toBe('allow');
+      const bash = permission?.bash as Record<string, unknown> | undefined;
+      expect(bash?.['*']).not.toBe('allow');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a runtime agent denial that is stricter than the session', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { bash: { '*': 'allow', 'rm *': 'deny' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: {
+              permission: { bash: { 'git push': 'deny', 'npm *': 'allow' } },
+            },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      // The agent's own denial survives, and the allowance for a pattern the
+      // session does not write is dropped, so this differs from the agent map.
+      expect(entries.reviewer?.permission).toEqual({
+        bash: { 'git push': 'deny' },
+      });
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('writes the agent permission verbatim when the session has no permission map', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    const permission = { edit: 'allow', bash: { '*': 'deny', 'git log *': 'allow' } };
+    try {
+      await materializeRuntimeProfile(home, {
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: { permission } }],
+      });
+      const entries = await readAgentEntries(home);
+      expect(entries.reviewer?.permission).toEqual(permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('omits the permission key when the session policy leaves no entry', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny' },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { mode: 'subagent', permission: { edit: 'allow' } },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      expect(entries.reviewer).toEqual({ mode: 'subagent' });
+      expect('permission' in (entries.reviewer ?? {})).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('bounds an agent entry by the permission map the session runs with', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny', bash: { '*': 'deny', 'git log *': 'allow' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: {
+              permission: { cron_create: 'allow', edit: 'allow', bash: { '*': 'allow' } },
+            },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      const permission = entries.reviewer?.permission as Record<string, unknown> | undefined;
+      expect(permission).not.toHaveProperty('cron_create');
+      expect(permission?.edit).not.toBe('allow');
+      const bash = permission?.bash as Record<string, unknown> | undefined;
+      expect(bash?.['*']).not.toBe('allow');
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

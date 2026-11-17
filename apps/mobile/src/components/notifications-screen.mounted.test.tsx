@@ -160,11 +160,9 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReasonCode: null },
     agentAttention: { available: true, unavailableReasonCode: null },
     agentUpdates: { available: true, unavailableReasonCode: null },
     sessionStatus: { available: true, unavailableReasonCode: null },
-    kiloclawActivity: { available: true, unavailableReasonCode: null },
     balanceAlerts: { available: true, unavailableReasonCode: null },
     spendAlerts: { available: true, unavailableReasonCode: null },
     securityFindings: { available: true, unavailableReasonCode: null },
@@ -174,11 +172,9 @@ function fullCapabilities(overrides: Record<string, unknown> = {}): Record<strin
 
 function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: true,
     agentAttention: true,
     agentUpdates: true,
     sessionStatus: true,
-    kiloclawActivity: true,
     balanceAlerts: true,
     spendAlerts: true,
     securityFindings: true,
@@ -364,7 +360,6 @@ describe('NotificationsScreen category rows', () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
     await waitForEnabledSwitch(renderer, 'Agent updates');
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
     expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
     act(() => {
       switchOnValueChange(renderer.root, 'Agent updates')?.(false);
@@ -793,11 +788,9 @@ describe('NotificationsScreen category availability', () => {
 
   it('happy: a preferences response without capabilities renders every row as available', async () => {
     prefsQueryFn.mockResolvedValue({
-      chatMessages: true,
       agentAttention: true,
       agentUpdates: true,
       sessionStatus: true,
-      kiloclawActivity: true,
       balanceAlerts: true,
       spendAlerts: true,
       securityFindings: true,
@@ -810,7 +803,6 @@ describe('NotificationsScreen category availability', () => {
     expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
   });
 
   it('retryable unhappy: a capabilities query failure keeps last good availability and shows retry', async () => {

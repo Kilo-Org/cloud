@@ -37,6 +37,7 @@ export type StreamEventType =
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
   | 'cloud.sandbox.status'
   | 'cloud.worktree.changes.ready'
+  | 'cloud.workspace.artifacts.changed'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue
   | 'cloud.message.sent' // Queued user message delivered to Kilo

@@ -160,7 +160,6 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     await logUnrewrittenResponse({
       response,
       model,
-      providerId: provider.type,
       logging: input.logging,
       error: null,
     });
@@ -206,7 +205,6 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
         await logUnrewrittenResponse({
           response: rejection.clone(),
           model,
-          providerId: provider.type,
           logging,
           error: { guardrail_rejection: verdict.action, guardrail: 'output' },
         });

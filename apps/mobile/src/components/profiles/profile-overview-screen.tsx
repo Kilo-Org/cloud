@@ -188,12 +188,11 @@ export function ProfileOverviewScreen({
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
       // The profile is gone, so there is nothing left to keep: the pop must not
-      // ask about edits to it.
-      metadataGuard.markClean();
-      // Back during the delete already left this profile, and a Back handled
-      // while this dismissal runs is the same leave; a second pop would remove
-      // the profiles list beneath it.
-      popOnce();
+      // ask about edits to it. Back during the delete already left this profile,
+      // and a Back handled while this dismissal runs is the same leave; a second
+      // pop would remove the profiles list beneath it, so the leave goes through
+      // the guard's own once-only exit.
+      metadataGuard.leaveWithoutAsking(popOnce);
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));
@@ -220,9 +219,9 @@ export function ProfileOverviewScreen({
     <View className="flex-1 bg-background">
       {/* Back keeps the route it was opened from (the Profiles list, or the
           session whose profile chip opened it); `backFallback` still lands on
-          Profiles when the app has no history, as a cold deep link does. The
-          profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break.
+          this stack's Profiles list when the app has no history, as a cold deep
+          link does. The profile name is user prose, not a UI label, so it keeps
+          a second line for a natural break.
 
           A read that has not answered yet shows a title-shaped bar in the
           title's own slot. The header used to read the generic Profiles title
@@ -238,7 +237,7 @@ export function ProfileOverviewScreen({
           ) : undefined
         }
         titleNumberOfLines={2}
-        backFallback={getProfilesPath()}
+        backFallback={getProfilesPath(stack)}
       />
       <TabScreenScrollView
         className="flex-1"

@@ -20,12 +20,22 @@ export type AuthProvider = {
 };
 
 type LoginMethodsCardProps = {
+  /**
+   * Where the provider round trip returns. The app shell passes its own page so
+   * the link completes inside the shell instead of the full web page.
+   */
+  callbackPath?: string;
   primaryEmail: string;
   providers: AuthProvider[];
   onError: (error: string) => void;
 };
 
-export function LoginMethodsCard({ primaryEmail, providers, onError }: LoginMethodsCardProps) {
+export function LoginMethodsCard({
+  primaryEmail,
+  providers,
+  onError,
+  callbackPath = '/connected-accounts',
+}: LoginMethodsCardProps) {
   const trpc = useTRPC();
   const alreadyLinkedProviders = new Set(providers.map(o => o.provider));
   const claudeSignInEnabled = useClaudeSignInEnabled();
@@ -37,7 +47,7 @@ export function LoginMethodsCard({ primaryEmail, providers, onError }: LoginMeth
     trpc.user.linkAuthProvider.mutationOptions({
       onSuccess: (data, variables) => {
         void signIn(variables.provider, {
-          callbackUrl: `/connected-accounts?linked=${variables.provider}`,
+          callbackUrl: `${callbackPath}?linked=${variables.provider}`,
         });
       },
       onError: () => onError('LINKING-FAILED'),

@@ -354,7 +354,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
       const nativeRead = await runInDurableObject(cold.stub, instance =>
         instance.kiloRequest({ name: 'session.status' })
       );
-      expect(nativeRead).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(nativeRead).toMatchObject({ ok: false, error: { code: 'runtime_offline' } });
 
       const answered = await cold.stub.answer({
         sessionId: cloudAgentSessionId,
@@ -431,7 +431,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
     const nativeRead = await runInDurableObject(cold.stub, instance =>
       instance.kiloRequest({ name: 'session.status' })
     );
-    expect(nativeRead).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    expect(nativeRead).toMatchObject({ ok: false, error: { code: 'runtime_offline' } });
 
     // The same durable identity cannot be admitted again, so a retry cannot
     // create a second accepted turn for the failed intent.

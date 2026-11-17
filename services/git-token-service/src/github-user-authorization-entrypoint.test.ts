@@ -10,7 +10,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { createHmac } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitHubTokenServiceModule from './github-token-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
@@ -74,6 +74,8 @@ function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
     {} as ExecutionContext,
     {
+      GITHUB_APP_CLIENT_ID: 'synthetic-client',
+      GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
       GITHUB_APP_SLUG: 'kiloconnect',
       GITHUB_APP_BOT_USER_ID: '240665456',
     } as CloudflareEnv
@@ -81,7 +83,27 @@ function createService(): GitTokenRPCEntrypoint {
 }
 
 describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const path = new URL(input).pathname;
+        if (path === '/repos/acme/repo')
+          return Response.json({
+            id: 101,
+            node_id: 'R_repo',
+            name: 'repo',
+            owner: { login: 'acme' },
+          });
+        if (path.endsWith('/token/scoped'))
+          return Response.json({
+            token: 'scoped-user-token',
+            installation: { repository_selection: 'selected' },
+          });
+        throw new Error('Unexpected synthetic request');
+      })
+    );
     vi.clearAllMocks();
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: true,
@@ -119,7 +141,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
   });
 
-  it('pins repository-only installation authority at issuance and every redemption despite available user authorization', async () => {
+  it('preserves repository-only legacy authority while denying user attachment escalation', async () => {
     const key = Buffer.alloc(32, 7).toString('base64');
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
@@ -141,68 +163,32 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       version: 2,
       source: 'installation',
       permissionScope: 'repository',
-      owner: 'acme',
-      repo: 'repo',
-      outboundContainerId: 'allocation-1',
     });
-    for (const [requestMethod, requestUrl] of [
-      ['POST', 'https://api.github.com/graphql'],
-      ['PATCH', 'https://api.github.com/repos/acme/repo/issues/1'],
-    ]) {
-      expect(
-        await service.redeemGitHubSessionCapability({
-          capability: issued.capability,
-          outboundContainerId: 'allocation-1',
-          requestMethod,
-          requestUrl,
-        })
-      ).toMatchObject({
-        success: true,
-        source: 'installation',
-        authorization: 'Bearer repository-only-token',
-      });
-    }
+    serviceMocks.getRepositoryOnlyToken.mockClear();
     for (const requestUrl of [
-      'https://api.github.com/orgs/acme/members/octocat',
-      'https://api.github.com/repos/foreign/private',
+      'https://api.github.com/graphql',
+      'https://api.github.com/repos/acme/repo/issues/1',
+      'https://uploads.github.com/user-attachments/assets?repository_id=101',
     ]) {
       expect(
         await service.redeemGitHubSessionCapability({
           capability: issued.capability,
           outboundContainerId: 'allocation-1',
-          requestMethod: 'GET',
+          requestMethod: 'POST',
           requestUrl,
         })
-      ).toEqual({ success: false, reason: 'repository_mismatch' });
+      ).toMatchObject(
+        requestUrl.includes('uploads.github.com')
+          ? { success: false, reason: 'invalid_upstream_request' }
+          : { success: true, source: 'installation', authorization: 'Bearer repository-only-token' }
+      );
     }
-    expect(
-      await service.redeemGitHubSessionCapability({
-        capability: issued.capability,
-        outboundContainerId: 'allocation-1',
-        requestMethod: 'POST',
-        requestUrl:
-          'https://uploads.github.com/user-attachments/assets?name=screenshot.png&repository_id=1145038391',
-      })
-    ).toEqual({ success: false, reason: 'invalid_upstream_request' });
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledWith('123', 'repo', 'standard', {
-      contents: 'write',
-      pull_requests: 'write',
-    });
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(2);
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
-    expect(
-      await service.redeemGitHubSessionCapability({
-        capability: issued.capability,
-        outboundContainerId: 'allocation-2',
-        requestMethod: 'GET',
-        requestUrl: 'https://api.github.com/repos/acme/repo',
-      })
-    ).toEqual({ success: false, reason: 'container_mismatch' });
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
   });
 
-  it('preserves recoverable permission lookup failures through capability issuance and redemption', async () => {
+  it('preserves recoverable permission lookup failures through native resolution and capability issuance', async () => {
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
       {
@@ -226,25 +212,14 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       reason: 'repository_permissions_unavailable',
     });
 
-    const issued = await service.issueGitHubSessionCapability(params);
-    if (!issued.success) throw new Error('Expected repository capability');
-    const redemption = {
-      capability: issued.capability,
-      outboundContainerId: 'allocation-1',
-      requestMethod: 'POST',
-      requestUrl: 'https://api.github.com/graphql',
-    };
     serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
       new GitHubRepositoryPermissionsUnavailableError()
     );
-    expect(await service.redeemGitHubSessionCapability(redemption)).toEqual({
+    expect(await service.getCloudAgentAuthForRepo(params)).toEqual({
       success: false,
       reason: 'repository_permissions_unavailable',
     });
-    expect(await service.redeemGitHubSessionCapability(redemption)).toMatchObject({
-      success: true,
-      authorization: 'Bearer repository-only-token',
-    });
+    expect(await service.issueGitHubSessionCapability(params)).toMatchObject({ success: true });
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });
@@ -282,6 +257,19 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
         email: '240665456+kiloconnect[bot]@users.noreply.github.com',
       },
     });
+  });
+
+  it('preserves the legacy connected identity without depending on the scoped-token endpoint', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 403 }));
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({ success: true, githubToken: 'user-token', source: 'user' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('repairs stale login metadata before resolving fenced Cloud Agent auth', async () => {
@@ -330,25 +318,77 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     );
   });
 
-  it.each(['credential_unreadable', 'credential_configuration_error'] as const)(
-    'uses installation identity when selection reports %s',
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'refresh_failed',
+    'insufficient_user_access',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ] as const)(
+    'uses repository-scoped bot auth for initial selection when personal auth reports %s',
     async reason => {
       serviceMocks.selectUserAuthorization.mockResolvedValueOnce({ selected: false, reason });
-
       const result = await createService().getCloudAgentAuthForRepo({
         githubRepo: 'acme/repo',
         userId: 'user_1',
         allowUserAuthorization: true,
       });
-
       expect(result).toMatchObject({
         success: true,
-        githubToken: 'installation-token',
         source: 'installation',
+        githubToken: 'installation-token',
         fallbackReason: reason,
       });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('123', 'repo', 'standard');
+      expect(fetch).not.toHaveBeenCalled();
     }
   );
+
+  it('uses the lite bot without requiring personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'lite',
+      repoName: 'repo',
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'lite_installation',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('keeps using authorized bot access when installation permissions do not support personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'read', pull_requests: 'read' },
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'insufficient_user_access',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
 });
 
 describe('fetch disconnect endpoint', () => {

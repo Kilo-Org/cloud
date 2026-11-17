@@ -104,6 +104,11 @@ type WorktreeChangesRefresh = {
   revision?: number;
   connectionVersion: number;
 };
+type WorkspaceArtifactsRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
 /**
@@ -617,6 +622,7 @@ type SessionManagerAtoms = {
    */
   availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
+  workspaceArtifactsRefresh: W<WorkspaceArtifactsRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -1242,6 +1248,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
+  const workspaceArtifactsRefreshAtom = atom<WorkspaceArtifactsRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
@@ -1663,9 +1670,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
-   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * Stack of loaded older pages, newest first. Each entry records the cursor
    * that was current before that page was fetched and the message ids the page
-   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * added. `trimRetainedHistory` pops from the end (oldest) to stay under
    * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
    * so the live tail always survives.
    */
@@ -1770,6 +1777,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
+    store.set(workspaceArtifactsRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
@@ -2589,30 +2597,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function trimRetainedHistory(): void {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return;
-    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
-    // last one popped. When two or more pages drop in one pass, overwriting
-    // on every pop leaves the cursor pointing at the newest dropped page, so
-    // `loadOlderMessages` could not re-fetch the oldest dropped page.
-    // Count only root-transcript rows. Child pages share this storage and
-    // must not push the window over the limit.
     let trimmedAny = false;
-    let oldestCursorBefore: string | null = null;
+    let resumeCursor: string | null = null;
     while (
       countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
       retainedHistoryStack.length > 0
     ) {
-      const entry = retainedHistoryStack.shift();
+      const entry = retainedHistoryStack.pop();
       if (!entry) break;
-      if (!trimmedAny) {
-        trimmedAny = true;
-        oldestCursorBefore = entry.cursorBefore;
-      }
+      trimmedAny = true;
+      resumeCursor = entry.cursorBefore;
       for (const id of entry.messageIds) {
         storage.deleteMessage(id);
       }
     }
     if (trimmedAny) {
-      olderMessagesCursor = oldestCursorBefore;
+      olderMessagesCursor = resumeCursor;
       // The rewind restores a page boundary the backend already served — only
       // a successful page is ever pushed onto the stack — so a terminal latch
       // recorded by a later page no longer describes this cursor. Clear the
@@ -3636,11 +3636,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
         }
-        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+        if (
+          event.type === 'worktree.changes.ready' ||
+          event.type === 'workspace.artifacts.changed' ||
+          event.type === 'connected'
+        ) {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
-          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'connected') {
+            const previousWorktree = store.get(worktreeChangesRefreshAtom);
+            store.set(worktreeChangesRefreshAtom, {
+              ...previousWorktree,
+              cloudSessionId,
+              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
+            });
+            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
+            store.set(workspaceArtifactsRefreshAtom, {
+              ...previousArtifacts,
+              cloudSessionId,
+              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
+            });
+            return;
+          }
           if (event.type === 'worktree.changes.ready') {
+            const previous = store.get(worktreeChangesRefreshAtom);
             if (event.revision <= (previous?.revision ?? 0)) return;
             store.set(worktreeChangesRefreshAtom, {
               cloudSessionId,
@@ -3648,10 +3667,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               connectionVersion: previous?.connectionVersion ?? 0,
             });
           } else {
-            store.set(worktreeChangesRefreshAtom, {
-              ...previous,
+            const previous = store.get(workspaceArtifactsRefreshAtom);
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(workspaceArtifactsRefreshAtom, {
               cloudSessionId,
-              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
             });
           }
           return;
@@ -4657,6 +4678,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
+      workspaceArtifactsRefresh: workspaceArtifactsRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
@@ -4685,6 +4707,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

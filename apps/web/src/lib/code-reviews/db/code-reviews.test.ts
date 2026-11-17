@@ -2721,7 +2721,7 @@ describe('listCodeReviews narrows the list DTO', () => {
     return reviewId;
   }
 
-  it('omits council_result, manual_config, and previous_summary_body from list rows', async () => {
+  it('omits heavy JSONB and text fields from list rows', async () => {
     const reviewId = await createReviewWithHeavyFields();
 
     const rows = await listCodeReviews({
@@ -2738,11 +2738,13 @@ describe('listCodeReviews narrows the list DTO', () => {
     expect(row).not.toHaveProperty('council_result');
     expect(row).not.toHaveProperty('manual_config');
     expect(row).not.toHaveProperty('previous_summary_body');
+    expect(row).not.toHaveProperty('repository_review_instructions_imports');
 
     const {
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());

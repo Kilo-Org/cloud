@@ -35,68 +35,25 @@ export type {
   EnkryptUsageWriteResponse,
 } from './enkrypt';
 
-/**
- * Wire contract for `POST /api/internal/usage/record`.
- *
- * The AI gateway runs on `kilocode-ai-gateway`, whose functions execute in both
- * Frankfurt and SFO, while the PostgreSQL primary is Frankfurt-only. The usage
- * write holds row locks on `kilocode_users` / `organizations` /
- * `organization_user_usage` across several sequential statements, so from SFO
- * the lock hold is dominated by transatlantic round trips rather than database
- * work.
- *
- * Selected usage normally goes through the configured queue transport; the
- * production Cloudflare consumer calls the Frankfurt-local endpoint, which
- * persists idempotently by usage ID, so redelivery does not create a second
- * debit. SFO instances call that endpoint directly through
- * `recordUsageInPrimaryRegion` for unselected accounting; Frankfurt instances
- * write unselected accounting locally. Selected usage falls back to a direct
- * write only in the two pre-publication cases where nothing was sent: missing
- * or unparseable publisher configuration and failed lifetime registration. A
- * timeout or other ambiguous publication failure is not a direct-write
- * fallback, because the message may already be queued.
- *
- * Invariants this schema deliberately encodes:
- *
- * - Nullable fields use `.nullable()`. Except for additive rollout fields that
- *   default to null, missing keys are rejected: `JSON.stringify` drops
- *   `undefined`-valued keys, and `null` is load-bearing here. For organization
- *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
- *   `system_prompt_prefix` to `null` so prompt text is never persisted.
- * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
- *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
- *   this holds by construction. It would NOT hold for a value read back out of
- *   PostgreSQL, which has shape `2026-04-29 01:16:12.945+00` — see
- *   `packages/db/AGENTS.md` "Timestamp boundaries". Keep the strict validator so
- *   a DB-shaped timestamp can never enter this path.
- * - `cost` and the token counts are PostgreSQL `bigint` mapped to JS `number`,
- *   so they are validated as safe integers.
- *
- * NUL-byte sanitization (`stripNulBytesInPlace`) happens on the sender inside
- * `toInsertableDbUsageRecord`, before serialization. `JSON.stringify` preserves
- * `\u0000` happily, so that sanitization is part of the sending contract: do not
- * move it to the receiver.
- */
-
 /** PostgreSQL `bigint` columns surfaced to JS as `number`. */
 const bigintAsNumber = z.number().int().safe();
 
 const CoreUsageSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   kilo_user_id: z.string(),
   cost: bigintAsNumber,
   input_tokens: bigintAsNumber,
   output_tokens: bigintAsNumber,
   cache_write_tokens: bigintAsNumber,
   cache_hit_tokens: bigintAsNumber,
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   requested_model: z.string().nullable(),
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
-  abuse_classification: z.nativeEnum(ABUSE_CLASSIFICATION),
-  organization_id: z.string().uuid().nullable(),
+  abuse_classification: z.enum(ABUSE_CLASSIFICATION),
+  organization_id: z.uuid().nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),
 });
@@ -104,7 +61,7 @@ const CoreUsageSchema = z.object({
 const UsageMetadataSchema = z.object({
   id: z.string(),
   message_id: z.string(),
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   http_x_forwarded_for: z.string().nullable(),
   http_x_vercel_ip_city: z.string().nullable(),
   http_x_vercel_ip_country: z.string().nullable(),
@@ -160,6 +117,48 @@ export const BouncerUsageEventEnqueueSchema = z.object({
 
 export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSchema>;
 
+/**
+ * Wire contract for the web app's usage record endpoint (POST).
+ *
+ * The AI gateway deployment runs in both Frankfurt and SFO, while the
+ * PostgreSQL primary is Frankfurt-only. The usage
+ * write holds row locks on `kilocode_users` / `organizations` /
+ * `organization_user_usage` across several sequential statements, so from SFO
+ * the lock hold is dominated by transatlantic round trips rather than database
+ * work.
+ *
+ * Selected usage normally goes through the configured queue transport; the
+ * production Cloudflare consumer calls the Frankfurt-local endpoint, which
+ * persists idempotently by usage ID, so redelivery does not create a second
+ * debit. SFO instances call that endpoint directly through
+ * `recordUsageInPrimaryRegion` for unselected accounting; Frankfurt instances
+ * write unselected accounting locally. Selected usage falls back to a direct
+ * write only in the two pre-publication cases where nothing was sent: missing
+ * or unparseable publisher configuration and failed lifetime registration. A
+ * timeout or other ambiguous publication failure is not a direct-write
+ * fallback, because the message may already be queued.
+ *
+ * Invariants this schema deliberately encodes:
+ *
+ * - Nullable fields use `.nullable()`. Except for additive rollout fields that
+ *   default to null, missing keys are rejected: `JSON.stringify` drops
+ *   `undefined`-valued keys, and `null` is load-bearing here. For organization
+ *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
+ *   `system_prompt_prefix` to `null` so prompt text is never persisted.
+ * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
+ *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
+ *   this holds by construction. It would NOT hold for a value read back out of
+ *   PostgreSQL, which has shape `2026-04-29 01:16:12.945+00` — see
+ *   `packages/db/AGENTS.md` "Timestamp boundaries". Keep the strict validator so
+ *   a DB-shaped timestamp can never enter this path.
+ * - `cost` and the token counts are PostgreSQL `bigint` mapped to JS `number`,
+ *   so they are validated as safe integers.
+ *
+ * NUL-byte sanitization (`stripNulBytesInPlace`) happens on the sender inside
+ * `toInsertableDbUsageRecord`, before serialization. `JSON.stringify` preserves
+ * `\u0000` happily, so that sanitization is part of the sending contract: do not
+ * move it to the receiver.
+ */
 export const UsageRecordRequestSchema = z.object({
   core: CoreUsageSchema,
   metadata: UsageMetadataSchema,

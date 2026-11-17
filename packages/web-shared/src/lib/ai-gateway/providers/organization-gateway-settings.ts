@@ -1,34 +1,67 @@
 import type { OrganizationDataRegion, OrganizationSettings } from '@kilocode/db/schema-types';
 import type { OrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import { getDomain } from 'tldts';
 
-export type ManagedGatewayId = 'openrouter' | 'vercel';
+export type ManagedGatewayId = 'openrouter';
 
+/**
+ * The organization's advanced gateway policies, as they apply to requests Kilo pays for. A user's
+ * own BYOK key (a provider key, or an OpenRouter or Vercel AI Gateway key) is exempt from both, as
+ * are a linked ChatGPT subscription or Claude billing connection, and autocomplete (FIM) and edit
+ * completions, which go straight to their providers without this policy.
+ *
+ * Neither policy changes the model lists the model endpoints return. That is a deliberate
+ * limitation until end users ask for it; see `packages/web-shared/AGENTS.md`.
+ */
 export type OrganizationGatewaySettings = {
-  disabledGateways: ReadonlySet<ManagedGatewayId>;
+  /**
+   * OpenRouter may not serve a request Kilo pays for. Set when the organization disabled it, and
+   * whenever an inference region is set, since OpenRouter cannot pin a region.
+   */
+  openRouterDisabled: boolean;
+  /**
+   * Requests Kilo pays for run only through Kilo's Vercel AI Gateway account, pinned to this
+   * region. Every other provider is refused for them.
+   */
   dataRegion: OrganizationDataRegion | null;
 };
 
 export const NO_ORGANIZATION_GATEWAY_SETTINGS: OrganizationGatewaySettings = {
-  disabledGateways: new Set(),
+  openRouterDisabled: false,
   dataRegion: null,
 };
 
-/** The organization's gateway settings that its enabled organization features let take effect. */
+/**
+ * The organization's gateway settings that take effect. They are an enterprise feature: an
+ * organization on another plan, including one downgraded from enterprise, keeps its stored
+ * settings but they do not apply. The `gateway_settings` organization feature gates the rollout.
+ */
 export function getOrganizationGatewaySettings(
   features: OrganizationFeatures,
-  organizationId: string,
-  settings: OrganizationSettings | undefined
+  organization: {
+    id: string;
+    plan: OrganizationPlan | undefined;
+    settings: OrganizationSettings | undefined;
+  }
 ): OrganizationGatewaySettings {
-  if (!settings || !isOrganizationFeatureEnabled(features, 'gateway_settings', organizationId)) {
+  const { id, plan, settings } = organization;
+  if (
+    !settings ||
+    plan !== 'enterprise' ||
+    !isOrganizationFeatureEnabled(features, 'gateway_settings', id)
+  ) {
     return NO_ORGANIZATION_GATEWAY_SETTINGS;
   }
-  const disabledGateways = new Set<ManagedGatewayId>();
-  if (settings.disable_openrouter) disabledGateways.add('openrouter');
-  if (settings.disable_vercel_ai_gateway) disabledGateways.add('vercel');
-  return { disabledGateways, dataRegion: settings.data_region ?? null };
+  const dataRegion = settings.data_region ?? null;
+  return {
+    openRouterDisabled: !!settings.disable_openrouter || dataRegion !== null,
+    dataRegion,
+  };
 }
 
 export function getManagedGatewayFromUrl(url: string): ManagedGatewayId | undefined {
@@ -37,19 +70,62 @@ export function getManagedGatewayFromUrl(url: string): ManagedGatewayId | undefi
   switch (getDomain(hostname, { allowPrivateDomains: false })) {
     case 'openrouter.ai':
       return 'openrouter';
-    case 'vercel.sh':
-      return 'vercel';
     default:
       return undefined;
   }
 }
 
-export function isManagedGatewayDisabled(
-  settings: OrganizationGatewaySettings,
-  providerType: Provider['type']
-): providerType is ManagedGatewayId {
+/** One way to serve a request, as far as the gateway settings are concerned. */
+export type GatewayPolicyRoute = {
+  provider: Pick<Provider, 'type' | 'apiUrl'>;
+  userByok: readonly BYOKResult[] | null;
+};
+
+/**
+ * Whether the user's own credential pays for the route: a BYOK key, or a linked ChatGPT
+ * subscription or Claude billing connection, which usage accounting treats the same way.
+ */
+function isUserPaidRoute(
+  route: Pick<GatewayPolicyRoute, 'userByok'> & { provider: Pick<Provider, 'type'> }
+): boolean {
   return (
-    (providerType === 'openrouter' || providerType === 'vercel') &&
-    settings.disabledGateways.has(providerType)
+    (!!route.userByok && route.userByok.length > 0) ||
+    route.provider.type === OPENAI_CHATGPT_PROVIDER_ID ||
+    route.provider.type === CLAUDE_BILLING_PROVIDER_ID
   );
+}
+
+/**
+ * Why the gateway settings refuse a route, or null when it may serve the request. A route the
+ * user's own credential pays for is never refused. Otherwise an inference region admits only Kilo's Vercel AI Gateway,
+ * and a disabled OpenRouter refuses OpenRouter and any upstream URL on its domain.
+ */
+export function getGatewaySettingsRefusal(
+  settings: OrganizationGatewaySettings,
+  route: GatewayPolicyRoute
+):
+  | { kind: 'inference-region'; region: OrganizationDataRegion }
+  | { kind: ManagedGatewayId }
+  | null {
+  if (isUserPaidRoute(route)) return null;
+  if (settings.dataRegion && route.provider.type !== 'vercel') {
+    return { kind: 'inference-region', region: settings.dataRegion };
+  }
+  if (
+    settings.openRouterDisabled &&
+    (route.provider.type === 'openrouter' ||
+      getManagedGatewayFromUrl(route.provider.apiUrl) === 'openrouter')
+  ) {
+    return { kind: 'openrouter' };
+  }
+  return null;
+}
+
+/** The region to pin the route's inference to: only Kilo's own Vercel AI Gateway route is pinned. */
+export function getRouteInferenceRegion(
+  settings: OrganizationGatewaySettings,
+  route: Pick<GatewayPolicyRoute, 'userByok'> & { provider: Pick<Provider, 'type'> }
+): OrganizationDataRegion | null {
+  if (isUserPaidRoute(route) || route.provider.type !== 'vercel') return null;
+  return settings.dataRegion;
 }

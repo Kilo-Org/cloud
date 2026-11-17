@@ -29,7 +29,9 @@ beforeEach(() => {
 
 afterEach(() => {
   resetDeploymentEnv();
-  for (const key of Object.keys(savedEnv) as (keyof typeof savedEnv)[]) {
+  if (savedEnv.NODE_ENV === undefined) delete env.NODE_ENV;
+  else env.NODE_ENV = savedEnv.NODE_ENV;
+  for (const key of ['VERCEL_ENV', 'VERCEL_TARGET_ENV', 'DEBUG_SHOW_DEV_UI'] as const) {
     const value = savedEnv[key];
     if (value === undefined) delete env[key];
     else env[key] = value;

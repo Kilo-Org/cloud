@@ -8,7 +8,10 @@ export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
 // A deployment is staging when the target environment is staging and the
 // build environment is not production. Staging deployments do not report
-// VERCEL_ENV=production, so the flag stays enabled there.
+// VERCEL_ENV=production, so the flag stays enabled there. Staging-specific
+// cosmetics that are safe everywhere (for example the staging favicon) key
+// off VERCEL_TARGET_ENV alone. packages/usage-queue repeats this check
+// because it must not depend on web-shared.
 export function isStagingDeployment(): boolean {
   return process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production';
 }

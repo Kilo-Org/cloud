@@ -1475,6 +1475,73 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(persistedBriefingExcerpt(harness)?.messageId).toBe('later');
   });
 
+  it('writes one briefing excerpt when two batches carry the same response', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    const completedBatch = [
+      {
+        type: 'part' as const,
+        data: {
+          id: 'final-text',
+          messageID: 'final',
+          type: 'text',
+          text: 'Final response.',
+          time: { start: 1000, end: 3000 },
+        },
+      },
+      {
+        type: 'message' as const,
+        data: {
+          ...assistantItem('final', 0.1).data,
+          finish: 'stop',
+          time: { created: 1000, completed: 3000 },
+        },
+      },
+    ];
+
+    // Both batches are accepted before either write lands, so they overlap.
+    await harness.durableObject.ingest(completedBatch, 'usr_live', 'ses_live', 1, 20_000);
+    await harness.durableObject.ingest(completedBatch, 'usr_live', 'ses_live', 1, 20_000);
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+    expect(persistedBriefingExcerpt(harness)?.messageId).toBe('final');
+  });
+
+  it('releases the briefing excerpt record when the write is rejected', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: warmLiveMeta(),
+      persistError: new Error('postgres unavailable'),
+    });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'final-text',
+            messageID: 'final',
+            type: 'text',
+            text: 'Final response.',
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            ...assistantItem('final', 0.1).data,
+            finish: 'stop',
+            time: { created: 1000, completed: 3000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+    expect(harness.meta.get('lastBriefingExcerptPersisted')).toBeUndefined();
+  });
+
   it('omits offloaded final text without fetching an R2 body', async () => {
     const part = {
       id: 'large-text',

@@ -261,6 +261,18 @@ function briefingExcerptIsNewer(
   return next.messageId > last.messageId;
 }
 
+/** Records the excerpt the object is sending, so the next identical batch adds no column. */
+function writeBriefingExcerptPersisted(
+  db: DrizzleSqliteDODatabase,
+  identity: BriefingExcerptIdentity
+): void {
+  writeIngestMetaValue(
+    db,
+    'lastBriefingExcerptPersisted',
+    JSON.stringify({ messageId: identity.messageId, completedAt: identity.completedAt })
+  );
+}
+
 function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey): number | null {
   const row = db
     .select({ value: ingestMeta.value })
@@ -1179,51 +1191,36 @@ export class SessionIngestDO extends DurableObject<Env> {
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
       const summaryToPersist = columns.liveSummary;
-      let excerptPersisted: BriefingExcerptIdentity | undefined;
+      // The excerpt gate runs before the write is scheduled: a batch that repeats a response the
+      // object already sent, or one another in-flight batch is sending, adds no excerpt column.
+      // The record is the reservation, so a slower batch cannot render a newer one redundant.
+      let excerptReserved: BriefingExcerptIdentity | undefined;
+      if (briefingResponseChanged) {
+        try {
+          const excerpt = this.latestBriefingExcerpt(storedItems);
+          if (excerpt && briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))) {
+            excerptReserved = excerpt;
+            writeBriefingExcerptPersisted(this.db, excerpt);
+            columns.briefingExcerpt = {
+              excerpt,
+              receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
+            };
+          }
+        } catch (error) {
+          console.error('SessionIngestDO failed to read completed briefing response', {
+            kiloUserId,
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       const connectionString = this.env.HYPERDRIVE.connectionString;
       this.ctx.waitUntil(
         (async () => {
           try {
-            if (briefingResponseChanged) {
-              try {
-                const excerpt = this.latestBriefingExcerpt(storedItems);
-                if (
-                  excerpt &&
-                  briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
-                ) {
-                  excerptPersisted = excerpt;
-                  columns.briefingExcerpt = {
-                    excerpt,
-                    receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
-                  };
-                }
-              } catch (error) {
-                console.error('SessionIngestDO failed to read completed briefing response', {
-                  kiloUserId,
-                  sessionId,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-              }
-            }
             if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
-            if (excerptPersisted !== undefined) {
-              // Max-merge like the throttle meta, so a slower in-flight batch cannot move the
-              // record backwards. A rejected write never reaches here, so the next batch retries.
-              if (
-                briefingExcerptIsNewer(excerptPersisted, readBriefingExcerptPersisted(this.db))
-              ) {
-                writeIngestMetaValue(
-                  this.db,
-                  'lastBriefingExcerptPersisted',
-                  JSON.stringify({
-                    messageId: excerptPersisted.messageId,
-                    completedAt: excerptPersisted.completedAt,
-                  })
-                );
-              }
-            }
             if (summaryToPersist !== undefined) {
               const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
               if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
@@ -1285,6 +1282,21 @@ export class SessionIngestDO extends DurableObject<Env> {
               }
             }
           } catch (error) {
+            // The record is written before the statement, so a rejected statement releases the
+            // reservation it made: the next batch must be free to send the same excerpt again,
+            // unless a newer reservation has replaced it.
+            const stored = readBriefingExcerptPersisted(this.db);
+            if (
+              excerptReserved !== undefined &&
+              stored !== null &&
+              stored.messageId === excerptReserved.messageId &&
+              stored.completedAt === excerptReserved.completedAt
+            ) {
+              this.db
+                .delete(ingestMeta)
+                .where(eq(ingestMeta.key, 'lastBriefingExcerptPersisted'))
+                .run();
+            }
             console.error('SessionIngestDO failed to persist live session columns', {
               kiloUserId,
               sessionId,

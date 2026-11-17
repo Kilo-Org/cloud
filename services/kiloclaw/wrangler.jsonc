@@ -116,11 +116,6 @@
       "entrypoint": "KiloClawBillingService",
     },
     { "binding": "KILO_CHAT", "service": "kilo-chat", "entrypoint": "KiloChatService" },
-    {
-      "binding": "NOTIFICATIONS",
-      "service": "notifications",
-      "entrypoint": "NotificationsService",
-    },
   ],
   "triggers": {
     // 1-minute cadence sweep for the scheduled-action notice fan-out.

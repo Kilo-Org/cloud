@@ -26,12 +26,6 @@ import { genericPushContentForPushData } from './push-copy';
 // this list is complete by construction.
 const channelCases = [
   [
-    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
-    'needs-input',
-  ],
-  [{ type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }, 'kiloclaw'],
-  [{ type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' }, 'kiloclaw'],
-  [
     {
       type: 'cloud_agent_session',
       cliSessionId: 'cli1',
@@ -111,7 +105,6 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
       { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
       { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
       { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-      { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
       {
@@ -164,16 +157,6 @@ describe('agentNotificationKindForPushData', () => {
     expect(agentNotificationKindForPushData(parsed)).toBe('progress');
   });
 
-  it('maps a chat.message to needs-input', () => {
-    const parsed = pushDataSchema.parse({
-      type: 'chat.message',
-      sandboxId: 'sb1',
-      conversationId: 'conv1',
-      messageId: 'm1',
-    });
-    expect(agentNotificationKindForPushData(parsed)).toBe('needs-input');
-  });
-
   it.each([
     [0, 'progress'],
     [1, 'needs-input'],
@@ -183,11 +166,6 @@ describe('agentNotificationKindForPushData', () => {
   });
 
   it.each([
-    ['instance-lifecycle', { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }],
-    [
-      'scheduled-action',
-      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
-    ],
     ['low_balance', { type: 'low_balance', organizationId: 'org1' }],
     ['security_finding', { type: 'security_finding', findingId: 'f1', scope: 'org' }],
     [
@@ -241,7 +219,7 @@ describe('agentNotificationKindForAndroidChannelId', () => {
   });
 
   it('returns null for a non-agent channel or absent marker', () => {
-    for (const channelId of ['kiloclaw', 'balance', 'security'] as const) {
+    for (const channelId of ['balance', 'security'] as const) {
       expect(agentNotificationKindForAndroidChannelId(channelId)).toBeNull();
     }
     expect(agentNotificationKindForAndroidChannelId(null)).toBeNull();
@@ -257,16 +235,6 @@ describe('iosInterruptionLevelForPushData', () => {
           type: 'cloud_agent_session',
           cliSessionId: 'cli1',
           category: 'attention',
-        })
-      )
-    ).toBe('time-sensitive');
-    expect(
-      iosInterruptionLevelForPushData(
-        pushDataSchema.parse({
-          type: 'chat.message',
-          sandboxId: 'sb1',
-          conversationId: 'conv1',
-          messageId: 'm1',
         })
       )
     ).toBe('time-sensitive');
@@ -313,16 +281,6 @@ describe('iosMutableContentForPushData', () => {
           type: 'cloud_agent_session',
           cliSessionId: 'cli1',
           category: 'attention',
-        })
-      )
-    ).toBe(false);
-    expect(
-      iosMutableContentForPushData(
-        pushDataSchema.parse({
-          type: 'chat.message',
-          sandboxId: 'sb1',
-          conversationId: 'conv1',
-          messageId: 'm1',
         })
       )
     ).toBe(false);
@@ -410,13 +368,7 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.12')).toBe('agent-progress');
   });
 
-  it('preserves pre-split chat and feature channels for an older build', () => {
-    expect(
-      androidChannelIdForPushDataToAppVersion(
-        { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
-        '1.0.4'
-      )
-    ).toBe('chat');
+  it('preserves a pre-split feature channel for an older build', () => {
     expect(
       androidChannelIdForPushDataToAppVersion(
         { type: 'low_balance', organizationId: 'org1' },
@@ -523,14 +475,12 @@ describe('genericPushContentForPushData', () => {
 
   it('translates the generic copy for the es locale', () => {
     const parsed = pushDataSchema.parse({
-      type: 'chat.message',
-      sandboxId: 'sb1',
-      conversationId: 'conv1',
-      messageId: 'm1',
+      type: 'low_balance',
+      organizationId: 'org1',
     });
     expect(genericPushContentForPushData(parsed, 'es')).toEqual({
       title: 'Kilo',
-      body: 'Tienes un mensaje nuevo',
+      body: 'Tu saldo necesita atención',
     });
   });
 
@@ -567,7 +517,7 @@ describe('androidChannelIdForRegisteredClient', () => {
   });
 
   it('keeps the pre-split channels for every client that created them', () => {
-    for (const channelId of ['kiloclaw', 'balance', 'security'] as const) {
+    for (const channelId of ['balance', 'security'] as const) {
       expect(androidChannelIdForRegisteredClient(channelId, '1.0.4')).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();

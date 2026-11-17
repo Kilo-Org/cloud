@@ -215,6 +215,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
     },
+    // A message that runs past the audit row's two clamped lines, so the
+    // mobile screen's disclosure has a row that actually needs it.
+    {
+      action: 'organization.member.change_role' as const,
+      message: `${adminEmail} was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month`,
+      actor_email: ownerEmail,
+      actor_name: 'Org admin lab owner',
+    },
   ];
   for (const [index, row] of auditRows.entries()) {
     await db

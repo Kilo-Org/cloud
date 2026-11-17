@@ -29,10 +29,8 @@ const session = { title: 'Refactor auth module', organizationId: null };
 
 const ALL_ON: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,
@@ -271,10 +269,8 @@ describe('dispatchAgentSessionNotificationPush', () => {
         // The push is needs-input now, so the 'Agent updates' toggle no longer
         // governs it; every other category stays irrelevant.
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: true,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
       },
     });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);

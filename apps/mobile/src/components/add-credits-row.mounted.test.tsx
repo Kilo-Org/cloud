@@ -25,6 +25,12 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
+/** Whether the storefront rule lets the external variant draw its control. */
+const storefront = vi.hoisted(() => ({ canLink: true }));
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => storefront.canLink,
+}));
+
 const BUTTON = 'Button' as ElementType;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -54,6 +60,7 @@ afterEach(() => {
   renderer = undefined;
   windowDims.width = 390;
   platform.OS = 'android';
+  storefront.canLink = true;
 });
 
 describe('AddCreditsRow mounted layout', () => {
@@ -97,9 +104,11 @@ describe('AddCreditsRow mounted layout', () => {
     expect(String(root.findByType(BUTTON).props.className)).not.toContain('w-full');
   });
 
-  it('renders nothing on iOS', () => {
-    platform.OS = 'ios';
-    expect(renderRow().findAllByType(BUTTON)).toHaveLength(0);
+  it('prints the label as plain text when the storefront rule refuses the link', () => {
+    storefront.canLink = false;
+    const root = renderRow();
+    expect(root.findAllByType(BUTTON)).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(1);
   });
 });
 
@@ -137,9 +146,11 @@ describe('AddCreditsRow inline placement', () => {
     expect(String(root.findByType(BUTTON).props.className ?? '')).not.toContain('w-full');
   });
 
-  it('keeps the App Store gate', () => {
-    platform.OS = 'ios';
-    expect(renderInline().findAllByType(BUTTON)).toHaveLength(0);
+  it('hands over plain text when the storefront rule refuses the link', () => {
+    storefront.canLink = false;
+    const root = renderInline();
+    expect(root.findAllByType(BUTTON)).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(1);
   });
 });
 

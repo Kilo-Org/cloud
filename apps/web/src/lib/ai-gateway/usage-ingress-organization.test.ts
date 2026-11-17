@@ -7,9 +7,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {}, readDb: {} }));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual<object>('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: jest.fn(),
+jest.mock('@kilocode/worker-utils/organization-membership', () => ({
+  ...jest.requireActual<object>('@kilocode/worker-utils/organization-membership'),
+  hasEffectiveOrganizationAccess: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
   isEmailBlacklisted: async () => false,
@@ -35,7 +35,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import jwt from 'jsonwebtoken';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import {
   extractUsageContextInfo,
@@ -107,7 +107,7 @@ const context: MicrodollarUsageContext = {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(findUserById).mockResolvedValue(user);
-  jest.mocked(isOrganizationMember).mockResolvedValue(true);
+  jest.mocked(hasEffectiveOrganizationAccess).mockResolvedValue(true);
   send.mockClear();
   provider.mockClear();
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -183,7 +183,7 @@ test.each(['', ' ', 'not-an-organization-id'])(
     expect(provider).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
-    expect(isOrganizationMember).not.toHaveBeenCalled();
+    expect(hasEffectiveOrganizationAccess).not.toHaveBeenCalled();
   }
 );
 
@@ -206,13 +206,16 @@ test.each([undefined, organizationId])(
       metadata: { user_prompt_prefix: header ? null : 'synthetic' },
     });
     if (header)
-      expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), header, user.id);
-    else expect(isOrganizationMember).not.toHaveBeenCalled();
+      expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: user.id,
+        organizationId: header,
+      });
+    else expect(hasEffectiveOrganizationAccess).not.toHaveBeenCalled();
   }
 );
 
 test('a valid organization ID still requires membership', async () => {
-  jest.mocked(isOrganizationMember).mockResolvedValue(false);
+  jest.mocked(hasEffectiveOrganizationAccess).mockResolvedValue(false);
   const result = await authenticateThenPublish(organizationId);
   expect(result.auth.authFailedResponse?.status).toBe(403);
   expect(provider).not.toHaveBeenCalled();
@@ -223,7 +226,10 @@ test('a signed organization takes precedence over an empty mutable header', asyn
   const result = await authenticateThenPublish('', organizationId);
   expect(result.publication).toEqual({ kind: 'accepted' });
   expect(send.mock.calls[0][0]).toMatchObject({ core: { organization_id: organizationId } });
-  expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
+  expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+    kiloUserId: user.id,
+    organizationId,
+  });
 });
 
 test('an empty signed organization cannot downgrade to a valid header or personal context', async () => {
@@ -253,7 +259,10 @@ test('a signed organization is retained when the mutable header is absent', asyn
   const result = await authenticateThenPublish(undefined, organizationId);
   expect(result.publication).toEqual({ kind: 'accepted' });
   expect(send.mock.calls[0][0]).toMatchObject({ core: { organization_id: organizationId } });
-  expect(isOrganizationMember).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
+  expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {
+    kiloUserId: user.id,
+    organizationId,
+  });
 });
 
 test('ingress still rejects a malformed organization identity without enqueueing', async () => {

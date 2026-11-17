@@ -1071,7 +1071,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      // Require access to every requested org (mirrors the single-org guard).
+      // Require access to every requested org. Roles come from memberships,
+      // plus the platform-admin elevation the helper documents.
       const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
       if (!hasAccessToAll) {
         throw new TRPCError({

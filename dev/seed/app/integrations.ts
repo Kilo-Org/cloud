@@ -104,7 +104,21 @@ function fixtureRows(owner: { userId: string; organizationId: string | null }) {
       platform_account_login: 'devseed-acme',
       integration_status: 'active',
       repository_access: 'all',
-      repositories: [],
+      // One cached repository, so the Cloud Agent and trigger repository pickers
+      // have a choice without contacting GitHub. The snapshot is what the server
+      // reads: a non-empty `repositories` answers from the cache, and a numeric id
+      // is the shape the pickers require.
+      repositories: [
+        {
+          id: 1101201,
+          name: 'devseed-hello-world',
+          full_name: 'devseed-acme/devseed-hello-world',
+          private: true,
+          default_branch: 'main',
+        },
+      ],
+      repositories_synced_at: new Date().toISOString(),
+      github_connection_role: 'workflow',
       github_app_type: 'standard',
     },
     {
@@ -222,6 +236,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   });
 
   console.log('This fixture represents: every integration the hub lists, connected.');
+  console.log('GitHub carries one cached repository (devseed-acme/devseed-hello-world), so the');
+  console.log(
+    'Cloud Agent and trigger repository pickers offer a choice without contacting GitHub.'
+  );
   console.log('Note: no provider was contacted. A Disconnect that revokes a real token will');
   console.log('fail for GitHub, Slack and Linear; Discord removes the row and GitLab suspends it.');
   console.log('Suggested next step: open Profile > Integrations in the app.');

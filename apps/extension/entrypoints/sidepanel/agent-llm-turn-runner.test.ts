@@ -75,6 +75,7 @@ const makeWorkflowCtx = (mode: 'dangerous' | 'safe' = 'dangerous') => ({
   getTabUrl: vi.fn(),
   mode,
   navigateTab: vi.fn(),
+  releaseBrowserCaller: vi.fn(),
   requestApproval: vi.fn(),
   selectedTabId: 7,
   selectedTabTitle: 'Test',
@@ -88,6 +89,7 @@ describe('dangerous turn runner workflow wiring', () => {
     ({
       apiBaseUrl: 'https://api.example.com',
       appendEvents: vi.fn() as never,
+      browserCaller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
       conversationEvents: [],
       fetch: vi.fn() as never,
       model: 'test-model',

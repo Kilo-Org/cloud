@@ -4,6 +4,7 @@ import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
@@ -31,9 +32,14 @@ const urlMatches = (left: string, right: string): boolean => {
  * Always sends WORKFLOW_PAGE_EVAL_TIMEOUT_MS (30 s); the default 5 s
  * timeout is too short for multi-action page scripts.
  */
-export const evalInTab = async (tabId: number, code: string): Promise<EvalTabResult> => {
+export const evalInTab = async (
+  tabId: number,
+  code: string,
+  caller?: BrowserCaller
+): Promise<EvalTabResult> => {
   try {
     const response: unknown = await browser.runtime.sendMessage({
+      caller: caller ?? { kind: 'workflow', runId: crypto.randomUUID() },
       code,
       tabId,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,

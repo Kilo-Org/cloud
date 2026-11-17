@@ -6,6 +6,7 @@ import type {
 } from '@/src/shared/agent-conversation';
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
@@ -13,21 +14,15 @@ type SafeToolCall = Extract<AgentConversationEvent, { readonly name: SafeToolNam
 type BrowserToolCall = Extract<AgentConversationEvent, { readonly name: KiloBrowserToolName }>;
 type DispatchableToolCall = SafeToolCall | BrowserToolCall;
 
-/*
- * The browser tools live behind the background browser-tool session; the side
- * panel forwards the call and the upstream arguments verbatim. A call the
- * current mode does not expose never reaches here (the turn runner turns it
- * into a refusal tool result).
- */
-const runBrowserToolCall = (toolCall: BrowserToolCall): Promise<EvalTabResult> =>
-  executeKiloBrowserToolCall(toolCall);
-
 const isBrowserToolCall = (toolCall: DispatchableToolCall): toolCall is BrowserToolCall =>
   'arguments' in toolCall;
 
-const runSafeToolCall = async (toolCall: DispatchableToolCall): Promise<EvalTabResult> => {
+const runSafeToolCall = async (
+  toolCall: DispatchableToolCall,
+  browserCaller: BrowserCaller
+): Promise<EvalTabResult> => {
   if (isBrowserToolCall(toolCall)) {
-    return runBrowserToolCall(toolCall);
+    return executeKiloBrowserToolCall(toolCall, browserCaller);
   }
 
   if (toolCall.name === 'web_search') {
@@ -78,8 +73,7 @@ const runSafeToolCall = async (toolCall: DispatchableToolCall): Promise<EvalTabR
   return { error: 'This safe tool is not available.', ok: false };
 };
 
-export const createSafeToolExecutor = (): ((
-  toolCall: DispatchableToolCall
-) => Promise<EvalTabResult>) => runSafeToolCall;
-
-export const executeSafeToolCall = createSafeToolExecutor();
+export const createSafeToolExecutor = (
+  browserCaller: BrowserCaller
+): ((toolCall: DispatchableToolCall) => Promise<EvalTabResult>) => toolCall =>
+  runSafeToolCall(toolCall, browserCaller);

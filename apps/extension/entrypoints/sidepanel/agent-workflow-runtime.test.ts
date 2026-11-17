@@ -52,7 +52,7 @@ vi.mock('#imports', () => ({
 import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 
 describe('workflow eval', () => {
-  it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS', async () => {
+  it('sends eval message with WORKFLOW_PAGE_EVAL_TIMEOUT_MS and the run caller', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
@@ -60,8 +60,14 @@ describe('workflow eval', () => {
       type: EVAL_TAB_MESSAGE,
     });
 
-    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({ ok: true, value: 42 });
+    const caller = { kind: 'workflow', runId: 'run-1' } as const;
+
+    await expect(evalInTab(7, 'return 42;', caller)).resolves.toStrictEqual({
+      ok: true,
+      value: 42,
+    });
     expect(mocks.sendMessage).toHaveBeenCalledWith({
+      caller,
       code: 'return 42;',
       tabId: 7,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,

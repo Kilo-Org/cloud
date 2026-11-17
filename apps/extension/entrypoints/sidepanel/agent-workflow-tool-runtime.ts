@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import {
   MAX_WORKFLOW_COUNT,
@@ -38,7 +39,12 @@ export interface WorkflowToolContext {
     kind: ApprovalKind,
     draft: Record<string, unknown>
   ) => Promise<ApprovalOutcome>;
-  readonly evalInTab: (tabId: number, code: string) => Promise<EvalTabResult>;
+  readonly evalInTab: (
+    tabId: number,
+    code: string,
+    caller?: BrowserCaller
+  ) => Promise<EvalTabResult>;
+  readonly releaseBrowserCaller: (caller: BrowserCaller) => Promise<void>;
   readonly navigateTab: (tabId: number, url: string) => Promise<void>;
   readonly getTabUrl: (tabId: number) => Promise<string>;
 }
@@ -469,23 +475,32 @@ const executeRunWorkflow = async (
     };
   }
 
-  const result = await runWorkflow(
-    // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
-    // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
-    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
-    {
-      evalInTab: ctx.evalInTab,
-      getTabUrl: ctx.getTabUrl,
-      navigateTab: ctx.navigateTab,
-    } as Parameters<typeof runWorkflow>[0],
-    {
-      dryRun,
-      input,
-      signal: ctx.signal,
-      tabId: ctx.selectedTabId,
-      workflow,
-    }
-  );
+  // One caller per run: the tab lease and the ref registry belong to this run, not to the conversation.
+  const caller: BrowserCaller = { kind: 'workflow', runId: crypto.randomUUID() };
+  let result: WorkflowRunResult;
+
+  try {
+    result = await runWorkflow(
+      // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
+      // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
+      // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
+      {
+        evalInTab: (tabId: number, code: string) => ctx.evalInTab(tabId, code, caller),
+        getTabUrl: ctx.getTabUrl,
+        navigateTab: ctx.navigateTab,
+      } as Parameters<typeof runWorkflow>[0],
+      {
+        dryRun,
+        input,
+        signal: ctx.signal,
+        tabId: ctx.selectedTabId,
+        workflow,
+      }
+    );
+  } finally {
+    // The run's lease ends here so a waiting caller (another conversation, or a CLI agent) can take the tab.
+    await ctx.releaseBrowserCaller(caller);
+  }
 
   return runResultToToolResult(result, dryRun, workflow.name);
 };

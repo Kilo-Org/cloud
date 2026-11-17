@@ -7,8 +7,8 @@ import {
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   discoverWebMcpToolsInTab,
-  evalInTab,
   evalInTabWithScripting,
+  evaluateTabCode,
   executeWebMcpToolInTab,
   getInspectableTab,
   getPageSnapshotInTabWithScripting,
@@ -150,23 +150,19 @@ describe('tab debugger helpers', () => {
     ]);
   });
 
-  it('evaluates dangerous-mode code in the selected tab', async () => {
+  it('evaluates dangerous-mode code through the tab session send', async () => {
     const calls: unknown[] = [];
-    const debuggerApi = createDebuggerApi({
-      sendCommand: (target, method, params) => {
-        calls.push({ method, params, target });
-        return { result: { type: 'number', value: 12_345 } };
-      },
-    });
+    const send = (method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params });
+      return { result: { type: 'number', value: 12_345 } };
+    };
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return document.documentElement.outerHTML.length;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({ ok: true, value: 12_345 });
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
     expect(calls).toStrictEqual([
       {
         method: 'Runtime.evaluate',
@@ -176,63 +172,48 @@ describe('tab debugger helpers', () => {
           returnByValue: true,
           timeout: 5000,
         },
-        target: { tabId: 7 },
       },
     ]);
   });
 
-  it('returns eval errors and still detaches', async () => {
-    const debuggerApi = createDebuggerApi({
-      sendCommand: () => ({
-        exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
-        result: { type: 'object' },
-      }),
+  it('returns eval errors without detaching the shared attachment', async () => {
+    const send = () => ({
+      exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
+      result: { type: 'object' },
     });
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return missingValue;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({
       error: 'Page evaluation failed: ReferenceError: missingValue is not defined',
       ok: false,
     });
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
   });
 
-  it('returns the eval result even when detach fails', async () => {
-    const debuggerApi: ChromeDebuggerApi = {
-      attach: () => {},
-      detach: () => {
-        throw new Error('Debugger is not attached to the tab with id: 7');
-      },
-      getTargets: () => [],
-      onDetach: { addListener: () => {}, removeListener: () => {} },
-      onEvent: { addListener: () => {}, removeListener: () => {} },
-      sendCommand: () => ({ result: { type: 'number', value: 42 } }),
+  it('reports a session send failure as an eval error', async () => {
+    const send = (): Record<string, unknown> => {
+      throw new Error('The debugger detached from the tab.');
     };
 
-    await expect(evalInTab({ code: 'return 42;', debuggerApi, tabId: 7 })).resolves.toStrictEqual({
-      ok: true,
-      value: 42,
+    await expect(evaluateTabCode({ code: 'return 42;', send })).resolves.toStrictEqual({
+      error: 'The debugger detached from the tab.',
+      ok: false,
     });
   });
 
   it('summarizes huge eval string results', async () => {
     const hugeValue = 'x'.repeat(8001);
-    const debuggerApi = createDebuggerApi({
-      sendCommand: () => ({
-        result: { type: 'string', value: hugeValue },
-      }),
+    const send = () => ({
+      result: { type: 'string', value: hugeValue },
     });
 
     await expect(
-      evalInTab({
+      evaluateTabCode({
         code: 'return document.documentElement.outerHTML;',
-        debuggerApi,
-        tabId: 7,
+        send,
       })
     ).resolves.toStrictEqual({
       ok: true,
@@ -846,6 +827,7 @@ describe('tab debugger helpers', () => {
     expect(
       isTabDebuggerRequest({
         arguments: { element: 'e5' },
+        caller: { kind: 'workflow', runId: 'run-1' },
         tabId: 7,
         tool: 'kilo_browser_snapshot',
         type: BROWSER_TOOL_MESSAGE,
@@ -858,13 +840,21 @@ describe('tab debugger helpers', () => {
         type: BROWSER_TOOL_MESSAGE,
       })
     ).toBe(true);
+    expect(
+      isTabDebuggerResponse({
+        ok: true,
+        takeOver: { holderKind: 'agent', sessionTitle: 'Kilo CLI session X', tabId: 7 },
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
     expect(isTabDebuggerResponse({ error: TAB_NOT_INSPECTABLE_ERROR, ok: false })).toBe(true);
   });
 
-  it('rejects a browser tool request without a tool name or arguments', () => {
+  it('rejects a browser tool request without a tool name, arguments or caller', () => {
     expect(
       isTabDebuggerRequest({
         arguments: {},
+        caller: { kind: 'workflow', runId: 'run-1' },
         tabId: 7,
         tool: 5,
         type: BROWSER_TOOL_MESSAGE,
@@ -873,6 +863,15 @@ describe('tab debugger helpers', () => {
     expect(
       isTabDebuggerRequest({
         arguments: '{}',
+        caller: { kind: 'workflow', runId: 'run-1' },
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+    expect(
+      isTabDebuggerRequest({
+        arguments: {},
         tabId: 7,
         tool: 'kilo_browser_snapshot',
         type: BROWSER_TOOL_MESSAGE,

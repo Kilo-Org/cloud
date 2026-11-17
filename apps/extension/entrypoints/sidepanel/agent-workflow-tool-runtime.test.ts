@@ -37,6 +37,7 @@ const createBaseCtx = (overrides: Partial<WorkflowToolContext> = {}): WorkflowTo
   getTabUrl: vi.fn().mockResolvedValue('https://example.com/page'),
   mode: 'dangerous',
   navigateTab: vi.fn().mockResolvedValue(undefined),
+  releaseBrowserCaller: vi.fn().mockResolvedValue(undefined),
   requestApproval: vi.fn().mockResolvedValue({ savedId: 'test-id', status: 'approved' }),
   selectedTabId: 1,
   selectedTabTitle: 'Example Page',

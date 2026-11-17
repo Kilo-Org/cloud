@@ -72,6 +72,9 @@ import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
 import { loadWebMcpSettings } from '@/src/shared/web-mcp-settings';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
+import { releaseBrowserCaller } from './browser-tool-runtime';
+import { BrowserTabTakeOverCard } from './browser-tab-takeover-card';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
 import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
@@ -103,6 +106,30 @@ const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
+
+/*
+ * One identity per side-panel page. `sessionStorage` survives a panel reload
+ * in the same tab, so a reload re-attaches to the tab leases it already held
+ * instead of queuing behind a lease it can no longer release.
+ */
+const readPanelId = (): string => {
+  try {
+    const stored = globalThis.sessionStorage?.getItem('kiloBrowserPanelId');
+
+    if (stored !== undefined && stored !== null && stored !== '') {
+      return stored;
+    }
+
+    const created = crypto.randomUUID();
+
+    globalThis.sessionStorage?.setItem('kiloBrowserPanelId', created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
+};
+
+const panelId = readPanelId();
 
 interface ConversationRunState {
   readonly abort: AbortController;
@@ -745,6 +772,11 @@ export const AgentChatPanel = ({
     }
     const runSelectedTabId = runStateEntry.selectedTabId;
     const runSelectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+    const browserCaller: BrowserCaller = {
+      conversationId,
+      kind: 'panel',
+      panelId,
+    };
 
     try {
       const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
@@ -779,6 +811,7 @@ export const AgentChatPanel = ({
         allowWebMcpInSafeMode,
         apiBaseUrl,
         appendEvents: runState.appendRunEvents,
+        browserCaller,
         conversationEvents: conversationEventsForGateway,
         executeRemoteMcpToolCall: event =>
           executeRemoteMcpToolCall({
@@ -815,6 +848,7 @@ export const AgentChatPanel = ({
           getTabUrl,
           mode: runMode,
           navigateTab,
+          releaseBrowserCaller,
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,
@@ -830,6 +864,9 @@ export const AgentChatPanel = ({
         const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
         const runContextLength = modelOptions.find(option => option.id === runModel)?.contextLength;
         const ratio = getContextRatio(latest, runContextLength);
+
+        // The turn's tab lease ends with it, so the next conversation or a queued CLI agent can take the tab.
+        await releaseBrowserCaller(browserCaller);
 
         // Clean up the run state first so compactConversation's running-conversation check passes.
         cleanupRun();
@@ -1423,6 +1460,8 @@ export const AgentChatPanel = ({
           <span className="min-w-0">{remoteMcpToolWarning}</span>
         </p>
       )}
+
+      <BrowserTabTakeOverCard />
 
       <MessageComposer
         activeConversationId={activeConversationId}

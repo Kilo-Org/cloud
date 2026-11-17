@@ -23,6 +23,12 @@ const state = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+// The panel's post-delete hand-off goes through the stack-safe replace; the
+// hook's own navigation plumbing is irrelevant here, and its mechanics are
+// covered by the navigation folder's suite.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({

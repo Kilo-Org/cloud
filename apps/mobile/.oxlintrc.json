@@ -248,7 +248,11 @@
     "@typescript-eslint/no-for-in-array": "error",
     "@typescript-eslint/no-implied-eval": "error",
     "@typescript-eslint/no-redundant-type-constituents": "off",
-    // 198 assertions are reported at 1.88, in files this change must not edit.
+    // Off for the whole app, not for one directory: the unnecessary assertions
+    // sit in components, lib and route files alike, most of them `as Href`
+    // route casts and casts on test fixtures. Turn the rule on in a change that
+    // spends its whole review on deleting them, so their removal is reviewed
+    // instead of buried in an unrelated diff.
     "@typescript-eslint/no-unnecessary-type-assertion": "off",
     "@typescript-eslint/no-unsafe-argument": "error",
     "@typescript-eslint/no-unsafe-assignment": "off",

@@ -25,6 +25,7 @@ import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { getVercelPricingMetadata } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
 import {
   applyTieredPricingRates,
   textPricingRates,
@@ -246,11 +247,13 @@ async function briefingPriceRates(
   inputTokensBound: number
 ): Promise<TextPricingRates & { reasoning: boolean }> {
   const extra = pickerExtraModel(model);
-  const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase().catch((): GatewayModelMap => ({})),
-    getPreferredProviderOrderConfig(),
-    getCustomPricingConfig(),
-  ]);
+  const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig, vercelPricing] =
+    await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase().catch((): GatewayModelMap => ({})),
+      getPreferredProviderOrderConfig(),
+      getCustomPricingConfig(),
+      getVercelPricingMetadata(),
+    ]);
   const unavailable = await getUnavailableModelIds();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   if (
@@ -283,7 +286,12 @@ async function briefingPriceRates(
             item.id,
             item === extra || item === targetExtra
               ? item.pricing
-              : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
+              : pickerModelPricing(
+                  item,
+                  endpointsMetadata,
+                  preferredProviderOrderConfig,
+                  vercelPricing
+                )
           )
         ),
         customPricingConfig,

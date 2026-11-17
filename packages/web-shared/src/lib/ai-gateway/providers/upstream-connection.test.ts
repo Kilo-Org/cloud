@@ -9,6 +9,7 @@ import {
   lookupPinnedUpstreamAddress,
   normalizeUpstreamHostname,
   UpstreamAddressUnverifiedError,
+  upstreamConnectionsPerHost,
   upstreamDispatcherFor,
 } from './upstream-connection';
 
@@ -180,6 +181,21 @@ describe('upstreamDispatcherFor', () => {
     expect(() => upstreamDispatcherFor('pinned.example', [])).toThrow(
       UpstreamAddressUnverifiedError
     );
+  });
+
+  describe('upstreamConnectionsPerHost', () => {
+    it.each([
+      { raw: undefined, expected: 64 },
+      { raw: '', expected: 64 },
+      { raw: '  ', expected: 64 },
+      { raw: '8', expected: 8 },
+      { raw: '0', expected: 64 },
+      { raw: '-4', expected: 64 },
+      { raw: '8.5', expected: 64 },
+      { raw: 'pinned', expected: 64 },
+    ])('parses $raw to $expected', ({ raw, expected }) => {
+      expect(upstreamConnectionsPerHost(raw)).toBe(expected);
+    });
   });
 
   it.each(['10.1.2.3', '127.0.0.1', '169.254.169.254', 'fd00::1'])(

@@ -37,11 +37,22 @@ const UPSTREAM_PIN_MAX_HOSTS = 1000;
 const UPSTREAM_AGENT_MAX_ENTRIES = 64;
 /**
  * Sockets one host's pool may keep open at once. Queued requests hold no
- * socket: undici queues in-process once the cap is reached. 64 is far above the
- * concurrency one gateway instance sends to one upstream host, so the cap
- * bounds only a degenerate single-host pile-up.
+ * socket: undici queues in-process once the cap is reached, and the queued
+ * request's budget keeps running, so a pool over its cap trades wait time for
+ * fewer sockets. `AI_GATEWAY_UPSTREAM_CONNECTIONS_PER_HOST` raises the cap for
+ * a deployment whose peak per-host concurrency is higher; 64 is far above the
+ * concurrency one gateway instance sends to a single upstream host, but every
+ * secure-proxy request shares one relay host, so that path sets the real peak.
  */
-const UPSTREAM_AGENT_CONNECTIONS_PER_HOST = 64;
+export function upstreamConnectionsPerHost(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return 64;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 64;
+}
+
+const UPSTREAM_AGENT_CONNECTIONS_PER_HOST = upstreamConnectionsPerHost(
+  process.env.AI_GATEWAY_UPSTREAM_CONNECTIONS_PER_HOST
+);
 
 type UpstreamPin = { addresses: string[]; expiresAt: number };
 

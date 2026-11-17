@@ -364,12 +364,18 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
       expect(flashListProps.current).toBeNull();
       expect(findSearchInput(renderer)).toBeDefined();
-      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      // The retry CTA is the shared `Button`, which forwards this label to the
+      // pressable it renders; count the host node so the composite and its
+      // element are not read as two controls.
+      const retries = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Retry loading files'
+      );
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
-        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        const retry = retries[0];
         act(() => {
-          (retry.props.onPress as () => void)();
+          (retry?.props.onPress as () => void)();
         });
         expect(listQueryResult.query.refetch).toHaveBeenCalledOnce();
       } else {

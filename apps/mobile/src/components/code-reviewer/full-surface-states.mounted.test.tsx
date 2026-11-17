@@ -572,11 +572,11 @@ describe('repository search', () => {
 
 describe('Recent review bodies', () => {
   it.each([
-    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
-    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
+    { orientation: 'portrait', left: 0, right: 0 },
+    { orientation: 'landscape', left: 47, right: 59 },
   ])(
-    'keeps the $orientation rows inside the side insets on top of the gutter',
-    async ({ left, right, paddingLeft, paddingRight }) => {
+    'keeps the $orientation list inside the side insets, with rows drawing the gutter',
+    async ({ left, right }) => {
       state.insets.left = left;
       state.insets.right = right;
       state.reviews.data = {
@@ -586,11 +586,23 @@ describe('Recent review bodies', () => {
       const { renderer, unmount } = await renderWithProviders(
         createElement(ReviewListScreen, { scope: 'personal' })
       );
+      // The container carries exactly the safe-area side insets, so a landscape
+      // row never starts under the sensor housing; the page gutter and the top
+      // space belong to the row, which every recycled row draws identically.
       expect(firstList(renderer).props.contentContainerStyle).toEqual({
-        paddingTop: 16,
-        paddingLeft,
-        paddingRight,
+        paddingLeft: left,
+        paddingRight: right,
       });
+      const rows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        const pressable = row.find(
+          node => typeof node.type === 'string' && node.type === 'Pressable'
+        );
+        const classes = String(pressable.props.className ?? '').split(' ');
+        expect(classes).toContain('px-4');
+        expect(classes).toContain('py-3');
+      }
       unmount();
     }
   );

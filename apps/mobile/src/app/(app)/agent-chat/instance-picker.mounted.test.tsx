@@ -363,4 +363,26 @@ describe('InstancePickerScreen list', () => {
       renderer.unmount();
     });
   });
+
+  it('dismisses from the header Cancel without reporting a pick', async () => {
+    const renderer = await mount();
+    const [sheet] = findByType(renderer.root, 'SheetHeader');
+    if (!sheet) {
+      throw new Error('The picker sheet did not mount');
+    }
+    const props = sheet.props as { onCancel?: () => void };
+    const cancel = props.onCancel;
+    expect(typeof cancel).toBe('function');
+
+    act(() => {
+      cancel?.();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(bridge.onSelect).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

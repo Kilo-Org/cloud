@@ -65,7 +65,8 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfilesPath: () => '/(app)/(tabs)/(3_profile)/profiles',
+  getProfilesPath: (stack: 'app' | 'profileTab' = 'profileTab') =>
+    stack === 'app' ? '/(app)/profile-management' : '/(app)/(tabs)/(3_profile)/profiles',
   getProfileVariablesPath: (id: string) => `/profiles/${id}/variables`,
   getProfileCommandsPath: (id: string) => `/profiles/${id}/commands`,
   getProfileSlashCommandsPath: (id: string) => `/profiles/${id}/slash-commands`,
@@ -166,6 +167,20 @@ describe('ProfileOverviewScreen terminal error states', () => {
     );
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['agentProfiles', 'list'] });
     expect(h.refetch).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('app stack: the header Back falls back to the app stack Profiles list', async () => {
+    Object.assign(h.query, { data: testProfile(), isError: false, isPending: false });
+
+    const { renderer, unmount } = await mountScreen(undefined, 'app');
+
+    // Both Stacks mount this screen, and a cold deep link arrives with nothing
+    // to pop, so the fallback stays in the Stack that mounted it.
+    expect(findOne(renderer.root, 'ScreenHeader').props.backFallback).toBe(
+      '/(app)/profile-management'
+    );
 
     unmount();
   });

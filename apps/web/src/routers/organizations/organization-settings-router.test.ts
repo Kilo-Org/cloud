@@ -1413,9 +1413,18 @@ describe('organizations settings trpc router', () => {
         .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
     }
 
+    async function setPlan(organizationId: string, plan: 'teams' | 'enterprise') {
+      await db.update(organizations).set({ plan }).where(eq(organizations.id, organizationId));
+    }
+
+    beforeEach(async () => {
+      await setPlan(testOrganization.id, 'enterprise');
+    });
+
     afterEach(async () => {
       await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
       await updateOrganizationSettings(testOrganization.id, {});
+      await setPlan(testOrganization.id, 'teams');
     });
 
     it('reports whether gateway settings are available', async () => {
@@ -1427,7 +1436,6 @@ describe('organizations settings trpc router', () => {
       ).resolves.toEqual({
         available: true,
         disable_openrouter: false,
-        disable_vercel_ai_gateway: false,
         data_region: null,
       });
     });
@@ -1438,16 +1446,15 @@ describe('organizations settings trpc router', () => {
 
       const result = await caller.organizations.settings.updateGatewaySettings({
         organizationId: testOrganization.id,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
 
-      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      expect(result.settings).toMatchObject({ disable_openrouter: true, data_region: 'eu' });
       await expect(
         caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
       ).resolves.toMatchObject({
-        disable_openrouter: false,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
       const auditLogs = await db
@@ -1456,8 +1463,83 @@ describe('organizations settings trpc router', () => {
         .where(eq(organization_audit_logs.organization_id, testOrganization.id))
         .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
-        'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
+        'Updated advanced policies: OpenRouter disabled; Inference region: European Union'
       );
+    });
+
+    it('reports gateway settings as unavailable for a non-enterprise organization', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('rejects gateway settings for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Advanced policies are not available for this organization.',
+      });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('reports gateway settings as unavailable for an enterprise organization outside the feature', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('reports model gateway availability while the feature is enabled', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).resolves.toEqual({ gateways: [] });
+    });
+
+    it('rejects model gateway availability while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects model gateway availability for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('rejects gateway settings while the feature is not enabled', async () => {

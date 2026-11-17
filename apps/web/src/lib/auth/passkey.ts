@@ -25,8 +25,13 @@ import {
 
 import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleConnection,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
+import { deleteExpiredPasskeyManagementAuthorizations } from './passkey-management';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.
@@ -127,7 +132,8 @@ export type PasskeyErrorCode =
   | 'CHALLENGE_ALREADY_USED'
   | 'WRONG_CHALLENGE'
   | 'UNKNOWN_CREDENTIAL'
-  | 'VERIFICATION_FAILED';
+  | 'VERIFICATION_FAILED'
+  | 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID';
 
 /**
  * A refused passkey ceremony. `code` is the stable contract the routes return;
@@ -345,18 +351,19 @@ export async function createRegistrationOptions(
  * rpId, both of which the library checks against this configuration), and
  * refuses a credential id that is already bound to a user.
  *
- * `sessionPepper` is the pepper of the browser session that started this
- * request. The credential is inserted while the user row is locked, and only if
- * that session is still current. Account recovery rotates the pepper on the
- * same row before it deletes passkeys. It therefore either commits first, and
- * this registration is refused, or waits for this insert and then deletes the
- * new credential.
+ * `authorize` runs inside the transaction that locks the user row and inserts
+ * the credential, before the insert. A refused authorization throws and rolls
+ * the whole enrollment back, so a credential and the authority that allowed it
+ * commit or fail together.
  */
-export async function verifyRegistration(
+async function verifyRegistrationWithAuthorization(
   kiloUserId: string,
   challengeId: string,
   response: RegistrationResponseJSON,
-  sessionPepper: string | null | undefined
+  authorize: (
+    tx: DrizzleTransaction,
+    owner: { web_session_pepper: string | null } | undefined
+  ) => Promise<void>
 ): Promise<PasskeyCredential> {
   const { rpId, expectedOrigins } = getRelyingParty();
 
@@ -390,9 +397,8 @@ export async function verifyRegistration(
       .from(kilocode_users)
       .where(eq(kilocode_users.id, kiloUserId))
       .for('update');
-    if (!owner || !isWebSessionCurrent(sessionPepper, owner)) {
-      throw new PasskeyVerificationError('VERIFICATION_FAILED');
-    }
+
+    await authorize(tx, owner);
 
     const [bound] = await tx
       .select({ kilo_user_id: passkey_credentials.kilo_user_id })
@@ -422,6 +428,54 @@ export async function verifyRegistration(
       throw new PasskeyVerificationError('VERIFICATION_FAILED');
     }
     return inserted;
+  });
+}
+
+/**
+ * Verify a browser enrollment. `sessionPepper` is the pepper of the browser
+ * session that started this request. Account recovery rotates the pepper on
+ * the same row before it deletes passkeys. It therefore either commits first,
+ * and this registration is refused, or waits for this insert and then deletes
+ * the new credential.
+ */
+export async function verifyRegistration(
+  kiloUserId: string,
+  challengeId: string,
+  response: RegistrationResponseJSON,
+  sessionPepper: string | null | undefined
+): Promise<PasskeyCredential> {
+  return verifyRegistrationWithAuthorization(
+    kiloUserId,
+    challengeId,
+    response,
+    async (_tx, owner) => {
+      if (!owner || !isWebSessionCurrent(sessionPepper, owner)) {
+        throw new PasskeyVerificationError('VERIFICATION_FAILED');
+      }
+    }
+  );
+}
+
+/**
+ * Verify a native app enrollment. `consumeAuthorization` redeems the
+ * single-use management grant inside the insertion transaction, so a grant is
+ * spent only by an enrollment that commits, and a failed attribution, a
+ * cancelled ceremony, or a rolled-back insert leaves it usable until it
+ * expires.
+ *
+ * There is no browser session pepper on this path: the native session and the
+ * fresh primary proof behind the grant are the authority.
+ */
+export async function verifyNativeRegistration(
+  kiloUserId: string,
+  challengeId: string,
+  response: RegistrationResponseJSON,
+  consumeAuthorization: (tx: DrizzleTransaction) => Promise<boolean>
+): Promise<PasskeyCredential> {
+  return verifyRegistrationWithAuthorization(kiloUserId, challengeId, response, async tx => {
+    if (!(await consumeAuthorization(tx))) {
+      throw new PasskeyVerificationError('PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID');
+    }
   });
 }
 
@@ -614,10 +668,14 @@ export async function consumeSignInTicket(ticket: string): Promise<PasskeySignIn
  * minted, and redemption only marks it consumed, so without this every passkey
  * sign-in would retain a user-linked row forever. Only rows past their expiry
  * are removed, so a redemption in flight is never cut short.
+ *
+ * Management authorizations: the same single-use, five-minute shape. Rows past
+ * expiry can authorize nothing, so they are removed under the same cutoff.
  */
 export async function cleanupExpiredPasskeyRows(): Promise<{
   challenges: number;
   tickets: number;
+  managementAuthorizations: number;
 }> {
   const cutoff = new Date().toISOString();
 
@@ -631,7 +689,13 @@ export async function cleanupExpiredPasskeyRows(): Promise<{
     .where(lt(passkey_sign_in_tickets.expires_at, cutoff))
     .returning({ id: passkey_sign_in_tickets.id });
 
-  return { challenges: challenges.length, tickets: tickets.length };
+  const managementAuthorizations = await deleteExpiredPasskeyManagementAuthorizations(cutoff);
+
+  return {
+    challenges: challenges.length,
+    tickets: tickets.length,
+    managementAuthorizations,
+  };
 }
 
 /** Passkeys registered by a user, newest first. */
@@ -647,8 +711,12 @@ export async function listPasskeysForUser(kiloUserId: string): Promise<PasskeyCr
  * Delete one of the user's passkeys. Scoped to the user so a caller can never
  * touch another user's credential, even with a known credential id.
  */
-export async function deletePasskey(kiloUserId: string, credentialId: string): Promise<boolean> {
-  const deleted = await db
+export async function deletePasskey(
+  kiloUserId: string,
+  credentialId: string,
+  fromDb: DrizzleConnection = db
+): Promise<boolean> {
+  const deleted = await fromDb
     .delete(passkey_credentials)
     .where(
       and(
@@ -668,9 +736,10 @@ export async function deletePasskey(kiloUserId: string, credentialId: string): P
 export async function renamePasskey(
   kiloUserId: string,
   credentialId: string,
-  name: string
+  name: string,
+  fromDb: DrizzleConnection = db
 ): Promise<PasskeyCredential | null> {
-  const [updated] = await db
+  const [updated] = await fromDb
     .update(passkey_credentials)
     .set({ name })
     .where(

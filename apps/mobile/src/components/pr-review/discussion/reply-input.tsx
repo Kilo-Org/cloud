@@ -2,42 +2,37 @@
 // (iOS ref pattern) per the repo's iOS rule. Submit calls the
 // (non-optimistic) reply mutation and re-fetches the list on settle.
 
-import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, TextInput, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 
 import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { ComposerInlineError } from '@/components/pr-review/composer-inline-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { clearDraft, clearDraftIfStill, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
-import {
-  isPrOperationAmbiguous,
-  isPrOperationPersistenceFailed,
-} from '@/lib/pr-review/merge/pr-operation-ledger';
+import { classifyPrInlineFailure, type PrInlineFailure } from '@/lib/pr-review/inline-failure';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import { trpcClient } from '@/lib/trpc';
 
 /**
  * Outcome of the UGC Terms gate. `accepted` means the current version is
  * already accepted or the user accepted now (the caller may post).
- * `dismissed` means the user cancelled the gate. `outdated` means the accept
- * was rejected because the version is stale — terminal, the caller must not
- * post. `unknown` means the Terms status could not be read, so acceptance is
- * unconfirmed.
+ * `dismissed` means the gate closed without acceptance: the user cancelled, or
+ * they opened the terms to read them. `outdated` means the accept was rejected
+ * because the version is stale — terminal, the caller must not post. `unknown`
+ * means the Terms status could not be read, so acceptance is unconfirmed.
  */
 export type TermsGateOutcome =
   | { kind: 'accepted' }
@@ -121,8 +116,13 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
           {
             text: i18n.t('prReview.discussion.viewTerms'),
             onPress: () => {
-              void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
-              show();
+              // Tapping any button dismisses the alert, so this arm must settle
+              // the gate itself: the submit that awaited it abandons its attempt
+              // instead of staying pending behind a spinner. Acceptance is still
+              // unconfirmed, so sending again re-enters this gate.
+              resolve({ kind: 'dismissed' });
+              // The terms render in their own native screen, not a browser.
+              router.push({ pathname: '/(app)/legal/[document]', params: { document: 'terms' } });
             },
           },
           {
@@ -168,6 +168,15 @@ type ReplyInputProps = {
   readonly onInputFocus?: () => void;
 };
 
+/** Failure kinds whose recovery lives outside the Reply button. */
+const REPLY_BLOCKING = new Set<PrInlineFailure['kind']>([
+  'body-empty',
+  'bad-request',
+  'not-recorded',
+  'forbidden',
+  'reconnect',
+]);
+
 export function ReplyInput({
   owner,
   repo,
@@ -181,14 +190,8 @@ export function ReplyInput({
   const { t } = useTranslation();
   const bodyRef = useRef<string>('');
   const inputRef = useRef<TextInput | null>(null);
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
   const [resetKey, setResetKey] = useState(0);
-  // The provider platform as a stable primitive: the error effect words a
-  // refusal after it without depending on the `provider` object identity.
-  const providerPlatform = provider?.ref.platform;
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
   // Durable reply draft, keyed by account and thread. Nothing is saved or
   // restored while the user id is unknown.
@@ -214,113 +217,92 @@ export function ReplyInput({
     bodyRef.current = draft.value ?? '';
   }
 
-  // Mirror mutation error into the inline box. Reply is NOT
-  // optimistic, so the user can hit the inline error and retry
-  // without waiting for a re-fetch.
-  useEffect(() => {
-    if (reply.error) {
-      // The ledger persistence-failure marker is retry-blocking: the row never
-      // became `reconcile_pending`, so the same key must not be retried.
-      if (isPrOperationPersistenceFailed(reply.error)) {
-        setInlineError(i18n.t('common.actionNotRecorded'));
-        setInlineErrorKind('bad-request');
-        return;
-      }
-      const classification = classifyPrReviewMutationError(reply.error);
-      if (isPrOperationAmbiguous(reply.error)) {
-        // The effect may have committed: tell the user to verify the PR
-        // instead of showing the generic retryable copy. Retry stays enabled.
-        setInlineError(i18n.t('prReview.operation.ambiguous'));
-        setInlineErrorKind('retryable');
-        return;
-      }
-      if (classification.kind === 'terms-required') {
-        void (async () => {
-          const outcome = await ensureTermsAcceptedOutcome();
-          if (outcome.kind === 'accepted') {
-            setInlineError(null);
-            setInlineErrorKind(null);
-          } else if (outcome.kind === 'outdated') {
-            setInlineError(t('prReview.discussion.termsOutdatedCopy'));
-            setInlineErrorKind('bad-request');
-          } else if (outcome.kind === 'unknown') {
-            setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
-            setInlineErrorKind('retryable');
-          } else {
-            setInlineError(t('prReview.discussion.termsAcceptRequired'));
-            setInlineErrorKind(null);
-          }
-        })();
-      } else if (classification.kind === 'bad-request') {
-        setInlineError(t('prReview.discussion.replyBadRequest'));
-        setInlineErrorKind('bad-request');
-      } else if (classification.kind === 'forbidden') {
-        // The provider arm words the refusal after the connected provider
-        // (merge request vs pull request); GitHub keeps the exact pre-s6 copy.
-        setInlineError(
-          providerPlatform
-            ? t('prReview.discussion.replyForbiddenTerm', {
-                term: t(providerPrNounKey(providerPlatform)),
-              })
-            : t('prReview.discussion.replyForbidden')
-        );
-        setInlineErrorKind('forbidden');
-      } else if (classification.kind === 'reconnect') {
-        setInlineError(reconnectExpiredMessage(providerPlatform));
-        setInlineErrorKind('reconnect');
-      } else {
-        // A generic/transient failure shows the specified retryable copy,
-        // never the raw provider error (uxs3 spot check, e6-offline-banner:
-        // the same leak as the composer). The draft stays intact and the
-        // Reply button stays enabled for the retry.
-        setInlineError(t('prReview.operation.couldNotReply'));
-        setInlineErrorKind('retryable');
-      }
-    }
-  }, [reply.error, t, providerPlatform]);
-
   const submit = async () => {
-    const body = bodyRef.current.trim();
-    if (!body || reply.isPending) {
+    const attempt = begin();
+    if (attempt === null) {
+      // One reply in flight: the double-tap window is closed.
       return;
     }
-    setInlineError(null);
-    setInlineErrorKind(null);
+    const body = bodyRef.current.trim();
+    if (!body) {
+      // The family's own validation copy, and a local rejection has no toast
+      // owner: it announces through the inline box like the composer's.
+      attempt.fail({
+        kind: 'body-empty',
+        message: t('prReview.composer.bodyEmpty'),
+        announce: 'here',
+      });
+      return;
+    }
     // Confirmed offline: fail the submit at once with the retryable copy
     // instead of starting a request that hangs on the UI deadline behind a
     // spinner (uxs3 spot check, e6-offline-hang). The draft stays intact,
     // nothing is pending, and the same tap retries once the banner clears.
-    if (getCommittedConnectivityStatus() === 'offline') {
-      setInlineError(t('prReview.operation.couldNotReply'));
-      setInlineErrorKind('retryable');
+    if (connectionRefusesWrites()) {
+      attempt.fail({
+        kind: 'retryable',
+        message: t('prReview.operation.couldNotReply'),
+        // A local rejection with no toast owner: the inline box announces it,
+        // like the composer's and the edit sheet's own validations.
+        announce: 'here',
+      });
       return;
     }
     const outcome = await ensureTermsAcceptedOutcome();
-    if (outcome.kind === 'outdated') {
-      setInlineError(t('prReview.discussion.termsOutdatedCopy'));
-      setInlineErrorKind('bad-request');
+    if (!attempt.owns()) {
+      // The thread unmounted while the gate ran: this token no longer owns the
+      // phase, so nothing may be posted.
       return;
     }
     if (outcome.kind === 'dismissed') {
+      attempt.abandon();
       return;
     }
-    reply.mutate(
-      // The provider arm posts the seam vars; the mutation hook routes the
-      // call by the live provider scope, so the ids here are provider-native
-      // (discussion id / root-comment id), never GitHub's numeric comment id.
-      provider
-        ? { threadId: provider.threadId, commentNodeId: provider.commentNodeId, body }
-        : { owner, repo, number, commentId, body },
-      {
-        onSuccess: () => {
-          bodyRef.current = '';
-          if (userId) {
-            void clearDraft(userId, replyDraftKey);
-          }
-          setResetKey(prev => prev + 1);
-        },
+    if (outcome.kind === 'outdated') {
+      attempt.fail({
+        kind: 'bad-request',
+        message: t('prReview.discussion.termsOutdatedCopy'),
+        announce: 'toast',
+      });
+      return;
+    }
+    try {
+      await reply.mutateAsync(
+        // The provider arm posts the seam vars; the mutation hook routes the
+        // call by the live provider scope, so the ids here are provider-native
+        // (discussion id / root-comment id), never GitHub's numeric comment id.
+        provider
+          ? { threadId: provider.threadId, commentNodeId: provider.commentNodeId, body }
+          : { owner, repo, number, commentId, body }
+      );
+      // A departed surface's token is dead: a newer mount owns the key, and the
+      // draft it is typing must survive this late success.
+      if (!attempt.succeed()) {
+        // A newer mount owns the slot: clear only the body this submit posted,
+        // so a draft typed after the unmount survives and the posted text does
+        // not re-seed the field on the next open.
+        if (userId) {
+          void clearDraftIfStill(userId, replyDraftKey, JSON.stringify(bodyRef.current));
+        }
+        return;
       }
-    );
+      bodyRef.current = '';
+      if (userId) {
+        void clearDraft(userId, replyDraftKey);
+      }
+      setResetKey(prev => prev + 1);
+    } catch (error) {
+      const classified = await classifyPrInlineFailure(error, {
+        surface: 'reply',
+        ...(provider ? { platform: provider.ref.platform } : {}),
+        announce: 'toast',
+      });
+      if (classified.kind === 'failure') {
+        attempt.fail(classified.failure);
+      } else {
+        attempt.abandon();
+      }
+    }
   };
 
   return (
@@ -330,7 +312,7 @@ export function ReplyInput({
           key={resetKey}
           ref={inputRef}
           defaultValue={bodyRef.current}
-          editable={!reply.isPending}
+          editable={feedback.status !== 'pending'}
           placeholder={t('prReview.discussion.replyPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           accessibilityLabel={t('prReview.discussion.replyBody')}
@@ -340,32 +322,22 @@ export function ReplyInput({
             if (userId) {
               saveDraft(userId, replyDraftKey, value);
             }
-            if (inlineError) {
-              setInlineError(null);
-              setInlineErrorKind(null);
-            }
+            // An edit retires every standing failure, as the shipped
+            // keystroke-clear did.
+            clearWhere(() => true);
           }}
           multiline
           textAlignVertical="top"
           className="min-h-16 rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm leading-[1.25rem] text-foreground"
         />
       ) : null}
-      {inlineError && inlineErrorKind !== 'reconnect' ? (
-        <Text className="text-xs text-destructive">{inlineError}</Text>
-      ) : null}
-      {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+      <ComposerInlineError feedback={feedback} />
       <View className="flex-row justify-end">
         <Button
           size="sm"
           variant="outline"
-          loading={reply.isPending}
-          disabled={
-            !draft.settled ||
-            reply.isPending ||
-            inlineErrorKind === 'bad-request' ||
-            inlineErrorKind === 'forbidden' ||
-            inlineErrorKind === 'reconnect'
-          }
+          loading={feedback.status === 'pending'}
+          disabled={!draft.settled || (failure !== null && REPLY_BLOCKING.has(failure.kind))}
           onPress={() => {
             void submit();
           }}

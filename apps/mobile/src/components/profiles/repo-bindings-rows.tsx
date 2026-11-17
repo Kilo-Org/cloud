@@ -87,33 +87,65 @@ export function RepoBindingRow({
 export function PickerField({
   label,
   value,
+  hint,
+  reserveHint,
   accessibilityLabel,
   disabled,
   onPress,
 }: Readonly<{
   label: string;
   value: string | null;
+  /** The line under the field right now, or null when it has nothing to say. */
+  hint: string | null;
+  /**
+   * The copy the hint line reserves, so the action row under the form does not
+   * move when a hint appears. Null reserves nothing, for a field that never has
+   * one.
+   */
+  reserveHint: string | null;
   accessibilityLabel: string;
   disabled: boolean;
   onPress: () => void;
 }>) {
   const colors = useThemeColors();
   return (
-    <Pressable
-      className={`${ROW_TARGET_CLASS} flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70`}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-    >
-      <Text
-        className={value === null ? 'text-sm text-muted-foreground' : 'text-sm text-foreground'}
-        numberOfLines={1}
+    <View className="gap-1.5">
+      <Pressable
+        className={`${ROW_TARGET_CLASS} flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70`}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={onPress}
       >
-        {value ?? label}
-      </Text>
-      <ChevronDown size={16} color={colors.mutedForeground} />
-    </Pressable>
+        <Text
+          className={value === null ? 'text-sm text-muted-foreground' : 'text-sm text-foreground'}
+          numberOfLines={1}
+        >
+          {value ?? label}
+        </Text>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </Pressable>
+      {reserveHint === null ? null : (
+        <View>
+          {/* Full-width, invisible copy reserves the hint's wrapped height at the
+              current width before there is anything to say, so showing it cannot
+              push the buttons below it down. Same recipe as `FormField`. */}
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Text className="w-full shrink-0 text-xs">{reserveHint}</Text>
+          </View>
+          {hint === null ? null : (
+            <View className="absolute inset-x-0 top-0">
+              <Text className="text-xs text-destructive">{hint}</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }

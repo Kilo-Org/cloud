@@ -24,10 +24,10 @@ import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-s
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
-  notificationIdentifierForSession,
   planNeedsInputNotifications,
   reconcileNotifiedAfterApply,
 } from '@/lib/needs-input-notification';
+import { notificationIdentifierForSession } from '@/lib/needs-input-presentation';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 

@@ -13,6 +13,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -476,12 +477,15 @@ async function runActivityCleanup(
     });
   } catch (error) {
     // Never throw: a failed unregister or record write must not block the
-    // account or org switch.
-    Sentry.captureException(error, {
-      tags: {
-        'error.subsystem': 'auth',
-        'error.operation': 'unregister_activity_tokens',
-      },
-    });
+    // account or org switch. A locked device refusing the record write is that
+    // device state, not a defect, and the record stays for the next attempt.
+    if (!isKeychainInteractionRefused(error)) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'auth',
+          'error.operation': 'unregister_activity_tokens',
+        },
+      });
+    }
   }
 }

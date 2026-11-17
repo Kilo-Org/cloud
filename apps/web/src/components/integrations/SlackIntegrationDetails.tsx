@@ -30,6 +30,8 @@ type SlackIntegrationDetailsProps = {
   error?: string;
   /** Organization members without management authority get a read-only view. */
   canManage?: boolean;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
 };
 
 const slackConnectionErrorMessages: Record<string, string> = {
@@ -64,6 +66,7 @@ export function SlackIntegrationDetails({
   success,
   error,
   canManage = true,
+  connectPath,
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -171,7 +174,8 @@ export function SlackIntegrationDetails({
 
   const handleInstall = () => {
     setIsStartingSlackConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
+    window.location.href =
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
   };
 
   const handleUninstall = async () => {

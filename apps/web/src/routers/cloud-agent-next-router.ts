@@ -106,7 +106,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
-import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
@@ -114,6 +114,26 @@ import {
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  deleteWorkspaceArtifactOutputSchema,
+  getWorkspaceArtifactDownloadUrlOutputSchema,
+  listWorkspaceArtifactsOutputSchema,
+  workspaceArtifactDeleteInputSchema,
+  workspaceArtifactDownloadInputSchema,
+  workspaceArtifactSessionInputSchema,
+} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import { sessionReadTrpcError } from '@/lib/session-trpc-errors';
+
+/**
+ * Retryable copy for a cloud-agent read that did not settle inside the mobile
+ * procedure budget. Fixed text: never the worker's own message.
+ */
+const SESSION_STATE_UNAVAILABLE_MESSAGE = 'Session state is temporarily unavailable. Try again.';
+const SESSION_MESSAGES_UNAVAILABLE_MESSAGE =
+  'Session messages are temporarily unavailable. Try again.';
+const SESSION_NOT_FOUND_MESSAGE = 'Session not found';
+const BRANCH_LISTING_UNAVAILABLE_MESSAGE = 'Repository branches took too long to load. Try again.';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -375,7 +395,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
           attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
-          clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
+          clientProvenance: isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))
+            ? 'mobile'
+            : 'browser',
         });
       } catch (error) {
         // Both dispatch paths route a worker's answer through the same helper,
@@ -618,6 +640,39 @@ export const cloudAgentNextRouter = createTRPCRouter({
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
       });
+    }),
+
+  listWorkspaceArtifacts: baseProcedure
+    .input(workspaceArtifactSessionInputSchema)
+    .output(listWorkspaceArtifactsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+    }),
+
+  getWorkspaceArtifactDownloadUrl: baseProcedure
+    .input(workspaceArtifactDownloadInputSchema)
+    .output(getWorkspaceArtifactDownloadUrlOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorkspaceArtifactDownloadUrl(
+        input.cloudAgentSessionId,
+        input.relativePath
+      );
+    }),
+
+  deleteWorkspaceArtifact: baseProcedure
+    .input(workspaceArtifactDeleteInputSchema)
+    .output(deleteWorkspaceArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.deleteWorkspaceArtifact(input);
     }),
 
   createTerminal: baseProcedure
@@ -938,7 +993,20 @@ export const cloudAgentNextRouter = createTRPCRouter({
       ]);
       const client = createCloudAgentNextClient(authToken);
 
-      return await client.getSession(input.cloudAgentSessionId);
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          read: () => client.getSession(input.cloudAgentSessionId),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_STATE_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
     }),
 
   getEgressAudit: baseProcedure
@@ -957,12 +1025,27 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
+      const client = createCloudAgentNextClient(authToken);
+
+      try {
+        return await withControlPlaneReadBudget({
+          clock: ctx,
+          message: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          read: () => client.getSessionMessagesPage(input),
+        });
+      } catch (error) {
+        throw (
+          sessionReadTrpcError(error, {
+            notFound: SESSION_NOT_FOUND_MESSAGE,
+            unavailable: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
+          }) ?? error
+        );
+      }
     }),
 
   getBackgroundActivity: baseProcedure
     .input(z.object({ cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/) }).strict())
-    .output(backgroundActivityInventorySchema)
+    .output(backgroundActivityInventorySchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);
@@ -1121,10 +1204,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
     )
     .output(ProviderBranchListingSchema)
     .query(async ({ ctx, input }) =>
-      listProviderRepositoryBranches({
-        platform: input.platform,
-        userId: ctx.user.id,
-        repositoryFullName: input.repository.fullName,
+      withControlPlaneReadBudget({
+        clock: ctx,
+        message: BRANCH_LISTING_UNAVAILABLE_MESSAGE,
+        read: () =>
+          listProviderRepositoryBranches({
+            platform: input.platform,
+            userId: ctx.user.id,
+            repositoryFullName: input.repository.fullName,
+          }),
       })
     ),
 });

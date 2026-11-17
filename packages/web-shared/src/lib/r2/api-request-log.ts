@@ -1,18 +1,12 @@
 import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { ApiRequestLog } from '@kilocode/db/schema';
+import type { ApiRequestLog2 } from '@kilocode/db/schema';
 import {
   EnkryptScanKindSchema,
   EnkryptScanPartSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
-
-export type ApiRequestLogBlobUpload = {
-  columns: Pick<ApiRequestLog, 'request_r2_key' | 'response_r2_key'>;
-  uploadError: string | null;
-};
 
 const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
@@ -34,17 +28,23 @@ const enkryptRequestLogSchema = z.object({
 export type EnkryptRequestLog = z.infer<typeof enkryptRequestLogSchema>;
 
 export const apiRequestLogBlobSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
-  enkrypt: z
-    .array(
-      // Blobs written before scans were split into parts have no `part`, but still hold the
-      // request and response bodies.
-      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
-    )
-    .optional(),
+  error: z.record(z.string(), z.unknown()).nullable(),
+  enkrypt: z.array(enkryptRequestLogSchema).optional(),
 });
+
+export type ApiRequestLogBlob = z.infer<typeof apiRequestLogBlobSchema>;
+
+/** `YYYY/MM/DD/<id>.json`, using the UTC date of `created_at`. */
+export function apiRequestLogBlobKey({
+  id,
+  created_at,
+}: Pick<ApiRequestLog2, 'id' | 'created_at'>): string {
+  const date = new Date(created_at).toISOString().slice(0, 10).replaceAll('-', '/');
+  return `${date}/${id}.json`;
+}
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };
 
@@ -73,24 +73,20 @@ function getStorage(): ApiRequestLogStorage {
   return storage;
 }
 
-export async function uploadApiRequestLogBlobs({
-  request,
-  response,
-  enkrypt,
-}: {
-  request: Record<string, unknown>;
-  response: string | undefined;
-  enkrypt?: EnkryptRequestLog[];
-}): Promise<ApiRequestLogBlobUpload> {
+/** Returns the upload error, or null when the blob was stored. */
+export async function uploadApiRequestLogBlob(
+  key: string,
+  { request, response, error, enkrypt }: Omit<ApiRequestLogBlob, 'version'>
+): Promise<string | null> {
   try {
     const { client, bucket } = getStorage();
-    const key = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}/record.v1.json`;
     const body = {
-      version: 1,
+      version: 2,
       request,
-      response: response ?? null,
+      response,
+      error,
       ...(enkrypt?.length ? { enkrypt } : {}),
-    } satisfies z.infer<typeof apiRequestLogBlobSchema>;
+    } satisfies ApiRequestLogBlob;
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -99,15 +95,9 @@ export async function uploadApiRequestLogBlobs({
         ContentType: 'application/json; charset=utf-8',
       })
     );
-    return {
-      columns: { request_r2_key: key, response_r2_key: key },
-      uploadError: null,
-    };
-  } catch (error) {
-    return {
-      columns: { request_r2_key: null, response_r2_key: null },
-      uploadError: String(error),
-    };
+    return null;
+  } catch (uploadError) {
+    return String(uploadError);
   }
 }
 

@@ -299,14 +299,14 @@ const cloudV1MessagesPageWireSchema = z.object({
   queuedMessages: z.array(queuedMessageSnapshotSchema).optional(),
 });
 
+/** Native v2 pages carry a conversation source and `{ message, parentID }` rows. */
+const cloudV2MessagesPageWireSchema = cloudV1MessagesPageWireSchema.extend({
+  source: kilo2ConversationSourceSchema,
+  messages: z.array(z.object({ message: z.unknown(), parentID: z.string().optional() })),
+});
+
 export const cloudSessionMessagesPageWireSchema = z
-  .union([
-    cloudV1MessagesPageWireSchema,
-    cloudV1MessagesPageWireSchema.extend({
-      source: kilo2ConversationSourceSchema,
-      messages: z.array(z.object({ message: z.unknown(), parentID: z.string().optional() })),
-    }),
-  ])
+  .union([cloudV1MessagesPageWireSchema, cloudV2MessagesPageWireSchema])
   .nullable();
 export type CloudSessionMessagesWirePage = z.infer<typeof cloudSessionMessagesPageWireSchema>;
 
@@ -314,12 +314,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
   (page): CloudSessionSnapshotPage | null => {
     if (page === null) return null;
     if (page.source?.version === 'v2') {
-      const native = cloudV1MessagesPageWireSchema
-        .extend({
-          source: kilo2ConversationSourceSchema,
-          messages: z.array(z.object({ message: z.unknown(), parentID: z.string().optional() })),
-        })
-        .parse(page);
+      const native = cloudV2MessagesPageWireSchema.parse(page);
       const messages: CloudSessionSnapshotPage['messages'] = [];
       let omittedItemCount = native.omittedItemCount;
       if (native.source.session.id !== native.info.id)

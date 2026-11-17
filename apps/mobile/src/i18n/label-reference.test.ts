@@ -31,7 +31,6 @@ await i18n.init({
   ),
   lng: 'en',
   fallbackLng: 'en',
-  compatibilityJSON: 'v4',
   interpolation: { escapeValue: false },
   initAsync: false,
   returnNull: false,

@@ -7,6 +7,23 @@ const mocks = vi.hoisted(() => ({
   deleteSession: vi.fn(
     async (_config: unknown, _sessionId: string, _signal?: AbortSignal): Promise<void> => {}
   ),
+  getSessionSnapshot: vi.fn(
+    async (
+      _config: unknown,
+      _sessionId: string,
+      _signal?: AbortSignal
+    ): Promise<{ worktreeId?: string | null; kiloSessionId?: string }> => ({})
+  ),
+  deleteWorktree: vi.fn(
+    async (
+      _config: unknown,
+      _input: { worktreeId: string },
+      _signal?: AbortSignal
+    ): Promise<{ success: true; deletedSessionIds: string[] }> => ({
+      success: true,
+      deletedSessionIds: [],
+    })
+  ),
 }));
 
 // Everything about the client stays real except the two teardown calls, so the
@@ -18,6 +35,8 @@ vi.mock('../../e2e/client.js', async importOriginal => {
     ...actual,
     interruptSession: mocks.interruptSession,
     deleteSession: mocks.deleteSession,
+    getSessionSnapshot: mocks.getSessionSnapshot,
+    deleteWorktree: mocks.deleteWorktree,
   };
 });
 
@@ -247,5 +266,51 @@ describe('cleanupRemoteSession delete budget', () => {
     // not silently applied to the interrupt (or dropped).
     expect(mocks.interruptSession.mock.calls[0]?.[2]).toBe(timeoutSpy.mock.results[0]?.value);
     expect(mocks.deleteSession.mock.calls[0]?.[2]).toBe(timeoutSpy.mock.results[1]?.value);
+  });
+});
+
+describe('cleanupRemoteSession last workspace root', () => {
+  it('deletes the owning workspace when the session is its last root', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deleteSession.mockRejectedValueOnce(
+      new Error(
+        'tRPC deleteSession failed: 409 Conflict — CONFLICT: workspace_requires_root_session'
+      )
+    );
+    mocks.getSessionSnapshot.mockResolvedValueOnce({
+      worktreeId: 'worktree_owned',
+      kiloSessionId: 'ses_owned',
+    });
+
+    await cleanupRemoteSession(config, 'workspace_last_root', 'label');
+
+    expect(mocks.getSessionSnapshot.mock.calls[0]?.[1]).toBe('workspace_last_root');
+    expect(mocks.deleteWorktree.mock.calls[0]?.[1]).toEqual({
+      worktreeId: 'worktree_owned',
+      onlyIfSoleSessionId: 'ses_owned',
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports a last root whose workspace it cannot find', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deleteSession.mockRejectedValueOnce(
+      new Error('CONFLICT: workspace_requires_root_session')
+    );
+
+    await cleanupRemoteSession(config, 'workspace_unlisted', 'label');
+
+    expect(mocks.deleteWorktree).not.toHaveBeenCalled();
+    expect(String(errorSpy.mock.calls[0]?.[0])).toContain('deleteWorktree:');
+  });
+
+  it('does not delete a workspace for other delete failures', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deleteSession.mockRejectedValueOnce(new Error('tRPC deleteSession failed: 500'));
+
+    await cleanupRemoteSession(config, 'workspace_other', 'label');
+
+    expect(mocks.getSessionSnapshot).not.toHaveBeenCalled();
+    expect(String(errorSpy.mock.calls[0]?.[0])).toContain('deleteSession: tRPC deleteSession');
   });
 });

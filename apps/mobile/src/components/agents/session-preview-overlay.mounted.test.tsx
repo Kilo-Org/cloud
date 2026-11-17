@@ -224,7 +224,7 @@ describe('SessionPreviewOverlay', () => {
     );
 
     expect(textWith(renderer, `${i18n.t('common.working')} · $0.12`)).toHaveLength(0);
-    expect(textWith(renderer, '$0.12')).toHaveLength(1);
+    expect(textWith(renderer, '\u2066$0.12\u2069')).toHaveLength(1);
   });
 
   it('contains VoiceOver in the card and menu column on open', () => {

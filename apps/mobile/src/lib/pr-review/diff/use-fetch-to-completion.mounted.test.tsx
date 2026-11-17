@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,21 +25,50 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 
 type QueryStub = Parameters<typeof useFetchToCompletion>[0];
 
+const PAGE = { pages: [{ files: [{ path: 'a.ts' }] }] };
+
+function stubQuery(overrides: Record<string, unknown>): QueryStub {
+  return {
+    isFetching: false,
+    hasNextPage: true,
+    data: PAGE,
+    dataUpdatedAt: 100,
+    fetchNextPage: vi.fn(),
+    ...overrides,
+  } as unknown as QueryStub;
+}
+
 function Probe({
-  query,
+  queryRef,
   holder,
+  rerender,
 }: {
-  query: QueryStub;
+  queryRef: { current: QueryStub };
   holder: { current: FetchToCompletionResult | null };
+  rerender: { current: () => void };
 }) {
-  holder.current = useFetchToCompletion(query, 200);
+  const [, setRenderCount] = useState(0);
+  rerender.current = () => {
+    setRenderCount(count => count + 1);
+  };
+  holder.current = useFetchToCompletion(queryRef.current, 200);
   return null;
 }
 
-async function mountProbe(query: QueryStub): Promise<{ current: FetchToCompletionResult | null }> {
+async function mountProbe(overrides: Record<string, unknown>) {
   const holder: { current: FetchToCompletionResult | null } = { current: null };
-  await renderWithProviders(createElement(Probe, { query, holder }));
-  return holder;
+  const queryRef = { current: stubQuery(overrides) };
+  const rerender: { current: () => void } = { current: () => undefined };
+  await renderWithProviders(createElement(Probe, { queryRef, holder, rerender }));
+  return {
+    holder,
+    update: (parts: Record<string, unknown>): void => {
+      queryRef.current = stubQuery({ ...overrides, ...parts });
+      act(() => {
+        rerender.current();
+      });
+    },
+  };
 }
 
 function current(holder: { current: FetchToCompletionResult | null }): FetchToCompletionResult {
@@ -50,31 +79,107 @@ function current(holder: { current: FetchToCompletionResult | null }): FetchToCo
   return result;
 }
 
-describe('useFetchToCompletion resolved error', () => {
-  it('stops after one request when fetchNextPage resolves with an error and hasNextPage stays true', async () => {
+describe('useFetchToCompletion failure phase', () => {
+  it('retains the failure while the query data version is unchanged', async () => {
     const pageError = new Error('later page failed');
     const fetchNextPage = vi.fn(async () => {
       await Promise.resolve();
-      return {
-        data: { pages: [{ files: [{ path: 'a.ts' }] }] },
-        hasNextPage: true,
-        error: pageError,
-      };
+      return { data: PAGE, hasNextPage: true, error: pageError, dataUpdatedAt: 100 };
     });
-    const query = {
-      isFetching: false,
-      hasNextPage: true,
-      fetchNextPage,
-      data: { pages: [{ files: [{ path: 'a.ts' }] }] },
-    } as unknown as QueryStub;
-
-    const holder = await mountProbe(query);
+    const { holder, update } = await mountProbe({ fetchNextPage });
     await act(async () => {
       await current(holder).run();
     });
 
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
-    expect(current(holder).error).toBe(pageError);
-    expect(current(holder).isRunning).toBe(false);
+    expect(current(holder).failure).toMatchObject({ kind: 'load-all-failed', at: 100 });
+    expect(current(holder).feedback.status).toBe('failed');
+
+    // Same data version: the failure is still the truth about this list.
+    update({ dataUpdatedAt: 100 });
+
+    expect(current(holder).failure).not.toBeNull();
+  });
+
+  it('retires a failure published after a refetch already advanced the version', async () => {
+    const pageError = new Error('later page failed');
+    const fetchNextPage = vi.fn(async () => {
+      await Promise.resolve();
+      return { data: PAGE, hasNextPage: true, error: pageError, dataUpdatedAt: 100 };
+    });
+    // The live version moved before the loop ran, and the failed page reports
+    // the version it was requested at.
+    const { holder } = await mountProbe({ fetchNextPage, dataUpdatedAt: 300 });
+    await act(async () => {
+      await current(holder).run();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(current(holder).failure).toBeNull();
+    expect(current(holder).feedback.status).toBe('idle');
+  });
+
+  it('retires the failure once a page lands beyond the version it failed at', async () => {
+    const pageError = new Error('later page failed');
+    const fetchNextPage = vi.fn(async () => {
+      await Promise.resolve();
+      return { data: PAGE, hasNextPage: true, error: pageError, dataUpdatedAt: 100 };
+    });
+    const { holder, update } = await mountProbe({ fetchNextPage });
+    await act(async () => {
+      await current(holder).run();
+    });
+    expect(current(holder).failure).not.toBeNull();
+
+    update({ dataUpdatedAt: 200 });
+
+    expect(current(holder).failure).toBeNull();
+    expect(current(holder).feedback.status).toBe('idle');
+  });
+
+  it('leaves a background refetch alone: Load all while the query is fetching runs nothing', async () => {
+    const fetchNextPage = vi.fn<() => Promise<Record<string, unknown>>>();
+    fetchNextPage.mockResolvedValue({
+      data: PAGE,
+      hasNextPage: false,
+      error: null,
+      dataUpdatedAt: 200,
+    });
+    const { holder } = await mountProbe({ isFetching: true, fetchNextPage });
+
+    await act(async () => {
+      await current(holder).run();
+    });
+
+    // fetchNextPage would cancel the refresh in flight and append to the old
+    // pages; the surface's admission covers its own attempts, not the query's.
+    expect(fetchNextPage).not.toHaveBeenCalled();
+    expect(current(holder).feedback.status).toBe('idle');
+  });
+
+  it('admits one run at a time: a second run while the first is pending issues one request', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    const fetchNextPage = vi.fn(async () => {
+      await gate.promise;
+      return { data: PAGE, hasNextPage: false, error: null, dataUpdatedAt: 100 };
+    });
+    const { holder } = await mountProbe({ fetchNextPage });
+    act(() => {
+      void current(holder).run();
+    });
+    expect(current(holder).feedback.status).toBe('pending');
+
+    await act(async () => {
+      await current(holder).run();
+    });
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+
+    gate.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(current(holder).feedback.status).toBe('succeeded');
   });
 });

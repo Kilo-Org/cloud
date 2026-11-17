@@ -141,6 +141,14 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
       expect(isDenylistedPath('organizations.cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
       expect(isDenylistedPath('cloudAgentNext.getWorkspaceSnapshotRecovery')).toBe(false);
+      expect(isDenylistedPath('cloudAgentNext.deleteWorkspaceArtifact')).toBe(true);
+      expect(isDenylistedPath('organizations.cloudAgentNext.deleteWorkspaceArtifact')).toBe(true);
+      expect(isDenylistedPath('cloudAgentNext.listWorkspaceArtifacts')).toBe(false);
+      expect(isDenylistedPath('cloudAgentNext.getWorkspaceArtifactDownloadUrl')).toBe(false);
+      expect(isDenylistedPath('organizations.cloudAgentNext.listWorkspaceArtifacts')).toBe(false);
+      expect(isDenylistedPath('organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl')).toBe(
+        false
+      );
     });
 
     it('withholds Vercel secrets and resource mutations while retaining status reads', () => {
@@ -175,6 +183,43 @@ describe('mcp-catalog catalog', () => {
       for (const leaf of mutations) {
         expect(isDenylistedPath(leaf.path)).toBe(true);
       }
+    });
+
+    it('withholds artifact deletion while keeping list and download in both scopes', () => {
+      const artifactLeaves = collectCatalogLeaves(rootRouter).filter(leaf =>
+        leaf.path.includes('WorkspaceArtifact')
+      );
+      const deletePaths = [
+        'cloudAgentNext.deleteWorkspaceArtifact',
+        'organizations.cloudAgentNext.deleteWorkspaceArtifact',
+      ];
+      for (const path of deletePaths) {
+        expect(artifactLeaves).toContainEqual(expect.objectContaining({ path, type: 'mutation' }));
+      }
+
+      const summaries = new Map(
+        artifactLeaves.map(leaf => [leaf.path, `Summary for ${leaf.path}.`] as const)
+      );
+      const { rows, missing } = buildCatalogRows(
+        // The artifact fixture is query-only once the deletes are withheld; the
+        // drift guard needs one published mutation with a summary.
+        [...artifactLeaves, mutationLeaf('user.updateProfile')],
+        new Map([...summaries, ['user.updateProfile', 'Updates the profile.']])
+      );
+
+      expect(missing).toEqual([]);
+      const paths = rows.map(row => row.path);
+      for (const path of deletePaths) {
+        expect(paths).not.toContain(path);
+      }
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          'cloudAgentNext.listWorkspaceArtifacts',
+          'cloudAgentNext.getWorkspaceArtifactDownloadUrl',
+          'organizations.cloudAgentNext.listWorkspaceArtifacts',
+          'organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl',
+        ])
+      );
     });
 
     it('withholds paid scheduling consent while exposing scheduled report reads', () => {

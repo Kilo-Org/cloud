@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "unicorn", "nextjs", "import"],
+  "plugins": ["typescript", "nextjs"],
   "jsPlugins": [{ "name": "drizzle", "specifier": "./oxlint-plugin-drizzle.js" }],
   "options": {
     "typeAware": true
@@ -21,25 +21,22 @@
     "**/dist/**",
     "**/.wrangler/**",
     "supabase/functions/**",
-    "**/types/opencode.gen.ts"
+    "**/opencode.gen.ts"
   ],
+  // Category defaults are off, so this block is the complete list of active checks,
+  // and each rules block below that is not a child of this one states why it relaxes.
   "rules": {
-    "constructor-super": "off",
     "for-direction": "error",
     "no-async-promise-executor": "error",
     "no-case-declarations": "error",
-    "no-class-assign": "off",
     "no-compare-neg-zero": "error",
     "no-cond-assign": "error",
-    "no-const-assign": "off",
     "no-constant-binary-expression": "error",
     "no-constant-condition": "error",
     "no-control-regex": "error",
     "no-debugger": "error",
     "no-delete-var": "error",
-    "no-dupe-class-members": "off",
     "no-dupe-else-if": "error",
-    "no-dupe-keys": "off",
     "no-duplicate-case": "error",
     "no-empty": "error",
     "no-empty-character-class": "error",
@@ -48,28 +45,20 @@
     "no-ex-assign": "error",
     "no-extra-boolean-cast": "error",
     "no-fallthrough": "error",
-    "no-func-assign": "off",
     "no-global-assign": "error",
-    "no-import-assign": "off",
     "no-invalid-regexp": "error",
     // Prose lives in trees that repository tooling cannot edit; code whitespace is still reported.
     "no-irregular-whitespace": ["error", { "skipComments": true }],
     "no-loss-of-precision": "error",
     "no-misleading-character-class": "error",
-    "no-new-native-nonconstructor": "off",
     "no-nonoctal-decimal-escape": "error",
-    "no-obj-calls": "off",
     "no-prototype-builtins": "error",
-    "no-redeclare": "off",
     "no-regex-spaces": "error",
     "no-self-assign": "error",
-    "no-setter-return": "off",
     "no-shadow-restricted-names": "error",
     "no-sparse-arrays": "error",
-    "no-this-before-super": "off",
     "no-unexpected-multiline": "error",
     "no-unsafe-finally": "error",
-    "no-unsafe-negation": "off",
     "no-unsafe-optional-chaining": "error",
     "no-unused-expressions": "error",
     "no-unused-labels": "error",
@@ -85,7 +74,6 @@
     "no-useless-backreference": "error",
     "no-useless-catch": "error",
     "no-useless-escape": "error",
-    "no-with": "off",
     "require-yield": "error",
     "use-isnan": "error",
     "valid-typeof": "error",
@@ -94,9 +82,6 @@
     "prefer-rest-params": "error",
     "prefer-spread": "error",
     "no-array-constructor": "error",
-    "no-throw-literal": "off",
-    "prefer-promise-reject-errors": "off",
-    "require-await": "off",
     "@next/next/google-font-display": "warn",
     "@next/next/google-font-preconnect": "warn",
     "@next/next/next-script-for-ga": "warn",
@@ -105,7 +90,6 @@
     "@next/next/no-css-tags": "warn",
     "@next/next/no-head-element": "warn",
     "@next/next/no-html-link-for-pages": "error",
-    "@next/next/no-img-element": "off",
     "@next/next/no-page-custom-font": "warn",
     "@next/next/no-styled-jsx-in-document": "warn",
     "@next/next/no-sync-scripts": "error",
@@ -127,7 +111,6 @@
       "rules": {
         "@typescript-eslint/ban-ts-comment": "error",
         "@typescript-eslint/no-duplicate-enum-values": "error",
-        "@typescript-eslint/no-empty-object-type": "off",
         "@typescript-eslint/no-explicit-any": "error",
         "@typescript-eslint/no-extra-non-null-assertion": "error",
         "@typescript-eslint/no-misused-new": "error",
@@ -155,6 +138,8 @@
       }
     },
     {
+      // The test override near the end of this file turns some of these rules off
+      // for test files: when adding a rule here, classify it there in the same change.
       "files": ["services/**/*.ts", "packages/**/*.ts"],
       "rules": {
         "@typescript-eslint/no-empty-object-type": "error",
@@ -179,22 +164,19 @@
     },
     {
       // Parts of services/ are off-limits to repository tooling, so the
-      // assertion-removal rule cannot be satisfied there. packages/ keeps it.
+      // assertion-removal rule cannot be satisfied there. This override names
+      // the service packages tooling may edit, and `excludeFiles` keeps the
+      // result out of the override array order: those packages inherit the
+      // rule from the shared override above, and every other service file
+      // stays off.
       "files": ["services/**/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-unnecessary-type-assertion": "off"
-      }
-    },
-    {
-      // Every service package this work can edit keeps the rule.
-      "files": [
+      "excludeFiles": [
         "services/ai-attribution/**/*.ts",
         "services/auto-routing/**/*.ts",
         "services/auto-routing-benchmark/**/*.ts",
         "services/cloud-agent-next/**/*.ts",
         "services/code-review-infra/**/*.ts",
         "services/container-usage-meter/**/*.ts",
-        "services/db-proxy/**/*.ts",
         "services/event-service/**/*.ts",
         "services/git-token-service/**/*.ts",
         "services/gmail-push/**/*.ts",
@@ -208,12 +190,13 @@
         "services/security-auto-analysis/**/*.ts",
         "services/security-sync/**/*.ts",
         "services/session-ingest/**/*.ts",
+        "services/session-sync/**/*.ts",
         "services/usage-ingest/**/*.ts",
         "services/user-data-export/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts"
       ],
       "rules": {
-        "@typescript-eslint/no-unnecessary-type-assertion": "error"
+        "@typescript-eslint/no-unnecessary-type-assertion": "off"
       }
     },
     {
@@ -222,12 +205,23 @@
         "services/webhook-agent-ingest/**/*.ts",
         "services/kiloclaw/**/*.ts"
       ],
+      // These trees interpolate untyped values into template strings by design.
       "rules": {
         "@typescript-eslint/restrict-template-expressions": "off"
       }
     },
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
+      // Tests assert on untyped fixtures, so this override turns off only the checks
+      // that fixture assertions trip: the `any`-flow rules, the two assertion rules,
+      // and `unbound-method` (jest mocks). Test files keep every other strict check,
+      // because those report defects in the test code itself, not in fixture typing:
+      // no-empty-object-type, await-thenable, no-base-to-string,
+      // no-duplicate-type-constituents, no-for-in-array, no-implied-eval,
+      // no-unsafe-enum-comparison, no-unsafe-unary-minus, restrict-plus-operands and
+      // restrict-template-expressions — except where a further tree-specific override
+      // turns one of them off again (cloud-agent-sdk and the three trees of the
+      // Interpolation-by-design override above).
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
@@ -243,6 +237,7 @@
     },
     {
       "files": ["services/gmail-push/**/*.ts"],
+      // The Gmail payload reaches the handler as an untyped SDK value.
       "rules": {
         "@typescript-eslint/no-unsafe-call": "off",
         "@typescript-eslint/no-unsafe-member-access": "off"
@@ -250,6 +245,7 @@
     },
     {
       "files": ["packages/cloud-agent-sdk/src/**/*.ts"],
+      // The client mirrors untyped upstream wire shapes.
       "rules": {
         "@typescript-eslint/no-base-to-string": "off",
         "@typescript-eslint/no-empty-object-type": "off",

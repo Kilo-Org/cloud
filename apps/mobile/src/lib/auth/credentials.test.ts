@@ -108,6 +108,12 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
+// The account boundary also drops the retained merge intent keys, and their
+// store mints through expo-crypto, whose expo root needs `__DEV__`. This suite
+// asserts the credential deletes, and the store's own suite covers the clear.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
 vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
@@ -211,6 +217,7 @@ vi.mock('@/lib/app-actions/session-catalog', () => ({
 }));
 
 import * as SecureStore from 'expo-secure-store';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
@@ -385,7 +392,7 @@ describe('refresh rotation', () => {
     try {
       const outcome = await performRefresh();
 
-      expect(outcome.ok).toBe(true);
+      expect(outcome.kind).toBe('ok');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -405,8 +412,8 @@ describe('refresh rotation', () => {
 
   // The defect this slice removes: a null refresh-token read used to be read
   // as "no session" and refused, which signed a healthy person out. It is a
-  // failed read of one member, not an absent credential set.
-  it('returns unreadable, not refused, when the refresh token is absent but the token is present', async () => {
+  // reliable read of a set with no refresh token, which can never rotate.
+  it('returns unrenewable, not refused, when the refresh token is absent but the token is present', async () => {
     store.set(AUTH_TOKEN_KEY, 'stored-token');
     vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
       await Promise.resolve();
@@ -419,13 +426,12 @@ describe('refresh rotation', () => {
       const outcome = await performRefresh();
 
       expect(outcome).toEqual({
-        ok: false,
-        refused: false,
-        unreadable: true,
-        presentKeys: [AUTH_TOKEN_KEY],
+        kind: 'unrenewable',
+        sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).not.toHaveBeenCalled();
-      // The stored token is untouched: nothing was deleted or published.
+      // Nothing was deleted or published: the caller decides how the session
+      // ends, and a refused outcome here would sign out before it is asked.
       expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
       expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     } finally {
@@ -441,7 +447,7 @@ describe('refresh rotation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
       expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
@@ -462,7 +468,7 @@ describe('refresh rotation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       setProtectedDataAvailable(true);
@@ -470,7 +476,7 @@ describe('refresh rotation', () => {
     }
   });
 
-  it('returns unreadable with no present keys for an empty credential set', async () => {
+  it('returns unreadable for an empty credential set', async () => {
     vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
       await Promise.resolve();
       return store.get(key) ?? null;
@@ -483,12 +489,7 @@ describe('refresh rotation', () => {
 
       // A null member never refuses: even an empty set is an unreadable read,
       // not a signed-out session.
-      expect(outcome).toEqual({
-        ok: false,
-        refused: false,
-        unreadable: true,
-        presentKeys: [],
-      });
+      expect(outcome).toEqual({ kind: 'unreadable' });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
@@ -515,7 +516,7 @@ describe('refresh rotation', () => {
     try {
       const outcome = await performRefresh();
 
-      expect(outcome.ok).toBe(true);
+      expect(outcome.kind).toBe('ok');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -523,6 +524,78 @@ describe('refresh rotation', () => {
         'r2',
         expectedOptions
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('settles a stalled 403 body as retry inside the deadline and lets the next refresh run', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    // Headers arrive, the body never ends: the refusal can never be read from
+    // it. Waiting on it used to keep the single-flight refresh pending, so no
+    // later refresh could start.
+    const stalled = new Response(
+      new ReadableStream({
+        start() {
+          // Never enqueues and never closes.
+        },
+      }),
+      { status: 403 }
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(stalled)
+      .mockResolvedValueOnce(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    try {
+      const pending = performRefresh();
+      const stalledOutcome = expect(pending).resolves.toEqual({ kind: 'transient' });
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await stalledOutcome;
+      vi.useRealTimers();
+
+      // The rotation that follows the stalled one is not blocked behind it.
+      await expect(performRefresh()).resolves.toMatchObject({ kind: 'ok' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // The pair that could not be classified was never dropped.
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('r2');
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reads only the capped prefix of a 403 body before classifying it', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    // A body whose refusal sits past the cap is an intermediary's page: the
+    // route's own refusal is one short JSON object and is read in full.
+    const padded = `${' '.repeat(1_100)}{"error":"SESSION_REVOKED"}`;
+    const fetchMock = vi.fn().mockResolvedValue(new Response(padded, { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ kind: 'transient', retryAfterMs: undefined });
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+  });
+
+  it('stops on a 403 carrying the route refusal inside the cap', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ error: 'SESSION_REVOKED' }, { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toEqual({ kind: 'refused', sessionVersion: currentAuthEpoch() });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -541,8 +614,7 @@ describe('refresh rotation', () => {
       // A refusal is scoped to the session that owned the refresh: it carries
       // that session's epoch so a handler can drop it once the epoch has moved.
       expect(outcome).toEqual({
-        ok: false,
-        refused: true,
+        kind: 'refused',
         sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);

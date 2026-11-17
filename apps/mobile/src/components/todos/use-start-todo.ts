@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { toast } from 'sonner-native';
 
 import { appendNewSessionPrefill } from '@/components/agents/new-session-prefill';
@@ -12,6 +12,7 @@ import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { startAgent } from '@/lib/app-actions/start-agent';
 import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { todoSessionPrompt } from '@/lib/todos/todo-model';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -19,12 +20,19 @@ import { useTRPC } from '@/lib/trpc';
 type StartableTodo = { id: string; title: string; notes: string | null };
 type StartDefaults = Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'>;
 
+/**
+ * The adapter's failure type. A refused start is never filed: the toast owns the
+ * copy and the row renders only its pending phase, so the admission is released
+ * instead of settled.
+ */
+type StartTodoFailure = { readonly kind: 'start-failed' };
+
 /** What the to-do screens get from `useStartTodo`. */
 export type StartTodoControls = {
   review: (todo: StartableTodo, list: StartDefaults) => void;
   startNow: (todo: StartableTodo, list: StartDefaults) => Promise<void>;
-  /** The to-do whose start is in flight, for its row's spinner. */
-  startingTodoId: string | null;
+  /** Whether this to-do's start is in flight, for its row's spinner and control. */
+  isStarting: (todoId: string) => boolean;
 };
 
 /** The new-session route prefilled from a to-do and its list's defaults. */
@@ -54,10 +62,9 @@ export function useStartTodo(): StartTodoControls {
   const trpc = useTRPC();
   const navigateToSession = useAgentSessionNavigator();
   const { openNewSessionHref } = useNewSessionNavigator();
-  const [startingTodoId, setStartingTodoId] = useState<string | null>(null);
-  // A to-do already starting ignores a second press. Held in a ref because the
-  // state that drives the spinner lands after this tick.
-  const startingRef = useRef(new Set<string>());
+  // One admission per to-do: a to-do already starting refuses a second press,
+  // and its row reads the pending entry for its spinner.
+  const starts = useKeyedSurfaceFeedback<string, StartTodoFailure>();
 
   const review = useCallback(
     (todo: StartableTodo, list: StartDefaults) => {
@@ -72,11 +79,10 @@ export function useStartTodo(): StartTodoControls {
         review(todo, list);
         return;
       }
-      if (startingRef.current.has(todo.id)) {
+      const attempt = starts.begin(todo.id);
+      if (attempt === null) {
         return;
       }
-      startingRef.current.add(todo.id);
-      setStartingTodoId(todo.id);
       try {
         const result = await startAgent({
           prompt: todoSessionPrompt(todo),
@@ -87,12 +93,19 @@ export function useStartTodo(): StartTodoControls {
           organizationId: list.organizationId ?? undefined,
         });
         if (!result.ok || !result.sessionId) {
+          // The toast owns the refusal copy and nothing renders a phase on the
+          // row, so the admission is released below rather than settled as a
+          // failure: a settled entry would stay in the store for the life of
+          // this surface.
           toast.error(result.message);
           return;
         }
         notificationHaptic(Haptics.NotificationFeedbackType.Success);
-        // The session exists now, so nothing below may stop it from opening: a
-        // failed link or cache refresh is reported and the session still opens.
+        // The to-do has no session until the link lands, so the start stays
+        // admitted: ending the row's spinner here would let a second press
+        // start a second session for the same to-do.
+        // Nothing below may stop the session from opening: a failed link or
+        // cache refresh is reported and the session still opens.
         const settled = await Promise.allSettled([
           linkStartedTodoSession({
             queryClient,
@@ -109,15 +122,22 @@ export function useStartTodo(): StartTodoControls {
         navigateToSession(result.sessionId, list.organizationId);
       } catch {
         // Callers fire this without awaiting, so a failure has to be reported
-        // here rather than escape as an unhandled rejection.
+        // here rather than escape as an unhandled rejection. The toast owns the
+        // copy; the admission is released by the `finally` below.
         toast.error(i18n.t('common.somethingWentWrong'));
       } finally {
-        startingRef.current.delete(todo.id);
-        setStartingTodoId(current => (current === todo.id ? null : current));
+        // One release per start: the row's spinner ends here whether the start
+        // reached a session or was refused, and no phase is left behind.
+        attempt.abandon();
       }
     },
-    [navigateToSession, queryClient, review, trpc]
+    [navigateToSession, queryClient, review, starts, trpc]
   );
 
-  return { review, startNow, startingTodoId };
+  const isStarting = useCallback(
+    (todoId: string) => starts.snapshot.states.get(todoId)?.status === 'pending',
+    [starts.snapshot.states]
+  );
+
+  return { review, startNow, isStarting };
 }

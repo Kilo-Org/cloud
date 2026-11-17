@@ -693,7 +693,9 @@ rate budget, and mailbox as socket submission.
 
 `queued` means never handed to a runner; `delivered` means handed to one, not
 executed or acknowledged. Unacked payloads redeliver oldest-first on reconnect
-until ack or TTL. Ack deletes the payload. TTL removes any remaining payload,
+until ack or TTL. Each replay re-sends the stored frame; the first hand-off records
+the transition, and later replays of an unchanged delivered row write nothing.
+Ack deletes the payload. TTL removes any remaining payload,
 marks only never-delivered items `expired`, and preserves `delivered` once handed
 off. Semantic execution outcomes are runner events. Finished status tombstones
 last up to 24 hours and may be evicted to maintain bounds; unknown/evicted IDs

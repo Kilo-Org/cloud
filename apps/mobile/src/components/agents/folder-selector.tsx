@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
@@ -6,6 +6,7 @@ import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -28,7 +29,7 @@ function FolderSelector({
   onChangeFolderPath,
   disabled = false,
 }: Readonly<FolderSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -44,7 +45,7 @@ function FolderSelector({
       currentPath: folderPath,
       onSelect: onChangeFolderPath,
     });
-    router.push('/(app)/agent-chat/folder-picker' as Href);
+    pushOnce('/(app)/agent-chat/folder-picker' as Href);
   }
 
   return (

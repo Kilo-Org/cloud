@@ -35,5 +35,11 @@ export default function ProfileMcpRoute() {
   if (staleScope) {
     return null;
   }
-  return <ProfileMcpScreen profileId={profileId} organizationId={organizationId} />;
+  return (
+    <ProfileMcpScreen
+      profileId={profileId}
+      organizationId={organizationId}
+      backFallback={getProfilesPath()}
+    />
+  );
 }

@@ -56,29 +56,31 @@ const ReasoningDetailsWithUnknownSchema = z.union([
   z.unknown().transform(() => null),
 ]);
 
-export const ReasoningDetailArraySchema = z
+const ReasoningDetailsListSchema = z
   .array(ReasoningDetailsWithUnknownSchema)
-  .transform(d => d.filter((d): d is ReasoningDetailUnion => !!d));
+  .transform(details => details.filter(isDefinedAndNotNull));
+
+export const ReasoningDetailArraySchema = ReasoningDetailsListSchema;
 
 export const OutputUnionToReasoningDetailsSchema = z.union([
   z
     .object({
       delta: z.object({
-        reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
+        reasoning_details: ReasoningDetailsListSchema,
       }),
     })
-    .transform(data => data.delta.reasoning_details.filter(isDefinedAndNotNull)),
+    .transform(data => data.delta.reasoning_details),
   z
     .object({
       message: z.object({
-        reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
+        reasoning_details: ReasoningDetailsListSchema,
       }),
     })
-    .transform(data => data.message.reasoning_details.filter(isDefinedAndNotNull)),
+    .transform(data => data.message.reasoning_details),
   z
     .object({
       text: z.string(),
-      reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
+      reasoning_details: ReasoningDetailsListSchema,
     })
-    .transform(data => data.reasoning_details.filter(isDefinedAndNotNull)),
+    .transform(data => data.reasoning_details),
 ]);

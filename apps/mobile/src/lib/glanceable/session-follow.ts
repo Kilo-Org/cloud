@@ -8,6 +8,7 @@ import {
 } from '@kilocode/notifications/schemas';
 
 import type * as AndroidFollow from '@/glanceable-android/session-follow';
+import type * as AndroidFollowStorage from '@/glanceable-android/session-follow-storage';
 import type * as IosFollow from '@/glanceable-ios/session-follow';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
@@ -43,6 +44,11 @@ function android(): typeof AndroidFollow {
   }
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
   return require('@/glanceable-android/session-follow') as typeof AndroidFollow;
+}
+
+function androidStorage(): typeof AndroidFollowStorage {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('@/glanceable-android/session-follow-storage') as typeof AndroidFollowStorage;
 }
 
 function iosFollow(): typeof IosFollow {
@@ -204,7 +210,7 @@ export const restoreFollowedSessionsFromStorage = async (): Promise<boolean> => 
   if (Platform.OS !== 'android') {
     return true;
   }
-  const known = await android().restoreFollowedSessionCardsFromStorage();
+  const known = await androidStorage().restoreFollowedSessionCardsFromStorage();
   return known;
 };
 

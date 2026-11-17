@@ -212,6 +212,14 @@ export class WhereBuilder {
     );
   }
 
+  addNotInOrNull(column: string, values: string[]): void {
+    const placeholders = values.map(() => '?').join(', ');
+    this.push(
+      `(${column} NOT IN (${placeholders}) OR ${column} IS NULL)`,
+      ...values.map(v => ({ type: 'TEXT' as const, value: v }))
+    );
+  }
+
   sql(): string {
     return this.clauses.length > 0 ? this.clauses.join('\n  AND ') : '1=1';
   }
@@ -343,11 +351,16 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
 
   addInIfNonEmpty('feature', filters.features);
   addInIfNonEmpty('model', filters.models);
+  addInIfNonEmpty('auto_model', filters.autoModels);
   addInIfNonEmpty('mode', filters.modes);
   addInIfNonEmpty('provider', filters.providers);
   addInIfNonEmpty('project_id', filters.projects);
   addNotInIfNonEmpty('feature', filters.excludedFeatures);
   addNotInIfNonEmpty('model', filters.excludedModels);
+  // Excluding named aliases must retain usage that has no router alias.
+  if (filters.excludedAutoModels && filters.excludedAutoModels.length > 0) {
+    where.addNotInOrNull('auto_model', filters.excludedAutoModels);
+  }
   addNotInIfNonEmpty('mode', filters.excludedModes);
   addNotInIfNonEmpty('provider', filters.excludedProviders);
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
@@ -467,6 +480,8 @@ export function dimensionColumn(dimension: BreakdownDimension): string {
       return 'feature';
     case 'model':
       return 'model';
+    case 'autoModel':
+      return 'auto_model';
     case 'mode':
       return 'mode';
     case 'user':
@@ -917,6 +932,10 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const costSumExpr = costSumExprSql(input.costSource);
 
       const requestedDims = input.groupBy;
+      // Append opt-in dimensions after the legacy metrics to preserve default SQL and offsets.
+      const autoModelSelect = requestedDims.includes('autoModel')
+        ? ', auto_model AS dim_auto_model'
+        : '';
 
       // For dimensions not in groupBy, emit an empty string constant so the
       // row shape stays stable regardless of which dimensions were requested.
@@ -948,7 +967,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           COALESCE(SUM(total_output_tokens), 0),
           COALESCE(SUM(total_cache_write_tokens), 0),
           COALESCE(SUM(total_cache_hit_tokens), 0),
-          COALESCE(SUM(error_count), 0)
+          COALESCE(SUM(error_count), 0)${autoModelSelect}
         FROM ${table}
         WHERE ${where.sql()}
         GROUP BY ${groupByClause}
@@ -982,6 +1001,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         user: 4,
         provider: 5,
         project: 6,
+        autoModel: 14,
       };
 
       return {
@@ -1071,7 +1091,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      // Require access to every requested org (mirrors the single-org guard).
+      // Require access to every requested org. Roles come from memberships,
+      // plus the platform-admin elevation the helper documents.
       const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
       if (!hasAccessToAll) {
         throw new TRPCError({

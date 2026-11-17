@@ -114,13 +114,18 @@ type TestPlace = {
 const PERSONAL_PLACE: TestPlace = { chatScope: 'u1:personal', org: { kind: 'personal' } };
 const chatPlace = vi.hoisted(() => ({ value: null as TestPlace | null }));
 
-/** The platform the screen reads; the App Store gate hides an external page on iOS. */
+/** The platform the screen reads. */
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** Whether the storefront rule lets an organization's top-up link out. */
+const storefrontRule = vi.hoisted(() => ({ linkAllowed: false }));
 /** The external link helper, so a press that opens a page is asserted, not launched. */
 const externalLink = vi.hoisted(() => ({
   open: vi.fn<(url: string, options?: { label?: string }) => Promise<void>>(),
 }));
 
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => storefrontRule.linkAllowed,
+}));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: externalLink.open }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
 
@@ -286,6 +291,7 @@ beforeEach(() => {
   state.send.mockClear();
   chatPlace.value = PERSONAL_PLACE;
   platform.OS = 'ios';
+  storefrontRule.linkAllowed = false;
   externalLink.open.mockReset();
 });
 afterEach(() => {
@@ -771,11 +777,11 @@ describe('a retained chat failure', () => {
 
   /* The balance that refused the send decides where the credit is bought. An
      organization's chat spends that organization's balance, so its own billing
-     page settles it; the in-app purchase screen would sell the person's packs
-     against a balance that never paid for the send. */
-  it('opens the organization billing page for a refused send the organization pays for', async () => {
+     page settles it, where the storefront rule allows the link. */
+  it('opens the organization billing page where the storefront rule allows the link', async () => {
     chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
-    platform.OS = 'android';
+    platform.OS = 'ios';
+    storefrontRule.linkAllowed = true;
     state.status = 'idle';
     state.failureKey = CREDITS_FAILURE_KEY;
     state.messages = [
@@ -794,12 +800,13 @@ describe('a retained chat failure', () => {
     expect(state.retry).not.toHaveBeenCalled();
   });
 
-  /* App Store review forbids an in-app link to an external purchase, so the
-     organization's page is offered only where the platform may open it. The
-     refusal still states its cause; the action it cannot take is not drawn. */
-  it('offers no organization top-up where the platform may not open it', async () => {
+  /* Outside the one storefront that may link, the organization's page prints as
+     plain text: the refusal still states its cause and the label, and nothing
+     opens. */
+  it('prints the organization top-up as plain text where the rule refuses the link', async () => {
     chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
-    platform.OS = 'ios';
+    platform.OS = 'android';
+    storefrontRule.linkAllowed = false;
     state.status = 'idle';
     state.failureKey = CREDITS_FAILURE_KEY;
     state.messages = [
@@ -810,6 +817,11 @@ describe('a retained chat failure', () => {
 
     expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
     expect(buttonLabels(tree)).toEqual([]);
+    expect(
+      tree.root.findAll(
+        node => (node.type as string) === 'Text' && node.props.children === i18n.t('addCredits.cta')
+      )
+    ).toHaveLength(1);
     expect(externalLink.open).not.toHaveBeenCalled();
   });
 

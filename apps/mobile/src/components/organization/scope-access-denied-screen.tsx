@@ -6,8 +6,7 @@ import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
-
-const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * The organization scope the reader may not see: access was lost, or the
@@ -61,7 +60,7 @@ export function ScopeAccessDeniedScreen({
             variant="outline"
             accessibilityLabel={t('organization.boundary.backToProfile')}
             onPress={() => {
-              router.replace(PROFILE_HREF);
+              router.replace(PROFILE_TAB_HREF);
             }}
           >
             <Text>{t('organization.boundary.backToProfile')}</Text>

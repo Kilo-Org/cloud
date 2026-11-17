@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Weebii irratti bulchi",
     "creditHistory": "Seenaa kireeditii",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Dhiisi",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Bittaa, nagahee fi sochii kireeditii",
     "invoicesSubtitle": "Beeksisa kaffaltii bittaa keetii buufadhu",
-    "manageBilling": "Kaffaltii kilo.ai irratti bulchi",
-    "manageBillingIosNote": "Malli kaffaltii, guutinsi ofumaanii fi odeeffannoon kaffaltii kilo.ai irratti bulchamu.",
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",
     "securityAgentSubtitle": "Hanqinoota nageenyaa barbaadiitii sirreessi",
     "reviews": "Sakatta'iinsa",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}} irratti haqama",
       "cancelScheduledChange": "Jijjiirama karoorfame haqi",
       "cancelled": "Miseensummaan haqameera",
-      "changePlan": "Karoora kilo.ai irratti jijjiiri",
-      "changePlanIosNote": "Jijjiiramni karoora kaffaltii kilo.ai irratti argama.",
       "creditHistoryEmpty": "Ammaaf kireeditiin Kilo Pass hin jiru.",
-      "manageInStore": "{{store}} keessatti bulchi",
       "resume": "Miseensummaa itti fufsiisi",
       "resumeCancelledDescription": "Kilo Pass kee ammas ofumaan haaromfamuu jalqaba.",
       "resumePausedDescription": "Kilo Pass kee guyyaa itti fufuuf karoorfame dura, amma itti fufa.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Boonasii bilisaa",
     "bonusReferral": "Boonasii wabii",
     "bonusAvailable": "Boonasii bilisaa argamu",
-    "kiloPassManagement": "Bulchiinsa Kilo Pass",
-    "kiloPassSetup": "Qophii Kilo Pass",
-    "opensManagementOnWeb": "Bulchiinsa Kilo Pass marsariitii irratti bana.",
     "loadFailedRetry": "Qunnamtii kee sakatta'i, irra deebi'ii yaali.",
     "legalTermsOfUse": "Ulaagaalee itti fayyadamaa (EULA)",
     "purchaseDifferentAccount": "Bittaan App Store kun herrega Kilo kee wajjin hin walqabsiifamne. Apple Account bittaaf fayyadamte keessa seeni; sana booda irra deebi'ii yaali.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Bakka miseensotaa bitadhu",
       "setupAutoTopUp": "Guutuu ofumaan qindeessi",
       "manageAutoTopUp": "Guutuu ofumaan bulchi",
-      "webAddress": "Teessoo weebii {{url}}",
       "opensOnWeb": "Weebii irratti bana"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Gareewwan",
       "guardrails": "Daangaa eegumsaa",
       "byok": "Furtuu mataa keetii fayyadami",
-      "ssoAndDomain": "SSO fi doomeenii",
-      "emailPreferences": "Filannoo imeelii",
-      "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
       "requestLogs": "Galmeewwan gaaffii",
       "subOrganizations": "Dhaabbilee jalaa",
@@ -3495,8 +3481,7 @@
       "paymentPending": "Kaffaltiin eegumsarra jira",
       "processingBlocked": "Adeemsi uggurameera",
       "processingNeedsReview": "Adeemsi sakatta'uu barbaada",
-      "retryHint": "Haala Kilo Pass fe'uuf deebi'ee yaala.",
-      "setupHint": "Qophii Kilo Pass weebii irratti bana."
+      "retryHint": "Haala Kilo Pass fe'uuf deebi'ee yaala."
     }
   },
   "authErrors": {

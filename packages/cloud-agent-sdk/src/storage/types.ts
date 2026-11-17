@@ -29,8 +29,8 @@ type SessionStorage = {
    * one pass is `getParts`; this call must never clone part content — an
    * implementation goes through `getParts` when it cannot answer cheaper.
    * Seeing the deltas `applyPartDelta` already accepted is required, matching
-   * `getParts`. The returned view aliases storage: copy a field before writing
-   * it elsewhere.
+   * `getParts`. The returned view aliases storage, including nested values
+   * inside the part: copy a field before writing it elsewhere.
    */
   getPart(messageId: string, partId: string): ReadonlyPart | undefined;
   /**

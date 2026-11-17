@@ -1297,11 +1297,12 @@ describe.each([
     }
     // The same-cursor duplicate of the last textless write arrives: only the
     // version presence check can drop it, and it must be present.
-    processor.process({
+    const accepted = processor.process({
       type: 'message.part.updated',
       part: textless,
       version: { sourceId, eventId: 1, cursor: 44 },
     });
+    expect(accepted).toBe(false);
     expect(wrapper.getParts).not.toHaveBeenCalled();
     expect(wrapper.getPart.mock.calls.length).toBeGreaterThanOrEqual(1);
     const stored = base.getParts('msg-1');

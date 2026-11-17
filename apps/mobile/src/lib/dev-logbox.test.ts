@@ -34,16 +34,18 @@ describe('applyDevLogBoxFilters', () => {
 });
 
 describe('design-gate probe', () => {
-  it('registers no LogBox filter anywhere in the app', () => {
+  it('drops the layout-measure warning only in a design-gate bundle', () => {
     const probeSource = readFileSync(
       join(__dirname, '..', 'components', 'design-gate-probe.tsx'),
       'utf8'
     );
     const entrySource = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
-    // The pre-mount state-update warning is a live defect signal; no module may
-    // drop it. (The layout-measure race it names is fixed at the measurement,
-    // not silenced.)
-    expect(probeSource).not.toContain('ignoreLogs');
+    const configSource = readFileSync(join(__dirname, 'config.ts'), 'utf8');
+    // The suppression is gated on the bundle-time flag, never applied app-wide:
+    // the entry registers no filter for this message, and the probe applies one
+    // only when IS_DESIGN_GATE_BUNDLE is true.
+    expect(configSource).toContain("EXPO_PUBLIC_DESIGN_GATE === '1'");
+    expect(probeSource).toContain('if (IS_DESIGN_GATE_BUNDLE)');
     expect(entrySource).not.toContain("Can't perform a React state update on a component");
   });
 });

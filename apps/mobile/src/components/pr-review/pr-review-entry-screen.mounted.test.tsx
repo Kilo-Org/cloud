@@ -1,10 +1,11 @@
-import { createElement, type ElementType, type ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { PrReviewEntryScreen } from './pr-review-entry-screen';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   renderWithProviders,
@@ -15,7 +16,7 @@ import {
 const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
-const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), back: vi.fn() }));
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
@@ -96,8 +97,6 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn(
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
 const ORG_B = { organizationId: 'org-b', organizationName: 'Umbrella', role: 'member' };
 
-const Pressable = 'Pressable' as ElementType;
-
 const mounted: RenderWithProvidersResult[] = [];
 
 async function mount(): Promise<RenderWithProvidersResult> {
@@ -115,18 +114,10 @@ async function press(node: ReactTestInstance) {
   });
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
-  }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   auth.token = 'token';
+  contextPickerSlot.clearAll();
   list.mockReset().mockResolvedValue([ORG_A, ORG_B]);
   storage.read.mockReset().mockResolvedValue('org-a');
   storage.write.mockReset().mockResolvedValue(undefined);
@@ -153,19 +144,18 @@ describe('PrReviewEntryScreen account picker', () => {
     }
     await press(control);
 
-    const rows = ui.renderer.root.findAll(
-      node =>
-        node.type === Pressable &&
-        node.props.accessibilityRole === 'button' &&
-        selectedState(node) !== undefined
-    );
-    expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
-
-    const umbrella = rows.find(row => row.props.accessibilityLabel === 'Umbrella');
-    if (!umbrella) {
-      throw new Error('the Umbrella row is missing from the picker');
+    // The header control opens the shared account picker with every account
+    // and the current one marked.
+    expect(navigation.push).toHaveBeenCalledWith('/(app)/context-picker');
+    const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+    if (bridge === undefined) {
+      throw new Error('the account picker route was not handed a bridge');
     }
-    await press(umbrella);
+    expect(bridge.options).toEqual(['Personal', 'Acme', 'Umbrella']);
+    expect(bridge.currentIndex).toBe(1);
+    await act(() => {
+      bridge.onSelect(2);
+    });
     await waitFor(
       () =>
         ui.renderer.root.findAll(

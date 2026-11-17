@@ -19,10 +19,13 @@ import {
   RegisterBenchmarkProfilesRequestSchema,
   RequeueBenchmarkRegistryRequestSchema,
   SyncBenchmarkSubscriptionsRequestSchema,
+  type BenchmarkConfig,
+  type BenchmarkConfigAdminResponseConfig,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
   resolveBenchmarkIdentity,
   resolvePolicySettings,
+  resolveEffectivePolicy,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
   type BenchmarkSchedulerConfigResponse,
@@ -98,7 +101,33 @@ function requestRouter(c: Context<HonoEnv>) {
   return AutoRouterSchema.parse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
 }
 
+/**
+ * The previous web release parses this response with a contract that still
+ * requires the fixed policy settings (ADR 0003 invariant 7: workers deploy
+ * before web promotion). Serve them from the resolved policy, never from the
+ * stored row. Remove once that release is promoted.
+ */
+function withLegacyAdminConfigFields(
+  config: BenchmarkConfig | null
+): BenchmarkConfigAdminResponseConfig | null {
+  if (config === null) return null;
+  const policy = resolveEffectivePolicy(config);
+  return {
+    ...config,
+    frontierMinAccuracyDelta: policy.frontierMinAccuracyDelta,
+    switchCostFactor: policy.switchCostFactor,
+    bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+    lowConfidenceThreshold: policy.lowConfidenceThreshold,
+    classifierRepetitions: policy.classifierRepetitions,
+    deciderRepetitions: policy.deciderRepetitions,
+    classifierMaxP95LatencyMs: policy.classifierMaxP95LatencyMs,
+  };
+}
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
+  // Every /admin/* route below requires the worker-wide authMiddleware
+  // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
+  // registerAdminRoutes(app). Keep the registration in that order.
   app.use('/admin/*', async (c, next) => {
     const router = AutoRouterSchema.safeParse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
     if (!router.success) return c.json({ error: 'Invalid router' }, 400);
@@ -108,7 +137,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   app.get('/admin/config', async c => {
     const config = await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c));
     return c.json({
-      config,
+      config: withLegacyAdminConfigFields(config),
       policySettings: config ? resolvePolicySettings(config) : null,
     });
   });
@@ -158,7 +187,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           })
         );
       });
-      return c.json({ config: saved, policySettings: resolvePolicySettings(saved) });
+      return c.json({
+        config: withLegacyAdminConfigFields(saved),
+        policySettings: resolvePolicySettings(saved),
+      });
     }
   );
 
@@ -286,7 +318,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const current = {
       router,
       engineIdentity: computeEngineIdentity('decider', router),
-      repetitions: config.deciderRepetitions,
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
     const [platform, user, platformEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
@@ -329,7 +361,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           await planPromptTransportRemeasure(c.env.BENCH_DB, {
             router: selected,
             engineIdentity: computeEngineIdentity('decider', selected),
-            repetitions: config.deciderRepetitions,
+            repetitions: resolveEffectivePolicy(config).deciderRepetitions,
             action,
             prices,
           })
@@ -357,7 +389,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         {
           router,
           engineIdentity: computeEngineIdentity('decider', router),
-          repetitions: config.deciderRepetitions,
+          repetitions: resolveEffectivePolicy(config).deciderRepetitions,
         },
         c.req.valid('json').scope
       );

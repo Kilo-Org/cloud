@@ -30,10 +30,15 @@ const trackInteraction = vi.hoisted(() => ({
 const toggleRows = vi.hoisted(() => ({
   rows: [] as {
     title: string;
+    accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
   }[],
+}));
+const pillGroups = vi.hoisted(() => ({
+  groups: [] as { label: string; accessibilityLabel?: string }[],
 }));
 const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
@@ -68,7 +73,10 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
   }),
 }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
-  PillGroup: () => null,
+  PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
+    pillGroups.groups.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: (props: { onSave: () => Promise<void> }) => {
@@ -79,6 +87,8 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: (props: {
     title: string;
+    accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -153,6 +163,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     save.mutateAsync.mockResolvedValue({});
     trackInteraction.mutate.mockClear();
     toggleRows.rows = [];
+    pillGroups.groups = [];
     saveButton.onSave = null;
     toastSuccess.mockClear();
   });
@@ -207,5 +218,102 @@ describe('AutomationSettingsScreen approval gate', () => {
     renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('names each repeated control with the section it belongs to', () => {
+    config.data = enabledConfig({ autoAnalysisEnabled: true, autoRemediationEnabled: true });
+    renderScreen();
+
+    const analysisSection = i18n.t('securityAgent.automation.autoAnalysis');
+    const remediationSection = i18n.t('securityAgent.automation.autoRemediation');
+    const includeTitle = i18n.t('securityAgent.automation.includeExistingFindings');
+    const severityTitle = i18n.t('securityAgent.automation.minimumSeverity');
+
+    const includeNames = toggleRows.rows
+      .filter(row => row.title === includeTitle)
+      .map(row => row.accessibilityLabel);
+    expect(includeNames).toHaveLength(2);
+    const includeAnalysis = includeNames.filter(name => name?.includes(analysisSection));
+    const includeRemediation = includeNames.filter(name => name?.includes(remediationSection));
+    expect(includeAnalysis).toHaveLength(1);
+    expect(includeRemediation).toHaveLength(1);
+
+    const severityGroups = pillGroups.groups.filter(group => group.label === severityTitle);
+    expect(severityGroups).toHaveLength(2);
+    const severityNames = severityGroups.map(group => group.accessibilityLabel);
+    const severityAnalysis = severityNames.filter(name => name?.includes(analysisSection));
+    const severityRemediation = severityNames.filter(name => name?.includes(remediationSection));
+    expect(severityAnalysis).toHaveLength(1);
+    expect(severityRemediation).toHaveLength(1);
+
+    // Label in name: each accessible name starts with the control's visible
+    // title, so a composed name that dropped it cannot pass.
+    for (const name of includeNames) {
+      expect(name?.startsWith(includeTitle)).toBe(true);
+    }
+    for (const name of severityNames) {
+      expect(name?.startsWith(severityTitle)).toBe(true);
+    }
+
+    const names = [...includeNames, ...severityNames];
+    expect(new Set(names).size).toBe(4);
+  });
+
+  it('titles each section switch briefly with its description as muted copy', () => {
+    config.data = enabledConfig();
+    renderScreen();
+
+    const sectionNames = [
+      'securityAgent.automation.autoAnalysis',
+      'securityAgent.automation.autoRemediation',
+      'securityAgent.automation.autoDismiss',
+    ].map(key => i18n.t(key));
+    const sections = [
+      {
+        title: i18n.t('securityAgent.automation.analyzeNewFindings'),
+        description: i18n.t('securityAgent.automation.autoAnalysisDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.openFixPrs'),
+        description: i18n.t('securityAgent.automation.autoRemediationDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.dismissNonExploitable'),
+        description: i18n.t('securityAgent.automation.autoDismissDescription'),
+      },
+    ];
+
+    // The rendered rows carry the proof, not the expected pairs: the screen
+    // draws one row per section in section order, so a row that repeated or
+    // swapped another section's title fails here.
+    const rendered = toggleRows.rows.filter(row =>
+      sections.some(section => section.title === row.title)
+    );
+    expect(rendered.map(row => row.title)).toEqual(sections.map(section => section.title));
+
+    for (const [index, section] of sections.entries()) {
+      const row = rendered[index];
+      if (!row) {
+        throw new Error(`section toggle row ${section.title} not found`);
+      }
+
+      // Each short title keeps its own description under it, so the three rows
+      // cannot swap copy between sections.
+      expect(row.subtitle).toBe(section.description);
+
+      // The sentence adds only what the title and heading cannot: the heading
+      // already says "Auto", so a subtitle that names the automatic behaviour
+      // is the repeated copy this row was trimmed of.
+      expect((row.subtitle ?? '').toLowerCase()).not.toMatch(/\bauto/);
+
+      // A title names the setting, not the section it sits under.
+      for (const sectionName of sectionNames) {
+        expect(row.title).not.toContain(sectionName);
+      }
+      expect(row.title.endsWith('.')).toBe(false);
+
+      // Label in name: the switch is named by the text the row shows.
+      expect(row.accessibilityLabel).toBeUndefined();
+    }
   });
 });

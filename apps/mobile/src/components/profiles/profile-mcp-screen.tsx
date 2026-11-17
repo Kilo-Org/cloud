@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -5,15 +6,17 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { McpServerRowView } from '@/components/profiles/mcp-server-row';
-import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
+import { McpFormSheet, type McpSaveFailure } from '@/components/profiles/mcp-form-sheet';
 import {
   type McpServerPayload,
   mcpServerRows,
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Server } from '@/components/ui/icons';
@@ -24,9 +27,11 @@ import {
   useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
+import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -52,22 +57,33 @@ function McpSkeleton() {
 export function ProfileMcpScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
+  // The server counts every row this profile holds and the list returns every
+  // row unfiltered, so the loaded length is the count the cap compares.
+  const atServerCap = servers.length >= MAX_PROFILE_MCP_SERVERS;
   // The open form, its fields and the refusal the sheet shows are one draft, so
   // opening or closing the form resets the refusal with everything else.
   const draftScope = `profiles:mcp:${profileId}`;
-  const form = useProfileFormDraft(draftScope, servers, {
-    conflict: false,
-    failure: null as string | null,
-  });
+  const form = useProfileFormDraft<McpServerSource, McpSaveFailure | null>(
+    draftScope,
+    servers,
+    null
+  );
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
@@ -82,7 +98,7 @@ export function ProfileMcpScreen({
     // The form this save belongs to. A remount keeps it alive; a later open or
     // close replaces it, and this attempt must then leave the new form alone.
     const generation = form.generation();
-    form.setNotes({ conflict: false, failure: null });
+    form.setNotes(null);
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
@@ -92,10 +108,16 @@ export function ProfileMcpScreen({
         return;
       }
       if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
-        form.setNotes({ conflict: true, failure: null });
+        form.setNotes({ kind: 'name-conflict' });
         return;
       }
-      form.setNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
+      // Only a create can pass the per-profile cap, and its service refuses it
+      // with this code and no other meaning on that path.
+      if (target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED') {
+        form.setNotes({ kind: 'limit' });
+        return;
+      }
+      form.setNotes({ kind: 'refused' });
       return;
     }
     if (form.isCurrent(generation)) {
@@ -115,9 +137,10 @@ export function ProfileMcpScreen({
 
   const confirmDelete = (target: McpServerSource) => {
     confirm({
-      title: t('common.delete'),
-      message: target.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.mcp.deleteTitle', { name: isolateLtrBidiText(target.name) }),
+      message: t('profiles.mcp.deleteMessage'),
+      confirmLabel: t('profiles.mcp.deleteConfirm'),
       onConfirm: () => {
         void runDelete(target.id);
       },
@@ -145,11 +168,11 @@ export function ProfileMcpScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.mcp.add')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -200,11 +223,18 @@ export function ProfileMcpScreen({
             />
           );
         })}
-        {canManage ? (
-          <Button onPress={handleStartAdd}>
+        <ProfileManageSlot permission={permission}>
+          {atServerCap ? (
+            <AccessibleStatus
+              message={t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          <Button disabled={atServerCap} onPress={handleStartAdd}>
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
-        ) : null}
+        </ProfileManageSlot>
       </>
     );
   }
@@ -215,6 +245,7 @@ export function ProfileMcpScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.mcp.title')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"
@@ -234,8 +265,7 @@ export function ProfileMcpScreen({
             .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
-          nameConflictFromServer={form.notes.conflict}
-          saveFailure={form.notes.failure}
+          saveFailure={form.notes}
           onClose={handleClose}
           onSave={payload => {
             void saveServer(form.editing, payload);

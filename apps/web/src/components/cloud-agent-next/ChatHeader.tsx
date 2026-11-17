@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CornerUpLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { CornerUpLeft, ExternalLink, MoreHorizontal, Layers, GitMerge } from 'lucide-react';
 import Link from 'next/link';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
@@ -18,8 +18,39 @@ import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { WorktreeChangesButton } from './WorktreeChanges';
+import { WorkspaceArtifactsButton } from './WorkspaceArtifacts';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { SandboxStatusIndicator } from './SandboxStatusIndicator';
+import { StackedWorkspaceActions } from './StackedWorkspaceActions';
+import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
+import { resolveStackedWorkspaceAvailability } from './workspace-stacks';
+import type { WorktreeBranchOperationTarget } from './useWorktreeBranchOperations';
+import { Badge } from '@/components/ui/badge';
+
+export type ChatStackBreadcrumbItem = {
+  worktreeId: string;
+  label: string;
+  prNumber: number | null;
+  prState: string | null;
+  prUrl: string | null;
+  isCurrent: boolean;
+};
+
+export type ChatStackInfo = {
+  entries: readonly ChatStackBreadcrumbItem[];
+  behindParent: boolean;
+  canCreateStackedWorkspace: boolean;
+  createStackedWorkspaceDisabledReason: string | null;
+  onCreateStackedWorkspace?: () => void;
+  onOpenWorktree?: (worktreeId: string) => void;
+  branchOperations?: {
+    worktreeId: string;
+    cloudAgentSessionId: string;
+    branch: string | null;
+    baseBranch: string | null;
+    stack: readonly WorktreeBranchOperationTarget[];
+  };
+};
 
 type ChatHeaderProps = {
   /** The signed-in user: worktree caches are partitioned by user. */
@@ -47,11 +78,16 @@ type ChatHeaderProps = {
   onToggleSound?: () => void;
   changesOpen?: boolean;
   onToggleChanges?: (event: MouseEvent<HTMLButtonElement>) => void;
+  artifactsOpen?: boolean;
+  onToggleArtifacts?: (event: MouseEvent<HTMLButtonElement>) => void;
   sessionTitle?: string;
   sessionActive: boolean;
   sandboxStatusEligible?: boolean;
   /** Whether the source session is a Cloud Agent session that can be forked. */
   canForkToCloud?: boolean;
+  stack?: ChatStackInfo | null;
+  onSendStackInstruction?: (instruction: string) => Promise<boolean | void> | boolean | void;
+  onStackOperationCompleted?: () => void;
 };
 
 export function ChatHeader({
@@ -75,6 +111,8 @@ export function ChatHeader({
   onToggleSound,
   changesOpen = false,
   onToggleChanges,
+  artifactsOpen = false,
+  onToggleArtifacts,
   kiloSessionId,
   organizationId,
   sessionTitle,
@@ -82,8 +120,26 @@ export function ChatHeader({
   sandboxStatusEligible = false,
   canForkToCloud = false,
   sandboxScopeId,
+  stack = null,
+  onSendStackInstruction,
+  onStackOperationCompleted,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
+  const [showBranchOperations, setShowBranchOperations] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const preflight = useStackedWorkspaceSource({
+    worktreeId,
+    organizationId,
+    enabled: Boolean(stack && menuOpen),
+  });
+  const { canCreateStackedWorkspace, createStackedWorkspaceDisabledReason } =
+    resolveStackedWorkspaceAvailability({
+      source: preflight.source,
+      isPending: preflight.isPending && Boolean(stack && menuOpen),
+      isError: preflight.isError,
+      fallbackCanCreate: stack?.canCreateStackedWorkspace,
+      fallbackDisabledReason: stack?.createStackedWorkspaceDisabledReason,
+    });
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sessionCostBreakdown = useMemo(
     () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
@@ -113,6 +169,9 @@ export function ChatHeader({
           trigger.focus();
         }}
         sessionId={cloudAgentSessionId}
+        organizationId={organizationId}
+        sandboxScopeId={sandboxScopeId}
+        computeBillingEnabled={sandboxStatusEligible}
         kiloSessionId={kiloSessionId}
         model={model}
         modelDisplayName={modelDisplayName}
@@ -122,15 +181,44 @@ export function ChatHeader({
         hasIncompleteHistory={hasIncompleteHistory}
       />
       <SessionActionsDialog
+        key={kiloSessionId}
         open={showActionsDialog}
         onOpenChange={setShowActionsDialog}
         kiloSessionId={kiloSessionId}
+        cloudAgentSessionId={cloudAgentSessionId}
         sessionTitle={sessionTitle}
         repository={repository}
         organizationId={organizationId}
         canForkToCloud={canForkToCloud}
       />
+      {stack?.branchOperations && Boolean(stack.branchOperations.cloudAgentSessionId) && (
+        <StackedWorkspaceActions
+          open={showBranchOperations}
+          onOpenChange={setShowBranchOperations}
+          worktreeId={stack.branchOperations.worktreeId}
+          cloudAgentSessionId={stack.branchOperations.cloudAgentSessionId}
+          branch={stack.branchOperations.branch}
+          baseBranch={stack.branchOperations.baseBranch}
+          stack={stack.branchOperations.stack}
+          organizationId={organizationId}
+          onSendInstruction={onSendStackInstruction}
+          onCompleted={onStackOperationCompleted}
+        />
+      )}
       <div className="flex min-w-0 items-center gap-1">
+        {stack && (
+          <div className="hidden min-w-0 items-center gap-0.5 overflow-x-auto md:flex">
+            {stack.behindParent && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-[10px] font-normal"
+                title="This branch does not include the latest changes from its parent. Restack it from Branch operations."
+              >
+                Behind parent
+              </Badge>
+            )}
+          </div>
+        )}
         {/* First, so its late-loading counts grow into the reserved space on the left
             instead of moving the other controls. */}
         {onToggleChanges && (
@@ -142,6 +230,16 @@ export function ChatHeader({
             worktreeId={worktreeId}
             open={changesOpen}
             onToggle={onToggleChanges}
+          />
+        )}
+        {onToggleArtifacts && (
+          <WorkspaceArtifactsButton
+            key={`workspace-artifacts:${currentUserId}:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            userId={currentUserId}
+            cloudAgentSessionId={changesCloudAgentSessionId}
+            organizationId={organizationId}
+            open={artifactsOpen}
+            onToggle={onToggleArtifacts}
           />
         )}
         {sandboxStatusEligible && (
@@ -156,7 +254,7 @@ export function ChatHeader({
         {onToggleSound && (
           <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="toolbar" />
         )}
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               ref={moreOptionsTriggerRef}
@@ -200,6 +298,33 @@ export function ChatHeader({
             >
               Session Info
             </DropdownMenuItem>
+            {stack && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  aria-disabled={!canCreateStackedWorkspace}
+                  title={
+                    createStackedWorkspaceDisabledReason ?? 'Start a workspace stacked on this one'
+                  }
+                  onSelect={event => {
+                    if (!canCreateStackedWorkspace) {
+                      event.preventDefault();
+                      return;
+                    }
+                    stack.onCreateStackedWorkspace?.();
+                  }}
+                >
+                  <Layers className="mr-2 h-4 w-4" />
+                  New stacked workspace
+                </DropdownMenuItem>
+                {stack.branchOperations && Boolean(stack.branchOperations.cloudAgentSessionId) && (
+                  <DropdownMenuItem onSelect={() => setShowBranchOperations(true)}>
+                    <GitMerge className="mr-2 h-4 w-4" />
+                    Branch operations
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <FeedbackDialog organizationId={organizationId} kiloSessionId={kiloSessionId} />

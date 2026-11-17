@@ -144,12 +144,15 @@ export function useAddMember(organizationId: string) {
   );
 }
 
-export function useAdminOrganizationDetails(organizationId: string) {
+export function useAdminOrganizationDetails(organizationId: string, enabled = true) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.admin.getDetails.queryOptions({
-      organizationId,
-    })
+    trpc.organizations.admin.getDetails.queryOptions(
+      {
+        organizationId,
+      },
+      { enabled }
+    )
   );
 }
 

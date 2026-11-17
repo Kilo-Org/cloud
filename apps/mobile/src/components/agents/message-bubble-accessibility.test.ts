@@ -39,13 +39,16 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ Clock: 'Clock' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Clock: 'Clock' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
 vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The Add credits element pulls `@/lib/external-link` → `expo-web-browser`, which
+// the pure project cannot load; this harness reads the bubble's own element tree.
+vi.mock('@/components/add-credits-row', () => ({ AddCreditsRow: 'AddCreditsRow' }));
 vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' }));
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
@@ -121,6 +124,11 @@ describe.each([
         expect(host).toBeNull();
         return;
       }
+      // Android composes an unnamed focus stop's name from its speaking
+      // non-focusable descendants in child order, so the host comes first.
+      const children = wrapper.props.children;
+      const [firstChild] = Array.isArray(children) ? children : [children];
+      expect(findElementByType(firstChild, 'View', isActionsOverlayProps)).not.toBeNull();
       expect(host?.props.accessibilityRole).toBe('text');
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();
@@ -144,4 +152,43 @@ describe.each([
       expect(selected).toEqual(callback ? [message, message] : []);
     }
   );
+});
+
+describe('MessageBubble failed message treatment', () => {
+  it('marks every error heading and leaves a message the person stopped unmarked', async () => {
+    const { MessageBubble } = await import('./message-bubble');
+    const retry = vi.fn<(message: StoredMessage) => void>();
+    // eslint-disable-next-line new-cap
+    const undelivered = MessageBubble.type({
+      message: userMessage('m-undelivered'),
+      deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const execution = MessageBubble.type({
+      message: userMessage('m-execution'),
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const stopped = MessageBubble.type({
+      message: userMessage('m-stopped'),
+      deliveryState: { status: 'failed', error: '', reason: 'interrupted' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
+    const unexplained = MessageBubble.type({
+      message: userMessage('m-unexplained'),
+      deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
+    });
+
+    // Every failure heading that reports an error carries the same marker; a
+    // message the person stopped reports a neutral status and carries none. The
+    // bubble keeps the same fill and ink as a delivered one in every state.
+    expect(findElementByType(undelivered, 'AlertCircle')).not.toBeNull();
+    expect(findElementByType(execution, 'AlertCircle')).not.toBeNull();
+    expect(findElementByType(stopped, 'AlertCircle')).toBeNull();
+    // Without a wired action the row states nothing, so no marker is drawn.
+    expect(findElementByType(unexplained, 'AlertCircle')).toBeNull();
+  });
 });

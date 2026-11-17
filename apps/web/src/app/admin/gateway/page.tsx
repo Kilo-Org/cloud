@@ -80,8 +80,7 @@ export default function AdminGatewayPage() {
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
-      <div className="flex w-full flex-col gap-y-4">
-        <h2 className="text-2xl font-bold">Gateway</h2>
+      <div className="flex w-full flex-col">
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-x-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>
@@ -138,10 +137,8 @@ export default function AdminGatewayPage() {
               ordered
               description={
                 <>
-                  Ordered list of preferred model IDs, stored in the <code>preferred_models</code>{' '}
-                  column of <code>ai_gateway_config</code>. The model catalog sorts these models
-                  first in this order, and every model in the list except <code>kilo-auto/*</code>{' '}
-                  is monitored by the model stats and health checks.
+                  The model catalog lists these models first, in this order. Model stats and health
+                  checks monitor every listed model except <code>kilo-auto/*</code>.
                 </>
               }
             />
@@ -153,13 +150,9 @@ export default function AdminGatewayPage() {
               ordered={false}
               description={
                 <>
-                  Model IDs the gateway hides from the catalog and rejects for direct requests,
-                  stored in the <code>unavailable_models</code> column of{' '}
-                  <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  Auto Small&apos;s free fallback, <code>{AUTO_SMALL_TARGET_MODELS.free}</code>, is
-                  internal-only: it is always hidden and rejected for direct requests, independently
-                  of this list. Kilo serves it through <code>{AUTO_SMALL_TARGET_MODELS.paid}</code>{' '}
-                  for users without balance.
+                  The gateway hides these models from the catalog and rejects direct requests for
+                  them; <code>kilo-auto</code> can still route to them.{' '}
+                  <code>{AUTO_SMALL_TARGET_MODELS.free}</code> is always treated as unavailable.
                 </>
               }
             />

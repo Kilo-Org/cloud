@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { emailDomainSuffixes, findBlacklistedDomains } from '@kilocode/worker-utils/account-access';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
 import {
@@ -197,20 +198,25 @@ export async function GET(
 
     const totalPages = Math.ceil(totalUserCount / limit);
 
-    const usersWithPaymentStatus: UserTableProps[] = await Promise.all(
-      users.map(async user => ({
-        ...user,
-        paymentMethodStatus: describePaymentMethods(
-          paymentMethodsByUserId[user.id] || [],
-          user,
-          usersWithValidationCredits.has(user.id)
-        ),
-        admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
-        is_blacklisted_by_domain: await isUserBlacklistedByDomain({
-          google_user_email: user.google_user_email,
-        }),
-      }))
+    const domainSuffixesByUserId = new Map(
+      users.map(user => [user.id, emailDomainSuffixes(user.google_user_email)])
     );
+    const blacklistedDomains = await findBlacklistedDomains(db, [
+      ...new Set([...domainSuffixesByUserId.values()].flat()),
+    ]);
+
+    const usersWithPaymentStatus: UserTableProps[] = users.map(user => ({
+      ...user,
+      paymentMethodStatus: describePaymentMethods(
+        paymentMethodsByUserId[user.id] || [],
+        user,
+        usersWithValidationCredits.has(user.id)
+      ),
+      admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
+      is_blacklisted_by_domain: (domainSuffixesByUserId.get(user.id) ?? []).some(domain =>
+        blacklistedDomains.has(domain)
+      ),
+    }));
 
     const response: UsersApiResponse = {
       users: usersWithPaymentStatus,

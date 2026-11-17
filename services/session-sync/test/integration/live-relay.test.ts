@@ -103,6 +103,33 @@ function setSocketExpiry(instance: unknown, state: DurableObjectState, exp: numb
   }
 }
 
+const socketAttachmentSchema = z
+  .object({
+    ticket: z.object({ role: z.string() }).passthrough(),
+    subscribed: z.boolean(),
+  })
+  .passthrough();
+type SocketAttachment = z.infer<typeof socketAttachmentSchema>;
+
+function relaySocket(
+  state: DurableObjectState,
+  keep: (attachment: SocketAttachment) => boolean
+): WebSocket {
+  const server = state
+    .getWebSockets()
+    .find(ws => keep(socketAttachmentSchema.parse(ws.deserializeAttachment())));
+  if (!server) throw new Error('Missing relay socket');
+  return server;
+}
+
+/** Records the text frames the relay hands to one server-side socket. */
+function captureRelaySend(server: WebSocket, frames: string[]): void {
+  vi.spyOn(server, 'send').mockImplementation(raw => {
+    if (typeof raw !== 'string') throw new Error('Relay sent a binary frame');
+    frames.push(raw);
+  });
+}
+
 async function setup() {
   const principal = personal(`relay-${crypto.randomUUID()}`);
   const sessionID = newSessionID();
@@ -146,6 +173,60 @@ async function setup() {
   ) => ({ channel: 'commands', type: 'send_message', commandID, body, ...options });
   return { principal, sessionID, stub, ticket, connect, command };
 }
+
+type RelayStub = DurableObjectStub<SessionRelayDO>;
+
+/**
+ * Records the SQL text of every statement the relay runs. Drizzle issues each of its statements
+ * through `state.storage.sql.exec`, so the text names the table a statement touches. The spy keeps
+ * the real implementation and stays installed for the rest of the test: the Durable Object keeps one
+ * storage object across `runInDurableObject` calls.
+ */
+async function recordStatements(stub: RelayStub): Promise<() => string[]> {
+  let recorded: (() => string[]) | undefined;
+  await runInDurableObject(stub, (_instance, state) => {
+    const queries = vi.spyOn(state.storage.sql, 'exec');
+    recorded = () => queries.mock.calls.map(([statement]) => statement);
+  });
+  if (!recorded) throw new Error('SQL instrumentation was not installed');
+  return recorded;
+}
+
+/**
+ * Counts the rows of `relay_commands` that a statement writes. `total_changes()` counts rows in
+ * every table, so it cannot attribute a change to this table; these triggers fire once per row this
+ * table writes, and only the probe row's own maintenance changes the counter. A statement that
+ * matches no row fires nothing, so an update that rewrites nothing adds nothing.
+ */
+async function countCommandWrites(stub: RelayStub): Promise<() => Promise<number>> {
+  await runInDurableObject(stub, (_instance, state) => {
+    const sql = state.storage.sql;
+    sql.exec('CREATE TABLE IF NOT EXISTS relay_write_probe (n INTEGER NOT NULL)');
+    sql.exec(
+      'INSERT INTO relay_write_probe (n) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM relay_write_probe)'
+    );
+    for (const event of ['INSERT', 'UPDATE', 'DELETE'])
+      sql.exec(
+        `CREATE TRIGGER IF NOT EXISTS relay_command_${event.toLowerCase()} AFTER ${event} ON relay_commands
+         BEGIN UPDATE relay_write_probe SET n = n + 1; END`
+      );
+  });
+  return () =>
+    runInDurableObject(
+      stub,
+      (_instance, state) =>
+        state.storage.sql.exec<{ n: number }>('SELECT n FROM relay_write_probe').one().n
+    );
+}
+
+/**
+ * The hand-off write: the UPDATE that records a command as delivered. The expiry sweep also issues
+ * `UPDATE relay_commands` statements on every connect, but those carry a status/payload predicate
+ * instead of assigning `delivered_at`, so the timestamp assignment separates a delivery from a
+ * sweep that matches no row.
+ */
+const recordsDelivery = (statement: string): boolean =>
+  /update\s+[`"]?relay_commands/i.test(statement) && /set\s+[`"]?delivered_at/i.test(statement);
 
 async function subscribe(stream: Inbox, afterSeq = 0) {
   stream.ws.send(JSON.stringify({ type: 'subscribe', afterSeq }));
@@ -299,6 +380,159 @@ it('bounds replay by bytes and requests a sync reset for evicted events', async 
   expect((await viewer.next('reset_required')).body).toMatchObject({ seq: 20 });
 });
 
+it('coalesces a repeated subscribe to the entries a socket has not received', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  for (const type of ['one', 'two', 'three', 'four']) {
+    runner.ws.send(JSON.stringify({ channel: 'events', type, body: type }));
+    expect(await viewer.next(type)).toMatchObject({ seq: expect.any(Number) });
+  }
+  const repeat = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const relay = instance as unknown as {
+      sweep: () => void;
+      notifyWatch: (ticket: unknown) => Promise<void>;
+    };
+    const sweeping = vi.spyOn(relay, 'sweep');
+    const watching = vi.spyOn(relay, 'notifyWatch');
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      return {
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
+        sweeps: sweeping.mock.calls.length,
+        watches: watching.mock.calls.length,
+      };
+    } finally {
+      vi.mocked(server.send).mockRestore();
+      sweeping.mockRestore();
+      watching.mockRestore();
+    }
+  });
+  expect(repeat).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 4, cursor: 4 },
+    sweeps: 0,
+    watches: 0,
+  });
+  runner.ws.send(JSON.stringify({ channel: 'events', type: 'five', body: 5 }));
+  expect((await viewer.next('five')).seq).toBe(5);
+  const afterLive = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      // Private relay state holds the delivered position this test needs to check.
+      const relay = instance as unknown as { delivered: WeakMap<WebSocket, number> };
+      return {
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
+        delivered: relay.delivered.get(server),
+        attachmentKeys: Object.keys(
+          z.record(z.string(), z.unknown()).parse(server.deserializeAttachment())
+        ).sort(),
+      };
+    } finally {
+      vi.mocked(server.send).mockRestore();
+    }
+  });
+  expect(afterLive).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 5, cursor: 5 },
+    delivered: 5,
+    // The persisted attachment keeps the previous release's shape, so a rollback can still parse it.
+    attachmentKeys: ['closed', 'reauthNotified', 'subscribed', 'ticket'],
+  });
+  await fixture.connect('viewer');
+  const catchUp = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && !saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 3 }));
+      return frames.map(frame => envelopeSchema.parse(JSON.parse(frame)).type);
+    } finally {
+      vi.mocked(server.send).mockRestore();
+    }
+  });
+  expect(catchUp).toEqual(['four', 'five', 'subscribed']);
+});
+
+it('resumes a reconstructed subscribed socket from its valid cursor without a persisted position', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  for (const type of ['one', 'two', 'three']) {
+    runner.ws.send(JSON.stringify({ channel: 'events', type, body: type }));
+    await viewer.next(type);
+  }
+  const resumed = await runInDurableObject(fixture.stub, async (_instance, state) => {
+    const initialize = vi.spyOn(state, 'blockConcurrencyWhile');
+    try {
+      const restored = new SessionRelayDO(state, testEnv);
+      const initialization = initialize.mock.results.at(-1);
+      if (initialization?.type !== 'return')
+        throw new Error('Relay initialization was not captured');
+      await initialization.value;
+      // Reconstruction starts the replay floor at the stored sequence ceiling.
+      const floor =
+        drizzle(state.storage, { logger: false })
+          .select()
+          .from(relayState)
+          .where(eq(relayState.id, 1))
+          .get()?.seq ?? 0;
+      const viewerServer = relaySocket(state, saved => saved.ticket.role === 'viewer');
+      const runnerServer = relaySocket(state, saved => saved.ticket.role === 'runner');
+      const frames: string[] = [];
+      captureRelaySend(viewerServer, frames);
+      const sent = () => frames.splice(0).map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      try {
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: floor })
+        );
+        const atFloor = sent().map(envelope => ({ type: envelope.type, body: envelope.body }));
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'four', body: 4 })
+        );
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'five', body: 5 })
+        );
+        const live = sent().map(envelope => ({ type: envelope.type, seq: envelope.seq }));
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: 3 })
+        );
+        const belowFloor = sent().map(envelope => envelope.type);
+        return { floor, atFloor, live, belowFloor };
+      } finally {
+        vi.mocked(viewerServer.send).mockRestore();
+      }
+    } finally {
+      initialize.mockRestore();
+    }
+  });
+  expect(resumed.floor).toBeGreaterThan(3);
+  expect(resumed.atFloor).toEqual([
+    { type: 'subscribed', body: { seq: resumed.floor, cursor: resumed.floor } },
+  ]);
+  expect(resumed.live).toEqual([
+    { type: 'four', seq: resumed.floor + 1 },
+    { type: 'five', seq: resumed.floor + 2 },
+  ]);
+  expect(resumed.belowFloor).toEqual(['reset_required']);
+});
+
 it('queues HTTP and socket commands together, delivers in order, dedupes, and removes payloads on ack', async () => {
   const fixture = await setup();
   const controller = await fixture.connect('controller');
@@ -377,6 +611,160 @@ it('redelivers unacknowledged queueable commands when the runner reconnects', as
   expect((await controller.next('runner_status')).body).toEqual({ runnerConnected: false });
   const replacement = await fixture.connect('runner');
   expect((await replacement.next('send_message')).body).toMatchObject({ commandID: 'retry' });
+});
+
+it('replays the retained mailbox on reconnect without rewriting delivered rows', async () => {
+  const fixture = await setup();
+  const token = await fixture.ticket('controller');
+  for (const id of ['replay-a', 'replay-b'])
+    await rpcResponse(
+      fixture.stub.command({ ticket: token, command: fixture.command(id, { prompt: id }) })
+    );
+  // The probe counts the rows this table writes, so a sweep statement that matches no row adds
+  // nothing, and the statement text names the write that does land.
+  const statements = await recordStatements(fixture.stub);
+  const writes = await countCommandWrites(fixture.stub);
+  const beforeFirst = { writes: await writes(), statements: statements().length };
+  const runner = await fixture.connect('runner');
+  const first = await runner.next('send_message');
+  const second = await runner.next('send_message');
+  expect(first.body).toMatchObject({ commandID: 'replay-a', payload: { prompt: 'replay-a' } });
+  expect(second.body).toMatchObject({ commandID: 'replay-b', payload: { prompt: 'replay-b' } });
+  // The first hand-off changes exactly two rows of `relay_commands`, one per retained command, and
+  // exactly two statements assign `delivered_at`: one for `replay-a` and one for `replay-b`. The
+  // connect's expiry sweep issues `UPDATE relay_commands` statements too, but they carry a
+  // status/payload predicate and touch no row, so neither the count nor the text records them as
+  // deliveries.
+  expect((await writes()) - beforeFirst.writes).toBe(2);
+  expect(statements().slice(beforeFirst.statements).filter(recordsDelivery)).toHaveLength(2);
+  runner.ws.close();
+  const beforeReplay = { writes: await writes(), statements: statements().length };
+  const replacement = await fixture.connect('runner');
+  const replayFirst = await replacement.next('send_message');
+  const replaySecond = await replacement.next('send_message');
+  expect(replayFirst.body).toEqual(first.body);
+  expect(replaySecond.body).toEqual(second.body);
+  // Redelivery is not a state change: the second connection writes no row of `relay_commands`, no
+  // statement of it records a delivery, and both rows keep the timestamp the first hand-off wrote.
+  expect((await writes()) - beforeReplay.writes).toBe(0);
+  expect(statements().slice(beforeReplay.statements).filter(recordsDelivery)).toEqual([]);
+  await runInDurableObject(fixture.stub, (_instance, state) => {
+    expect(
+      drizzle(state.storage)
+        .select()
+        .from(relayCommands)
+        .all()
+        .map(row => ({ status: row.status, delivered_at: row.delivered_at }))
+    ).toEqual([
+      { status: 'delivered', delivered_at: expect.any(Number) },
+      { status: 'delivered', delivered_at: expect.any(Number) },
+    ]);
+  });
+});
+
+it('keeps a queued command unrecorded when the runner hand-off send fails, then delivers it later', async () => {
+  const fixture = await setup();
+  const token = await fixture.ticket('controller');
+  await rpcResponse(
+    fixture.stub.command({
+      ticket: token,
+      command: fixture.command('failed-hand-off', { prompt: 'hand-off' }),
+    })
+  );
+  const controller = await fixture.connect('controller');
+  const announced = Promise.withResolvers<'announced'>();
+  const recordStatus = (event: MessageEvent) => {
+    const frame = envelopeSchema.parse(JSON.parse(String(event.data)));
+    if (frame.type === 'command_status') announced.resolve('announced');
+  };
+  controller.ws.addEventListener('message', recordStatus);
+  const runnerToken = await fixture.ticket('runner');
+  const originalSend = WebSocket.prototype.send;
+  const closed = Promise.withResolvers<CloseEvent>();
+  await runInDurableObject(fixture.stub, async instance => {
+    // The relay creates the runner socket inside fetch, so only the prototype can fail its send
+    // before the hand-off starts. Every other frame passes through untouched.
+    const failing = vi.spyOn(WebSocket.prototype, 'send').mockImplementation(function (
+      this: WebSocket,
+      raw
+    ) {
+      if (typeof raw === 'string' && raw.includes('failed-hand-off'))
+        throw new Error('Synthetic command transport failure');
+      originalSend.call(this, raw);
+    });
+    try {
+      const response = await instance.fetch(
+        new Request('https://relay.test/', {
+          headers: { upgrade: 'websocket', authorization: `Bearer ${runnerToken}` },
+        })
+      );
+      expect(response.status).toBe(101);
+      if (!response.webSocket) throw new Error('Runner did not upgrade');
+      response.webSocket.addEventListener('close', closed.resolve, { once: true });
+      response.webSocket.accept();
+    } finally {
+      failing.mockRestore();
+    }
+  });
+  // A transport failure closes the runner instead of recording anything as delivered.
+  expect((await closed.promise).code).toBe(1011);
+  const stored = () =>
+    runInDurableObject(fixture.stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(relayCommands)
+        .where(eq(relayCommands.command_id, 'failed-hand-off'))
+        .get()
+    );
+  expect(await stored()).toMatchObject({
+    status: 'queued',
+    payload: JSON.stringify({ prompt: 'hand-off' }),
+    delivered_at: null,
+  });
+  // Real 100 ms, not fake timers: the bound covers the runtime's own buffered frame delivery, which
+  // a faked clock cannot advance. It only ever exposes an announcement that never arrives.
+  const silence = Promise.withResolvers<'timeout'>();
+  setTimeout(() => silence.resolve('timeout'), 100);
+  expect(await Promise.race([announced.promise, silence.promise])).toBe('timeout');
+  controller.ws.removeEventListener('message', recordStatus);
+  const replacement = await fixture.connect('runner');
+  expect((await replacement.next('send_message')).body).toMatchObject({
+    commandID: 'failed-hand-off',
+    payload: { prompt: 'hand-off' },
+  });
+  expect((await controller.next('command_status')).body).toEqual({
+    commandID: 'failed-hand-off',
+    status: 'delivered',
+  });
+  expect(await stored()).toMatchObject({
+    status: 'delivered',
+    payload: JSON.stringify({ prompt: 'hand-off' }),
+    delivered_at: expect.any(Number),
+  });
+});
+
+it('sends no frame and changes no row when a runner connects to an empty mailbox', async () => {
+  const fixture = await setup();
+  const statements = await recordStatements(fixture.stub);
+  const writes = await countCommandWrites(fixture.stub);
+  const before = { writes: await writes(), statements: statements().length };
+  const runner = await fixture.connect('runner');
+  // Explicit bound on a real clock: the frame would already have been buffered by the runtime, so a
+  // faked clock cannot advance it, and the wait only lets a real `send_message` surface.
+  const emptyMailboxWaitMs = 100;
+  const silence = Promise.withResolvers<'timeout'>();
+  setTimeout(() => silence.resolve('timeout'), emptyMailboxWaitMs);
+  const observed = await Promise.race([runner.next('send_message'), silence.promise]);
+  expect(observed).toBe('timeout');
+  const window = statements().slice(before.statements);
+  // The expiry sweep issues `UPDATE relay_commands` statements even for an empty mailbox, so the
+  // probe shows those statements write no row, and the statements that would add or record a
+  // command are what a connect must not run at all.
+  expect((await writes()) - before.writes).toBe(0);
+  expect(window.filter(recordsDelivery)).toEqual([]);
+  expect(
+    window.filter(statement => /insert\s+into\s+[`"]?relay_commands/i.test(statement))
+  ).toEqual([]);
 });
 
 it('rejects offline liveOnly commands and clears delivered payloads without replaying after disconnection', async () => {
@@ -1317,11 +1705,15 @@ it('contains a failed raw replay send, closes that viewer, and still schedules c
     JSON.stringify({ channel: 'events', type: 'replay-fixture', body: { text: 'opaque' } })
   );
   await viewer.next('replay-fixture');
-  const closed = whenClosed(viewer.ws);
+  const replay = await fixture.connect('viewer');
+  const closed = whenClosed(replay.ws);
   await runInDurableObject(fixture.stub, async (instance, state) => {
     const server = state.getWebSockets().find(ws => {
-      const saved = ws.deserializeAttachment() as { ticket: { role: string } };
-      return saved.ticket.role === 'viewer';
+      const saved = ws.deserializeAttachment() as {
+        ticket: { role: string };
+        subscribed: boolean;
+      };
+      return saved.ticket.role === 'viewer' && !saved.subscribed;
     });
     if (!server) throw new Error('Missing replay viewer socket');
     const relay = instance as unknown as { schedule: () => Promise<void> };
@@ -1333,6 +1725,7 @@ it('contains a failed raw replay send, closes that viewer, and still schedules c
       await expect(
         instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }))
       ).resolves.toBeUndefined();
+      expect(sending).toHaveBeenCalled();
       expect(scheduling).toHaveBeenCalled();
     } finally {
       sending.mockRestore();

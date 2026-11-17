@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { GLANCEABLE_STATUS_COPY_KEY } from '@/lib/glanceable/presentation';
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { numberFormat } from '@/lib/intl-cache';
 
 /**
@@ -87,7 +87,7 @@ export function glanceableLayoutCopy() {
     stepRunning: i18n.t('glanceable.step.running'),
     searching: i18n.t('glanceable.step.searching'),
     thinking: i18n.t('glanceable.step.thinking'),
-    of: i18n.t('glanceable.planOf'),
+    planProgress: i18n.t('glanceable.planProgress'),
     filesChanged: i18n.t('glanceable.filesChanged'),
     finishedIn: i18n.t('glanceable.finishedIn'),
     minute: i18n.t('common.durationMinuteShort'),
@@ -167,16 +167,17 @@ const COST_SAMPLE = 1.25;
 
 /**
  * The session cost format in the active language, for the widget process,
- * which has no formatter: the currency template around the amount ("$#",
- * "# $", "US$ #"), with `#` where the number goes, and the decimal separator.
- * The template comes from the app's own cost formatter, so the card shows the
- * currency symbol the app shows everywhere else. Empty slots mean the
- * template could not be read, and the layout falls back to "$#" and ".".
+ * which has no formatter: the text the app's cost formatter puts around the
+ * amount ("$#"), with `#` where the number goes, and the decimal separator.
+ * The template comes from the app's prefixed cost formatter, so the symbol
+ * leads the number in every language, matching the cost label the app shows
+ * everywhere else. Empty slots mean the template could not be read, and the
+ * layout falls back to "$#" and ".".
  */
 type GlanceableCostFormat = { costTemplate: string; costDecimal: string };
 
 function glanceableCostFormat(): GlanceableCostFormat {
-  const sample = formatCurrency(COST_SAMPLE, i18n.language, 2);
+  const sample = formatPrefixedMoney(COST_SAMPLE, i18n.language);
   const amount = numberFormat(i18n.language, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

@@ -157,6 +157,7 @@ export function useSessionMutations() {
         treatMissingAsDeleted(deleteOptions.mutationFn(input, context), {
           success: true,
           session_id: input.session_id,
+          cleanup: 'pending' as const,
         })
       );
       return result;

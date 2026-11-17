@@ -91,6 +91,7 @@ export type FixtureCloud = {
     profileId: string;
     gitUrl: string;
     scope: string;
+    seedPrompt?: string;
   }): Promise<HostedResources>;
   workspaceSummary(
     identity: RunIdentity,
@@ -187,15 +188,12 @@ export function createCloudResources(input: {
       return created.id;
     },
 
-    async createWorkspace({ identity, profileId, gitUrl, scope }) {
-      const created = await createHostedWorkspace(
-        driverConfig({ stack: input.stack, identity, devVars }),
-        {
-          profileId,
-          prompt: scopedDirective(scope, 'idle'),
-          repository: { type: 'git', url: gitUrl },
-        }
-      );
+    async createWorkspace({ identity, profileId, gitUrl, seedPrompt }) {
+      const config = driverConfig({ stack: input.stack, identity, devVars });
+      const repository = { type: 'git' as const, url: gitUrl };
+      const created = await (seedPrompt === undefined
+        ? createHostedWorkspace(config, { profileId, repository })
+        : createHostedWorkspace(config, { profileId, repository, prompt: seedPrompt }));
       return {
         workspaceId: created.workspaceId,
         cloudAgentSessionId: created.cloudAgentSessionId,

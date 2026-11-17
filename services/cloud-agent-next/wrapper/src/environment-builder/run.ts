@@ -263,6 +263,7 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     if (input.commands.length === 0) reporter.line('No setup commands');
     await repository.runSetupCommands({
       commands: input.commands,
+      kind: 'build',
       directory,
       env,
       redact,

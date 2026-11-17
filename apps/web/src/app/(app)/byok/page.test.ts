@@ -28,6 +28,10 @@ jest.mock('@/components/organizations/byok/OpenAiChatGptCard', () => ({
   OpenAiChatGptCardView: () => createElement('div', null, 'card-skeleton'),
 }));
 
+jest.mock('@/components/organizations/byok/ClaudeBillingCard', () => ({
+  ClaudeBillingCard: () => null,
+}));
+
 const { default: PersonalBYOKPage } = require('./page') as {
   default: () => ReactElement;
 };

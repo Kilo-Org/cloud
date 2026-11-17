@@ -15,6 +15,10 @@ Every invocation rebuilds wrapper output. Payload hashes identify the output byt
 creates immutable objects, reads them back, and publishes the descriptor last. An exact-SHA handoff
 is published only after the runtime-free base and real CLI/wrapper compatibility check pass.
 
+Local development startup runs `--local` automatically and reads descriptor hashes from the ignored
+`.wrangler/runtime-local-vars.json`. It uses local R2 at `.wrangler/state/v3`, not the remote bucket.
+Restart the Worker after changing the wrapper so the local descriptors are rebuilt and selected.
+
 `Dockerfile.containers.runtime-free` contains generic tools and the initial entrypoint. It has no
 Kilo CLI, wrapper, supervisor or credential helper. Its input identity covers the runtime ABI, Dockerfile and
 `linux/amd64`. The recipe has no COPY or ADD inputs. Adding one requires extending the declared
@@ -62,9 +66,9 @@ Publication requires these approved and provisioned resources:
 - Repository secret `CLOUDFLARE_API_TOKEN` with permission to push to the selected account's container
   registry. The publisher reuses the existing deploy token.
 
-An automatic run publishes only when `runtime-targets.json` at the source SHA has a downloaded default
-or named target. The admission job reads that catalog through the GitHub API for the exact SHA.
-A preinstalled-only catalog skips the publish job. With the checked-in downloaded default, every
+The admission job reads `runtime-targets.json` through the GitHub API for the exact source SHA and
+requires downloaded/runtime-free for every target. Preinstalled and all-in-one selections are rejected.
+BYOC Vercel startup uses the same published release. Every
 eligible successful main-push CI run publishes its exact-SHA handoff, even without runtime changes.
 The publisher reuses a verified cached base when its inputs have not changed.
 
@@ -78,7 +82,7 @@ credentials or deploy the Worker.
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.
 
-Downloaded deployment preparation uses the exact checked-out source SHA. The same downloaded catalog
+Downloaded and Vercel deployment preparation use the exact checked-out source SHA. The same downloaded catalog
 starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
 without holding the publisher's concurrency lock. Publication runs are titled with their source SHA,
 so preparation reads their state with the deploy's read-only token. While any run for the SHA is
@@ -92,7 +96,6 @@ base inputs, stored payload bytes, compatibility and target image configuration 
 its custom build can run. Runtime-free targets use the recorded registry digest. Registry credentials
 stay in a temporary Docker configuration, which the command removes on exit.
 
-Preinstalled deployments make no runtime storage request and require no publisher credentials.
 The Worker deployment matrix does not cancel unrelated jobs when one target fails.
 
 The deployment selector can choose an earlier successful CI commit. A checkout that predates both

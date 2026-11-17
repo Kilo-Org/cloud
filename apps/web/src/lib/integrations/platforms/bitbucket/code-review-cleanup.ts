@@ -14,7 +14,6 @@ type BitbucketCodeReviewerCleanupWorkspace = {
 
 type BitbucketCodeReviewerIntegrationCleanupInput = {
   organizationId: string;
-  currentManagerId: string;
   integrationId: string;
   workspace?: BitbucketCodeReviewerCleanupWorkspace | null;
 };
@@ -47,7 +46,6 @@ export async function cleanupBitbucketCodeReviewerForIntegration(
   if (!input.workspace) return;
   await deleteBitbucketCodeReviewWorkspaceWebhooksBestEffort({
     organizationId: input.organizationId,
-    currentManagerId: input.currentManagerId,
     workspace: {
       integrationId: input.integrationId,
       workspaceUuid: input.workspace.uuid,

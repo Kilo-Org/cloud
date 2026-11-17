@@ -5,7 +5,6 @@
  */
 
 import { useMemo } from 'react';
-import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { buildContextLengthByModelId } from '@/components/cloud-agent-next/model-context-lengths';
@@ -16,10 +15,9 @@ type UseOrganizationModelsReturn = {
   modelOptions: ModelOption[];
   /** Whether models are still loading */
   isLoadingModels: boolean;
+  hasLoadedModels: boolean;
   /** Context windows keyed by exact catalog model ID */
   contextLengthByModelId: ReadonlyMap<string, number>;
-  /** The organization's default model */
-  defaultModel: string | undefined;
 };
 
 /**
@@ -41,8 +39,6 @@ export function useOrganizationModels(
     'member',
     { staleTime: CLOUD_AGENT_METADATA_STALE_TIME, gcTime: CLOUD_AGENT_METADATA_STALE_TIME }
   );
-
-  const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
   // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
@@ -66,7 +62,7 @@ export function useOrganizationModels(
   return {
     modelOptions,
     isLoadingModels: enabled && isLoadingOpenRouter,
+    hasLoadedModels: openRouterModels !== undefined,
     contextLengthByModelId,
-    defaultModel: defaultsData?.defaultModel,
   };
 }

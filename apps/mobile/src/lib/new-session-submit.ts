@@ -151,7 +151,17 @@ export type NewSessionStartBlockedReason =
   /** Cloud Agent needs prompt text; an attachment alone does not submit. */
   | 'enter-prompt'
   /** Remote CLI needs prompt text or a file; an empty composer spawns nothing. */
-  | 'enter-prompt-or-file';
+  | 'enter-prompt-or-file'
+  /** A failed attachment blocks Start until the user removes it. */
+  | 'attachment-failed'
+  /** An upload in flight blocks Start until it settles. */
+  | 'attachment-uploading'
+  /** A still-loading profile blocks Start until the query settles. */
+  | 'profile-loading'
+  /** Cloud Agent needs a model; an empty or unavailable one disables Start. */
+  | 'model-missing'
+  /** A selected repository that no longer resolves to a picker row blocks Start. */
+  | 'stale-selection';
 
 /**
  * The inputs for `resolveNewSessionStartBlockedReason`. `gate` is the entry's
@@ -199,6 +209,38 @@ type NewSessionStartBlockedReasonInput = {
 );
 
 /**
+ * The composer precondition that owns a Cloud Agent Start gate, named so a
+ * disabled Start the repository step does not cause is never silent. Each of
+ * these disables the gate on its own (`resolveNewSessionStartDisabled` ORs
+ * them in), so reading them from the gate names a real cause. A failed
+ * attachment outranks an upload in flight: the same chip usually carries both,
+ * and the failure is what the user has to fix. A waiting profile outranks a
+ * missing model: the profile settles on its own, and the model the screen will
+ * show may arrive with it. A clone entry has no composer and no profile, so it
+ * never reaches here.
+ */
+function resolveComposerBlockedReason(
+  input: NewSessionStartBlockedReasonInput
+): NewSessionStartBlockedReason | null {
+  if (input.entry !== 'new-session') {
+    return null;
+  }
+  if (input.gate.attachmentsHasFailed) {
+    return 'attachment-failed';
+  }
+  if (input.gate.attachmentsIsUploading) {
+    return 'attachment-uploading';
+  }
+  if (input.gate.isProfileLoading) {
+    return 'profile-loading';
+  }
+  if (input.gate.model === '') {
+    return 'model-missing';
+  }
+  return null;
+}
+
+/**
  * One line naming why Start is unavailable, or `null` when nothing nameable is
  * the blocker. Kept pure and beside the gates so both entries share the same
  * decision and the tests can pin it without rendering.
@@ -216,10 +258,19 @@ type NewSessionStartBlockedReasonInput = {
  *
  * The empty composer never hides that blocker, because the form opens empty:
  * with nothing typed and no repository selected the footer names the
- * repository/provider step, with its action. Once a repository is selected, an
- * empty composer is named instead, because a disabled Start with no
- * explanation is a dead end: Cloud Agent needs prompt text, and a remote CLI
- * needs a prompt or a file.
+ * repository step. Once a repository is selected, an empty composer is named
+ * instead, because a disabled Start with no explanation is a dead end: Cloud
+ * Agent needs prompt text, and a remote CLI needs a prompt or a file.
+ *
+ * `connect-provider` is the state where the repository section's connect card
+ * owns the step: that card names the connect prompt and carries its own
+ * button, so the footer does not render the reason and opens no connect flow.
+ *
+ * The other preconditions that block Start are named too, wherever they own
+ * the blocker: a failed or in-flight attachment, a still-loading profile, an
+ * empty model, and a repository key that no longer resolves each say what the
+ * user waits for, picks, or fixes. Creating and submitting stay `null`, because
+ * no copy can tell the user what to do about a request already in flight.
  */
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput
@@ -240,9 +291,10 @@ export function resolveNewSessionStartBlockedReason(
   if (input.selectedRepo !== '') {
     // A key that no longer resolves to a picker row is the blocker (the
     // repository section asks for a new pick), so the prompt is not the reason:
-    // naming it would leave the real blocker unstated.
+    // naming it would leave the real blocker unstated. The clone entry keeps
+    // its own footer and its own gate, so it names nothing here.
     if (!input.selectedRepositoryResolved) {
-      return null;
+      return input.entry === 'new-session' ? 'stale-selection' : null;
     }
     if (
       input.entry === 'new-session' &&
@@ -256,7 +308,7 @@ export function resolveNewSessionStartBlockedReason(
     ) {
       return 'enter-prompt';
     }
-    return null;
+    return resolveComposerBlockedReason(input);
   }
   // A still-loading list only defers the decision while it could change it: when
   // no rows exist yet, naming a blocker now could name the wrong one. Once rows
@@ -286,9 +338,11 @@ export function resolveNewSessionStartBlockedReason(
         });
 
   // Still disabled with a repository supplied: some other condition blocks
-  // Start, so the missing repository is not the reason.
+  // Start, so the missing repository is not the reason. Name the one the user
+  // can act on or wait out; only a create or submit already in flight stays
+  // silent, because no copy can tell the user what to do about it.
   if (gateDisabledWithSyntheticRepo) {
-    return null;
+    return resolveComposerBlockedReason(input);
   }
 
   // The account cannot pick a repository yet and a provider can still be
@@ -307,12 +361,12 @@ export function resolveNewSessionStartBlockedReason(
 }
 
 /**
- * The provider the footer's connect action opens for the `connect-provider`
- * reason: the first group still in the `connect` state, in the repository
- * section's fixed github/gitlab/bitbucket order, or `null` when no provider is
- * left to connect. Kept pure so the target choice is pinnable without
- * rendering; the screen only ever reads it when the reason is
- * `connect-provider`, which itself requires a connectable group.
+ * The provider still available to connect: the first group in the `connect`
+ * state, in the repository section's fixed github/gitlab/bitbucket order, or
+ * `null` when no provider is left to connect. Kept pure so the connect state
+ * is pinnable without rendering; the screen reads it only to tell whether the
+ * `connect-provider` state applies, which the repository section's connect
+ * card then carries.
  */
 export function resolveNewSessionConnectProvider<K extends string>(
   groups: readonly { key: K; status: string }[]

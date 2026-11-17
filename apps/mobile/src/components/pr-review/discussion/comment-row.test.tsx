@@ -64,6 +64,10 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/ui/icons', () => ({ MoreHorizontal: 'MoreHorizontal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
@@ -289,7 +293,9 @@ describe('CommentRow overflow actions', () => {
 
     expect(mutateFns[0]).toHaveBeenCalledTimes(1);
     optionsAt(0).onSuccess?.({ receiptId: 'r1' });
-    expect(toastSuccess).toHaveBeenCalledWith('Report submitted. Receipt r1');
+    expect(toastSuccess).toHaveBeenCalledWith('Report submitted. Receipt r1', {
+      action: { label: expect.any(String), onClick: expect.any(Function) },
+    });
 
     renderer.unmount();
   });

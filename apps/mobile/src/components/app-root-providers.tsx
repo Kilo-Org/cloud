@@ -4,15 +4,18 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
+import { DeviceLanguageFollow } from '@/components/device-language-follow';
 import { OfflineBanner } from '@/components/offline-banner';
 import { SheetTouchGuard } from '@/components/sheet-touch-guard';
+import { KeyboardMotionProvider } from '@/components/keyboard-motion-provider';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { SystemFontScaleProvider } from '@/lib/font-scale/system-font-scale';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -21,6 +24,7 @@ import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
 import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
+import { useModalSurfacePresented } from '@/lib/modal-surface-veil';
 import { shouldHideTabBar } from '@/lib/tab-bar-layout';
 import { useRenderedTabBarHeight } from '@/lib/tab-bar-clearance';
 import { getToastBottomOffset } from '@/lib/toast-offset';
@@ -61,13 +65,15 @@ export function AppRootProviders({
       <GestureHandlerRootView className="flex-1 bg-background">
         {/* `react-native-keyboard-controller` measures the keyboard once in native
           code and hands the height and the insets to every consumer. The app's
-          keyboard surfaces — `KeyboardAvoidingView` on the session, history,
-          quick-chat and detail screens — read it from here instead of listening
-          to React Native's keyboard events. */}
-        <KeyboardProvider>
+          keyboard surfaces — `KeyboardAvoidingView` on the session, quick-chat
+          and detail screens, and the shared owned-keyboard lift on the Agents
+          list and history — read it from here instead of listening to React
+          Native's keyboard events. */}
+        <KeyboardMotionProvider>
           <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <QueryClientNativeLifecycle />
+              <DeviceLanguageFollow enabled={languageReady} />
               <AuthProvider>
                 <AppUnlockProvider
                   promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
@@ -99,7 +105,7 @@ export function AppRootProviders({
               </AuthProvider>
             </QueryClientProvider>
           </TRPCProvider>
-        </KeyboardProvider>
+        </KeyboardMotionProvider>
       </GestureHandlerRootView>
     </SystemFontScaleProvider>
   );
@@ -110,12 +116,35 @@ export function AppRootProviders({
  * portal overlays. `SheetTouchGuard` claims a touch that starts before the
  * sheet's own window exists, the tab bar and those overlays included; see
  * `@/lib/sheet-touch-guard` for the window it covers.
+ *
+ * The navigator and the app chrome also take the modal veil while an in-tree
+ * modal surface — a `DialogCard`, the session preview overlay — is open. Such a
+ * surface renders into the `PortalHost` below, inside the app's own window, so
+ * nothing else hides what it covers: on Android the covered screen stayed in the
+ * accessibility tree, ahead of the dialog's own controls (measured with
+ * `uiautomator dump --compressed`). The `PortalHost` stays outside the veiled
+ * view, which leaves the dialog as the only reachable and tappable surface
+ * while it is up. Native sheets are separate windows on Android, and on the
+ * other platform they render their content inside the app tree, so they never
+ * take this veil.
  */
 function AppCoveredContent({ children }: Readonly<{ children: ReactNode }>) {
+  const modalSurface = useModalSurfacePresented();
   return (
     <SheetTouchGuard>
-      {children}
-      <OfflineBanner />
+      <View
+        // Keep the native view: Android collapses Views whose only props are
+        // styles, and a collapsed view drops its accessibility props, so the
+        // hiding would silently no-op. The scene gate escapes it the same way.
+        collapsable={false}
+        accessibilityElementsHidden={modalSurface}
+        importantForAccessibility={modalSurface ? 'no-hide-descendants' : 'auto'}
+        pointerEvents={modalSurface ? 'none' : 'auto'}
+        className="flex-1"
+      >
+        {children}
+        <OfflineBanner />
+      </View>
       <PortalHost />
     </SheetTouchGuard>
   );

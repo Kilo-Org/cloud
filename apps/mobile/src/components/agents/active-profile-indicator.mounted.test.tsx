@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { buildActiveProfileIndicatorState } from './active-profile-indicator-model';
 import { ActiveProfileIndicator } from './active-profile-indicator';
 
@@ -70,6 +70,31 @@ describe('ActiveProfileIndicator', () => {
     expect(label).toContain('Selected profile: Backend');
     expect(label).toContain('Open Settings to review');
     expect(renderer.root.findByType('SlidersHorizontal' as never)).toBeTruthy();
+  });
+
+  it('joins a Japanese label with the catalog’s own punctuation', async () => {
+    await i18n.changeLanguage('ja');
+    try {
+      const state = buildActiveProfileIndicatorState({
+        selectedProfileName: 'Backend',
+        repoBoundProfileName: 'Repo profile',
+        hasSelectedProfileId: true,
+        hasManualEnvVars: true,
+        hasManualSetupCommands: true,
+      });
+      const { renderer } = mount(state);
+
+      const label = pill(renderer).props.accessibilityLabel as string;
+      // The catalog's own sentence, colon and list marks, never the ASCII ones.
+      expect(label).toContain('。');
+      expect(label).toContain('：');
+      expect(label).toContain('、');
+      expect(label).not.toMatch(/[:.,] /);
+      // The profile name is the user's own data, so it arrives unchanged.
+      expect(label).toContain('Backend');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('renders the amber attention treatment for the needs-attention state', () => {

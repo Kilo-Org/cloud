@@ -150,8 +150,18 @@ export function usePullRefresh(refetch: PullRefetch): PullRefresh {
     run(false);
   }, [run]);
   const markSettled = useCallback(() => {
+    // A rejected run may still be holding its failure through the anti-flicker
+    // beat, with the budget timer armed behind it. This success supersedes that
+    // run: drop both timers and retire it, so neither can turn the line back on.
+    // A run that is genuinely still fetching is untouched.
+    if (settleTimerRef.current !== null) {
+      clearTimers();
+      tokenRef.current += 1;
+      setRefreshing(false);
+      setBusy(false);
+    }
     setFailed(false);
-  }, []);
+  }, [clearTimers]);
 
   return { refreshing, busy, failed, startPull, startRetry, markSettled };
 }

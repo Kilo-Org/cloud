@@ -701,6 +701,60 @@ describe('createUserWebConnection', () => {
     }
   });
 
+  it('replaces a connected viewer and restores its subscriptions on manual retry', async () => {
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken: jest
+        .fn()
+        .mockReturnValueOnce('initial-ticket')
+        .mockResolvedValue('retry-ticket'),
+    });
+    const release = client.subscribeToCliSession('ses-1');
+    try {
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      client.retryConnection();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(client.isConnected()).toBe(false);
+      open(sockets[1]);
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } }, sockets[1]);
+      expect(client.isConnected()).toBe(true);
+      expect(sockets[1].send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
+      );
+    } finally {
+      release();
+      client.destroy();
+    }
+  });
+
+  it('rejects an interrupted command without replaying it during manual retry', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'ticket' });
+    const release = client.subscribeToCliSession('ses-1');
+    try {
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      const command = client.sendCommand('ses-1', 'send_message', { text: 'Synthetic message' });
+      const rejected = expect(command).rejects.toThrow('Connection lost during reconnect');
+      await Promise.resolve();
+      client.retryConnection();
+      await rejected;
+      await Promise.resolve();
+      open(sockets[1]);
+
+      expect(sockets[1].send).toHaveBeenCalledTimes(1);
+      expect(sockets[1].send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
+      );
+    } finally {
+      release();
+      client.destroy();
+    }
+  });
+
   it('grants a manual retry a fresh token attempt budget before any socket exists', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0);

@@ -385,6 +385,13 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
   );
 }
 
+const CHILD_ROLE_LABELS = {
+  owner: { badge: 'Owner', detail: 'Owner' },
+  admin: { badge: 'Admin', detail: 'Admin' },
+  billing_manager: { badge: 'Billing', detail: 'Billing manager' },
+  member: { badge: '', detail: 'Member' },
+} satisfies Record<OrganizationRole, { badge: string; detail: string }>;
+
 type ChildTeamsControlProps = {
   organization: OrganizationWithMembersResponse;
   member: OrganizationMemberResponse;
@@ -436,7 +443,8 @@ function ChildTeamsControl({
     childMemberships.length > 0 ? (
       <div className="flex flex-wrap gap-1">
         {childMemberships.map(child => {
-          const label = `${child.name}${child.role !== 'member' ? ` · ${child.role === 'owner' ? 'Owner' : 'Billing'}` : ''}`;
+          const roleLabel = CHILD_ROLE_LABELS[child.role].badge;
+          const label = `${child.name}${roleLabel ? ` · ${roleLabel}` : ''}`;
 
           if (!canOpenChildOrganizations) {
             return (
@@ -502,7 +510,7 @@ function ChildTeamsControl({
                     <span className="truncate">{childOrganization.name}</span>
                     {locked ? (
                       <span className="text-muted-foreground text-xs">
-                        {membership.role === 'owner' ? 'Owner' : 'Billing manager'} in child team
+                        {CHILD_ROLE_LABELS[membership.role].detail} in child team
                       </span>
                     ) : null}
                   </span>

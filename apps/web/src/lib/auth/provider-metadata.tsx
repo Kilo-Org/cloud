@@ -6,6 +6,7 @@ import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
+import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
 import { KeyRound, Mail, SquareUserRound } from 'lucide-react';
 import React, { type JSX } from 'react';
 import * as z from 'zod';
@@ -39,6 +40,12 @@ const AllAuthProviders = [
     signInLabel: 'Continue with ChatGPT',
     icon: <OpenAILogo />,
   },
+  {
+    id: 'claude',
+    name: 'Claude',
+    signInLabel: 'Continue with Claude',
+    icon: <ClaudeLogo />,
+  },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },
   // Passkeys are not an OAuth account to link or unlink: they are listed and
@@ -53,7 +60,8 @@ export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 // Subset offered for OAuth sign-in: every provider except SSO, email, passkeys
-// and the dev-only one.
+// and the dev-only one. Claude is listed here, and the offering surfaces drop it
+// until it is launched (`withLaunchedClaudeSignIn`).
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
   p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 
@@ -62,11 +70,10 @@ export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as con
 export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id), 'email'] as const;
 
 // Providers whose callback does not carry the web session that started an
-// account link: the link requires that session, and Apple's callback is a
-// cross-site form POST. They stay sign-in methods only. This is the single
-// declaration of the exclusion; the offered list and the link start both read
-// what it produces.
-const LinkSessionUnavailableProviderIds = ['apple'] as const satisfies readonly AuthProviderId[];
+// account link and have no completion bounce. Apple used to be listed here:
+// its callback now parks an explicit pending link and completes it on a
+// same-site route that carries the session, so it is linkable.
+const LinkSessionUnavailableProviderIds = [] as const satisfies readonly AuthProviderId[];
 
 // The providers a person may start an account link for. Every link start reads
 // this list, not only the `/connected-accounts` offer: the organization BYOK

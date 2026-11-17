@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postcss from 'postcss';
+
+import { runIfMain } from '../../../tools/lib/entry-point.mjs';
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS_PATH = join(mobileDir, 'src', 'global.css');
@@ -18,6 +20,7 @@ export const TOKEN_KEYS = [
   ['primary', '--primary'],
   ['primaryForeground', '--primary-foreground'],
   ['primaryDisabled', '--primary-disabled'],
+  ['primaryDisabledAction', '--primary-disabled-action'],
   ['secondary', '--secondary'],
   ['secondaryForeground', '--secondary-foreground'],
   ['secondaryFill', '--secondary-fill'],
@@ -57,6 +60,7 @@ export const TOKEN_KEYS = [
   ['rowSage', '--row-sage'],
   ['rowMoss', '--row-moss'],
   ['rowFern', '--row-fern'],
+  ['rowPine', '--row-pine'],
 ];
 
 function collectDeclarations(rule) {
@@ -102,13 +106,29 @@ function normalizeColorValue(value) {
   return value.startsWith('#') ? value.toUpperCase() : value;
 }
 
-function formatObject(declarations) {
+/**
+ * Encodes a declaration value as a single-quoted string literal that holds the
+ * value as data. JSON.stringify supplies the escaping for quotes, backslashes
+ * and control characters; its double quotes are unescaped and single quotes
+ * escaped, so the literal keeps the repository's single-quote style.
+ */
+function formatValueSource(value) {
+  const unquote = String.raw`\"`;
+  const quote = String.raw`\'`;
+  const escaped = JSON.stringify(value)
+    .slice(1, -1)
+    .replaceAll(unquote, '"')
+    .replaceAll(`'`, quote);
+  return `'${escaped}'`;
+}
+
+export function formatObject(declarations) {
   const lines = TOKEN_KEYS.map(([jsKey, cssVar]) => {
     const value = declarations[cssVar];
     if (value === undefined) {
       throw new Error(`${CSS_PATH}: missing ${cssVar} declaration`);
     }
-    return `  ${jsKey}: '${value}',`;
+    return `  ${jsKey}: ${formatValueSource(value)},`;
   });
   return `{\n${lines.join('\n')}\n} as const;`;
 }
@@ -125,8 +145,10 @@ export function generateThemeColorsSource() {
   ].join('\n');
 }
 
-const scriptPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && resolve(process.argv[1]) === resolve(scriptPath)) {
-  writeFileSync(OUTPUT_PATH, generateThemeColorsSource());
-  console.log(`Wrote ${OUTPUT_PATH}`);
-}
+runIfMain(
+  () => {
+    writeFileSync(OUTPUT_PATH, generateThemeColorsSource());
+    console.log(`Wrote ${OUTPUT_PATH}`);
+  },
+  import.meta.url
+);

@@ -1,4 +1,5 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { RuntimeProxyAttestationAudience } from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 export type RuntimeCredentialProxyTargets = {
   backendBaseUrl: string;
@@ -94,9 +95,17 @@ function isAllowedBackendRoute(
   );
 }
 
-function isAllowedProviderRoute(method: string, path: string): boolean {
+function isAllowedProviderRoute(
+  method: string,
+  path: string,
+  organizationId: string | undefined
+): boolean {
   if (path === '/models') return method === 'GET';
   if (path === '/models/validate') return method === 'POST';
+  if (method === 'GET') {
+    const match = /^\/organizations\/([A-Za-z0-9._-]+)\/models$/.exec(path);
+    return match !== null && organizationId !== undefined && match[1] === organizationId;
+  }
   return (
     method === 'POST' &&
     [
@@ -110,14 +119,38 @@ function isAllowedProviderRoute(method: string, path: string): boolean {
   );
 }
 
-function logicalProviderPath(pathname: string): string | null {
+const ORGANIZATION_MODEL_CATALOG_PATH =
+  /^\/api\/(?:openrouter|gateway)\/(?:api\/)?organizations\/[A-Za-z0-9._-]+\/models$/;
+
+/**
+ * The attestation plane that authenticates the upstream endpoint, which is not
+ * always the plane of the upstream host. The gateway app serves the
+ * organization model catalog with the shared web (kilo-api) tRPC context, so a
+ * provider-facade request to it must carry a kilo-api attestation.
+ */
+export function runtimeProxyAttestationAudience(
+  route: RuntimeCredentialProxyRoute,
+  pathname: string
+): RuntimeProxyAttestationAudience {
+  if (route === 'backend') return 'kilo-api';
+  if (route === 'ingest') return 'session-ingest';
+  if (route === 'provider' && ORGANIZATION_MODEL_CATALOG_PATH.test(pathname)) return 'kilo-api';
+  return 'kilo-gateway';
+}
+
+function logicalProviderPath(pathname: string, organizationId: string | undefined): string | null {
   const prefix = ['/api/openrouter', '/api/gateway'].find(value =>
     pathname.startsWith(`${value}/`)
   );
   if (!prefix) return null;
-  const path = pathname.slice(prefix.length);
+  // Kilo v1 appends /api/organizations/<org> to its configured provider base.
+  // Normalize that catalog alias before applying the same session-org allowlist.
+  const path = pathname.slice(prefix.length).replace(/^\/api\/organizations\//, '/organizations/');
   if (path.startsWith('/v1/') && prefix !== '/api/gateway') return null;
-  return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
+  return isAllowedProviderRoute('GET', path, organizationId) ||
+    isAllowedProviderRoute('POST', path, organizationId)
+    ? path
+    : null;
 }
 
 export const EXA_PROXY_PATHS = [
@@ -277,10 +310,13 @@ export function resolveRuntimeCredentialProxyScopedIngestRoute(
 }
 
 /**
- * Resolves a child session-scope route for an adopted scope handle: the facade
- * forwards create, ingest, export and title on any non-member session id as a
- * v2 assertion. The path id is not required to differ from the handle's own
- * root; membership is the facade's decision.
+ * Resolves the v2 forwarding target for a child session-scope request on an
+ * adopted scope handle. This function only selects the forwarding path: it
+ * checks the shape of the path id and the allowed method, and it makes no
+ * membership decision. session-ingest authorizes every v2 create, ingest,
+ * export and title request and answers 404 or 409 for an id outside the
+ * asserted scope; see `resolveRuntimeCredentialProxyScopeIngestRoute` for the
+ * enforcing functions.
  */
 export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
   input: ResolveRuntimeCredentialProxyScopedV2Input
@@ -316,10 +352,27 @@ export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
 /**
  * Decides, for one adopted scope handle, whether an ingest-plane request is a
  * member-root request served on the public path or a child candidate forwarded
- * as a v2 assertion. This is the single owner of that decision: the caller
- * passes the current member roots and receives either the public URL or the
- * scoped URL. A `{sessionId}`-only create whose id is a current member root
- * stays public; every other create needs a `parentSessionId` and goes scoped.
+ * as a v2 assertion. This is the single owner of the forwarding-path decision:
+ * the caller passes the current member roots and receives either the public
+ * URL or the scoped URL. A `{sessionId}`-only create whose id is a current
+ * member root stays public; every other create needs a `parentSessionId` and
+ * goes scoped.
+ *
+ * The forwarding path is not an authorization decision. session-ingest owns
+ * scope membership for every v2 create, ingest, export and title request:
+ *
+ * - ingest, export and title: `resolveScopedChildSession` authorizes the path
+ *   id, and the routes answer 404 `session_not_found` when it refuses.
+ * - create: `resolveScopedCreateParent` authorizes the body's
+ *   `parentSessionId`, and the route answers 409 `session_scope_conflict` when
+ *   it refuses.
+ *
+ * Both functions live in
+ * `services/session-ingest/src/services/cloud-agent-worktree-scope.ts` and
+ * accept an id only with the same owner, organization and worktree. A non-root
+ * id must also have an ancestry that reaches an asserted member root, and a
+ * root id must itself be an asserted member root. The routes in
+ * `services/session-ingest/src/routes/cloud-agent-session-scope.ts` use both.
  */
 export function resolveRuntimeCredentialProxyScopeIngestRoute(input: {
   targets: RuntimeCredentialProxyTargets;
@@ -400,8 +453,8 @@ export function resolveRuntimeCredentialProxyRoute(
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {
-    const logicalPath = logicalProviderPath(path);
-    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath)) {
+    const logicalPath = logicalProviderPath(path, input.organizationId);
+    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath, input.organizationId)) {
       return providerTargetUrl(input.targets.providerBaseUrl, logicalPath, input.search);
     }
   }

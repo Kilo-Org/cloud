@@ -154,7 +154,10 @@ describe('NewSessionScreen account gate', () => {
   });
 });
 
-const AGENTS_SESSIONS_HREF = '/(app)/(tabs)/(2_agents)/';
+const AGENTS_SESSIONS_INDEX_HREF = {
+  pathname: '/(app)/(tabs)/(2_agents)/',
+  params: {},
+} as const;
 
 async function renderErrorBoundary(): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -243,7 +246,7 @@ describe('NewSessionScreen route error boundary', () => {
     const renderer = await renderErrorBoundary();
     pressBack(renderer);
     expect(state.router.back).not.toHaveBeenCalled();
-    expect(state.router.replace).toHaveBeenCalledExactlyOnceWith(AGENTS_SESSIONS_HREF);
+    expect(state.router.replace).toHaveBeenCalledExactlyOnceWith(AGENTS_SESSIONS_INDEX_HREF);
     unmount(renderer);
   });
 });

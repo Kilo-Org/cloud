@@ -6,9 +6,9 @@ import {
   cloudAgentWorktreeLocationSchema,
   cloudAgentChildSessionLineageSchema,
   sessionIdSchema,
-  WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
   WORKTREE_UNREGISTERED_CHILD_SESSIONS,
   WORKTREE_CHILD_LINEAGE_CONFLICT,
+  WORKTREE_MEMBERSHIP_CHANGED,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
@@ -26,6 +26,28 @@ import type { TRPCContext } from '../../types';
 import { protectedProcedure } from '../auth';
 
 const ROOT_DELETION_CONCURRENCY = 8;
+const WORKTREE_IDENTITY_CONFLICT = 'worktree_identity_conflict';
+const SAFE_ERROR_CLASS = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/;
+const KNOWN_DELETION_ERROR_CODES: ReadonlyArray<readonly [string, string]> = [
+  [WORKTREE_UNREGISTERED_CHILD_SESSIONS, WORKTREE_UNREGISTERED_CHILD_SESSIONS],
+  [WORKTREE_CHILD_LINEAGE_CONFLICT, WORKTREE_CHILD_LINEAGE_CONFLICT],
+  [WORKTREE_MEMBERSHIP_CHANGED, WORKTREE_MEMBERSHIP_CHANGED],
+  ['worktree_access_denied', 'worktree_access_denied'],
+  ['Worktree identity conflict', WORKTREE_IDENTITY_CONFLICT],
+  ['worktree_deletion_not_started', 'worktree_deletion_not_started'],
+  ['worktree_cleanup_manifest_changed', 'worktree_cleanup_manifest_changed'],
+  ['worktree_cleanup_session_conflict', 'worktree_cleanup_session_conflict'],
+  ['worktree_deleting', 'worktree_deleting'],
+];
+
+/** Bounded, sanitized cause fields. Never forwards a raw error message. */
+function safeDeletionError(error: unknown): { errorClass: string; errorCode?: string } {
+  const errorClass =
+    error instanceof Error && SAFE_ERROR_CLASS.test(error.name) ? error.name : 'UnknownError';
+  const message = error instanceof Error ? error.message : '';
+  const errorCode = KNOWN_DELETION_ERROR_CODES.find(([needle]) => message.includes(needle))?.[1];
+  return { errorClass, ...(errorCode ? { errorCode } : {}) };
+}
 
 async function mapDeletionRoots<T, R>(
   items: T[],
@@ -44,10 +66,23 @@ async function mapDeletionRoots<T, R>(
   return output;
 }
 
+function isHardDeletionError(error: unknown): boolean {
+  if (error instanceof TRPCError) return true;
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes(WORKTREE_CHILD_LINEAGE_CONFLICT) ||
+    error.message.includes(WORKTREE_UNREGISTERED_CHILD_SESSIONS) ||
+    error.message.includes(WORKTREE_MEMBERSHIP_CHANGED) ||
+    error.message.includes('worktree_access_denied') ||
+    error.message.includes('Worktree identity conflict')
+  );
+}
+
 export const DeleteWorktreeInput = z
   .object({
     worktreeId: cloudAgentWorktreeIdSchema,
     kilocodeOrganizationId: z.uuid().optional(),
+    onlyIfSoleSessionId: sessionIdSchema.optional(),
   })
   .strict();
 
@@ -55,6 +90,7 @@ export const DeleteWorktreeOutput = z
   .object({
     success: z.literal(true),
     deletedSessionIds: z.array(sessionIdSchema),
+    cleanup: z.enum(['complete', 'pending']).default('complete'),
   })
   .strict();
 
@@ -83,6 +119,7 @@ export async function deleteWorktreeResources(
   let outcome = 'failed';
   let sessionCount: number | undefined;
   let locationCount: number | undefined;
+  let unreachableRootCount = 0;
   let errorCode: string | undefined;
   let retryable: boolean | undefined;
   logControlDiagnostic('worktree_deletion', { worktreeId: params.worktreeId, phase: 'started' });
@@ -98,7 +135,10 @@ export async function deleteWorktreeResources(
     }
     setStage('begin_deletion');
     let state = cloudAgentWorktreeDeletionStateSchema.parse(
-      await ctx.env.SESSION_INGEST.beginCloudAgentWorktreeDeletion(params)
+      await ctx.env.SESSION_INGEST.beginCloudAgentWorktreeDeletion({
+        ...params,
+        ...(input.onlyIfSoleSessionId ? { onlyIfSoleSessionId: input.onlyIfSoleSessionId } : {}),
+      })
     );
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
@@ -107,6 +147,7 @@ export async function deleteWorktreeResources(
       return {
         success: true,
         deletedSessionIds: state.manifest.sessions.map(session => session.sessionId),
+        cleanup: 'complete',
       };
     }
     const runtimeLocations = [...state.runtimeLocations];
@@ -115,20 +156,36 @@ export async function deleteWorktreeResources(
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return null;
       const cloudAgentSessionId = session.cloudAgentSessionId;
-      const rawBegin = await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
-        stub =>
-          stub.beginWorktreeDeletion({
+      try {
+        const rawBegin = await withDORetry(
+          () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
+          stub =>
+            stub.beginWorktreeDeletion({
+              worktreeId: params.worktreeId,
+              ownerId: ctx.userId,
+              kiloSessionId: session.sessionId,
+              ...(params.organizationId ? { organizationId: params.organizationId } : {}),
+            }),
+          'beginWorktreeDeletion'
+        );
+        const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
+        const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
+        return { cloudAgentSessionId, location, children };
+      } catch (error) {
+        if (isHardDeletionError(error)) throw error;
+        unreachableRootCount += 1;
+        logControlDiagnostic(
+          'worktree_deletion',
+          {
             worktreeId: params.worktreeId,
-            ownerId: ctx.userId,
-            kiloSessionId: session.sessionId,
-            ...(params.organizationId ? { organizationId: params.organizationId } : {}),
-          }),
-        'beginWorktreeDeletion'
-      );
-      const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
-      const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
-      return { cloudAgentSessionId, location, children };
+            phase: 'discovery_unavailable',
+            cloudAgentSessionId,
+            ...safeDeletionError(error),
+          },
+          'warn'
+        );
+        return null;
+      }
     });
     for (const discovery of discoveries) {
       if (!discovery) continue;
@@ -143,9 +200,6 @@ export async function deleteWorktreeResources(
         runtimeLocations.push(location);
       }
     }
-    setStage('runtime_history');
-    locationCount = runtimeLocations.length;
-    if (runtimeLocations.length === 0) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
     setStage('record_manifest');
     state = cloudAgentWorktreeDeletionStateSchema.parse(
       await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
@@ -156,15 +210,19 @@ export async function deleteWorktreeResources(
     );
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
+
+    setStage('content_deletion');
+    const content = await ctx.env.SESSION_INGEST.deleteCloudAgentWorktreeContent(params);
+    sessionCount = content.deletedSessionIds.length;
+
+    let runtimeComplete = state.runtimeLocations.length > 0;
+    const completed = new Set(
+      (state.manifest.completedRuntimeLocations ?? []).map(
+        location => `${location.provider}:${location.sandboxId}`
+      )
+    );
     for (const location of state.runtimeLocations) {
-      if (
-        state.manifest.completedRuntimeLocations?.some(
-          completed =>
-            completed.sandboxId === location.sandboxId && completed.provider === location.provider
-        )
-      ) {
-        continue;
-      }
+      if (completed.has(`${location.provider}:${location.sandboxId}`)) continue;
       setStage('runtime_cleanup');
       const locationStartedAt = Date.now();
       let cleanup: WorktreeDeleteResult | undefined;
@@ -181,48 +239,142 @@ export async function deleteWorktreeResources(
             'deleteWorktreeResources'
           )
         );
-      } finally {
+      } catch (error) {
+        if (isHardDeletionError(error)) throw error;
+        runtimeComplete = false;
         logControlDiagnostic(
           'worktree_cleanup_location',
           {
             worktreeId: params.worktreeId,
             sandboxId: location.sandboxId,
             provider: location.provider,
-            result: cleanup ? 'resources_cleaned' : 'failed',
-            sessionCount: cleanup?.sessionIds.length,
+            result: 'pending',
             durationMs: Date.now() - locationStartedAt,
+            ...safeDeletionError(error),
           },
-          cleanup ? 'info' : 'warn'
+          'warn'
         );
+        continue;
       }
+      logControlDiagnostic('worktree_cleanup_location', {
+        worktreeId: params.worktreeId,
+        sandboxId: location.sandboxId,
+        provider: location.provider,
+        result: 'resources_cleaned',
+        sessionCount: cleanup.sessionIds.length,
+        durationMs: Date.now() - locationStartedAt,
+      });
       setStage('record_cleanup');
-      state = cloudAgentWorktreeDeletionStateSchema.parse(
-        await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-          ...params,
-          sessionIds: cleanup.sessionIds,
-          completedRuntimeLocation: location,
-        })
-      );
+      try {
+        state = cloudAgentWorktreeDeletionStateSchema.parse(
+          await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
+            ...params,
+            sessionIds: cleanup.sessionIds,
+            completedRuntimeLocation: location,
+          })
+        );
+      } catch (error) {
+        if (isHardDeletionError(error)) throw error;
+        logControlDiagnostic(
+          'worktree_deletion',
+          {
+            worktreeId: params.worktreeId,
+            phase: 'record_cleanup_pending',
+            sandboxId: location.sandboxId,
+            provider: location.provider,
+            ...safeDeletionError(error),
+          },
+          'warn'
+        );
+        outcome = 'pending';
+        return {
+          success: true,
+          deletedSessionIds: content.deletedSessionIds,
+          cleanup: 'pending',
+        };
+      }
       sessionCount = state.manifest.sessions.length;
       locationCount = state.runtimeLocations.length;
+      completed.add(`${location.provider}:${location.sandboxId}`);
     }
-    setStage('finish_sessions');
-    await mapDeletionRoots(state.manifest.sessions, async session => {
-      if (!session.cloudAgentSessionId) return;
-      const cloudAgentSessionId = session.cloudAgentSessionId;
-      await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
-        stub => stub.finishWorktreeDeletion(params.worktreeId),
-        'finishWorktreeDeletion'
-      );
-    });
+
+    if (runtimeComplete) {
+      setStage('finish_sessions');
+      const finished = await mapDeletionRoots(state.manifest.sessions, async session => {
+        if (!session.cloudAgentSessionId) return true;
+        const cloudAgentSessionId = session.cloudAgentSessionId;
+        try {
+          await withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
+            stub => stub.finishWorktreeDeletion(params.worktreeId),
+            'finishWorktreeDeletion'
+          );
+          return true;
+        } catch (error) {
+          if (isHardDeletionError(error)) throw error;
+          logControlDiagnostic(
+            'worktree_deletion',
+            {
+              worktreeId: params.worktreeId,
+              phase: 'finish_pending',
+              cloudAgentSessionId,
+              ...safeDeletionError(error),
+            },
+            'warn'
+          );
+          return false;
+        }
+      });
+      runtimeComplete = finished.every(Boolean);
+    }
+
+    if (!runtimeComplete) {
+      if (state.runtimeLocations.length === 0) {
+        logControlDiagnostic(
+          'worktree_deletion',
+          {
+            worktreeId: params.worktreeId,
+            phase: 'runtime_history_missing',
+            unreachableRootCount,
+          },
+          'warn'
+        );
+      }
+      outcome = 'pending';
+      return {
+        success: true,
+        deletedSessionIds: content.deletedSessionIds,
+        cleanup: 'pending',
+      };
+    }
+
     setStage('complete_deletion');
-    const output = DeleteWorktreeOutput.parse(
-      await ctx.env.SESSION_INGEST.completeCloudAgentWorktreeDeletion(params)
-    );
+    let output: z.infer<typeof DeleteWorktreeOutput>;
+    try {
+      output = DeleteWorktreeOutput.parse(
+        await ctx.env.SESSION_INGEST.completeCloudAgentWorktreeDeletion(params)
+      );
+    } catch (error) {
+      if (isHardDeletionError(error)) throw error;
+      logControlDiagnostic(
+        'worktree_deletion',
+        {
+          worktreeId: params.worktreeId,
+          phase: 'complete_pending',
+          ...safeDeletionError(error),
+        },
+        'warn'
+      );
+      outcome = 'pending';
+      return {
+        success: true,
+        deletedSessionIds: content.deletedSessionIds,
+        cleanup: 'pending',
+      };
+    }
     sessionCount = output.deletedSessionIds.length;
     outcome = 'completed';
-    return output;
+    return { ...output, cleanup: 'complete' };
   } catch (error) {
     if (error instanceof TRPCError) {
       outcome =
@@ -232,21 +384,31 @@ export async function deleteWorktreeResources(
       errorCode = error.code;
       throw error;
     }
-    if (error instanceof Error && error.message.includes(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE)) {
-      outcome = 'history_unavailable';
-      errorCode = 'WORKTREE_RUNTIME_HISTORY_UNAVAILABLE';
-      retryable = false;
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Worktree runtime location is missing',
-        cause: { error: 'WORKTREE_RUNTIME_HISTORY_UNAVAILABLE', retryable: false },
-      });
-    }
     if (error instanceof Error && error.message.includes('worktree_access_denied')) {
       outcome = 'rejected';
       errorCode = 'FORBIDDEN';
       retryable = false;
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_MEMBERSHIP_CHANGED)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_MEMBERSHIP_CHANGED';
+      retryable = false;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: WORKTREE_MEMBERSHIP_CHANGED,
+        cause: { error: errorCode, retryable: false },
+      });
+    }
+    if (error instanceof Error && error.message.includes('Worktree identity conflict')) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_IDENTITY_CONFLICT';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: WORKTREE_IDENTITY_CONFLICT,
+        cause: { error: errorCode, retryable: false },
+      });
     }
     if (error instanceof Error && error.message.includes(WORKTREE_UNREGISTERED_CHILD_SESSIONS)) {
       outcome = 'rejected';
@@ -291,6 +453,7 @@ export async function deleteWorktreeResources(
         result: outcome,
         sessionCount,
         locationCount,
+        unreachableRootCount,
         errorCode,
         retryable,
         durationMs: Date.now() - startedAt,

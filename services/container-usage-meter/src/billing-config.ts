@@ -1,6 +1,7 @@
 export const MINIMUM_REMAINING_MICRODOLLARS = 5_000_000;
 const DEFAULT_WARN_REMAINING_MICRODOLLARS = 10_000_000;
 const CLOUD_AGENT_SERVICE_PREFIX = 'cloud-agent-next-';
+let configurationLogged = false;
 
 export type BillingConfig = {
   services: ReadonlySet<string>;
@@ -71,7 +72,7 @@ export function billingConfigFromEnv(env: BillingEnvironment): BillingConfig {
     (cloudAgentUserIds.size > 0 || cloudAgentOrgIds.size > 0) &&
     validThreshold;
   const cloudAgentListsAreValid = cloudAgentUserIds !== null && cloudAgentOrgIds !== null;
-  return {
+  const config: BillingConfig = {
     services: services ?? SHADOW_ONLY_BILLING_CONFIG.services,
     userIds: userIds ?? SHADOW_ONLY_BILLING_CONFIG.userIds,
     orgIds: orgIds ?? SHADOW_ONLY_BILLING_CONFIG.orgIds,
@@ -86,6 +87,44 @@ export function billingConfigFromEnv(env: BillingEnvironment): BillingConfig {
       : DEFAULT_WARN_REMAINING_MICRODOLLARS,
     enabled: gastownEnabled || cloudAgentEnabled,
   };
+  if (!configurationLogged) {
+    configurationLogged = true;
+    const invalidFields = [
+      ...(services === null ? ['CONTAINER_BILLING_SERVICES'] : []),
+      ...(!validThreshold ? ['CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS'] : []),
+      ...(services?.has('gastown') && userIds === null ? ['CONTAINER_BILLING_USER_IDS'] : []),
+      ...(services?.has('gastown') && orgIds === null ? ['CONTAINER_BILLING_ORG_IDS'] : []),
+      ...((services?.has('cloud-agent-next') ||
+        [...(services ?? [])].some(service => service.startsWith(CLOUD_AGENT_SERVICE_PREFIX))) &&
+      !cloudAgentListsAreValid
+        ? [
+            ...(cloudAgentUserIds === null ? ['CONTAINER_BILLING_CLOUD_AGENT_USER_IDS'] : []),
+            ...(cloudAgentOrgIds === null ? ['CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS'] : []),
+          ]
+        : []),
+    ];
+    console.log(
+      JSON.stringify({
+        event: 'container_billing_configuration',
+        enabled: config.enabled,
+        services: [...config.services],
+        cloudAgentUsersEnrolled: config.cloudAgentUserIds.size > 0,
+        cloudAgentOrganizationsEnrolled: config.cloudAgentOrgIds.size > 0,
+        warnRemainingMicrodollars: config.warnRemainingMicrodollars,
+      })
+    );
+    if (invalidFields.length > 0) {
+      console.error(
+        JSON.stringify({
+          event: 'container_billing_configuration_invalid',
+          message: 'Invalid container billing configuration leaves affected payers in shadow mode',
+          invalidFields,
+          configEnabled: config.enabled,
+        })
+      );
+    }
+  }
+  return config;
 }
 
 export function billingModeFor(
@@ -105,5 +144,5 @@ export function billingModeFor(
     : subject.type === 'user'
       ? config.userIds
       : config.orgIds;
-  return payerIds?.has(subject.id) ? 'paid' : 'shadow';
+  return payerIds.has(subject.id) || (isCloudAgentService && payerIds.has('*')) ? 'paid' : 'shadow';
 }

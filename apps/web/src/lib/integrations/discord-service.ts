@@ -2,7 +2,7 @@ import 'server-only';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -14,6 +14,7 @@ import {
 } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
@@ -152,9 +153,40 @@ export async function getInstallation(
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DISCORD))
     )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a row that carries the server id
+    // only in `platform_account_id`, so an update targets the same row and the
+    // owner keeps one connection.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
+    )
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * A row can record its server in `platform_account_id` while
+ * `platform_installation_id` is empty. The lifecycle still supports that row
+ * shape, so the lookups below cover it wherever a server is resolved.
+ */
+function legacyDiscordGuildCondition(guildId: string) {
+  return and(
+    eq(platform_integrations.platform_account_id, guildId),
+    isNull(platform_integrations.platform_installation_id)
+  );
+}
+
+/**
+ * Rows that record a server: its canonical row, plus a legacy row that carries
+ * the server id only in `platform_account_id`.
+ */
+function recordsDiscordGuildCondition(guildId: string) {
+  return or(
+    eq(platform_integrations.platform_installation_id, guildId),
+    legacyDiscordGuildCondition(guildId)
+  );
 }
 
 /**
@@ -170,8 +202,15 @@ export async function getInstallationByGuildId(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.DISCORD),
-        eq(platform_integrations.platform_installation_id, guildId)
+        recordsDiscordGuildCondition(guildId)
       )
+    )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a legacy row that carries the
+    // server id only in `platform_account_id`.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
     )
     .limit(1);
 
@@ -179,16 +218,21 @@ export async function getInstallationByGuildId(
 }
 
 /**
- * Find a Discord installation for `guildId` that belongs to a different Kilo
- * owner. Callers use this before persisting a connection so a server owned
- * elsewhere is rejected without touching either row.
+ * Find a Discord installation that already records `guildId` for a different
+ * Kilo owner. Callers use this before persisting a connection so each server
+ * stays bound to one owner and the write is refused without touching either row.
+ *
+ * A server resolves to the row that holds it as its canonical installation id.
+ * Only when no such row exists do rows that record the server in
+ * `platform_account_id` take part, matching how `upsertDiscordInstallation`
+ * reads the bound server of an existing row.
  */
 export async function getConflictingDiscordInstallation(
   owner: Owner,
   guildId: string,
   database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await database
+  const canonical = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -199,13 +243,44 @@ export async function getConflictingDiscordInstallation(
     )
     .limit(2);
 
-  return integrations.find(integration => !isOwnedBy(integration, owner)) ?? null;
+  const foreignCanonical = canonical.find(integration => !isOwnedBy(integration, owner));
+  if (foreignCanonical) {
+    return foreignCanonical;
+  }
+  if (canonical.length > 0) {
+    return null;
+  }
+
+  const [conflicting] = await database
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        legacyDiscordGuildCondition(guildId),
+        isOwnedByAnotherOwner(owner)
+      )
+    )
+    .limit(1);
+
+  return conflicting ?? null;
 }
 
 function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
   return owner.type === 'user'
     ? integration.owned_by_user_id === owner.id && integration.owned_by_organization_id === null
     : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
+}
+
+/**
+ * The complement of `isOwnedBy` as a filter. `NOT` over the nullable owner columns
+ * would drop rows, so each owner is compared with `IS NOT DISTINCT FROM` and the
+ * other owner column with `IS NULL`.
+ */
+function isOwnedByAnotherOwner(owner: Owner) {
+  return owner.type === 'user'
+    ? sql`NOT (${platform_integrations.owned_by_user_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_organization_id} IS NULL)`
+    : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
 }
 
 /**
@@ -431,6 +506,9 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
  * Get the model for a Discord integration.
  * Reads model_slug from the given installation's metadata, falling back to
  * the platform default for installations created before model config existed.
+ * For organization-owned integrations, a stored model is resolved through the
+ * organization's current policy at read time, so a policy change applies to the
+ * next message; a user-owned integration keeps its stored model.
  */
 export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
@@ -440,7 +518,10 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
   const metadata = integration.metadata as { model_slug?: string } | null;
   if (metadata?.model_slug) {
-    return metadata.model_slug;
+    return resolveOrganizationBotModel({
+      organizationId: owner.type === 'org' ? owner.id : null,
+      storedModelSlug: metadata.model_slug,
+    });
   }
 
   // Pre-existing installation without a stored model — resolve a default

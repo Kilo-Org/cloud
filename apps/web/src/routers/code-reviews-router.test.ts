@@ -526,6 +526,29 @@ describe('codeReviewRouter.listForOrganization role-gated ids', () => {
   });
 });
 
+describe('codeReviewRouter.listForUser budget', () => {
+  it('answers a spent mobile budget retryably instead of an empty list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'list-for-user-budget@example.com',
+      google_user_name: 'List For User Budget',
+      is_admin: false,
+    });
+
+    try {
+      const caller = await createCallerForUser(user.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(caller.codeReviews.listForUser({})).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Your code reviews took too long to load. Try again.',
+      });
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+    }
+  });
+});
+
 describe('codeReviewRouter.get role-gated ids', () => {
   let ownerUser: User;
   let memberUser: User;
@@ -2173,6 +2196,69 @@ describe('review agent config REVIEW.md setting', () => {
     expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
 
+  it.each(['personal', 'organization'] as const)(
+    'persists, patches, preserves, and clears the %s guideline allowlist',
+    async scope => {
+      const caller = await createCallerForUser(testUser.id);
+      const input = {
+        platform: 'github' as const,
+        reviewStyle: 'balanced' as const,
+        focusAreas: [],
+        modelSlug: 'test-model',
+        reviewGuidelineSourceRepositories: ['acme/guidelines'],
+      };
+      if (scope === 'personal') await caller.personalReviewAgent.saveReviewConfig(input);
+      else
+        await caller.organizations.reviewAgent.saveReviewConfig({
+          ...input,
+          organizationId: organization.id,
+        });
+      const get = () =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.getReviewConfig({ platform: 'github' })
+          : caller.organizations.reviewAgent.getReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+            });
+      const patch = (value: {
+        reviewStyle?: 'strict';
+        reviewGuidelineSourceRepositories?: string[];
+      }) =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.patchReviewConfig({ platform: 'github', ...value })
+          : caller.organizations.reviewAgent.patchReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+              ...value,
+            });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewStyle: 'strict' });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewGuidelineSourceRepositories: ['acme/other'] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/other']);
+      const saved = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          scope === 'personal'
+            ? eq(agent_configs.owned_by_user_id, testUser.id)
+            : eq(agent_configs.owned_by_organization_id, organization.id)
+        ),
+      });
+      expect(saved?.config).toEqual(
+        expect.objectContaining({ review_guideline_source_repositories: ['acme/other'] })
+      );
+      await patch({ reviewGuidelineSourceRepositories: [] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual([]);
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: ['https://example.com/policy'] })
+      ).rejects.toThrow();
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: Array(101).fill('acme/guidelines') })
+      ).rejects.toThrow();
+    }
+  );
+
   it('persists organization disableReviewMd true as disable_review_md true', async () => {
     const caller = await createCallerForUser(testUser.id);
 
@@ -2253,6 +2339,192 @@ describe('review agent config REVIEW.md setting', () => {
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      selectedRepositoryIds: [101],
+      autoConfigureWebhooks: false,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101],
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode "all"', async () => {
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: { webhook_secret: 'webhook-secret' },
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [202],
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [202],
+      })
+    );
+    // The clamp resolves the saved mode to 'selected', so the GitLab webhook
+    // sync runs for the selection the client sent.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202],
+      [],
+      {},
+      'https://gitlab.com'
+    );
+    expect(result.webhookSync).toEqual({ created: 0, updated: 0, deleted: 0, errors: [] });
+  });
+});
+
+describe('review agent config repository_selection_mode reads', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Selection Mode Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+  });
+
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports selected for a personal GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([101]);
+  });
+
+  it('reports selected for the personal GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([]);
+  });
+
+  it('reports all for the personal GitHub default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(returned.repositorySelectionMode).toBe('all');
+  });
+
+  it('reports selected for an organization GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [303],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([303]);
+  });
+
+  it('reports selected for the organization GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+  });
+
+  it('keeps the organization Bitbucket default selected', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'bitbucket',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
   });
 });
 
@@ -3442,8 +3714,8 @@ describe('personalReviewAgent.patchReviewConfig', () => {
           },
         ],
         disable_review_md: true,
-        // Web-only setting the patch schema never carries; `false` proves
-        // the patch passes it through instead of resetting to the default.
+        // A setting a patch may carry. `false` here proves a patch that omits
+        // it keeps this value instead of resetting to the default.
         skip_bot_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
@@ -3496,6 +3768,38 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     expect(stored?.is_enabled).toBe(false);
   });
 
+  it('persists skipBotPullRequests from a patch and keeps the stored value when a patch omits it', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    // The mobile overview's toggle sends only this field.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      skipBotPullRequests: true,
+    });
+    expect(
+      (await caller.personalReviewAgent.getReviewConfig({ platform: 'github' })).skipBotPullRequests
+    ).toBe(true);
+
+    // A patch that does not carry it must not reset it to the default.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+    });
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        skip_bot_pull_requests: true,
+      })
+    );
+  });
+
   it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {
     await seedPersonalGithubConfig();
     const caller = await createCallerForUser(testUser.id);
@@ -3535,7 +3839,7 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         repository_selection_mode: 'all',
         gate_threshold: 'off',
         disable_review_md: true,
-        // Web-only setting preserved by the patch pass-through:
+        // A setting the patch did not carry, preserved by the field-merge:
         skip_bot_pull_requests: false,
         // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
         review_memory_enabled: true,

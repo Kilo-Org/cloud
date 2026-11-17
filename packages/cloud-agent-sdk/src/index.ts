@@ -11,13 +11,29 @@ export type {
   NativeSocket,
   NativeSocketConstructor,
 } from './native-sync';
-export type { NativeMessage, NativeSnapshot } from './native-sync-snapshot';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
 
 export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
-export { createSessionManager } from './session-manager';
+export { createSessionManager, RETAINED_MESSAGE_WINDOW } from './session-manager';
 export { sessionConfigFromFetchedSession } from './session-config';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
@@ -29,6 +45,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,
@@ -36,6 +53,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,
@@ -55,6 +74,7 @@ export type {
   PermissionResponse,
 } from './session';
 
+export { cloudMessageInfoSchema, cloudMessagePartSchema } from './cloud-conversation-schemas';
 export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 
@@ -149,7 +169,7 @@ export type { Connection, ConnectionConfig } from './cloud-agent-connection';
 export { createMemoryStorage } from './storage/memory';
 export { createJotaiStorage } from './storage/jotai';
 export type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-export type { SessionStorage, StorageMutation } from './storage/types';
+export type { SessionStorage, SessionSubscriptionKey, StorageMutation } from './storage/types';
 
 export { stripPartContentIfFile, getStepFinishRoutedModel } from './part-utils';
 export type { RoutedModelRef } from './part-utils';
@@ -158,7 +178,10 @@ export { splitByContiguousPrefix } from './array-utils';
 export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
-export { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+export {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 export type {
   KiloSdkMessageHistory,

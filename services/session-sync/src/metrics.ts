@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer';
 
 import type { Env } from './env';
+import { failureCause, type FailureCause } from './overload';
+import type { SyncError } from './protocol';
 
 export type Metrics = {
   tenant: string;
@@ -10,6 +12,14 @@ export type Metrics = {
   requestBytes: number;
 };
 const requests = new WeakMap<Request, Metrics>();
+
+export function metricsEnabled(env: Pick<Env, 'SESSION_SYNC_METRICS'>): boolean {
+  try {
+    return Boolean(env.SESSION_SYNC_METRICS);
+  } catch {
+    return false;
+  }
+}
 
 /** Known byte lengths avoid counting streams for in-memory JSON responses. */
 export function jsonResponse(body: unknown, init?: ResponseInit): Response {
@@ -53,7 +63,12 @@ export function requestRoute(request: Request): string {
   const path = new URL(request.url).pathname;
   if (path === '/v1/auth/exchange') return `${request.method} /v1/auth/exchange`;
   if (path === '/v1/sessions') return `${request.method} /v1/sessions`;
-  if (path === '/v1/presence' || path === '/v1/presence/ticket') {
+  if (
+    path === '/v1/presence' ||
+    path === '/v1/presence/ticket' ||
+    path === '/v1/notifications' ||
+    path === '/v1/notifications/ticket'
+  ) {
     return `${request.method} ${path}`;
   }
   if (/^\/v1\/presence\/instances\/[^/]+\/commands$/.test(path)) {
@@ -64,7 +79,9 @@ export function requestRoute(request: Request): string {
   if (/^\/internal\/users\/[^/]+\/erase$/.test(path)) {
     return `${request.method} /internal/users/:id/erase`;
   }
-  const match = /^\/v1\/sessions\/[^/]+(?:\/(entities|batches|blobs)(?:\/[^/]+)?)?$/.exec(path);
+  const match = /^\/v1\/sessions\/[^/]+(?:\/(entities|batches|blobs|status)(?:\/[^/]+)?)?$/.exec(
+    path
+  );
   return match
     ? `${request.method} /v1/sessions/:id${match[1] ? `/${match[1]}${match[1] === 'blobs' ? '/:hash' : ''}` : ''}`
     : 'not_found';
@@ -188,5 +205,185 @@ export async function instrument(
     if (fetching) throw error;
     logFailure();
     return fetch(request);
+  }
+}
+
+export type DiagnosticOperation =
+  | 'getState'
+  | 'register'
+  | 'applyBatch'
+  | 'setStatus'
+  | 'readEntities'
+  | 'beginBlob'
+  | 'abortBlob'
+  | 'commitBlob'
+  | 'locateBlob'
+  | 'deleteSession'
+  | 'authorizeLive'
+  | 'relayWatch'
+  | 'presenceConnect'
+  | 'relayConnect'
+  | 'syncInitialize'
+  | 'relayInitialize'
+  | 'presenceInitialize'
+  | 'tenantAdmission';
+export type DiagnosticStage =
+  | 'rpc_lookup'
+  | 'rpc'
+  | 'tenant_rpc'
+  | 'queue_admission'
+  | 'queue_wait'
+  | 'rate_credit'
+  | 'hash'
+  | 'receipt_prune'
+  | 'validate'
+  | 'sql_transaction'
+  | 'lease_reserve'
+  | 'lease_reapply'
+  | 'schedule'
+  | 'watch_queue'
+  | 'watch_rpc'
+  | 'watch_storage'
+  | 'watch_budget'
+  | 'initialize';
+type DiagnosticPoint = {
+  operation: DiagnosticOperation;
+  stage: DiagnosticStage;
+  tenant?: 'user' | 'organization' | 'unknown';
+  outcome?: 'ok' | 'error' | 'lease_required' | SyncError['code'];
+  cause?: FailureCause;
+  durationMs?: number;
+  queueDepth?: number;
+  retainedBytes?: number;
+  error?: unknown;
+};
+type Aggregate = {
+  at: number;
+  count: number;
+  duration: number;
+  depth: number;
+  bytes: number;
+  overloaded: number;
+  retryable: number;
+};
+const diagnosticFailures = new WeakMap<AnalyticsEngineDataset, Map<string, Aggregate>>();
+
+/**
+ * Shares the existing metrics binding. Successes sample 1/128; failures aggregate
+ * per bounded key for one second without timers or pending I/O. An idle/evicted
+ * isolate may lose its final aggregate, so these are not accounting counters.
+ */
+export function diagnostic(env: Pick<Env, 'SESSION_SYNC_METRICS'>, point: DiagnosticPoint): void {
+  try {
+    const binding = env.SESSION_SYNC_METRICS;
+    if (!binding) return;
+    const outcome = point.outcome ?? (point.error === undefined ? 'ok' : 'error');
+    if (outcome === 'ok' && Math.random() >= 1 / 128) return;
+    const cause = point.cause ?? (point.error === undefined ? 'none' : failureCause(point.error));
+    const blobs = [
+      'diagnostic_v1',
+      point.operation,
+      point.stage,
+      outcome,
+      cause,
+      point.tenant ?? 'unknown',
+    ];
+    let count = 1;
+    let duration = point.durationMs ?? 0;
+    let depth = point.queueDepth ?? 0;
+    let bytes = point.retainedBytes ?? 0;
+    const error = point.error;
+    const flags = error !== null && typeof error === 'object' ? error : {};
+    let overloaded = 'overloaded' in flags && flags.overloaded === true ? 1 : 0;
+    let retryable = 'retryable' in flags && flags.retryable === true ? 1 : 0;
+    if (outcome !== 'ok') {
+      let keys = diagnosticFailures.get(binding);
+      if (!keys) {
+        keys = new Map();
+        diagnosticFailures.set(binding, keys);
+      }
+      const key = blobs.join(':');
+      const now = Date.now();
+      let aggregate = keys.get(key);
+      if (!aggregate) {
+        if (keys.size >= 128) {
+          const oldest = keys.keys().next().value;
+          if (oldest !== undefined) keys.delete(oldest);
+        }
+        aggregate = {
+          at: now - 1000,
+          count: 0,
+          duration: 0,
+          depth: 0,
+          bytes: 0,
+          overloaded: 0,
+          retryable: 0,
+        };
+        keys.set(key, aggregate);
+      }
+      aggregate.count++;
+      aggregate.duration += duration;
+      aggregate.depth = Math.max(aggregate.depth, depth);
+      aggregate.bytes = Math.max(aggregate.bytes, bytes);
+      aggregate.overloaded += overloaded;
+      aggregate.retryable += retryable;
+      if (now - aggregate.at < 1000) return;
+      ({ count, duration, depth, bytes, overloaded, retryable } = aggregate);
+      aggregate.at = now;
+      aggregate.count =
+        aggregate.duration =
+        aggregate.depth =
+        aggregate.bytes =
+        aggregate.overloaded =
+        aggregate.retryable =
+          0;
+    }
+    binding.writeDataPoint({
+      indexes: ['diagnostic_v1'],
+      blobs,
+      doubles: [duration, count, depth, bytes, overloaded, retryable, outcome === 'ok' ? 128 : 1],
+    });
+  } catch {
+    // Diagnostics must never change admission, retry, or transport behavior.
+  }
+}
+
+/** Measures an existing asynchronous boundary without converting its exception. */
+export async function phase<T>(
+  env: Pick<Env, 'SESSION_SYNC_METRICS'>,
+  operation: DiagnosticOperation,
+  stage: DiagnosticStage,
+  fn: () => Promise<T>,
+  tenant?: 'user' | 'organization'
+): Promise<T> {
+  if (!metricsEnabled(env)) return fn();
+  const started = performance.now();
+  try {
+    const value = await fn();
+    diagnostic(env, { operation, stage, tenant, durationMs: performance.now() - started });
+    return value;
+  } catch (error) {
+    diagnostic(env, { operation, stage, tenant, durationMs: performance.now() - started, error });
+    throw error;
+  }
+}
+
+/** Measures synchronous work without introducing an await inside a transaction. */
+export function syncPhase<T>(
+  env: Pick<Env, 'SESSION_SYNC_METRICS'>,
+  operation: DiagnosticOperation,
+  stage: DiagnosticStage,
+  fn: () => T,
+  tenant?: 'user' | 'organization'
+): T {
+  if (!metricsEnabled(env)) return fn();
+  const started = performance.now();
+  try {
+    const value = fn();
+    diagnostic(env, { operation, stage, tenant, durationMs: performance.now() - started });
+    return value;
+  } catch (error) {
+    diagnostic(env, { operation, stage, tenant, durationMs: performance.now() - started, error });
+    throw error;
   }
 }

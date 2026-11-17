@@ -15,7 +15,9 @@ export type DestructiveConfirmDialogProps = {
   /**
    * A third, non-destructive choice rendered between Cancel and the confirm —
    * for a confirmation that offers a way out other than "do it" or "don't",
-   * such as discarding unsaved changes also offering Save.
+   * such as discarding unsaved changes also offering Save. Pressing it leaves
+   * the confirmation the way the other two choices do: the sheet dismisses and
+   * `onPress` runs once the dismissal finished.
    */
   extraAction?: { label: string; onPress: () => void };
   onConfirm: () => void;
@@ -42,6 +44,13 @@ export type DestructiveConfirmDialogProps = {
  *
  * Keep the request mounted until native dismissal finishes. The action runs
  * afterward, so deleting its owner cannot empty the sheet during dismissal.
+ *
+ * All three choices leave that way, the extra one included. It is a
+ * save-and-stay rather than a decision about the removal, so the sheet must go
+ * either way: the reader lands on the screen the save was about and reads the
+ * outcome there — a refusal is reported by that screen's own line, never by a
+ * sheet held over it, and a sheet that stayed would also let a second press
+ * queue another save behind the first.
  */
 export function DestructiveConfirmDialog({
   title,
@@ -99,7 +108,10 @@ export function DestructiveConfirmDialog({
               variant="secondary"
               className="w-full"
               onPress={() => {
-                extraAction.onPress();
+                // Dismiss first, run after: the same hand-off Cancel and the
+                // destructive confirm use, so the reader is back on the screen
+                // — and sees whatever it reports — instead of under a sheet.
+                dismiss(extraAction.onPress);
               }}
             >
               <Text>{extraAction.label}</Text>

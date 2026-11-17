@@ -3,12 +3,14 @@ import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
+  RuntimeInstructionsSchema,
 } from '../shared/runtime-profile.js';
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import { Limits } from '../schema.js';
+import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
 
 /**
@@ -207,34 +209,6 @@ export const MCPServerConfigSchema = z.discriminatedUnion('type', [
   MCPRemoteServerConfigSchema,
 ]);
 
-/**
- * Runtime instruction schema. Each entry is materialized to
- * `${SESSION_HOME}/.kilocode/rules/<name>.md` at preparation time, alongside
- * the Cloud-Agent-owned `cloud-agent.md`. The reserved `cloud-agent` name is
- * rejected here so an imported profile cannot overwrite that rules file.
- */
-export const RuntimeInstructionSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(Limits.MAX_RUNTIME_INSTRUCTION_NAME_LENGTH)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Instruction name must be a lowercase slug')
-    .refine(name => name !== 'cloud-agent', {
-      message:
-        'Instruction name conflicts with the Cloud-Agent-owned rules file; choose another name',
-    }),
-  content: z.string().min(1).max(Limits.MAX_RUNTIME_INSTRUCTION_CONTENT),
-});
-
-export const RuntimeInstructionsSchema = z
-  .array(RuntimeInstructionSchema)
-  .max(
-    Limits.MAX_RUNTIME_INSTRUCTIONS,
-    `Maximum ${Limits.MAX_RUNTIME_INSTRUCTIONS} runtime instructions allowed`
-  );
-
-export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
-
 /** Discriminated payload for the initial execution on a newly-prepared session. */
 export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
   z.object({
@@ -242,11 +216,7 @@ export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
     prompt: z.string().min(1),
     mode: z.string().min(1),
     model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: AgentVariantSchema.optional(),
   }),
   z.object({
     type: z.literal('command'),
@@ -279,6 +249,7 @@ const SharedSessionProfileFields = {
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({
@@ -338,11 +309,7 @@ export const MetadataSchema = z.object({
   // Mode accepts built-in slugs plus any custom slug from runtimeAgents.
   mode: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).optional(),
   model: z.string().optional(),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   appendSystemPrompt: z.string().max(10000).optional(),

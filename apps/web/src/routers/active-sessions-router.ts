@@ -6,7 +6,10 @@ import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.serve
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   activeSessionSchema,
   listActiveSessions,
@@ -127,6 +130,16 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
   }
 
   if (!response.ok) {
+    // The mint reports a retryable condition with 503: the Durable Object hop
+    // was unavailable or outlived its budget inside the worker, so a retry can
+    // still mint. Keep that retryability instead of flattening it into a
+    // gateway error the client would treat as final.
+    if (response.status === 503 || response.status === 504) {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+    }
     throw new TRPCError({
       code: 'BAD_GATEWAY',
       message: `Session ingest failed to mint a ticket (status ${response.status})`,
@@ -182,11 +195,9 @@ export const activeSessionsRouter = createTRPCRouter({
     .output(homeWidgetResponseSchema)
     .query(async ({ ctx, input }) => {
       if (input.organizationId !== null) {
-        // A personal widget never uses the platform-admin elevation bypass.
-        await ensureOrganizationAccess(
-          { ...ctx, user: { ...ctx.user, is_admin: false } },
-          input.organizationId
-        );
+        // A personal widget never uses the platform-admin elevation bypass and
+        // never accepts a support grant.
+        await ensureMemberOrganizationAccess(ctx.user, input.organizationId);
       }
       return buildHomeWidgetResponseForUser({
         userId: ctx.user.id,

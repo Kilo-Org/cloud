@@ -11,12 +11,16 @@ import {
 import { utf8ByteLength } from '@/lib/utf8-utils';
 
 const expoFileSystemMock = vi.hoisted(() => {
-  const File = vi.fn(function FileMock() {
-    return {};
-  });
-  const Directory = vi.fn(function DirectoryMock() {
+  const Directory = vi.fn(function DirectoryMock(base: string, name: string) {
     return {
+      uri: `${base}/${name}`,
       create: vi.fn(),
+    };
+  });
+  const File = vi.fn(function FileMock(base: { uri: string }, name: string) {
+    return {
+      uri: `${base.uri}/${name}`,
+      delete: vi.fn(),
     };
   });
   return {
@@ -25,10 +29,6 @@ const expoFileSystemMock = vi.hoisted(() => {
     Paths: { cache: 'file:///cache' },
   };
 });
-
-const reactNativeMock = vi.hoisted(() => ({
-  Platform: { OS: 'ios' },
-}));
 
 const expoSharingMock = vi.hoisted(() => ({
   isAvailableAsync: vi.fn(),
@@ -45,10 +45,6 @@ vi.mock('expo-file-system', () => ({
   Paths: expoFileSystemMock.Paths,
 }));
 
-vi.mock('react-native', () => ({
-  Platform: reactNativeMock.Platform,
-}));
-
 vi.mock('expo-sharing', () => ({
   isAvailableAsync: expoSharingMock.isAvailableAsync,
   shareAsync: expoSharingMock.shareAsync,
@@ -60,7 +56,6 @@ vi.mock('@/lib/temp-file-registry', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  reactNativeMock.Platform.OS = 'ios';
   expoSharingMock.isAvailableAsync.mockResolvedValue(true);
   expoSharingMock.shareAsync.mockResolvedValue(undefined);
 });
@@ -110,27 +105,7 @@ describe('shareLocalFile', () => {
 });
 
 describe('shareMaterializedRemoteFile', () => {
-  it('keeps the temp file for the TTL reap after a successful iOS share', async () => {
-    const deleted: string[] = [];
-    await shareMaterializedRemoteFile(
-      {
-        uri: 'file:///cache/org-invoices/a.pdf',
-        delete: () => {
-          deleted.push('file:///cache/org-invoices/a.pdf');
-        },
-      },
-      async () => {
-        await Promise.resolve();
-      }
-    );
-    expect(deleted).toEqual([]);
-    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(
-      'file:///cache/org-invoices/a.pdf'
-    );
-  });
-
-  it('keeps the temp file for the TTL reap after a successful Android share', async () => {
-    reactNativeMock.Platform.OS = 'android';
+  it('keeps the temp file for the TTL reap after a successful share', async () => {
     const deleted: string[] = [];
     await shareMaterializedRemoteFile(
       {
@@ -185,8 +160,11 @@ describe('downloadRemoteFile', () => {
     });
 
     expect(result.uri).toBe('file:///cache/org-invoices/in_1-a.pdf');
-    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'org-invoices');
-    expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalled();
+    expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalledWith(
+      'https://example.com/a.pdf',
+      expect.objectContaining({ uri: 'file:///cache/org-invoices/in_1-a.pdf' }),
+      { idempotent: true }
+    );
 
     result.delete();
     expect(downloaded.delete).toHaveBeenCalled();
@@ -230,8 +208,11 @@ describe('shareRemoteFile', () => {
       filename: 'a.pdf',
     });
 
-    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'org-invoices');
-    expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalled();
+    expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalledWith(
+      'https://example.com/a.pdf',
+      expect.objectContaining({ uri: 'file:///cache/org-invoices/in_1-a.pdf' }),
+      { idempotent: true }
+    );
     expect(expoSharingMock.shareAsync).toHaveBeenCalledWith(downloaded.uri, undefined);
     expect(downloaded.delete).not.toHaveBeenCalled();
     expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(downloaded.uri);

@@ -9,9 +9,11 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { ListTodo, Play } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useTodoLists, useUpNextTodos } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { todoItemPath } from '@/lib/todos/todo-routes';
+import { cn } from '@/lib/utils';
 
 /** Open points at the newest linked session once one has run; Start leads otherwise. */
 function UpNextGlyph({ hasSession, color }: Readonly<{ hasSession: boolean; color: string }>) {
@@ -35,7 +37,7 @@ export function UpNextSection({
   const colors = useThemeColors();
   const upNext = useUpNextTodos(organizationId, enabled);
   const lists = useTodoLists(organizationId, enabled);
-  const { review, startNow, startingTodoId } = useStartTodo();
+  const { review, startNow, isStarting } = useStartTodo();
   const navigateToSession = useAgentSessionNavigator();
   const items = upNext.data ?? [];
 
@@ -48,8 +50,7 @@ export function UpNextSection({
       {items.map(item => {
         const list = lists.data?.find(candidate => candidate.id === item.listId);
         const newestSession = item.sessions[0] ?? null;
-        const canPress =
-          startingTodoId !== item.id && (newestSession !== null || list !== undefined);
+        const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
         const actionLabel = newestSession
           ? t('notifications.action.openSession')
           : t('agentChat.newSession.startSession');
@@ -108,13 +109,17 @@ export function UpNextSection({
                 }
               }}
               accessibilityState={{ disabled: !canPress }}
-              className="size-10 items-center justify-center rounded-full bg-secondary active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
-              {startingTodoId === item.id ? (
-                <ActivityIndicator color={colors.foreground} />
-              ) : (
-                <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
-              )}
+              {/* The visible circle keeps its 35pt size inside the frame:
+                  DESIGN.md keeps the target, not the visual, at 44pt. */}
+              <View className="size-10 items-center justify-center rounded-full bg-secondary">
+                {isStarting(item.id) ? (
+                  <ActivityIndicator color={colors.foreground} />
+                ) : (
+                  <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
+                )}
+              </View>
             </Pressable>
           </View>
         );

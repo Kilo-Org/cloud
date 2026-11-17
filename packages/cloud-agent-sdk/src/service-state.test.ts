@@ -909,6 +909,26 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('accumulates session setup and start command messages into setupLog', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        step: 'session_setup_commands',
+        message: 'Running session setup command 1 of 1: npm install',
+      });
+      state.process({
+        type: 'preparing',
+        step: 'start_commands',
+        message: 'Running start command 1 of 1: npm run dev',
+      });
+
+      expect(state.getSetupLog()).toEqual([
+        'Running session setup command 1 of 1: npm install',
+        'Running start command 1 of 1: npm run dev',
+      ]);
+    });
+
     it('clears setupLog on ready', () => {
       const state = createServiceState(makeConfig());
 
@@ -1041,6 +1061,170 @@ describe('createServiceState', () => {
           id: 'attempt-2',
           triggerMessageId: 'message-2',
           status: 'running',
+        }),
+      ]);
+    });
+
+    it('v2 attempt_failed with the cancellation reason reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+        }),
+      ]);
+    });
+
+    it.each(['reload', 'reconnect'] as const)(
+      'keeps historical cancellation snapshots from interrupting a healthy session on %s',
+      connection => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const cancelled = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          revision: 2,
+          timestamp: 2_000,
+          step: 'failed' as const,
+          message: 'preparation_cancelled',
+          action: 'attempt_snapshot' as const,
+          attempt: {
+            id: 'attempt-1',
+            triggerMessageId: 'message-1',
+            status: 'failed' as const,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        };
+        const completed = {
+          ...cancelled,
+          attemptId: 'attempt-2',
+          triggerMessageId: 'message-2',
+          timestamp: 4_000,
+          step: 'ready' as const,
+          message: 'Environment prepared',
+          attempt: {
+            id: 'attempt-2',
+            triggerMessageId: 'message-2',
+            status: 'completed' as const,
+            startedAt: 3_000,
+            completedAt: 4_000,
+            revision: 2,
+          },
+        };
+        if (connection === 'reconnect') {
+          state.process(completed);
+          state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        }
+        state.process({
+          type: 'connected',
+          sessionStatus: { type: 'idle' },
+          cloudStatus: { type: 'ready' },
+        });
+        state.process(cancelled);
+        state.process(completed);
+        state.process({
+          ...cancelled,
+          action: 'step_snapshot',
+          stepId: 'phase:workspace_setup',
+          stepSnapshot: {
+            id: 'phase:workspace_setup',
+            key: 'workspace_setup',
+            kind: 'phase',
+            label: 'Workspace setup',
+            status: 'failed',
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        });
+
+        expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+        expect(state.getStatus()).toEqual({ type: 'idle' });
+        expect(state.getPreparationAttempts()[0]).toMatchObject({
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+          steps: [expect.objectContaining({ status: 'failed' })],
+        });
+        onError.mockClear();
+        state.process({ type: 'session.error', error: 'Current error' });
+        expect(onError).toHaveBeenCalledWith('Current error');
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'Current error' });
+      }
+    );
+
+    it('keeps a workspace stop interrupted after the preparation failure arrives', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'message-1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
         }),
       ]);
     });
@@ -1435,6 +1619,75 @@ describe('createServiceState', () => {
       expect(reconnected.getCloudStatus()).toEqual({ type: 'ready' });
     });
 
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves selected snapshot time %j through live updates and normalized replay',
+      snapshotCapturedAt => {
+        const state = createServiceState(makeConfig());
+        const base = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          step: 'environment_snapshot',
+          message: 'Using environment snapshot',
+          timestamp: 2_000,
+        };
+        state.process({ ...base, action: 'attempt_started', revision: 1 });
+        state.process({
+          ...base,
+          action: 'step_started',
+          revision: 2,
+          stepId: 'snapshot',
+          kind: 'phase',
+          label: 'environment snapshot',
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 3,
+          stepId: 'snapshot',
+          detail: base.message,
+          ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 4,
+          stepId: 'snapshot',
+          detail: `${base.message}; a replacement build is running`,
+        });
+        state.process({ ...base, action: 'attempt_completed', revision: 5 });
+        const attempt = state.getPreparationAttempts()[0];
+        if (!attempt) throw new Error('Expected preparation attempt');
+        if (snapshotCapturedAt === undefined)
+          expect(attempt.steps[0]).not.toHaveProperty('snapshotCapturedAt');
+        else expect(attempt.steps[0]).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+        const reconnected = createServiceState(makeConfig());
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'attempt_snapshot',
+            revision: 5,
+            attempt,
+          }),
+        });
+        for (const stepSnapshot of attempt.steps) {
+          reconnected.process({
+            type: 'preparing',
+            ...preparingDataSchema.parse({
+              ...base,
+              action: 'step_snapshot',
+              revision: stepSnapshot.revision,
+              stepId: stepSnapshot.id,
+              stepSnapshot,
+            }),
+          });
+        }
+        expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      }
+    );
+
     it('keeps only the most recent step output and marks the step truncated', () => {
       const state = createServiceState(makeConfig());
       const base = {
@@ -1809,6 +2062,36 @@ describe('createServiceState', () => {
         cloudStatus: { type: 'error', message: 'Sandbox failed' },
       });
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Sandbox failed' });
+    });
+
+    it.each(['preparation_cancelled', 'Environment preparation was stopped'])(
+      'a preparation cancellation status %s reads as a stop, not an error',
+      message => {
+        const state = createServiceState(makeConfig());
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'preparing', step: 'cloning' },
+        });
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'error', message },
+        });
+        expect(state.getCloudStatus()).toBeNull();
+        expect(state.getStatus()).toEqual({ type: 'interrupted' });
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+      }
+    );
+
+    it('a preparation cancellation replayed by a durable refresh reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'idle' },
+        cloudStatus: { type: 'error', message: 'preparation_cancelled' },
+      });
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
     it('reset clears cloudStatus back to null', () => {
@@ -3058,6 +3341,31 @@ describe('createServiceState', () => {
 
       expect(state.getCloudStatus()).toBeNull();
       expect(state.getStatus()).toEqual({ type: 'interrupted' });
+    });
+
+    it('a terminal preparation cancellation reads as an interrupt', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation was stopped',
+        reason: 'execution',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Environment preparation was stopped',
+        reason: 'interrupted',
+      });
+      expect(onError).not.toHaveBeenCalled();
     });
 
     it('cloud.message.failed with reason=interrupted settles the accepted turn', () => {

@@ -1,9 +1,12 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
+import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import {
-  CloudAgentAuthoritySchema,
-  validateCloudAgentAuthorityClaims,
-} from './cloud-agent-authority';
+  assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
+  verifyKiloTokenSignature,
+} from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
@@ -11,11 +14,6 @@ const runtimeAdmission = z.object({
   source: z.enum(['user', 'automation']),
   authorizationUserId: z.string().min(1),
   authorizationPepper: z.string().nullable(),
-});
-const runtimeAuthorization = z.object({
-  id: z.string().uuid(),
-  resourceKind: z.enum(['cloud-agent-next', 'gastown']),
-  resourceId: z.string().min(1),
 });
 
 /**
@@ -32,7 +30,6 @@ export const kiloTokenPayload = z.object({
   env: z.string().optional(),
   // Optional extras from JWTTokenExtraPayload
   isAdmin: z.boolean().optional(),
-  gastownAccess: z.boolean().optional(),
   botId: z.string().optional(),
   organizationId: z.string().optional(),
   organizationRole: organizationRole.optional(),
@@ -41,10 +38,10 @@ export const kiloTokenPayload = z.object({
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
   deviceSessionId: z.string().optional(),
-  // Org memberships (baked into gastown tokens to avoid DB lookups)
+  // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
   runtimeAdmission: runtimeAdmission.optional(),
-  runtimeAuthorization: runtimeAuthorization.optional(),
+  runtimeAuthorization: CloudAgentNextRuntimeAuthorizationClaimSchema.optional(),
   cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
   // Standard JWT claims
   iat: z.number().optional(),
@@ -61,7 +58,6 @@ const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).str
 export type SignKiloTokenExtra = Pick<
   KiloTokenPayload,
   | 'isAdmin'
-  | 'gastownAccess'
   | 'botId'
   | 'organizationId'
   | 'organizationRole'
@@ -133,19 +129,15 @@ export async function verifyKiloToken(
   secret: string,
   options?: { audience?: string }
 ): Promise<KiloTokenPayload> {
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
+  const { payload } = await verifyKiloTokenSignature(token, secret, {
     audience: options?.audience,
   });
   if (options?.audience === undefined && payload.aud !== undefined) {
     throw new Error('Unexpected token audience');
   }
 
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
-    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
-      throw new Error('Token issued in the future');
-    }
+  if (checkKiloTokenAuthorityClaims(payload)) {
+    assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
   return kiloTokenPayload.parse(payload);

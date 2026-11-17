@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 import '@/i18n';
@@ -26,6 +26,7 @@ const config = vi.hoisted(() => ({
 }));
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
+const integrationAccount = vi.hoisted(() => ({ login: 'alice' as string | undefined }));
 const connectivity = vi.hoisted(() => ({ known: true }));
 const platformError = vi.hoisted(() => ({
   variants: [] as string[],
@@ -43,12 +44,19 @@ const permission = vi.hoisted(() => ({
   canManage: true,
 }));
 
-const mintInstallState = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ token: 'install-state-token' }))
+const webhookWarning = vi.hoisted(() => ({ shown: false }));
+const saveMutation = vi.hoisted(() => ({ isPending: false, mutate: vi.fn() }));
+
+const handoffUrl = vi.hoisted(() =>
+  vi.fn((_target: unknown): Promise<string> =>
+    Promise.resolve('https://app.kilo.ai/app-shell/handoff?token=handoff-token')
+  )
 );
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
+
+const councilUi = vi.hoisted(() => ({ allowed: false }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -91,13 +99,11 @@ vi.mock('@/components/agents/model-selector', () => ({
   openModelPicker: openPicker,
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: handoffUrl }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: launchBrowser,
   reportLateLaunchFailure: vi.fn(),
-}));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mintInstallState } } },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
@@ -158,6 +164,10 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,
   PERSONAL_SCOPE: 'personal',
@@ -165,20 +175,20 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
   useGitLabStatus: () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
-  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: false }),
+  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: webhookWarning.shown }),
   useReviewConfig: () => config,
   useReviewerPermission: () => permission,
-  useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
+  useSaveReviewConfig: () => saveMutation,
   useToggleReviewer: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -285,7 +295,11 @@ beforeEach(() => {
   permission.status = 'ready';
   permission.canEdit = true;
   permission.canManage = true;
+  webhookWarning.shown = false;
+  saveMutation.isPending = false;
+  saveMutation.mutate.mockClear();
   provider.status = 'connected';
+  integrationAccount.login = 'alice';
   connectivity.known = true;
   platformError.variants = [];
   platformError.backFallbacks = [];
@@ -295,7 +309,7 @@ beforeEach(() => {
   motion.reducedMotion = false;
   centeredState.mockClear();
   scrollView.mockClear();
-  mintInstallState.mockClear();
+  handoffUrl.mockClear();
   launchBrowser.mockClear();
   openExternal.mockClear();
   openPicker.mockClear();
@@ -543,12 +557,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: undefined,
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     // Returning from the browser re-reads the config, so a fixed reviewer clears the banner.
     expect(config.refetch).toHaveBeenCalledTimes(1);
@@ -561,43 +572,26 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App', 'org-1');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app', organizationId: 'org-1' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1&installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
   });
 
-  it('falls back to the integration page when minting an install state is refused', async () => {
-    // Organizations whose members can edit the config but not mint an install
-    // state, and organizations that already hold an installation, still reach
-    // the page that opens the install/manage flow.
-    mintInstallState.mockImplementationOnce(() =>
-      Promise.reject(new Error('This organization already has a GitHub installation'))
-    );
-    config.data = makeConfig({
-      actionRequired: makeActionRequired('github_installation_required'),
-    });
-
-    await pressRecovery('Update GitHub App', 'org-1');
-
-    expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1'
-    );
-    expect(config.refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens the GitLab integration page for a project-access block', async () => {
+  it('opens the GitLab integration shell page for a project-access block', async () => {
     config.data = makeConfig({
       actionRequired: makeActionRequired('gitlab_project_access_required'),
     });
 
     await pressRecovery('Update GitLab integration', 'org-1', 'gitlab');
 
+    expect(handoffUrl).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'gitlab',
+      organizationId: 'org-1',
+    });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/organizations/org-1/integrations/gitlab'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     expect(config.refetch).toHaveBeenCalledTimes(1);
   });
@@ -650,6 +644,101 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     expect(texts).toContain(
       'Only organization owners, admins, and billing managers can change these settings.'
     );
+  });
+});
+
+describe('PlatformOverviewScreen Automatic reviews account line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected account under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual(['alice']);
+  });
+
+  it('paints the label alone so the row keeps one line without a login', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    integrationAccount.login = undefined;
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual([]);
+  });
+});
+
+describe('PlatformOverviewScreen GitLab webhook warning', () => {
+  const SELECTION = [7, 11];
+
+  /** Rendered copy of an element subtree, before it becomes host nodes. */
+  function elementCopy(node: unknown): string[] {
+    if (node == null) {
+      return [];
+    }
+    if (typeof node === 'string') {
+      return [node];
+    }
+    if (Array.isArray(node)) {
+      return node.flatMap(item => elementCopy(item));
+    }
+    if (typeof node !== 'object') {
+      return [];
+    }
+    if ('children' in node) {
+      return elementCopy(node.children);
+    }
+    if ('props' in node && node.props != null && typeof node.props === 'object') {
+      return 'children' in node.props ? elementCopy(node.props.children) : [];
+    }
+    return [];
+  }
+
+  /** Controls whose own rendered copy includes `label`. */
+  function controlsLabelled(
+    renderer: TestRenderer.ReactTestRenderer,
+    label: string
+  ): TestRenderer.ReactTestInstance[] {
+    return renderer.root
+      .findAllByType('Pressable')
+      .filter(node => elementCopy(node.props.children).includes(label));
+  }
+
+  function renderWarning(scope = 'org-1'): Promise<TestRenderer.ReactTestRenderer> {
+    webhookWarning.shown = true;
+    config.data = makeConfig({
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: SELECTION,
+    });
+    return render(scope, 'gitlab');
+  }
+
+  it('re-runs the sync with the current selection for an editor', async () => {
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(retry?.props.disabled).toBe(false);
+    await press(retry as TestRenderer.ReactTestInstance);
+    // The PATCH routers sync project hooks only for a patch that carries the
+    // selection, so the retry re-sends the current one.
+    expect(saveMutation.mutate).toHaveBeenCalledWith({ selectedRepositoryIds: SELECTION });
+  });
+
+  it('keeps the retry disabled for a member who cannot edit', async () => {
+    permission.canEdit = false;
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(collectText(renderer.toJSON())).toContain('Webhook setup incomplete');
+    expect(retry?.props.disabled).toBe(true);
   });
 });
 

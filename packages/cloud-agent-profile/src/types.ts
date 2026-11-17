@@ -119,6 +119,7 @@ export type ProfileResponse = {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt: string | null;
   vars: ProfileVarResponse[];
   commands: ProfileCommandResponse[];
   mcpServers: ProfileMcpServerResponse[];

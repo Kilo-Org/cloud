@@ -16,7 +16,11 @@ import { TodoToolCardBody } from './todo-tool-card';
 import { WebSearchToolCardBody } from './web-search-tool-card';
 import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
-vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  View: 'View',
+  TextInput: 'TextInput',
+}));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
@@ -274,7 +278,9 @@ describe('tool-card output caps removed', () => {
     expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
     const labelTexts = findAll(
       root,
-      el => el.type === 'Text' && (el.props as { children?: unknown }).children === 'command'
+      el =>
+        el.type === 'Text' &&
+        (el.props as { children?: unknown }).children === 'profiles.commandLabel'
     );
     expect(labelTexts).toHaveLength(1);
     // The field value flows through `SelectableText`'s read-only TextInput.

@@ -49,6 +49,8 @@ export {
 
 export { parseLocalConfigArchive } from './parse';
 
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from '../contracts/limit-copy';
+
 export {
   IMPORT_CATEGORIES,
   importItemId,

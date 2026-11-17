@@ -13,6 +13,12 @@ function neverResolves() {
   return jest.fn((_hostname: string) => new Promise<string[]>(() => {}));
 }
 
+function pendingResolution() {
+  const { promise, resolve } = Promise.withResolvers<string[]>();
+  const resolveHostAddresses = jest.fn((_hostname: string) => promise);
+  return { resolveHostAddresses, resolve };
+}
+
 function after(ms: number): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, ms);
@@ -150,14 +156,241 @@ describe('findUpstreamUrlViolation', () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('leaves no cached verdict for a host whose lookup reached the deadline', async () => {
+  it('applies each caller its own deadline to a shared resolution', async () => {
     const stalled = neverResolves();
-    await expect(check('https://slow.example.com/v1', stalled)).resolves.toBe('dns_lookup_failed');
+    const startedAt = performance.now();
 
-    const healthy = resolvesTo('104.18.2.115');
-    await expect(check('https://slow.example.com/v1', healthy)).resolves.toBeNull();
-    expect(healthy).toHaveBeenCalledTimes(1);
+    const verdicts = await Promise.all([
+      check('https://pending.example.com/v1', stalled),
+      check('https://pending.example.com/v1', stalled),
+      check('https://pending.example.com/v1', stalled),
+    ]);
+
+    expect(verdicts).toEqual(['dns_lookup_failed', 'dns_lookup_failed', 'dns_lookup_failed']);
+    expect(stalled).toHaveBeenCalledTimes(1);
+    expect(performance.now() - startedAt).toBeLessThan(3_000);
   }, 10_000);
+
+  it('submits one lookup across several caller deadlines', async () => {
+    const resolve = neverResolves();
+
+    const verdicts: Array<string | null> = [];
+    for (const _ of [0, 1, 2]) {
+      verdicts.push(await check('https://stalled.example.com/v1', resolve));
+    }
+
+    expect(verdicts).toEqual(['dns_lookup_failed', 'dns_lookup_failed', 'dns_lookup_failed']);
+    expect(resolve).toHaveBeenCalledTimes(1);
+  }, 15_000);
+
+  it('fails fast once the process runs the maximum number of lookups', async () => {
+    const first = pendingResolution();
+    const second = pendingResolution();
+    const third = neverResolves();
+
+    const outstanding = [
+      check('https://a.example.com/v1', first.resolveHostAddresses),
+      check('https://b.example.com/v1', second.resolveHostAddresses),
+    ];
+    await after(10);
+
+    const startedAt = performance.now();
+    await expect(check('https://c.example.com/v1', third)).resolves.toBe('dns_lookup_failed');
+    expect(performance.now() - startedAt).toBeLessThan(100);
+    expect(third).not.toHaveBeenCalled();
+
+    first.resolve(['104.18.2.115']);
+    second.resolve(['104.18.2.115']);
+    await expect(Promise.all(outstanding)).resolves.toEqual([null, null]);
+  });
+
+  it('keeps lookup capacity when the settle deadline forgets the entry before the resolver settles', async () => {
+    jest.useFakeTimers();
+    try {
+      const first = pendingResolution();
+      const second = pendingResolution();
+      const third = neverResolves();
+
+      const pending = Promise.all([
+        check('https://a.example.com/v1', first.resolveHostAddresses),
+        check('https://b.example.com/v1', second.resolveHostAddresses),
+      ]);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
+      expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+      // The settle deadline stops further reuse of the two entries, and each
+      // resolver keeps its place in the limit until it settles.
+      await jest.advanceTimersByTimeAsync(30_000);
+
+      await expect(check('https://c.example.com/v1', third)).resolves.toBe('dns_lookup_failed');
+      expect(third).not.toHaveBeenCalled();
+
+      first.resolve(['104.18.2.115']);
+      second.resolve(['104.18.2.115']);
+      await expect(pending).resolves.toEqual([null, null]);
+
+      // A settled resolver releases its capacity for the next host.
+      const fourth = resolvesTo('104.18.2.115');
+      await expect(check('https://d.example.com/v1', fourth)).resolves.toBeNull();
+      expect(fourth).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  }, 10_000);
+
+  it('keeps the shared resolution when the only caller aborts', async () => {
+    const { resolveHostAddresses, resolve } = pendingResolution();
+    const controller = new AbortController();
+    const reason = new DOMException('client went away', 'AbortError');
+
+    const aborted = check(
+      'https://stalled.example.com/v1',
+      resolveHostAddresses,
+      controller.signal
+    );
+    await after(10);
+    controller.abort(reason);
+    await expect(aborted).rejects.toBe(reason);
+
+    // The next validation waits on the same pending lookup.
+    const next = check('https://stalled.example.com/v1', resolveHostAddresses);
+    await after(10);
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+    resolve(['104.18.2.115']);
+    await expect(next).resolves.toBeNull();
+  });
+
+  it('keeps one lookup when a resolution settles after its callers finished', async () => {
+    const stalled = Promise.withResolvers<string[]>();
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => stalled.promise);
+
+    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBe(
+      'dns_lookup_failed'
+    );
+
+    // The next validation waits on the same pending lookup.
+    const second = check('https://stalled.example.com/v1', resolve);
+    await after(10);
+    expect(resolve).toHaveBeenCalledTimes(1);
+
+    stalled.resolve(['104.18.2.115']);
+    await expect(second).resolves.toBeNull();
+  }, 10_000);
+
+  it('starts a new lookup once the shared one settles', async () => {
+    const first = Promise.withResolvers<string[]>();
+    const second = Promise.withResolvers<string[]>();
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      return calls === 1 ? first.promise : second.promise;
+    });
+
+    const pendingFirst = check('https://internal.example.com/v1', resolve);
+    await after(10);
+    first.resolve(['10.1.2.3']);
+    await expect(pendingFirst).resolves.toBe('non_public_address');
+
+    const pendingSecond = check('https://internal.example.com/v1', resolve);
+    await after(10);
+    expect(resolve).toHaveBeenCalledTimes(2);
+
+    second.resolve(['104.18.2.115']);
+    await expect(pendingSecond).resolves.toBeNull();
+  });
+
+  it('keeps a shared resolution for a caller that outlives the first deadline', async () => {
+    const { resolveHostAddresses, resolve } = pendingResolution();
+
+    const first = check('https://pending.example.com/v1', resolveHostAddresses);
+    await after(1_500);
+    const second = check('https://pending.example.com/v1', resolveHostAddresses);
+
+    await expect(first).resolves.toBe('dns_lookup_failed');
+    resolve(['104.18.2.115']);
+    await expect(second).resolves.toBeNull();
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+  }, 10_000);
+
+  it('resolves again for a later validation after the resolution settled', async () => {
+    const privateResolve = resolvesTo('10.1.2.3');
+    await expect(check('https://internal.example.com/v1', privateResolve)).resolves.toBe(
+      'non_public_address'
+    );
+
+    const publicResolve = resolvesTo('104.18.2.115');
+    await expect(check('https://internal.example.com/v1', publicResolve)).resolves.toBeNull();
+    expect(publicResolve).toHaveBeenCalledWith('internal.example.com');
+  });
+
+  it('shares one resolution among validations of the same host that overlap', async () => {
+    const { resolveHostAddresses, resolve } = pendingResolution();
+
+    const pending = Promise.all(
+      [0, 1, 2, 3, 4].map(() => check('https://llm.example.com/v1', resolveHostAddresses))
+    );
+    await after(10);
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+    resolve(['104.18.2.115']);
+    await expect(pending).resolves.toEqual([null, null, null, null, null]);
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+    expect(resolveHostAddresses).toHaveBeenCalledWith('llm.example.com');
+  });
+
+  it('keeps the shared resolution for the callers that remain when one caller stops', async () => {
+    const { resolveHostAddresses, resolve } = pendingResolution();
+    const controller = new AbortController();
+    const reason = new DOMException('client went away', 'AbortError');
+
+    const aborted = check('https://llm.example.com/v1', resolveHostAddresses, controller.signal);
+    const other = check('https://llm.example.com/v1', resolveHostAddresses);
+
+    controller.abort(reason);
+    await expect(aborted).rejects.toBe(reason);
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+    resolve(['104.18.2.115']);
+    await expect(other).resolves.toBeNull();
+  });
+
+  it('retries once for overlapping validations of a host whose resolution fails once', async () => {
+    const resolve = jest.fn(async (_hostname: string): Promise<string[]> => {
+      await after(0);
+      throw new Error('getaddrinfo EAI_AGAIN');
+    });
+
+    const verdicts = await Promise.all(
+      [0, 1, 2, 3].map(() => check('https://broken.example.com/v1', resolve))
+    );
+
+    expect(verdicts).toEqual([
+      'dns_lookup_failed',
+      'dns_lookup_failed',
+      'dns_lookup_failed',
+      'dns_lookup_failed',
+    ]);
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it('resolves each hostname separately', async () => {
+    const first = pendingResolution();
+    const second = pendingResolution();
+
+    const pending = Promise.all([
+      check('https://a.example.com/v1', first.resolveHostAddresses),
+      check('https://b.example.com/v1', second.resolveHostAddresses),
+    ]);
+    await after(10);
+    expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
+    expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+    first.resolve(['104.18.2.115']);
+    second.resolve(['10.1.2.3']);
+    await expect(pending).resolves.toEqual([null, 'non_public_address']);
+  });
 
   it('reuses a public verdict but re-resolves a rejected host', async () => {
     const publicResolve = resolvesTo('104.18.2.115');

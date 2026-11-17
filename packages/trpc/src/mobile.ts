@@ -5,14 +5,21 @@ import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
+import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
+import { appShellRouter } from '@/routers/app-shell-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
+import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
+import { slackRouter } from '@/routers/slack-router';
+import { linearRouter } from '@/routers/linear-router';
+import { discordRouter } from '@/routers/discord-router';
+import { gitlabRouter } from '@/routers/gitlab-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
-import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
@@ -22,7 +29,12 @@ import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
+import { computeBillingRouter } from '@/routers/compute-billing-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
+import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
+import { byokRouter } from '@/routers/byok-router';
+import { userExportsRouter } from '@/routers/user-exports-router';
+import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -37,14 +49,21 @@ const mobileRouter = createTRPCRouter({
   cliSessionsV2: cliSessionsV2Router,
   todos: todosRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentSettings: cloudAgentSettingsRouter,
+  cloudEnvironments: cloudEnvironmentsRouter,
   githubApps: githubAppsRouter,
+  appShell: appShellRouter,
+  platformIntegrations: platformIntegrationsRouter,
+  slack: slackRouter,
+  linear: linearRouter,
+  discord: discordRouter,
+  gitlab: gitlabRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   securityAgent: securityAgentRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
-  kiloclaw: kiloclawRouter,
   models: modelsRouter,
   activeSessions: activeSessionsRouter,
   modelPreferences: modelPreferencesRouter,
@@ -54,7 +73,15 @@ const mobileRouter = createTRPCRouter({
   kiloChat: kiloChatRouter,
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
+  computeBilling: computeBillingRouter,
   agentProfiles: agentProfilesMobileRouter,
+  usageAnalytics: usageAnalyticsRouter,
+  byok: byokRouter,
+  userExports: userExportsRouter,
+  // Cloud Agent webhook/scheduled triggers. The procedures keep the server-side
+  // `baseProcedure` auth and their own `ensureOrganizationAccess` checks; this
+  // mount only exposes them to the mobile client.
+  webhookTriggers: webhookTriggersRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

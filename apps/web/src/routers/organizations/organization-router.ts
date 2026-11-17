@@ -39,6 +39,7 @@ import {
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  requireLiveOrganizationForPlatformAdmin,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
   organizationBillingProcedure,
@@ -476,10 +477,28 @@ export const organizationsRouter = createTRPCRouter({
   update: organizationBillingMutationProcedure
     .input(OrganizationUpdateSchema)
     .mutation(async opts => {
-      await db
-        .update(organizations)
-        .set({ name: opts.input.name })
-        .where(eq(organizations.id, opts.input.organizationId));
+      await db.transaction(async tx => {
+        const [current] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, opts.input.organizationId));
+        const oldName = current?.name;
+        await tx
+          .update(organizations)
+          .set({ name: opts.input.name })
+          .where(eq(organizations.id, opts.input.organizationId));
+        if (oldName !== undefined && oldName !== opts.input.name) {
+          await createAuditLog({
+            organization_id: opts.input.organizationId,
+            action: 'organization.settings.change',
+            actor_email: opts.ctx.user.google_user_email,
+            actor_id: opts.ctx.user.id,
+            actor_name: opts.ctx.user.google_user_name,
+            message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
+            tx,
+          });
+        }
+      });
       return {
         organization: {
           id: opts.input.organizationId,
@@ -512,7 +531,7 @@ export const organizationsRouter = createTRPCRouter({
     }),
 
   updateSeatsRequired: adminProcedure.input(OrganizationSeatsUpdateSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     await db
       .update(organizations)
       .set({ require_seats: opts.input.seatsRequired })
@@ -604,7 +623,7 @@ export const organizationsRouter = createTRPCRouter({
 
   // this is an admin only route used to show seat purchases in a debug UI for KILO admins
   seatPurchases: adminProcedure.input(OrganizationIdInputSchema).query(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     const seatPurchases = await db
       .select()
       .from(organization_seats_purchases)

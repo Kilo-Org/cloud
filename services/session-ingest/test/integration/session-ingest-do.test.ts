@@ -14,8 +14,15 @@ import {
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
+import { cloneSessionIntoDestination } from '../../src/clone/session-clone';
+import type { Env } from '../../src/env';
 import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../../src/ingest/briefing-excerpt';
+import {
+  SESSION_METRICS_WINDOW_MAX_ROW_BYTES,
+  SESSION_METRICS_WINDOW_MAX_ROWS,
+} from '../../src/dos/session-metrics-window';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
+import type { SessionMetricsParamsInput } from '@kilocode/worker-utils';
 
 const encoder = new TextEncoder();
 
@@ -1657,14 +1664,17 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
-    it('returns bounded pages by sortable message item_id while preserving native id/time cursors', async () => {
+    it('returns bounded pages in creation order when the stored ids do not follow the clock', async () => {
       const sessionId = 'ses_sdk_page_000000000000001';
       const stub = getStub(kiloUserId, sessionId);
+      // Written as the conversation happened, with ids that descend: a session
+      // an older or foreign writer stored. The newest page is the newest turn,
+      // and the rows inside it stay chronological.
       const messages = [
-        { id: 'msg_400', created: 100 },
-        { id: 'msg_300', created: 400 },
-        { id: 'msg_100', created: 300 },
-        { id: 'msg_200', created: 200 },
+        { id: 'msg_d', created: 100 },
+        { id: 'msg_c', created: 200 },
+        { id: 'msg_b', created: 300 },
+        { id: 'msg_a', created: 400 },
       ].map(message => ({
         id: message.id,
         sessionID: sessionId,
@@ -1682,17 +1692,47 @@ describe('SessionIngestDO integration', () => {
       );
 
       const latest = await stub.readKiloSdkMessages({ limit: 2 });
-      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_300', 'msg_400']);
+      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_b', 'msg_a']);
       expect(latest.nextCursor).toBeTruthy();
       if (!latest.nextCursor) throw new Error('Expected cursor for an older message page');
       expect(JSON.parse(atob(latest.nextCursor.replace(/-/g, '+').replace(/_/g, '/')))).toEqual({
-        id: 'msg_300',
-        time: 400,
+        id: 'msg_b',
+        time: 300,
       });
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
-      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_d', 'msg_c']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('orders one bounded page by creation time even when arrival order disagrees', async () => {
+      const sessionId = 'ses_sdk_page_order_0000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      // Written out of order, with ids that do not sort with the clock either:
+      // the page is still chronological inside itself.
+      const messages = [
+        { id: 'msg_2', created: 300 },
+        { id: 'msg_1', created: 100 },
+        { id: 'msg_3', created: 200 },
+      ].map(message => ({
+        id: message.id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: message.created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      }));
+
+      await stub.ingest(
+        messages.map(info => ({ type: 'message' as const, data: info })),
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const page = await stub.readKiloSdkMessages({ limit: 3 });
+      expect(page.messages.map(message => message.info.id)).toEqual(['msg_1', 'msg_3', 'msg_2']);
+      expect(page.nextCursor).toBeNull();
     });
 
     it('omits a message identity outside the cursor contract from a bounded page', async () => {
@@ -4067,6 +4107,348 @@ describe('SessionIngestDO integration', () => {
 
       await stub.clear();
     });
+
+    it('seeds a long history from its stored rows in bounded batches with an exact total', async () => {
+      const sessionId = 'ses_cost_aggregate_batched_4';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // 40 stored message rows: half carry their contribution, half predate the column and
+      // need their body; one is R2-offloaded and contributes nothing; one carries a stored
+      // contribution that disagrees with its body, which must win.
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 40; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at, cost_usd) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            `message/b${index}`,
+            'message',
+            JSON.stringify(assistantMessage(`b${index}`, 0.02).data),
+            1_000 + index,
+            index >= 20 ? 0.01 : null
+          );
+        }
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key) ' +
+            'VALUES (?, ?, ?, ?)',
+          'message/offloaded',
+          'message',
+          '{}',
+          'items/offloaded'
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, cost_usd) VALUES (?, ?, ?, ?)',
+          'message/column_wins',
+          'message',
+          JSON.stringify(assistantMessage('column_wins', 9).data),
+          0.5
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_new', 0.05)], kiloUserId, sessionId, 1, 5_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [expected] = [
+          ...state.storage.sql.exec<{ total: number | null }>(
+            'SELECT SUM(CASE WHEN cost_usd IS NULL THEN json_extract(item_data, ' +
+              "'$.cost') ELSE cost_usd END) AS total FROM ingest_items " +
+              "WHERE item_type = 'message' AND item_data_r2_key IS NULL"
+          ),
+        ];
+        // 20 pre-column bodies at 0.02, 20 stored contributions at 0.01, the column row at
+        // 0.5 (its body says 9), and the batch's own message at 0.05.
+        expect(readStoredTotal(state)).toBeCloseTo(expected.total ?? 0, 10);
+        expect(readStoredTotal(state)).toBeCloseTo(20 * 0.02 + 20 * 0.01 + 0.5 + 0.05, 10);
+
+        // A batch step reads a body's size, never the body: a row with a stored contribution
+        // reports none, and a pre-column row reports the size of the body it would need.
+        const sized = [
+          ...state.storage.sql.exec<{ item_id: string; body_bytes: number }>(
+            'SELECT item_id, CASE WHEN cost_usd IS NULL THEN length(CAST(item_data AS BLOB)) ' +
+              'ELSE 0 END AS body_bytes FROM ingest_items WHERE item_id IN (?, ?) ' +
+              'ORDER BY item_id',
+            'message/b0',
+            'message/b39'
+          ),
+        ];
+        expect(sized.map(row => [row.item_id, row.body_bytes > 0])).toEqual([
+          ['message/b0', true],
+          ['message/b39', false],
+        ]);
+
+        // The body read returns the stored body of a pre-column row, which parses to that
+        // row's contribution.
+        const [body] = [
+          ...state.storage.sql.exec<{ item_data: string }>(
+            'SELECT item_data FROM ingest_items WHERE item_id = ?',
+            'message/b0'
+          ),
+        ];
+        expect(JSON.parse(body.item_data).cost).toBeCloseTo(0.02, 10);
+      });
+
+      await stub.clear();
+    });
+  });
+
+  describe('metrics emission budget', () => {
+    function userMessage(id: string, created: number) {
+      return { id, role: 'user' as const, time: { created } };
+    }
+
+    /**
+     * Runs the close path with an O11Y stub bound in place of the service binding, and returns
+     * the rows every SQLite statement produced while it ran plus the emitted records.
+     */
+    async function runAlarmCountingRows(stub: DurableObjectStub) {
+      return runInDurableObject(stub, async (instance, state) => {
+        const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+        const exec = sqlStorage.exec;
+        const cursors: Array<{ rowsRead: number }> = [];
+        sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+          const cursor = exec.apply(this, args);
+          cursors.push(cursor);
+          return cursor;
+        };
+        // The test worker has no O11Y service binding; the close path needs one to finish.
+        // The DO keeps its bindings on a plain property, so a test can replace them.
+        const doInstance = instance as unknown as { env: Record<string, unknown> };
+        const emitted: SessionMetricsParamsInput[] = [];
+        Object.defineProperty(doInstance, 'env', {
+          value: {
+            ...doInstance.env,
+            O11Y: {
+              ingestSessionMetrics: async (params: SessionMetricsParamsInput) => {
+                emitted.push(params);
+              },
+            },
+          },
+          configurable: true,
+        });
+        try {
+          await instance.alarm();
+        } finally {
+          sqlStorage.exec = exec;
+        }
+        return {
+          rowsRead: cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0),
+          emitted,
+          metricsEmitted: [
+            ...state.storage.sql.exec<{ value: string }>(
+              "SELECT value FROM ingest_meta WHERE key = 'metricsEmitted'"
+            ),
+          ].length,
+        };
+      });
+    }
+
+    it('reads a fixed window of a long history and marks the emitted record', async () => {
+      const sessionId = 'ses_metrics_budget_long_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const storedCostUsd = 1.5;
+      const historyRows = SESSION_METRICS_WINDOW_MAX_ROWS * 2;
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_budget' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(storedCostUsd)
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+        for (let index = 0; index < historyRows; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) ' +
+              'VALUES (?, ?, ?, ?)',
+            `message/h${String(index).padStart(5, '0')}`,
+            'message',
+            JSON.stringify(userMessage(`h${String(index).padStart(5, '0')}`, index)),
+            index
+          );
+        }
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      // The scan reads at most its row ceiling plus a few single-row lookups.
+      expect(observed.rowsRead).toBeLessThanOrEqual(SESSION_METRICS_WINDOW_MAX_ROWS + 32);
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: true,
+        totalTurns: SESSION_METRICS_WINDOW_MAX_ROWS,
+        totalCost: storedCostUsd,
+        // The anchors outside the read identify the session.
+        platform: 'cli',
+        organizationId: 'org_metrics_budget',
+        sessionDurationMs: 60_000,
+      });
+      expect(observed.emitted[0].timeToFirstResponseMs).toBeUndefined();
+      expect(observed.metricsEmitted).toBe(1);
+
+      await stub.clear();
+    });
+
+    it('marks a complete read as unbounded', async () => {
+      const sessionId = 'ses_metrics_budget_short_0001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_short' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+          { type: 'message', data: userMessage('u1', 1000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: false,
+        totalTurns: 1,
+        platform: 'cli',
+        sessionDurationMs: 60_000,
+      });
+
+      await stub.clear();
+    });
+
+    it('marks a read of exactly the row ceiling with every message counted as complete', async () => {
+      const sessionId = 'ses_metrics_budget_exact_0001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_exact' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+        for (let index = 0; index < SESSION_METRICS_WINDOW_MAX_ROWS; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) ' +
+              'VALUES (?, ?, ?, ?)',
+            `message/e${String(index).padStart(5, '0')}`,
+            'message',
+            JSON.stringify(userMessage(`e${String(index).padStart(5, '0')}`, index)),
+            index
+          );
+        }
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      // The two anchor rows are older than every message row; the read still reports them.
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: false,
+        totalTurns: SESSION_METRICS_WINDOW_MAX_ROWS,
+        platform: 'cli',
+        organizationId: 'org_metrics_exact',
+        sessionDurationMs: 60_000,
+      });
+
+      await stub.clear();
+    });
+
+    it('measures the per-row ceiling in bytes for a multibyte body', async () => {
+      const sessionId = 'ses_metrics_budget_multibyte_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      // 400k three-byte characters: under the ceiling counted in characters, over it in bytes.
+      const multibyteBody = '界'.repeat(400_000);
+      expect(encoder.encode(multibyteBody).byteLength).toBeGreaterThan(
+        SESSION_METRICS_WINDOW_MAX_ROW_BYTES
+      );
+      expect(multibyteBody.length).toBeLessThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
+
+      await stub.ingest(
+        [
+          { type: 'message', data: { ...userMessage('wide', 1000), text: multibyteBody } },
+          { type: 'message', data: userMessage('narrow', 2000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({ metricsBounded: true, totalTurns: 1 });
+
+      await stub.clear();
+    });
+
+    it('keeps a body above the per-row ceiling out of the counted figures', async () => {
+      const sessionId = 'ses_metrics_budget_oversized_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const oversizedBody = 'x'.repeat(SESSION_METRICS_WINDOW_MAX_ROW_BYTES + 1);
+      expect(
+        encoder.encode(JSON.stringify({ ...userMessage('huge', 1000), text: oversizedBody }))
+          .byteLength
+      ).toBeGreaterThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
+
+      await stub.ingest(
+        [
+          { type: 'message', data: { ...userMessage('huge', 1000), text: oversizedBody } },
+          { type: 'message', data: userMessage('small', 2000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      // The projected body is a stored row the counted figures leave out.
+      expect(observed.emitted[0]).toMatchObject({ metricsBounded: true, totalTurns: 1 });
+
+      await stub.clear();
+    });
   });
 
   describe('timestamp guard', () => {
@@ -4125,5 +4507,178 @@ describe('SessionIngestDO integration', () => {
 
       expect(snapshot.info).toEqual({ title: 'New' });
     });
+  });
+});
+
+describe('SessionIngestDO clone stage', () => {
+  const kiloUserId = 'usr_test_clone_stage';
+  const sourceSessionId = 'ses_clone_source_0000000000000';
+  const destinationSessionId = 'ses_clone_dest_000000000000000';
+
+  const cloneEnv = {
+    SESSION_INGEST_DO: env.SESSION_INGEST_DO,
+    SESSION_INGEST_R2: env.SESSION_INGEST_R2,
+  } as unknown as Env;
+
+  function messageRow(index: number, sessionId: string) {
+    const itemId = `msg_clone_${String(index).padStart(4, '0')}`;
+    return {
+      itemId: `message/${itemId}`,
+      body: JSON.stringify({
+        id: itemId,
+        sessionID: sessionId,
+        role: 'user',
+        time: { created: index },
+      }),
+    };
+  }
+
+  async function seedSourceRows(sessionId: string, count: number) {
+    await runInDurableObject(getStub(kiloUserId, sessionId), async (_instance, state) => {
+      const chunkSize = 20;
+      for (let start = 0; start < count; start += chunkSize) {
+        const end = Math.min(start + chunkSize, count);
+        const values: string[] = [];
+        const bindings: Array<string | number> = [];
+        for (let index = start; index < end; index += 1) {
+          const row = messageRow(index, sessionId);
+          values.push('(?, ?, ?, NULL, ?)');
+          bindings.push(row.itemId, 'message', row.body, index);
+        }
+        state.storage.sql.exec(
+          `INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at)
+           VALUES ${values.join(', ')}`,
+          ...bindings
+        );
+      }
+    });
+  }
+
+  async function destinationRowCount(sessionId: string) {
+    return runInDurableObject(getStub(kiloUserId, sessionId), async (_instance, state) => {
+      const [row] = [
+        ...state.storage.sql.exec<{ inserted: number }>(
+          `SELECT COUNT(*) AS inserted FROM ingest_items`
+        ),
+      ];
+      return row?.inserted ?? 0;
+    });
+  }
+
+  it('clones a real 1700-row source across bounded requests and verifies it', async () => {
+    await seedSourceRows(sourceSessionId, 1700);
+
+    const first = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(first).toEqual({ status: 'in_progress' });
+    expect(
+      await getStub(kiloUserId, destinationSessionId).inspectCloneStage({
+        sourceSessionId,
+        destinationSessionId,
+      })
+    ).toMatchObject({ status: 'in_progress', copiedItemCount: 1600 });
+
+    const second = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(second).toEqual({ status: 'in_progress' });
+    expect(
+      await getStub(kiloUserId, destinationSessionId).inspectCloneStage({
+        sourceSessionId,
+        destinationSessionId,
+      })
+    ).toMatchObject({ status: 'in_progress', copiedItemCount: 1700, verifyRows: 1500 });
+
+    const third = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(third).toEqual({ status: 'ready', copiedItemCount: 1700 });
+    expect(await destinationRowCount(destinationSessionId)).toBe(1700);
+
+    // The destination rows carry the destination session id.
+    await runInDurableObject(
+      getStub(kiloUserId, destinationSessionId),
+      async (_instance, state) => {
+        const [row] = [
+          ...state.storage.sql.exec<{ item_data: string }>(
+            `SELECT item_data FROM ingest_items ORDER BY id LIMIT 1`
+          ),
+        ];
+        expect(JSON.parse(row?.item_data ?? '{}')).toMatchObject({
+          sessionID: destinationSessionId,
+        });
+      }
+    );
+  });
+
+  it('confirms a complete stage from its record after the source is gone', async () => {
+    const source = 'ses_clone_source_0000000000001';
+    const destination = 'ses_clone_dest_000000000000001';
+    await seedSourceRows(source, 3);
+
+    const params = {
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId: source,
+      destinationSessionId: destination,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    };
+    expect(await cloneSessionIntoDestination(params)).toEqual({
+      status: 'ready',
+      copiedItemCount: 3,
+    });
+
+    // A repeat request must not read the source: the stage already recorded and
+    // verified its count, so an emptied source changes nothing.
+    await getStub(kiloUserId, source).clear();
+    expect(await cloneSessionIntoDestination(params)).toEqual({
+      status: 'ready',
+      copiedItemCount: 3,
+    });
+    expect(await destinationRowCount(destination)).toBe(3);
+  });
+
+  it('rejects a stored body above the row budget and leaves the destination empty', async () => {
+    const source = 'ses_clone_source_0000000000002';
+    const destination = 'ses_clone_dest_000000000000002';
+    const bodyKey = `clone-source/${source}/message/msg_clone_huge`;
+    await env.SESSION_INGEST_R2.put(bodyKey, 'x'.repeat(5 * 1024 * 1024));
+    await runInDurableObject(getStub(kiloUserId, source), async (_instance, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at)
+         VALUES (?, 'message', '{}', ?, 1)`,
+        'message/msg_clone_huge',
+        bodyKey
+      );
+    });
+
+    await expect(
+      cloneSessionIntoDestination({
+        env: cloneEnv,
+        kiloUserId,
+        sourceSessionId: source,
+        destinationSessionId: destination,
+        sourceOrganizationId: null,
+        destinationOrganizationId: null,
+      })
+    ).resolves.toEqual({ status: 'rejected', code: 'clone_setup_failed' });
+    expect(await destinationRowCount(destination)).toBe(0);
   });
 });

@@ -1,5 +1,7 @@
 import { relative } from 'node:path';
 
+import { matchesKiloPermissionPattern } from '../shared/profile-permission-policy.js';
+
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
 export function bitbucketReviewInputPath(reviewId: string): string {
@@ -16,7 +18,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'find',
   'grep',
   'rg',
-  'awk',
   'wc',
   'sort',
   'uniq',
@@ -24,9 +25,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'tr',
   'nl',
   'jq',
-  'git',
-  'git fetch',
-  'git pull',
   'gh pr diff',
   'gh pr view',
   'gh api repos/*/pulls/*/reviews',
@@ -46,7 +44,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'file',
   'head',
   'tail',
-  'sed',
   'cd',
   'mkdir',
   'touch',
@@ -112,17 +109,17 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sh',
   'zsh',
   'fish',
-  'sed -i',
-  'sed -*i',
-  'sed --in-place',
-  'sed --in-place*',
-  'sed * -i',
-  'sed * -*i',
-  'sed * --in-place',
-  'sed * --in-place*',
-  'awk * -i*',
-  'awk * --in-place*',
-  'awk *system(*',
+  // A rule is evaluated against the whole command text, and the matcher has no
+  // character class, so a rule cannot test one argument token. The entries
+  // below therefore refuse the find and sort options that start another program
+  // or write a file by name. A command that matches no rule resolves to a
+  // prompt, and a code-review session rejects every prompt, so a utility whose
+  // only permitted forms cannot be written as a rule keeps no allow rule.
+  'find *-exec*',
+  'find *-ok*',
+  'find *-delete*',
+  'find *-fprint*',
+  'find *-fls*',
   'sort -o',
   'sort -o*',
   'sort -*o',
@@ -133,6 +130,8 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sort * -*o',
   'sort * --output',
   'sort * --output*',
+  'sort *--compress-program*',
+  'sort *--co*',
   'uniq * *',
   'python',
   'python3',
@@ -154,27 +153,6 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'ssh',
   'tmux',
   'screen',
-  'git add',
-  'git branch',
-  'git clean',
-  'git commit',
-  'git config',
-  'git mv',
-  'git push',
-  'git restore',
-  'git rm',
-  'git merge',
-  'git rebase',
-  'git cherry-pick',
-  'git reset',
-  'git checkout',
-  'git switch',
-  'git stash',
-  'git tag',
-  'git worktree',
-  'git am',
-  'git apply',
-  'git remote set-url',
   'gh pr merge',
   'gh pr review',
   'gh pr create',
@@ -225,6 +203,54 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'pytest',
   'vitest',
 ];
+
+// A permission rule is anchored at both ends of the whole command text, so a
+// read rule names the subcommand directly after git. Every other git form keeps
+// the git denial, including a read that carries a global option.
+const CODE_REVIEW_GIT_READ_SUBCOMMANDS = [
+  'diff',
+  'fetch',
+  'log',
+  'pull',
+  'rev-parse',
+  'show',
+  'status',
+];
+
+// The review workflow reads with these subcommands and the options named here
+// are outside that workflow, so each read rule keeps a matching denial pattern.
+// Git accepts any unambiguous prefix of a long option, and the matcher has no
+// character class, so a pattern covers the shortest accepted prefix at any
+// position, with `=` and with a separating space. `--upload-pack` is the only
+// fetch or pull option that starts with `--upl`, so the shorter prefix keeps
+// `--unshallow` and the update options available to a shallow review clone. The
+// `ext::` remote helper runs the command carried in its URL locally, and that
+// URL carries no option, so each read subcommand that takes a remote denies it.
+const CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS = [
+  'git fetch *--upl*',
+  'git pull *--upl*',
+  'git fetch *ext::*',
+  'git pull *ext::*',
+  'git diff *--output*',
+  'git log *--output*',
+  'git show *--output*',
+  'git diff *--ext-diff*',
+  'git log *--ext-diff*',
+  'git show *--ext-diff*',
+  'git diff *--text*',
+  'git log *--text*',
+  'git show *--text*',
+];
+
+// The policy denies the edit tool, so a review session writes no file. An output
+// redirect on an allow-listed command is the one write form a pattern can name,
+// and it is refused for every command the policy allows. A heredoc payload is
+// not part of the classified command text, so the forge publication commands
+// keep working; they need no output redirect.
+const CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS = [
+  ...CODE_REVIEW_ALLOWED_COMMANDS,
+  ...CODE_REVIEW_GIT_READ_SUBCOMMANDS.map(subcommand => `git ${subcommand}`),
+].map(command => `${command} *>*`);
 
 const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'ls',
@@ -368,7 +394,17 @@ export function getCommandGuardPolicy(
     return {
       policyName: 'code-review-read-only',
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
-      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS, 'git'],
+      // The read set is installed after the git denial, and the last matching
+      // rule wins. The denied read options are installed after them.
+      allowedAfterDenied: CODE_REVIEW_GIT_READ_SUBCOMMANDS.flatMap(subcommand => [
+        `git ${subcommand}`,
+        `git ${subcommand} *`,
+      ]),
+      deniedAfterAllowedOverrides: [
+        ...CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
+        ...CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS,
+      ],
     };
   }
 
@@ -377,10 +413,10 @@ export function getCommandGuardPolicy(
 
 export function buildCommandGuardBashPermissions(
   commandGuardPolicy: CommandGuardPolicy
-): Record<string, string> {
+): Record<string, 'allow' | 'deny'> {
   // Denies are inserted after allows so exact duplicates still fail closed;
   // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
-  const bashPermissions: Record<string, string> = {};
+  const bashPermissions: Record<string, 'allow' | 'deny'> = {};
   if (commandGuardPolicy.defaultDeny) {
     bashPermissions['*'] = 'deny';
   }
@@ -409,11 +445,13 @@ export function buildCommandGuardBashPermissions(
   return bashPermissions;
 }
 
+export type CommandGuardPermission = 'allow' | 'deny' | Record<string, 'allow' | 'deny'>;
+
 export function getCommandGuardPermissions(
   policy: CommandGuardPolicy,
   workspacePath: string,
   bitbucketReviewId?: string
-): Record<string, string | Record<string, string>> {
+): Record<string, CommandGuardPermission> {
   const bitbucketReviewPolicy = policy.policyName === 'bitbucket-code-review-read-only';
   return {
     edit:
@@ -435,18 +473,13 @@ export function getCommandGuardPermissions(
   };
 }
 
-function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
-  let escaped = pattern
-    .replaceAll('\\', '/')
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  if (escaped.endsWith(' .*')) {
-    escaped = `${escaped.slice(0, -3)}( .*)?`;
-  }
-  return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
-}
+export { matchesKiloPermissionPattern };
 
+// The runtime classifies a shell call per parsed command node: the CLI collects
+// one pattern for each command in the call and refuses the call when one
+// pattern resolves to deny. This resolver classifies the command text of a
+// single node with the same pattern rules, so a caller passes one node's text
+// and never a joined shell line.
 export function resolveCommandGuardBashPermission(
   permissions: Record<string, string>,
   command: string

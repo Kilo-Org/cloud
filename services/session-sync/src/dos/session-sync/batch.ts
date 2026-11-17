@@ -1,8 +1,9 @@
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { asc, and, eq } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import { LIMITS, utf8Bytes, type BatchRequest, type Principal, type Receipt } from '../../protocol';
-import { raise, toReceipt, update, writable, type Db, type ReceiptRow } from './session';
+import { raise, toReceipt, update, writable, type Db, type Meta, type ReceiptRow } from './session';
+type BatchWork = { pruneMs: number; pruneAttempts: number; pruneError?: unknown };
 
 /**
  * Applies one batch, records its receipt, and advances the source position.
@@ -20,8 +21,9 @@ export function apply(
   sessionID: string,
   batch: BatchRequest,
   digest: string,
-  now: number
-): Receipt {
+  now: number,
+  work?: BatchWork
+): { receipt: Receipt; meta?: Meta } {
   const meta = writable(db, principal, sessionID);
   if (meta.source_id !== batch.sourceID) {
     raise('source_conflict', 'The session is bound to another source');
@@ -32,7 +34,7 @@ export function apply(
     if (prior.digest !== digest) {
       raise('batch_conflict', 'The batch ID was already committed with different content');
     }
-    return toReceipt(sessionID, prior);
+    return { receipt: toReceipt(sessionID, prior) };
   }
 
   if (batch.after !== meta.position) {
@@ -120,7 +122,7 @@ export function apply(
       .run();
   }
 
-  update(db, {
+  const updated = {
     position: batch.through,
     revision,
     batches: meta.batches + 1,
@@ -128,7 +130,8 @@ export function apply(
     inline_bytes: inlineBytes,
     updated_at: now,
     last_write_at: now,
-  });
+  };
+  update(db, updated);
 
   const receipt: ReceiptRow = {
     batch_id: batch.batchID,
@@ -140,18 +143,27 @@ export function apply(
     committed_at: now,
   };
   db.insert(receipts).values(receipt).run();
-  prune(db);
-  return toReceipt(sessionID, receipt);
+  prune(db, meta.batches + 1, work);
+  return { receipt: toReceipt(sessionID, receipt), meta: { ...meta, ...updated } };
 }
 
-/** Keeps the newest receipts. Positions increase strictly, so `through` orders them. */
-function prune(db: Db): void {
-  const oldest = db
-    .select({ through: receipts.through })
-    .from(receipts)
-    .orderBy(desc(receipts.through))
-    .limit(1)
-    .offset(LIMITS.receipts - 1)
-    .get();
-  if (oldest) db.delete(receipts).where(lt(receipts.through, oldest.through)).run();
+/** One accepted batch inserts one receipt; positions strictly order that tail. */
+function prune(db: Db, accepted: number, work?: BatchWork): void {
+  if (accepted <= LIMITS.receipts) return;
+  const started = work ? performance.now() : 0;
+  if (work) work.pruneAttempts++;
+  try {
+    const oldest = db
+      .select({ through: receipts.through })
+      .from(receipts)
+      .orderBy(asc(receipts.through))
+      .limit(1)
+      .get();
+    if (oldest) db.delete(receipts).where(eq(receipts.through, oldest.through)).run();
+  } catch (error) {
+    if (work) work.pruneError = error;
+    throw error;
+  } finally {
+    if (work) work.pruneMs += performance.now() - started;
+  }
 }

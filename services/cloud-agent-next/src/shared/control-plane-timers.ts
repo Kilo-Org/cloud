@@ -22,6 +22,8 @@ export type ControlPlaneTimers = {
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
+    billingAdmissionMs: number;
+    billingAdmissionMinimumMs: number;
     wrapperFirstConnectMs: number;
     wrapperHelloMs: number;
     heartbeatMs: number;
@@ -33,10 +35,20 @@ export type ControlPlaneTimers = {
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Wait before the alarm retries a failed renewal while the grant is still valid. */
+    credentialGrantRenewalRetryMs: number;
     /** Bounds one member's backing renewal during scope-handle resolution. */
     scopeBackingTokenMs: number;
+    /** Bounds the membership read that gates an organization-attributed grant. */
+    organizationMembershipReadMs: number;
+    /** How many bounded membership reads one grant issuance makes before it denies. */
+    organizationMembershipReadAttempts: number;
+    /** Wait between two membership reads of the same issuance. */
+    organizationMembershipReadRetryMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
+    /** Total bound on confirming the stop of a failed snapshot launch before its retry. */
+    snapshotRetryStopMs: number;
   };
   wrapper: {
     heartbeatIntervalMs: number;
@@ -76,8 +88,13 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
-// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
-// also ships in the wrapper without the worker sources.
+const PROVIDER_STOP_ATTEMPT_MS = 30_000;
+// A container wedged in a snapshot start can take minutes to destroy. In
+// production, the stop after a timed-out restore was confirmed 38 s, 2 min 13 s
+// and 3 min 14 s after the first stop began; one 30-s stop never confirmed it.
+const SNAPSHOT_RETRY_STOP_MS = 4 * MINUTE_MS;
+// Snapshot starts use `DEADLINE_MS.repositoryStartup` for each launch attempt;
+// this module also ships in the wrapper without the worker sources.
 const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
@@ -87,12 +104,15 @@ const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
 const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
 const KILO_SESSION_MS = 2 * MINUTE_MS;
 
-// Fixed preparation work includes one create retry and one retry each for
-// runtime start and session import. Setup retains its per-command bounds;
-// the attempt deadline is its aggregate stop.
+// Fixed preparation work includes one create retry, one snapshot launch retry
+// (a stop confirmed within its own bound, then its own launch bound) and one
+// retry each for runtime start and session import. Setup retains its
+// per-command bounds; the attempt deadline is its aggregate stop.
 const ROUTE_PREPARATION_MS =
   PREPARATION_CREATE_MS +
   PROVIDER_CREATE_RETRY_MS +
+  PREPARATION_CREATE_MS +
+  SNAPSHOT_RETRY_STOP_MS +
   PREPARATION_CREATE_MS +
   WRAPPER_FIRST_CONNECT_MS +
   WRAPPER_HELLO_MS +
@@ -106,8 +126,8 @@ const ROUTE_PREPARATION_MS =
 // max backoff). Timers that bound external work stay real: provider create and
 // container boot, the preparation attempt, the pause before a failed create is retried,
 // restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
-// 10-15 s), health request, the real-SSE reconnect window, credential grants
-// and the provider stop ladder.
+// 10-15 s), health request, the real-SSE reconnect window, credential grants,
+// the organization membership read and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
@@ -115,6 +135,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
     wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
     wrapperHelloMs: WRAPPER_HELLO_MS,
+    billingAdmissionMs: MINUTE_MS,
+    billingAdmissionMinimumMs: 1_000,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
     routePreparationMs: ROUTE_PREPARATION_MS,
@@ -123,13 +145,25 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
+    // Grants are renewed from the alarm and on `deliver` below the threshold, so
+    // their lease does not bound how long one native execution may run.
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    credentialGrantRenewalRetryMs: 5 * MINUTE_MS,
     // Bounds external token renewal, so it stays real and short enough for the
     // Session DO's total scope-resolution bound.
     scopeBackingTokenMs: 3_000,
-    providerStopAttemptMs: 30_000,
+    // The membership read is one indexed row. A read that cannot answer inside
+    // the bound denies the grant instead of holding the Sandbox DO operation
+    // queue, so it stays real. One unreadable read is a single observation, not
+    // a decision, so an issuance retries it a few times inside the 30 s grant
+    // issuance bound (3 * 3 s + 2 * 1 s = 11 s) before it denies.
+    organizationMembershipReadMs: 3_000,
+    organizationMembershipReadAttempts: 3,
+    organizationMembershipReadRetryMs: 1_000,
+    providerStopAttemptMs: PROVIDER_STOP_ATTEMPT_MS,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
+    snapshotRetryStopMs: SNAPSHOT_RETRY_STOP_MS,
   };
   const wrapper = {
     heartbeatIntervalMs: ms(5_000),
@@ -151,7 +185,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Allow transient reclaim to clear while bounding a sustained memory stall.
     kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
-    turnHardCapMs: ms(120 * MINUTE_MS),
+    turnHardCapMs: ms(12 * HOUR_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };

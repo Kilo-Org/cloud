@@ -29,6 +29,7 @@ const callbackAuthErrors = new Set([
   'EMAIL-INVALID-FORMAT',
   'EMAIL-MUST-BE-LOWERCASE',
   'EMAIL-CANNOT-CONTAIN-PLUS',
+  'EMAIL-REQUIRED',
 ]);
 
 function getInitialCallbackError(error: string | undefined): string {

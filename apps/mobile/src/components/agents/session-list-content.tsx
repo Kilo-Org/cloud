@@ -1,20 +1,25 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
-import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
+import {
+  selectSessionListBodyModel,
+  type SessionListClearAction,
+} from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
-import { type SessionSection } from '@/components/agents/session-list-helpers';
+import {
+  type SessionSection,
+  sessionSectionAccessibilityLabel,
+} from '@/components/agents/session-list-helpers';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import {
   flattenSessionSections,
@@ -62,6 +67,13 @@ type AgentSessionListContentProps = {
    */
   hasFreshHistory: boolean;
   isFetchingNextPage: boolean;
+  /**
+   * The last next-page request failed. The loaded rows stay, and the list
+   * footer carries the retryable line with its Retry action, so the end of the
+   * list never reads as the end of the history.
+   */
+  isFetchNextPageError: boolean;
+  onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
@@ -74,12 +86,15 @@ type AgentSessionListContentProps = {
    */
   nonPullRefreshes: number;
   hasActiveQuery: boolean;
+  /** A platform or project filter narrows the list, so it can cause an empty body. */
+  hasActiveFilters: boolean;
   isSearching: boolean;
   /** True while the driving query fetches — the error body's retry in flight. */
   isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
-  onClearQuery: () => void;
+  /** Retires exactly the narrowing input the pressed clear control names. */
+  onClearAction: (action: SessionListClearAction) => void;
   /** The no-history body's next step: open the new-session composer. */
   onCreateSession: () => void;
 };
@@ -93,16 +108,19 @@ export function AgentSessionListContent({
   isError,
   hasFreshHistory,
   isFetchingNextPage,
+  isFetchNextPageError,
+  onRetryNextPage,
   refetch,
   onRetry,
   onEndReached,
   onSessionPress,
   nonPullRefreshes,
   hasActiveQuery,
+  hasActiveFilters,
   isSearching,
   isRetrying,
   searchQuery,
-  onClearQuery,
+  onClearAction,
   onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
@@ -179,8 +197,8 @@ export function AgentSessionListContent({
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
     hasHistoryContent: sections.length > 0,
-    hasActiveQuery,
     isSearching,
+    hasActiveFilters,
     isError,
   });
 
@@ -194,14 +212,37 @@ export function AgentSessionListContent({
     hasFreshHistory,
   });
 
-  const clearQueryAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={onClearQuery} className={STATE_ACTION_CLASS}>
-        <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
-      </Button>
-    ),
-    [isSearching, onClearQuery, t]
-  );
+  // One control per active narrowing input, each naming exactly what it clears.
+  // A search and a filter can both hide the session, so the body would otherwise
+  // leave the hidden cause in place behind a label naming the other one.
+  const clearActions = useMemo(() => {
+    const actions =
+      bodyModel.kind === 'filtered-empty' || bodyModel.kind === 'query-error-empty'
+        ? bodyModel.clearActions
+        : [];
+    if (actions.length === 0) {
+      return null;
+    }
+    return (
+      <View className="flex-row flex-wrap items-center justify-center gap-2">
+        {actions.map(action => (
+          <Button
+            key={action}
+            variant="outline"
+            testID={action === 'clear-search' ? 'session-clear-search' : 'session-clear-filters'}
+            onPress={() => {
+              onClearAction(action);
+            }}
+            className={STATE_ACTION_CLASS}
+          >
+            <Text>
+              {action === 'clear-search' ? t('common.clearSearch') : t('common.clearFilters')}
+            </Text>
+          </Button>
+        ))}
+      </View>
+    );
+  }, [bodyModel, onClearAction, t]);
 
   // The no-history body's next step. It opens the same composer the Agents
   // tab's "New session" action does, so an empty history never dead-ends at a
@@ -303,30 +344,65 @@ export function AgentSessionListContent({
     }
   }, [onEndReached]);
 
+  // A failed next page keeps every loaded row and says so at the end of the
+  // list: the spinner alone ended the list silently, so the last loaded row
+  // read as the end of the history. The retry calls `fetchNextPage`, and the
+  // end-reach gate stops re-firing while this line stands (see
+  // `shouldLoadMoreSessions`).
+  let listFooter: ReactNode = null;
+  if (isFetchNextPageError) {
+    listFooter = (
+      <View className="items-center gap-3 px-6 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('common.couldnTLoadMore')}
+        </Text>
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          onPress={onRetryNextPage}
+          loading={isFetchingNextPage}
+          accessibilityLabel={t('common.retry')}
+        >
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      </View>
+    );
+  } else if (isFetchingNextPage) {
+    listFooter = (
+      <View className="py-4">
+        <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  }
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
+      // The reserved cold-open slots are separate list items in the stored
+      // list's own shape — a date-header placeholder, then one cell per session
+      // placeholder — so each is measured at its real height and the rows swap
+      // into the reserved space without a jump.
+      if (item.kind === 'section-header-skeleton') {
+        return <SessionSectionHeaderSkeleton />;
+      }
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot in the stored list's own shape (a date header
-        // above the first row, then eyebrow and title rows), so the rows swap
-        // into the reserved space without a jump.
-        const row = <SessionRowSkeleton index={item.index} subtitle={false} />;
-        return item.index === 0 ? (
-          <View>
-            <SessionSectionHeaderSkeleton />
-            {row}
-          </View>
-        ) : (
-          row
-        );
+        return <SessionRowSkeleton index={item.index} subtitle={false} />;
       }
       if (item.kind === 'section-header') {
-        return <SessionListSectionHeader title={item.title} count={item.count} />;
+        return (
+          <SessionListSectionHeader
+            title={item.title}
+            count={item.count}
+            accessibilityLabel={sessionSectionAccessibilityLabel(item.title, item.count)}
+          />
+        );
       }
       return (
         <StoredSessionRow
           session={item.session}
           sortBy={SESSION_LIST_SORT}
           sectionTitle={item.sectionTitle}
+          timeZone={item.timeZone}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {
@@ -361,9 +437,14 @@ export function AgentSessionListContent({
   // fresh open whose own load failed shows the retryable error instead of
   // presenting them as loaded (see `selectSessionListContentSurface`).
   // Gated on !isLoading so a cold-open load never flashes this surface.
+  //
+  // None of these bodies carries an entering animation. An entering fade holds
+  // the view at its start value until the animation runs, and a body mounted
+  // during a screen transition can miss that run: its whole area then stays
+  // invisible, which reads as the blank body this screen must never show.
   if (surface.kind === 'full-screen-error') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <QueryError
           message={t('common.couldNotLoadSessions')}
@@ -371,7 +452,7 @@ export function AgentSessionListContent({
           isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -380,17 +461,17 @@ export function AgentSessionListContent({
   // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <BodyEmpty
           kind="no-past-sessions"
           isSearching={isSearching}
-          clearQueryAction={clearQueryAction}
+          hasActiveFilters={hasActiveFilters}
           createSessionAction={createSessionAction}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -400,20 +481,18 @@ export function AgentSessionListContent({
   // FlashList empty → populated transition is what mis-lays-out the swap.
   if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <BodyEmpty
           kind={bodyModel.kind}
           isSearching={isSearching}
-          secondaryAction={
-            bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
-          }
-          clearQueryAction={clearQueryAction}
+          hasActiveFilters={hasActiveFilters}
+          clearActions={clearActions}
           isRetrying={isRetrying}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -444,14 +523,14 @@ export function AgentSessionListContent({
           keyExtractor={keyExtractor}
           getItemType={getItemType}
           extraData={attentionFocusRevision}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View className="py-4">
-                <ActivityIndicator color={colors.mutedForeground} />
-              </View>
-            ) : null
-          }
+          ListFooterComponent={listFooter}
           contentContainerStyle={contentInsetStyle}
+          // The search field above this list holds the keyboard while results
+          // are filtered. With the platform default the list claims that touch
+          // and only closes the keyboard, so a result needed two taps; with
+          // this value the row's own press runs and the list still follows a
+          // drag (see `keyboardDismissMode`).
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}

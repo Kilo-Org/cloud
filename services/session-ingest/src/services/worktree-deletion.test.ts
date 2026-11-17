@@ -13,6 +13,8 @@ import {
 } from '@kilocode/db/schema';
 import {
   cloudAgentWorktreeDeletionManifestSchema,
+  cloudAgentWorktreeDeletionSchema,
+  WORKTREE_MEMBERSHIP_CHANGED,
   type CloudAgentWorktreeDeletionParams,
   type CanDestroyCloudAgentWorktreeSandboxParams,
 } from '@kilocode/session-ingest-contracts';
@@ -20,6 +22,7 @@ import {
   beginWorktreeDeletion,
   recordWorktreeCleanup,
   completeWorktreeDeletion,
+  deleteWorktreeContent,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
@@ -56,6 +59,12 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     worktree_id: worktreeId,
     kilo_user_id: userId,
     organization_id: null,
+    parent_worktree_id: null,
+    base_branch: null,
+    base_sha: null,
+    git_url: null,
+    git_branch: null,
+    sidebar_position: null,
     name: 'Private worktree name',
     folder_id: null,
     created_at: createdAt,
@@ -245,9 +254,16 @@ function database(rootCount = 1, descendantCount = 0) {
       if (table === cloud_agent_worktrees) {
         const source = !inTransaction && frozenWorktreeReads ? frozenWorktreeReads : worktrees;
         const id = bound.find(value => typeof value === 'string' && value.startsWith('worktree_'));
-        return id
+        const selected = id
           ? source.filter(row => row.worktree_id === id)
           : source.filter(row => row.deletion_completed_at === null);
+        return selected.map(row => ({
+          ...row,
+          kiloUserId: row.kilo_user_id,
+          organizationId: row.organization_id,
+          deletionStartedAt: row.deletion_started_at,
+          deletionCompletedAt: row.deletion_completed_at,
+        }));
       }
       if (table === organization_memberships)
         return membershipAllowed ? [{ id: 'membership' }] : [];
@@ -455,6 +471,8 @@ function database(rootCount = 1, descendantCount = 0) {
     },
   };
   let commitError: Error | undefined;
+  let failCommitAtWrite: number | undefined;
+  let committedWrites = 0;
   const db = {
     ...tx,
     transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
@@ -466,7 +484,11 @@ function database(rootCount = 1, descendantCount = 0) {
       const previousActivity = structuredClone(watchActivity);
       try {
         const result = await callback(tx);
-        if (commitError && transactionWrote) throw commitError;
+        if (commitError && transactionWrote) {
+          committedWrites += 1;
+          if (failCommitAtWrite === undefined || committedWrites === failCommitAtWrite)
+            throw commitError;
+        }
         events.push('commit');
         return result;
       } catch (error) {
@@ -531,8 +553,9 @@ function database(rootCount = 1, descendantCount = 0) {
     notifications,
     pendingNotifications,
     executionContext,
-    failCommit: (error?: Error) => {
+    failCommit: (error?: Error, atWrite?: number) => {
       commitError = error;
+      failCommitAtWrite = atWrite;
     },
     denyMembership: () => {
       membershipAllowed = false;
@@ -655,8 +678,12 @@ describe('durable worktree deletion journal', () => {
       expect(f.notifications).toHaveLength(4);
       expect(f.notifications).toEqual(expect.arrayContaining(expectedEvents));
       expect(f.pendingNotifications).toHaveLength(4);
-      expect(f.events.indexOf('notifySessionEvent')).toBeGreaterThan(
-        f.events.lastIndexOf('commit')
+      const firstNotification = f.events.indexOf('notifySessionEvent');
+      expect(firstNotification).toBeGreaterThan(f.events.indexOf('deleteRows'));
+      // The content transaction committed before the first event. The tombstone
+      // is a later transaction and must not gate event delivery.
+      expect(f.events.lastIndexOf('commit', firstNotification)).toBeGreaterThan(
+        f.events.indexOf('deleteRows')
       );
       expect(f.members).toEqual([unrelated]);
 
@@ -686,6 +713,41 @@ describe('durable worktree deletion journal', () => {
     await Promise.all(f.pendingNotifications);
     expect(f.members).toEqual([]);
     expect(f.notifications).toHaveLength(3);
+  });
+
+  it('publishes deletion events after content commit so a tombstone failure cannot lose them', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    const manifest = structuredClone(f.worktrees[0].deletion_manifest);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      // The content transaction is write 1; the tombstone transaction is write 2.
+      f.failCommit(new Error('tombstone commit failed'), 2);
+      await expect(completeWorktreeDeletion(env, params, f.executionContext)).rejects.toThrow(
+        'tombstone commit failed'
+      );
+      await Promise.all(f.pendingNotifications);
+
+      expect(f.members).toEqual([]);
+      expect(f.worktrees[0]).toMatchObject({
+        deletion_completed_at: null,
+        deletion_manifest: manifest,
+        runtime_locations: [location],
+      });
+      expect(f.notifications).toHaveLength(1);
+
+      f.failCommit();
+      await expect(completeWorktreeDeletion(env, params, f.executionContext)).resolves.toEqual({
+        success: true,
+        deletedSessionIds: [kiloId(0)],
+      });
+      await Promise.all(f.pendingNotifications);
+      expect(f.notifications).toHaveLength(1);
+      expect(f.worktrees[0].deletion_completed_at).not.toBeNull();
+      expect(f.worktrees[0].deletion_manifest).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('journals a runtime-only never-run child, retains it after partial cleanup, and replays its tombstone', async () => {
@@ -1273,7 +1335,7 @@ describe('durable worktree deletion journal', () => {
     const f = database();
     await beginWorktreeDeletion(env, params);
     await expect(
-      registerCloudAgentWorktree(f.tx as never, {
+      registerCloudAgentWorktree(f.db as never, {
         sessionId: kiloId(100),
         kiloUserId: userId,
         cloudAgentSessionId: cloudId(100),
@@ -1518,11 +1580,123 @@ describe('retireWorktreeIfSoleMember', () => {
     expect(f.ledgerReads).toEqual([]);
   });
 
+  it('writes the stack parent and base on the first insert only', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    const registration = {
+      sessionId: kiloId(100),
+      kiloUserId: userId,
+      cloudAgentSessionId: cloudId(100),
+      cloudAgentWorktreeId: otherWorktreeId,
+      parentWorktreeId: worktreeId,
+      baseBranch: 'feat-a',
+      baseSha: 'a'.repeat(40),
+      gitUrl: 'https://github.com/acme/repo',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+
+    await registerCloudAgentWorktree(f.db as never, registration);
+    expect(f.worktrees.find(row => row.worktree_id === otherWorktreeId)).toMatchObject({
+      parent_worktree_id: worktreeId,
+      base_branch: 'feat-a',
+      base_sha: 'a'.repeat(40),
+    });
+
+    await registerCloudAgentWorktree(f.db as never, {
+      ...registration,
+      baseBranch: 'feat-b',
+      baseSha: 'b'.repeat(40),
+    });
+    expect(f.worktrees.find(row => row.worktree_id === otherWorktreeId)).toMatchObject({
+      base_branch: 'feat-a',
+      base_sha: 'a'.repeat(40),
+    });
+  });
+
+  it.each([
+    ['another owner', { kilo_user_id: 'oauth/github:someone-else' }],
+    ['another organization', { organization_id: organizationId }],
+  ])('rejects a stack parent from %s', async (_name, parentScope) => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    Object.assign(f.worktrees[0], parentScope);
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_unavailable');
+  });
+
+  it('fails closed when a stack registration omits the child repository', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_repository_required');
+  });
+
+  it.each([
+    ['differs', 'https://github.com/acme/other'],
+    ['is missing from the parent session', null],
+  ])('rejects a stack parent whose repository %s', async (_name, parentGitUrl) => {
+    const f = database();
+    if (parentGitUrl !== null) f.members[0].gitUrl = parentGitUrl;
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_repository_mismatch');
+  });
+
+  it('rejects a stack parent that is being deleted', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    f.worktrees[0].deletion_started_at = '2026-08-27 02:00:00+00';
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_deleting');
+  });
+
   it('race: a competing registration loses after the retirement marker and throws WORKTREE_DELETING', async () => {
     const f = database();
     await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
     await expect(
-      registerCloudAgentWorktree(f.tx as never, {
+      registerCloudAgentWorktree(f.db as never, {
         sessionId: kiloId(100),
         kiloUserId: userId,
         cloudAgentSessionId: cloudId(100),
@@ -1707,5 +1881,142 @@ describe('retireWorktreeIfSoleMember', () => {
     await expect(retire(f).call()).resolves.toEqual({ kind: 'unresolved' });
     expect(retire(f).worktreeWrites()).toBe(0);
     expect(f.worktrees[0].deletion_started_at).toBe('2026-08-27 02:00:00+00');
+  });
+});
+
+describe('sole-member begin guard', () => {
+  it('rejects a concurrent sibling root before writing the marker or watches', async () => {
+    const f = database(2);
+    await expect(
+      beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(0) })
+    ).rejects.toThrow(WORKTREE_MEMBERSHIP_CHANGED);
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+    expect(f.worktrees[0].deletion_manifest).toBeNull();
+    expect(f.events).not.toContain('updateWorktree');
+    expect(f.events).not.toContain('finishWatches');
+  });
+
+  it('rejects when the requested session is not the sole root', async () => {
+    const f = database();
+    await expect(
+      beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(1) })
+    ).rejects.toThrow(WORKTREE_MEMBERSHIP_CHANGED);
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+    expect(f.worktrees[0].deletion_manifest).toBeNull();
+  });
+
+  it('allows descendants of the sole root', async () => {
+    database(1, 1);
+    await expect(
+      beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(0) })
+    ).resolves.toMatchObject({
+      completed: false,
+      manifest: {
+        version: 1,
+        sessions: [
+          { sessionId: kiloId(0), cloudAgentSessionId: cloudId(0) },
+          { sessionId: kiloId(1), cloudAgentSessionId: null },
+        ],
+      },
+    });
+  });
+
+  it('checks the committed manifest on replay instead of re-reading membership', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(0) });
+    const manifest = structuredClone(f.worktrees[0].deletion_manifest);
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: cloudId(1),
+      organizationId: null,
+      worktreeId,
+      userId,
+      parentSessionId: null,
+    });
+    await expect(
+      beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(0) })
+    ).resolves.toMatchObject({ completed: false, manifest });
+    await expect(
+      beginWorktreeDeletion(env, { ...params, onlyIfSoleSessionId: kiloId(1) })
+    ).rejects.toThrow(WORKTREE_MEMBERSHIP_CHANGED);
+    expect(f.worktrees[0].deletion_manifest).toEqual(manifest);
+  });
+});
+
+describe('deleteWorktreeContent', () => {
+  it('deletes content and rows but retains the deletion journal and runtime locations', async () => {
+    const f = database(2, 1);
+    await beginWorktreeDeletion(env, params);
+    const manifest = structuredClone(f.worktrees[0].deletion_manifest);
+    const sessionIds = [kiloId(0), kiloId(1), kiloId(2)];
+
+    await expect(deleteWorktreeContent(env, params, f.executionContext)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: sessionIds,
+    });
+    await Promise.all(f.pendingNotifications);
+
+    expect(f.members).toEqual([]);
+    expect(f.cleared).toEqual(new Set(sessionIds));
+    expect(f.notifications).toHaveLength(3);
+    expect(f.worktrees[0]).toMatchObject({
+      deletion_completed_at: null,
+      deletion_manifest: manifest,
+      runtime_locations: [location],
+      deleted_session_ids: sessionIds,
+    });
+  });
+
+  it('is idempotent and does not duplicate deletion events', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    const first = await deleteWorktreeContent(env, params, f.executionContext);
+    await Promise.all(f.pendingNotifications);
+    const second = await deleteWorktreeContent(env, params, f.executionContext);
+    await Promise.all(f.pendingNotifications);
+
+    expect(second).toEqual(first);
+    expect(f.notifications).toHaveLength(1);
+    expect(f.worktrees[0].deletion_completed_at).toBeNull();
+    expect(f.worktrees[0].deletion_manifest).not.toBeNull();
+  });
+
+  it('still tombstones and does not re-notify when complete follows a logical delete', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    const logical = await deleteWorktreeContent(env, params, f.executionContext);
+    await Promise.all(f.pendingNotifications);
+
+    await expect(completeWorktreeDeletion(env, params, f.executionContext)).resolves.toEqual(
+      logical
+    );
+    await Promise.all(f.pendingNotifications);
+
+    expect(f.notifications).toHaveLength(1);
+    expect(f.worktrees[0]).toMatchObject({
+      name: null,
+      runtime_locations: [],
+      deletion_manifest: null,
+      deleted_session_ids: logical.deletedSessionIds,
+    });
+    expect(f.worktrees[0].deletion_completed_at).not.toBeNull();
+  });
+});
+
+describe('worktree deletion contract', () => {
+  it('exports the membership-changed code and accepts the sole-session precondition', () => {
+    expect(WORKTREE_MEMBERSHIP_CHANGED).toBe('worktree_membership_changed');
+    expect(
+      cloudAgentWorktreeDeletionSchema.parse({
+        ...params,
+        onlyIfSoleSessionId: kiloId(0),
+      })
+    ).toEqual({ ...params, onlyIfSoleSessionId: kiloId(0) });
+    expect(() =>
+      cloudAgentWorktreeDeletionSchema.parse({
+        ...params,
+        onlyIfSoleSessionId: 'not-a-session-id',
+      })
+    ).toThrow();
   });
 });

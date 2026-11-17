@@ -3,6 +3,7 @@ import { type Effort, type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 
+import { type ChatFlag } from './chat-flag';
 import { type ChatRecord, NO_RECORD } from './store';
 
 /**
@@ -17,10 +18,46 @@ import { type ChatRecord, NO_RECORD } from './store';
 export type Question = {
   readonly text: string;
   readonly images: readonly LocalImage[];
+  /**
+   * The kept question this asks again, when it is a retry of one: its record is
+   * the one the ask drops once the slot holds the question, so two attempts that
+   * say the same words never take each other's place.
+   */
+  readonly from?: string | null;
 };
 
 /** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
 export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
+
+/**
+ * A question that was asked and never answered, and one asked later took its
+ * place in the one slot a chat keeps.
+ *
+ * It stays in the transcript where it was said rather than going with the slot:
+ * the words may be all that is left of what the person pasted, so they keep
+ * their bubble, their Retry and their Copy to composer.
+ */
+export type Displaced = Question &
+  ChatTarget & {
+    /** Names its bubble, so its Retry finds it after another failure moved the list. */
+    readonly id: string;
+    /**
+     * How many stored turns came before it. The store appends a turn per
+     * answered question, so this places the bubble among the turns that were
+     * said after it and keeps the conversation in the order it happened.
+     */
+    readonly afterTurns: number;
+    /** Why it has no answer: the answer failed, or the person stopped it. */
+    readonly outcome: 'failed' | 'stopped';
+    /**
+     * The fixed copy key the slot's failure had when this question left it, so
+     * the bubble states the same cause where it was said: a send the account's
+     * balance refused keeps its statement and Add credits, and no Retry that
+     * would meet the same balance. A question kept before this was recorded, or
+     * one the person stopped, says nothing about a cause.
+     */
+    readonly failureKey?: string | null;
+  };
 
 /** What a chat screen draws. */
 export type ChatState = {
@@ -41,6 +78,19 @@ export type ChatState = {
   readonly asked: string | null;
   /** The images that question carries. Empty when it carries none. */
   readonly askedImages: readonly LocalImage[];
+  /**
+   * The kept question the slot is asking again, when it is a retry of one.
+   *
+   * That question is already in the transcript, so the slot does not draw a
+   * second bubble for it: the bubble where it was said is the current attempt,
+   * and everything said after it stays after it.
+   */
+  readonly askedFrom: string | null;
+  /**
+   * The questions asked before that one and never answered, oldest first. A
+   * later send takes the one slot, and what it took the place of is kept here.
+   */
+  readonly displaced: readonly Displaced[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
   /** The effort that question was asked with. */
@@ -61,6 +111,15 @@ export type ChatState = {
    * last moved. Changed when a call ends, not on every word of an answer.
    */
   readonly record: ChatRecord;
+  /**
+   * The web-search switch, with the choice on disk and how far this session is
+   * from it. The two flags live here rather than in a store of their own, so a
+   * tap, its write and the move it causes are one operation of the chat, and a
+   * chat that moves carries them with it.
+   */
+  readonly webSearch: ChatFlag;
+  /** The Kilo MCP switch, the same way. */
+  readonly kiloTools: ChatFlag;
 };
 
 /**
@@ -85,8 +144,13 @@ const watchers = new Map<string, Set<() => void>>();
  */
 const movedTo = new Map<string, string>();
 
-/** Follows a chain of moves to the chat a screen should read now. */
-function resolve(sessionId: string): string {
+/**
+ * Follows a chain of moves to the chat a screen should read now.
+ *
+ * Exported for the registry's own queue, which orders operations by the chat
+ * that carried on rather than by the id the caller still holds.
+ */
+export function resolveSessionId(sessionId: string): string {
   const seen = new Set<string>();
   let current = sessionId;
   while (!seen.has(current)) {
@@ -135,12 +199,16 @@ export const NOTHING = {
   answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
+  askedFrom: null,
+  displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,
   waiting: [] as readonly Question[],
   failed: null,
   failureKey: null,
   record: NO_RECORD,
+  webSearch: { kind: 'reading' },
+  kiloTools: { kind: 'reading' },
 } satisfies Omit<ChatState, 'sessionId' | 'model' | 'effort' | 'status'>;
 
 function publish(sessionId: string): void {
@@ -151,7 +219,7 @@ function publish(sessionId: string): void {
 
 /** Changes what a chat looks like, and tells whoever is watching. */
 export function change(sessionId: string, into: Partial<ChatState>): void {
-  const target = resolve(sessionId);
+  const target = resolveSessionId(sessionId);
   states.set(target, { ...snapshotOf(target), ...into });
   publish(target);
   if (target !== sessionId) {
@@ -184,7 +252,7 @@ export function moveState(from: string, to: string): void {
 
 /** The state a screen draws, whether or not the chat has opened yet. */
 export function snapshotOf(sessionId: string): ChatState {
-  const target = resolve(sessionId);
+  const target = resolveSessionId(sessionId);
   const held = states.get(target);
   if (held !== undefined) {
     return held;
@@ -221,7 +289,7 @@ export function forgetState(sessionId: string): void {
      are read before any is removed, so a chain resolves as it was. */
   const stale: string[] = [];
   for (const from of movedTo.keys()) {
-    if (resolve(from) === sessionId) {
+    if (resolveSessionId(from) === sessionId) {
       stale.push(from);
     }
   }

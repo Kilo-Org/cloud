@@ -7,7 +7,10 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 - Worker, Durable Object, router, queue, stream, ingest, callback, and sandbox-control logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
 - The control wrapper runs inside the sandbox container. Its durable debug log is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`, configured through `WRAPPER_LOG_PATH`).
 - Kilo CLI logs inside the sandbox live under `/tmp/kilo-worktrees/<home>/.local/share/kilo/log/*.log`.
-- The wrapper uploads a bounded archive containing its own log plus the worktree Kilo logs every 30 seconds and again on shutdown. Wrangler shows matching R2 upload traffic.
+- Kilo v2 uses the runtime's actual home, commonly `/home/<id>/.local/share/kilo2/log/opencode.log`.
+  `/root/.local/share/kilo2/log/opencode.log` can contain only the version probe;
+  do not mistake it for the running session's log.
+- The wrapper uploads its log and worktree Kilo v1/v2 logs every 30 seconds and on shutdown. Wrangler shows matching R2 upload traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
 
 ## First Triage
@@ -27,6 +30,7 @@ Useful Worker-log landmarks include:
 - `Wrapper ingest WebSocket accepted`
 - `Client stream WebSocket accepted for setup`
 - `Session message terminalized`
+- `Runtime credential proxy request failed` (`logTag: runtime_proxy_request_failed`): one record per failed Kilo credential-proxy request. `rejectionStage: route` with `pathShape` means the facade has no allowlist entry for that path and answered 404 without an upstream call. When Kilo v2 then cannot load its model catalog, the run fails with `failure_reason = model_catalog_unavailable` (platform) and the user sees "The Kilo model catalog could not be loaded".
 
 ## Worker Logs
 
@@ -62,7 +66,7 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers`. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
+Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers.runtime-free`, then download the selected CLI and wrapper. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
 
 To inspect one candidate:
 
@@ -152,16 +156,37 @@ Kilo database or WAL files can also be copied when investigating persistence vis
 
 Control-plane sessions upload a bounded wrapper/Kilo file archive plus JSON records from the current wrapper: `wrapper.lifecycle`, `session.execution`, `control.workload`, `control.upload`, and `control.request` for worktree deletion only (`worktree.prepareDeletion`, `worktree.delete`, with `stage`, `worktreeId`, and `sessionCount`). Those records exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code. `session.sync` and `accepted_reconciliation` are from the replaced wrapper and are not emitted.
 
-The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads that log plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
+The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills.
+
+The same file uploader includes the wrapper log and native logs in one `files.tar.gz` archive.
+It scans `.local/share/kilo/log` and `.local/share/kilo2/log` beneath each runtime home.
+Homes can use `/home/<home>` or the older `/tmp/kilo-worktrees/<home>` layout.
+Archive paths retain the home name and native log path. The wrapper log keeps its existing archive name.
+Uploads run every 30 seconds and during shutdown after the JSON flush. R2 keys are:
 
 ```text
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/files.tar.gz
 ```
 
+File capture limits are 1 MiB per file, 4 MiB total retained content, and 64 source files.
+The wrapper log has priority. Native logs follow in newest-modified order.
+Large files retain complete lines from their tail, with a `[TRUNCATED: ...]` marker.
+Oversized individual lines are discarded. `TRUNCATED.txt` reports files omitted by the total size or file-count limit.
+These limits leave space for tar headers and gzip overhead beneath the existing 8 MiB upload cap.
+
+The existing output redactor removes recognized credential fields, auth headers, cookies, URL credentials, and all URL queries, including signatures.
+It also remembers known wrapper launch secrets before the wrapper removes them from its environment.
+Redaction precedes final size trimming. Only redacted copies enter the private temporary archive directory; capture does not change source logs.
+Symlinks and files outside the log directories are excluded. Missing or unreadable logs do not prevent other files from uploading.
+Logs can still contain prompts and code; credential redaction is not content anonymization.
+
+Upload retry, timeout, abort, and finalization behavior stays unchanged. Capture does not change turn results or native drain timing.
+The separate legacy v1 `logs.tar.gz` uploader remains unchanged.
+
 `sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
 
-For a `no_progress` or `execution_limit` outcome, find the `session.execution` record with `phase=deadline_expired`. The native session supervisor emits it for every expired Kilo execution, including unrouted and subagent work. It records `reason`, `nativeRuntimeId` and the expired `kiloSessionId`, plus `sessionId` and `rootKiloSessionId` when the execution belongs to a routed chat. `no_progress` means 20 minutes passed without real assistant or tool progress; a silent running tool does not hold that clock, and only waits on the user pause it. `execution_limit` is the separate 120-minute wall-clock cap, counted from the start of the run; follow-up messages that Kilo queues into the run do not restart it. If Kilo was retrying the model request when `no_progress` expired, the routed turn fails as that assistant failure (for example `assistantReason=rate_limited`) instead of `no_progress`, or as `provider_unavailable` when the retry text is not recognized; the `deadline_expired` record still says `no_progress`. The wrapper no longer reads native message parts before a deadline, so there is no last-tool or `phase=freshness` probe evidence; use the Kilo CLI log in the file archive for tool detail.
+For a `no_progress` or `execution_limit` outcome, find the `session.execution` record with `phase=deadline_expired`. The native session supervisor emits it for every expired Kilo execution, including unrouted and subagent work. It records `reason`, `nativeRuntimeId` and the expired `kiloSessionId`, plus `sessionId` and `rootKiloSessionId` when the execution belongs to a routed chat. `no_progress` means 20 minutes passed without real assistant or tool progress; a silent running tool does not hold that clock, and only waits on the user pause it. `execution_limit` is the separate 12-hour wall-clock cap, counted from the start of the run; follow-up messages that Kilo queues into the run do not restart it. If Kilo was retrying the model request when `no_progress` expired, the routed turn fails as that assistant failure (for example `assistantReason=rate_limited`) instead of `no_progress`, or as `provider_unavailable` when the retry text is not recognized; the `deadline_expired` record still says `no_progress`. The wrapper no longer reads native message parts before a deadline, so there is no last-tool or `phase=freshness` probe evidence; use the Kilo CLI log in the file archive for tool detail.
 
 `control.workload` records are per `scopeId`, so count distinct scopes to see whether the allocation was shared. `cpuUsageUsec`, `cpuThrottledUsec`, `cpuThrottleCount`, `ioReadBytes`, and `ioWriteBytes` are cumulative cgroup counters: compare consecutive samples from the same scope. Stats sample every 30 seconds, plus sooner (at most once per 10 seconds) when a throttle or memory-event counter increases or the group first crosses 90% of its memory cap (the pressure signal releases only below 80%), so consecutive samples may be farther apart than the old one-second cadence. `toolCpuUsageUsec`, `serverCpuUsageUsec`, `toolIoReadBytes`, and `toolIoWriteBytes` separate the tools subgroup from the Kilo server; they do not identify one command when several run together. `memoryMaxEvents` counts attempts to cross the memory limit and can rise without an OOM kill. `anonBytes`, `fileBytes`, and `shmemBytes` are the group `memory.stat` split, and `toolCurrentBytes`/`serverCurrentBytes` (with peaks) attribute the total to the tools subgroup or the Kilo server, so a full headroom can be traced to page cache from tool or Docker storage I/O (`file`) versus process memory (`anon`). Per-subgroup `toolAnonBytes`/`toolFileBytes`/`toolShmemBytes` and `server*` equivalents come from each subgroup's `memory.stat`. `*FileBytes` includes shmem; without swap only the rest is reclaimable. Memory a direct Kilo child allocates before the sweep moves it into tools stays charged to the server. A `workloadPhase: "protection"` record per scope reports the server's `memory.min` (`serverMinBytes`), or `phase: "failed"` when the kernel refused it. `wrapper.lifecycle` `kilo_memory_hold_started`/`kilo_memory_hold_ended` mark a hang restart held while the workload reclaimed at its cap, with `currentBytes`, `aggregateMaxBytes`, `memoryMaxEvents`, and on end `memoryHoldOutcome` and `elapsedMs`. `pressureAvailable` reports whether the kernel exposes `memory.pressure` (PSI); when it is false, rely on `memory.events` and `memory.stat`. A `health_probe_false` restart logs the latest snapshot for that runtime's own scope under the restart line's `workload` key, and a hang restart after an expired memory hold fails the turn as `sandbox_out_of_memory`. The Worker `container_launch_identity` diagnostic joins the physical allocation reference and sandbox name to Cloudflare's 64-character `containerInstanceId`, which can be queried in Cloudflare's historical Containers metrics. These counters show resource activity or contention, not useful tool progress.
 

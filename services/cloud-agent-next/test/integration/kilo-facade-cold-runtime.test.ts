@@ -22,7 +22,7 @@ import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -143,8 +143,7 @@ async function installSandbox(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    const sandboxEnv = (instance as unknown as { env: Record<string, unknown> }).env;
-    installFakeCredentialEnv(sandboxEnv, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -355,7 +354,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
       const nativeRead = await runInDurableObject(cold.stub, instance =>
         instance.kiloRequest({ name: 'session.status' })
       );
-      expect(nativeRead).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(nativeRead).toMatchObject({ ok: false, error: { code: 'runtime_offline' } });
 
       const answered = await cold.stub.answer({
         sessionId: cloudAgentSessionId,
@@ -432,7 +431,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
     const nativeRead = await runInDurableObject(cold.stub, instance =>
       instance.kiloRequest({ name: 'session.status' })
     );
-    expect(nativeRead).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    expect(nativeRead).toMatchObject({ ok: false, error: { code: 'runtime_offline' } });
 
     // The same durable identity cannot be admitted again, so a retry cannot
     // create a second accepted turn for the failed intent.

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
@@ -28,9 +28,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<DefaultsResponse | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
-    requestMethod: request.method,
-  });
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/defaults',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }

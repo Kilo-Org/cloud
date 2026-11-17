@@ -29,6 +29,7 @@ import {
   type ApiVersion,
   type DriverConfig,
   type StreamConnection,
+  type StreamEvent,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SharedScenario } from './scenarios-shared.js';
@@ -403,6 +404,50 @@ async function runCallbackCompletion(
 }
 
 /**
+ * The assistant messages on a stream with the user message each answers. A
+ * callback finds its text by this parent, so a batch answered under another
+ * user message shows here.
+ */
+function assistantParents(
+  events: StreamEvent[]
+): Array<{ id: string; parentID: string; textLength: number; firstTextAt?: string }> {
+  const parents = new Map<string, string>();
+  const texts = new Map<string, { length: number; firstAt: string }>();
+  for (const event of events) {
+    if (event.streamEventType !== 'kilocode') continue;
+    const properties = event.data.properties;
+    if (properties === null || typeof properties !== 'object') continue;
+    const part = 'part' in properties ? properties.part : undefined;
+    if (part !== null && typeof part === 'object') {
+      const { messageID, type, text } = part as {
+        messageID?: unknown;
+        type?: unknown;
+        text?: unknown;
+      };
+      if (type === 'text' && typeof messageID === 'string' && typeof text === 'string') {
+        const firstAt = texts.get(messageID)?.firstAt ?? event.timestamp;
+        texts.set(messageID, { length: text.length, firstAt });
+      }
+    }
+    const info = 'info' in properties ? properties.info : undefined;
+    if (info === null || typeof info !== 'object') continue;
+    const { id, parentID, role } = info as { id?: unknown; parentID?: unknown; role?: unknown };
+    if (role === 'assistant' && typeof id === 'string' && typeof parentID === 'string') {
+      parents.set(id, parentID);
+    }
+  }
+  return [...parents].map(([id, parentID]) => {
+    const text = texts.get(id);
+    return {
+      id,
+      parentID,
+      textLength: text?.length ?? 0,
+      ...(text === undefined ? {} : { firstTextAt: text.firstAt }),
+    };
+  });
+}
+
+/**
  * callback-batch-followup: boot on a fast warm-up turn, hold the next turn on a
  * bounded `slow:90:1000:16`, queue two follow-ups, let the hold complete, and
  * expect one message-correlated callback for the last queued message only; then
@@ -511,7 +556,14 @@ async function runCallbackBatchFollowup(
       !queuedBatchCallbackIds.includes(second.messageId);
     if (!batchCallbackOk) {
       return fail(
-        `queued callback batch mismatch: ids=${queuedBatchCallbackIds.join(',') || 'none'} status=${firstCallback?.status ?? 'missing'} text=${JSON.stringify(firstCallback?.lastAssistantMessageText)}`
+        `queued callback batch mismatch: ids=${queuedBatchCallbackIds.join(',') || 'none'} status=${firstCallback?.status ?? 'missing'} text=${JSON.stringify(firstCallback?.lastAssistantMessageText)} ` +
+          `held=${hold.held.messageId} second=${second.messageId} third=${third.messageId} ` +
+          `assistantParents=${JSON.stringify(assistantParents(stream.events))} ` +
+          `callbackKeys=${Object.keys(firstCallback ?? {})
+            .sort()
+            .join(',')} ` +
+          `recentActivityLength=${typeof firstCallback?.recentActivity === 'string' ? firstCallback.recentActivity.length : 'none'} ` +
+          `observedAt=${new Date().toISOString()}`
       );
     }
 
@@ -749,7 +801,7 @@ export const CALLBACK_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultTimeoutMs: CALLBACK_BATCH_TIMEOUT_MS,
     disabled:
-      'the queued-batch callback has no assistant text; suspected cause: the wrapper reports the batch completed before Kilo answers the last follow-up',
+      'Kilo v1 closes the queued slot for the second follow-up as completed before it answers the third, so the wrapper reports the batch completed early; not fixed for v1 because Cloud Agent moves to Kilo v2',
     run: runCallbackBatchFollowup,
   },
   'callback-interrupt': {

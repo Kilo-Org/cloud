@@ -136,6 +136,7 @@ describe('applyUsagePricing', () => {
     { label: 'free', context: makeContext({ is_free: true }) },
     { label: 'user BYOK', context: makeContext({ user_byok: true }) },
     { label: 'ChatGPT', context: makeContext({ provider: 'openai-chatgpt' }) },
+    { label: 'Claude organization', context: makeContext({ provider: 'claude-billing' }) },
   ])(
     'zeroes billed cost and cache discount for $label while preserving market cost',
     ({ context }) => {

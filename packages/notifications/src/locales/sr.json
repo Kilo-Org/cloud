@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Vaša agentska sesija ima ažuriranje",
-      "chatMessage": "Imate novu poruku",
-      "instanceLifecycle": "Vaša instanca ima ažuriranje",
-      "scheduledAction": "Zakazana radnja ima ažuriranje",
       "lowBalance": "Vaš saldo zahteva pažnju",
       "spendAlert": "Vaša potrošnja zahteva pažnju",
       "securityFinding": "Bezbednosni nalaz zahteva pažnju",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Zadatak završen"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Neuspešno: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Prekinuto: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Bez naslova",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Upozorenje o potrošnji",
       "body": "Potrošnja za {{scopeName}} prešla je ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Novi bezbednosni nalaz ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Novi bezbednosni nalaz ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA upozorenje",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "SLA upozorenje"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA kršenje",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "SLA kršenje"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Bezbednosna provera ima ažuriranje"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} je spreman",
-      "body": "Dodirnite da započnete ćaskanje."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} nije uspeo da se pokrene",
-      "body": "Pokretanje nije uspelo."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} će se uskoro ponovo pokrenuti",
-      "body": "Zakazano ponovno pokretanje u {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Ponovno pokretanje {{instanceName}}-a otkazano",
-      "body": "Prethodno zakazano ponovno pokretanje je otkazano."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} će se uskoro nadograditi",
-      "bodyWithTag": "Nadogradnja na {{targetImageTag}} u {{when}}.",
-      "bodyWithoutTag": "Zakazana nadogradnja u {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Nadogradnja {{instanceName}}-a otkazana",
-      "body": "Prethodno zakazana nadogradnja je otkazana."
     }
   },
   "sessionReady": {

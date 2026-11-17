@@ -46,6 +46,9 @@ export class FixtureProviderError extends Error {
 export const Lane = z.enum(['local', 'cloud']);
 export type Lane = z.infer<typeof Lane>;
 
+export const ScenarioID = z.enum(['session.open', 'prompt.stream', 'permission.continue']);
+export type ScenarioID = z.infer<typeof ScenarioID>;
+
 export const Resource = z.object({
   kind: z.string().min(1),
   id: z.string().min(1),
@@ -107,6 +110,7 @@ export const ProviderPrepareRequest = z.object({
   operation: z.literal('prepare'),
   runId: z.string().min(1),
   lane: Lane,
+  scenarioId: ScenarioID.optional(),
   fakeLlmScope: z.string().min(1),
   descriptorPath: z.string().min(1),
   projectDir: z.string().min(1),

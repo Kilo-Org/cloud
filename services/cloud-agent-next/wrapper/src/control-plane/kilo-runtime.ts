@@ -1,4 +1,8 @@
 import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
+import {
+  GH_STACK_EXTENSION_NAME,
+  GH_STACK_EXTENSIONS_ROOT,
+} from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -303,6 +307,7 @@ export type KiloRuntimeOptions = {
   onEvent?: (event: KiloFeedEvent) => void;
   onHarnessActivity?: (event: HarnessActivityEvent) => void;
   onActivityChange?: () => void;
+  onFeedInterrupted?: (nativeRuntimeId: string) => void;
   onDeadline?: (
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
@@ -334,11 +339,14 @@ export type KiloRuntimeOptions = {
   isIdle?: (client: Harness, directory: string, signal: AbortSignal) => Promise<boolean>;
   /** Names the reserved port in the agent rules; unknown leaves that rule out. */
   sandboxProvider?: AgentSandboxProvider;
+  /** Adds the workspace Artifacts guidance to the agent rules when sync is running. */
+  artifacts?: boolean;
   /** Creates the Kilo home/auth/runtime directories before spawn (spec §7). */
   prepareFilesystem?: (
     env: Record<string, string>,
     directory: string,
-    sandboxProvider?: AgentSandboxProvider
+    sandboxProvider?: AgentSandboxProvider,
+    artifacts?: boolean
   ) => Promise<void>;
 };
 
@@ -351,6 +359,7 @@ export type KiloFeedCallbacks = {
 };
 
 export type KiloRuntime = {
+  readonly nativeRuntimeId: string;
   readonly directory: string;
   readonly env: Record<string, string>;
   readonly client: Harness;
@@ -371,6 +380,7 @@ export type KiloRuntime = {
   isRestarting(): boolean;
   isUnavailable(): boolean;
   needsCompute(): boolean;
+  liveTreeExecutions(root: string): number[] | undefined;
   sessionState(id: string): ReturnType<RuntimeActivity['state']>;
   refreshActivity(): Promise<void>;
   shutdown(): Promise<void>;
@@ -485,6 +495,16 @@ function createHealthProbe(
   };
 }
 
+function exitsWithin(kilo: KiloProcess, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    kilo.exited.then(() => true),
+    new Promise<boolean>(resolve => {
+      timer = setTimeout(() => resolve(false), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 /** PTY half of credential maintenance; native idle comes from the supervisor. */
 async function defaultIsIdle(
   client: Harness,
@@ -516,13 +536,15 @@ async function defaultIsIdle(
 export async function prepareKiloFilesystem(
   env: Record<string, string>,
   directory: string,
-  sandboxProvider?: AgentSandboxProvider
+  sandboxProvider?: AgentSandboxProvider,
+  artifacts?: boolean
 ): Promise<void> {
   const home = env.HOME;
   if (home !== undefined && home.length > 0) {
     await writeCloudAgentRulesFile(home, {
       bashDefaultTimeoutMs: env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
       ...(sandboxProvider ? { sandboxProvider } : {}),
+      ...(artifacts ? { artifacts } : {}),
     });
   }
   const dataHome = env.XDG_DATA_HOME;
@@ -532,6 +554,19 @@ export async function prepareKiloFilesystem(
     await fsp.writeFile(path.join(authDirectory, 'auth.json'), env.KILO_AUTH_CONTENT ?? '', {
       mode: 0o600,
     });
+    // `gh` looks for extensions under `$XDG_DATA_HOME/gh/extensions`, while the
+    // runtime HOME is per worktree and starts empty. Expose the image-baked
+    // gh-stack extension through that path. An existing link (or an upgrade the
+    // agent installed) is left untouched.
+    const extensionsDirectory = path.join(dataHome, 'gh', 'extensions');
+    await fsp.mkdir(extensionsDirectory, { recursive: true });
+    const ghStackLink = path.join(extensionsDirectory, GH_STACK_EXTENSION_NAME);
+    try {
+      await fsp.lstat(ghStackLink);
+    } catch {
+      const ghStackSource = path.join(GH_STACK_EXTENSIONS_ROOT, GH_STACK_EXTENSION_NAME);
+      await fsp.symlink(ghStackSource, ghStackLink, 'dir');
+    }
   }
   const runtimeDir = env.XDG_RUNTIME_DIR;
   if (runtimeDir !== undefined && runtimeDir.length > 0) {
@@ -724,6 +759,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
               attempt !== feedAttempt
             )
               return;
+            if (feed === next && client?.drainSession) {
+              feed = undefined;
+              options.onFeedInterrupted?.(processId);
+              next.close();
+            }
             currentActivity?.lost();
             // A stream end completes the current attempt; with none in flight it
             // starts a new recovery episode. It never restarts Kilo directly.
@@ -738,10 +778,23 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function runRecovery(): Promise<void> {
+    let refusedSince: number | undefined;
     while (phase === 'running' || phase === 'suspected') {
       const now = scheduler.now();
       pruneReconnects(now);
       if (reconnects.length >= timers.sseReconnectLimit) {
+        // Refused reopens spend the budget within milliseconds of a crash, before the
+        // process exit arrives. That exit then restarts Kilo for its real reason.
+        const refused = kiloProcess;
+        if (
+          client?.drainSession &&
+          refused &&
+          refusedSince !== undefined &&
+          now - refusedSince < timers.healthRequestMs
+        ) {
+          if (await exitsWithin(refused, timers.healthRequestMs)) return;
+          if (refused !== kiloProcess) return;
+        }
         // Spec §7: too many reconnects inside the window without a recovered
         // stream; restart Kilo.
         await restartHung('sse_reconnect_budget');
@@ -753,8 +806,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       if (!current) return;
       const previous = feed;
       feed = undefined;
+      if (previous && client?.drainSession) options.onFeedInterrupted?.(nativeRuntimeId);
       previous?.close();
       if (await openAttempt(current)) return;
+      refusedSince ??= now;
     }
   }
 
@@ -915,7 +970,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
     const env = options.env;
-    await prepareFilesystem(env, options.directory, options.sandboxProvider);
+    await prepareFilesystem(env, options.directory, options.sandboxProvider, options.artifacts);
     if (currentPhase() === 'stopped') throw new Error('Kilo runtime is shutting down');
     const controller = new AbortController();
     startAbort = controller;
@@ -1267,12 +1322,17 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
             }
           );
         } catch {
+          pendingCredentials = true;
           log('control-plane MCP credential refresh failed; retaining pending credential restart');
         }
       }
     },
     applyPendingCredentials,
+    get nativeRuntimeId() {
+      return nativeRuntimeId;
+    },
     needsCompute: () => activity?.needsCompute() ?? false,
+    liveTreeExecutions: root => activity?.liveTreeExecutions(root),
     sessionState: id => activity?.state(id),
     refreshActivity: () => activity?.refresh() ?? Promise.resolve(),
     phase: currentPhase,
@@ -1300,6 +1360,7 @@ export type KiloRuntimesOptions = Omit<
   | 'onUnavailable'
   | 'onDeadline'
   | 'onActivityChange'
+  | 'onFeedInterrupted'
   | 'onMemoryHold'
 > & {
   pidfileDirectory?: string;
@@ -1315,6 +1376,7 @@ export type KiloRuntimesOptions = Omit<
     stopped: Promise<boolean>
   ) => void;
   onActivityChange?: (key: string) => void;
+  onFeedInterrupted?: (nativeRuntimeId: string, key: string) => void;
   onMemoryHold?: (info: { directory: string; held: boolean; key: string }) => void;
 };
 
@@ -1492,6 +1554,7 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         onDeadline: (identity, reason, retry, stopped) =>
           options.onDeadline?.(identity, reason, retry, input.key, stopped),
         onActivityChange: () => options.onActivityChange?.(input.key),
+        onFeedInterrupted: id => options.onFeedInterrupted?.(id, input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
         onMemoryHold: info => options.onMemoryHold?.({ ...info, key: input.key }),
       });

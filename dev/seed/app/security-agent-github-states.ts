@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
@@ -73,6 +73,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`unexpected arguments: ${rest.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('app:security-agent-github-states');
   const db = getSeedDb();
   const ownerUserId = await lookupUserId(ownerEmail);
   const memberUserId = await lookupUserId(memberEmail);

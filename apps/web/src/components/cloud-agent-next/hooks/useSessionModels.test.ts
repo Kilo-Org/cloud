@@ -1,13 +1,20 @@
 import { describe, expect, it } from '@jest/globals';
-import type { RemoteModelState } from '@kilocode/cloud-agent-sdk';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { CloudAgentModelOverride, RemoteModelState } from '@kilocode/cloud-agent-sdk';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
   buildSessionModels,
   createRemoteModelOverride,
   resolveGatewayOrganization,
+  useSessionModels,
   validateRemoteModelOverride,
   type SessionModelOption,
 } from './useSessionModels';
+import { useOrganizationModels } from './useOrganizationModels';
+
+jest.mock('./useOrganizationModels', () => ({ useOrganizationModels: jest.fn() }));
+jest.mock('./useRememberKnownModel', () => ({ useRememberKnownModel: () => {} }));
 
 const gatewayModels = [
   {
@@ -24,6 +31,190 @@ const emptyRemoteState = {
   protocol: 'unknown',
   refresh: 'idle',
 } satisfies RemoteModelState;
+
+describe('useSessionModels', () => {
+  it.each([false, true])(
+    'fetches a known selected model catalog only on picker intent=%s',
+    requested => {
+      jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+        modelOptions: [],
+        isLoadingModels: requested,
+        hasLoadedModels: false,
+        contextLengthByModelId: new Map(),
+      });
+      function Picker() {
+        const models = useSessionModels({
+          activeSessionType: 'cloud-agent',
+          remoteModelState: emptyRemoteState,
+          observedModel: null,
+          remoteModelOverride: null,
+          gatewayModelId: gatewayModels[0].id,
+          fetchedSessionData: { organizationId: 'org-owning' },
+          sessionIdFromParams: 'session-1',
+          knownModels: [{ ...gatewayModels[0], mayTrainOnYourPrompts: false }],
+          loadGatewayCatalog: requested,
+        });
+        return createElement('output', null, models.modelOptions[0]?.name);
+      }
+      expect(renderToStaticMarkup(createElement(Picker))).toContain('Claude Sonnet 4');
+      expect(useOrganizationModels).toHaveBeenCalledWith('org-owning', requested);
+    }
+  );
+
+  it('still fetches immediately when the selected model is not known', () => {
+    jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+      modelOptions: [],
+      isLoadingModels: true,
+      hasLoadedModels: false,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: 'unknown/model',
+        fetchedSessionData: { organizationId: null },
+        sessionIdFromParams: 'session-1',
+        knownModels: [],
+        loadGatewayCatalog: false,
+      });
+      return null;
+    }
+    renderToStaticMarkup(createElement(Picker));
+    expect(useOrganizationModels).toHaveBeenCalledWith(undefined, true);
+  });
+  it.each([false, true])('restores the session model with catalog loading=%s', isLoadingModels => {
+    jest.mocked(useOrganizationModels).mockReturnValue({
+      modelOptions: isLoadingModels ? [] : gatewayModels,
+      isLoadingModels,
+      hasLoadedModels: !isLoadingModels,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: {
+          model: { providerID: 'kilo', modelID: gatewayModels[0].id },
+          variant: 'high',
+        },
+        remoteModelOverride: null,
+        gatewayModelId: 'old/session-model',
+        gatewayVariant: 'low',
+        fetchedSessionData: { organizationId: null },
+        sessionIdFromParams: 'session-1',
+        knownModels: [{ ...gatewayModels[0], mayTrainOnYourPrompts: false }],
+      });
+      return createElement(
+        'output',
+        { 'data-loading': models.isLoadingModels },
+        models.modelOptions.find(option => option.id === models.selectedValue)?.name,
+        ':',
+        models.selectedVariant
+      );
+    }
+
+    expect(renderToStaticMarkup(createElement(Picker))).toBe(
+      '<output data-loading="false">Claude Sonnet 4:high</output>'
+    );
+  });
+  it('uses the cached organization catalog before the model picker opens', () => {
+    jest
+      .mocked(useOrganizationModels)
+      .mockClear()
+      .mockReturnValue({
+        modelOptions: gatewayModels,
+        isLoadingModels: false,
+        hasLoadedModels: true,
+        contextLengthByModelId: new Map([[gatewayModels[0].id, 200_000]]),
+      });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: gatewayModels[0].id,
+        fetchedSessionData: { organizationId: 'org-owning' },
+        sessionIdFromParams: 'session-2',
+        knownModels: [
+          { ...gatewayModels[0], name: 'Old name', variants: [], mayTrainOnYourPrompts: false },
+        ],
+        loadGatewayCatalog: false,
+      });
+      return createElement(
+        'output',
+        null,
+        models.modelOptions[0]?.name,
+        ':',
+        models.availableVariants.join(','),
+        ':',
+        models.gatewayContextLengthByModelId.get(gatewayModels[0].id)
+      );
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe(
+      '<output>Claude Sonnet 4:none,high:200000</output>'
+    );
+    expect(useOrganizationModels).toHaveBeenCalledWith('org-owning', false);
+  });
+
+  it('honors a cached empty catalog instead of restoring a model removed by policy', () => {
+    jest.mocked(useOrganizationModels).mockReturnValue({
+      modelOptions: [],
+      isLoadingModels: false,
+      hasLoadedModels: true,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: gatewayModels[0].id,
+        fetchedSessionData: { organizationId: 'org-owning' },
+        sessionIdFromParams: 'session-2',
+        knownModels: [{ ...gatewayModels[0], mayTrainOnYourPrompts: false }],
+        loadGatewayCatalog: false,
+      });
+      return createElement(
+        'output',
+        { 'data-loading': models.isLoadingModels },
+        models.modelOptions.length
+      );
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe(
+      '<output data-loading="false">0</output>'
+    );
+  });
+
+  it('does not expose a cached catalog before an existing chat owner is resolved', () => {
+    jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+      modelOptions: gatewayModels,
+      isLoadingModels: false,
+      hasLoadedModels: true,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: null,
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        fetchedSessionData: null,
+        routeOrganizationId: 'org-other',
+        sessionIdFromParams: 'session-unresolved',
+        knownModels: [],
+        loadGatewayCatalog: false,
+      });
+      return createElement('output', null, models.modelOptions.length);
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe('<output>0</output>');
+    expect(useOrganizationModels).toHaveBeenCalledWith(undefined, false);
+  });
+});
 
 describe('resolveGatewayOrganization', () => {
   it('uses the persisted session organization instead of the route organization', () => {
@@ -53,6 +244,87 @@ describe('resolveGatewayOrganization', () => {
 });
 
 describe('buildSessionModels', () => {
+  it('restores the observed Cloud Agent model even with a warm Gateway catalog', () => {
+    const result = buildSessionModels({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: emptyRemoteState,
+      observedModel: {
+        model: { providerID: 'kilo', modelID: gatewayModels[0].id },
+        variant: 'high',
+      },
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+      gatewayModelId: 'old/session-model',
+      gatewayVariant: 'low',
+    });
+
+    expect(result.selectedValue).toBe(gatewayModels[0].id);
+    expect(result.selectedVariant).toBe('high');
+    expect(result.availableVariants).toEqual(['none', 'high']);
+  });
+
+  it.each([
+    { model: gatewayModels[0].id, variant: 'high' },
+    { model: gatewayModels[0].id },
+  ] satisfies CloudAgentModelOverride[])(
+    'keeps an explicit Cloud Agent selection over restored model and variant: %j',
+    cloudAgentModelOverride => {
+      const result = buildSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: {
+          model: { providerID: 'kilo', modelID: 'old/observed-model' },
+          variant: 'low',
+        },
+        remoteModelOverride: null,
+        cloudAgentModelOverride,
+        gatewayModels,
+        gatewayModelsLoading: false,
+        gatewayModelId: 'old/session-model',
+        gatewayVariant: 'low',
+      });
+
+      expect(result.selectedValue).toBe(cloudAgentModelOverride.model);
+      expect(result.selectedVariant).toBe(cloudAgentModelOverride.variant);
+      expect(result.availableVariants).toEqual(['none', 'high']);
+    }
+  );
+
+  it('drops a restored variant removed from the catalog', () => {
+    const result = buildSessionModels({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: emptyRemoteState,
+      observedModel: {
+        model: { providerID: 'kilo', modelID: gatewayModels[0].id },
+        variant: 'removed',
+      },
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+    });
+    expect(result.selectedVariant).toBeUndefined();
+  });
+
+  it('does not reinterpret another provider model as a Gateway model', () => {
+    const result = buildSessionModels({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: emptyRemoteState,
+      observedModel: {
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        variant: 'max',
+      },
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+      gatewayModelId: gatewayModels[0].id,
+      gatewayVariant: 'high',
+    });
+
+    expect(result.selectedValue).toBe(gatewayModels[0].id);
+    expect(result.selectedVariant).toBe('high');
+  });
+
   it('keeps Cloud Agent on the existing Gateway catalog and selection', () => {
     const result = buildSessionModels({
       activeSessionType: 'cloud-agent',
@@ -123,6 +395,7 @@ describe('buildSessionModels', () => {
       gatewayModels,
       gatewayModelsLoading: false,
       gatewayModelId: gatewayModels[0].id,
+      cloudAgentModelOverride: { model: 'cloud-only/model', variant: 'low' },
       gatewayOrganizationId: 'org-persisted',
     });
 

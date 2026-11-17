@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ChatListScreen } from '@/components/chat/chat-list-screen';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   renderWithProviders,
@@ -115,7 +116,15 @@ vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
 vi.mock('sonner-native', () => ({
   toast: { error: state.toastError, dismiss: state.toastDismiss },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: state.push, back: vi.fn() }),
+}));
+// The scope row opens the shared picker through the press-burst guard; this
+// suite asserts the press reached the route, so the guarded push is the router
+// mock it already checks.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => state.push,
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -192,21 +201,6 @@ function accountControl(ui: RenderWithProvidersResult) {
   return ui.renderer.root.findByProps({ accessibilityHint: 'Select account' });
 }
 
-/** The open picker's account rows, in option order. */
-function optionRows(ui: RenderWithProvidersResult) {
-  return ui.renderer.root.findAll(node => {
-    const selectionState: unknown = node.props.accessibilityState;
-    return (
-      (node.type as string) === 'Pressable' &&
-      node.props.accessibilityRole === 'button' &&
-      typeof selectionState === 'object' &&
-      selectionState !== null &&
-      'selected' in selectionState &&
-      typeof selectionState.selected === 'boolean'
-    );
-  });
-}
-
 async function press(node: ReactTestInstance): Promise<void> {
   const onPress = node.props.onPress as (() => void) | undefined;
   await act(() => {
@@ -214,13 +208,22 @@ async function press(node: ReactTestInstance): Promise<void> {
   });
 }
 
+/**
+ * Presses the account control, then applies the row the picker route reports
+ * for that account: the row press and the route's pick are the same call.
+ */
 async function chooseAccount(ui: RenderWithProvidersResult, name: string): Promise<void> {
   await press(accountControl(ui));
-  const row = optionRows(ui).find(node => node.props.accessibilityLabel === name);
-  expect(row).toBeDefined();
-  if (row !== undefined) {
-    await press(row);
+  expect(state.push).toHaveBeenCalledWith('/(app)/context-picker');
+  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (bridge === undefined) {
+    throw new Error('the account picker route was not handed a bridge');
   }
+  const index = bridge.options.indexOf(name);
+  expect(index).toBeGreaterThan(-1);
+  await act(() => {
+    bridge.onSelect(index);
+  });
 }
 
 describe('the workspace the Chat tab names', () => {

@@ -4,8 +4,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { i18n } from './index';
 
 const SUPPORT_COPY_KEYS = [
-  'kiloclaw.onboarding.provisioning.stalledBody',
-  'kiloclaw.accessRequired.iosContact',
   'codeReviewer.actionRequired.githubIpAllowList.description',
   'codeReviewer.actionRequired.repeatedRepositoryCloneTimeout.description',
 ] as const;
@@ -17,7 +15,7 @@ afterEach(async () => {
 describe('support email interpolation', () => {
   it('renders the shared address in English without a caller-provided variable', () => {
     for (const key of SUPPORT_COPY_KEYS) {
-      const rendered = i18n.t(key, { name: 'Claw' });
+      const rendered = i18n.t(key);
       expect(rendered).toContain(SUPPORT_EMAIL);
       expect(rendered).not.toContain('{{');
     }
@@ -29,11 +27,8 @@ describe('support email interpolation', () => {
     await i18n.changeLanguage('de');
 
     expect(i18n.hasResourceBundle('de', 'translation')).toBe(true);
-    expect(i18n.t('kiloclaw.accessRequired.iosContact')).toBe(
-      `Fragen? Schreibe an ${SUPPORT_EMAIL}.`
-    );
     for (const key of SUPPORT_COPY_KEYS) {
-      const rendered = i18n.t(key, { name: 'Claw' });
+      const rendered = i18n.t(key);
       expect(rendered).toContain(SUPPORT_EMAIL);
       expect(rendered).not.toContain('{{');
     }

@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- one cohesive mounted suite: rendering states, reorder and delete labels, and the save/reconcile paths share the screen's mock harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import {
   changeRowText,
   commitRow,
@@ -17,6 +16,8 @@ import {
   testCommands,
   type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
+import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -36,10 +37,12 @@ const h = vi.hoisted(() => ({
   back: vi.fn(),
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -48,7 +51,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: h.back }),
+  useRouter: () => ({ back: h.back, canGoBack: () => true }),
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
@@ -64,7 +67,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helpers must be loaded inside the factory.
+  const { createElement } = await import('react');
+  return {
+    // The real state renders its `action` below the title, so the manage slot's
+    // sentence or the manager's CTA reaches the tree the way the screen hands it over.
+    EmptyState: (props: { action?: unknown }) =>
+      createElement('EmptyState', props, props.action as never),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
@@ -102,13 +115,17 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 /** Press the add CTA the empty state renders through its `action` prop. */
 function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
-  const action = findOne(renderer.root, 'EmptyState').props.action as {
-    props: { onPress: () => void };
-  };
+  const action = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  if (!action) {
+    throw new Error('the empty state rendered no add CTA');
+  }
   act(() => {
-    action.props.onPress();
+    (action.props as { onPress: () => void }).onPress();
   });
 }
 
@@ -116,6 +133,7 @@ describe('ProfileCommandsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -156,6 +174,22 @@ describe('ProfileCommandsScreen', () => {
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
     pressEmptyAction(renderer);
     expect(findFields(renderer.root)[0]?.props.placeholder).toBe('e.g. pnpm install');
+
+    unmount();
+  });
+
+  it('resolving: offers neither the add CTA nor the role sentence before the role is known', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testCommands();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      ROLE_SENTENCE
+    );
 
     unmount();
   });
@@ -591,5 +625,38 @@ describe('ProfileCommandsScreen', () => {
     ]);
 
     unmount();
+  });
+
+  it('names the setup command cap above the disabled add control', async () => {
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${String(index)}`)
+    );
+    h.query.isPending = false;
+
+    const atCap = await mountScreen();
+    const capCopy = i18n.t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS });
+    const footer = atCap.renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === capCopy)
+    );
+    // The notice holds the slot's first line, above the add control.
+    expect(footer).toHaveLength(2);
+    expect(footer[0]?.type).toBe('Text');
+    expect(footer[1]?.type).toBe('Button');
+    expect(String(footer[0]?.props.className)).toContain('text-warn');
+    expect(footer[1]?.props.disabled).toBe(true);
+    atCap.unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS - 1 }, (_, index) => `cmd ${String(index)}`)
+    );
+    const belowCap = await mountScreen();
+    expect(findAll(belowCap.renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      capCopy
+    );
+    expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    belowCap.unmount();
   });
 });

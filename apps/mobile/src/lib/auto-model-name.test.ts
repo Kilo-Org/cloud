@@ -25,7 +25,7 @@ describe('autoModelLabel', () => {
     }
   });
 
-  it('strips the KiloClaw model prefix before the lookup', () => {
+  it('strips the provider model prefix before the lookup', () => {
     expect(autoModelLabel('kilocode/kilo-auto/balanced', 'Auto Balanced')).toBe(
       i18n.t('models.auto.balanced')
     );

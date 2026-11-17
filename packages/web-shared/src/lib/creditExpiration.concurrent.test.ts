@@ -389,6 +389,16 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
         createdAt: account.org?.created_at ?? account.user.created_at,
         microdollarsUsed: 900,
         totalMicrodollarsAcquired: 1_900,
+        ...(account.org
+          ? {
+              bouncer: {
+                rootOrganizationId: account.org.id,
+                createdAt: account.org.created_at,
+                microdollarsUsed: 900,
+                totalMicrodollarsAcquired: 1_900,
+              },
+            }
+          : {}),
       });
       expect(balance.balanceLimitedByUserAllowance).toBe(false);
     } finally {

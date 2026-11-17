@@ -1,10 +1,15 @@
 export { classifyOrganizationEntitlement } from './classification';
 export {
   getDaysRemainingInTrial,
+  getOrganizationTrialEndDate,
   getOrgTrialStatusFromDays,
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from './trial';
+export {
+  isPaidOrganizationSeatSubscriptionStatus,
+  PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
+} from './types';
 export type {
   OrganizationEntitlementBypassReason,
   OrganizationEntitlementClassification,
@@ -14,4 +19,5 @@ export type {
   OrganizationSeatPurchaseSubscriptionStatus,
   OrganizationTrialDisplayStatus,
   OrganizationTrialStage,
+  PaidOrganizationSeatSubscriptionStatus,
 } from './types';

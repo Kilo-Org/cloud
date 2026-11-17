@@ -26,11 +26,12 @@ export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
 /** The user chose Not now on the iOS install-attribution pre-prompt; do not ask again. */
 export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
-export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
+/** The last cloud environment chosen per repository and scope, by choice key. */
+export const LAST_CLOUD_ENVIRONMENT_KEY = 'last-cloud-environment';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
 export const HIDE_THINKING_KEY = 'agent-hide-thinking-details';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
@@ -44,13 +45,17 @@ export const LANGUAGE_PREFERENCE_KEY = 'language-preference';
 export const LANGUAGE_RETURN_TARGET_KEY = 'language-return-target';
 /** Language whose forced layout direction the last launch already reloaded for. */
 export const LANGUAGE_DIRECTION_ATTEMPT_KEY = 'language-direction-attempt';
-/** Login email draft, persisted before an RTL language reload. */
+/** Login email draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
 export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
-/** Login SSO-recovery banner draft, persisted before an RTL language reload. */
+/** Login SSO-recovery banner draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
+/** The one sign-in attempt record: the draft a reload reads, or the tombstone that retires it. */
+export const LOGIN_DRAFT_RECORD_KEY = 'login-draft-record';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
 /** Profile credit balance masked as `*****`. Device preference; survives reboot. */
 export const HIDE_BALANCE_KEY = 'hide-balance';
+/** The painted stand-in for an amount the hide-balance preference keeps off screen. */
+export const HIDDEN_BALANCE = '*****';
 export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
 /** Return key in the agent composer sends/start instead of inserting a newline. */
 export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
@@ -102,7 +107,6 @@ export const ACTIVE_USER_ID_KEY = 'active-user-id';
  * epoch-fenced and NOT deleted on sign-out: it must survive the teardown.
  */
 export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
-export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';
@@ -176,6 +180,14 @@ export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
  * account never restores another account's route (see `lib/last-route.ts`).
  */
 export const LAST_ROUTE_KEY = 'last-route';
+
+/**
+ * The scope names the app last showed behind the Code Reviewer headers. Holds
+ * `{ version, userId, entries }`; the account id inside the record scopes it,
+ * so one account's names never paint under another account's header (see
+ * `lib/code-reviewer-scope-name.ts`).
+ */
+export const REVIEWER_SCOPE_NAMES_KEY = 'reviewer-scope-names';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

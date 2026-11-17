@@ -7,21 +7,22 @@ import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { hasOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
-import { and, eq, isNull } from 'drizzle-orm';
+import { organizationAccessQuery } from '@kilocode/worker-utils/organization-membership';
+import { and, eq, exists, isNull, sql } from 'drizzle-orm';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 
 import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, timed } from './metrics';
+import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agent-upload';
 
 export type { Principal };
 
 /** A Secrets Store binding in deployment, or a plain string from local vars. */
 export type SecretBinding = string | { get(): Promise<string | null> };
 
-export type AuthEnv = {
+export type AuthEnv = CloudAgentUploadEnv & {
   NEXTAUTH_SECRET: SecretBinding;
   SESSION_SYNC_SECRET: SecretBinding;
   HYPERDRIVE: Hyperdrive;
@@ -221,11 +222,38 @@ async function checkAccount(
   credential: Credential,
   organizationID: string | undefined
 ): Promise<Response | undefined> {
+  const deviceSessionID =
+    credential.deviceSessionID === undefined
+      ? undefined
+      : z.uuid().safeParse(credential.deviceSessionID);
   const [user] = await db
     .select({
       pepper: kilocode_users.api_token_pepper,
       blockedReason: kilocode_users.blocked_reason,
       blockedAt: kilocode_users.blocked_at,
+      deviceSessionActive: deviceSessionID?.success
+        ? exists(
+            db
+              .select({ id: device_sessions.id })
+              .from(device_sessions)
+              .where(
+                and(
+                  eq(device_sessions.id, deviceSessionID.data),
+                  eq(device_sessions.kilo_user_id, credential.userID),
+                  isNull(device_sessions.revoked_at)
+                )
+              )
+          ).mapWith(Boolean)
+        : sql<boolean>`false`,
+      organizationAccess:
+        organizationID === undefined
+          ? sql<boolean>`true`
+          : exists(
+              organizationAccessQuery(db, {
+                kiloUserId: credential.userID,
+                organizationId: organizationID,
+              })
+            ).mapWith(Boolean),
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, credential.userID))
@@ -235,30 +263,14 @@ async function checkAccount(
     return failure(403, 'account_blocked', 'The account is blocked');
   }
 
-  if (credential.deviceSessionID !== undefined) {
-    const id = z.uuid().safeParse(credential.deviceSessionID);
-    if (!id.success) return invalidCredential();
-    const [session] = await db
-      .select({ id: device_sessions.id })
-      .from(device_sessions)
-      .where(
-        and(
-          eq(device_sessions.id, id.data),
-          eq(device_sessions.kilo_user_id, credential.userID),
-          isNull(device_sessions.revoked_at)
-        )
-      )
-      .limit(1);
-    if (!session) return invalidCredential('The device session is no longer active');
+  if (deviceSessionID !== undefined) {
+    if (!deviceSessionID.success) return invalidCredential();
+    if (!user.deviceSessionActive) {
+      return invalidCredential('The device session is no longer active');
+    }
   }
 
-  if (
-    organizationID !== undefined &&
-    !(await hasOrganizationAccess(db, {
-      kiloUserId: credential.userID,
-      organizationId: organizationID,
-    }))
-  ) {
+  if (!user.organizationAccess) {
     return failure(403, 'organization_access_denied', 'Organization access is required');
   }
   return undefined;
@@ -283,6 +295,8 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (!token) return failure(401, 'unauthenticated', 'A Kilo bearer credential is required');
   const body = await readExchangeBody(request);
   if (body instanceof Response) return body;
+  const hosted = await exchangeCloudAgentUpload(token, body.organizationID, env);
+  if (hosted) return hosted;
 
   try {
     const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);

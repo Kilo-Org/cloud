@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/nextjs';
 import type { ElementType, ReactNode } from 'react';
 import {
   Bot,
-  BookOpen,
   Building2,
   Cable,
   ChartColumnIncreasing,
@@ -11,8 +10,6 @@ import {
   Cloud,
   Coins,
   CreditCard,
-  Download,
-  Factory,
   Key,
   List,
   MessageSquare,
@@ -163,11 +160,6 @@ const cloudItems: SidebarStoryItem[] = [
     icon: Shield,
     url: '/security-agent',
   },
-  {
-    title: 'Gas Town',
-    icon: Factory,
-    url: '/gastown',
-  },
 ];
 
 const accountItems: SidebarStoryItem[] = [
@@ -203,19 +195,6 @@ const accountItems: SidebarStoryItem[] = [
   },
 ];
 
-const startItems: SidebarStoryItem[] = [
-  {
-    title: 'Install',
-    icon: Download,
-    url: '/install',
-  },
-  {
-    title: 'Learn',
-    icon: BookOpen,
-    url: '/learn',
-  },
-];
-
 const kiloClawEntryItems: SidebarStoryItem[] = [
   {
     title: 'KiloClaw',
@@ -240,7 +219,6 @@ const allUrls = [
   ...kiloClawItems,
   ...cloudItems,
   ...accountItems,
-  ...startItems,
 ].flatMap(item => (typeof item === 'string' ? [item] : item.url ? [item.url] : []));
 
 function StoryOrganizationSwitcher() {
@@ -322,7 +300,6 @@ function PersonalSidebar({ menu }: { menu: 'main' | 'kiloClaw' }) {
             <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>

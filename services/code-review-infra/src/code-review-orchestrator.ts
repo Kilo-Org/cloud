@@ -1149,6 +1149,78 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   /**
+   * Stop a cloud-agent-next session that must not run or keep running.
+   * The review is already terminal, so a failed interrupt must not throw.
+   */
+  private async interruptAbandonedSession(
+    source: string,
+    cloudAgentSessionId: string,
+    reason: string
+  ): Promise<void> {
+    console.log('[CodeReviewOrchestrator] Abandoning cloud-agent-next session', {
+      reviewId: this.state.reviewId,
+      attemptId: this.state.attemptId,
+      source,
+      reason,
+      cloudAgentSessionId,
+      reviewStatus: this.state.status,
+    });
+
+    try {
+      await this.interruptCloudAgentSession(cloudAgentSessionId);
+    } catch (interruptError) {
+      console.warn('[CodeReviewOrchestrator] Failed to interrupt abandoned session', {
+        reviewId: this.state.reviewId,
+        attemptId: this.state.attemptId,
+        source,
+        reason,
+        cloudAgentSessionId,
+        error: interruptError instanceof Error ? interruptError.message : String(interruptError),
+      });
+    }
+  }
+
+  /**
+   * Record the cloud-agent-next session and decide whether its execution may start.
+   * A cancellation or a terminal review wins over a session that is ready to run:
+   * the session is abandoned and the caller must not start it.
+   */
+  private async confirmExecutionAllowed(
+    source: string,
+    cloudAgentSessionId: string,
+    cliSessionId?: string
+  ): Promise<boolean> {
+    // A cancel that arrived while the session was being prepared could not interrupt a
+    // session id it did not know yet, so this run owns the abandonment.
+    if (this.cancelled) {
+      await this.interruptAbandonedSession(source, cloudAgentSessionId, 'cancelled_before_record');
+      return false;
+    }
+
+    const options: { sessionId: string; cliSessionId?: string } = {
+      sessionId: cloudAgentSessionId,
+    };
+    if (cliSessionId) {
+      options.cliSessionId = cliSessionId;
+    }
+
+    const statusUpdateResult = await this.updateStatus('running', options);
+    if (statusUpdateResult === 'db-terminal') {
+      await this.interruptAbandonedSession(source, cloudAgentSessionId, 'review_already_terminal');
+      return false;
+    }
+
+    // A cancel can also land while the status update above is in flight. cancel() interrupts
+    // the session once it is recorded, and this run must still not start it.
+    if (this.cancelled) {
+      await this.interruptAbandonedSession(source, cloudAgentSessionId, 'cancelled_during_record');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * RPC method: Run the review.
    * Called via HTTP context or alarm to start queued work.
    */
@@ -1196,6 +1268,18 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         reviewId: this.state.reviewId,
         timestamp: new Date().toISOString(),
       });
+
+      // A review that was ended while this run was queued must not allocate a session.
+      if (this.cancelled || isTerminalStatus(this.state.status)) {
+        console.log(
+          '[CodeReviewOrchestrator] Skipping session preparation - review no longer live',
+          {
+            reviewId: this.state.reviewId,
+            reviewStatus: this.state.status,
+          }
+        );
+        return;
+      }
 
       // Build common headers for prepareSession (internalApiProtectedProcedure)
       const internalHeaders: Record<string, string> = {
@@ -1276,10 +1360,14 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       });
 
       // Store session IDs immediately (no stream parsing needed)
-      await this.updateStatus('running', {
-        sessionId: cloudAgentSessionId,
-        cliSessionId: kiloSessionId,
-      });
+      const executionAllowed = await this.confirmExecutionAllowed(
+        'cloud-agent-next-fresh',
+        cloudAgentSessionId,
+        kiloSessionId
+      );
+      if (!executionAllowed) {
+        return;
+      }
 
       // Step 2: Initiate execution
       // initiateFromKilocodeSessionV2 is a protectedProcedure (Bearer token only)
@@ -1468,6 +1556,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         callbackTarget,
       });
 
+      // A cancellation that landed during the health preflight must not start a turn.
+      if (this.cancelled) {
+        console.log('[CodeReviewOrchestrator] Follow-up skipped - review cancelled', {
+          reviewId: this.state.reviewId,
+          cloudAgentSessionId: previousSessionId,
+        });
+        return;
+      }
+
       // Step 2: Send follow-up message (user-facing, no callbackTarget)
       console.log('[CodeReviewOrchestrator] Calling sendMessageV2', {
         reviewId: this.state.reviewId,
@@ -1485,10 +1582,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         gitToken: this.state.sessionInput.gitToken,
       });
 
-      // Store session ID (reusing the previous one) and execution ID
-      await this.updateStatus('running', {
-        sessionId: previousSessionId,
-      });
+      // Store session ID (reusing the previous one); a cancellation that landed while the
+      // message was being sent abandons the execution instead of reporting it as started.
+      const executionAllowed = await this.confirmExecutionAllowed(
+        'cloud-agent-next-followup',
+        previousSessionId
+      );
+      if (!executionAllowed) {
+        return;
+      }
 
       console.log('[CodeReviewOrchestrator] Follow-up execution started via sendMessageV2', {
         reviewId: this.state.reviewId,

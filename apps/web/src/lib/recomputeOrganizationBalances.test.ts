@@ -3,13 +3,34 @@ import {
   organizations,
   microdollar_usage,
   exa_usage_log,
+  enkrypt_usage,
+  kilo_pass_org_agreements,
+  kilo_pass_org_allocation_plan_rows,
+  kilo_pass_org_audit_records,
+  kilo_pass_org_issuance_snapshots,
+  kilo_pass_org_qualifying_spend_events,
 } from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { defineMicrodollarUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { eq } from 'drizzle-orm';
+import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import {
+  MICRODOLLARS_PER_ENKRYPT_CREDIT,
+  recordEnkryptUsageLocally,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
+import type { EnkryptUsageWrite } from '@kilocode/usage-contracts';
+import { recordExaUsage } from './exa-usage';
+import { activatePaidAgreement, createPendingAgreement } from './kilo-pass-org/service';
+import { and, eq, inArray, like } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+
+jest.mock('next/server', () => ({
+  ...jest.requireActual('next/server'),
+  after: jest.fn(),
+}));
 
 async function createTestOrg(
   ownerId: string,
@@ -364,5 +385,204 @@ describe('recomputeOrganizationBalances', () => {
     });
     // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
     expect(updatedOrg!.microdollars_used).toBe(5_000_000);
+  });
+});
+
+describe('recomputeOrganizationBalances after live usage writes', () => {
+  const organizationIds: string[] = [];
+  const agreementIds: string[] = [];
+
+  const llmCost = 2_000;
+  const exaCost = 3_000;
+  const enkryptCredits = 7;
+  const enkryptCharge = enkryptCredits * MICRODOLLARS_PER_ENKRYPT_CREDIT;
+
+  afterEach(async () => {
+    const ids = organizationIds.splice(0);
+    const agreements = agreementIds.splice(0);
+    if (ids.length === 0) return;
+    await db
+      .delete(kilo_pass_org_qualifying_spend_events)
+      .where(
+        inArray(kilo_pass_org_qualifying_spend_events.allocation_container_organization_id, ids)
+      );
+    await db
+      .delete(kilo_pass_org_issuance_snapshots)
+      .where(inArray(kilo_pass_org_issuance_snapshots.allocation_container_organization_id, ids));
+    if (agreements.length > 0) {
+      await db
+        .delete(kilo_pass_org_audit_records)
+        .where(inArray(kilo_pass_org_audit_records.agreement_id, agreements));
+    }
+    await db
+      .delete(kilo_pass_org_allocation_plan_rows)
+      .where(inArray(kilo_pass_org_allocation_plan_rows.allocation_container_organization_id, ids));
+    await db
+      .delete(kilo_pass_org_agreements)
+      .where(inArray(kilo_pass_org_agreements.parent_organization_id, ids));
+    await db
+      .delete(creditTransactionsTable)
+      .where(inArray(creditTransactionsTable.organization_id, ids));
+    await db.delete(microdollar_usage).where(inArray(microdollar_usage.organization_id, ids));
+    await db.delete(exa_usage_log).where(inArray(exa_usage_log.organization_id, ids));
+    await db.delete(enkrypt_usage).where(inArray(enkrypt_usage.organization_id, ids));
+    await db.delete(organizations).where(inArray(organizations.id, ids));
+  });
+
+  async function ordinaryOrganization() {
+    const owner = await insertTestUser();
+    const organization = await createTestOrganization(
+      `recompute-live-${randomUUID()}`,
+      owner.id,
+      0
+    );
+    organizationIds.push(organization.id);
+    return { owner, organization };
+  }
+
+  async function kiloPassOrganization() {
+    const now = new Date();
+    const window = {
+      start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+      end: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
+    };
+    const { owner, organization } = await ordinaryOrganization();
+    const agreement = await createPendingAgreement({
+      parentOrganizationId: organization.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: `sub_${randomUUID()}`,
+      providerSeatAddOnItemId: `si_${randomUUID()}`,
+      initialAllocations: [],
+    });
+    agreementIds.push(agreement.agreementId);
+    await activatePaidAgreement({
+      agreementId: agreement.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: window.start,
+      paidUntil: window.end,
+      paidSeatCount: 1,
+      firstWindow: window,
+      isBridge: false,
+    });
+    return { owner, organization };
+  }
+
+  function enkryptWrite(
+    organizationId: string,
+    kiloUserId: string,
+    creditsCost: number | null
+  ): EnkryptUsageWrite {
+    return {
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      organizationId,
+      kiloUserId,
+      sessionId: null,
+      apiKind: 'messages',
+      decision: 'allowed',
+      creditsCost,
+      addedLatencyMs: null,
+      guardrail: 'input',
+    };
+  }
+
+  async function writeLlmExaAndEnkryptUsage(organizationId: string, kiloUserId: string) {
+    const { core, metadata } = await defineMicrodollarUsage();
+    const llmOutcome = await insertUsageRecord(
+      {
+        ...core,
+        kilo_user_id: kiloUserId,
+        organization_id: organizationId,
+        cost: llmCost,
+        created_at: new Date().toISOString(),
+      },
+      metadata
+    );
+    expect(llmOutcome).toMatchObject({ wasRedelivery: false });
+    await expect(
+      recordExaUsage({
+        id: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        userId: kiloUserId,
+        organizationId,
+        path: '/search',
+        costMicrodollars: exaCost,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 0,
+      })
+    ).resolves.toBe('recorded');
+    await expect(
+      recordEnkryptUsageLocally(enkryptWrite(organizationId, kiloUserId, enkryptCredits))
+    ).resolves.toBe('recorded');
+  }
+
+  async function balanceColumns(organizationId: string) {
+    const [row] = await db
+      .select({
+        microdollars_used: organizations.microdollars_used,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_balance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    return row;
+  }
+
+  it('keeps the balance the live writers produced for an ordinary organization', async () => {
+    const { owner, organization } = await ordinaryOrganization();
+    await writeLlmExaAndEnkryptUsage(organization.id, owner.id);
+    const live = await balanceColumns(organization.id);
+    expect(live.microdollars_used).toBe(llmCost + exaCost + enkryptCharge);
+
+    const result = await recomputeOrganizationBalances({ organizationId: organization.id });
+
+    expect(result).toMatchObject({ success: true, accounting_error_mUsd: 0 });
+    expect(await balanceColumns(organization.id)).toEqual(live);
+  });
+
+  it('keeps the usage the live writers produced for a Kilo Pass allocation container', async () => {
+    const { owner, organization } = await kiloPassOrganization();
+    await writeLlmExaAndEnkryptUsage(organization.id, owner.id);
+    const enkryptDebits = await db
+      .select({ amount: creditTransactionsTable.amount_microdollars })
+      .from(creditTransactionsTable)
+      .where(
+        and(
+          eq(creditTransactionsTable.organization_id, organization.id),
+          like(creditTransactionsTable.credit_category, 'kpo:consumption:enkrypt-guardrail:%')
+        )
+      );
+    expect(enkryptDebits).toEqual([{ amount: -enkryptCharge }]);
+    const live = await balanceColumns(organization.id);
+    expect(live.microdollars_used).toBe(llmCost + exaCost + enkryptCharge);
+
+    const result = await recomputeOrganizationBalances({ organizationId: organization.id });
+
+    expect(result.success).toBe(true);
+    expect(await balanceColumns(organization.id)).toEqual(live);
+  });
+
+  it('leaves an organization with only zero-charge Enkrypt usage unchanged', async () => {
+    const { owner, organization } = await ordinaryOrganization();
+    for (const creditsCost of [null, 0]) {
+      await expect(
+        recordEnkryptUsageLocally(enkryptWrite(organization.id, owner.id, creditsCost))
+      ).resolves.toBe('recorded');
+    }
+    const live = await balanceColumns(organization.id);
+    expect(live).toEqual({
+      microdollars_used: 0,
+      total_microdollars_acquired: 0,
+      microdollars_balance: 0,
+    });
+
+    const result = await recomputeOrganizationBalances({ organizationId: organization.id });
+
+    expect(result).toMatchObject({ success: true, accounting_error_mUsd: 0 });
+    expect(await balanceColumns(organization.id)).toEqual(live);
   });
 });

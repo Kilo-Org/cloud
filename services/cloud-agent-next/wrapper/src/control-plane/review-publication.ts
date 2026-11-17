@@ -15,6 +15,8 @@ export function createReviewPublication(input: {
   submit: (signal: AbortSignal) => Promise<void>;
   abortAndResume: () => void;
   warn: (message: string) => void;
+  /** V2 completion must also confirm the recovery submission's response and drain. */
+  awaitSubmissionResponse?: boolean;
   scheduler: {
     setTimeout: (handler: () => void, ms: number) => ReturnType<typeof setTimeout>;
     clearTimeout: (handle: ReturnType<typeof setTimeout>) => void;
@@ -40,7 +42,7 @@ export function createReviewPublication(input: {
       if (type === 'session.turn.open' && state === 'submitted') state = 'running';
       if (type === 'session.turn.close' && state === 'running') {
         state = 'spent';
-        clearTimer();
+        if (!input.awaitSubmissionResponse) clearTimer();
       }
     },
     observeActivity(activity: HarnessActivity) {
@@ -106,6 +108,7 @@ export function createReviewPublication(input: {
       return true;
     },
     dispose() {
+      if (input.awaitSubmissionResponse) state = 'abandoned';
       clearTimer();
       abort.abort();
     },

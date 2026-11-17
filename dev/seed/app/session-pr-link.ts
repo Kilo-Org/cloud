@@ -1,7 +1,7 @@
 import { cli_sessions_v2, github_branch_pull_requests, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, like, or, sql } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
@@ -336,6 +336,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const options = parseArgs(args);
+  assertLocalSeedDatabase('app:session-pr-link');
   const db = getSeedDb();
 
   // Resolve the user id from the email, mirroring app:user-id.

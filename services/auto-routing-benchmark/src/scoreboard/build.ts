@@ -46,8 +46,9 @@ export function buildScoreboard({
   rebuildFromSweep = false,
   complexityLabels = null,
   pricing = null,
-  accuracyNoiseBand,
+  accuracyNoiseBand: accuracyNoiseBandOverride,
 }: BuildScoreboardInput): Scoreboard {
+  const accuracyNoiseBand = accuracyNoiseBandOverride ?? table.accuracyNoiseBand;
   const profile = costProfile ?? rerankProfile ?? table.productionTokenProfile ?? null;
   if (rebuildFromSweep && !sweep) throw new Error('Rebuilding requires an offline sweep');
   const candidateKey = (candidate: {

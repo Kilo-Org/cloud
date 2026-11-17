@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { handleModelsRequest } from './models';
 
@@ -28,6 +30,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn((_userId: string, models: unknown[]) => models),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models', () => ({
+  tagClaudeBillingByokModels: jest.fn((_owner: unknown, models: unknown[]) => models),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
@@ -38,6 +43,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/model-stats/enkrypt', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/model-stats/enkrypt'),
+  getEnkryptBenchmarks: jest.fn(async () => null),
+}));
 
 const { getUserFromAuth } = jest.requireMock('@kilocode/web-shared/lib/user/server');
 const { getEnhancedOpenRouterModels } = jest.requireMock(
@@ -52,6 +61,9 @@ const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
 const { tagOpenAiChatGptByokModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
 );
+const { tagClaudeBillingByokModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
   '@kilocode/web-shared/lib/organizations/organization-models'
 );
@@ -64,14 +76,20 @@ const { getAutoFreeCandidates } = jest.requireMock(
 const { listUsableCustomRouters } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/custom-routers'
 );
+const { getEnkryptBenchmarks } = jest.requireMock<typeof Enkrypt>(
+  '@kilocode/web-shared/lib/model-stats/enkrypt'
+);
+const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
+const mockedGetEnkryptBenchmarks = jest.mocked(getEnkryptBenchmarks);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
 const mockedGetDirectByokCatalogModelIds = jest.mocked(getDirectByokCatalogModelIds);
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
+const mockedTagClaudeBillingByokModels = jest.mocked(tagClaudeBillingByokModels);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
@@ -107,11 +125,15 @@ describe('GET /api/openrouter/models', () => {
       authFailedResponse: null,
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('public/model')] });
+    mockedGetEnkryptBenchmarks.mockResolvedValue(null);
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
     mockedGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
     mockedTagOpenAiChatGptByokModels.mockImplementation(
       (_userId: string, models: OpenRouterModel[]) => models
+    );
+    mockedTagClaudeBillingByokModels.mockImplementation(
+      (_owner: unknown, models: OpenRouterModel[]) => models
     );
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
@@ -122,7 +144,12 @@ describe('GET /api/openrouter/models', () => {
   test('builds the public catalog for the request country', async () => {
     await handleModelsRequest(request({ 'x-vercel-ip-country': 'cu' }));
 
-    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith(
+      expect.objectContaining({ countryCode: 'CU' })
+    );
+    expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0]?.fromDb).toBe(readDb);
+    expect(mockedGetEnkryptBenchmarks).toHaveBeenCalledTimes(1);
+    expect(mockedGetEnkryptBenchmarks.mock.calls[0]?.[0]?.fromDb).toBe(readDb);
   });
 
   test('builds the organization catalog for the request country', async () => {
@@ -146,7 +173,10 @@ describe('GET /api/openrouter/models', () => {
   test('builds an unrestricted catalog without a request country', async () => {
     await handleModelsRequest(request());
 
-    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: null });
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith(
+      expect.objectContaining({ countryCode: null })
+    );
+    expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0]?.fromDb).toBe(readDb);
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
@@ -165,8 +195,12 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('returns BYOK availability for regular and direct authenticated models', async () => {
-    const publicModel = makeModel('public/model');
-    const directModel = { ...makeModel('direct/model'), hasUserByokAvailable: true };
+    const publicModel = { ...makeModel('public/model'), isFree: true };
+    const directModel = {
+      ...makeModel('direct/model'),
+      hasUserByokAvailable: true,
+      isFree: false,
+    };
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-id' },
       organizationId: null,
@@ -184,7 +218,7 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: [{ ...publicModel, hasUserByokAvailable: true }, directModel],
+      data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
     expect(mockedGetDirectByokCatalogModelIds).toHaveBeenCalledWith({
       type: 'user',
@@ -219,6 +253,23 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith(
       { kiloUserId: 'user-id', organizationId: null },
       [openAiModel, otherModel]
+    );
+  });
+
+  test('tags the personal list from the personal Claude billing link', async () => {
+    const claudeModel = makeModel('anthropic/claude-sonnet-4.6');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+    } as never);
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [claudeModel] });
+    mockedAddUserByokAvailability.mockResolvedValue([claudeModel]);
+
+    await handleModelsRequest(request());
+
+    expect(mockedTagClaudeBillingByokModels).toHaveBeenCalledWith(
+      { kind: 'personal', kiloUserId: 'user-id' },
+      [claudeModel]
     );
   });
 

@@ -21,7 +21,14 @@ export const PICKER_ROUTE_PATHS = [
   '/agent-chat/instance-picker',
   '/agent-chat/folder-picker',
   '/agent-chat/profile-picker',
+  '/context-picker',
 ] as const satisfies readonly string[];
+
+/**
+ * The href every opener claims and pushes for the account picker. `hrefKey`
+ * serializes the push to this exact text, so both must stay in sync.
+ */
+export const PR_PICKER = '/(app)/context-picker' as const;
 
 /** Route names as they appear in the navigation state (no leading slash). */
 export const PICKER_ROUTE_NAMES: readonly string[] = PICKER_ROUTE_PATHS.map(path =>

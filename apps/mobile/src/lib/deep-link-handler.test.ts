@@ -82,6 +82,56 @@ const MAPPED_CASES = [
     path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
     href: '/(app)/code-reviewer/org_1/reviews/rev_9',
   },
+  {
+    path: 'https://app.kilo.ai/credits',
+    href: '/(app)/(tabs)/(3_profile)/credit-history',
+  },
+  {
+    path: 'https://app.kilo.ai/usage',
+    href: '/(app)/usage',
+  },
+  {
+    path: 'https://app.kilo.ai/invoices',
+    href: '/(app)/(tabs)/(3_profile)/invoices',
+  },
+  {
+    path: 'https://app.kilo.ai/data-exports',
+    href: '/(app)/(tabs)/(3_profile)/data-export',
+  },
+  {
+    path: 'https://app.kilo.ai/byok',
+    href: '/(app)/(tabs)/(3_profile)/provider-keys',
+  },
+  {
+    path: 'https://app.kilo.ai/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations',
+  },
+  {
+    path: 'https://app.kilo.ai/subscriptions/kilo-pass',
+    href: '/(app)/kilo-pass',
+  },
+  {
+    path: 'https://app.kilo.ai/security-agent/config',
+    href: '/(app)/security-agent/personal/settings',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/security-agent/config',
+    href: '/(app)/security-agent/org_1/settings',
+  },
+  {
+    // The org scope rides the query, the way the credit-activity link carries
+    // it, so the screen shows the organization the link names.
+    path: 'https://app.kilo.ai/organizations/org_1/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations?org=org_1',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/usage-details',
+    href: '/(app)/(tabs)/(3_profile)/organization/usage?org=org_1',
+  },
+  {
+    path: 'https://app.kilo.ai/s/share-token.abc-def',
+    href: '/(app)/shared/share-token.abc-def',
+  },
 ] as const;
 
 describe('redirectSystemPath', () => {
@@ -135,6 +185,28 @@ describe('redirectSystemPath', () => {
     });
   });
 
+  describe('removed mobile destinations', () => {
+    it.each([
+      'https://app.kilo.ai/claw',
+      'https://app.kilo.ai/claw/?at=message',
+      'kiloapp://claw',
+      'kiloapp:///claw',
+      'kiloapp://app.kilo.ai/claw',
+      'kiloapp:///kiloclaw/settings',
+      'kiloapp:///chat/sandbox-1/conversation-1',
+      'kiloapp:///onboarding',
+      'kiloapp:///(app)/(tabs)/(1_kiloclaw)/chat/instance-picker',
+      'kiloapp:///%28app%29/%28tabs%29/%281_kiloclaw%29',
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/chat/sandbox-1/instance-picker',
+    ])('opens the shell cold and leaves the current screen warm for %s', path => {
+      expect(redirectSystemPath({ path, initial: true })).toBe('/');
+      expect(redirectSystemPath({ path, initial: false })).toBeNull();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('a link that names no screen', () => {
     // Resolving one of these replaces the visible route and unmounts the screen
     // beneath it, so the unsaved state of that screen (an open form) is lost
@@ -148,8 +220,21 @@ describe('redirectSystemPath', () => {
       'kiloapp://',
       'kiloapp:///definitely-not-a-route',
       'kiloapp:///dev/unknown-fixture',
-      'kiloapp://agent-chat/not-a-session',
-      'kiloapp:///(app)/agent-chat/not-a-session',
+      // A session-family capture the store cannot address names no session.
+      'kiloapp://agent-chat/ses:1',
+      'kiloapp:///(app)/agent-chat/ses:1',
+      // Sub-paths of the account pages the app owns at their root: the app has
+      // no per-service detail screen, so these stay on the web. A literal row
+      // matches exactly, so Android's filter never delivers them here.
+      // `/security-agent/<page>` is NOT in this list: that family is indexed for
+      // the phone's search, and `opensAppRoutePath` passes it through by design.
+      'https://app.kilo.ai/integrations/slack',
+      'https://app.kilo.ai/integrations/linear/reinstall',
+      'https://app.kilo.ai/subscriptions/kilo-pass/refer',
+      'https://app.kilo.ai/organizations/org_1/byok',
+      'https://app.kilo.ai/organizations/org_1/members',
+      'https://app.kilo.ai/organizations/org_1/payment-details',
+      'https://app.kilo.ai/organizations/org_1/integrations/linear',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
@@ -161,16 +246,33 @@ describe('redirectSystemPath', () => {
 
   describe('session destination', () => {
     it.each([
-      'https://app.kilo.ai/cloud/sessions/not-a-session',
-      'kiloapp:///cloud/sessions/not-a-session',
-      // An id shape seen in the wild: a UUID can never be a session id.
-      'https://app.kilo.ai/cloud/sessions/00000000-0000-0000-0000-000000000000',
-      'https://app.kilo.ai/cloud/sessions/ses_short',
-    ])('ignores %s, which the session route cannot open', path => {
+      // A capture the store's id rule refuses addresses no session: the route
+      // could never read one, so the link opens nothing and the visible screen
+      // keeps its state.
+      'https://app.kilo.ai/cloud/sessions/ses:1',
+      'kiloapp:///cloud/sessions/ses:1',
+    ])('ignores %s, which the session route cannot address', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
         expect(getPendingDeepLink()).toBeNull();
         expect(mocks.navigate).not.toHaveBeenCalled();
+      }
+    });
+
+    it.each([
+      // Every id the session store can hold names a session the route can
+      // address, including ones minted before the canonical shape and a ses_
+      // id whose length drifted from it. The route's denial is the answer for
+      // an id that does not resolve.
+      ['an id minted before the canonical shape', 'xmw2l780h18'],
+      ['a ses_ id longer than the canonical shape', 'ses_01J9FRESH000000000000000001'],
+    ])('stashes %s for the session route', (_name, sessionId) => {
+      for (const initial of [true, false]) {
+        _resetDeepLinkLaunchForTests();
+        expect(
+          redirectSystemPath({ path: `kiloapp:///cloud/sessions/${sessionId}`, initial })
+        ).toBeNull();
+        expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${sessionId}`);
       }
     });
 
@@ -488,5 +590,55 @@ describe('redirectSystemPath', () => {
       // Read clears the slot — subsequent reads return null.
       expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
     });
+  });
+});
+
+// Android's intent filter for the organization root also matches the two web
+// create pages (a `pathPattern` cannot exclude segments). The table maps both
+// to the app's own create screen, so they navigate like any other universal
+// link instead of opening a page.
+describe('organization create links', () => {
+  const CREATE_HREF = '/(app)/(tabs)/(3_profile)/organization/create';
+
+  it.each(['new', 'create'])(
+    'stashes the native create screen for a warm /organizations/%s',
+    page => {
+      _resetDeepLinkLaunchForTests();
+
+      const result = redirectSystemPath({
+        path: `https://app.kilo.ai/organizations/${page}`,
+        initial: false,
+      });
+
+      // Falsy, like every handled link: a truthy return re-dispatches the
+      // linking resolver and races our navigation.
+      expect(result).toBeNull();
+      expect(getPendingDeepLink()).toBe(CREATE_HREF);
+    }
+  );
+
+  it.each(['new', 'create'])('stashes it for a cold /organizations/%s redirect', page => {
+    _resetDeepLinkLaunchForTests();
+
+    const result = redirectSystemPath({
+      path: `https://app.kilo.ai/organizations/${page}`,
+      initial: true,
+    });
+
+    expect(result).toBeNull();
+    expect(getPendingDeepLink()).toBe(CREATE_HREF);
+  });
+
+  it('maps the app-scheme spelling of the same page', () => {
+    _resetDeepLinkLaunchForTests();
+
+    expect(redirectSystemPath({ path: 'kiloapp:///organizations/new', initial: false })).toBeNull();
+    expect(getPendingDeepLink()).toBe(CREATE_HREF);
+  });
+
+  it('still stashes the organization root itself', () => {
+    _resetDeepLinkLaunchForTests();
+    redirectSystemPath({ path: 'https://app.kilo.ai/organizations/org_1', initial: false });
+    expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/org_1');
   });
 });

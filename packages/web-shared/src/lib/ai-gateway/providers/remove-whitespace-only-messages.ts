@@ -1,11 +1,12 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { isCacheableMessagesContentBlock } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 function isWhitespaceOnlyText(text: unknown) {
   return typeof text === 'string' && text.trim() === '';
 }
 
-function isWhitespaceOnlyMessage(message: Anthropic.MessageParam) {
+export function isWhitespaceOnlyMessage(message: Anthropic.MessageParam) {
   if (typeof message.content === 'string') {
     return isWhitespaceOnlyText(message.content);
   }
@@ -22,27 +23,28 @@ function findCacheControl(message: Anthropic.MessageParam) {
     .findLast(block => block.cache_control)?.cache_control;
 }
 
-function isCacheableBlock(
-  block: Anthropic.ContentBlockParam
-): block is Exclude<
-  Anthropic.ContentBlockParam,
-  Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
-> {
-  return block.type !== 'thinking' && block.type !== 'redacted_thinking';
-}
-
-function addCacheControl(
-  message: Anthropic.MessageParam,
-  cacheControl: Anthropic.CacheControlEphemeral
-) {
-  if (typeof message.content === 'string') {
-    message.content = [{ type: 'text', text: message.content, cache_control: cacheControl }];
-    return;
+/** Carries a removed message's breakpoint without mutating the retained history. */
+export function preserveCacheControl(
+  previousMessage: Anthropic.MessageParam,
+  removedMessage: Anthropic.MessageParam
+): Anthropic.MessageParam {
+  const cacheControl = findCacheControl(removedMessage);
+  if (!cacheControl) return previousMessage;
+  if (typeof previousMessage.content === 'string') {
+    return {
+      ...previousMessage,
+      content: [{ type: 'text', text: previousMessage.content, cache_control: cacheControl }],
+    };
   }
-  const target = message.content.findLast(isCacheableBlock);
-  if (target && !target.cache_control) {
-    target.cache_control = cacheControl;
-  }
+  if (!Array.isArray(previousMessage.content)) return previousMessage;
+  const target = previousMessage.content.findLast(isCacheableMessagesContentBlock);
+  if (!target || target.cache_control) return previousMessage;
+  return {
+    ...previousMessage,
+    content: previousMessage.content.map(block =>
+      block === target ? { ...block, cache_control: cacheControl } : block
+    ),
+  };
 }
 
 /**
@@ -69,10 +71,9 @@ export function removeWhitespaceOnlyMessages(body: GatewayMessagesRequest) {
       return;
     }
     removedRoles.push(message.role);
-    const cacheControl = findCacheControl(message);
     const previousMessage = keptMessages.at(-1);
-    if (cacheControl && previousMessage) {
-      addCacheControl(previousMessage, cacheControl);
+    if (previousMessage) {
+      keptMessages[keptMessages.length - 1] = preserveCacheControl(previousMessage, message);
     }
   });
 

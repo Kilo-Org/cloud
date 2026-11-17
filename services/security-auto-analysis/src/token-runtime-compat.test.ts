@@ -53,7 +53,7 @@ describe('automation issuer to runtime compatibility', () => {
           nextAuthSecret: secret,
           connectionString: 'unused',
           resourceAudience: { audience, mode: 'allow-legacy' },
-          getUserPepper: async () => ({ pepper: principal.apiTokenPepper, blockedReason: null }),
+          getUserPepper: async () => ({ pepper: principal.apiTokenPepper, blocked: false }),
         });
       await expect(authenticate(legacy.token, 'kilo-api')).resolves.toEqual({ userId: user.id });
       await expect(authenticate(control, 'cloud-agent-next')).resolves.toEqual({ userId: user.id });

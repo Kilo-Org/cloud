@@ -102,6 +102,25 @@ describe('ChildSessionSheet title layout', () => {
 });
 
 describe('ChildSessionSheet mounted', () => {
+  it.each([true, false])(
+    'passes the child live state %s to its message parts',
+    async isStreaming => {
+      const renderPart = vi.fn(() => null);
+      const renderer = await renderSheet({
+        ...buildProps({
+          getChildMessages: () => [makeAssistantMessage()],
+          hydrationState: readyState,
+        }),
+        isStreaming,
+        renderPart,
+      });
+      expect(renderPart).toHaveBeenCalledWith(expect.objectContaining({ isStreaming }));
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
   it('keeps the wrapped title, live rows, and Retry through hydration recovery', async () => {
     const messages = [makeAssistantMessage()];
     const props = buildProps({

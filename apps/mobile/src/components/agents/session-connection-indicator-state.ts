@@ -1,6 +1,6 @@
 import { type AgentStatus, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
-export type SessionConnectionState = 'up' | 'down' | 'exhausted' | 'none';
+export type SessionConnectionState = 'up' | 'down' | 'unavailable' | 'exhausted' | 'none';
 
 export function resolveSessionConnectionState(input: {
   activeSessionType: ResolvedSession['type'] | null;
@@ -9,8 +9,11 @@ export function resolveSessionConnectionState(input: {
   reconnectExhausted: boolean;
 }): SessionConnectionState {
   if (input.activeSessionType === 'remote') {
-    if (!input.userWebConnected || input.agentStatusType === 'disconnected') {
+    if (!input.userWebConnected) {
       return input.reconnectExhausted ? 'exhausted' : 'down';
+    }
+    if (input.agentStatusType === 'disconnected') {
+      return 'unavailable';
     }
     return 'up';
   }
@@ -59,7 +62,10 @@ export function resolveSessionConnectionDisplay(input: {
   if (state === 'up') {
     return input.agentStatusType === 'scheduled' ? 'scheduled' : 'connected';
   }
-  if (state === 'exhausted') {
+  if (
+    state === 'exhausted' ||
+    (state === 'unavailable' && (input.everConnected || input.reconnectExhausted))
+  ) {
     return 'lost';
   }
   return downDisplay;

@@ -1,5 +1,5 @@
 /**
- * Slack notification delivery for SLO and container capacity alerts.
+ * Slack notification delivery for SLO, container capacity and queue alerts.
  */
 
 import type { AlertSeverity } from './slo-config';
@@ -67,21 +67,17 @@ export type QueueBacklogAlertPayload = {
   oldestMessageTimestamp?: Date;
 };
 
-export type GastownHealthAlertPayload = {
-  alertType: 'gastown_container_health';
-  severity: 'ticket';
-  windowMinutes: number;
-  sustainedFailureMinutes: number;
-  // Towns whose watchdog exhausted its restart budget — confirmed wedges.
-  exhaustedTownIds: string[];
-  // Towns failing continuously past the sustained threshold with no recovery.
-  sustainedTownIds: string[];
-  // Broad "code was updated" churn is suspected; the page carries an annotation.
-  deployChurnSuspected: boolean;
-  deployChurnTownCount: number;
-  // Info-trend context (does not gate paging).
-  affectedTownCount: number;
-  weightedFailedChecks: number;
+export type DeadLetterQueueAlertPayload = {
+  alertType: 'dead_letter_queue';
+  severity: AlertSeverity;
+  provider: string;
+  model: string;
+  clientName: string;
+  queueId: string;
+  backlogCount: number;
+  newMessages: number;
+  backlogBytes: number;
+  oldestMessageTimestamp?: Date;
 };
 
 export type AlertPayload =
@@ -89,12 +85,21 @@ export type AlertPayload =
   | ContainerCapacityAlertPayload
   | ContainerAllocationAlertPayload
   | QueueBacklogAlertPayload
-  | GastownHealthAlertPayload;
+  | DeadLetterQueueAlertPayload;
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+/**
+ * A Slack block field for a value that comes from telemetry or configuration
+ * rather than this Worker's source. Plain text renders the value exactly as it
+ * is given.
+ */
+function plainTextField(label: string, value: string): object {
+  return { type: 'plain_text', text: `${label}:\n${value}` };
 }
 
 function formatSeverityLabel(severity: AlertSeverity): string {
@@ -118,8 +123,8 @@ function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
       return 'Container Capacity';
     case 'queue_backlog':
       return 'Queue Backlog';
-    case 'gastown_container_health':
-      return 'Gastown Container Health';
+    case 'dead_letter_queue':
+      return 'Dead-Letter Queue';
   }
 }
 
@@ -147,8 +152,8 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Provider:*\n${alert.provider}` },
-        { type: 'mrkdwn', text: `*Model:*\n${alert.model}` },
+        plainTextField('Provider', alert.provider),
+        plainTextField('Model', alert.model),
         {
           type: 'mrkdwn',
           text: `*Burn rate:*\n${alert.burnRate.toFixed(1)}x (threshold: ${alert.burnRateThreshold}x)`,
@@ -179,7 +184,7 @@ function buildCapacitySlackBlocks(
       {
         type: 'section',
         fields: [
-          { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+          plainTextField('Application', alert.model),
           { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
           { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
           { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
@@ -213,7 +218,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+        plainTextField('Application', alert.model),
         {
           type: 'mrkdwn',
           text: `*Instances:*\n${alert.usedInstances} / ${alert.maxInstances}`,
@@ -225,7 +230,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       text: {
-        type: 'mrkdwn',
+        type: 'plain_text',
         text: `Container: ${alert.clientName}${healthText}`,
       },
     },
@@ -247,7 +252,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.model}` },
+        plainTextField('Queue ID', alert.model),
         {
           type: 'mrkdwn',
           text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages`,
@@ -269,72 +274,32 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
   ];
 }
 
-const GASTOWN_DASHBOARD_URL = 'https://ops.kiloapps.io/d/gastown-ops-1/gastown-operations';
-const GASTOWN_HEALTH_RUNBOOK_URL =
-  'https://github.com/Kilo-Org/on-call/blob/main/runbooks/gastown-container-health-failures.md';
-
-function formatTownList(townIds: string[]): string {
-  if (townIds.length === 0) return 'none';
-  const shown = townIds.slice(0, 10).join(', ');
-  return townIds.length > 10 ? `${shown} (+${townIds.length - 10} more)` : shown;
-}
-
-function buildGastownHealthReason(alert: GastownHealthAlertPayload): string {
-  const reasons: string[] = [];
-  if (alert.exhaustedTownIds.length > 0) {
-    reasons.push(
-      `${alert.exhaustedTownIds.length} town(s) exhausted auto-restarts (confirmed wedge): ${formatTownList(alert.exhaustedTownIds)}`
-    );
-  }
-  if (alert.sustainedTownIds.length > 0) {
-    reasons.push(
-      `${alert.sustainedTownIds.length} town(s) failing >= ${alert.sustainedFailureMinutes} min with no recovery: ${formatTownList(alert.sustainedTownIds)}`
-    );
-  }
-  return reasons.length > 0 ? reasons.join('\n') : 'Container health wedge detected.';
-}
-
-function buildGastownHealthSlackBlocks(alert: GastownHealthAlertPayload): object[] {
-  const wedgeTownCount = new Set([...alert.exhaustedTownIds, ...alert.sustainedTownIds]).size;
-  const churnNote = alert.deployChurnSuspected
-    ? `\n:warning: Deploy churn suspected across ${alert.deployChurnTownCount} town(s) ("code was updated"). Deploy-caused failures are excluded; the wedges above still need attention.`
-    : '';
+function buildDeadLetterQueueSlackBlocks(alert: DeadLetterQueueAlertPayload): object[] {
+  const severityLabel = formatSeverityLabel(alert.severity);
+  const oldestMessageTimestamp = alert.oldestMessageTimestamp?.toISOString() ?? 'Unknown';
 
   return [
     {
       type: 'header',
-      text: {
-        type: 'plain_text',
-        text: ':ticket: TICKET — Gastown container health failures',
-      },
+      text: { type: 'plain_text', text: `${severityLabel} — Dead-Letter Queue Alert` },
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Window:*\n${alert.windowMinutes}-minute window` },
-        { type: 'mrkdwn', text: `*Wedged towns:*\n${wedgeTownCount.toLocaleString('en-US')}` },
+        { type: 'mrkdwn', text: `*Queue:*\n${alert.model}` },
         {
           type: 'mrkdwn',
-          text: `*Exhausted:*\n${alert.exhaustedTownIds.length.toLocaleString('en-US')}`,
+          text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages (${alert.newMessages.toLocaleString('en-US')} since last alert)`,
         },
-        {
-          type: 'mrkdwn',
-          text: `*Sustained:*\n${alert.sustainedTownIds.length.toLocaleString('en-US')}`,
-        },
+        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.queueId}` },
+        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString('en-US')}` },
       ],
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${buildGastownHealthReason(alert)}${churnNote}`,
-      },
-    },
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `Trend (non-paging): ${alert.weightedFailedChecks.toLocaleString('en-US')} weighted failed checks across ${alert.affectedTownCount.toLocaleString('en-US')} town(s).\nDo not restart towns without active-session authorization.\n<${GASTOWN_DASHBOARD_URL}|Gastown dashboard> | <${GASTOWN_HEALTH_RUNBOOK_URL}|Container-health runbook>`,
+        text: `Each message is usage that was not recorded after every retry. Oldest message: ${oldestMessageTimestamp}\nRunbook: services/usage-ingest/README.md#dead-letter-alert`,
       },
     },
   ];
@@ -350,8 +315,8 @@ export function buildSlackMessage(alert: AlertPayload): object {
       return { blocks: buildCapacitySlackBlocks(alert) };
     case 'queue_backlog':
       return { blocks: buildQueueBacklogSlackBlocks(alert) };
-    case 'gastown_container_health':
-      return { blocks: buildGastownHealthSlackBlocks(alert) };
+    case 'dead_letter_queue':
+      return { blocks: buildDeadLetterQueueSlackBlocks(alert) };
     default:
       return { blocks: buildSloSlackBlocks(alert) };
   }

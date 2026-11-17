@@ -13,6 +13,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
+let mockClaudeEnabled = false;
+let mockReturning = false;
+let mockProviderSelect = false;
+
+jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
+  useClaudeSignInEnabled: () => mockClaudeEnabled,
+}));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
@@ -24,13 +31,15 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     emailValidation: { isValid: true, error: null },
     error: '',
     showTurnstile: false,
-    flowState: 'landing',
-    tier: 'new',
-    hint: mockHintEmail ? { lastEmail: mockHintEmail, lastAuthMethod: 'openai' } : null,
-    showEmailInput: !isSignUp,
+    flowState: mockProviderSelect ? 'provider-select' : 'landing',
+    tier: mockReturning ? 'returning' : 'new',
+    hint: mockHintEmail
+      ? { lastEmail: mockHintEmail, lastAuthMethod: mockReturning ? 'claude' : 'openai' }
+      : null,
+    showEmailInput: mockReturning ? false : !isSignUp,
     email: mockFlowEmail,
     isVerifying: false,
-    availableProviders: [],
+    availableProviders: mockProviderSelect ? ['google', 'claude'] : [],
     isNewUser: false,
     pendingSignIn: null,
     turnstileError: false,
@@ -78,6 +87,15 @@ jest.mock('@/components/auth/sign-in/EmailInputForm', () => ({
     createElement('button', null, submitLabel ?? 'Continue'),
 }));
 
+jest.mock('@/components/auth/sign-in/ProviderSelectView', () => ({
+  ProviderSelectView: ({ providers }: { providers: string[] }) =>
+    createElement(
+      Fragment,
+      null,
+      ...providers.map(provider => createElement('button', { key: provider }, provider))
+    ),
+}));
+
 const { SignInForm } = require('./SignInForm') as {
   SignInForm: (props: {
     searchParams: Record<string, string>;
@@ -89,6 +107,9 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
+  mockClaudeEnabled = false;
+  mockReturning = false;
+  mockProviderSelect = false;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -122,4 +143,25 @@ describe('SignInForm sign-in options', () => {
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
   });
+
+  it('offers server-discovered Claude without an identified browser PostHog person', () => {
+    mockProviderSelect = true;
+    mockFlowEmail = 'employee@kilocode.ai';
+    mockClaudeEnabled = false;
+    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(html).toContain('claude');
+    expect(html).toContain('google');
+  });
+
+  it.each([false, true])(
+    'offers a remembered Claude method only when it is available (%s)',
+    enabled => {
+      mockClaudeEnabled = enabled;
+      mockReturning = true;
+      mockHintEmail = 'remembered@example.com';
+      const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+      expect(html.includes('Continue with Claude')).toBe(enabled);
+      expect(html).toContain('or see other sign-in methods');
+    }
+  );
 });

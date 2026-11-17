@@ -18,7 +18,7 @@ describe('BytePlus Coding direct BYOK provider', () => {
     ]);
     expect(models.find(model => model.id === 'bytedance-seed-code')).toMatchObject({
       name: 'ByteDance-Seed-Code',
-      flags: expect.arrayContaining(['recommended', 'vision']),
+      flags: ['vision', 'reasoning'],
       context_length: 262144,
     });
   });

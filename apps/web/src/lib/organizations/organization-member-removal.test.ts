@@ -10,6 +10,7 @@ import {
   organization_user_limits,
   cli_sessions_v2,
   external_side_effect_outbox,
+  claude_billing_connections,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -30,22 +31,14 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { removeUserFromOrganization } from './organization-member-removal';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
-import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
   closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
-}));
-
-// Mock next/server's after function which requires request context.
-jest.mock('next/server', () => ({
-  ...jest.requireActual('next/server'),
-  after: jest.fn((fn: () => void | Promise<void>) => {
-    void fn();
-  }),
 }));
 
 describe('removeUserFromOrganization', () => {
@@ -71,6 +64,36 @@ describe('removeUserFromOrganization', () => {
     await db.delete(organization_seats_purchases);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
+  });
+
+  test("keeps the organization's Claude link when the person who linked it leaves", async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Claude organization removal', owner.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await db.insert(claude_billing_connections).values({
+      organization_id: organization.id,
+      user_profile_id: `uprof_org_${member.id}`,
+      connection_id: 'ocon_org',
+      status: 'connected',
+      connected_at: new Date().toISOString(),
+      created_by: member.id,
+    });
+
+    await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+    const rows = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, organization.id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        kilo_user_id: null,
+        status: 'connected',
+        connection_id: 'ocon_org',
+        created_by: member.id,
+      }),
+    ]);
   });
 
   test('should remove user from organization', async () => {

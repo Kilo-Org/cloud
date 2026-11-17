@@ -4,6 +4,7 @@ import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
+import { chatFlagBehind, type ChatFlagName } from './chat-flag';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -35,6 +36,8 @@ let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 let clonedWith:
   | { readonly tools?: readonly string[]; readonly model?: string; readonly effort?: string }
   | undefined = undefined;
+/** How many moves this run has made: a clone is always a session of its own. */
+let clonesMade = 0;
 /** The effort the store says a session was opened with. */
 let storedEffort: string | null = null;
 /**
@@ -52,6 +55,9 @@ let failOpenFor: string | undefined = undefined;
 let missingToolsFor: string | undefined = undefined;
 /** A session id whose stored names no longer resolve when it is cloned onto. */
 let missingCloneFor: string | undefined = undefined;
+let failCloneFor: string | undefined = undefined;
+/** A session id whose next clone fails, whatever it is cloned onto, once. */
+let failCloneOnce: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
@@ -109,6 +115,7 @@ const released: string[] = [];
  * Holds a scope's close open, so a test can open the same chat again while the
  * close still runs, which is the moment the ordering is about.
  */
+let cloning: Promise<void> | undefined = undefined;
 let closing: Promise<void> | undefined = undefined;
 
 /**
@@ -119,6 +126,7 @@ const mcp = vi.hoisted(() => ({
   tools: [] as { readonly definition: { readonly name: string } }[],
   /** The per-chat setting, absent meaning on. */
   enabled: new Map<string, boolean>(),
+  refuseNextWrite: false,
   ensure: vi.fn(async () => {
     await Promise.resolve();
     return {
@@ -126,6 +134,14 @@ const mcp = vi.hoisted(() => ({
       tools: [] as { readonly definition: { readonly name: string } }[],
     };
   }),
+}));
+const toolReads = vi.hoisted((): { sessionId: string | null; gate: Promise<void> | undefined } => ({
+  sessionId: null,
+  gate: undefined,
+}));
+const questionRead = vi.hoisted((): { gate: Promise<undefined> | undefined; started: boolean } => ({
+  gate: undefined,
+  started: false,
 }));
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
@@ -147,6 +163,14 @@ const TURN = {
   sessionId: 's1',
   role: 'user',
   parts: [{ id: 'prt_1', kind: 'text', body: 'hi' }],
+} as const;
+
+/** The answer to it: an answered question is stored as both turns, not as one. */
+const ANSWER = {
+  id: 'trn_2',
+  sessionId: 's1',
+  role: 'assistant',
+  parts: [{ id: 'prt_2', kind: 'text', body: 'because' }],
 } as const;
 
 const handleFor = (id: string) => {
@@ -256,12 +280,25 @@ vi.mock('@kilocode/harness-sdk', () => {
       onto: { readonly tools?: readonly string[]; readonly model?: string } | undefined
     ) => {
       clonedWith = onto;
+      if (failCloneFor === id) {
+        return Effect.fail(new Error('the session could not be cloned'));
+      }
+      /* A backend can refuse the copy for any reason; this is that refusal. */
+      if (failCloneOnce === id) {
+        failCloneOnce = undefined;
+        return Effect.fail(new FakeToolMissingError());
+      }
       /* A clone that names no tools keeps the stored set, so it is the one that
          fails when the registry no longer holds those names. */
       if (missingCloneFor === id && onto?.tools === undefined) {
         return Effect.fail(new FakeToolMissingError());
       }
-      return Effect.succeed(handleFor('s2'));
+      clonesMade += 1;
+      const sessionId = `s${clonesMade + 1}`;
+      return Effect.promise(async () => {
+        await cloning;
+        return handleFor(sessionId);
+      });
     },
   };
 });
@@ -316,12 +353,26 @@ vi.mock('./remote-mcp', () => ({
 }));
 vi.mock('./kilo-mcp', () => ({
   ensureKiloMcp: mcp.ensure,
+  mcpChoiceFor: async (sessionId: string) => {
+    await Promise.resolve();
+    return mcp.enabled.get(sessionId) === undefined ? null : false;
+  },
   mcpEnabledFor: async (sessionId: string) => {
+    if (sessionId === toolReads.sessionId) {
+      await toolReads.gate;
+    }
     await Promise.resolve();
     return mcp.enabled.get(sessionId) ?? true;
   },
-  setMcpEnabled: async (sessionId: string, enabled: boolean) => {
+  setMcpEnabled: async (sessionId: string, enabled: boolean, signal?: AbortSignal) => {
     await Promise.resolve();
+    if (signal?.aborted) {
+      throw new Error('cancelled');
+    }
+    if (mcp.refuseNextWrite) {
+      mcp.refuseNextWrite = false;
+      throw new Error('the choice could not be written');
+    }
     if (enabled) {
       mcp.enabled.delete(sessionId);
       return;
@@ -342,24 +393,61 @@ vi.mock('./kilo-mcp', () => ({
   kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
 }));
 const storedQuestions = vi.hoisted(() => new Map<string, string>());
-vi.mock('@/lib/persist/encrypted-kv', () => ({
-  encryptedDatabase: async () => {
-    await Promise.resolve();
-    return {};
-  },
-  getItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    return storedQuestions.get(`${scope}:${key}`) ?? null;
-  },
-  setItem: async (scope: string, key: string, value: string) => {
-    await Promise.resolve();
-    storedQuestions.set(`${scope}:${key}`, value);
-  },
-  removeItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    storedQuestions.delete(`${scope}:${key}`);
-  },
+/**
+ * Holds the next per-chat choice write open, and refuses the next few, so a test
+ * decides when a tap's write lands and whether it is refused.
+ */
+const choiceWrites = vi.hoisted(() => ({
+  scope: 'chat-web-search',
+  gate: undefined as Promise<void> | undefined,
+  refuse: 0,
 }));
+vi.mock('@/lib/persist/encrypted-kv', () => {
+  const setItem = async (
+    scope: string,
+    key: string,
+    write: string | { value: string; signal?: AbortSignal }
+  ) => {
+    const value = typeof write === 'string' ? write : write.value;
+    const signal = typeof write === 'string' ? undefined : write.signal;
+    await Promise.resolve();
+    if (scope === choiceWrites.scope) {
+      await choiceWrites.gate;
+      if (choiceWrites.refuse > 0) {
+        choiceWrites.refuse -= 1;
+        throw new Error('the choice could not be written');
+      }
+    }
+    if (signal?.aborted) {
+      throw new Error('cancelled');
+    }
+    storedQuestions.set(`${scope}:${key}`, value);
+  };
+  return {
+    encryptedDatabase: async () => {
+      await Promise.resolve();
+      return {};
+    },
+    getItem: async (scope: string, key: string) => {
+      await Promise.resolve();
+      const stored = storedQuestions.get(`${scope}:${key}`) ?? null;
+      if (scope === 'chat-asked-target' && questionRead.gate !== undefined) {
+        questionRead.started = true;
+        await questionRead.gate;
+      }
+      return stored;
+    },
+    setItem,
+    setItemWithSignal: setItem,
+    removeItem: async (scope: string, key: string, signal?: AbortSignal) => {
+      await Promise.resolve();
+      if (signal?.aborted) {
+        throw new Error('cancelled');
+      }
+      storedQuestions.delete(`${scope}:${key}`);
+    },
+  };
+});
 /**
  * The scope recorded for each chat, which is what the store's `chats` row holds.
  * A start writes it and a move carries it to the session the chat moved onto.
@@ -387,6 +475,20 @@ const scopes = vi.hoisted(() => {
 });
 /** Every session a reopen asked the SDK for, so an open that never ran is told. */
 let continued: string[] = [];
+
+/**
+ * What the registry released from the on-device model, in order. The model
+ * client itself is proved in its own suite; here it is the call site that
+ * matters — Stop, a close and a sign-out all have to reach it with the chat's
+ * session id.
+ */
+const releasedRounds = vi.hoisted(() => ({ owners: [] as string[] }));
+vi.mock('./native-round-slot', () => ({
+  releaseNativeModelRound: async (owner: string) => {
+    await Promise.resolve();
+    releasedRounds.owners.push(owner);
+  },
+}));
 
 vi.mock('./store', () => ({
   forgetSession: (_database: unknown, sessionId: string) => {
@@ -432,17 +534,19 @@ const {
   enterChat,
   refreshChatTools,
   releaseChat,
+  releaseEveryChat,
   retryChat,
+  retryChatFlag,
   retryKiloMcp,
   say,
-  setMcpEnabled,
-  setWebSearchEnabled,
+  setChatFlag,
   startChat,
   stopChat,
 } = await import('./registry');
+const { chatFlagValueOf } = await import('./chat-flag');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./scope');
-const { askedIn, forgetAsked } = await import('./pending');
+const { askedIn, firstQuestionIn, forgetAsked, keptIn } = await import('./pending');
 
 /** The words of the line that is waiting, which is what most of these read. */
 const waitingWords = (sessionId: string) => snapshotOf(sessionId).waiting.map(one => one.text);
@@ -493,17 +597,29 @@ beforeEach(async () => {
   asked.length = 0;
   released.length = 0;
   closing = undefined;
+  cloning = undefined;
+  toolReads.sessionId = null;
+  toolReads.gate = undefined;
+  questionRead.gate = undefined;
+  questionRead.started = false;
   finish = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
   failOpenFor = undefined;
   missingToolsFor = undefined;
   missingCloneFor = undefined;
+  failCloneOnce = undefined;
   failHistoryFor = undefined;
+  failCloneFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
+  creditsFailureFor = undefined;
   storedQuestions.clear();
+  choiceWrites.gate = undefined;
+  choiceWrites.refuse = 0;
   clonedWith = undefined;
+  clonesMade = 0;
+  releasedRounds.owners.length = 0;
   storedEffort = null;
   openedWith = undefined;
   storedTools = null;
@@ -514,6 +630,7 @@ beforeEach(async () => {
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
+  mcp.refuseNextWrite = false;
   remote.tools.length = 0;
   remote.offered.length = 0;
   continuesWith = [];
@@ -582,6 +699,111 @@ describe('what a chat is opened with', () => {
   });
 });
 
+describe('an exchange that fails before its tools answer', () => {
+  it('releases the on-device round it leaves waiting', async () => {
+    /* The exchange can fail between two tool rounds — the model became
+       unavailable while its tools ran — and `settle` ends it without `halt`.
+       The round it left waiting can never be answered, so it is released here
+       or every other chat on that model stays refused. */
+    failAnswerFor = opened;
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(releasedRounds.owners).toEqual(['s1']);
+  });
+});
+
+describe('ending an exchange while its tools run', () => {
+  it('releases the on-device round on Stop, on closing the chat and on sign-out', async () => {
+    /* An interrupted exchange can leave an on-device generation waiting for tool
+       results nobody will supply. Every teardown path has to hand its session id
+       to the release, or the next chat's ask is refused as busy. */
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+    expect(releasedRounds.owners).toEqual(['s1']);
+
+    // The chat is closed and its row deleted: the same release, from endChat.
+    releasedRounds.owners.length = 0;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await releaseChat(opened);
+    await settled();
+    expect(releasedRounds.owners).toEqual(['s1']);
+
+    // Signing out ends every open chat through the same path.
+    releasedRounds.owners.length = 0;
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await releaseEveryChat();
+    expect(releasedRounds.owners).toEqual(['s1']);
+  });
+});
+
+describe('a tool change queued while an answer was arriving', () => {
+  it('keeps the queued change when its move fails on a session the store has not written', async () => {
+    /* The store has no row, so the pending change is the only reason to move.
+       A move that fails must leave it for the retry: clearing it first drops the
+       switch the person flipped and asks the question on the old tool set. */
+    storedTools = null;
+    settingsSwitch.enabled = false;
+    await refreshChatTools();
+    await settled();
+    failCloneOnce = opened;
+
+    await say(opened, { text: 'hello', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+    expect(snapshotOf(opened).failed).not.toBeNull();
+
+    /* The retry proves the change survived: without it the chat has no reason
+       to move, and the question goes out on the names it was opened with. */
+    clonedWith = undefined;
+    await say(opened, { text: 'hello again', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('clears the applied change on the chat the move installed', async () => {
+    storedTools = null;
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    /* The switch moves while the answer is still arriving, so the change waits
+       for the settle instead of being applied under the answer. */
+    settingsSwitch.enabled = false;
+    await refreshChatTools();
+    await settled();
+    expect(clonedWith).toBeUndefined();
+    expect(clonesMade).toBe(0);
+
+    finish?.();
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+
+    /* The change landed on the session it moved to. A second round must move
+       again only if the installed chat still waits on it. */
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    expect(clonesMade).toBe(1);
+  });
+});
+
 describe('the Kilo MCP tools a chat is opened with', () => {
   /** The one tool the fake server offers, named the way the harness names it. */
   const discovered = { definition: { name: 'mcp_kilo_read-file' } };
@@ -622,7 +844,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     expect(mcp.ensure).not.toHaveBeenCalled();
 
     mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
-    await setMcpEnabled(opened, true);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: true });
     await settled();
 
     expect(mcp.ensure).toHaveBeenCalledWith(
@@ -640,7 +862,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await settled();
     expect(snapshotOf(opened).sessionId).toBe('s1');
 
-    await setMcpEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
     await settled();
 
     /* The tool set is frozen for the life of a session, so turning it off is a
@@ -658,7 +880,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
     await settled();
 
-    await setMcpEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
     await settled();
 
     /* Never under an answer that is still coming: the chat has not moved. */
@@ -670,6 +892,38 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
     expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('reports a saved choice whose move was refused as behind, and the retry moves the chat onto it', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+
+    failCloneFor = opened;
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
+
+    /* The choice is the person's and the store holds it; only this session is
+       not on it. So the flag is saved and says how far behind it is, rather than
+       reporting the tap as a failure that lost the choice. */
+    expect(snapshotOf(opened).kiloTools).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'behind',
+    });
+    expect(mcp.enabled.get(opened)).toBe(false);
+
+    failCloneFor = undefined;
+    await retryChatFlag({ sessionId: opened, place, flag: 'kiloTools' });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(snapshotOf(opened).kiloTools).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'current',
+    });
   });
 
   it('opens a stored chat whose tool names no longer resolve, on the names now held', async () => {
@@ -774,7 +1028,7 @@ describe('web search in a chat', () => {
     expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
 
     storedTools = ['time', ...SETTINGS];
-    await setWebSearchEnabled(opened, true);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true });
     await settled();
 
     expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
@@ -783,16 +1037,97 @@ describe('web search in a chat', () => {
   it('moves an idle Kilo chat off web search when the person turns it off', async () => {
     storedTools = [...BASE, ...SETTINGS];
 
-    await setWebSearchEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     await settled();
 
     expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
+  it('keeps a tap that lands before the chat is entered when the stored choice is read', async () => {
+    /* The mount read used to resolve after a tap and put the stored value back
+       over it while the store held the tapped one. The read runs inside the
+       chat's turn now, so a tap enqueued first has already written. */
+    storedTools = [...BASE, ...SETTINGS];
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'on');
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+
+    const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
+    const enter = enterChat(place, opened);
+    gate.resolve(undefined);
+    await tap;
+    await enter;
+    await settled();
+
+    expect(snapshotOf(opened).webSearch).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'current',
+    });
+    /* One move, onto the names turning it off implies, and the choice went with
+       the chat it moved onto. */
+    expect(clonesMade).toBe(1);
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
+    expect(storedQuestions.get(`${choiceWrites.scope}:s2`)).toBe('off');
+  });
+
+  it('leaves the stored choice on screen when two taps are both refused', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    await enterChat(place, opened);
+    await settled();
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, true)).toBe(false);
+
+    choiceWrites.refuse = 2;
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true })
+    ).rejects.toThrow('the choice could not be written');
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false })
+    ).rejects.toThrow('the choice could not be written');
+
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, true)).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBe('off');
+  });
+
+  it('keeps a first tap that landed when a second is refused', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    await enterChat(place, opened);
+    await settled();
+
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true });
+    choiceWrites.refuse = 1;
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false })
+    ).rejects.toThrow('the choice could not be written');
+
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, false)).toBe(true);
+  });
+
+  it('applies a tap and the question started together in one order', async () => {
+    /* The tap's write, the move it causes and the question's move are one queue
+       per chat: the question is asked on the session the tap made, and the
+       choice is carried to it rather than read and deleted in between. */
+    storedTools = [...BASE, ...SETTINGS];
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+
+    const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
+    const send = say(opened, { text: 'hello', images: [] }, { model: 'kilo/two', effort: null });
+    gate.resolve(undefined);
+    await tap;
+    await send;
+    await settled();
+
+    const landed = snapshotOf(opened).sessionId;
+    expect(landed).toBe('s3');
+    expect(storedQuestions.get(`${choiceWrites.scope}:${landed}`)).toBe('off');
+    expect(asked.at(-1)).toEqual({ sessionId: 's3', text: 'hello' });
+  });
+
   it('keeps the person choice when the chat moves onto another model', async () => {
     storedTools = [...BASE, ...SETTINGS];
-    await setWebSearchEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     await settled();
     storedTools = ['time', ...SETTINGS];
 
@@ -1015,6 +1350,726 @@ describe('a send the account cannot pay for', () => {
   });
 });
 
+describe('a question a later send took the slot from', () => {
+  it('keeps the failed words in the transcript, before the question that replaced them', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(
+      opened,
+      { text: 'the long question', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* It keeps everything needed to ask it again, and where it was said: no
+       turn was stored for it, so it goes before every one of them. */
+    expect(held.displaced).toMatchObject([
+      {
+        text: 'the long question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ]);
+    const [kept] = held.displaced;
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The identifier names its bubble, and is the one its Retry finds it by.
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:${kept.id}`,
+      `${held.sessionId}:asked`,
+    ]);
+    // Written down with the chat, so reopening it keeps the bubble.
+    expect(await keptIn(held.sessionId)).toEqual(held.displaced);
+  });
+
+  it('says why the newest question failed after a reopen, with the kept one still above it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+
+    /* Both records are read back: the words of the question a later send took
+       the slot from, and why the question now in the slot has no answer. The
+       banner and its Add credits control hang off the second. */
+    const held = snapshotOf(opened);
+    expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
+    expect(held.displaced.map(one => one.text)).toEqual(['first']);
+    const kept = held.displaced[0];
+    // The cause the question failed with is written down too, so its bubble
+    // states it where the question was said.
+    expect(kept?.failureKey).toBe(CREDITS_FAILURE_KEY);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:${kept?.id}`,
+      `${held.sessionId}:asked`,
+    ]);
+  });
+
+  it('is on screen above the answer that came after it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    /* The next question moves the chat onto another model, which is a session
+       the gateway answers for, so an answer lands after the failure. */
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    storedHistory = [TURN];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    // Said before the turn the store now holds, so it stays above it.
+    expect(held.turns).toEqual([TURN]);
+    const drawn = asMessages(held).map(one => one.info.id);
+    expect(drawn).toHaveLength(2);
+    expect(drawn[0]).toMatch(/:displaced:/);
+    expect(drawn[1]).toBe(TURN.id);
+  });
+
+  it('is asked again from its own Retry, on the model it was asked of', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+    clonedWith = undefined;
+    creditsFailureFor = undefined;
+
+    await retryChat(opened, kept);
+    await settled();
+
+    /* It stays in the transcript where it was said, and the slot draws no
+       second bubble for it: the attempt on screen is that one bubble. */
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
+    const drawn = asMessages(snapshotOf(opened)).map(one => one.info.id);
+    expect(drawn[0]).toBe(`${snapshotOf(opened).sessionId}:displaced:${kept.id}`);
+    expect(drawn).not.toContain(`${snapshotOf(opened).sessionId}:asked`);
+    expect(asked.map(one => one.text)).toEqual(['first']);
+    // Asked on the model it was asked of, not the one the chat is on now.
+    expect(clonedWith).toEqual({ model: 'kilo/one' });
+    expect(snapshotOf(opened).askedModel).toBe('kilo/one');
+
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).asked).toBeNull();
+    // The answer is a stored turn now, so the bubble it was asked at goes.
+    expect(snapshotOf(opened).displaced).toEqual([]);
+  });
+
+  it('stays above the question said after it when it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    expect(snapshotOf(opened).asked).toBe('second');
+
+    await retryChat(opened, first);
+    await settled();
+
+    /* The conversation reads in the order it was said: the question asked
+       again stays where it was, and the one said after it — kept when the slot
+       was taken back — stays under it. */
+    const [askedFirst, second] = snapshotOf(opened).displaced;
+    if (askedFirst === undefined || second === undefined) {
+      throw new TypeError('both failed questions were not kept');
+    }
+    expect(askedFirst.id).toBe(first.id);
+    expect(asMessages(snapshotOf(opened)).map(one => one.info.id)).toEqual([
+      `${opened}:displaced:${first.id}`,
+      `${opened}:displaced:${second.id}`,
+    ]);
+    expect(snapshotOf(opened).askedFrom).toBe(first.id);
+    // Its own copy survives the attempt, because its bubble is on screen.
+    const written = await keptIn(opened);
+    expect(written.map(one => one.id)).toEqual([first.id, second.id]);
+  });
+
+  it('is asked once when its Retry is pressed twice', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+
+    await retryChat(opened, kept);
+    // The second press holds the entry the first one took away.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+
+  it('is queued once when its Retry is pressed twice while another answer arrives', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving, so the retry waits behind it rather than asking now.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    // The second press finds the question already in the line.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(waitingWords(opened)).toEqual(['first']);
+  });
+
+  it('keeps a question said after it under its answer once it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    await retryChat(opened, first);
+    await settled();
+    /* The answer to the question asked again is stored as its own turn and the
+       answer's, which is what the exchange writes. */
+    storedHistory = [TURN, ANSWER];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* The question said after the one it answers moves under both stored turns,
+       so it reads after the answer rather than between it and its question. */
+    expect(held.displaced.map(one => [one.text, one.afterTurns])).toEqual([['second', 2]]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      TURN.id,
+      ANSWER.id,
+      `${held.sessionId}:displaced:${held.displaced[0]?.id ?? ''}`,
+    ]);
+    // The list is written as it is drawn, so a reopen keeps the order.
+    const written = await keptIn(held.sessionId);
+    expect(written.map(one => one.afterTurns)).toEqual([2]);
+  });
+
+  it('is still named for the question that opened the chat after it is asked again', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The first question stays the chat's name, and stays where it was said,
+    // while the question said after it is kept under it.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first', 'second']);
+    expect(await firstQuestionIn(opened)).toBe('first');
+  });
+
+  it('is kept when what took its slot was the person stopping the answer', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    // The second question waits; stopping the first lets it be asked.
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).asked).toBe('second');
+  });
+
+  it('keeps the written copy of a retry still waiting when another question is asked', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const held = snapshotOf(opened).displaced;
+    expect(held.map(one => one.text)).toEqual(['first', 'second']);
+
+    creditsFailureFor = undefined;
+    await say(opened, { text: 'fourth', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // Both retries wait for the answer arriving, with nothing but their written
+    // copies to survive a restart.
+    await retryChat(opened, held[0]);
+    await retryChat(opened, held[1]);
+    await settled();
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first', 'second']);
+    // The third one the fourth send pushed out of the slot is written too.
+    const waiting = await keptIn(opened);
+    expect(waiting.map(one => one.text)).toEqual(['first', 'second', 'third']);
+
+    // The answer lands and the first retry is asked, which writes its own copy
+    // away without touching the one still waiting behind it.
+    finish?.();
+    await settled();
+    /* The first retry is the slot's question now, so its own copy stays while
+       it is asked, and the one waiting behind it keeps its copy too. */
+    const written = await keptIn(opened);
+    expect(written.map(one => one.text)).toEqual(['first', 'second', 'third']);
+  });
+
+  it('keeps the earlier failed bubble when the same question is sent again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    // The first failure is a bubble of its own, and the second is the slot's.
+    expect(held.displaced.map(one => one.text)).toEqual(['the same words']);
+    expect(asMessages(held)).toHaveLength(2);
+  });
+
+  it('reopens a question it was asked again where it was said', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('interrupted', place);
+    /* The slot names the kept question it asks again, and the list holds that
+       question and the one said after it: the open draws both once, in the
+       order they were asked. */
+    const question = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    };
+    storedQuestions.set(
+      `chat-asked-target:interrupted`,
+      JSON.stringify({ ...question, from: 'a' })
+    );
+    storedQuestions.set(
+      'chat-kept-questions:interrupted',
+      JSON.stringify([
+        { id: 'a', ...question, afterTurns: 0, outcome: 'failed' },
+        {
+          id: 'b',
+          text: 'the failure it was slid above',
+          model: 'kilo/one',
+          effort: null,
+          images: [],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'interrupted');
+    await settled();
+
+    const held = snapshotOf('interrupted');
+    /* Both are kept questions, and the second was said after the first: the
+       attempt is the earlier bubble rather than a copy at the bottom. */
+    expect(held.displaced.map(one => one.text)).toEqual([
+      'the question asked again',
+      'the failure it was slid above',
+    ]);
+    expect(held.askedFrom).toBe('a');
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'interrupted:displaced:a',
+      'interrupted:displaced:b',
+    ]);
+    // Both stay written: each is a bubble the conversation cannot rebuild.
+    const written = await keptIn('interrupted');
+    expect(written.map(one => one.id)).toEqual(['a', 'b']);
+  });
+
+  it('drops both records of a question whose answer landed before the slot was cleared', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('answered', place);
+    /* The answer landed, the kept record was dropped, and the process stopped
+       before the slot's record was cleared. */
+    storedHistory = [
+      {
+        id: 'trn_9',
+        sessionId: 'answered',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'the question asked again' }],
+      },
+      {
+        id: 'trn_10',
+        sessionId: 'answered',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:answered',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'answered');
+    await settled();
+
+    const held = snapshotOf('answered');
+    // The answer is the transcript; no failed bubble stands beside it.
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['trn_9', 'trn_10']);
+    expect(await askedIn('answered')).toBeNull();
+  });
+
+  it('does not fold a later attempt that repeats an earlier answered question', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('repeat', place);
+    /* The first "hi" was answered long before; the second, said after two turns,
+       failed and was asked again when the app stopped. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 2,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_13',
+        sessionId: 'repeat',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_14',
+        sessionId: 'repeat',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:repeat', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:repeat', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'repeat');
+    await settled();
+
+    // The earlier answer is not this attempt's answer: the bubble and its Retry stay.
+    const held = snapshotOf('repeat');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+    const written = await keptIn('repeat');
+    expect(written.map(one => one.id)).toEqual(['a']);
+  });
+
+  it('does not fold a retry whose answer never came when the same words were answered before', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('retry-lost', place);
+    /* "hi" failed and was kept; "hi" sent again was answered, which stored its
+       turn; then the kept one was asked again and its answer never came. The
+       answer the store holds is not the retry's. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_15',
+        sessionId: 'retry-lost',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_16',
+        sessionId: 'retry-lost',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:retry-lost',
+      JSON.stringify({ ...words, from: 'a', after: 2 })
+    );
+    storedQuestions.set('chat-kept-questions:retry-lost', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'retry-lost');
+    await settled();
+
+    // Its bubble and its Retry stay: the stored turn is not the answer to it.
+    const held = snapshotOf('retry-lost');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+  });
+
+  it('folds a question whose answer is the newest question after tool results', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('tooled', place);
+    /* The answer used the chat's tool, so its results are stored as a user turn
+       with no text, after the question and before the answer's own words. */
+    const words = {
+      text: 'what time is it',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_17',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_18',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p2', kind: 'toolResult', callId: 'c1', body: '12:00', failed: false }],
+      },
+      {
+        id: 'trn_19',
+        sessionId: 'tooled',
+        role: 'assistant',
+        parts: [{ id: 'p3', kind: 'text', body: 'noon' }],
+      },
+    ];
+    /* The slot names a kept record the list no longer holds, which is what a
+       refused `forgetAsked` after the list was written away leaves, and what an
+       entry `keptIn` could not read leaves too. The newest question turn then
+       has to win over the tool-results turn for the fold to happen at all. */
+    storedQuestions.set('chat-asked-target:tooled', JSON.stringify({ ...words, from: 'a' }));
+
+    await enterChat(place, 'tooled');
+    await settled();
+
+    const held = snapshotOf('tooled');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+  });
+
+  it('drops the kept record a stored answer already answered', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('half', place);
+    /* The kept record survived a refused write while the answer landed, and the
+       slot still names it. */
+    const words = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_11',
+        sessionId: 'half',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_12',
+        sessionId: 'half',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:half', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:half', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'half');
+    await settled();
+
+    const held = snapshotOf('half');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    const written = await keptIn('half');
+    expect(written.map(one => one.id)).toEqual([]);
+  });
+
+  it('keeps the slot question whose kept copy was never written', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('unwritten', place);
+    storedQuestions.set(
+      'chat-asked-target:unwritten',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'unwritten');
+    await settled();
+
+    // Nothing was answered, so the question is still the one its Retry hangs off.
+    const held = snapshotOf('unwritten');
+    expect(held.asked).toBe('the question asked again');
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['unwritten:asked']);
+  });
+
+  it('draws two questions that say the same words with different pictures', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('pictures', place);
+    const words = { text: 'what is this', model: 'kilo/one', effort: null };
+    storedQuestions.set(
+      `chat-asked-target:pictures`,
+      JSON.stringify({ ...words, images: [{ media: 'image/jpeg', data: 'BBBB' }] })
+    );
+    storedQuestions.set(
+      'chat-kept-questions:pictures',
+      JSON.stringify([
+        {
+          id: 'a',
+          ...words,
+          images: [{ media: 'image/jpeg', data: 'AAAA' }],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'pictures');
+    await settled();
+
+    // Same words, different picture: two questions, both on screen.
+    expect(asMessages(snapshotOf('pictures')).map(one => one.info.id)).toEqual([
+      'pictures:displaced:a',
+      'pictures:asked',
+    ]);
+  });
+
+  it('leaves the slot record with the question being answered when a retry only waits', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving now, with its own record in the slot.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    await settled();
+
+    // It waits behind the answer, and the slot still records that answer's question.
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first']);
+    expect(await askedIn(opened)).toEqual({
+      text: 'third',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      // The answer in front of it is a turn the store already holds.
+      after: 1,
+      // Nothing says why an answer still arriving failed.
+      failureKey: null,
+    });
+
+    // The answer in front of it lands, so the retry is asked and becomes the slot's.
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened).waiting).toEqual([]);
+    expect(await askedIn(opened)).toMatchObject({
+      text: 'first',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+    /* Its kept copy stays, because that bubble is the attempt on screen; the
+       failure the ask pushed out of the slot took its place after it. */
+    const keptAfter = await keptIn(opened);
+    expect(keptAfter.map(one => one.text)).toEqual(['first', 'second']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
+  });
+
+  it('opens again with what a later send kept', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+  });
+});
+
 describe('a chat that moved', () => {
   it('leaves the chat it moved off pointing at the one it became', async () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
@@ -1190,13 +2245,9 @@ describe('opening a chat where it was recorded', () => {
     expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
   });
 
-  it('leaves a chat a tool retry moved while the chat was being let go', async () => {
-    /* The retry reads the chat, then waits on the server. The chat is let go
-       from another place in that wait, and the retry lands on the session it
-       moved onto after the chat has left the live ones. */
-    /* The chat this run starts carries no scope of its own, so it is opened
-       from the store first: the one that continues is the chat whose close a
-       test can hold open. */
+  it('does not revive a chat when a tool retry finishes discovery during its close', async () => {
+    /* Discovery starts first, but its move must wait for the close that took
+       the chat's turn while the server was answering. */
     await releaseChat(opened);
     await enterChat(place, opened);
     continued = [];
@@ -1218,21 +2269,18 @@ describe('opening a chat where it was recorded', () => {
 
     server.resolve(undefined);
     await settled();
-    const carried = snapshotOf(opened).sessionId;
-    expect(carried).toBe('s2');
+    expect(clonesMade).toBe(0);
 
     gate.resolve(undefined);
     await Promise.all([foreign, retrying]);
     await settled();
 
-    /* The let-go id settles for itself and says nothing about the chat that
-       carried on: that one is live, and it keeps its transcript. */
-    expect(snapshotOf(carried)).toMatchObject({
+    expect(clonesMade).toBe(0);
+    expect(snapshotOf(opened)).toMatchObject({
       status: 'idle',
-      turns: [TURN],
-      failureKey: null,
+      model: '',
+      failureKey: 'queryError.notFoundDescription',
     });
-    await releaseChat(carried);
   });
 
   it('keeps an organization’s chat out of the personal place', async () => {
@@ -1324,6 +2372,307 @@ describe('opening a chat where it was recorded', () => {
       turns: [],
       failureKey: 'queryError.notFoundDescription',
     });
+  });
+});
+
+describe('a tool retry queued behind send startup', () => {
+  it('keeps the answering session until its answer settles', async () => {
+    const cloneGate = Promise.withResolvers<undefined>();
+    cloning = cloneGate.promise;
+    const sending = say(opened, { text: 'first', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    const retrying = retryKiloMcp(opened);
+    await settled();
+    const namesGate = Promise.withResolvers<undefined>();
+    toolReads.sessionId = 's2';
+    toolReads.gate = namesGate.promise;
+    cloneGate.resolve(undefined);
+    await sending;
+    await settled();
+    expect(asked.at(-1)?.sessionId).toBe('s2');
+    namesGate.resolve(undefined);
+    await retrying;
+    await settled();
+
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf(opened)).toMatchObject({ sessionId: 's2', status: 'working' });
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).sessionId).toBe('s3');
+    expect(snapshotOf(opened).turns).toEqual([TURN]);
+  });
+});
+describe('a refused flag choice whose session is already behind', () => {
+  it('keeps the saved switch value and the explicit application retry', async () => {
+    failCloneFor = opened;
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
+    expect(chatFlagBehind(snapshotOf(opened).kiloTools)).toBe(true);
+    mcp.refuseNextWrite = true;
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: true })
+    ).rejects.toThrow('the choice could not be written');
+    const refused = snapshotOf(opened).kiloTools;
+    expect(chatFlagValueOf(refused, true)).toBe(false);
+    expect(chatFlagBehind(refused)).toBe(true);
+
+    failCloneFor = undefined;
+    await retryChatFlag({ sessionId: opened, place, flag: 'kiloTools' });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(chatFlagBehind(snapshotOf(opened).kiloTools)).toBe(false);
+    expect(chatFlagValueOf(snapshotOf(opened).kiloTools, true)).toBe(false);
+  });
+});
+
+describe('a flag applied after an answer', () => {
+  it.each(['webSearch', 'kiloTools'] satisfies readonly ChatFlagName[])(
+    'keeps %s moving until a deferred move settles and reports its refusal',
+    async flag => {
+      mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+      storedTools = [...BASE, ...SETTINGS, 'mcp_kilo_read-file'];
+      await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+      await settled();
+      await setChatFlag({ sessionId: opened, place, flag, next: false });
+      const readFlag = () =>
+        flag === 'webSearch' ? snapshotOf(opened).webSearch : snapshotOf(opened).kiloTools;
+      const whileAnswering = readFlag();
+      failCloneFor = opened;
+      finish?.();
+      await settled();
+
+      expect(whileAnswering).toMatchObject({ kind: 'saved', application: 'moving' });
+      expect(readFlag()).toEqual({ kind: 'saved', choice: false, application: 'behind' });
+      failCloneFor = undefined;
+      await retryChatFlag({ sessionId: opened, place, flag });
+      expect(readFlag()).toEqual({ kind: 'saved', choice: false, application: 'current' });
+    }
+  );
+});
+
+describe('account teardown preserving non-flag work', () => {
+  it('waits for a kept-question read before sign-out may wipe it', async () => {
+    failAnswerFor = opened;
+    await say(opened, { text: 'failed', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    failAnswerFor = undefined;
+    const gate = Promise.withResolvers<undefined>();
+    questionRead.gate = gate.promise;
+    const sending = say(
+      opened,
+      { text: 'replacement', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+    expect(questionRead.started).toBe(true);
+    const teardown = { finished: false };
+    const releasing = (async () => {
+      await releaseEveryChat();
+      teardown.finished = true;
+    })();
+    await settled();
+    const finishedBeforeRead = teardown.finished;
+    if (finishedBeforeRead) {
+      storedQuestions.clear();
+    }
+    gate.resolve(undefined);
+    await Promise.all([sending, releasing]);
+    if (!finishedBeforeRead) {
+      storedQuestions.clear();
+    }
+    await settled();
+
+    expect(finishedBeforeRead).toBe(false);
+    expect(storedQuestions.size).toBe(0);
+    expect(snapshotOf(opened).asked).toBeNull();
+  });
+
+  it('finishes preference migration before account switch returns', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    mcp.enabled.set(opened, false);
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const sending = say(opened, { text: 'moved', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    expect(scopes.of('s2')).toBe(place.chatScope);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBeUndefined();
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    await settled();
+    const finishedBeforeCopy = finished;
+    gate.resolve(undefined);
+    await Promise.all([sending, releasing]);
+    opened = 's2';
+    await enterChat(place, opened);
+
+    expect(finishedBeforeCopy).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBe('off');
+    expect(snapshotOf(opened).webSearch).toMatchObject({ kind: 'saved', choice: false });
+    expect(snapshotOf(opened).kiloTools).toMatchObject({ kind: 'saved', choice: false });
+  });
+
+  it('does not detach a held close while a start is discovering', async () => {
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    const discovery = Promise.withResolvers<undefined>();
+    mcp.ensure.mockImplementationOnce(async () => {
+      await discovery.promise;
+      return { status: 'ready', tools: [] };
+    });
+    const starting = startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+    const closeGate = Promise.withResolvers<undefined>();
+    closing = closeGate.promise;
+    let finished = false;
+    vi.useFakeTimers();
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    try {
+      await vi.advanceTimersByTimeAsync(1_100);
+    } finally {
+      vi.useRealTimers();
+    }
+    const finishedBeforeClose = finished;
+    discovery.resolve(undefined);
+    await starting;
+    closeGate.resolve(undefined);
+    await releasing;
+
+    expect(finishedBeforeClose).toBe(false);
+    expect(snapshotOf(opened).status).toBe('opening');
+  });
+});
+
+describe('account teardown during a flag turn', () => {
+  it('cancels a never-settling flag persist and fences its late continuation', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place: null,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    try {
+      await vi.waitFor(
+        () => {
+          expect(finished).toBe(true);
+        },
+        { timeout: 1_500 }
+      );
+    } finally {
+      storedQuestions.clear();
+      gate.resolve(undefined);
+      await Promise.all([picking, releasing]);
+    }
+    await settled();
+    expect(storedQuestions.size).toBe(0);
+    expect(snapshotOf(opened).webSearch.kind).toBe('reading');
+    expect(snapshotOf('s2').model).toBe('');
+  });
+
+  it('waits for a flag session move once application has started', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    cloning = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    expect(clonesMade).toBe(1);
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    await settled();
+    const finishedBeforeMove = finished;
+    gate.resolve(undefined);
+    await Promise.all([picking, releasing]);
+
+    expect(finishedBeforeMove).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:s2`)).toBe('off');
+    expect(snapshotOf('s2').model).toBe('');
+  });
+});
+
+describe('releasing a chat with queued operations', () => {
+  it('releases the successor after a pending flag turn and its waiting successor settle', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    const waiting = setChatFlag({
+      sessionId: opened,
+      place: null,
+      flag: 'webSearch',
+      next: true,
+    });
+    const releasing = releaseChat(opened);
+    gate.resolve(undefined);
+    await Promise.all([picking, waiting, releasing]);
+
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf('s2').model).toBe('');
+  });
+
+  it('settles a release without skipping a reopen waiting behind it', async () => {
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+    const releasing = releaseChat(opened);
+    await settled();
+    const reopening = enterChat(place, opened);
+    gate.resolve(undefined);
+    await Promise.all([releasing, reopening]);
+
+    expect(continued).toEqual([opened]);
+    expect(snapshotOf(opened).model).toBe('kilo/one');
+  });
+
+  it('cancels and forgets unopened flags before sign-out or account switch can continue', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: 'unopened',
+      place: null,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    const waiting = setChatFlag({
+      sessionId: 'unopened',
+      place: null,
+      flag: 'webSearch',
+      next: true,
+    });
+    await releaseEveryChat();
+    expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
+    gate.resolve(undefined);
+    await Promise.all([picking, waiting]);
+
+    expect(storedQuestions.get(`${choiceWrites.scope}:unopened`)).toBeUndefined();
+    expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
   });
 });
 
@@ -1523,6 +2872,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
         failureKey: errorKey,
       });
 
@@ -1632,6 +2982,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
         failureKey: errorKey,
       });
       await retryChat(opened);

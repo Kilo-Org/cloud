@@ -1,4 +1,4 @@
-import { usePathname } from 'expo-router';
+import { usePathname, useSegments } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,17 +19,24 @@ declare global {
 export function DesignGateProbe() {
   const anchor = useRef<ViewInstance>(null);
   const pathname = usePathname();
+  const segments = useSegments();
+  const screenKey = segments.join('/');
   const insets = useSafeAreaInsets();
   const route = useRef(pathname);
+  const screen = useRef(screenKey);
   const safeArea = useRef(insets);
   useEffect(() => {
     route.current = pathname;
+    // A tab change keeps the URL at `/`, so the focused segments are the only
+    // evidence that another screen is on top.
+    screen.current = screenKey;
     safeArea.current = insets;
-  }, [pathname, insets]);
+  }, [pathname, screenKey, insets]);
   useEffect(() => {
     const api = createDesignGateApi({
       document: () => anchor.current?.ownerDocument ?? null,
       route: () => route.current,
+      screen: () => screen.current,
       safeArea: () => safeArea.current,
     });
     globalThis.__kiloDesignGate = api;

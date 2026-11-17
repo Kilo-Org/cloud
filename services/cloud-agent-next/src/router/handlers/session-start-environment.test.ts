@@ -28,6 +28,7 @@ function environmentLoad(
 
 const {
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
@@ -35,6 +36,7 @@ const {
   startNewSessionMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
@@ -56,6 +58,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -99,6 +102,7 @@ describe('startSession environment propagation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);

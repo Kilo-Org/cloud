@@ -185,6 +185,8 @@ describe('useStackSafeReplace', () => {
     endTransition();
     expect(resetMock).toHaveBeenCalledTimes(1);
 
+    // The cleanup the assertion above saw is applied before the next replace.
+    setStack([TABS, r('session-1', 'agent-chat/[session-id]')], 1);
     latestReplace?.('/(app)/agent-chat/ses_2');
     setStack(
       [TABS, r('session-1', 'agent-chat/[session-id]'), r('session-2', 'agent-chat/[session-id]')],
@@ -248,6 +250,50 @@ describe('useStackSafeReplace', () => {
     unmount(renderer);
   });
 
+  it('ignores a transition that ends before the push commits, then retires on the real one', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    // The screen's own arrival event was still in flight and lands now: the
+    // stack has not gained the pushed route yet, so this end belongs to the
+    // navigation that opened the source, not to the push.
+    endTransition();
+    expect(resetMock).not.toHaveBeenCalled();
+
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-1', 'agent-chat/[session-id]')], 2);
+    endTransition();
+
+    // The end of the real push still retires the source, so Back skips it.
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock.mock.calls[0]?.[0]).toEqual({
+      routes: [TABS, r('session-1', 'agent-chat/[session-id]')],
+      index: 1,
+    });
+
+    unmount(renderer);
+  });
+
+  it('stops tracking a source whose push never settled instead of retiring it later', () => {
+    const now = vi.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(1_000);
+      const renderer = mount();
+
+      latestReplace?.('/(app)/agent-chat/ses_1');
+      // The push never ended, so the source stays put. A much later transition
+      // must not retire it: by then the reader may be using that screen.
+      now.mockReturnValue(60_000);
+      setStack([TABS, r('new-1', 'agent-chat/new'), r('session-1', 'agent-chat/[session-id]')], 2);
+      endTransition();
+
+      expect(resetMock).not.toHaveBeenCalled();
+
+      unmount(renderer);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('leaves the stack alone when the source route is already gone', () => {
     const renderer = mount();
 
@@ -257,19 +303,6 @@ describe('useStackSafeReplace', () => {
     setStack([TABS], 0);
     endTransition();
 
-    expect(resetMock).not.toHaveBeenCalled();
-
-    unmount(renderer);
-  });
-
-  it('leaves the stack alone when the source route is the only one left', () => {
-    setStack([r('new-1', 'agent-chat/new')], 0);
-    const renderer = mount();
-
-    latestReplace?.('/(app)/agent-chat/ses_1');
-    endTransition();
-
-    // Resetting to an empty route list would tear down the navigator.
     expect(resetMock).not.toHaveBeenCalled();
 
     unmount(renderer);

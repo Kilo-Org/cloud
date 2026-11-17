@@ -6,21 +6,13 @@ const mockEncryptKeyedEnvelope = jest.fn(
   (value: string, _scheme: string, _key: unknown, aad: string) => `envelope:${value}:${aad}`
 );
 
-const insertValuesMock = jest.fn().mockReturnThis();
-const onConflictMock = jest.fn().mockReturnThis();
-const returningMock = jest.fn();
-const insertChain = {
-  values: insertValuesMock,
-  onConflictDoUpdate: onConflictMock,
-  returning: returningMock,
-};
-const insertMock = jest.fn(() => insertChain);
-const dbMock = { insert: insertMock };
-
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  get db() {
-    return dbMock;
-  },
+const mockStoreIdentity = jest.fn();
+const mockExpected = { authorizationId: null, credentialVersion: null };
+jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
+  storeGitHubIdentity: (...args: unknown[]) => mockStoreIdentity(...args),
+}));
+jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
+  getGitHubUserAuthorizationStatus: async () => mockExpected,
 }));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -41,9 +33,7 @@ import { seedUserGithubToken } from './dev-seed';
 
 beforeEach(() => {
   jest.clearAllMocks();
-  insertValuesMock.mockReturnThis();
-  onConflictMock.mockReturnThis();
-  returningMock.mockResolvedValue([{ id: 'row-1' }]);
+  mockStoreIdentity.mockResolvedValue({ status: 'connected' });
 });
 
 describe('seedUserGithubToken', () => {
@@ -84,7 +74,7 @@ describe('seedUserGithubToken', () => {
       githubUserId: '42',
     });
 
-    const passedValues = insertValuesMock.mock.calls[0]?.[0];
+    const passedValues = mockStoreIdentity.mock.calls[0]?.[0];
     expect(passedValues).toEqual(
       expect.objectContaining({
         kilo_user_id: 'user-1',
@@ -101,25 +91,21 @@ describe('seedUserGithubToken', () => {
     expect(passedValues.refresh_token_encrypted).toContain('refresh');
   });
 
-  it('upserts on the (kilo_user_id, github_app_type) unique index', async () => {
+  it('uses the shared identity writer with the current revision', async () => {
     await seedUserGithubToken({
       kiloUserId: 'user-1',
       token: 'fake-token',
       githubLogin: 'octocat',
       githubUserId: '42',
     });
-
-    // The target is a composite (kilo_user_id, github_app_type); we don't
-    // reach into the column definitions, just assert the conflict clause was
-    // set so the row gets upserted instead of failing on duplicate-key.
-    const onConflictArg = onConflictMock.mock.calls[0]?.[0];
-    expect(onConflictArg).toBeDefined();
-    expect(onConflictArg.set).toBeDefined();
-    expect(onConflictArg.setWhere).toBeDefined();
+    expect(mockStoreIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ credential_source: 'github_app' }),
+      mockExpected
+    );
   });
 
   it('returns upserted=false when no row is returned', async () => {
-    returningMock.mockResolvedValueOnce([]);
+    mockStoreIdentity.mockResolvedValueOnce({ status: 'disconnect_existing_identity_first' });
     const result = await seedUserGithubToken({
       kiloUserId: 'user-1',
       token: 'fake-token',

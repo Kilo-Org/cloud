@@ -16,6 +16,7 @@ import {
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { disableUserAccessForDeletion } from '@/lib/user/deletion-queue/deletion-access';
 import { catalogEntryFor, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
@@ -161,6 +162,8 @@ async function persistAnonymizeSuccessTx(params: {
     }
 
     await tx.execute(sql.raw(`SET LOCAL statement_timeout = ${Math.floor(timeoutMs)}`));
+    // GitHub identity writers take this lock before the user row. Keep the same order.
+    await lockGitHubIdentityWrites(tx, userId);
     const [user] = await tx
       .select({ id: kilocode_users.id })
       .from(kilocode_users)

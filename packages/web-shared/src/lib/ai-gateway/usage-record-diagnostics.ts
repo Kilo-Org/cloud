@@ -2,6 +2,7 @@ import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { pool } from '@kilocode/web-shared/lib/drizzle';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import type { UsageRecordWriteOutcome } from './processUsage.types';
 
@@ -41,7 +42,6 @@ export async function observeUsageRecordCompletion(
       const sampleRate = level === 'info' ? completionSuccessSampleRate() : 1;
       if (sampleRate === 1 || Math.random() < sampleRate) {
         const createdAt = Date.parse(usage.created_at);
-        const region = process.env.VERCEL_REGION;
         console[level](
           JSON.stringify({
             level,
@@ -55,7 +55,7 @@ export async function observeUsageRecordCompletion(
             ...(Number.isFinite(createdAt)
               ? { event_age_ms: Math.max(0, Date.now() - createdAt) }
               : {}),
-            execution_region: region === 'fra1' || region === 'sfo1' ? region : 'unknown',
+            execution_region: getVercelExecutionRegion(),
           })
         );
       }

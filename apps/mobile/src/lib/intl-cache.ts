@@ -233,6 +233,21 @@ function dropDateFormattersForNewDeviceZone(): void {
   dateTimeFormats.clear();
 }
 
+/**
+ * The device's time zone as `Intl` resolves it now.
+ *
+ * `Date`'s local getters are not a substitute: the JavaScript runtime caches the
+ * zone it started in, so a device that changed zone while the app ran keeps
+ * answering the old wall clock for the rest of the process. This is the same
+ * probe `dropDateFormattersForNewDeviceZone` makes, exposed for callers that
+ * bucket by calendar day: a section heading and the device clock must name the
+ * same day, so they read the same signal.
+ */
+export function deviceTimeZone(): string {
+  dropDateFormattersForNewDeviceZone();
+  return cachedDeviceTimeZone ?? new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+}
+
 export function dateTimeFormat(
   /** Omitted only to read the device's own resolved options, e.g. its time zone. */
   locale: string | undefined,

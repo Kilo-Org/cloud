@@ -9,6 +9,7 @@ import type { StoredMessage } from '../types';
 import type { CloudMessagePresentation, CloudPartPresentation } from './presentation-types';
 
 export type CloudPresentationActions = {
+  collapseTools?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   onOpenPreparationDetails?: (attemptId: string) => void;

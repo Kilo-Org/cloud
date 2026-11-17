@@ -740,9 +740,11 @@ context updates, messages and downloads are not advertised, so a view does not
 offer them.
 
 The View side of the Apps metadata is the official
-`@modelcontextprotocol/ext-apps` bridge package, pinned to the 1.x line that
-speaks this package's `@modelcontextprotocol/sdk`; its 2.x peers on the v2 SDK
-split and moves when the client does.
+`@modelcontextprotocol/ext-apps` bridge package, now on the 2.x line, over an MCP
+client that is still `@modelcontextprotocol/sdk` 1.x; that client's move to the
+v2 SDK split is the next, larger change. The wire protocol versions and the view
+interop are unchanged across the ext-apps major, so a 1.x view and a 2.x view
+both drive this host bridge over the same messages.
 
 ## Entry points
 

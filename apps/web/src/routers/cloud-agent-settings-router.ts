@@ -1,22 +1,27 @@
 import 'server-only';
+import { TRPCClientError } from '@trpc/client';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   ORGANIZATION_MANAGE_ROLES,
   canManageOrganization,
 } from '@kilocode/app-shared/organizations';
+import { cloud_agent_user_settings, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
   sandboxSelectionCapabilitiesSchema,
-  type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  BuiltinAgentSettingsInputSchema,
   canonicalRepoFullName,
   clearContextSandboxAllocation,
+  getBuiltinAgentSettings,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
+  setBuiltinAgentSettings,
   setContextSandboxAllocation,
   setRepositorySettings,
   type ProfileOwner,
@@ -28,6 +33,7 @@ import {
   getSavedAllocationReason,
   loadSandboxCapabilities,
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
+import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
@@ -46,15 +52,18 @@ const CloudAgentSettingsSchema = z.object({
   canManage: z.boolean(),
   contextAllocation: z.string().nullable(),
   contextUnavailableReason: z.string().optional(),
+  builtinAgents: BuiltinAgentSettingsInputSchema,
   repositories: z.array(RepositorySettingsRowSchema),
-  capabilities: sandboxSelectionCapabilitiesSchema,
+  capabilities: sandboxSelectionCapabilitiesSchema.nullable(),
   // Repository-scoped capability views so a GitLab row never offers a
   // GitHub-only allocation such as Vercel.
   capabilitiesByPlatform: z.object({
-    github: sandboxSelectionCapabilitiesSchema,
-    gitlab: sandboxSelectionCapabilitiesSchema,
+    github: sandboxSelectionCapabilitiesSchema.nullable(),
+    gitlab: sandboxSelectionCapabilitiesSchema.nullable(),
   }),
 });
+
+const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
 
 function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
   return organizationId
@@ -64,6 +73,27 @@ function ownerFromInput(organizationId: string | undefined, userId: string): Pro
 
 function toRepositoryPlatform(platform: string): RepositoryPlatform {
   return platform === 'gitlab' ? 'gitlab' : 'github';
+}
+
+async function loadSettingsCapabilities(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string | undefined
+) {
+  try {
+    const capabilities = await loadSandboxCapabilities(user, headersList, organizationId);
+    const [github, gitlab] = await Promise.all(
+      (['github', 'gitlab'] as const).map(platform =>
+        loadSandboxCapabilities(user, headersList, organizationId, platform)
+      )
+    );
+    return { capabilities, capabilitiesByPlatform: { github, gitlab } };
+  } catch (error) {
+    const code: unknown =
+      error instanceof TRPCClientError ? (error.data?.code ?? error.shape?.data?.code) : undefined;
+    if (code !== 'SERVICE_UNAVAILABLE') throw error;
+    return { capabilities: null, capabilitiesByPlatform: { github: null, gitlab: null } };
+  }
 }
 
 export const cloudAgentSettingsRouter = createTRPCRouter({
@@ -85,11 +115,13 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [capabilities, settings, bindings] = await Promise.all([
-        loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
-        getSandboxAllocationSettings(db, owner),
-        listBindings(db, owner),
-      ]);
+      const [{ capabilities, capabilitiesByPlatform }, settings, bindings, builtinAgents] =
+        await Promise.all([
+          loadSettingsCapabilities(ctx.user, ctx.headersList, organizationId),
+          getSandboxAllocationSettings(db, owner),
+          listBindings(db, owner),
+          getBuiltinAgentSettings(db, ctx.user.id),
+        ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
       const rowKey = (fullName: string, platform: RepositoryPlatform) =>
@@ -119,24 +151,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         });
       }
 
-      const repositoryPlatforms: RepositoryPlatform[] = ['github', 'gitlab'];
-      const repositoryCapabilities = new Map<RepositoryPlatform, SandboxSelectionCapabilities>();
-      await Promise.all(
-        repositoryPlatforms.map(async platform => {
-          const caps = await loadSandboxCapabilities(
-            ctx.user,
-            ctx.headersList,
-            organizationId,
-            platform
-          );
-          repositoryCapabilities.set(platform, caps);
-        })
-      );
-
       const repositories = [...rows.values()]
         .map(row => {
-          if (!row.allocation) return row;
-          const caps = repositoryCapabilities.get(row.repositoryPlatform) ?? capabilities;
+          if (!row.allocation || !capabilities) return row;
+          const caps = capabilitiesByPlatform[row.repositoryPlatform] ?? capabilities;
           const ownerReason = getSavedAllocationReason(capabilities, row.allocation);
           const repositoryReason = findSandboxOption(
             caps,
@@ -156,20 +174,19 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
             a.repositoryPlatform.localeCompare(b.repositoryPlatform)
         );
 
-      const contextReason = settings.contextAllocation
-        ? getSavedAllocationReason(capabilities, settings.contextAllocation)
-        : undefined;
+      const contextReason =
+        settings.contextAllocation && capabilities
+          ? getSavedAllocationReason(capabilities, settings.contextAllocation)
+          : undefined;
 
       return {
         canManage,
         contextAllocation: settings.contextAllocation,
         ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
+        builtinAgents,
         repositories,
         capabilities,
-        capabilitiesByPlatform: {
-          github: repositoryCapabilities.get('github') ?? capabilities,
-          gitlab: repositoryCapabilities.get('gitlab') ?? capabilities,
-        },
+        capabilitiesByPlatform,
       };
     }),
 
@@ -244,6 +261,41 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         allocation: input.allocation ?? null,
       });
       return { success: true };
+    }),
+
+  getBuiltinAgents: baseProcedure
+    .output(BuiltinAgentSettingsInputSchema)
+    .query(({ ctx }) => getBuiltinAgentSettings(db, ctx.user.id)),
+
+  setBuiltinAgents: baseProcedure
+    .input(z.object({ agents: BuiltinAgentSettingsInputSchema }))
+    .output(z.object({ success: z.boolean(), agents: BuiltinAgentSettingsInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const agents = await setBuiltinAgentSettings(db, ctx.user.id, input.agents);
+      return { success: true, agents };
+    }),
+
+  getWorkspaceOrder: baseProcedure.output(WorkspaceOrderSchema).query(async ({ ctx }) => {
+    const [settings] = await db
+      .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
+      .from(cloud_agent_user_settings)
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id))
+      .limit(1);
+    return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
+  }),
+
+  setWorkspaceOrder: baseProcedure
+    .input(WorkspaceOrderSchema)
+    .output(WorkspaceOrderSchema)
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(cloud_agent_user_settings)
+        .values({ kilo_user_id: ctx.user.id, workspace_order: input.workspaceOrder })
+        .onConflictDoUpdate({
+          target: cloud_agent_user_settings.kilo_user_id,
+          set: { workspace_order: input.workspaceOrder },
+        });
+      return { workspaceOrder: input.workspaceOrder };
     }),
 
   removeRepositorySettings: baseProcedure

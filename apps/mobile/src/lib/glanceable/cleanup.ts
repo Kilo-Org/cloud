@@ -27,9 +27,20 @@ export function getTerminalBlankEpoch(): number {
 // blocks every publisher until a successful org list confirms membership.
 let orgMembershipLost = false;
 
+// Bumped only when a lost org is confirmed again. A decision latched on the
+// lost membership — the Home widget credential — compares it to the value it
+// captured, so a refusal caused by the missing membership is retried once the
+// org returns, while an unrelated refusal keeps its latch.
+let orgConfirmationEpoch = 0;
+
 /** True while a confirmed lost org blocks publication. */
 export function isGlanceableOrgLost(): boolean {
   return orgMembershipLost;
+}
+
+/** How many times a lost org has been confirmed again in this process. */
+export function getGlanceableOrgConfirmationEpoch(): number {
+  return orgConfirmationEpoch;
 }
 
 /**
@@ -153,7 +164,11 @@ export function writeLostOrgSnapshotAndEnd(): void {
 
 /** A successful org list holds the selection: release the lost-org latch. */
 export function confirmGlanceableOrgMembership(): void {
+  if (!orgMembershipLost) {
+    return;
+  }
   orgMembershipLost = false;
+  orgConfirmationEpoch += 1;
 }
 
 /**

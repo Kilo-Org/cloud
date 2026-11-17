@@ -17,7 +17,12 @@ import {
 } from '@/lib/integrations/github/multiple-installations';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
-import { effectiveAppTypeCondition, ownerCondition } from '@/lib/integrations/db/predicates';
+import {
+  effectiveAppTypeCondition,
+  occupiesAnotherGitHubInstallationSlot,
+  ownerCondition,
+} from '@/lib/integrations/db/predicates';
+import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
@@ -151,11 +156,11 @@ export async function connectVerifiedGitHubInstallation(
             isNull(platform_integrations.github_disconnected_at)
           )
         );
-      const hasAnotherInstallation = ownerIntegrations.some(
-        integration =>
-          integration.installationId !== null &&
-          (integration.installationId !== data.platformInstallationId ||
-            (integration.appType ?? 'standard') !== data.githubAppType)
+      const hasAnotherInstallation = ownerIntegrations.some(integration =>
+        occupiesAnotherGitHubInstallationSlot(integration, {
+          installationId: data.platformInstallationId,
+          appType: data.githubAppType,
+        })
       );
       if (hasAnotherInstallation) {
         return { ok: false, reason: 'multiple_installations_disabled' };
@@ -383,11 +388,8 @@ export async function connectVerifiedGitHubInstallation(
   try {
     return await (transaction ? execute(transaction) : db.transaction(execute));
   } catch (error) {
-    const code =
-      error && typeof error === 'object' && 'cause' in error
-        ? (error.cause as { code?: string } | undefined)?.code
-        : (error as { code?: string } | undefined)?.code;
-    if (code === '55P03' || code === '40P01' || code === '57014') {
+    const code = getPostgresErrorCode(error);
+    if (code !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(code)) {
       return { ok: false, reason: 'retryable_conflict' };
     }
     throw error;

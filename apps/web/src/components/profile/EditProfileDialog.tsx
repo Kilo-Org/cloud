@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -23,6 +23,8 @@ type EditProfileDialogProps = {
   githubUrl: string | null;
   githubLinkedViaOAuth: boolean;
 };
+
+const URL_ERROR_MESSAGE = 'URL must start with http:// or https://';
 
 function isValidHttpUrlOrEmpty(value: string): boolean {
   if (value.trim() === '') return true;
@@ -72,38 +74,34 @@ export function EditProfileDialog({
 
   function handleSave() {
     const trimmedLinkedin = linkedinValue.trim();
+    const trimmedGithub = githubValue.trim();
 
     let hasError = false;
 
     if (trimmedLinkedin !== '' && !isValidHttpUrlOrEmpty(trimmedLinkedin)) {
-      setLinkedinError('URL must start with http:// or https://');
+      setLinkedinError(URL_ERROR_MESSAGE);
       hasError = true;
     } else {
       setLinkedinError(null);
     }
 
     if (!githubLinkedViaOAuth) {
-      const trimmedGithub = githubValue.trim();
       if (trimmedGithub !== '' && !isValidHttpUrlOrEmpty(trimmedGithub)) {
-        setGithubError('URL must start with http:// or https://');
+        setGithubError(URL_ERROR_MESSAGE);
         hasError = true;
       } else {
         setGithubError(null);
       }
-
-      if (hasError) return;
-
-      updateProfileMutation.mutate({
-        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
-        github_url: trimmedGithub === '' ? null : trimmedGithub,
-      });
-    } else {
-      if (hasError) return;
-
-      updateProfileMutation.mutate({
-        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
-      });
     }
+
+    if (hasError) {
+      return;
+    }
+
+    updateProfileMutation.mutate({
+      linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
+      github_url: githubLinkedViaOAuth ? undefined : trimmedGithub === '' ? null : trimmedGithub,
+    });
   }
 
   return (
@@ -124,11 +122,17 @@ export function EditProfileDialog({
                 setLinkedinError(null);
               }}
               aria-invalid={linkedinError !== null}
+              aria-describedby={linkedinError ? 'linkedin-url-error' : undefined}
             />
-            {linkedinError && <p className="text-destructive text-sm">{linkedinError}</p>}
+            <p
+              id="linkedin-url-error"
+              role={linkedinError ? 'alert' : undefined}
+              className="text-destructive text-sm"
+            >
+              {linkedinError}
+            </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="github-url">GitHub Profile URL</Label>
             {githubLinkedViaOAuth ? (
               <p className="text-muted-foreground text-sm">
                 Linked via GitHub.{' '}
@@ -138,6 +142,7 @@ export function EditProfileDialog({
               </p>
             ) : (
               <>
+                <Label htmlFor="github-url">GitHub Profile URL</Label>
                 <Input
                   id="github-url"
                   placeholder="https://github.com/yourusername"
@@ -147,13 +152,22 @@ export function EditProfileDialog({
                     setGithubError(null);
                   }}
                   aria-invalid={githubError !== null}
+                  aria-describedby={githubError ? 'github-url-error' : undefined}
                 />
-                {githubError && <p className="text-destructive text-sm">{githubError}</p>}
+                <p
+                  id="github-url-error"
+                  role={githubError ? 'alert' : undefined}
+                  className="text-destructive text-sm"
+                >
+                  {githubError}
+                </p>
               </>
             )}
           </div>
           {updateProfileMutation.error && (
-            <p className="text-destructive text-sm">Failed to save profile. Please try again.</p>
+            <p role="alert" className="text-destructive text-sm">
+              Failed to save profile. Please try again.
+            </p>
           )}
         </div>
         <DialogFooter>

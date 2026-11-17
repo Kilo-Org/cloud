@@ -46,7 +46,10 @@ const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /** Interval for the early housekeeping run that `alarm` schedules. */
 const PURGE_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 
-/** Rows one housekeeping delete statement removes. */
+/**
+ * Rows one housekeeping delete statement removes. The create path reclaims the
+ * same batch, so housekeeping and creation share one bound.
+ */
 export const PENDING_PURGE_BATCH_SIZE = 90;
 
 /**
@@ -153,7 +156,11 @@ export interface OAuthStoreApi {
     identity: { kiloUserId: string; kiloToken: string },
     nowIso: string
   ): Promise<boolean>;
-  /** Insert a fresh pending authorization (status 'pending'). */
+  /**
+   * Insert a fresh pending authorization (status 'pending'). The call also
+   * reclaims one batch of rows that are already past their expiry, before it
+   * inserts.
+   */
   createPendingAuthorization(input: NewPendingAuthorization): Promise<void>;
   getPendingAuthorization(id: string): Promise<PendingAuthorization | null>;
   /** pending -> denied after the user denied the Kilo pairing upstream (s2). */
@@ -243,6 +250,11 @@ export class KiloMcpOAuthStore
   }
 
   async createPendingAuthorization(input: NewPendingAuthorization): Promise<void> {
+    // Reclaim one batch of rows that are already past their expiry relative to
+    // this start, before adding another, so housekeeping and creation share one
+    // batch bound. `createdAt` is the caller's clock; the store reads none, so
+    // the reclaimed set is deterministic under test.
+    this.deleteExpiredPendingBatch(input.createdAt);
     this.db
       .insert(oauthPendingAuthorizations)
       .values({
@@ -380,6 +392,32 @@ export class KiloMcpOAuthStore
     return this.drainExpiredPending(nowIso, maxBatches);
   }
 
+  /**
+   * Delete up to one batch of pending rows past `nowIso` and report how many
+   * were removed. The alarm drain and the create path both call this, so the
+   * reclaimed set and its `expires_at` index stay one implementation.
+   */
+  private deleteExpiredPendingBatch(nowIso: string): number {
+    const expiredIds = this.db
+      .select({ id: oauthPendingAuthorizations.id })
+      .from(oauthPendingAuthorizations)
+      .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
+      .limit(PENDING_PURGE_BATCH_SIZE)
+      .all()
+      .map(row => row.id);
+    if (expiredIds.length === 0) return 0;
+    this.db
+      .delete(oauthPendingAuthorizations)
+      .where(
+        and(
+          lt(oauthPendingAuthorizations.expires_at, nowIso),
+          inArray(oauthPendingAuthorizations.id, expiredIds)
+        )
+      )
+      .run();
+    return expiredIds.length;
+  }
+
   /** Delete expired pending-authorization rows in at most `maxBatches` batches. */
   private async drainExpiredPending(
     nowIso: string,
@@ -387,25 +425,9 @@ export class KiloMcpOAuthStore
   ): Promise<{ deleted: number; moreRemaining: boolean }> {
     let deleted = 0;
     for (let batch = 0; batch < maxBatches; batch += 1) {
-      const expiredIds = this.db
-        .select({ id: oauthPendingAuthorizations.id })
-        .from(oauthPendingAuthorizations)
-        .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
-        .limit(PENDING_PURGE_BATCH_SIZE)
-        .all()
-        .map(row => row.id);
-      if (expiredIds.length === 0) return { deleted, moreRemaining: false };
-      this.db
-        .delete(oauthPendingAuthorizations)
-        .where(
-          and(
-            lt(oauthPendingAuthorizations.expires_at, nowIso),
-            inArray(oauthPendingAuthorizations.id, expiredIds)
-          )
-        )
-        .run();
-      deleted += expiredIds.length;
-      if (expiredIds.length < PENDING_PURGE_BATCH_SIZE) return { deleted, moreRemaining: false };
+      const removed = this.deleteExpiredPendingBatch(nowIso);
+      deleted += removed;
+      if (removed < PENDING_PURGE_BATCH_SIZE) return { deleted, moreRemaining: false };
     }
     const next = this.db
       .select({ id: oauthPendingAuthorizations.id })

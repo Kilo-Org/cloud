@@ -11,6 +11,11 @@ export const MAX_SINGLE_ITEM_BYTES = 50 * 1024 * 1024;
 export const INGEST_CHUNK_MAX_BYTES = 4 * 1024 * 1024;
 export const INGEST_CHUNK_MAX_ITEMS = 128;
 
+// Largest stored body one clone source window carries. The clone stages a window
+// as one batch and digests its rows, so the window bounds the RPC payload, the
+// staged batch, and the digest input at once.
+export const CLONE_WINDOW_MAX_BYTES = 4 * 1024 * 1024;
+
 // Largest body the request handler accepts before staging. Matches the queue
 // consumer's per-item cap, so a payload the consumer is built to chunk is never
 // rejected at the edge; bodies are counted during multipart storage with flat memory.

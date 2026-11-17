@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { postAuth } from '@/lib/auth/auth-fetch';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { parseTokenPair, type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
@@ -164,6 +164,7 @@ export type PasskeySignInResult =
       refreshToken?: string;
       expiresIn?: number;
       created?: boolean;
+      pendingLink?: PendingLinkResult;
     }
   | {
       status: 'error';
@@ -176,16 +177,21 @@ export type PasskeySignInResult =
       reported?: boolean;
     };
 
+export type PasskeyTicketResult =
+  | { status: 'ok'; ticket: string }
+  | { status: 'error'; failure: PasskeyFailure };
+
 /**
- * Run one usernameless passkey sign-in: mint options server-side, let the
- * platform credential API produce the assertion, hand the assertion back for
- * server-side verification, then redeem the one-time ticket through the same
- * native token route the other providers use. The screen signs the returned
- * token pair in.
+ * Run the passkey ceremony up to the one-time ticket the server mints: mint
+ * options, let the platform authenticator produce the assertion, and let the
+ * server verify it. The ticket is proof of a live primary sign-in; the caller
+ * decides what to redeem it for. Sign-in trades it for a session; passkey
+ * management presents it to mint a management authorization, which must not
+ * replace the session the person is already using.
  */
-export async function signInWithPasskey(
+export async function mintPasskeyTicket(
   api: PasskeysApi | null = loadPasskeys()
-): Promise<PasskeySignInResult> {
+): Promise<PasskeyTicketResult> {
   if (!usable(api)) {
     return { status: 'error', failure: 'unsupported' };
   }
@@ -242,6 +248,24 @@ export async function signInWithPasskey(
   if (!ticket.success) {
     return { status: 'error', failure: 'failed' };
   }
+  return { status: 'ok', ticket: ticket.data.ticket };
+}
+
+/**
+ * Run one usernameless passkey sign-in: mint a ticket through the platform
+ * ceremony, then redeem it through the same native token route the other
+ * providers use. The screen signs the returned token pair in.
+ * `pendingLinkToken` ties the sign-in to the pending link it resolves.
+ */
+export async function signInWithPasskey(
+  api: PasskeysApi | null = loadPasskeys(),
+  pendingLinkToken?: string
+): Promise<PasskeySignInResult> {
+  const minted = await mintPasskeyTicket(api);
+  if (minted.status === 'error') {
+    return { status: 'error', failure: minted.failure };
+  }
+  const verifiedTicket = minted.ticket;
 
   let admissionBody: Record<string, unknown> = {};
   try {
@@ -253,9 +277,10 @@ export async function signInWithPasskey(
 
   const tokenResult = await postAuth('/api/auth/native/token', {
     provider: 'passkey',
-    ticket: ticket.data.ticket,
+    ticket: verifiedTicket,
     supportsRefresh: true,
     ...admissionBody,
+    ...(pendingLinkToken ? { pendingLinkToken } : {}),
   });
   if (!tokenResult.ok) {
     if (!tokenResult.errorCode) {
@@ -279,12 +304,88 @@ export async function signInWithPasskey(
     refreshToken: 'refreshToken' in parsed ? parsed.refreshToken : undefined,
     expiresIn: 'expiresIn' in parsed ? parsed.expiresIn : undefined,
     created: parsed.created,
+    ...(parsed.pendingLink ? { pendingLink: parsed.pendingLink } : {}),
   };
 }
 
+/**
+ * Why a native registration did not add a credential.
+ *
+ * - `cancelled`: the sheet was dismissed; nothing was written.
+ * - `unsupported`: this build or platform cannot run the ceremony.
+ * - `management-required`: the bearer is a live native session but carried no
+ *   fresh primary proof; the screen verifies the person in the app and retries.
+ * - `authorization-invalid`: the management authorization expired, was already
+ *   consumed, or was minted for another operation; a new one is required.
+ * - `device-unsupported`: this bearer cannot manage passkeys at all (an API
+ *   key, a CLI or device-auth credential), so no in-app step can fix it.
+ * - `session-ended`: the bearer itself was refused; the person signs in again.
+ * - `failed`: the ceremony or the request failed; a fresh attempt is a retry.
+ */
+export type PasskeyRegistrationFailure =
+  | 'cancelled'
+  | 'unsupported'
+  | 'management-required'
+  | 'authorization-invalid'
+  | 'device-unsupported'
+  | 'session-ended'
+  | 'failed';
+
 export type PasskeyRegistrationResult =
   | { status: 'ok' }
-  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'failed' };
+  | { status: 'error'; failure: PasskeyRegistrationFailure };
+
+/**
+ * Map the registration route's refusals. The route accepts a native bearer only
+ * with a management authorization minted from fresh primary proof: without one
+ * it answers `PASSKEY_MANAGEMENT_REQUIRED`, and one that expired, was consumed,
+ * or belongs to another operation answers
+ * `PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID`. Both ask the app to verify and
+ * retry, never for a browser. `PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED` and a
+ * refused bearer are terminal for this account on this device.
+ */
+function registrationRefusal(
+  failure: {
+    errorCode: string | undefined;
+    httpStatus?: number;
+  },
+  step: 'options' | 'verify'
+): PasskeyRegistrationFailure {
+  // The options step answers 401 without a code only for a bearer it will not
+  // accept. Verify also answers 401 for the challenge itself — expired,
+  // replayed, or a signature that did not verify — which a fresh ceremony
+  // fixes, so its unknown refusals stay retryable.
+  const unknownRefusal: PasskeyRegistrationFailure =
+    step === 'options' && failure.httpStatus === 401 ? 'session-ended' : 'failed';
+  switch (failure.errorCode) {
+    case 'PASSKEY_MANAGEMENT_REQUIRED': {
+      return 'management-required';
+    }
+    case 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID': {
+      return 'authorization-invalid';
+    }
+    case 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED': {
+      return 'device-unsupported';
+    }
+    case 'Unauthorized':
+    case 'UNAUTHORIZED': {
+      return 'session-ended';
+    }
+    case 'REAUTH_REQUIRED': {
+      // The cookie path's answer; a native request that receives it needs the
+      // same in-app verification a management refusal asks for.
+      return 'management-required';
+    }
+    // `undefined` is named for the exhaustiveness rule; the default answers the
+    // codes the server may add later. Both give the same fallback refusal.
+    case undefined: {
+      return unknownRefusal;
+    }
+    default: {
+      return unknownRefusal;
+    }
+  }
+}
 
 /** Creation has no credential to be missing yet, so `no-passkey` is just a refusal. */
 function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'failed' {
@@ -292,13 +393,24 @@ function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'fai
   return failure === 'cancelled' || failure === 'unsupported' ? failure : 'failed';
 }
 
+/** The fresh primary proof one registration may spend. */
+export type PasskeyRegistrationOptions = {
+  /**
+   * The management authorization minted from fresh primary proof. Single use:
+   * the server consumes it when it verifies the attestation, so a ceremony that
+   * fails after that consumes it needs a new one.
+   */
+  managementAuthorization: string;
+};
+
 /**
  * Create a passkey for the signed-in user: mint registration options with the
- * session's bearer token, run the platform ceremony, then let the server verify
- * the attestation against the challenge it stored. The credential only exists
- * once the server has accepted it.
+ * session's bearer token and its management authorization, run the platform
+ * ceremony, then let the server verify the attestation against the challenge it
+ * stored. The credential only exists once the server has accepted it.
  */
 export async function registerPasskey(
+  options: PasskeyRegistrationOptions,
   api: PasskeysApi | null = loadPasskeys()
 ): Promise<PasskeyRegistrationResult> {
   if (!usable(api)) {
@@ -306,9 +418,14 @@ export async function registerPasskey(
   }
 
   const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
-  const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
+  const authorization = { managementAuthorization: options.managementAuthorization };
+  const optionsResult = await postAuth(
+    REGISTER_ROUTE,
+    { action: 'options', ...authorization },
+    authHeaders
+  );
   if (!optionsResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(optionsResult, 'options') };
   }
   const ceremony = ceremonyOptionsSchema.safeParse(optionsResult.data);
   if (!ceremony.success) {
@@ -331,11 +448,12 @@ export async function registerPasskey(
       action: 'verify',
       challengeId: ceremony.data.challengeId,
       response: attestation,
+      ...authorization,
     },
     authHeaders
   );
   if (!verifyResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(verifyResult, 'verify') };
   }
   return { status: 'ok' };
 }

@@ -90,6 +90,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(true);
@@ -100,6 +101,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: false,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);
@@ -110,6 +112,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: true,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);
@@ -120,7 +123,19 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: true,
+      })
+    ).toBe(false);
+  });
+
+  it('returns false when the last next page failed (footer retry owns recovery)', () => {
+    expect(
+      shouldLoadMoreSessions({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: true,
+        isPlaceholderData: false,
       })
     ).toBe(false);
   });
@@ -130,6 +145,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: undefined,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);

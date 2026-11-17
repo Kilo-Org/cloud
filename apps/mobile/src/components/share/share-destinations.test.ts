@@ -23,6 +23,7 @@ function session(id: string, over: Partial<StoredSession> = {}): StoredSession {
     total_cost_microdollars: null,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+    last_activity_at: null,
     version: 0,
     associatedPr: null,
     ...over,

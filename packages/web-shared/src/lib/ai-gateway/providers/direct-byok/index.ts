@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import {
   COMPATIBLE_USER_AGENT,
+  type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -20,7 +20,6 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
@@ -62,17 +61,15 @@ function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
   model: DirectByokModel,
   id: string
-) {
-  return provider.getModelChatApi
-    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
-    : getAiSdkProvider(id, provider.id);
+): DirectByokAiSdkProvider | undefined {
+  if (provider.getModelChatApi) {
+    return AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)];
+  }
+  const choice = provider.getAiSdkProvider?.(id);
+  return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
 
-function convertModel(
-  provider: DirectByokProvider,
-  model: DirectByokModel,
-  preferredIndex: number
-) {
+function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
   return {
@@ -109,8 +106,8 @@ function convertModel(
       model.flags?.includes('reasoning') ? ['reasoning'] : []
     ),
     default_parameters: {},
-    preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
+    isFree: false,
     opencode: withLegacyVariants({
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:
@@ -287,7 +284,6 @@ export async function createDirectByokReferenceResolver(
 }
 
 async function getDirectByokModels(keys: EnabledByokProvider[]) {
-  const firstPreferredId = (await getPreferredModels()).length;
   // A catalog-mode key serves only catalog ids, so its bespoke models are not listed.
   const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
     keys.some(key => key.providerId === provider.id && !isCatalogModeKey(key))
@@ -295,9 +291,8 @@ async function getDirectByokModels(keys: EnabledByokProvider[]) {
   const modelsByProvider = await Promise.all(
     enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
   );
-  let nextPreferredId = firstPreferredId;
   return modelsByProvider.flatMap(({ provider, models }) =>
-    models.map(model => convertModel(provider, model, nextPreferredId++))
+    models.map(model => convertModel(provider, model))
   );
 }
 
@@ -322,14 +317,26 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   return { provider: null, model: null };
 }
 
+/** Models the owner's enabled keys serve. */
+export async function getDirectByokModelsForOwner(owner: ByokOwner) {
+  return getDirectByokModels(await getEnabledByokProviders(readDb, owner));
+}
+
 export async function getDirectByokModelsForOrganization(organizationId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'organization', id: organizationId });
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'user', id: userId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'user', id: userId });
+}
+
+/**
+ * The URL string of a fetch input: a string as it arrives, a `URL` by its `href`, and a `Request`
+ * by its `url`. Interpolating the input would turn a `Request` into `[object Request]`.
+ */
+function fetchInputUrlString(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
 }
 
 /**
@@ -357,12 +364,9 @@ export async function createAiSdkProvider(
     baseURL: chatCompletionsUrl,
     apiKey: awsBedrock || apiKeyHeader ? undefined : apiKey,
     name: 'openaiCompatible',
-    headers: {
-      ...(apiKeyHeader === 'x-api-key' && { 'x-api-key': apiKey }),
-      ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
-    },
+    headers: directByokProvider.chatCompletionsHeaders(upstream),
     fetch: async (url, init) => {
-      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : String(url);
+      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : fetchInputUrlString(url);
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
       if (!awsBedrock || typeof init?.body !== 'string') {

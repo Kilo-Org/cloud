@@ -40,14 +40,14 @@ const BRANCH = 'feature/worktree';
 const PR_URL = `${GIT_URL}/pull/42`;
 
 const mockRuntimeDelete = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
-const mockHostedRuntimeDelete =
-  jest.fn<
-    (input: {
-      workspaceId: string;
-      sessionId: string;
-      operationKey: string;
-    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>
-  >();
+const mockHostedRuntimeDelete = jest.fn<
+  (input: { workspaceId: string; sessionId: string; operationKey: string }) => Promise<{
+    success: true;
+    workspaceId: string;
+    sessionId: string;
+    cleanup: 'complete' | 'pending';
+  }>
+>();
 const mockWorktreeDelete = jest.fn<(input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>();
 const mockGetRuntimeSession = jest.fn<(sessionId: string) => Promise<Record<string, unknown>>>();
 const mockDeleteSessionIngest = jest.fn<(sessionId: string, userId: string) => Promise<void>>();
@@ -272,10 +272,11 @@ beforeEach(async () => {
     success: true,
     workspaceId: WORKTREE_ID,
     sessionId: WORKSPACE_ID,
+    cleanup: 'complete',
   });
   mockWorktreeDelete
     .mockReset()
-    .mockResolvedValue({ success: true, deletedSessionIds: [SESSION_ID] });
+    .mockResolvedValue({ success: true, deletedSessionIds: [SESSION_ID], cleanup: 'complete' });
   mockGetRuntimeSession.mockReset().mockRejectedValue(new Error('Runtime not configured'));
   mockDeleteSessionIngest.mockReset().mockImplementation(async (sessionId, userId) => {
     await db
@@ -423,6 +424,7 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
       success: true,
       session_id: SESSION_ID,
+      cleanup: 'complete',
     });
 
     expect(mockHostedRuntimeDelete).toHaveBeenCalledWith({
@@ -430,6 +432,40 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
       sessionId: WORKSPACE_ID,
       operationKey: expect.any(String),
     });
+    expect(mockRuntimeDelete).not.toHaveBeenCalled();
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+  });
+
+  it('forwards the caller operation key to the authoritative hosted delete', async () => {
+    await expect(
+      createCaller({ user }).delete({ session_id: SESSION_ID, operationKey: UUID })
+    ).resolves.toEqual({
+      success: true,
+      session_id: SESSION_ID,
+      cleanup: 'complete',
+    });
+
+    expect(mockHostedRuntimeDelete).toHaveBeenCalledWith({
+      workspaceId: WORKTREE_ID,
+      sessionId: WORKSPACE_ID,
+      operationKey: UUID,
+    });
+  });
+
+  it('passes pending hosted cleanup through without a second runtime or ingest delete', async () => {
+    mockHostedRuntimeDelete.mockResolvedValueOnce({
+      success: true,
+      workspaceId: WORKTREE_ID,
+      sessionId: WORKSPACE_ID,
+      cleanup: 'pending',
+    });
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+      success: true,
+      session_id: SESSION_ID,
+      cleanup: 'pending',
+    });
+
     expect(mockRuntimeDelete).not.toHaveBeenCalled();
     expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
   });
@@ -457,6 +493,29 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it('rejects an authorization failure before falling back to ingest cleanup', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('Session access denied', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'Session access denied',
+            data: { code: 'FORBIDDEN' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session access denied',
+    });
+
+    expect(await readSessions()).toHaveLength(1);
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
   it('falls back to ingest cleanup when the authoritative operation reports not found', async () => {
     mockHostedRuntimeDelete.mockRejectedValueOnce(
       new TRPCClientError('workspace_not_found', {
@@ -473,9 +532,123 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
       success: true,
       session_id: SESSION_ID,
+      cleanup: 'complete',
     });
 
     expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+    expect(mockRuntimeDelete).not.toHaveBeenCalled();
+  });
+
+  describe('legacy runtime deletion', () => {
+    async function readLegacySession() {
+      const [session] = await db
+        .select()
+        .from(cli_sessions_v2)
+        .where(
+          and(eq(cli_sessions_v2.session_id, SESSION_ID), eq(cli_sessions_v2.kilo_user_id, USER_ID))
+        );
+      return session;
+    }
+
+    async function makeLegacySession() {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: null })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    }
+
+    it.each([
+      [
+        'an unsuccessful Worker response',
+        () => mockRuntimeDelete.mockResolvedValueOnce({ success: false }),
+      ],
+      [
+        'a generic Worker failure',
+        () => mockRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable')),
+      ],
+    ])('continues ingest cleanup with pending cleanup after %s', async (_label, arrangeFailure) => {
+      await makeLegacySession();
+      arrangeFailure();
+
+      await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+        success: true,
+        session_id: SESSION_ID,
+        cleanup: 'pending',
+      });
+
+      expect(mockHostedRuntimeDelete).not.toHaveBeenCalled();
+      expect(mockRuntimeDelete).toHaveBeenCalledWith(WORKSPACE_ID);
+      expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+      expect(mockCaptureException).toHaveBeenCalled();
+      expect(await readLegacySession()).toBeUndefined();
+    });
+
+    it('reports complete cleanup when legacy runtime deletion succeeds', async () => {
+      await makeLegacySession();
+
+      await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+        success: true,
+        session_id: SESSION_ID,
+        cleanup: 'complete',
+      });
+
+      expect(mockRuntimeDelete).toHaveBeenCalledWith(WORKSPACE_ID);
+      expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('reports complete cleanup after a typed runtime NOT_FOUND', async () => {
+      await makeLegacySession();
+      mockRuntimeDelete.mockRejectedValueOnce(
+        new TRPCClientError('workspace_not_found', {
+          result: {
+            error: {
+              code: -32603,
+              message: 'workspace_not_found',
+              data: { code: 'NOT_FOUND' },
+            },
+          },
+        })
+      );
+
+      await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+        success: true,
+        session_id: SESSION_ID,
+        cleanup: 'complete',
+      });
+
+      expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it.each(['CONFLICT', 'FORBIDDEN', 'UNAUTHORIZED'] as const)(
+      'rejects a hard %s failure before ingest cleanup',
+      async code => {
+        await makeLegacySession();
+        mockRuntimeDelete.mockRejectedValueOnce(
+          new TRPCClientError('runtime deletion rejected', {
+            result: {
+              error: {
+                code: -32603,
+                message: 'runtime deletion rejected',
+                data: { code },
+              },
+            },
+          })
+        );
+
+        await expect(
+          createCaller({ user }).delete({ session_id: SESSION_ID })
+        ).rejects.toMatchObject({ code });
+
+        expect(await readLegacySession()).toMatchObject({
+          session_id: SESSION_ID,
+          cloud_agent_worktree_id: null,
+        });
+        expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+        expect(mockCaptureException).not.toHaveBeenCalled();
+      }
+    );
   });
 });
 
@@ -665,6 +838,13 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         [WORKTREE_ID]: {
           name: null,
           defaultTitle: ownershipRow.title,
+          branch: null,
+          folderId: null,
+          sidebarPosition: null,
+          parentWorktreeId: null,
+          baseBranch: null,
+          baseSha: null,
+          createdAt: new Date(ownershipRow.created_at).toISOString(),
           prSession: null,
           sessions: [
             {
@@ -1070,6 +1250,13 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       [WORKTREE_ID]: {
         name: null,
         defaultTitle: ownershipRow.title,
+        branch: null,
+        folderId: null,
+        sidebarPosition: null,
+        parentWorktreeId: null,
+        baseBranch: null,
+        baseSha: null,
+        createdAt: new Date(ownershipRow.created_at).toISOString(),
         prSession: null,
         sessions: [
           {
@@ -1354,6 +1541,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
         'latest_run_terminal_at',
         'created_at',
         'updated_at',
+        'last_activity_at',
         'version',
         'total_cost_microdollars',
         'associatedPr',
@@ -1812,7 +2000,11 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
     'forwards the authenticated exact scope without per-session deletion: %p',
     async organizationId => {
       const deletedSessionIds = Array.from({ length: 205 }, (_, index) => `ses_deleted_${index}`);
-      mockWorktreeDelete.mockResolvedValueOnce({ success: true, deletedSessionIds });
+      mockWorktreeDelete.mockResolvedValueOnce({
+        success: true,
+        deletedSessionIds,
+        cleanup: 'complete',
+      });
       const caller = createCaller({
         user,
         headersList: new Headers({ 'x-client-source': 'browser' }),
@@ -1820,7 +2012,7 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
 
       await expect(
         caller.deleteWorktree({ worktreeId: WORKTREE_ID, organizationId })
-      ).resolves.toEqual({ success: true, deletedSessionIds });
+      ).resolves.toEqual({ success: true, deletedSessionIds, cleanup: 'complete' });
       expect(mockGenerateCloudAgentToken).toHaveBeenCalledWith(user);
       expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
       expect(mockWorktreeDelete).toHaveBeenCalledTimes(1);
@@ -1833,6 +2025,44 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
       expect(await readSessions()).toHaveLength(1);
     }
   );
+
+  it('forwards onlyIfSoleSessionId only when the caller supplies it', async () => {
+    const caller = createCaller({ user });
+
+    await caller.deleteWorktree({ worktreeId: WORKTREE_ID, organizationId: null });
+    await caller.deleteWorktree({
+      worktreeId: WORKTREE_ID,
+      organizationId: null,
+      onlyIfSoleSessionId: SESSION_ID,
+    });
+
+    expect(mockWorktreeDelete).toHaveBeenNthCalledWith(1, {
+      worktreeId: WORKTREE_ID,
+    });
+    expect(mockWorktreeDelete).toHaveBeenNthCalledWith(2, {
+      worktreeId: WORKTREE_ID,
+      onlyIfSoleSessionId: SESSION_ID,
+    });
+  });
+
+  it('propagates pending worktree cleanup without per-session deletion', async () => {
+    mockWorktreeDelete.mockResolvedValueOnce({
+      success: true,
+      deletedSessionIds: [SESSION_ID],
+      cleanup: 'pending',
+    });
+
+    await expect(
+      createCaller({ user }).deleteWorktree({ worktreeId: WORKTREE_ID, organizationId: null })
+    ).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [SESSION_ID],
+      cleanup: 'pending',
+    });
+
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+    expect(mockRuntimeDelete).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['CONFLICT', 409, 'worktree_deletion_pending'],
@@ -1866,6 +2096,7 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
     mockWorktreeDelete.mockResolvedValueOnce({
       success: false,
       deletedSessionIds: [],
+      cleanup: 'complete',
     } as unknown as DeleteWorktreeOutput);
     await expect(
       caller.deleteWorktree({ worktreeId: WORKTREE_ID, organizationId: null })
@@ -1889,13 +2120,158 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
       const caller = createCaller({ user });
       await expect(
         caller.deleteWorktree({ worktreeId: WORKTREE_ID, organizationId })
-      ).resolves.toEqual({ success: true, deletedSessionIds: [SESSION_ID] });
+      ).resolves.toEqual({
+        success: true,
+        deletedSessionIds: [SESSION_ID],
+        cleanup: 'complete',
+      });
       await expect(
         createCaller({ user }).deleteWorktree({ worktreeId: WORKTREE_ID, organizationId })
-      ).resolves.toEqual({ success: true, deletedSessionIds: [SESSION_ID] });
+      ).resolves.toEqual({
+        success: true,
+        deletedSessionIds: [SESSION_ID],
+        cleanup: 'complete',
+      });
       expect(mockWorktreeDelete).toHaveBeenCalledTimes(2);
       expect(await readWorktree()).toEqual(before);
       expect(await readSessions()).toEqual([]);
     }
   );
+});
+
+describe('cliSessionsV2 Cloud Agent workspace PR', () => {
+  async function insertWorkspace(
+    overrides: Partial<typeof cloud_agent_worktrees.$inferInsert> = {}
+  ) {
+    await db.insert(cloud_agent_worktrees).values({
+      worktree_id: WORKTREE_ID,
+      kilo_user_id: USER_ID,
+      organization_id: null,
+      git_url: GIT_URL,
+      git_branch: BRANCH,
+      ...overrides,
+    });
+  }
+
+  async function insertPr(
+    prNumber: number,
+    overrides: Partial<typeof github_branch_pull_requests.$inferInsert> = {}
+  ) {
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: BRANCH,
+      owned_by_user_id: USER_ID,
+      pr_url: `${GIT_URL}/pull/${prNumber}`,
+      pr_number: prNumber,
+      pr_state: 'open',
+      pr_title: `PR ${prNumber}`,
+      review_decision_pending: false,
+      ...overrides,
+    });
+  }
+
+  async function listedPr(sessionId = SESSION_ID) {
+    const result = await createCaller({ user }).list({
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+    });
+    return result.cliSessions.find(session => session.session_id === sessionId)?.associatedPr;
+  }
+
+  it('shows a PR on the workspace branch on every chat without a link of its own', async () => {
+    await insertWorkspace();
+    await insertPr(42);
+    const sibling = await insertSession();
+
+    expect(await listedPr()).toMatchObject({ number: 42, state: 'open', title: 'PR 42' });
+    expect(await listedPr(sibling.session_id)).toMatchObject({ number: 42, state: 'open' });
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID].prSession?.associatedPr).toMatchObject({ number: 42 });
+  });
+
+  it('shows the workspace PR in runtime state without a link verification key', async () => {
+    await insertWorkspace();
+    await insertPr(42);
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.associatedPr).toMatchObject({ number: 42, state: 'open', title: 'PR 42' });
+    expect(result.prLinkVerificationKey).toBeUndefined();
+  });
+
+  it('prefers the open PR on the branch over an older merged one', async () => {
+    await insertWorkspace();
+    await insertPr(41, { pr_state: 'merged' });
+    await insertPr(43);
+
+    expect(await listedPr()).toMatchObject({ number: 43, state: 'open' });
+  });
+
+  it('still shows a merged PR when it is the only PR on the branch', async () => {
+    await insertWorkspace();
+    await insertPr(41, { pr_state: 'merged' });
+
+    expect(await listedPr()).toMatchObject({ number: 41, state: 'merged' });
+  });
+
+  it('shows no PR for another branch, another tenant, or a deleting workspace', async () => {
+    await insertWorkspace();
+    await insertPr(44, { git_branch: 'other-branch' });
+    await insertPr(45, { owned_by_user_id: OTHER_USER_ID });
+    expect(await listedPr()).toBeNull();
+
+    await insertPr(46);
+    await db
+      .update(cloud_agent_worktrees)
+      .set({ deletion_started_at: LATER_TIME })
+      .where(eq(cloud_agent_worktrees.worktree_id, WORKTREE_ID));
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID]).toBeUndefined();
+  });
+
+  it("prefers the workspace PR over a chat's own verified link to a closed PR", async () => {
+    await insertWorkspace();
+    await insertPr(47);
+    await insertPr(30, { git_branch: 'old-branch', pr_state: 'closed' });
+    await db
+      .update(cli_sessions_v2)
+      .set({
+        git_url: GIT_URL,
+        platform: 'github',
+        pr_url: `${GIT_URL}/pull/30`,
+        pr_number: 30,
+        pr_link_verified_at: INITIAL_TIME,
+      })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+
+    expect(await listedPr()).toMatchObject({ number: 47, state: 'open' });
+  });
+
+  it("keeps a local session's own verified link and ignores branch-only PRs", async () => {
+    await insertPr(48, { git_branch: 'local-branch' });
+    const local = await insertSession({
+      cloud_agent_worktree_id: null,
+      cloud_agent_session_id: null,
+      created_on_platform: 'cli',
+      git_url: GIT_URL,
+      git_branch: 'local-branch',
+    });
+    const result = await createCaller({ user }).list({ organizationId: null });
+    expect(
+      result.cliSessions.find(session => session.session_id === local.session_id)?.associatedPr
+    ).toBeNull();
+  });
 });

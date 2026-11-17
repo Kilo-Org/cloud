@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_briefing_context_preferences,
   agent_briefing_preferences,
@@ -10,7 +9,7 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { isValidEmail, resolveSeedUserId } from '../lib/users';
 import type { SeedResult } from '../index';
 
@@ -122,9 +121,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
   const options = parseArgs(args);
-  if (process.env.USE_PRODUCTION_DB === 'true')
-    throw new Error('Production databases are not allowed.');
-  assertLoopback(computeDatabaseUrl(), 'database host');
+  assertLocalSeedDatabase('app:agent-briefing');
   const webUrl = resolveWebUrl(options.webUrl);
   assertLoopback(webUrl, 'web URL');
   const cronSecret = process.env.CRON_SECRET;

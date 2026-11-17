@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -13,6 +19,7 @@ type ServerState = {
   attempts: number;
   connections: number;
   hellos: Array<Record<string, unknown>>;
+  upgradeHeaders: Headers[];
   mode: 'accept' | 'reject' | 'shutdown';
 };
 
@@ -22,12 +29,13 @@ function startControlServer(mode: ServerState['mode']): {
   send: (frame: unknown) => void;
   stop: () => void;
 } {
-  const state: ServerState = { attempts: 0, connections: 0, hellos: [], mode };
+  const state: ServerState = { attempts: 0, connections: 0, hellos: [], upgradeHeaders: [], mode };
   const sockets = new Set<Bun.ServerWebSocket<undefined>>();
   const server = Bun.serve<undefined>({
     port: 0,
     fetch(request, srv) {
       state.attempts += 1;
+      state.upgradeHeaders.push(request.headers);
       if (state.mode === 'reject') return new Response('rejected', { status: 503 });
       if (srv.upgrade(request)) return undefined;
       return new Response('upgrade failed', { status: 400 });
@@ -158,6 +166,37 @@ function nativeLogsEnv(url: string, uploadPort: number): Record<string, string> 
 }
 
 describe('control-plane wrapper process', () => {
+  it('reports the installed CLI and bundled wrapper versions from the real entrypoint', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wrapper-versions-'));
+    const cli = join(directory, 'kilo');
+    await writeFile(
+      cli,
+      "#!/bin/sh\n[ \"$1\" = '--version' ] || exit 1\nprintf '7.9.0-canary.123\\n'\n"
+    );
+    await chmod(cli, 0o755);
+    const server = startControlServer('accept');
+    const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+      env: childEnv(`ws://127.0.0.1:${server.port}/sandbox-control-v2/fake`, {
+        PATH: `${directory}:${process.env.PATH ?? ''}`,
+        KILO_RUNTIME_HARNESS: 'kilo',
+      }),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    try {
+      await waitFor(() => server.state.hellos.length > 0);
+      expect(server.state.upgradeHeaders[0].get(KILO_CLI_VERSION_HEADER)).toBe('7.9.0-canary.123');
+      expect(server.state.upgradeHeaders[0].get(WRAPPER_VERSION_HEADER)).toBe(WRAPPER_VERSION);
+      server.send({ type: 'shutdown', reason: 'test shutdown' });
+      expect(await waitForExit(child, 6_000)).toBe(0);
+    } finally {
+      if (child.exitCode === null) child.kill();
+      await child.exited;
+      server.stop();
+      await rm(directory, { recursive: true });
+    }
+  }, 15_000);
+
   it('exits 0 on terminal admission rejection before welcome without reconnecting', async () => {
     const server = startControlServer('shutdown');
     const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
@@ -290,4 +329,42 @@ describe('control-plane wrapper process', () => {
       await handle.child.exited;
     }
   }, 90_000);
+
+  it('generates a new wrapper identity for each process with the same launch environment', async () => {
+    const server = startControlServer('accept');
+    const launchId = '5d8a9f1e-3f4b-4c2d-8e7a-1b2c3d4e5f60';
+    const env = childEnv(`ws://127.0.0.1:${server.port}/sandbox-control-v2/fake`, {
+      CONTROL_WRAPPER_INSTANCE_ID: launchId,
+      CONTROL_PLANE_TIMER_DIVISOR: '50',
+    });
+    const children: Bun.Subprocess[] = [];
+    const identities: string[] = [];
+    try {
+      for (let index = 0; index < 2; index += 1) {
+        const before = server.state.hellos.length;
+        const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+          env,
+          stdout: 'ignore',
+          stderr: 'ignore',
+        });
+        children.push(child);
+        await waitFor(() => server.state.hellos.length > before);
+        const identity = server.state.hellos[before]?.wrapperId;
+        expect(identity).toBeTypeOf('string');
+        identities.push(String(identity));
+        server.send({ type: 'shutdown', reason: 'test shutdown' });
+        expect(await waitForExit(child, 6_000)).toBe(0);
+        await child.exited;
+      }
+      expect(identities[0]).not.toBe(launchId);
+      expect(identities[1]).not.toBe(launchId);
+      expect(identities[0]).not.toBe(identities[1]);
+    } finally {
+      for (const child of children) {
+        if (child.exitCode === null) child.kill();
+        await child.exited;
+      }
+      server.stop();
+    }
+  }, 20_000);
 });

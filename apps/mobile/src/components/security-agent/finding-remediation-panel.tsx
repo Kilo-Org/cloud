@@ -28,7 +28,7 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
@@ -171,6 +171,7 @@ export function FindingRemediationPanel({
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -287,9 +288,9 @@ export function FindingRemediationPanel({
           }}
         >
           {startRemediation.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color={mutedDisabledInk} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.remediation.start')}</Text>
+          <Text>{t('securityAgent.remediation.start')}</Text>
         </Button>
       ) : null}
 

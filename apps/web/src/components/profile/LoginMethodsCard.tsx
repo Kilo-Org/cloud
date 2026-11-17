@@ -9,6 +9,7 @@ import { useMutation } from '@tanstack/react-query';
 import { signIn } from 'next-auth/react';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
+import { useClaudeSignInEnabled } from '@/lib/auth/claude/use-claude-sign-in-enabled';
 
 export type AuthProvider = {
   provider: AuthProviderId;
@@ -19,21 +20,34 @@ export type AuthProvider = {
 };
 
 type LoginMethodsCardProps = {
+  /**
+   * Where the provider round trip returns. The app shell passes its own page so
+   * the link completes inside the shell instead of the full web page.
+   */
+  callbackPath?: string;
   primaryEmail: string;
   providers: AuthProvider[];
   onError: (error: string) => void;
 };
 
-export function LoginMethodsCard({ primaryEmail, providers, onError }: LoginMethodsCardProps) {
+export function LoginMethodsCard({
+  primaryEmail,
+  providers,
+  onError,
+  callbackPath = '/connected-accounts',
+}: LoginMethodsCardProps) {
   const trpc = useTRPC();
   const alreadyLinkedProviders = new Set(providers.map(o => o.provider));
-  const availableProviders = AccountLinkingProviders.filter(p => !alreadyLinkedProviders.has(p.id));
+  const claudeSignInEnabled = useClaudeSignInEnabled();
+  const availableProviders = AccountLinkingProviders.filter(
+    p => !alreadyLinkedProviders.has(p.id) && (p.id !== 'claude' || claudeSignInEnabled)
+  );
 
   const linkMutation = useMutation(
     trpc.user.linkAuthProvider.mutationOptions({
       onSuccess: (data, variables) => {
         void signIn(variables.provider, {
-          callbackUrl: `/connected-accounts?linked=${variables.provider}`,
+          callbackUrl: `${callbackPath}?linked=${variables.provider}`,
         });
       },
       onError: () => onError('LINKING-FAILED'),

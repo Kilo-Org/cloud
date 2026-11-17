@@ -1,9 +1,18 @@
 import { SETUP_SCRIPT_LIMITS } from '@kilocode/cloud-agent-profile/setup-script';
+import { z } from 'zod';
 import type { MCPServerConfig } from './persistence/types.js';
 
 export * from './shared/agent-modes.js';
 import { type AgentMode } from './shared/agent-modes.js';
 import { RuntimeProfileLimits } from './shared/runtime-profile.js';
+
+/**
+ * Thinking-effort variant for a model. Variants are model- and agent-specific
+ * keys — the catalog's `opencode.variants`, or a stored profile agent's
+ * `config.variant` — so the stored length bound is the only rule here: the
+ * catalog, not this schema, decides which keys exist.
+ */
+export const AgentVariantSchema = z.string().min(1).max(50);
 
 // === Limits ===
 export const Limits = {
@@ -15,9 +24,6 @@ export const Limits = {
   MAX_SETUP_COMMAND_LENGTH: SETUP_SCRIPT_LIMITS.MAX_LENGTH,
   MAX_MCP_SERVERS: 20,
   ...RuntimeProfileLimits,
-  MAX_RUNTIME_INSTRUCTIONS: 50,
-  MAX_RUNTIME_INSTRUCTION_NAME_LENGTH: 100,
-  MAX_RUNTIME_INSTRUCTION_CONTENT: 100_000,
   SESSION_TTL_DAYS: 90,
   SESSION_TTL_MS: 90 * 24 * 60 * 60 * 1000, // 90 days in milliseconds
   /** Maximum source sessions in one local-worktree-to-cloud continuation. */

@@ -26,6 +26,7 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
 vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ primaryForeground: '#fff', foreground: '#000' }),
 }));
 // Keep the real Button (its shrink-0 base and the `cn` merge are what this

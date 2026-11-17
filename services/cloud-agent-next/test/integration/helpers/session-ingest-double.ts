@@ -220,10 +220,16 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     async completeCloudAgentWorktreeDeletion(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async deleteCloudAgentWorktreeContent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async canDestroyCloudAgentWorktreeSandbox(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
     async createSessionForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async recordCloudAgentSessionHarness(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
     async setGeneratedTitleForCloudAgent(): Promise<never> {
@@ -233,6 +239,15 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
       throw new Error(UNSUPPORTED_METHOD);
     },
     async deleteSessionForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async deleteHostedWorkspaceSession(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async assertHostedWorkspaceSessionDeletable(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async getCloudAgentWorkspaceStatus(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
     async getSessionMessages(): Promise<never> {

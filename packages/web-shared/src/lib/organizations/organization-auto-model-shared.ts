@@ -3,8 +3,6 @@ import type { OrganizationSettings } from '@kilocode/web-shared/lib/organization
 import { ORGANIZATION_AUTO_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 export { MAX_ORGANIZATION_AUTO_ROUTES } from '@kilocode/db/schema-types';
 
-export const ORGANIZATION_AUTO_MODEL_FLAG = 'organization-auto-model-routing';
-
 export function hasOrganizationAutoRoute(
   routes: Record<string, string> | undefined,
   slug: string

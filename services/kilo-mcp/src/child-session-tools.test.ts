@@ -81,6 +81,7 @@ describe('dedicated child session tools', () => {
     expect(scoped.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'search_models',
       'generate_message_id',
+      'list_environments',
       'spawn_session',
       'list_child_sessions',
       'get_session',
@@ -257,6 +258,32 @@ describe('dedicated child session tools', () => {
     });
   });
 
+  it.each([null, organizationId])('forwards a selected environment for scope %s', async org => {
+    const connection = {
+      ...auth,
+      ...(org ? { organizationId: org } : {}),
+      cloudAgentAuthority: { ...authority, organizationId: org },
+    };
+    const requestedEnvironment = {
+      id: '88888888-8888-4888-8888-888888888888',
+      repositories: [
+        { repoFullName: 'acme/other', branch: 'feature/child' },
+        { repoFullName: 'acme/third' },
+      ],
+    };
+    const args = { ...launch, requestedEnvironment };
+    await run('spawn_session', args, connection);
+    const request = new Request(...fetchImpl.mock.calls[0]!);
+    expect(new URL(request.url).pathname).toBe(
+      `/api/trpc/${org ? 'organizations.' : ''}cloudAgentNext.prepareSession`
+    );
+    expect(await request.json()).toEqual({
+      ...args,
+      autoInitiate: true,
+      ...(org ? { organizationId: org } : {}),
+    });
+  });
+
   it('forwards a workspace session callback target', async () => {
     const callbackTarget = {
       url: 'workspace:workspace_22345678-1234-4234-8234-123456789abc',
@@ -294,6 +321,22 @@ describe('dedicated child session tools', () => {
         token: 'a'.repeat(64),
       },
     },
+    { requestedEnvironment: { id: 'not-a-uuid' } },
+    {
+      requestedEnvironment: {
+        id: '88888888-8888-4888-8888-888888888888',
+        repositories: [{ repoFullName: 'acme/other', branch: '' }],
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: '88888888-8888-4888-8888-888888888888',
+        repositories: [{ repoFullName: 'acme/other', extra: true }],
+      },
+    },
+    { requestedEnvironment: { id: '88888888-8888-4888-8888-888888888888', extra: true } },
+    { requireEnvironmentChoice: true },
+    { requireEnvironmentChoice: false },
     { operationKey: 'invalid' },
   ])('rejects extra or invalid launch arguments before forwarding: %j', async override => {
     await expect(run('spawn_session', { ...launch, ...override })).rejects.toThrow('schema');
@@ -342,7 +385,12 @@ describe('dedicated child session tools', () => {
   });
 
   it('rejects expired or mismatched scoped credentials before model or session fetches', async () => {
-    for (const name of ['search_models', 'generate_message_id', 'spawn_session']) {
+    for (const name of [
+      'search_models',
+      'generate_message_id',
+      'list_environments',
+      'spawn_session',
+    ]) {
       for (const override of [
         { cloudAgentAuthority: { ...authority, expiresAt: 1 } },
         { kiloUserId: 'other-user' },
@@ -366,7 +414,20 @@ describe('dedicated child session tools', () => {
     }
     expect(tools.find(tool => tool.name === 'spawn_session')?.inputSchema).toMatchObject({
       required: expect.arrayContaining(['operationKey', 'model', 'prompt']),
+      properties: {
+        requestedEnvironment: { type: 'object' },
+      },
     });
+    expect(tools.find(tool => tool.name === 'spawn_session')?.inputSchema).not.toHaveProperty(
+      'properties.requireEnvironmentChoice'
+    );
+    expect(tools.find(tool => tool.name === 'list_environments')?.inputSchema).toMatchObject({
+      properties: { repository: { type: 'object' } },
+      required: ['repository'],
+    });
+    expect(tools.find(tool => tool.name === 'list_environments')?.annotations.readOnlyHint).toBe(
+      true
+    );
     expect(
       tools.find(tool => tool.name === 'search_models')?.inputSchema.required ?? []
     ).not.toContain('limit');
@@ -466,6 +527,73 @@ describe('scoped workspace folder tools', () => {
     expect(assignment?.annotations.readOnlyHint).toBe(false);
     expect(assignment?.description).toContain('all sibling chats');
     expect(assignment?.description).toContain('Cannot move the parent workspace');
+  });
+});
+
+describe('scoped environment discovery tool', () => {
+  const repository = { platform: 'github', fullName: 'acme/repo' } as const;
+
+  it.each([null, organizationId])('pins environment listing to the signed scope %s', async org => {
+    const connection = {
+      ...auth,
+      ...(org ? { organizationId: org } : {}),
+      cloudAgentAuthority: { ...authority, organizationId: org },
+    };
+    await run('list_environments', { repository }, connection);
+    const request = new Request(...fetchImpl.mock.calls[0]!);
+    expect(request.method).toBe('GET');
+    expect(new URL(request.url).pathname).toBe('/api/trpc/cloudEnvironments.list');
+    expect(JSON.parse(new URL(request.url).searchParams.get('input')!)).toEqual({
+      repository,
+      ...(org ? { organizationId: org } : {}),
+    });
+    expect(request.headers.get('x-kilocode-organizationid')).toBe(org);
+  });
+
+  it.each([
+    {},
+    { repository, extra: true },
+    { repository, organizationId },
+    { repository, organizationId: null },
+    { repository: { platform: 'github' } },
+    { repository: { platform: 'github', fullName: '' } },
+    { repository: { platform: 'github', fullName: 'acme/repo', organizationId } },
+    { repository: { platform: 'local', fullName: 'acme/repo' } },
+    { repository: { platform: 'gitlab', projectPath: 'group/project' } },
+    {
+      repository: {
+        platform: 'bitbucket',
+        workspaceUuid: '88888888-8888-4888-8888-888888888888',
+        repositoryUuid: '99999999-9999-4999-8999-999999999999',
+      },
+    },
+  ])('rejects invalid environment listing input before fetching: %j', async args => {
+    await expect(run('list_environments', args)).rejects.toThrow('schema');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(['cloudEnvironments.listAll', 'cloudEnvironments.get', 'cloudEnvironments.create'])(
+    'does not publish the adjacent environment operation %s as a tool',
+    async name => {
+      await expect(run(name, { repository })).rejects.toThrow('Unknown tool');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
+  it('marks environment listing read-only and names the launch handoff', () => {
+    const tools = childSessionTools(authority);
+    const listing = tools.find(tool => tool.name === 'list_environments');
+    expect(listing?.annotations.readOnlyHint).toBe(true);
+    expect(listing?.annotations.destructiveHint).toBe(false);
+    expect(listing?.annotations.idempotentHint).toBe(true);
+    expect(listing?.description).toContain('requestedEnvironment.id');
+    expect(listing?.description).toContain('GitHub repository');
+    expect(listing?.description).toContain('only for the requested repository');
+    expect(listing?.description).not.toContain('cannot list other repositories');
+    const spawn = tools.find(tool => tool.name === 'spawn_session');
+    expect(spawn?.description).toContain('requestedEnvironment');
+    expect(spawn?.description).toContain('Omit requestedEnvironment');
+    expect(spawn?.description).toContain('automatic/default behavior');
   });
 });
 

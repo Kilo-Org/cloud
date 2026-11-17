@@ -186,15 +186,13 @@ describe('GET /users/after-sign-in', () => {
     );
   });
 
-  it('routes callbackPath=/claw through the interstitial', async () => {
+  it('keeps the web-only Claw callback outside the mobile interstitial', async () => {
     const response = await GET(
       new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fclaw')
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/users/continue?to=%2Fclaw'
-    );
+    expect(response.headers.get('location')).toBe('http://localhost:3000/claw');
   });
 
   it('routes callbackPath=/cloud/sessions through the interstitial', async () => {
@@ -208,13 +206,20 @@ describe('GET /users/after-sign-in', () => {
     expect(location.searchParams.get('to')).toBe('/cloud/sessions');
   });
 
-  it('does not route single-org /organizations/<id> through the interstitial', async () => {
+  // The organization root is an app-owned row (it is where an accepted
+  // invitation lands), so it follows `/cloud/sessions` and every other claimed
+  // path: a server redirect to it would be handed to the installed app, so the
+  // browser goes through the client-side bounce instead. Same destination, and
+  // the interstitial is not platform-gated.
+  it('routes single-org /organizations/<id> through the interstitial', async () => {
     mockGetProfileRedirectPath.mockResolvedValueOnce('/organizations/org-1');
 
     const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('http://localhost:3000/organizations/org-1');
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.pathname).toBe('/users/continue');
+    expect(location.searchParams.get('to')).toBe('/organizations/org-1');
   });
 
   it('does not route /account-verification through the interstitial', async () => {
@@ -248,6 +253,23 @@ describe('GET /users/after-sign-in', () => {
         id: 'user-after-sign-in',
         google_user_email: 'after-sign-in@example.com',
         blocked_reason: 'payment',
+        has_validation_stytch: true,
+      },
+    } as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/account-blocked');
+  });
+
+  it('routes an account with a block timestamp to /account-blocked', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({
+      user: {
+        id: 'user-after-sign-in',
+        google_user_email: 'after-sign-in@example.com',
+        blocked_reason: null,
+        blocked_at: '2026-01-15T12:00:00.000Z',
         has_validation_stytch: true,
       },
     } as Awaited<ReturnType<typeof getUserFromAuth>>);

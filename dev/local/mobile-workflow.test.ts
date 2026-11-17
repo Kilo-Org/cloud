@@ -2,32 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-test('tab layout derives accessibility labels from the visible tab count', () => {
-  const layout = fs.readFileSync('apps/mobile/src/app/(app)/(tabs)/_layout.tsx', 'utf8');
-
-  assert.match(layout, /const tabCount = visibleTabCount\(showKiloClawTab\);/);
-  assert.match(
-    layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.home'\),\s*tabBarPosition\('home', tabFlags\) \?\? 1,\s*tabCount\s*\)/
-  );
-  assert.match(
-    layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.kiloclaw'\),\s*tabBarPosition\('kiloclaw', tabFlags\) \?\? 2,\s*tabCount\s*\)/
-  );
-  assert.match(
-    layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*needsInputBadge\s*\?\s*`\$\{t\('common\.agents'\)\}, \$\{needsInputBadge\} \$\{t\('agents\.sessionRow\.needsInput'\)\}`\s*:\s*t\('common\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
-  );
-  assert.match(
-    layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.chat'\),\s*tabBarPosition\('chat', tabFlags\) \?\? 3,\s*tabCount\s*\)/
-  );
-  assert.match(
-    layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.profile'\),\s*tabCount,\s*tabCount\s*\)/
-  );
-});
-
 test('Android tooling is resolved independently of the agent PATH', async () => {
   const { resolveAndroidEnvironment } = await import('./mobile-android');
   const env = resolveAndroidEnvironment({

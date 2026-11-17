@@ -1,13 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { GET } from './route';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
 
 jest.mock('@/lib/organizations/organization-auth');
 jest.mock('@/lib/organizations/organization-modes');
 
-const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
+const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContextOrSupport);
 const mockedGetAllOrganizationModes = jest.mocked(getAllOrganizationModes);
 
 describe('GET /api/organizations/[id]/modes', () => {

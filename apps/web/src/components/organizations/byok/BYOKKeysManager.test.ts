@@ -5,11 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BYOKApiKeyResponse } from '@/lib/byok/types';
-import {
-  BYOKKeysManager,
-  getStructuredCredentialKind,
-  VERCEL_BYOK_PROVIDER_NAMES,
-} from './BYOKKeysManager';
+import { VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
+import { BYOKKeysManager, getStructuredCredentialKind } from './BYOKKeysManager';
 
 type ListInput = { organizationId?: string };
 type ReorderInput = ListInput & { keyIds: string[] };
@@ -108,6 +105,11 @@ function installDom() {
 describe('BYOKKeysManager provider names', () => {
   it('offers Cohere as a Vercel BYOK provider', () => {
     expect(VERCEL_BYOK_PROVIDER_NAMES.cohere).toBe('Cohere');
+  });
+
+  it('uses the current Novita AI and SpaceXSI provider names', () => {
+    expect(VERCEL_BYOK_PROVIDER_NAMES.novita).toBe('Novita AI');
+    expect(VERCEL_BYOK_PROVIDER_NAMES.xai).toBe('SpaceXSI');
   });
 
   it('names the pasted OpenAI entry for the credential it holds', () => {

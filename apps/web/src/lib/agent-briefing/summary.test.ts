@@ -1,4 +1,4 @@
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
@@ -15,6 +15,7 @@ import {
   KILO_AUTO_SMALL_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { briefingPriceBound, briefingPrompt } from './summary';
+import { briefingFactsSchema } from './evidence';
 import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -133,7 +134,7 @@ describe('briefing model pricing', () => {
         name: aion.name,
         reasoning: { mandatory: false, supported_efforts: ['low'] },
         endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const roomy = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
@@ -161,7 +162,7 @@ describe('briefing model pricing', () => {
           { tag: 'other-route', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
           { tag: 'preferred-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
         ],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
@@ -204,7 +205,7 @@ describe('briefing model pricing', () => {
         id: 'vendor/listed',
         name: 'Listed',
         endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
@@ -243,7 +244,7 @@ describe('briefing model pricing', () => {
         id: autoSmall.id,
         name: autoSmall.name,
         endpoints: [{ tag: 'alibaba', pricing: { prompt: '0.001', completion: '0.002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     expect(withCatalogRow).toEqual(
@@ -298,7 +299,7 @@ describe('briefing model pricing', () => {
         name: alias.name,
         alias_target: { slug: target.id },
         endpoints: [],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const quote = await briefingPriceBound(alias.id, 'Overnight activity', 2_000_000);
@@ -321,7 +322,7 @@ describe('briefing model pricing', () => {
         name: alias.name,
         alias_target: { slug: targetId },
         endpoints: [],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     await expect(briefingPriceBound(alias.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
@@ -382,31 +383,38 @@ function reportRow(excerpt: string, title = 'Captured session'): BriefingReportR
   } as unknown as BriefingReportRow;
 }
 
+function promptFor(row: BriefingReportRow): string {
+  return briefingPrompt(row, briefingFactsSchema.parse(row.facts), row.language);
+}
+
 describe('briefing prompt evidence', () => {
   const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
 
   it('sends no credential material from stored facts to the model', () => {
-    const prompt = briefingPrompt(
-      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`),
-      'English'
+    const prompt = promptFor(
+      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`)
     );
     expect(prompt).not.toContain(secretKey);
     expect(prompt).toContain('[redacted credential]');
   });
 
   it('sends only excerpts that screening clears', () => {
-    const prompt = briefingPrompt(
-      reportRow('Stopped at client_' + 'secret: "' + secretKey),
-      'English'
-    );
+    const prompt = promptFor(reportRow('Stopped at client_' + 'secret: "' + secretKey));
     expect(prompt).not.toContain(secretKey);
     expect(prompt).not.toContain('Stopped at');
   });
 
+  it('sends only screened excerpts to the model', () => {
+    const prompt = promptFor(
+      reportRow('Set MYSQL_' + 'PWD=' + 'hunter' + '2 then ran the migration.')
+    );
+    expect(prompt).not.toContain('hunter' + '2');
+    expect(prompt).toContain('[redacted credential]');
+  });
+
   it('sends only titles that screening clears', () => {
-    const prompt = briefingPrompt(
-      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),
-      'English'
+    const prompt = promptFor(
+      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey)
     );
     expect(prompt).not.toContain(secretKey);
     expect(prompt).toContain('Agent session');

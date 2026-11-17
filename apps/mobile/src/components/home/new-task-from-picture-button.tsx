@@ -93,7 +93,18 @@ export function NewTaskFromPictureButton({
 
   return (
     <View className="mx-4">
-      <Button variant="secondary" size="lg" className="w-full" onPress={handlePress}>
+      {/* The filled neutral action paints `--secondary-fill`, which the dark
+          scheme lifts to stay apart from an outlined control on a sheet's card.
+          This button sits on the near-black page beside the filled primary, so
+          there it takes the raised card pair the Explore rows below it use: the
+          `--secondary` surface with the hairline edge, so the container reads as
+          a button. The transparent light edge keeps the light fill unchanged. */}
+      <Button
+        variant="secondary"
+        size="lg"
+        className="w-full border border-transparent dark:border-neutral-700 dark:bg-secondary"
+        onPress={handlePress}
+      >
         <Camera size={18} color={colors.secondaryForeground} />
         <Text className="shrink text-center font-semibold">{t('home.newTaskFromPicture')}</Text>
       </Button>

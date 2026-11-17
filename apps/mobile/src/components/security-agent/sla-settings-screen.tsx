@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -74,8 +75,7 @@ const SLA_ROWS = [
 
 // Uncontrolled numeric TextInput — never pass `value` back on iOS (see
 // apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
-// the parsed number (or NaN while invalid) purely to drive dirty/validity,
-// mirroring the derived-state pattern in kiloclaw/settings-card.tsx.
+// the parsed number (or NaN while invalid) purely to drive dirty/validity.
 function SlaDayRow({
   label,
   description,
@@ -140,7 +140,8 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
   const [slaEnabled, setSlaEnabled] = useState(false);
@@ -226,10 +227,11 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    setBaseline(previous => ({ ...previous, ...patch }));
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
@@ -284,6 +286,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
+      {feedback.node}
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets

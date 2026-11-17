@@ -8,12 +8,15 @@ import {
   agent_environment_profile_agents,
   agent_environment_profile_kilo_commands,
   agent_environment_profile_instructions,
+  cli_sessions_v2,
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
 import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
 import {
+  assertOwnerProfileLimit,
   buildOwnershipCondition,
+  lockProfileCreation,
   lockProfileOwnership,
   verifyProfileOwnership,
 } from './profile-utils';
@@ -30,6 +33,11 @@ import { listInstructionsForProfile } from './profile-instructions-service';
  * `createdByUserId` records the user who initiated the creation. For
  * user-owned profiles this matches `owner.id`; for org-owned profiles it
  * identifies the member who authored the shared profile.
+ *
+ * The owner's profile count and the insert are one unit under the owner's
+ * creation lock, so parallel creates cannot take an owner past
+ * `MAX_OWNER_PROFILES`. The limit guards creation alone: profiles an owner
+ * already holds stay readable and editable.
  */
 export async function createProfile(
   db: WorkerDb,
@@ -38,18 +46,23 @@ export async function createProfile(
   name: string,
   description?: string
 ): Promise<{ id: string }> {
-  const [profile] = await db
-    .insert(agent_environment_profiles)
-    .values({
-      owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
-      owned_by_user_id: owner.type === 'user' ? owner.id : null,
-      created_by_user_id: createdByUserId,
-      name,
-      description: description ?? null,
-    })
-    .returning({ id: agent_environment_profiles.id });
+  return await db.transaction(async tx => {
+    await lockProfileCreation(tx, owner);
+    await assertOwnerProfileLimit(tx, owner);
 
-  return { id: profile.id };
+    const [profile] = await tx
+      .insert(agent_environment_profiles)
+      .values({
+        owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        created_by_user_id: createdByUserId,
+        name,
+        description: description ?? null,
+      })
+      .returning({ id: agent_environment_profiles.id });
+
+    return { id: profile.id };
+  });
 }
 
 /**
@@ -297,7 +310,7 @@ export async function getProfile(
 ): Promise<ProfileResponse> {
   const profile = await verifyProfileOwnership(db, profileId, owner);
 
-  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions] =
+  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions, [usage]] =
     await Promise.all([
       db
         .select({
@@ -329,6 +342,14 @@ export async function getProfile(
       listAgentsForProfile(db, profileId),
       listKiloCommandsForProfile(db, profileId),
       listInstructionsForProfile(db, profileId),
+      db
+        .select({
+          lastUsedAt: sql<
+            string | null
+          >`max(coalesce(${cli_sessions_v2.last_activity_at}, ${cli_sessions_v2.created_at}))`,
+        })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.profile_id, profileId)),
     ]);
 
   return {
@@ -338,6 +359,7 @@ export async function getProfile(
     isDefault: profile.is_default,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
+    lastUsedAt: usage?.lastUsedAt ? new Date(usage.lastUsedAt).toISOString() : null,
     vars,
     commands,
     mcpServers,
@@ -386,6 +408,26 @@ export async function clearDefaultProfile(
     .update(agent_environment_profiles)
     .set({ is_default: false })
     .where(eq(agent_environment_profiles.id, profileId));
+}
+
+/**
+ * Resolve the owner's default profile by identifier only.
+ *
+ * Session preparation orders the profile layers from this id and reads the
+ * applied profile's collections inside its own layer transaction. The id is
+ * the only value it needs here.
+ */
+export async function getDefaultProfileId(
+  db: WorkerDb,
+  owner: ProfileOwner
+): Promise<string | null> {
+  const [profile] = await db
+    .select({ id: agent_environment_profiles.id })
+    .from(agent_environment_profiles)
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)))
+    .limit(1);
+
+  return profile?.id ?? null;
 }
 
 /**

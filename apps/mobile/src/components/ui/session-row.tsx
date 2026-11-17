@@ -10,13 +10,24 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor } from '@/lib/agent-color';
+import { agentColor, isPlaceholderTint, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
-  /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
+  /** Uppercase label shown in the eyebrow, and hashed when no `agentState` is passed. */
   agentLabel: string;
+  /**
+   * The row tint to paint for the label: the word's colour must not drift with
+   * its translation, so the key pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, `platform` names the kind of
+   * agent the row ran on, and `repository` names the repository it ran in; all
+   * three label the row's context rather than the session, so they take the
+   * muted pair and the title leads. `idle`/`live` keep the ramp entry the
+   * English word already hashed to (sky blue). Omit it for a label that is the
+   * session's own name, such as a chat's model, which hashes.
+   */
+  agentState?: 'unknown' | 'platform' | 'repository' | 'idle' | 'live' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
@@ -81,11 +92,13 @@ type SessionRowProps = {
 
 /**
  * Used by Home and Agents list. Composes agent hue strip + eyebrow +
- * ellipsized title + mono meta + chevron. Hue is deterministically hashed
- * from `agentLabel` so the strip, eyebrow and tile always match.
+ * ellipsized title + mono meta + chevron. The strip, eyebrow and tile always
+ * share one tint: the pinned `agentState`, else the hue hashed from
+ * `agentLabel`.
  */
 export function SessionRow({
   agentLabel,
+  agentState = null,
   title,
   subtitle,
   meta,
@@ -103,8 +116,12 @@ export function SessionRow({
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const color = agentColor(agentLabel);
-  const dimStrip = !live && !needsInput;
+  const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
+  // A row that is neither live nor waiting recedes behind one that is. The
+  // muted context tint is already the quietest mark a row can carry, and
+  // multiplying it again erased the strip on the dark page, so only an accent
+  // strip dims.
+  const dimStrip = !live && !needsInput && !isPlaceholderTint(color);
   const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
   const eyebrowDecision = selectSessionRowEyebrowRight({
@@ -207,6 +224,7 @@ export function SessionRow({
       {stripMode === 'edge' ? (
         <AgentBadge
           agent={agentLabel}
+          tint={color}
           variant="strip"
           className={dimStrip ? 'opacity-30' : undefined}
         />

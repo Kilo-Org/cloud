@@ -1,8 +1,7 @@
-import { computeDatabaseUrl } from '@kilocode/db';
 import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
@@ -88,22 +87,6 @@ export function parseReviewListArgs(args: string[]): ReviewListArgs {
   return { email, count };
 }
 
-function assertLocalDatabaseTarget(): string {
-  if (process.env.USE_PRODUCTION_DB === 'true') {
-    throw new Error('Code review review-list seed refuses to run with USE_PRODUCTION_DB=true.');
-  }
-
-  const databaseUrl = new URL(computeDatabaseUrl());
-  const localHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-  if (!localHostnames.has(databaseUrl.hostname)) {
-    throw new Error(
-      `Code review review-list seed requires a loopback database host; received ${databaseUrl.hostname}.`
-    );
-  }
-
-  return databaseUrl.hostname;
-}
-
 function chooseByIndex<T>(values: readonly T[], index: number, label: string): T {
   const value = values[index % values.length];
   if (value === undefined) {
@@ -187,7 +170,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const { email, count } = parseReviewListArgs(args);
-  const databaseHost = assertLocalDatabaseTarget();
+  const databaseHost = assertLocalSeedDatabase('code-reviews:review-list');
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email);
 

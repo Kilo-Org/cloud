@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { authorize, exchange, type Principal } from './auth';
+import { authorizeCloudAgentUpload } from './cloud-agent-upload';
 import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
@@ -21,13 +22,23 @@ import {
   pageQuerySchema,
   registerRequestSchema,
   sessionIDSchema,
+  statusRequestSchema,
   type Result,
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { jsonResponse, requestMetrics, requestRoute, timed } from './metrics';
+import {
+  diagnostic,
+  phase,
+  jsonResponse,
+  requestMetrics,
+  requestRoute,
+  timed,
+  type DiagnosticOperation,
+} from './metrics';
 import { live } from './live/routes';
 import { LiveTicketError } from './live/ticket';
+import { notifications } from './notifications/routes';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -57,7 +68,7 @@ async function call<T>(
   c: C,
   sessionID: string,
   operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<Result<T>>,
-  name: string
+  name: DiagnosticOperation
 ): Promise<Result<T>> {
   const tenant = c.get('principal').tenant;
   return timed(c.req.raw, 'doMs', async () => {
@@ -66,12 +77,13 @@ async function call<T>(
         try {
           return getSessionSyncDOStub(c.env, { tenant, sessionID });
         } catch (error) {
+          diagnostic(c.env, { operation: name, stage: 'rpc_lookup', tenant: tenant.type, error });
           throw rpcError(error);
         }
       },
       async stub => {
         try {
-          return await operation(stub);
+          return await phase(c.env, name, 'rpc', () => operation(stub), tenant.type);
         } catch (error) {
           throw rpcError(error);
         }
@@ -81,6 +93,15 @@ async function call<T>(
       if (error instanceof ServiceOverloaded) return overloaded();
       throw error;
     });
+    if (!result.ok) {
+      diagnostic(c.env, {
+        operation: name,
+        stage: 'rpc',
+        tenant: tenant.type,
+        outcome: result.error.code,
+        cause: 'typed_result',
+      });
+    }
     const metrics = requestMetrics(c.req.raw);
     if (
       metrics &&
@@ -168,9 +189,11 @@ app.route('/internal', internal);
 
 app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
 app.route('/v1', live);
+app.route('/v1', notifications);
 
 app.use('/v1/sessions/*', async (c, next) => {
-  const principal = await authorize(c.req.raw, c.env);
+  const principal =
+    (await authorizeCloudAgentUpload(c.req.raw, c.env)) ?? (await authorize(c.req.raw, c.env));
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
   const metrics = requestMetrics(c.req.raw);
@@ -230,6 +253,21 @@ app.post('/v1/sessions/:id/batches', async c => {
   return respond(
     await call(c, input.sessionID, async s => await s.applyBatch(input), 'applyBatch')
   );
+});
+
+app.put('/v1/sessions/:id/status', async c => {
+  const sessionID = sessionParam(c);
+  if (!sessionID.ok) return failure(sessionID.error);
+  const body = await readJson(c.req.raw, 2048);
+  if (!body.ok) return failure(body.error);
+  const request = statusRequestSchema.safeParse(body.value);
+  if (!request.success) return failure(invalid(request.error));
+  const input = {
+    principal: c.get('principal'),
+    sessionID: sessionID.value,
+    request: request.data,
+  };
+  return respond(await call(c, input.sessionID, stub => stub.setStatus(input), 'setStatus'));
 });
 
 app.get('/v1/sessions/:id/entities', async c => {

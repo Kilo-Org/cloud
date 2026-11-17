@@ -13,6 +13,7 @@ jest.mock('@/lib/device-auth/device-auth', () => {
 import {
   approveDeviceAuthRequest,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
+  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
@@ -66,6 +67,35 @@ describe('POST /api/device-auth/tokens', () => {
     expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {
       confirmedClientId: 'client-abc',
     });
+  });
+
+  it('passes the pending link choice to the approval', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+
+    const response = await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH', add_pending_link: false }), sessionHeaders)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', { addPendingLink: false });
+  });
+
+  it('answers 409 when the approval omits the pending link choice', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockRejectedValueOnce(new Error(DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE));
+
+    const response = await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE });
   });
 
   it('answers 409 when the approval does not confirm the client it names', async () => {

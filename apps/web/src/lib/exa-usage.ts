@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -6,6 +5,7 @@ import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/or
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import type { ExaUsageRecord, ExaUsageWriteResponse } from '@kilocode/usage-contracts';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -56,46 +56,78 @@ export async function getExaMonthlyUsage(
   return { usage: total, freeAllowance };
 }
 
+export type ExaUsageWriteOptions = {
+  /**
+   * Bounds the transaction to the caller's remaining budget with transaction-local
+   * `lock_timeout`, `statement_timeout` and `idle_in_transaction_session_timeout`. A caller that
+   * stops awaiting the write at its own deadline needs this so the transaction cannot hold its
+   * connection and locks past that deadline.
+   */
+  deadlineMs?: number;
+};
+
+/** The documented server `statement_timeout`; the caller's remaining budget may only tighten it. */
+const WRITE_ACTIVE_TIMEOUT_MS = 120_000;
+/** A suspended client is idle between statements; this bounds how long its transaction may sit. */
+const WRITE_IDLE_TIMEOUT_MS = 60_000;
+
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
+ * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
  * Low-balance notification scheduling happens only after commit.
  */
-export async function recordExaUsage(params: {
-  userId: string;
-  organizationId: string | undefined;
-  path: string;
-  costMicrodollars: number;
-  chargedToBalance: boolean;
-  freeAllowanceMicrodollars: number;
-  featureId?: string;
-  type?: string;
-}): Promise<void> {
+export async function recordExaUsage(
+  record: ExaUsageRecord,
+  options: ExaUsageWriteOptions = {}
+): Promise<ExaUsageWriteResponse['status']> {
   const {
+    id,
+    occurredAt,
     userId,
-    organizationId,
     path,
     costMicrodollars,
     chargedToBalance,
     freeAllowanceMicrodollars,
     featureId,
     type,
-  } = params;
+  } = record;
+  const organizationId = record.organizationId ?? undefined;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
-  const sourceId = randomUUID();
-  const occurredAt = new Date().toISOString();
 
-  const organizationUsage = await db.transaction(async tx => {
-    await tx.insert(exa_usage_log).values({
-      id: sourceId,
-      kilo_user_id: userId,
-      organization_id: organizationId ?? null,
-      path,
-      cost_microdollars: costMicrodollars,
-      charged_to_balance: chargedToBalance,
-      feature_id: featureId ?? null,
-      type: type ?? null,
-      created_at: occurredAt,
-    });
+  const outcome = await db.transaction(async tx => {
+    if (options.deadlineMs !== undefined) {
+      const budgetMs = Math.max(1_000, Math.floor(options.deadlineMs));
+      const activeTimeoutMs = Math.min(budgetMs, WRITE_ACTIVE_TIMEOUT_MS);
+      const idleTimeoutMs = Math.min(budgetMs, WRITE_IDLE_TIMEOUT_MS);
+      // PostgreSQL rejects a parameterized SET; Math.floor above proves these are integers.
+      await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${activeTimeoutMs}'`));
+      await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${activeTimeoutMs}'`));
+      await tx.execute(
+        sql.raw(`SET LOCAL idle_in_transaction_session_timeout = '${idleTimeoutMs}'`)
+      );
+    }
+
+    const [inserted] = await tx
+      .insert(exa_usage_log)
+      .values({
+        id,
+        kilo_user_id: userId,
+        organization_id: organizationId ?? null,
+        path,
+        cost_microdollars: costMicrodollars,
+        charged_to_balance: chargedToBalance,
+        feature_id: featureId ?? null,
+        type: type ?? null,
+        created_at: occurredAt,
+      })
+      .onConflictDoNothing({
+        target: [exa_usage_log.id, exa_usage_log.created_at],
+      })
+      .returning({ id: exa_usage_log.id });
+
+    if (!inserted) {
+      return { status: 'duplicate' as const, organizationUsage: null };
+    }
 
     await upsertMonthlyCounter(tx, {
       userId,
@@ -106,22 +138,26 @@ export async function recordExaUsage(params: {
       freeAllowanceMicrodollars,
     });
 
-    if (!chargedToBalance || costMicrodollars <= 0) return null;
+    if (!chargedToBalance || costMicrodollars <= 0) {
+      return { status: 'recorded' as const, organizationUsage: null };
+    }
 
-    const result = await deductFromBalance(tx, {
+    const organizationUsage = await deductFromBalance(tx, {
       userId,
       organizationId,
       occurredAt,
       costMicrodollars,
-      sourceId,
+      sourceId: id,
     });
 
-    return result;
+    return { status: 'recorded' as const, organizationUsage };
   });
 
-  if (organizationId && organizationUsage) {
-    scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+  if (organizationId && outcome.organizationUsage) {
+    scheduleOrganizationLowBalanceAlert(organizationId, outcome.organizationUsage);
   }
+
+  return outcome.status;
 }
 
 /**

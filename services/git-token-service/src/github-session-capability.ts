@@ -3,20 +3,17 @@ import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import {
   CURRENT_CAPABILITY_PREFIX,
-  LEGACY_CAPABILITY_PREFIX,
+  GITHUB_TASK_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
+import {
+  githubTaskGrantSchema,
+  type GitHubTaskGrant,
+} from '@kilocode/worker-utils/github-task-grant';
 
-const LEGACY_PREFIX = LEGACY_CAPABILITY_PREFIX.github;
 const BOUND_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.github;
+const TASK_CAPABILITY_PREFIX = GITHUB_TASK_CAPABILITY_PREFIX;
 const CAPABILITY_PURPOSE = 'github_scm_session';
-const MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
-const MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
-
-function getGitHubSessionCapabilityLifetimeMs(version: 1 | 2): number {
-  return version === 1
-    ? MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
-    : MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS;
-}
+const MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
 const GitHubPathPartSchema = z
   .string()
@@ -54,33 +51,45 @@ const GitHubSessionCapabilityClaimsBaseSchema = z.object({
   issuedAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().positive(),
 });
-const GitHubLegacySessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
-  version: z.literal(1),
-}).strict();
 const GitHubBoundSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
   version: z.literal(2),
   outboundContainerId: z.string().min(1),
   permissionScope: z.literal('repository').optional(),
-})
-  .strict()
-  .refine(claims => claims.permissionScope === undefined || claims.source === 'installation');
+}).strict();
+const GitHubTaskSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(3),
+  outboundContainerId: z.string().min(1),
+  taskGrant: githubTaskGrantSchema,
+}).strict();
 const GitHubSessionCapabilityClaimsSchema = z
   .discriminatedUnion('version', [
-    GitHubLegacySessionCapabilityClaimsSchema,
     GitHubBoundSessionCapabilityClaimsSchema,
+    GitHubTaskSessionCapabilityClaimsSchema,
   ])
-  .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
     claims =>
-      claims.expiresAt - claims.issuedAt <= getGitHubSessionCapabilityLifetimeMs(claims.version)
+      claims.version !== 2 ||
+      claims.permissionScope === undefined ||
+      claims.source === 'installation'
+  )
+  .refine(
+    claims =>
+      claims.version !== 3 ||
+      (claims.taskGrant.repository.owner === claims.owner &&
+        claims.taskGrant.repository.name === claims.repo)
+  )
+  .refine(claims => claims.expiresAt > claims.issuedAt)
+  .refine(
+    claims => claims.expiresAt - claims.issuedAt <= MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
   );
 
 export type GitHubAuthSource = 'user' | 'installation';
 export type GitHubSessionIdentity = z.infer<typeof GitHubSessionIdentitySchema>;
 export type GitHubSessionCapabilitySubject = {
   userId: string;
-  outboundContainerId?: string;
+  outboundContainerId: string;
   permissionScope?: 'repository';
+  taskGrant?: GitHubTaskGrant;
   orgId?: string;
   integrationId?: string;
   accessPurpose?: 'workflow' | 'agent';
@@ -137,20 +146,24 @@ export class GitHubSessionCapabilityCodec {
   constructor(private readonly encryptionKey: string) {}
 
   issue(subject: GitHubSessionCapabilitySubject): string {
+    if (subject.outboundContainerId.length === 0) {
+      throw new GitHubSessionCapabilityError('capability_configuration_error');
+    }
     const issuedAt = Date.now();
-    const bound = subject.outboundContainerId !== undefined;
-    const version = bound ? 2 : 1;
+    const { taskGrant, ...boundSubject } = subject;
+    const version = taskGrant ? 3 : 2;
     const parsed = GitHubSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
       version,
-      ...subject,
+      ...boundSubject,
+      ...(taskGrant ? { taskGrant } : {}),
       issuedAt,
-      expiresAt: issuedAt + getGitHubSessionCapabilityLifetimeMs(version),
+      expiresAt: issuedAt + MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
     });
     if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
 
     try {
-      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_PREFIX;
+      const prefix = version === 3 ? TASK_CAPABILITY_PREFIX : BOUND_CAPABILITY_PREFIX;
       return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitHubSessionCapabilityError('capability_configuration_error');
@@ -158,8 +171,8 @@ export class GitHubSessionCapabilityCodec {
   }
 
   decode(capability: string): GitHubSessionCapabilityClaims {
-    const format = capability.startsWith(LEGACY_PREFIX)
-      ? { prefix: LEGACY_PREFIX, version: 1 as const }
+    const format = capability.startsWith(TASK_CAPABILITY_PREFIX)
+      ? { prefix: TASK_CAPABILITY_PREFIX, version: 3 as const }
       : capability.startsWith(BOUND_CAPABILITY_PREFIX)
         ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
         : null;

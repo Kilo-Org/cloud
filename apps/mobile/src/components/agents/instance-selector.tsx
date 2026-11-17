@@ -1,11 +1,18 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
-import { cloudAgentTargetLabel, formatInstanceTarget } from '@/lib/instance-target-label';
+import {
+  cloudAgentTargetLabel,
+  formatInstanceTarget,
+  formatInstanceValue,
+} from '@/lib/instance-target-label';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -36,20 +43,15 @@ type InstanceSelectorProps = {
   disabled?: boolean;
 };
 
-function selectorLabel({
+function selectorValue({
   value,
-  isLoading,
   pendingComputer = false,
 }: {
   value: InstancePickerInstance | null;
-  isLoading: boolean;
   pendingComputer?: boolean;
 }): string {
   if (value) {
-    return formatInstanceTarget(value);
-  }
-  if (isLoading) {
-    return i18n.t('common.loading');
+    return formatInstanceValue(value);
   }
   if (pendingComputer) {
     return i18n.t('agentChat.instancePicker.noCliInstances');
@@ -65,19 +67,47 @@ export function InstanceSelector({
   onChange,
   disabled = false,
 }: Readonly<InstanceSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
+  // The list decides what "Run on" says, so an empty field is loading until it
+  // settles. A bound target keeps its name while a refetch runs: the same
+  // instance list opens the picker either way.
+  if (isLoading && value === null) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', {
+          label: t('common.loading'),
+        })}
+        accessibilityState={{ busy: true }}
+        className={FIELD_TRIGGER_FRAME_CLASS}
+      >
+        <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+          {/* The branch row's loading bar: a name-width line, so the field
+              reads as the row it becomes. `bg-muted-soft` because the default
+              `bg-skeleton-fill` equals this frame's `bg-secondary` in the light
+              palette, where the bar would paint nothing. */}
+          <Skeleton className="h-4 w-1/3 bg-muted-soft" />
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
+      </View>
+    );
+  }
+
   // The Cloud Agent default is always selectable, even when the list is
-  // loading or empty — only the "open the picker" path is gated.
+  // empty — only the "open the picker" path is gated.
   const canOpenPicker = !disabled;
-  const label = selectorLabel({ value, isLoading, pendingComputer });
-  // A target is selected in every state but the loading copy and the unbound
-  // computer: the Cloud Agent default is a real value, not a placeholder, so it
-  // takes the same foreground ink as a bound instance. Placeholder ink would
-  // read as "nothing chosen yet" beside the account value above it.
-  const isPlaceholder = value === null && (isLoading || pendingComputer);
+  const label = selectorValue({ value, pendingComputer });
+  // The value line names the computer alone, but a screen reader hears the
+  // whole target: the project is where the session will run.
+  const accessibleTarget = value === null ? label : formatInstanceTarget(value);
+  // A target is selected in every state but the unbound computer: the Cloud
+  // Agent default is a real value, not a placeholder, so it takes the same
+  // foreground ink as a bound instance. Placeholder ink would read as "nothing
+  // chosen yet" beside the account value above it.
+  const isPlaceholder = value === null && pendingComputer;
 
   function handlePress() {
     if (!canOpenPicker) {
@@ -92,7 +122,7 @@ export function InstanceSelector({
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,
     // so the keyboard must be down before this push.
     Keyboard.dismiss();
-    router.push('/(app)/agent-chat/instance-picker' as Href);
+    pushOnce('/(app)/agent-chat/instance-picker' as Href);
   }
 
   return (
@@ -100,23 +130,29 @@ export function InstanceSelector({
       onPress={handlePress}
       disabled={!canOpenPicker}
       accessibilityRole="button"
-      accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', { label })}
+      accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', {
+        label: accessibleTarget,
+      })}
       accessibilityState={{ disabled: !canOpenPicker }}
-      className={cn(
-        'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
-        !canOpenPicker && 'opacity-50'
-      )}
+      className={cn(FIELD_TRIGGER_FRAME_CLASS, !canOpenPicker && 'opacity-50')}
     >
-      <Text
-        className={cn(
-          'flex-1 text-base',
-          isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
-        )}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+        <Text
+          className={cn(
+            'min-w-0 flex-1 text-base',
+            isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
+          )}
+          numberOfLines={1}
+          // The value is a computer name, read from the start, so it takes the
+          // ordinary tail cut. The project it runs in is the Folder field's job
+          // below the row, and repeating it cut the name itself on a compact
+          // screen.
+          ellipsizeMode="tail"
+        >
+          {label}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

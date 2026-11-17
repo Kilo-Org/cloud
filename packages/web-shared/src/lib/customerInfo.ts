@@ -25,32 +25,40 @@ export const getCustomerInfo = async (
   searchParams: NextAppSearchParams
 ): Promise<CustomerInfo> => {
   const kiloUserId = user.id;
-  const hasStripePayementMethodPromise = hasPaymentMethodInStripe({
-    stripeCustomerId: user.stripe_customer_id,
-  });
 
-  const paymentEligblePromise = (async () => {
-    const result = await db.query.payment_methods.findFirst({
-      columns: { id: true },
-      where: and(
-        eq(payment_methods.user_id, kiloUserId),
-        eq(payment_methods.eligible_for_free_credits, true),
-        isNull(payment_methods.deleted_at)
-      ),
-    });
-    return !!result;
-  })();
-
-  const [paymentsSummary, hasOrganizations, hasReceivedWelcomeCredits] = await Promise.all([
+  // Every read starts here, so a rejection from any of them is observed by the
+  // `Promise.all` below and reaches the caller's error handling at the point it
+  // happens, instead of sitting unhandled until its promise is awaited later.
+  const [
+    paymentsSummary,
+    hasOrganizations,
+    hasReceivedWelcomeCredits,
+    hasStripePaymentMethod,
+    hasPaymentMethodEligibleForFreeCredits,
+  ] = await Promise.all([
     summarizeUserPayments(kiloUserId),
     userHasOrganizations(user.id),
     hasReceivedAnyFreeWelcomeCredits(user.id),
+    hasPaymentMethodInStripe({
+      stripeCustomerId: user.stripe_customer_id,
+    }),
+    (async () => {
+      const result = await db.query.payment_methods.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(payment_methods.user_id, kiloUserId),
+          eq(payment_methods.eligible_for_free_credits, true),
+          isNull(payment_methods.deleted_at)
+        ),
+      });
+      return !!result;
+    })(),
   ]);
   return {
     hasPaid: paymentsSummary.payments_count > 0,
     paymentsSummary,
-    hasStripePaymentMethod: await hasStripePayementMethodPromise,
-    hasPaymentMethodEligibleForFreeCredits: await paymentEligblePromise,
+    hasStripePaymentMethod,
+    hasPaymentMethodEligibleForFreeCredits,
     paymentStatus_untrusted: searchParams.payment_status as string,
     user,
     hasOrganizations: hasOrganizations,

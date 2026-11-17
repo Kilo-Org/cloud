@@ -16,7 +16,6 @@ import {
 } from '@kilocode/db/schema';
 import { watchPrPolicySchema } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import {
@@ -34,6 +33,7 @@ import {
   watchPrProjectionSchema,
 } from './watch-pr-events';
 import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
+import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
 
 type WatchContext = Parameters<typeof ensureOrganizationAccess>[0];
 
@@ -77,12 +77,6 @@ export function serializeWatchPr(watch: CloudAgentPrWatch) {
   };
 }
 
-async function requireRelease(ctx: WatchContext) {
-  if (!(await isReleaseToggleEnabled('cloud-agent-watch-pr', ctx.user.id))) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Watch PR enablement is not available' });
-  }
-}
-
 async function ownedSession(ctx: WatchContext, sessionId: string) {
   const session = await db.query.cli_sessions_v2.findFirst({
     where: and(
@@ -93,6 +87,47 @@ async function ownedSession(ctx: WatchContext, sessionId: string) {
   if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   if (session.organization_id) await ensureOrganizationAccess(ctx, session.organization_id);
   return session;
+}
+
+/**
+ * The session as a Watch PR source: the PR its badge shows. A chat in a Cloud
+ * Agent workspace watches the workspace's PR (a PR on the branch the workspace
+ * has checked out) even without a link of its own. That PR is presented as the
+ * session's link, reported on the workspace branch, so `verifySource` still
+ * checks it against GitHub before any watch starts. Use only for watch source
+ * checks; the result is not the stored session row.
+ */
+async function ownedWatchSource(ctx: WatchContext, sessionId: string) {
+  return withWorkspacePullRequest(await ownedSession(ctx, sessionId));
+}
+
+/**
+ * The source session of an existing watch, presenting the watched PR: the
+ * session's own link when it names that PR, else the workspace PR when it
+ * does. A different PR winning the badge later must not orphan the watch.
+ */
+async function ownedWatchSourceFor(ctx: WatchContext, watch: CloudAgentPrWatch) {
+  const session = await ownedSession(ctx, watch.source_session_id);
+  if (session.pr_number === watch.pr_number) return session;
+  const workspace = await withWorkspacePullRequest(session);
+  return workspace.pr_number === watch.pr_number ? workspace : session;
+}
+
+async function withWorkspacePullRequest(session: CliSessionV2): Promise<CliSessionV2> {
+  if (!session.cloud_agent_worktree_id) return session;
+  const workspacePr = await readWorkspacePullRequest(session);
+  if (!workspacePr) return session;
+  return {
+    ...session,
+    git_url: workspacePr.gitUrl,
+    git_branch: workspacePr.gitBranch,
+    platform: 'github',
+    pr_url: workspacePr.prUrl,
+    pr_number: workspacePr.prNumber,
+    pr_head_ref: workspacePr.gitBranch,
+    pr_head_sha: null,
+    pr_link_verified_at: session.pr_link_verified_at ?? new Date().toISOString(),
+  };
 }
 
 async function ownedWatch(ctx: WatchContext, watchId: string) {
@@ -316,88 +351,85 @@ export async function getPrWatchOptions(
   ctx: WatchContext,
   input: z.infer<typeof watchPrQuerySchema>
 ) {
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
-  const enabled = await isReleaseToggleEnabled('cloud-agent-watch-pr', ctx.user.id);
   const integrationOptions: {
     integrationId: string;
     appType: 'standard' | 'lite';
     accountLogin: string | null;
   }[] = [];
-  let unavailableReason: string | null = enabled ? null : 'Watch PR enablement is not available';
-  if (enabled) {
-    try {
-      const source = assertWatchPrSource(session);
-      const worktree = await db.query.cloud_agent_worktrees.findFirst({
+  let unavailableReason: string | null = null;
+  try {
+    const source = assertWatchPrSource(session);
+    const worktree = await db.query.cloud_agent_worktrees.findFirst({
+      where: and(
+        eq(cloud_agent_worktrees.worktree_id, source.worktreeId),
+        eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id)
+      ),
+    });
+    if (
+      !worktree ||
+      worktree.organization_id !== session.organization_id ||
+      worktree.deletion_started_at
+    ) {
+      unavailableReason = 'Source worktree is unavailable';
+    } else {
+      const integrations = await db.query.platform_integrations.findMany({
         where: and(
-          eq(cloud_agent_worktrees.worktree_id, source.worktreeId),
-          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id)
+          eq(platform_integrations.platform, 'github'),
+          session.organization_id
+            ? and(
+                eq(platform_integrations.owned_by_organization_id, session.organization_id),
+                isNull(platform_integrations.owned_by_user_id)
+              )
+            : and(
+                eq(platform_integrations.owned_by_user_id, ctx.user.id),
+                isNull(platform_integrations.owned_by_organization_id)
+              )
         ),
+        orderBy: platform_integrations.id,
       });
-      if (
-        !worktree ||
-        worktree.organization_id !== session.organization_id ||
-        worktree.deletion_started_at
-      ) {
-        unavailableReason = 'Source worktree is unavailable';
-      } else {
-        const integrations = await db.query.platform_integrations.findMany({
-          where: and(
-            eq(platform_integrations.platform, 'github'),
-            session.organization_id
-              ? and(
-                  eq(platform_integrations.owned_by_organization_id, session.organization_id),
-                  isNull(platform_integrations.owned_by_user_id)
-                )
-              : and(
-                  eq(platform_integrations.owned_by_user_id, ctx.user.id),
-                  isNull(platform_integrations.owned_by_organization_id)
-                )
-          ),
-          orderBy: platform_integrations.id,
-        });
-        for (const integration of integrations) {
-          if (
-            !integration.platform_installation_id ||
-            integration.permissions?.contents !== 'write' ||
-            (integration.repository_access !== 'all' &&
-              !(
-                integration.repository_access === 'selected' &&
-                integration.repositories?.some(
-                  repository => repository.full_name.toLowerCase() === source.repo.fullName
-                )
-              ))
-          )
-            continue;
-          const appType = integration.github_app_type ?? 'standard';
-          try {
-            await assertGitHubInstallationRuntimeAuthorized(
-              integration.platform_installation_id,
-              appType,
-              integration.id,
-              'agent'
-            );
-          } catch (error) {
-            if (error instanceof GitHubRuntimeAuthorizationError) continue;
-            throw error;
-          }
-          integrationOptions.push({
-            integrationId: integration.id,
+      for (const integration of integrations) {
+        if (
+          !integration.platform_installation_id ||
+          integration.permissions?.contents !== 'write' ||
+          (integration.repository_access !== 'all' &&
+            !(
+              integration.repository_access === 'selected' &&
+              integration.repositories?.some(
+                repository => repository.full_name.toLowerCase() === source.repo.fullName
+              )
+            ))
+        )
+          continue;
+        const appType = integration.github_app_type ?? 'standard';
+        try {
+          await assertGitHubInstallationRuntimeAuthorized(
+            integration.platform_installation_id,
             appType,
-            accountLogin: integration.platform_account_login,
-          });
+            integration.id,
+            'agent'
+          );
+        } catch (error) {
+          if (error instanceof GitHubRuntimeAuthorizationError) continue;
+          throw error;
         }
-        if (!integrationOptions.length)
-          unavailableReason = 'No eligible GitHub connection is available';
+        integrationOptions.push({
+          integrationId: integration.id,
+          appType,
+          accountLogin: integration.platform_account_login,
+        });
       }
-    } catch (error) {
-      if (!(error instanceof TRPCError) || error.code !== 'BAD_REQUEST') throw error;
-      unavailableReason = error.message;
+      if (!integrationOptions.length)
+        unavailableReason = 'No eligible GitHub connection is available';
     }
+  } catch (error) {
+    if (!(error instanceof TRPCError) || error.code !== 'BAD_REQUEST') throw error;
+    unavailableReason = error.message;
   }
   return {
-    enabled,
-    canEnable: enabled && unavailableReason === null,
+    enabled: true,
+    canEnable: unavailableReason === null,
     unavailableReason,
     integrationOptions,
     defaultIntegrationId:
@@ -423,9 +455,8 @@ export function assertWatchPrExpiry(expiresAt: string, now = Date.now()) {
 }
 
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
-  await requireRelease(ctx);
   assertWatchPrExpiry(input.expiresAt);
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   const { source, integration, appType, pr } = await verifySource(
     ctx,
@@ -576,7 +607,7 @@ async function settleUnavailableWatch(watch: CloudAgentPrWatch) {
 }
 
 export async function getWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrQuerySchema>) {
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   let source: ReturnType<typeof assertWatchPrSource>;
   try {
@@ -638,7 +669,6 @@ export async function changeWatchPr(
   input: z.infer<typeof watchPrMutationSchema>,
   action: 'pause' | 'resume' | 'stop'
 ) {
-  if (action === 'resume') await requireRelease(ctx);
   const watch = await settleUnavailableWatch(await ownedWatch(ctx, input.watchId));
   if (watch.generation !== input.generation)
     throw new TRPCError({ code: 'CONFLICT', message: 'Watch changed; reload before retrying' });
@@ -654,7 +684,7 @@ export async function changeWatchPr(
         code: 'PRECONDITION_FAILED',
         message: 'Only paused watches can resume',
       });
-    const session = await ownedSession(ctx, watch.source_session_id);
+    const session = await ownedWatchSourceFor(ctx, watch);
     if (
       session.cloud_agent_worktree_id !== watch.worktree_id ||
       session.organization_id !== watch.organization_id
@@ -721,7 +751,7 @@ export async function recheckWatchPr(
       code: 'PRECONDITION_FAILED',
       message: 'Finished watches cannot be rechecked',
     });
-  const session = await ownedSession(ctx, watch.source_session_id);
+  const session = await ownedWatchSourceFor(ctx, watch);
   if (
     session.cloud_agent_worktree_id !== watch.worktree_id ||
     session.organization_id !== watch.organization_id

@@ -18,10 +18,7 @@ import * as dolthubService from '@/lib/integrations/dolthub-service';
  */
 const DOLTHUB_USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
-/**
- * `{owner}/{repo}` upstream — same regex shape as `dolthubUpstream` on the
- * wasteland service input, kept in sync intentionally.
- */
+/** `{owner}/{repo}` upstream. */
 const DOLTHUB_UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
 
 export const dolthubRouter = createTRPCRouter({
@@ -48,14 +45,11 @@ export const dolthubRouter = createTRPCRouter({
 
   /**
    * Returns the OAuth-issued DoltHub access token plus the cached username
-   * (if any), for the caller to forward into the Wasteland worker's
-   * `storeCredential` mutation.
+   * (if any).
    *
    * The token is a bearer secret — only return it to the authenticated
    * owner of an *active* integration. Mirrors the `installed` check used
    * by `getInstallation` so a stale, non-active row never leaks its token.
-   * The wasteland worker stores its own encrypted copy; the browser never
-   * persists this token.
    */
   getInstallationCredentials: baseProcedure
     .input(optionalOrgInput)
@@ -76,9 +70,8 @@ export const dolthubRouter = createTRPCRouter({
     }),
 
   /**
-   * Persist the DoltHub username the user just confirmed during a
-   * wasteland connect, so subsequent connects can skip the prompt.
-   * No-op when the integration isn't installed.
+   * Persist the DoltHub username the user just confirmed so it can be reused
+   * without prompting again. No-op when the integration isn't installed.
    */
   rememberUsername: baseProcedure
     .input(
@@ -126,8 +119,7 @@ export const dolthubRouter = createTRPCRouter({
 
   /**
    * Probes DoltHub to confirm `{owner}/{repo}` exists. Used by the
-   * upstream picker to block submission of typo'd or non-existent
-   * upstreams before the wasteland worker tries to fork or push.
+   * upstream picker to block submission of typo'd or non-existent upstreams.
    *
    * The verify call uses the OAuth-issued token when available so private
    * repos the OAuth user can read also resolve; without a token the probe

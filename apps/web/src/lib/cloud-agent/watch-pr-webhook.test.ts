@@ -6,7 +6,6 @@ const mockReceipt = jest.fn();
 const mockInsert = jest.fn();
 const mockUpdate = jest.fn();
 const mockTransaction = jest.fn();
-const mockFlag = jest.fn();
 const mockAuthorize = jest.fn();
 const mockRetainCi = jest.fn();
 const mockReadCi = jest.fn();
@@ -27,9 +26,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     }),
     transaction: (callback: (tx: unknown) => Promise<void>) => mockTransaction(callback),
   },
-}));
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: (flag: string, owner: string) => mockFlag(flag, owner),
 }));
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
@@ -112,7 +108,6 @@ describe('awaited watch PR durable observation', () => {
     mockReceipt.mockResolvedValue([]);
     mockInsert.mockResolvedValue(undefined);
     mockUpdate.mockResolvedValue(undefined);
-    mockFlag.mockResolvedValue(true);
     mockAuthorize.mockResolvedValue(undefined);
     mockRetainCi.mockResolvedValue(1);
     mockReadCi.mockResolvedValue([]);
@@ -137,7 +132,6 @@ describe('awaited watch PR durable observation', () => {
     await observeWatchPrWebhook(input);
     const query = new PgDialect().sqlToQuery(mockCandidates.mock.calls[0][0]);
     expect(query.params).toEqual(['123', 'standard', '456', 'finished', head]);
-    expect(mockFlag).toHaveBeenCalledWith('cloud-agent-watch-pr', 'oauth/owner');
     expect(mockAuthorize).toHaveBeenCalledWith(
       '123',
       'standard',
@@ -427,13 +421,6 @@ describe('awaited watch PR durable observation', () => {
     );
   });
 
-  it('ignores feature-disabled watches without runtime authorization or projection', async () => {
-    mockFlag.mockResolvedValue(false);
-    await observeWatchPrWebhook(input);
-    expect(mockAuthorize).not.toHaveBeenCalled();
-    expect(mockTransaction).not.toHaveBeenCalled();
-  });
-
   it('fails closed for changed tenant or removed selected repository access', async () => {
     for (const invalid of [
       { ...candidate, userId: 'different-owner' },
@@ -442,7 +429,6 @@ describe('awaited watch PR durable observation', () => {
       mockCandidates.mockResolvedValue([invalid]);
       await observeWatchPrWebhook(input);
     }
-    expect(mockFlag).not.toHaveBeenCalled();
     expect(mockAuthorize).not.toHaveBeenCalled();
     expect(mockTransaction).not.toHaveBeenCalled();
   });

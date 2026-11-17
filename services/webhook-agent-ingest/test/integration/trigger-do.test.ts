@@ -24,6 +24,23 @@ async function expectSandboxAllocation(
   });
 }
 
+async function expectEnvironmentId(
+  stub: DurableObjectStub<TriggerDO>,
+  environmentId: string | null
+): Promise<void> {
+  expect((await stub.getConfig())?.environmentId).toBe(environmentId);
+  expect((await stub.getConfigForResponse())?.environmentId).toBe(environmentId);
+  await runInDurableObject(stub, async (_instance, state) => {
+    const config = await state.storage.get<{ environmentId?: string | null }>('config');
+    expect(config?.environmentId).toBe(environmentId);
+    const row = drizzle(state.storage)
+      .select({ environmentId: triggerConfig.environment_id })
+      .from(triggerConfig)
+      .get();
+    expect(row?.environmentId).toBe(environmentId);
+  });
+}
+
 describe('TriggerDO', () => {
   const testUserId = 'user123';
   const testOrgId = 'org456';
@@ -369,6 +386,140 @@ describe('TriggerDO', () => {
         promptTemplate: 'Updated {{body}}',
       });
       await expectSandboxAllocation(normalStub, 'isolated-standard');
+    });
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'persists environment selection for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `environment-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+        const environmentId = '11111111-1111-4111-8111-111111111111';
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          environmentId,
+          activationMode,
+          cronExpression,
+        });
+
+        await expectEnvironmentId(stub, environmentId);
+      }
+    );
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'preserves, clears, and ignores undefined environment updates for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `environment-update-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+        const environmentId = '22222222-2222-4222-8222-222222222222';
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          cronExpression,
+        });
+        await expectEnvironmentId(stub, null);
+
+        await stub.updateConfig({ environmentId });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ environmentId: undefined });
+        await expectEnvironmentId(stub, environmentId);
+
+        await stub.updateConfig({ environmentId: null });
+        await expectEnvironmentId(stub, null);
+      }
+    );
+
+    it('hydrates a legacy trigger without an environment selection as null', async () => {
+      const triggerId = 'environment-legacy';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: triggerId,
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            prompt_template: 'Process {{body}}',
+            activation_mode: 'webhook',
+          })
+          .run();
+      });
+
+      expect((await stub.getConfig())?.environmentId).toBeNull();
+    });
+
+    it('rejects environment selection for KiloClaw without mutating configs', async () => {
+      const kiloclawId = env.TRIGGER_DO.idFromName(`${testUserNamespace}/environment-kiloclaw`);
+      const kiloclawStub = env.TRIGGER_DO.get(kiloclawId);
+      const environmentId = '33333333-3333-4333-8333-333333333333';
+      const baseConfig = {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      };
+
+      await runInDurableObject(kiloclawStub, async (instance, state) => {
+        await expect(
+          instance.configure(testUserNamespace, 'environment-kiloclaw', {
+            ...baseConfig,
+            targetType: 'kiloclaw_chat',
+            environmentId,
+          })
+        ).rejects.toThrow('Environment selection is only supported for Cloud Agent triggers');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+
+      await kiloclawStub.configure(testUserNamespace, 'environment-kiloclaw', {
+        ...baseConfig,
+        targetType: 'kiloclaw_chat',
+        environmentId: null,
+      });
+      const before = await kiloclawStub.getConfig();
+
+      await runInDurableObject(kiloclawStub, async instance => {
+        await expect(instance.updateConfig({ environmentId })).rejects.toThrow(
+          'Environment selection is only supported for Cloud Agent triggers'
+        );
+      });
+      expect(await kiloclawStub.getConfig()).toEqual(before);
+      await expectEnvironmentId(kiloclawStub, null);
+
+      await expect(
+        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}', environmentId: null })
+      ).resolves.toEqual({ success: true });
+      await expectEnvironmentId(kiloclawStub, null);
+      expect(await kiloclawStub.getConfig()).toMatchObject({
+        ...before,
+        promptTemplate: 'Updated {{body}}',
+      });
     });
 
     it('round-trips an omitted variant as undefined', async () => {

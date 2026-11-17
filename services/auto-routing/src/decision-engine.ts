@@ -1,4 +1,5 @@
 import {
+  rankCandidates,
   taxonomyRouteKey,
   DEFAULT_AUTO_ROUTING_MODE,
   isVirtualAutoModelId,
@@ -64,6 +65,31 @@ function candidateVariant(candidate: RankedCandidate): string | null {
     return candidate.reasoningEffort;
   }
   return null;
+}
+
+function pairOf(candidate: RankedCandidate): BenchmarkPair {
+  return { model: candidate.model, variant: candidateVariant(candidate) };
+}
+
+// Keep only each mapped model's final variant. Unmapped models keep every
+// variant; a mapping whose pair is absent from the eligible set keeps the
+// model's candidates instead of dropping or resurrecting a filtered pair.
+function selectFinalCandidates(
+  candidates: ReadonlyArray<RankedCandidate>,
+  table: RoutingTable,
+  routeKey: string,
+  complexity: ClassifierOutput['reasoningComplexity'],
+  applyMapping: boolean
+): ReadonlyArray<RankedCandidate> {
+  if (!applyMapping) return candidates;
+  return candidates.filter(candidate => {
+    const variant = table.effortByComplexity?.[routeKey]?.[candidate.model]?.[complexity];
+    if (variant === undefined) return true;
+    const mappedPresent = candidates.some(
+      c => c.model === candidate.model && candidateVariant(c) === variant
+    );
+    return !mappedPresent || candidateVariant(candidate) === variant;
+  });
 }
 
 function findIncumbentCandidate(
@@ -296,15 +322,59 @@ export function computeDecision(
   }
 
   const effectiveMode = isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode;
-  const freshPick = pickFreshCandidate(candidates, effectiveMode);
+  const requestTokens = options.constraints?.promptTokensEstimate ?? options.contextTokens;
+  const applyMapping =
+    effectiveMode !== 'cheapest' &&
+    !options.preserveIncumbentVariant &&
+    !!classification.reasoningComplexity;
+  const finalCandidates = selectFinalCandidates(
+    candidates,
+    table,
+    routeKey,
+    classification.reasoningComplexity,
+    applyMapping
+  );
+  const canReprice =
+    requestTokens != null &&
+    table.accuracyNoiseBand != null &&
+    finalCandidates.some(candidate => candidate.pricing != null);
+  const selectionCandidates = canReprice
+    ? rankCandidates(
+        finalCandidates.map(candidate => ({
+          ...candidate,
+          p50LatencyMs: candidate.p50LatencyMs ?? null,
+        })),
+        table.minAccuracy,
+        {
+          requestTokens,
+          accuracyNoiseBand: table.accuracyNoiseBand,
+          ignoreLatency: finalCandidates.every(candidate => candidate.p50LatencyMs == null),
+        }
+      )
+    : finalCandidates;
+  const pickedSelection = pickFreshCandidate(selectionCandidates, effectiveMode);
+  // Selection copies may carry cold request estimates. Sticky economics and
+  // the decision keep the published candidate, so the horizon cache-loss
+  // term below is counted once, against published estimates.
+  const picked =
+    selectionCandidates === finalCandidates
+      ? pickedSelection
+      : (finalCandidates.find(
+          c =>
+            c.model === pickedSelection.model &&
+            candidateVariant(c) === candidateVariant(pickedSelection) &&
+            c.avgCostUsd === pickedSelection.avgCostUsd &&
+            c.accuracy === pickedSelection.accuracy
+        ) ??
+        finalCandidates.find(
+          c =>
+            c.model === pickedSelection.model &&
+            candidateVariant(c) === candidateVariant(pickedSelection)
+        ) ??
+        pickedSelection);
+  const freshPair = pairOf(picked);
   const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
-    if (
-      effectiveMode === 'cheapest' ||
-      options.preserveIncumbentVariant ||
-      !classification.reasoningComplexity
-    ) {
-      return candidate;
-    }
+    if (!applyMapping) return candidate;
     const variant =
       table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
     if (variant === undefined) return candidate;
@@ -313,8 +383,6 @@ export function computeDecision(
       candidate
     );
   };
-  const picked = applyComplexityEffort(freshPick);
-  const freshPair = { model: picked.model, variant: candidateVariant(picked) };
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
   const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
@@ -326,7 +394,7 @@ export function computeDecision(
   const costSwitchWorthwhile = (candidate: RankedCandidate): boolean => {
     if (
       table.switchHorizonTurns != null &&
-      options.contextTokens != null &&
+      requestTokens != null &&
       candidate.estimatedRequestCostUsd != null &&
       picked.estimatedRequestCostUsd != null &&
       candidate.pricing != null &&
@@ -336,32 +404,27 @@ export function computeDecision(
         (candidate.estimatedRequestCostUsd - picked.estimatedRequestCostUsd) *
         table.switchHorizonTurns;
       const cacheLossCost =
-        options.contextTokens *
+        requestTokens *
         (picked.pricing.promptUsdPerToken -
           (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
       return expectedSavings > cacheLossCost;
     }
     return picked.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
   };
+  const incumbentPair = incumbentCandidate ? pairOf(incumbentCandidate) : null;
+  const incumbentServedPair = incumbentPick ? pairOf(incumbentPick) : null;
   const stickyIncumbent =
     incumbentCandidate &&
     incumbentPick &&
+    incumbentPair &&
+    incumbentServedPair &&
     incumbentStickyEligible(incumbentCandidate) &&
-    ((incumbentCandidate.model === freshPick.model &&
-      ((options.preserveIncumbentVariant &&
-        !sameExactPair(
-          { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-          freshPair
-        )) ||
-        incumbentPick !== incumbentCandidate ||
-        picked !== freshPick)) ||
-      (!sameExactPair(
-        { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-        freshPair
-      ) &&
-        ((mode !== 'best_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
-          (mode === 'best_accuracy' &&
-            !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
+    !sameExactPair(incumbentPair, freshPair) &&
+    (sameExactPair(incumbentServedPair, freshPair) ||
+      (options.preserveIncumbentVariant && incumbentCandidate.model === picked.model) ||
+      (mode !== 'best_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
+      (mode === 'best_accuracy' &&
+        !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)));
 
   if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {
@@ -378,7 +441,7 @@ export function computeDecision(
 
   const switched =
     incumbent !== null &&
-    (picked !== freshPick || incumbent.variant === null
+    (incumbent.variant === null
       ? incumbent.model !== picked.model
       : !sameExactPair(incumbent, freshPair));
 

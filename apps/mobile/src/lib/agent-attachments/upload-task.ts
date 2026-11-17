@@ -6,6 +6,7 @@ import {
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from '@/lib/agent-attachments/constants';
+import { NativeUploadProgress } from '@/lib/native-transfer-progress';
 
 export function normalizeFilename(name: string, extension: AgentAttachmentExtension): string {
   // If the original filename had no usable extension we append the
@@ -92,9 +93,10 @@ export async function uploadOne(args: {
     uploadType: UploadType.BINARY_CONTENT,
     httpMethod: 'PUT',
     headers: { 'Content-Type': contentType },
-    onProgress: ({ bytesSent, totalBytes }) => {
-      if (totalBytes > 0) {
-        onProgress(bytesSent / totalBytes);
+    onProgress: progress => {
+      const parsed = NativeUploadProgress.safeParse(progress);
+      if (parsed.success && parsed.data.totalBytes > 0) {
+        onProgress(parsed.data.bytesSent / parsed.data.totalBytes);
       } else {
         onProgress(null);
       }

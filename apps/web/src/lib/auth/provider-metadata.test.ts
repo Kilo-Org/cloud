@@ -26,17 +26,16 @@ describe('Anaconda provider metadata', () => {
 });
 
 describe('account linking provider list', () => {
-  test('keeps Apple a sign-in method without offering it for linking', () => {
+  test('offers Apple for linking through the pending completion bounce', () => {
     expect(OAuthProviderIds).toContain('apple');
     expect(ProdNonSSOAuthProviders).toContain('apple');
-    expect(isAccountLinkingProvider('apple')).toBe(false);
-    expect(AccountLinkingProviders.map(p => p.id)).not.toContain('apple');
+    expect(isAccountLinkingProvider('apple')).toBe(true);
+    expect(AccountLinkingProviders.map(p => p.id)).toContain('apple');
   });
 
-  test('offers every other linkable provider for linking', () => {
+  test('offers every linkable provider for linking', () => {
     const offered = AccountLinkingProviders.map(p => p.id);
     for (const provider of LinkableAuthProviders) {
-      if (provider.id === 'apple') continue;
       expect(offered).toContain(provider.id);
       expect(isAccountLinkingProvider(provider.id)).toBe(true);
     }

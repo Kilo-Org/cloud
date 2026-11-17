@@ -7,6 +7,7 @@ import vertexByok, {
   getGcpVertexHost,
   parseGcpVertexCredentials,
   resolveGcpVertexUpstream,
+  toMistralChatCompletionsBody,
 } from './vertex-byok';
 
 jest.mock('../../custom-llm/google-service-account', () => ({
@@ -236,29 +237,64 @@ describe('vertexByok definition', () => {
     });
   });
 
-  it('drops mismatched Claude thinking blocks', () => {
+  it.each(
+    [
+      {
+        model: 'vertex-byok/claude-sonnet-5-5',
+        upstreamModel: 'claude-sonnet-5-5',
+      },
+      {
+        model: 'vertex-byok/claude-sonnet-latest',
+        upstreamModel: 'claude-sonnet-latest',
+      },
+    ].flatMap(models =>
+      (['adaptive', 'disabled', 'omitted'] as const).map(mode => ({ ...models, mode }))
+    )
+  )('handles $mode Claude thinking for $model', ({ model, upstreamModel, mode }) => {
     const context = createContext(
       {
         kind: 'messages',
         body: {
-          model: 'claude-sonnet-5-5',
-          messages: [],
+          model: upstreamModel,
+          messages: [
+            { role: 'user', content: 'hello' },
+            {
+              role: 'assistant',
+              content: [
+                { type: 'thinking', thinking: '', signature: 'FAKE_VERTEX_TEST_SIGNATURE' },
+                { type: 'redacted_thinking', data: 'FAKE_VERTEX_TEST_REDACTED_DATA' },
+                { type: 'text', text: 'Previous answer.' },
+              ],
+            },
+          ],
           max_tokens: 10,
-          thinking: { type: 'adaptive' },
+          ...(mode !== 'omitted' && { thinking: { type: mode } }),
         },
       },
-      'vertex-byok/claude-sonnet-5-5'
+      model
     );
 
     vertexByok.transformRequest(context);
 
-    expect(context.request.body).toEqual({
-      messages: [],
+    expect(context.request.body).toMatchObject({
       max_tokens: 10,
-      thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+      thinking:
+        mode === 'disabled'
+          ? { type: 'disabled' }
+          : { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
       anthropic_version: 'vertex-2023-10-16',
     });
+    expect(context.request.body).not.toHaveProperty('model');
+    if (context.request.kind !== 'messages') throw new Error('Expected Messages request');
+    expect(context.request.body.messages[1]).toMatchObject({
+      role: 'assistant',
+      content:
+        mode === 'disabled'
+          ? [{ type: 'text', text: 'Previous answer.' }]
+          : [{ type: 'thinking' }, { type: 'redacted_thinking' }, { type: 'text' }],
+    });
     expect(context.extraHeaders['anthropic-beta']).toBe('thinking-binding-controls-2026-08-01');
+    expect(context.extraHeaders['x-anthropic-beta']).toBe('thinking-binding-controls-2026-08-01');
   });
 
   it('reduces Mistral requests to the fields Mistral accepts', () => {
@@ -316,5 +352,56 @@ describe('vertexByok definition', () => {
     vertexByok.transformRequest(context);
 
     expect(context.request.body.model).toBe(upstreamModel);
+  });
+});
+
+describe('toMistralChatCompletionsBody', () => {
+  it('renames the OpenAI-style fields and drops every field Mistral rejects', () => {
+    const body = {
+      model: 'mistral-medium-3',
+      messages: [
+        { role: 'user', content: 'hi', name: 'ada', reasoning: 'hidden' },
+        { role: 'tool', content: 'result', tool_call_id: 'call-1', refusal: 'no' },
+      ],
+      max_completion_tokens: 100,
+      seed: 7,
+      stream: true,
+      stream_options: { include_usage: true },
+      tool_choice: 'auto',
+      user: 'user-hash',
+      safety_identifier: 'user-hash',
+      prompt_cache_key: 'session-hash',
+      reasoning_effort: 'high',
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'read', parameters: { type: 'object' }, strict: true },
+        },
+      ],
+    };
+
+    toMistralChatCompletionsBody(body);
+
+    expect(body).toStrictEqual({
+      model: 'mistral-medium-3',
+      messages: [
+        { role: 'user', content: 'hi', name: 'ada' },
+        { role: 'tool', content: 'result', tool_call_id: 'call-1' },
+      ],
+      max_tokens: 100,
+      random_seed: 7,
+      stream: true,
+      stream_options: { include_usage: true },
+      tool_choice: 'auto',
+      tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+    });
+  });
+
+  it('keeps an explicit max_tokens and random_seed over the OpenAI names', () => {
+    const body = { max_tokens: 5, max_completion_tokens: 9, random_seed: 1, seed: 2 };
+
+    toMistralChatCompletionsBody(body);
+
+    expect(body).toStrictEqual({ max_tokens: 5, random_seed: 1 });
   });
 });

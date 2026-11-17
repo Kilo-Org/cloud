@@ -114,50 +114,82 @@ export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   }));
 }
 
+/** The three actions a whole-agent permission can hold. */
+type WholeAction = 'allow' | 'ask' | 'deny';
+
+/** Whether the stored permission is one action for every tool. */
+function isWholeAction(permission: AgentPermissionMap): permission is WholeAction {
+  return permission === 'allow' || permission === 'ask' || permission === 'deny';
+}
+
+/**
+ * The whole-agent action a stored permission applies to every tool at once, or
+ * `undefined` when the permission is a per-tool map (or absent). The switches
+ * cannot express such a rule: it governs tools this editor does not list.
+ */
+function wholeActionOf(permission: AgentPermissionMap): WholeAction | undefined {
+  if (isWholeAction(permission)) {
+    return permission;
+  }
+  return undefined;
+}
+
 /**
  * The per-tool map when the value is one, or an empty map when the permission
- * is the CLI's bare-action shorthand (`allow`/`ask`/`deny`) or absent. Mirrors
- * the web editor's `typeof permission !== 'object'` guard: a bare action means
- * "every tool at this level" and carries no per-tool rules.
+ * is the CLI's whole-agent action (`allow`/`ask`/`deny`) or absent. Mirrors the
+ * web editor's check: a whole-agent action means "every tool at this level" and
+ * carries no per-tool rules.
  */
 function permissionMapOf(permission: AgentPermissionMap): Readonly<Record<string, unknown>> {
-  if (
-    permission == null ||
-    permission === 'allow' ||
-    permission === 'ask' ||
-    permission === 'deny'
-  ) {
+  if (permission == null || isWholeAction(permission)) {
     return {};
   }
   return permission;
 }
 
+/** The whole-agent action of a stored permission, for the read-only note. */
+export function readWholeToolAction(permission: AgentPermissionMap): string | undefined {
+  return wholeActionOf(permission);
+}
+
 /**
  * The tools denied for this agent. Only a simple string rule of `deny` counts;
- * per-pattern maps and other actions are left alone, matching the web editor.
+ * per-pattern maps and other actions are left alone. A whole-agent `deny`
+ * denies every tool.
  */
 export function readDisabledTools(permission: AgentPermissionMap): string[] {
+  if (wholeActionOf(permission) === 'deny') {
+    return [...PERMISSION_TOOLS];
+  }
   const map = permissionMapOf(permission);
   return PERMISSION_TOOLS.filter(tool => map[tool] === 'deny');
 }
 
 /**
- * Apply the UI's disable toggles onto the existing permission map, preserving
- * any per-pattern rules and unrelated tool keys. Toggling a tool off writes
- * `deny`; toggling it back on clears a simple string rule but leaves a
- * per-pattern map alone. An empty result becomes `undefined` so the config
- * carries no empty permission object.
+ * Apply the UI's disable toggles onto the existing permission map.
+ *
+ * A tool the user switches off gets `deny`. A stored `deny` on a tool the user
+ * switches on is cleared. Every other stored rule stays exactly as loaded:
+ * per-tool `ask`/`allow`, per-pattern maps, the `null` sentinel, and tool keys
+ * this editor does not list. A tool whose switch ends where it started keeps
+ * its loaded rule.
+ *
+ * A whole-agent permission (one action for every tool) applies to tools this
+ * editor does not list, so it is returned as the stored value.
  */
 export function mergePermissions(
   existing: AgentPermissionMap,
   disabledTools: readonly string[]
-): Record<string, unknown> | undefined {
+): Record<string, unknown> | string | undefined {
+  const wholeAction = wholeActionOf(existing);
+  if (wholeAction !== undefined) {
+    return wholeAction;
+  }
   const base = new Map(Object.entries(permissionMapOf(existing)));
   for (const tool of PERMISSION_TOOLS) {
     if (disabledTools.includes(tool)) {
       base.set(tool, 'deny');
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- permission values are an open rule union; a string arm is the only clearable one
-    } else if (typeof base.get(tool) === 'string') {
+    } else if (base.get(tool) === 'deny') {
       base.delete(tool);
     }
   }

@@ -3,6 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { withPlatformRepositoryMode } from '@/lib/code-reviews/core/repository-mode';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 
@@ -36,7 +37,10 @@ export async function setReviewAnalyticsEnabled(input: {
   enabled: boolean;
   createdBy: string;
 }): Promise<boolean> {
-  const config = createDefaultCodeReviewConfig({ reviewAnalyticsEnabled: input.enabled });
+  const config = withPlatformRepositoryMode(
+    input.platform,
+    createDefaultCodeReviewConfig({ reviewAnalyticsEnabled: input.enabled })
+  );
   const updatedConfig = sql<CodeReviewAgentConfig | Record<string, unknown>>`jsonb_set(
     CASE
       WHEN jsonb_typeof(${agent_configs.config}) = 'object' THEN ${agent_configs.config}

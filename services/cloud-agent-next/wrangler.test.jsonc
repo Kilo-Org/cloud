@@ -2,13 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "cloud-agent-test",
   "main": "test/test-worker.ts",
-  "compatibility_date": "2026-06-03",
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
     "WORKER_URL": "https://worker.example.com",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
-    // Fake-provider tests have no Postgres binding. Capacity queries run in the Postgres suite.
-    "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
   },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "durable_objects": {
@@ -41,6 +40,11 @@
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
       },
+      { "class_name": "SentrySessionProbe", "name": "SENTRY_SESSION_PROBE" },
+      { "class_name": "SentryLegacySessionProbe", "name": "SENTRY_LEGACY_SESSION_PROBE" },
+      { "class_name": "SentrySandboxControlProbe", "name": "SENTRY_SANDBOX_CONTROL_PROBE" },
+      { "class_name": "SentrySandboxContainerProbe", "name": "SENTRY_SANDBOX_CONTAINER_PROBE" },
+      { "class_name": "SentryDisabledProbe", "name": "SENTRY_DISABLED_PROBE" },
     ],
   },
   "migrations": [
@@ -72,9 +76,23 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v13",
     },
+    {
+      "new_sqlite_classes": [
+        "SentrySessionProbe",
+        "SentryLegacySessionProbe",
+        "SentrySandboxControlProbe",
+        "SentrySandboxContainerProbe",
+        "SentryDisabledProbe",
+      ],
+      "tag": "sentry-probes",
+    },
   ],
   "r2_buckets": [
     { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-runtime-test" },
+    {
+      "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+      "bucket_name": "cloud-agent-workspace-artifacts-test",
+    },
   ],
   "queues": {
     "producers": [

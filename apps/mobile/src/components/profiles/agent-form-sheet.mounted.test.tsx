@@ -2,11 +2,12 @@
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
+import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
@@ -78,6 +79,13 @@ function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
 
 function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+/** The per-tool switches, one per entry in the tool list. */
+function toolSwitches(root: ReactTestInstance): ReactTestInstance[] {
+  return findAll(root, 'Switch').filter(node =>
+    PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
+  );
 }
 
 function findField(root: ReactTestInstance, label: string): ReactTestInstance {
@@ -181,6 +189,19 @@ function mountSheet(
   existingSlugs: readonly string[] = [],
   draftScope?: string
 ) {
+  return mountSheetWith(agent, { existingSlugs, draftScope });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
+function mountSheetWith(
+  agent: AgentSource | null,
+  options: {
+    existingSlugs?: readonly string[];
+    draftScope?: string;
+    saveFailure?: AgentSaveFailure | null;
+  } = {}
+) {
+  const { existingSlugs = [], draftScope, saveFailure = null } = options;
   return renderWithProviders(
     createElement(AgentFormSheet, {
       draftScope,
@@ -188,6 +209,7 @@ function mountSheet(
       existingSlugs,
       organizationId: undefined,
       isSaving: false,
+      saveFailure,
       onClose: () => {
         h.onClose();
       },
@@ -233,6 +255,57 @@ describe('AgentFormSheet parity fields', () => {
         node => node.props.accessibilityLabel === tool
       );
       expect(switches).toHaveLength(1);
+    }
+
+    unmount();
+  });
+
+  it('shows a whole-agent rule as read-only switches with a note naming it', async () => {
+    const wholeRule = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...wholeRule,
+      config: { ...wholeRule.config, permission: 'ask' },
+    });
+
+    const switches = toolSwitches(renderer.root);
+    expect(switches).toHaveLength(PERMISSION_TOOLS.length);
+    for (const node of switches) {
+      expect(node.props.disabled).toBe(true);
+      expect(node.props.value).toBe(true);
+    }
+    // The note renders the catalog sentence with the stored action filled in.
+    const note = i18n.t('profiles.agents.wholeToolRule', { rule: 'ask' });
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === note)).toBe(true);
+
+    unmount();
+  });
+
+  it('denies every tool when the stored whole-agent rule is an outright denial', async () => {
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: { ...base.config, permission: 'deny' },
+    });
+
+    for (const node of toolSwitches(renderer.root)) {
+      expect(node.props.disabled).toBe(true);
+      expect(node.props.value).toBe(false);
+    }
+
+    unmount();
+  });
+
+  it('leaves a per-tool map editable', async () => {
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: { ...base.config, permission: { bash: 'deny', read: 'ask' } },
+    });
+
+    const switches = toolSwitches(renderer.root);
+    expect(switches).toHaveLength(PERMISSION_TOOLS.length);
+    for (const node of switches) {
+      expect(node.props.disabled).toBe(false);
     }
 
     unmount();
@@ -433,6 +506,37 @@ describe('AgentFormSheet refused save', () => {
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 508, animated: true });
     expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('AgentFormSheet save refusal copy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('names the cap in the warn tone when a create is refused past it', async () => {
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'limit' } });
+
+    const cap = i18n.t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === cap);
+
+    expect(status?.props.className).toContain('text-warn');
+    expect(status?.props.className).not.toContain('text-destructive');
+
+    unmount();
+  });
+
+  it('shows any other refused create in the destructive tone', async () => {
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'refused' } });
+
+    const failed = i18n.t('profiles.agents.saveFailed');
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === failed);
+
+    expect(status?.props.className).toContain('text-destructive');
 
     unmount();
   });

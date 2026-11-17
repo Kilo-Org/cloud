@@ -17,7 +17,6 @@ import {
   Shield,
   Key,
   Webhook,
-  Factory,
   Settings,
   CreditCard,
   MessageSquare,
@@ -30,7 +29,6 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -47,10 +45,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
-
-  // Feature flags
-  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -149,15 +143,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    ...(isGastownEnabled || isDevelopment
-      ? [
-          {
-            title: 'Gas Town',
-            icon: Factory,
-            url: '/gastown',
-          },
-        ]
-      : []),
   ];
 
   // Account group

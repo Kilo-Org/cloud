@@ -23,6 +23,7 @@ import {
   AGENT_SETUP_FAILURE_METRIC,
   COLLECTION_METRIC,
   PRODUCT_ORIGINS,
+  RUNTIME_HARNESS_BUCKETS,
   assembleExecutionHeadlines,
   assembleFailureRows,
   assembleSetupFailureRows,
@@ -33,6 +34,7 @@ import {
   type OutcomeRole,
   type ProductOrigin,
   type RunCountRow,
+  type RuntimeHarnessBucket,
   type SessionSetupFailureRow,
 } from './outcome-aggregate.js';
 
@@ -81,6 +83,7 @@ function runRow(input: {
   generation: OutcomeGeneration;
   role: OutcomeRole;
   origin: ProductOrigin;
+  runtimeHarness?: RuntimeHarnessBucket;
   status: 'completed' | 'failed' | 'interrupted' | 'queued' | 'accepted';
   responsibility?: string;
   runCount: number;
@@ -92,6 +95,7 @@ function runRow(input: {
     generation: input.generation,
     role: input.role,
     origin: input.origin,
+    runtimeHarness: input.runtimeHarness ?? 'kilo',
     status: input.status,
     responsibility: (input.responsibility ?? 'unknown') as RunCountRow['responsibility'],
     failureStage: input.failureStage ?? 'unknown',
@@ -161,23 +165,29 @@ describe('execution outcome window', () => {
 });
 
 describe('execution headline assembly', () => {
-  it('emits every generation, role and origin with explicit zeros', () => {
+  it('emits every generation, role, origin and runtime harness with explicit zeros', () => {
     const headlines = assembleExecutionHeadlines([]);
-    expect(headlines).toHaveLength(12);
-    expect(headlines.map(row => `${row.generation}/${row.role}/${row.productOrigin}`)).toEqual([
-      'legacy/initial/code-review',
-      'legacy/initial/other',
-      'legacy/initial/unknown',
-      'legacy/follow_up/code-review',
-      'legacy/follow_up/other',
-      'legacy/follow_up/unknown',
-      'control/initial/code-review',
-      'control/initial/other',
-      'control/initial/unknown',
-      'control/follow_up/code-review',
-      'control/follow_up/other',
-      'control/follow_up/unknown',
-    ]);
+    expect(headlines).toHaveLength(36);
+    expect(
+      headlines.map(
+        row => `${row.generation}/${row.role}/${row.productOrigin}/${row.runtimeHarness}`
+      )
+    ).toEqual(
+      [
+        'legacy/initial/code-review',
+        'legacy/initial/other',
+        'legacy/initial/unknown',
+        'legacy/follow_up/code-review',
+        'legacy/follow_up/other',
+        'legacy/follow_up/unknown',
+        'control/initial/code-review',
+        'control/initial/other',
+        'control/initial/unknown',
+        'control/follow_up/code-review',
+        'control/follow_up/other',
+        'control/follow_up/unknown',
+      ].flatMap(cell => RUNTIME_HARNESS_BUCKETS.map(harness => `${cell}/${harness}`))
+    );
     for (const headline of headlines) {
       expect(headline).toMatchObject({
         completed: 0,
@@ -299,6 +309,7 @@ describe('failure breakdown assembly', () => {
         generation: 'legacy',
         role: 'initial',
         productOrigin: 'other',
+        runtimeHarness: 'kilo',
         responsibility: 'platform',
         stage: 'pre_dispatch',
         code: 'sandbox_connect_failed',
@@ -347,6 +358,49 @@ describe('failure breakdown assembly', () => {
         (headline?.userFailed ?? 0) +
         (headline?.unknownFailed ?? 0)
     );
+  });
+});
+
+describe('runtime harness split', () => {
+  it('keeps Kilo v1, v2 and unreported runs in separate headline and failure rows', () => {
+    const cell = { generation: 'control', role: 'initial', origin: 'other' } as const;
+    const runCounts: RunCountRow[] = [
+      runRow({ ...cell, runtimeHarness: 'kilo', status: 'completed', runCount: 5 }),
+      runRow({ ...cell, runtimeHarness: 'kilo2', status: 'completed', runCount: 2 }),
+      runRow({
+        ...cell,
+        runtimeHarness: 'kilo2',
+        status: 'failed',
+        responsibility: 'platform',
+        runCount: 1,
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        failureReason: 'assistant_unknown',
+      }),
+      runRow({ ...cell, runtimeHarness: 'unknown', status: 'interrupted', runCount: 4 }),
+    ];
+
+    const headlines = assembleExecutionHeadlines(runCounts).filter(
+      row =>
+        row.generation === cell.generation &&
+        row.role === cell.role &&
+        row.productOrigin === cell.origin
+    );
+    expect(
+      headlines.map(({ runtimeHarness, completed, platformFailed, interrupted }) => ({
+        runtimeHarness,
+        completed,
+        platformFailed,
+        interrupted,
+      }))
+    ).toEqual([
+      { runtimeHarness: 'kilo', completed: 5, platformFailed: 0, interrupted: 0 },
+      { runtimeHarness: 'kilo2', completed: 2, platformFailed: 1, interrupted: 0 },
+      { runtimeHarness: 'unknown', completed: 0, platformFailed: 0, interrupted: 4 },
+    ]);
+    expect(assembleFailureRows(runCounts)).toEqual([
+      expect.objectContaining({ runtimeHarness: 'kilo2', responsibility: 'platform', count: 1 }),
+    ]);
   });
 });
 
@@ -446,6 +500,12 @@ describe('cloud agent outcome aggregate wiring', () => {
     const reason = render(runSelect.failureReason as SQL);
     expect(reason.sql).toContain('coalesce("cloud_agent_session_runs"."failure_reason", ');
 
+    const runtimeHarness = render(runSelect.runtimeHarness as SQL);
+    expect(runtimeHarness.sql).toContain(
+      `"cloud_agent_session_runs"."container"->>'runtimeHarness' in ('kilo', 'kilo2')`
+    );
+    expect(runtimeHarness.sql).toContain(`else 'unknown' end`);
+
     const setupGeneration = render(setupSelect.generation as SQL);
     expect(setupGeneration.sql).toMatch(
       /left\("cloud_agent_sessions"\."cloud_agent_session_id", \$1\) = \$2/
@@ -465,17 +525,17 @@ describe('cloud agent outcome aggregate wiring', () => {
 });
 
 describe('runCloudAgentOutcomeCollection emission', () => {
-  it('emits exactly 12 zero agent_execution rows for one closed bucket and no failure rows', async () => {
+  it('emits exactly 36 zero agent_execution rows for one closed bucket and no failure rows', async () => {
     getPgDbMock.mockReturnValue(makeDb([[], []]).db);
 
     await runCloudAgentOutcomeCollection({} as never, new Date('2026-02-01T00:10:00.000Z'));
 
-    expect(loggerMock.info).toHaveBeenCalledTimes(12);
+    expect(loggerMock.info).toHaveBeenCalledTimes(36);
     expect(loggerMock.error).not.toHaveBeenCalled();
     const records = loggerMock.withFields.mock.calls.map(
       ([fields]) => fields as Record<string, unknown>
     );
-    expect(records).toHaveLength(12);
+    expect(records).toHaveLength(36);
     for (const record of records) {
       expect(record.metric).toBe(AGENT_EXECUTION_METRIC);
       expect(record.observedAt).toBe('2026-02-01T00:10:00.000Z');
@@ -549,6 +609,7 @@ describe('runCloudAgentOutcomeCollection emission', () => {
       generation: 'legacy',
       role: 'initial',
       productOrigin: 'code-review',
+      runtimeHarness: 'kilo',
       responsibility: 'platform',
       stage: 'pre_dispatch',
       code: 'sandbox_connect_failed',
@@ -600,7 +661,7 @@ describe('runCloudAgentOutcomeCollection emission', () => {
       count: 1,
     });
     const headlines = records.filter(record => record.metric === AGENT_EXECUTION_METRIC);
-    expect(headlines).toHaveLength(12);
+    expect(headlines).toHaveLength(36);
     const headline = headlines.find(
       record =>
         record.generation === 'legacy' &&

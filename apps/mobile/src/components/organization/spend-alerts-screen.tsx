@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -38,10 +38,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatList, formatMoney, formatNumber } from '@/lib/format';
+import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
@@ -131,6 +132,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     return (
       <OrganizationBoundary
         title={t('notifications.channel.spend')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationId}
       />
     );
@@ -145,7 +147,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('notifications.channel.spend')} />
+        <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
         <QueryError
           className="bg-background"
           message={t('spendAlerts.loadError')}
@@ -162,7 +164,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
@@ -285,7 +287,7 @@ function SpendAlertsForm({
   const spend7d = spend?.spend7dMicrodollars ?? 0;
   const hasSpend = spend24h > 0 || spend7d > 0;
   const spendValue = hasSpend
-    ? formatMoney(fromMicrodollars(spend24h), i18n.language)
+    ? formatPrefixedMoney(fromMicrodollars(spend24h), i18n.language)
     : t('spendAlerts.noSpend');
 
   const windowOptions: readonly { value: WindowOption; label: string }[] = [
@@ -416,7 +418,7 @@ function SpendAlertsForm({
       )}
 
       <Button disabled={!canSave} loading={save.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </>
   );
@@ -428,7 +430,11 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={scopeLabel} value={scopeName} selectable />
+        {/* The owner of the alert is a name, not an identifier: it paints in the
+            sans face, like the row label and the empty amount below it, while
+            the amount keeps the code face because that is the value someone
+            copies. The name stays selectable all the same. */}
+        <KvRow label={scopeLabel} value={scopeName} valueFace="text" selectable />
         {/* A selectable value is exempt from the row's one-line clamp (Android's
             selection path re-applies selection and drops it), so only the amount
             — the value someone copies — is selectable. The empty placeholder is
@@ -438,14 +444,22 @@ function SpendAlertsForm({
           label={t('spendAlerts.spend24h')}
           value={spendValue}
           valueFace={hasSpend ? 'mono' : 'text'}
+          // An amount's symbol is neutral to the paragraph's direction, so the
+          // run carries its own left-to-right order; the empty placeholder is a
+          // sentence and keeps the paragraph's.
+          valueDirection={hasSpend ? 'ltr' : undefined}
           selectable={hasSpend}
           last
         />
       </View>
 
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+      {/* One 44dp row on the same 10.5dp inset as the KvRow card above: the
+          switch's own box sets the height, so the card adds no vertical
+          padding of its own. The switch's end inset lives in CardSwitch, so
+          every switch on the screen ends level with the label's start. */}
+      <View className="min-h-11 flex-row items-center justify-between rounded-lg bg-secondary px-3">
         <Text className="text-sm font-medium">{t('spendAlerts.sendAlerts')}</Text>
-        <Switch
+        <CardSwitch
           accessibilityLabel={t('spendAlerts.sendAlerts')}
           value={enabled}
           onValueChange={value => {
@@ -574,6 +588,29 @@ function SpendAlertsForm({
   );
 }
 
+/**
+ * The shared `Switch`, pulled out to sit level with the row's label.
+ *
+ * The card ends its content at `px-3` = 10.5dp (the native rem here is 14dp),
+ * and the label's ink starts about 10dp in. An unpulled switch's painted end
+ * (the thumb at its travel limit, about 3dp past the track's own end) lands
+ * about 14dp from the card edge, visibly deeper than the label. Pulling the
+ * node out by one spacing unit (`-me-1` = 3.5dp) puts the painted thumb end
+ * about 10–11dp from the edge, level with the label's start, and keeps about
+ * 7dp of the node's hit area inside the card.
+ *
+ * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
+ * the writing direction, where a hand-picked `-mr-1` would land on the label's
+ * side under RTL.
+ */
+function CardSwitch(props: ComponentProps<typeof Switch>) {
+  return (
+    <View className="-me-1">
+      <Switch {...props} />
+    </View>
+  );
+}
+
 type RuleCardProps = Readonly<{
   title: string;
   subtitle: string;
@@ -614,14 +651,19 @@ function RuleCard({
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <View className="flex-1 pr-3">
+      {/* Same 10.5dp scale as the cards around it: px-3 matches the KvRow card
+          above, and py-3 is that card's row padding, so the title and subtitle
+          keep 10.5dp from the card's edges. The switch's own box is taller than a
+          single line and taller than the two-line block, so it sets nothing
+          here. */}
+      <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+        <View className="flex-1 pe-3">
           <Text className="text-sm font-medium">{title}</Text>
           <Text variant="muted" className="mt-0.5 text-xs">
             {subtitle}
           </Text>
         </View>
-        <Switch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
+        <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
       </View>
 
       {children}
@@ -631,7 +673,7 @@ function RuleCard({
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
               into the switch label, so the two Email rows stay distinct. */}
-          <Switch
+          <CardSwitch
             accessibilityLabel={emailLabel}
             value={emailEnabled}
             onValueChange={onEmailChange}
@@ -654,7 +696,7 @@ function RuleCard({
         ) : (
           <View className="min-h-11 flex-row items-center justify-between">
             <Text className="text-sm">{t('notifications.push')}</Text>
-            <Switch
+            <CardSwitch
               accessibilityLabel={pushLabel}
               value={pushEnabled}
               onValueChange={onPushChange}
@@ -684,14 +726,14 @@ function SpendAlertsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView className="flex-1" contentContainerClassName="px-4 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         {/* The scope group holds two KvRows now (the scope owner and the 24 h
             spend); each row is py-3 (24) plus a text-sm line (20) = 44, so the
             block reserves 88 and the loaded rows swap in without moving Save. */}
         <Skeleton className="h-[88px] rounded-lg" />
-        <Skeleton className="h-[56px] rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
         <RuleCardSkeleton />
         <RuleCardSkeleton />
         <Skeleton className="h-11 rounded-md" />

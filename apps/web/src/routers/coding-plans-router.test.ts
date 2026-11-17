@@ -12,6 +12,11 @@ import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
+import {
+  TEST_BYOK_DATA_KEY,
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
@@ -197,6 +202,8 @@ function usageResponse() {
     { status: 200, headers: { 'content-type': 'application/json' } }
   );
 }
+
+useFakeByokKms();
 
 beforeEach(() => {
   mockedGetBytePlusUsage.mockResolvedValue({
@@ -631,7 +638,7 @@ describe('coding plans router', () => {
       .values({
         kilo_user_id: owner.id,
         provider_id: 'minimax',
-        encrypted_api_key: encryptApiKey(managedKey, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope(managedKey),
         management_source: 'coding_plan',
         created_by: owner.id,
       })
@@ -1511,7 +1518,7 @@ describe('coding plans router', () => {
       .values({
         kilo_user_id: user.id,
         provider_id: 'minimax',
-        encrypted_api_key: encryptApiKey('coding-plan-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('coding-plan-secret'),
         management_source: 'coding_plan',
         created_by: user.id,
       })
@@ -1666,7 +1673,7 @@ describe('coding plans router', () => {
         kilo_user_id: user.id,
         organization_id: null,
         provider_id: 'minimax',
-        encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('assigned-old-secret'),
         management_source: 'coding_plan',
         created_by: user.id,
       })
@@ -1721,9 +1728,9 @@ describe('coding plans router', () => {
     expect(decryptApiKey(replacedAssigned.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(
       'assigned-replacement-key'
     );
-    expect(decryptApiKey(replacedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-      'assigned-replacement-key'
-    );
+    expect(
+      decryptApiKey(replacedByok.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
+    ).toBe('assigned-replacement-key');
 
     await expect(
       caller.codingPlans.adminReplaceInventoryCredential({
@@ -1762,7 +1769,7 @@ describe('coding plans router', () => {
     });
   });
 
-  it('writes a fresh envelope alongside the legacy key when replacing an assigned credential', async () => {
+  it('writes a fresh envelope when replacing an assigned credential', async () => {
     const kms = mockKms();
     try {
       const admin = await insertTestUser({ is_admin: true });
@@ -1779,7 +1786,6 @@ describe('coding plans router', () => {
           kilo_user_id: user.id,
           organization_id: null,
           provider_id: 'minimax',
-          encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
           encrypted_api_key_envelope: STALE_ENVELOPE,
           management_source: 'coding_plan',
           created_by: user.id,
@@ -1810,9 +1816,6 @@ describe('coding plans router', () => {
         .select()
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, installedByok.id));
-      expect(decryptApiKey(replacedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-        'assigned-replacement-key'
-      );
       expect(replacedByok.encrypted_api_key_envelope).toMatchObject({
         wrapped_dek: 'wrapped',
         kms_key_id: 'alias/test',
@@ -1834,7 +1837,7 @@ describe('coding plans router', () => {
     }
   });
 
-  it('writes a fresh envelope alongside the legacy key when reassigning a subscription credential', async () => {
+  it('writes a fresh envelope when reassigning a subscription credential', async () => {
     const kms = mockKms();
     try {
       const admin = await insertTestUser({ is_admin: true });
@@ -1855,7 +1858,6 @@ describe('coding plans router', () => {
           kilo_user_id: user.id,
           organization_id: null,
           provider_id: 'minimax',
-          encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
           encrypted_api_key_envelope: STALE_ENVELOPE,
           management_source: 'coding_plan',
           created_by: user.id,
@@ -1890,9 +1892,6 @@ describe('coding plans router', () => {
         .select()
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, installedByok.id));
-      expect(decryptApiKey(reassignedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-        'pooled-secret'
-      );
       expect(reassignedByok.encrypted_api_key_envelope).toMatchObject({
         wrapped_dek: 'wrapped',
         kms_key_id: 'alias/test',
@@ -1913,61 +1912,57 @@ describe('coding plans router', () => {
     }
   });
 
-  it('clears a stale envelope when reassigning without the KMS service configured', async () => {
-    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+  it('refuses to reassign a subscription credential without the KMS service configured', async () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
-    try {
-      const admin = await insertTestUser({ is_admin: true });
-      const user = await insertTestUser();
-      const previous = await insertInventory({
-        encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
-        credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
-        status: 'assigned',
-        assigned_to_user_id: user.id,
-      });
-      await insertInventory({
-        encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
-        credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
-      });
-      const [installedByok] = await db
-        .insert(byok_api_keys)
-        .values({
-          kilo_user_id: user.id,
-          organization_id: null,
-          provider_id: 'minimax',
-          encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
-          encrypted_api_key_envelope: STALE_ENVELOPE,
-          management_source: 'coding_plan',
-          created_by: user.id,
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const previous = await insertInventory({
+      encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+    });
+    const pooled = await insertInventory({
+      encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
+    });
+    const [installedByok] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: user.id,
+        organization_id: null,
+        provider_id: 'minimax',
+        encrypted_api_key_envelope: STALE_ENVELOPE,
+        management_source: 'coding_plan',
+        created_by: user.id,
+      })
+      .returning();
+    const [subscription] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          key_inventory_id: previous.id,
+          installed_byok_key_id: installedByok.id,
+          status: 'active',
         })
-        .returning();
-      const [subscription] = await db
-        .insert(coding_plan_subscriptions)
-        .values(
-          subscriptionValues(user.id, {
-            key_inventory_id: previous.id,
-            installed_byok_key_id: installedByok.id,
-            status: 'active',
-          })
-        )
-        .returning();
-      const caller = await createCallerForUser(admin.id);
+      )
+      .returning();
+    const caller = await createCallerForUser(admin.id);
 
-      await caller.codingPlans.adminReassignSubscriptionCredential({
-        subscriptionId: subscription.id,
-      });
+    await expect(
+      caller.codingPlans.adminReassignSubscriptionCredential({ subscriptionId: subscription.id })
+    ).rejects.toThrow('Unable to create an encryption key for the credential. Try again.');
 
-      const [reassignedByok] = await db
-        .select()
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.id, installedByok.id));
-      expect(decryptApiKey(reassignedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-        'pooled-secret'
-      );
-      expect(reassignedByok.encrypted_api_key_envelope).toBeNull();
-    } finally {
-      if (originalUrl !== undefined) process.env.BYOK_KMS_SERVICE_URL = originalUrl;
-    }
+    const [unchangedByok] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, installedByok.id));
+    const [unchangedPooled] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, pooled.id));
+    expect(unchangedByok.encrypted_api_key_envelope).toEqual(STALE_ENVELOPE);
+    expect(unchangedPooled.status).toBe('available');
   });
 
   it('rejects inventory replacement after the stored credential identity changes', async () => {

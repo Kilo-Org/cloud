@@ -3,7 +3,7 @@ import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isKimiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   BedrockCredentialsSchema,
   type BedrockCredentials,
@@ -13,6 +13,7 @@ import type {
   DirectByokProvider,
   DirectByokUpstream,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { credentialHeaders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   ReasoningDetailsTransform,
   type GatewayChatApiKind,
@@ -145,7 +146,8 @@ export default {
     }
     dropThinkingBlocksOnPrefixMismatch(context);
   },
-  models: cachedEnhancedDirectByokModelList({ providerId: 'bedrock-byok', recommendedModels: [] }),
+  models: cachedDirectByokModelList('bedrock-byok'),
+  chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model }) {
     return resolveAwsBedrockUpstream(credential, model);
   },

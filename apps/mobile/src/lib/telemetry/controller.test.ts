@@ -153,25 +153,6 @@ describe('clearTelemetryDecision', () => {
   });
 });
 
-describe('resetTelemetryControllerForTests', () => {
-  it('resets every module-level variable', () => {
-    // generation increments only on account change.
-    // From undefined to the first decision is not a change.
-    setTelemetryDecision('acct-1', true);
-    setTelemetryDecision('acct-2', true);
-    expect(currentGeneration()).toBeGreaterThan(0);
-    expect(currentEpoch()).toBeGreaterThan(0);
-    expect(allowsMandatory()).toBe(true);
-
-    resetTelemetryControllerForTests();
-    expect(currentGeneration()).toBe(0);
-    expect(currentEpoch()).toBe(0);
-    expect(allowsMandatory()).toBe(false);
-    expect(allowsOptional()).toBe(false);
-    expect(currentAccountId()).toBeUndefined();
-  });
-});
-
 describe('currentAccountId', () => {
   it('returns undefined before any decision', () => {
     expect(currentAccountId()).toBeUndefined();
@@ -260,17 +241,5 @@ describe('subscribeToTelemetryGeneration', () => {
 
     unsubscribeThrowing();
     unsubscribeSecond();
-  });
-
-  it('does not notify on the test-only reset', () => {
-    const listener = vi.fn<() => void>();
-    const unsubscribe = subscribeToTelemetryGeneration(listener);
-    setTelemetryDecision('acct-1', true);
-    listener.mockClear();
-
-    resetTelemetryControllerForTests();
-
-    expect(listener).not.toHaveBeenCalled();
-    unsubscribe();
   });
 });

@@ -51,6 +51,7 @@ export {
 export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
 
 // Profile CRUD + lookups
+export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
   updateProfile,
@@ -130,6 +131,9 @@ export {
 
 export type { SkillsShSource } from './skills-sh';
 
+// Size-limit copy shared by the profile and runtime contracts
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from './contracts/limit-copy';
+
 // Agent CRUD + session helpers
 export {
   MAX_PROFILE_AGENTS,
@@ -181,6 +185,7 @@ export {
   instructionCreateInputSchema,
   instructionUpdateInputSchema,
   listInstructionsForProfile,
+  getProfileInstructions,
   createInstruction,
   updateInstruction,
   deleteInstruction,
@@ -220,6 +225,25 @@ export {
   type SandboxAllocationCandidates,
   type RepositoryAllocationSetting,
 } from './sandbox-allocation-settings-service';
+
+// User-scoped built-in agent overrides (model, variant, visibility)
+export {
+  CLOUD_AGENT_BUILTIN_AGENTS,
+  CLOUD_AGENT_BUILTIN_AGENT_SLUGS,
+  BuiltinAgentOverrideSchema,
+  BuiltinAgentSettingsSchema,
+  BuiltinAgentSettingsInputSchema,
+  getCloudAgentBuiltinAgent,
+  normalizeBuiltinAgentSettings,
+  hasBuiltinAgentSettings,
+  MAX_BUILTIN_AGENT_MODEL_LENGTH,
+  MAX_BUILTIN_AGENT_VARIANT_LENGTH,
+  type CloudAgentBuiltinAgentDefinition,
+  type CloudAgentBuiltinAgentSlug,
+  type BuiltinAgentOverride,
+  type BuiltinAgentSettings,
+} from './builtin-agents';
+export { getBuiltinAgentSettings, setBuiltinAgentSettings } from './builtin-agent-settings-service';
 
 // Local config import (preview diff + selective upsert)
 export {

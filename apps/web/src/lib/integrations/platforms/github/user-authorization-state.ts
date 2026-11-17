@@ -1,4 +1,8 @@
 import 'server-only';
+import {
+  GitHubIdentityPreconditionSchema,
+  type GitHubIdentityPrecondition,
+} from '@kilocode/db/github-identity';
 
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
@@ -15,6 +19,7 @@ const STATE_PREFIX = 'github-user-authorization:';
 const PKCE_TTL_SECONDS = OAUTH_STATE_TTL_SECONDS + 5;
 const StatePayloadSchema = z.object({
   verifierRef: z.string().min(1),
+  expected: GitHubIdentityPreconditionSchema,
 });
 
 export type GitHubUserAuthorizationState = {
@@ -23,7 +28,8 @@ export type GitHubUserAuthorizationState = {
 };
 
 export async function createGitHubUserAuthorizationState(
-  userId: string
+  userId: string,
+  expected: GitHubIdentityPrecondition
 ): Promise<GitHubUserAuthorizationState> {
   const codeVerifier = randomBytes(32).toString('base64url');
   const verifierRef = randomBytes(16).toString('base64url');
@@ -36,7 +42,9 @@ export async function createGitHubUserAuthorizationState(
     throw new Error('GitHub user authorization requires configured transient state storage');
   }
 
-  const encodedPayload = Buffer.from(JSON.stringify({ verifierRef })).toString('base64url');
+  const encodedPayload = Buffer.from(JSON.stringify({ verifierRef, expected })).toString(
+    'base64url'
+  );
   const state = createOAuthState(`${STATE_PREFIX}${encodedPayload}`, userId, undefined, {
     provider: 'github',
   });
@@ -46,7 +54,7 @@ export async function createGitHubUserAuthorizationState(
 }
 
 export type GitHubUserAuthorizationStateResult =
-  | { status: 'consumed'; codeVerifier: string }
+  | { status: 'consumed'; codeVerifier: string; expected: GitHubIdentityPrecondition }
   | {
       status: 'invalid';
       reason:
@@ -75,24 +83,24 @@ export async function consumeGitHubUserAuthorizationState(
   }
 
   const encodedPayload = verified.state.owner.slice(STATE_PREFIX.length);
-  let verifierRef: string;
+  let payload: z.infer<typeof StatePayloadSchema>;
   try {
     const parsed = StatePayloadSchema.safeParse(
       JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'))
     );
     if (!parsed.success) return { status: 'invalid', reason: 'payload_invalid' };
-    verifierRef = parsed.data.verifierRef;
+    payload = parsed.data;
   } catch {
     return { status: 'invalid', reason: 'payload_invalid' };
   }
 
+  // The signed state carries the precondition. Redis holds only the PKCE verifier.
   try {
     const codeVerifier = await redisClient.getdel<string>(
-      githubUserAuthorizationPkceRedisKey(verifierRef)
+      githubUserAuthorizationPkceRedisKey(payload.verifierRef)
     );
-    return codeVerifier
-      ? { status: 'consumed', codeVerifier }
-      : { status: 'invalid', reason: 'verifier_missing' };
+    if (!codeVerifier) return { status: 'invalid', reason: 'verifier_missing' };
+    return { status: 'consumed', codeVerifier, expected: payload.expected };
   } catch {
     return { status: 'storage_error', reason: 'storage_unavailable' };
   }

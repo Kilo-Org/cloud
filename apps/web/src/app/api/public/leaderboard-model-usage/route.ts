@@ -9,9 +9,11 @@ import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redi
 const LEADERBOARD_MODEL_USAGE_QUERY = `
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
-    , coalesce(mu.requested_model, mu.model) as "model"
     , case
-        when mu.feature ilike '%claw%' then 'kiloclaw'
+        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
+        else coalesce(mu.requested_model, mu.model)
+      end as "model"
+    , case
         when mu.mode ilike '%code%' then 'code'
         when mu.mode ilike '%review%' then 'review'
         when mu.mode ilike '%plan%' then 'plan'
@@ -38,7 +40,7 @@ const modelUsageSchema = z.array(
   z.object({
     usageDate: z.string(),
     model: z.string().min(1),
-    mode: z.enum(['kiloclaw', 'code', 'review', 'plan', 'ask', 'debug']).nullable(),
+    mode: z.enum(['code', 'review', 'plan', 'ask', 'debug']).nullable(),
     tokens: z.number(),
   })
 );

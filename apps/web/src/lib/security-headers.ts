@@ -38,13 +38,15 @@ function webSocketOriginFromUrl(value: string | undefined): string | null {
 export function getConfiguredConnectSrcOrigins(
   env: Record<string, string | undefined> = process.env
 ): string[] {
+  const sessionSyncUrl =
+    env.NODE_ENV === 'development'
+      ? env.NEXT_PUBLIC_SESSION_SYNC_URL || 'http://localhost:8817'
+      : undefined;
   return compactUnique([
     originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
-    originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
-    webSocketOriginFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
-    originFromUrl(env.NEXT_PUBLIC_SESSION_SYNC_URL || 'https://session-sync.kiloapps.io'),
-    webSocketOriginFromUrl(env.NEXT_PUBLIC_SESSION_SYNC_URL || 'https://session-sync.kiloapps.io'),
+    originFromUrl(sessionSyncUrl),
+    webSocketOriginFromUrl(sessionSyncUrl),
   ]);
 }
 

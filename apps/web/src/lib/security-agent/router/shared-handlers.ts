@@ -1,3 +1,4 @@
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { createHash } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
@@ -265,13 +266,22 @@ async function resolveAuditReportOwner(
   };
 }
 
+/**
+ * When support access is ON the platform-admin unmask is removed, even for a
+ * real member admin; OFF preserves today's behavior.
+ */
+function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
+  if (isSupportAccessEnabled()) return false;
+  return ctx.user.is_admin;
+}
+
 async function logPlatformAdminAuditReportAccess(params: {
   ctx: TRPCContext;
   owner: SecurityAgentAuditReportOwner;
   periodStart: string;
   periodEndExclusive: string;
 }): Promise<void> {
-  if (!params.ctx.user.is_admin) return;
+  if (!platformAdminUnmaskEnabled(params.ctx)) return;
 
   const securityOwner =
     params.owner.type === 'organization'
@@ -308,7 +318,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     params.deps.resolveOwner(params.ctx, params.input)
   );
 
-  if (params.ctx.user.is_admin) {
+  if (platformAdminUnmaskEnabled(params.ctx)) {
     // `isRequestingUserKiloAdmin` below unmasks Kilo-admin and unattributed
     // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
     // before the query so an over-budget or failed report still attributes the
@@ -323,7 +333,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     const report = await getSecurityAgentAuditReport({
       owner,
       input: params.input,
-      isRequestingUserKiloAdmin: params.ctx.user.is_admin,
+      isRequestingUserKiloAdmin: platformAdminUnmaskEnabled(params.ctx),
     });
     await logPlatformAdminAuditReportAccess({
       ctx: params.ctx,

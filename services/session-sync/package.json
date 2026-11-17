@@ -6,9 +6,11 @@
     "dev": "wrangler dev --env local",
     "staging:config": "node scripts/render-staging-config.mjs \"$SESSION_SYNC_STAGING_RESOURCES\"",
     "staging:dry-run": "pnpm run staging:config && wrangler deploy --config .wrangler/wrangler.staging.json --dry-run --outdir .wrangler/staging-dry-run",
-    "test": "vitest run && node --test scripts/render-staging-config.test.mjs",
+    "test": "vitest run && node --test scripts/*.test.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
+    "perf:qualify": "node --import tsx scripts/perf-qualify.mjs",
+    "perf:budget": "node scripts/perf-budget.mjs",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-sync/src services/session-sync/test services/session-sync/scripts"
   },
@@ -27,8 +29,10 @@
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jsonc-parser": "3.3.1",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "ws": "8.21.0"
   }
 }

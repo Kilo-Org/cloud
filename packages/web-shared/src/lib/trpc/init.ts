@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
+import type { OrganizationAccess } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   cloudAgentAuthorityProcedureKind,
   cloudAgentAuthorityProcedures,
@@ -20,6 +21,7 @@ import {
 import {
   deriveCredentialKind,
   type AdminStepUpState,
+  type PrivilegedActionClass,
   type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
@@ -34,13 +36,14 @@ import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   getMinimumVersions,
-  isMobileClient,
 } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import {
   buildTimingLine,
   readClientDimensions,
   shouldLogTiming,
 } from '@kilocode/web-shared/lib/observability/request-timing';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import {
   controlPlanePathFromInfo,
   controlPlaneTypeFromInfo,
@@ -80,6 +83,12 @@ export type TRPCContext = {
    * on it can reuse the result instead of evaluating twice.
    */
   adminStepUpState?: AdminStepUpState;
+  /**
+   * Credential and privileged-inventory entry resolved once by the admin guard,
+   * so the step-up enforcement chained after it and specialized guards cannot
+   * name a different credential or action for the same request.
+   */
+  adminAttribution?: AdminAttribution;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -87,12 +96,24 @@ export type TRPCContext = {
   // to the exact procedure. Optional for the same reason as the fields above.
   trpcPath?: string;
   trpcType?: string;
+  /**
+   * Set by the organization procedure middlewares after one mode-aware
+   * resolution, so a resolver can tell `member`, `legacy_admin`, and
+   * `support` apart without re-querying.
+   */
+  organizationAccess?: OrganizationAccess;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by
   // `createTRPCContext` so the procedure middleware shares the same 10s window
   // as the shared auth read. Absent for web/CLI callers and test constructors.
   controlPlaneStartedAt?: number;
+  /**
+   * Read client for model-stats snapshot loads. The gateway's REST facet sets
+   * `readDb` because its handlers run in `sfo1`; the web app leaves it unset and
+   * loads through the primary, which it must after a write invalidation.
+   */
+  fromDb?: ModelStatsLoadClient;
 };
 
 /**
@@ -103,6 +124,8 @@ export type TRPCContext = {
 export type CreateTRPCContextOpts = {
   req?: Request;
   info?: ControlPlaneRequestInfo;
+  /** Sets `TRPCContext.fromDb`; the gateway's REST facet passes `readDb`. */
+  fromDb?: ModelStatsLoadClient;
 };
 
 /**
@@ -167,7 +190,10 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
-    controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,
+    controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
+      ? startedAt
+      : undefined,
+    fromDb: opts?.fromDb,
   };
 };
 
@@ -257,7 +283,7 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // Sentry middleware must not capture one event per request during an outage
 // (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
-  if (!isMobileClient(ctx.headersList)) return next();
+  if (!isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))) return next();
   const minimums = await getMinimumVersions();
   if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
     throw appUpdateRequiredError();
@@ -296,11 +322,18 @@ export const baseProcedure = t.procedure
   .use(sentryMiddleware)
   .use(auditContextMiddleware);
 
-// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
-// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
-// admin.* tRPC surface with a single event.
-type AdminGuardFn = Parameters<typeof t.middleware>[0];
-const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
+export type AdminAttribution = {
+  credential: PrivilegedCredentialKind;
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+};
+
+// Derives the credential and the privileged-inventory entry once per admin
+// request. The guard publishes the result on the context, so the step-up
+// enforcement that runs after it reuses it instead of deriving the same two
+// values from the same inputs.
+function resolveAdminAttribution(ctx: TRPCContext, path: string, type: string): AdminAttribution {
+  if (ctx.adminAttribution) return ctx.adminAttribution;
   const credential =
     ctx.credential ??
     deriveCredentialKind({
@@ -308,16 +341,24 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       tokenSource: ctx.tokenSource ?? null,
       internalApiUse: ctx.internalApiUse,
     });
-  const isBearer = credential !== 'session';
-  const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+  return { credential, ...actionClassForAdminProcedure(path, type) };
+}
+
+// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
+// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
+// admin.* tRPC surface with a single event.
+type AdminGuardFn = Parameters<typeof t.middleware>[0];
+const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
+  const attribution = resolveAdminAttribution(ctx, path, type);
+  const isBearer = attribution.credential !== 'session';
   const emitPrivileged = (outcome: 'succeeded' | 'denied' | 'failed') =>
     emitPrivilegedAccessEvent({
       surface: 'trpc',
       user: ctx.user,
-      credential,
+      credential: attribution.credential,
       outcome,
-      actionClass,
-      actionId: inventoryId,
+      actionClass: attribution.actionClass,
+      actionId: attribution.inventoryId,
       target: null,
       wouldBlock: true,
       userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
@@ -340,7 +381,7 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
     user: ctx.user,
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,
-    credential,
+    credential: attribution.credential,
     wouldBlock: isBearer,
     userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
     route: path,
@@ -348,7 +389,7 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
     ip: ctx.ip ?? null,
   });
   try {
-    const result = await next();
+    const result = await next({ ctx: { adminAttribution: attribution } });
     if (isBearer) {
       if (result.ok) {
         emitPrivileged('succeeded');
@@ -375,14 +416,7 @@ const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, 
   const enabled = isAdminStepUpEnabled();
   if (!enabled || path.startsWith('stepUp.')) return next();
 
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      internalApiUse: ctx.internalApiUse,
-    });
-  const { actionClass } = actionClassForAdminProcedure(path, type);
+  const { credential, actionClass } = resolveAdminAttribution(ctx, path, type);
 
   const adminStepUpState = await runStepUpGuard({
     userId: ctx.user.id,

@@ -152,6 +152,33 @@ describe('organization SSO policy', () => {
     });
   });
 
+  test('releases domain authority when the claiming organization drops its domain', async () => {
+    const organization = await createOrganization({
+      name: 'Releasing Organization',
+      sso_domain: 'released-domain.example.com',
+    });
+
+    await expect(resolveSsoAuthorityForDomain('released-domain.example.com')).resolves.toEqual({
+      status: 'required',
+      domain: 'released-domain.example.com',
+      sourceOrganizationId: organization.id,
+    });
+
+    await db
+      .update(organizations)
+      .set({ sso_domain: null })
+      .where(eq(organizations.id, organization.id));
+
+    await expect(resolveSsoAuthorityForDomain('released-domain.example.com')).resolves.toEqual({
+      status: 'not_required',
+      domain: 'released-domain.example.com',
+    });
+    await expect(resolveEffectiveOrganizationSsoPolicy(organization.id)).resolves.toEqual({
+      status: 'not_required',
+      organizationId: organization.id,
+    });
+  });
+
   test('batch resolution preserves scalar semantics for every policy outcome', async () => {
     const direct = await createOrganization({
       name: 'Batch Direct SSO Organization',

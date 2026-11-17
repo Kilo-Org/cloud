@@ -17,6 +17,7 @@ const INTENT_COPY_KEYS = [
   'startAgent',
   'openNeedsInput',
   'openSession',
+  'openSessionByName',
   'openPullRequest',
   'promptParam',
   'repositoryParam',

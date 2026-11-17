@@ -5,9 +5,11 @@
  * probing provider endpoints, so an unsupported action degrades to a
  * reason string the UI can show — never to a silent failure.
  *
- * Invariant: every `supported: false` capability carries a human-readable
- * provider reason. The per-provider constants below are the single source
- * of that copy.
+ * `ProviderReviewCapability` makes the rule structural: the unsupported branch
+ * must carry a reason field, and the supported branch cannot carry any copy.
+ * The per-provider constants below are the single source of that copy, and
+ * they are readonly, so the one shared supported value cannot be rewritten in
+ * place through any provider's table.
  */
 
 import type { ProviderPrPlatform } from './contracts';
@@ -16,56 +18,65 @@ import type { ProviderPrPlatform } from './contracts';
 export type ProviderReviewEvent = 'approve' | 'request_changes' | 'comment';
 
 /**
- * A capability that may be absent on a provider. When `supported` is false,
- * `reason` MUST hold a human-readable explanation naming the provider
- * (e.g. 'Bitbucket Cloud does not expose auto-merge in its API'); when
- * supported, `reason` is ''.
+ * A capability that may be absent on a provider. The union makes the rule
+ * structural: an unsupported capability MUST carry a human-readable
+ * explanation naming the provider (e.g. 'Bitbucket Cloud does not expose
+ * auto-merge in its API'), and a supported capability carries no reason.
  */
-export type ProviderReviewCapability = {
-  supported: boolean;
-  reason: string;
-};
+export type ProviderReviewCapability =
+  | { readonly supported: true; readonly reason: '' }
+  | { readonly supported: false; readonly reason: string };
 
+/**
+ * Every affordance a review surface renders and the data the provider
+ * supplies for it. Each affordance is one capability, whether or not any
+ * provider lacks it today, so a surface reads `.supported` the same way for
+ * all of them.
+ */
 export type ProviderReviewCapabilities = {
   /** Whether the viewer can post a comment on the PR/MR. */
-  canComment: boolean;
+  readonly canComment: ProviderReviewCapability;
   /** The review events the provider accepts, in display order. */
-  reviewEvents: ProviderReviewEvent[];
-  canResolveThreads: boolean;
-  canMerge: boolean;
-  autoMerge: ProviderReviewCapability;
-  reactions: ProviderReviewCapability;
+  readonly reviewEvents: readonly ProviderReviewEvent[];
+  /** Whether the viewer can resolve and unresolve discussion threads. */
+  readonly canResolveThreads: ProviderReviewCapability;
+  /** Whether the viewer can merge the PR/MR at all. */
+  readonly canMerge: ProviderReviewCapability;
+  /** Whether the provider can merge when its required gates pass later. */
+  readonly autoMerge: ProviderReviewCapability;
+  /** Whether the provider stores reactions on review comments. */
+  readonly reactions: ProviderReviewCapability;
   /** Whether the provider exposes per-reviewer approval states. */
-  reviewStatus: ProviderReviewCapability;
+  readonly reviewStatus: ProviderReviewCapability;
 };
 
 const SUPPORTED: ProviderReviewCapability = { supported: true, reason: '' };
 
 export const GITHUB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
-  canComment: true,
+  canComment: SUPPORTED,
   reviewEvents: ['approve', 'request_changes', 'comment'],
-  canResolveThreads: true,
-  canMerge: true,
+  canResolveThreads: SUPPORTED,
+  canMerge: SUPPORTED,
   autoMerge: SUPPORTED,
   reactions: SUPPORTED,
   reviewStatus: SUPPORTED,
 };
 
 export const GITLAB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
-  canComment: true,
+  canComment: SUPPORTED,
   reviewEvents: ['approve', 'request_changes', 'comment'],
-  canResolveThreads: true,
-  canMerge: true,
+  canResolveThreads: SUPPORTED,
+  canMerge: SUPPORTED,
   autoMerge: SUPPORTED,
   reactions: SUPPORTED,
   reviewStatus: SUPPORTED,
 };
 
 export const BITBUCKET_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
-  canComment: true,
+  canComment: SUPPORTED,
   reviewEvents: ['approve', 'request_changes', 'comment'],
-  canResolveThreads: true,
-  canMerge: true,
+  canResolveThreads: SUPPORTED,
+  canMerge: SUPPORTED,
   autoMerge: {
     supported: false,
     reason: 'Bitbucket Cloud does not expose auto-merge in its API',

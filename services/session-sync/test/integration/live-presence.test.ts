@@ -13,6 +13,7 @@ import {
   presenceCommandRates,
   presenceCommandRoutes,
 } from '../../src/db/presence-sqlite-schema';
+import type { Env } from '../../src/env';
 import { LIVE_LIMITS, type LiveEnvelope } from '../../src/live/protocol';
 import { mintTicket } from '../../src/live/ticket';
 import type { Principal } from '../../src/protocol';
@@ -127,13 +128,14 @@ async function heartbeat(connection: Connection, instanceID: string, ad = advert
 // storage and accepted sockets, then invoke the reconstructed event handlers.
 async function reconstruct(
   stub: DurableObjectStub<SessionPresenceDO>,
-  callback: (instance: SessionPresenceDO, state: DurableObjectState) => Promise<void>
+  callback: (instance: SessionPresenceDO, state: DurableObjectState) => Promise<void>,
+  env: Env = testEnv
 ): Promise<void> {
   await runInDurableObject(stub, async (_instance, state) => {
     const initialize = vi.spyOn(state, 'blockConcurrencyWhile');
     let restored: SessionPresenceDO;
     try {
-      restored = new SessionPresenceDO(state, testEnv);
+      restored = new SessionPresenceDO(state, env);
       const initialization = initialize.mock.results.at(-1);
       if (initialization?.type !== 'return')
         throw new Error('Constructor initialization was not captured');
@@ -274,6 +276,129 @@ describe('live presence', () => {
     expect((await removed).body).toEqual({ instances: [] });
   });
 
+  it('sends an instance snapshot only when a heartbeat changes what viewers see', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const runner = await connect(principal, 'runner');
+    const viewer = await connect(principal, 'viewer');
+    viewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await viewer.next('instances')).body).toEqual({ instances: [] });
+    const ad = advertisement([newSessionID()]);
+    await heartbeat(runner, 'steady-instance', ad);
+    expect((await viewer.next('instances')).body).toMatchObject({
+      instances: [expect.objectContaining({ instanceID: 'steady-instance', online: true })],
+    });
+    await heartbeat(runner, 'steady-instance', ad);
+    await heartbeat(runner, 'steady-instance', ad);
+    const changed = { ...ad, version: '2.0.1' };
+    await heartbeat(runner, 'steady-instance', changed);
+    expect((await viewer.next('instances')).body).toMatchObject({
+      instances: [expect.objectContaining({ advertisement: changed })],
+    });
+    expect(viewer.received.filter(frame => frame.type === 'instances')).toHaveLength(3);
+  });
+
+  it('does not publish when a subscribed controller disconnects', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const stub = getPresenceStub(testEnv, principal.userID);
+    const ad = advertisement();
+    const runner = await connect(principal, 'runner');
+    await heartbeat(runner, 'visible-instance', ad);
+    const controller = await connect(principal, 'controller');
+    controller.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await controller.next('instances')).body).toMatchObject({
+      instances: [expect.objectContaining({ instanceID: 'visible-instance' })],
+    });
+    const viewer = await connect(principal, 'viewer');
+    viewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    await viewer.next('instances');
+    const changed = { ...ad, version: '2.0.1' };
+    await reconstruct(stub, async (restored, state) => {
+      let controllerSocket: WebSocket | undefined;
+      let runnerSocket: WebSocket | undefined;
+      for (const ws of state.getWebSockets()) {
+        const saved = ws.deserializeAttachment() as { ticket: { role: string } };
+        if (saved.ticket.role === 'controller') controllerSocket = ws;
+        if (saved.ticket.role === 'runner') runnerSocket = ws;
+      }
+      if (!controllerSocket || !runnerSocket) throw new Error('Missing presence sockets');
+      await restored.webSocketClose(controllerSocket, 1000, 'Controller finished');
+      await restored.webSocketMessage(
+        runnerSocket,
+        JSON.stringify({
+          type: 'heartbeat',
+          instanceID: 'visible-instance',
+          advertisement: changed,
+        })
+      );
+    });
+    expect((await viewer.next('instances')).body).toMatchObject({
+      instances: [expect.objectContaining({ advertisement: changed })],
+    });
+    expect(viewer.received.filter(frame => frame.type === 'instances')).toHaveLength(2);
+  });
+
+  it('publishes a removal when a server frame fails on a runner transport', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const stub = getPresenceStub(testEnv, principal.userID);
+    const sessionID = newSessionID();
+    const runner = await connect(principal, 'runner');
+    await heartbeat(runner, 'failed-transport', advertisement([sessionID]));
+    const viewer = await connect(principal, 'viewer');
+    viewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    await viewer.next('instances');
+    await runInDurableObject(stub, async (_instance, state) => {
+      for (const ws of state.getWebSockets()) {
+        const saved = ws.deserializeAttachment() as { ticket: { role: string } };
+        if (saved.ticket.role === 'runner') {
+          ws.send = () => {
+            throw new Error('Synthetic transport failure');
+          };
+        }
+      }
+    });
+    await stub.watch({ tenant: principal.tenant, sessionID, watching: true });
+    expect((await viewer.next('instances')).body).toEqual({ instances: [] });
+    expect(await stub.list()).toEqual([]);
+  });
+
+  it('records why each presence broadcast happened', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const stub = getPresenceStub(testEnv, principal.userID);
+    await connect(principal, 'runner');
+    const ad = advertisement();
+    const reasons: string[] = [];
+    const writeDataPoint = (point?: {
+      blobs?: readonly ((ArrayBuffer | string) | null)[];
+    }): void => {
+      const blobs = point?.blobs ?? [];
+      const reason = blobs[2];
+      if (blobs[0] === 'presence_broadcast' && typeof reason === 'string') reasons.push(reason);
+    };
+    await reconstruct(
+      stub,
+      async (restored, state) => {
+        let runnerSocket: WebSocket | undefined;
+        for (const ws of state.getWebSockets()) {
+          const saved = ws.deserializeAttachment() as { ticket: { role: string } };
+          if (saved.ticket.role === 'runner') runnerSocket = ws;
+        }
+        if (!runnerSocket) throw new Error('Missing runner socket');
+        const frame = (advertisementValue: InstanceAdvertisement) =>
+          JSON.stringify({
+            type: 'heartbeat',
+            instanceID: 'metred-instance',
+            advertisement: advertisementValue,
+          });
+        await restored.webSocketMessage(runnerSocket, frame(ad));
+        await restored.webSocketMessage(runnerSocket, frame(ad));
+        await restored.webSocketMessage(runnerSocket, frame({ ...ad, version: '2.0.1' }));
+        await restored.webSocketMessage(runnerSocket, 'x'.repeat(LIVE_LIMITS.messageBytes + 1));
+      },
+      { ...testEnv, SESSION_SYNC_METRICS: { writeDataPoint } }
+    );
+    expect(reasons).toEqual(['heartbeat', 'heartbeat', 'message_too_large']);
+  });
+
   it('completes the close handshake when the runner omits a close code', async () => {
     const principal = personal(`usr-${crypto.randomUUID()}`);
     const runner = await connect(principal, 'runner');
@@ -373,6 +498,7 @@ describe('live presence', () => {
     });
     expect((await runner.closed).code).toBe(4000);
     expect((await viewer.next('instances')).body).toEqual({ instances: [] });
+    expect(viewer.received.filter(frame => frame.type === 'instances')).toHaveLength(2);
     expect(await stub.list()).toEqual([]);
   });
 

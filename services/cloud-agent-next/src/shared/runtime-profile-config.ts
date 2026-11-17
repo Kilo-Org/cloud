@@ -1,4 +1,8 @@
-import type { RuntimeAgentInput, RuntimeKiloCommandInput } from './runtime-profile.js';
+import type {
+  RuntimeAgentInput,
+  RuntimeBuiltinAgents,
+  RuntimeKiloCommandInput,
+} from './runtime-profile.js';
 import { normalizeKilocodeModel } from './model-utils.js';
 
 export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgentInput): Record<string, unknown> {
@@ -19,6 +23,26 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgentInput): Recor
   if (config.permission !== undefined) entry.permission = config.permission;
   if (config.options !== undefined) entry.options = config.options;
   return entry;
+}
+
+/**
+ * Built-in agents already carry their own mode and prompt, so an override only
+ * contributes the keys the user set. Setting `mode: primary` here would turn a
+ * subagent such as `explore` into a primary agent.
+ */
+export function buildBuiltinAgentEntries(
+  agents: RuntimeBuiltinAgents | undefined
+): Record<string, Record<string, unknown>> {
+  if (!agents) return {};
+  return Object.fromEntries(
+    Object.entries(agents).map(([slug, override]) => {
+      const entry: Record<string, unknown> = {};
+      if (override.model != null) entry.model = normalizeKilocodeModel(override.model);
+      if (override.variant !== undefined) entry.variant = override.variant;
+      if (override.disable === true) entry.disable = true;
+      return [slug, entry];
+    })
+  );
 }
 
 export function buildKiloCommandsConfiguration(commands: readonly RuntimeKiloCommandInput[]) {

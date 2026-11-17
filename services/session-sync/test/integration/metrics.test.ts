@@ -1,10 +1,15 @@
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import worker from '../../src/index';
 import { instrument, jsonResponse } from '../../src/metrics';
 import { grant, newSessionID, personal, sha256, testEnv } from '../helpers';
 import type { Env } from '../../src/env';
+
+beforeEach(() => {
+  vi.spyOn(Math, 'random').mockReturnValue(0.5);
+});
+afterEach(() => vi.restoreAllMocks());
 
 it('records one bounded datapoint with actual streamed bytes and no identifiers', async () => {
   const writeDataPoint = vi.fn();

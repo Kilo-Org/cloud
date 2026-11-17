@@ -98,6 +98,7 @@ type UserWebConnection = {
   // The boolean readiness API (old form) stays the readiness source for existing consumers; the exhaustion signal is additive and owns only recovery UI. Removal condition: none — the boolean API is permanent.
   isReconnectExhausted: () => boolean;
   onReconnectExhaustionChange: (listener: (exhausted: boolean) => void) => () => void;
+  /** Replace the viewer socket and restore subscriptions without replaying interrupted commands. */
   retryConnection: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
   sendCommand: (
@@ -717,7 +718,7 @@ function createUserWebConnection(
     },
     retryConnection() {
       if (baseConnection) {
-        baseConnection.retryReconnect();
+        baseConnection.reconnectWithRefreshedAuth?.();
         return;
       }
       if (destroyed || !hasLifetime()) return;

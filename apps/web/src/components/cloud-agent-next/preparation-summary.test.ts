@@ -2,9 +2,12 @@ import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/clou
 import {
   extractTickerLines,
   findRunningSetupCommand,
+  phaseDisplayText,
+  preparationFailureText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
+import { formatSnapshotTime } from './snapshot-display';
 
 function step(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
   return {
@@ -32,6 +35,51 @@ function attempt(overrides: Partial<PreparationAttempt>): PreparationAttempt {
 }
 
 describe('summarizePreparationAttempt', () => {
+  it.each([
+    ['environment_snapshot', 'Using environment snapshot'],
+    ['workspace_restore', 'Using workspace snapshot'],
+  ] as const)('shows the compact local capture time for %s', (key, latestDetail) => {
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    const snapshotStep = step({ key, latestDetail, snapshotCapturedAt: capturedAt });
+    const text = `${latestDetail} · ${formatSnapshotTime(capturedAt)}`;
+    expect(phaseDisplayText(snapshotStep)).toBe(text);
+    expect(summarizePreparationAttempt(attempt({ steps: [snapshotStep] }))).toEqual({
+      kind: 'phase',
+      text,
+    });
+    expect(phaseDisplayText({ ...snapshotStep, status: 'completed' })).toBe(text);
+    expect(phaseDisplayText(step({ key, latestDetail }))).toBe(latestDetail);
+  });
+
+  it.each([
+    'Using environment snapshot; environment settings have changed',
+    'Using environment snapshot; cached files may use older settings',
+    'Using environment snapshot; built for an earlier image; using it during the rollout window; a replacement build was started',
+  ])('keeps older successful snapshot status compact: %s', latestDetail => {
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    const snapshotStep = step({
+      key: 'environment_snapshot',
+      latestDetail,
+      snapshotCapturedAt: capturedAt,
+    });
+    const text = `Using environment snapshot · ${formatSnapshotTime(capturedAt)}`;
+    expect(phaseDisplayText(snapshotStep)).toBe(text);
+    expect(summarizePreparationAttempt(attempt({ steps: [snapshotStep] }))).toEqual({
+      kind: 'phase',
+      text,
+    });
+    expect(phaseDisplayText({ ...snapshotStep, snapshotCapturedAt: undefined })).toBe(
+      'Using environment snapshot'
+    );
+  });
+
+  it('does not replace an environment snapshot failure with the success label', () => {
+    const latestDetail = 'Environment snapshot is unavailable. Rebuild the environment.';
+    expect(
+      phaseDisplayText(step({ key: 'environment_snapshot', status: 'failed', latestDetail }))
+    ).toBe(latestDetail);
+  });
+
   it('reports starting while no step is running yet', () => {
     expect(summarizePreparationAttempt(attempt({}))).toEqual({ kind: 'starting' });
     const completedOnly = attempt({ steps: [step({ status: 'completed' })] });
@@ -165,6 +213,35 @@ describe('summarizePreparationAttempt', () => {
     expect(summarizePreparationAttempt(failed)).toEqual({ kind: 'failed', error: 'clone failed' });
   });
 
+  it('reports a user stop as stopped instead of a raw route failure', () => {
+    const stopped = attempt({
+      status: 'failed',
+      completedAt: 13_400,
+      safeError: 'preparation_cancelled',
+    });
+    expect(summarizePreparationAttempt(stopped)).toEqual({
+      kind: 'stopped',
+      duration: '12s',
+    });
+  });
+
+  it('detects a cancellation carried only by the failed step', () => {
+    const stopped = attempt({
+      status: 'failed',
+      steps: [
+        step({
+          id: 'running',
+          status: 'failed',
+          safeError: 'Environment preparation was stopped',
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(stopped)).toEqual({
+      kind: 'stopped',
+      duration: undefined,
+    });
+  });
+
   it('falls back to the last failed step error, then to none', () => {
     const failed = attempt({
       status: 'failed',
@@ -293,6 +370,14 @@ describe('preparationSummaryLine', () => {
       preparationSummaryLine(attempt({ status: 'failed', completedAt: 13_400, safeError: 'boom' }))
     ).toBe('Preparation failed · 12s');
   });
+
+  it('reports a stopped summary for a cancelled preparation', () => {
+    expect(
+      preparationSummaryLine(
+        attempt({ status: 'failed', completedAt: 13_400, safeError: 'preparation_cancelled' })
+      )
+    ).toBe('Preparation stopped · 12s');
+  });
 });
 
 describe('findRunningSetupCommand', () => {
@@ -337,5 +422,21 @@ describe('extractTickerLines', () => {
 
   it('preserves blank interior lines', () => {
     expect(extractTickerLines('one\n\ntwo')).toEqual(['one', '', 'two']);
+  });
+});
+
+describe('preparationFailureText', () => {
+  it('replaces the cancellation reason with user copy', () => {
+    expect(preparationFailureText('preparation_cancelled')).toBe(
+      'Environment preparation was stopped'
+    );
+    expect(preparationFailureText('Environment preparation was stopped')).toBe(
+      'Environment preparation was stopped'
+    );
+  });
+
+  it('leaves an ordinary failure unchanged', () => {
+    expect(preparationFailureText('Workspace setup failed')).toBe('Workspace setup failed');
+    expect(preparationFailureText(undefined)).toBeUndefined();
   });
 });

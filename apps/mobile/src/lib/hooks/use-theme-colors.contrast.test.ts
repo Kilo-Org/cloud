@@ -224,26 +224,44 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
   });
 });
 
-describe('disabled primary fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints primaryForeground on
-  // `--primary-disabled`; the pair must clear 4.5:1 in both themes so the
-  // label (and any child that hard-codes primaryForeground) stays legible.
-  it('light theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
+describe('disabled primary action fill contrast (WCAG AA text)', () => {
+  // A disabled default-variant Button paints its label on
+  // `--primary-disabled-action`: the palette's disabled primary under white in
+  // light, and a dim neutral under `--foreground` in dark. The dark plate must
+  // stay a visible object on the near-black page and stand off the outlined
+  // control beside it, while staying clearly below the enabled brand fill. The
+  // palette's `--primary-disabled` is left to the Switch's disabled on-track.
+  it('light theme: primaryForeground vs primaryDisabledAction >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
+  it('dark theme: foreground vs primaryDisabledAction >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.foreground, darkColors.primaryDisabledAction);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the disabled plate stays a visible object on the page', () => {
+    // 2.6:1 off the page. The inactive icon surface (1.7:1) leaves a full-width
+    // plate without presence, so a disabled primary reads as a stray label.
+    expect(
+      contrastRatio(darkColors.primaryDisabledAction, darkColors.background)
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('dark theme: the disabled plate outranks the outlined control beside it', () => {
+    // The outline variant fills with `--secondary`; a disabled primary must
+    // still read as the stronger surface, not as a second outlined control.
+    expect(
+      contrastRatio(darkColors.primaryDisabledAction, darkColors.secondary)
+    ).toBeGreaterThanOrEqual(1.5);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
-    // The disabled fill is a neutral grey that must read as a superseded
-    // control next to the enabled brand fill, not as a second brand colour
-    // (2.69:1 between the two fills), or a disabled Start would look tappable
-    // and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    // The plate must read as a superseded control next to the enabled brand
+    // fill, not as a second brand colour, or a disabled Start would look
+    // tappable and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });
@@ -323,13 +341,14 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
 });
 
 describe('idle composer control and ring track contrast (non-text)', () => {
-  // Two dark-mode surfaces the light theme already carries: the composer's send
-  // circle while there is nothing to send, and the track under the context-usage
-  // ring's arc. Both painted the light theme's neutral and hairline tint, which
-  // sit within 1.2:1 of the near-black page and left the disc and the ring
-  // invisible. The floors below are perception floors, not a WCAG bar: the fill
-  // and the track must read as objects on the page, and the ring track must stay
-  // under the neutral arc so a part-filled arc still reads as a fraction.
+  // Two surfaces that needed their own step: the composer's send circle while
+  // there is nothing to send (dark only — the light theme keeps its neutral),
+  // and the track under the context-usage ring's arc (both themes: the light
+  // hairline tint sat within 1.2:1 of its pill and left the ring invisible just
+  // as the dark one did). The floors below are perception floors, not a WCAG
+  // bar: the fill and the track must read as objects on their surfaces, and the
+  // ring track must stay under the neutral arc so a part-filled arc still reads
+  // as a fraction.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],
@@ -351,15 +370,24 @@ describe('idle composer control and ring track contrast (non-text)', () => {
     }
   });
 
-  it('dark theme: the ring track reads on its pill and stays under the neutral arc', () => {
-    // The header pill's own surface is `secondary`, so the track is measured
-    // over that, not over the page.
-    const track = compositeToken(darkColors.ringTrack, darkColors.secondary);
-    const trackRatio = contrastRatio(track, darkColors.secondary);
-    expect(trackRatio).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    expect(trackRatio).toBeLessThan(
-      contrastRatio(darkColors.mutedForeground, darkColors.secondary)
-    );
+  // The ring paints in the header pill (`secondary`) and in the context and
+  // message-details sheets (`background`), so the track is measured over both
+  // rather than over the page alone. It must clear the perception floor on each
+  // and stay under the neutral arc so a part-filled arc still reads as a
+  // fraction. Light once shipped the hairline tint here (1.11:1 on the pill),
+  // which left the ring as a lone arc with no circle under it.
+  it('every theme: the ring track reads on its surfaces and stays under the neutral arc', () => {
+    for (const [themeName, colors] of themes) {
+      const arcRatio = contrastRatio(colors.mutedForeground, colors.secondary);
+      for (const surfaceName of ['secondary', 'background'] as const) {
+        const surface = colors[surfaceName];
+        const trackRatio = contrastRatio(compositeToken(colors.ringTrack, surface), surface);
+        expect(trackRatio, `ring track vs ${surfaceName} (${themeName})`).toBeGreaterThanOrEqual(
+          MIN_VISIBLE_SURFACE_RATIO
+        );
+        expect(trackRatio, `ring track vs arc (${themeName})`).toBeLessThan(arcRatio);
+      }
+    }
   });
 });
 

@@ -48,6 +48,7 @@ export const LIMITS = {
   uploadMs: 5 * 60_000,
   /** Grace period for verified blobs without a current entity reference. */
   unreferencedMs: 15 * 60_000,
+  tenantInitialLeaseBytes: 1024 * 1024,
   tenantLeaseBytes: 32 * 1024 * 1024,
   userTenantSessions: 10_000,
   userTenantBytes: 100 * 1024 * 1024 * 1024,
@@ -258,6 +259,24 @@ export const registerRequestSchema = z.strictObject({
 });
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
+export const sessionStatusSchema = z.strictObject({
+  value: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9_-]*$/),
+  version: positionSchema,
+  updatedAt: z.number().int(),
+});
+export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+export const statusRequestSchema = z.strictObject({
+  version: z.literal(1),
+  sourceID: uuidSchema,
+  after: positionSchema,
+  status: sessionStatusSchema.shape.value,
+});
+
 export const batchRequestSchema = z
   .strictObject({
     version: z.literal(1),
@@ -354,6 +373,7 @@ export const liveStateSchema = z.strictObject({
   }),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
+  status: sessionStatusSchema.nullable().optional(),
 });
 
 export const deletedStateSchema = z.strictObject({

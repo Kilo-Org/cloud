@@ -24,6 +24,7 @@ import type {
   CommandsAvailableData,
 } from '../shared/protocol.js';
 import { logger } from '../logger.js';
+import { projectKilocodeEventForDisplay } from '../shared/tool-display-projection.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
@@ -82,6 +83,8 @@ export type QueuedMessageSnapshot = {
   content: string;
   timestamp: number;
   delivery?: 'queued' | 'sent';
+  turnType?: 'command';
+  completedAt?: number;
   terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
@@ -235,6 +238,7 @@ export function createStreamHandler(
           | 'kilocode'
           | 'cloud.message.queued'
           | 'cloud.message.sent'
+          | 'cloud.message.completed'
           | 'cloud.message.failed',
         data: unknown,
         timestamp: number
@@ -264,6 +268,10 @@ export function createStreamHandler(
         );
       };
       for (const msg of queued) {
+        if (msg.completedAt !== undefined) {
+          sendSnapshot('cloud.message.completed', { messageId: msg.messageId }, msg.completedAt);
+          continue;
+        }
         if (!msg.terminalFailure) continue;
         sendSnapshot(
           'cloud.message.queued',
@@ -314,7 +322,7 @@ export function createStreamHandler(
       if (!options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
 
       for (const msg of queued) {
-        if (msg.terminalFailure) continue;
+        if (msg.terminalFailure || msg.completedAt !== undefined) continue;
         sendSnapshot(
           'cloud.message.queued',
           { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
@@ -323,7 +331,11 @@ export function createStreamHandler(
         if (msg.delivery === 'sent') {
           sendSnapshot(
             'cloud.message.sent',
-            { messageId: msg.messageId, delivery: 'sent' },
+            {
+              messageId: msg.messageId,
+              delivery: 'sent',
+              ...(msg.turnType === 'command' ? { turnType: 'command' } : {}),
+            },
             msg.timestamp
           );
         }
@@ -428,6 +440,17 @@ export function createStreamHandler(
             )
               continue;
             const formatted = formatStreamEvent(event, sessionId);
+            // Replay uses the same revisioned preview as history pages, so a
+            // reconnect does not redownload the tool bodies a page omitted.
+            if (
+              filters.toolDisplay === 'preview' &&
+              event.stream_event_type === 'kilocode' &&
+              event.mutation_cursor !== undefined
+            )
+              formatted.data = projectKilocodeEventForDisplay(
+                formatted.data,
+                event.mutation_cursor
+              );
             const message = JSON.stringify(materialized ? { ...formatted, eventId: 0 } : formatted);
             ws.send(message);
             bytesSent += message.length;

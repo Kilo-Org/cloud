@@ -1,4 +1,3 @@
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_environment_profile_kilo_commands,
   agent_environment_profiles,
@@ -7,7 +6,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email>';
 
@@ -56,11 +55,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (!/^[a-z0-9][a-z0-9._+-]*@example\.com$/i.test(email)) {
     throw new Error(`Not a local fake account email: ${email}`);
   }
-  const host = new URL(computeDatabaseUrl()).hostname;
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(host) ||
-    process.env.NODE_ENV === 'production'
-  ) {
+  assertLocalSeedDatabase('app:mobile-slash-commands');
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('This fixture requires a local development database.');
   }
 

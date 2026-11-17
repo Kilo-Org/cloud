@@ -113,6 +113,47 @@ describe('o11y worker', () => {
     expect(response.status).toBe(204);
   });
 
+  it('accepts provider names built from letters, digits, dot, underscore and hyphen', async () => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+      },
+      body: JSON.stringify(makeValidApiMetricsBody({ provider: ' custom-public.v2_beta ' })),
+    });
+
+    const response = await workerFetch(request, env, createExecutionContext());
+    expect(response.status).toBe(204);
+    expect(aeSpy.writeDataPoint.mock.calls[0][0].blobs[0]).toBe('custom-public.v2_beta');
+  });
+
+  it.each([
+    ['an exclamation mark', 'custom!public'],
+    ['a slash', 'custom/public'],
+    ['a space', 'open router'],
+    ['more than 64 characters', 'a'.repeat(65)],
+    ['uppercase letters', 'OpenRouter'],
+  ])('rejects a provider name with %s', async (_label, provider) => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+      },
+      body: JSON.stringify(makeValidApiMetricsBody({ provider })),
+    });
+
+    const response = await workerFetch(request, env, createExecutionContext());
+    expect(response.status).toBe(400);
+    expect(aeSpy.writeDataPoint).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ error: 'Invalid request body' });
+  });
+
   it('writes data point to Analytics Engine and Pipeline on successful ingest', async () => {
     const aeSpy = makeWriteDataPointSpy();
     const pipelineSpy = makePipelineSpy();
@@ -292,7 +333,7 @@ describe('session metrics RPC', () => {
       'user_123',
       'anthropic/claude-sonnet-4',
     ]);
-    expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1]);
+    expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1, 0]);
 
     expect(pipelineSpy.send).toHaveBeenCalledOnce();
     expect(pipelineSpy.send.mock.calls[0][0]).toEqual([
@@ -344,6 +385,22 @@ describe('session metrics RPC', () => {
 
     const call = aeSpy.writeDataPoint.mock.calls[0][0];
     expect(call.doubles[1]).toBe(-1);
+  });
+
+  it('marks a record whose counted figures cover only part of the session', async () => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const ctx = createExecutionContext();
+    const instance = new Worker(ctx, env);
+
+    await instance.ingestSessionMetrics({
+      ...makeValidSessionMetrics(),
+      metricsBounded: true,
+    });
+
+    const call = aeSpy.writeDataPoint.mock.calls[0][0];
+    expect(call.doubles[11]).toBe(1);
+    // The exported stream keeps its immutable schema; the flag rides the AE point.
   });
 
   it('defaults ingestVersion to 0 when omitted', async () => {

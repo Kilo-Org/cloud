@@ -195,6 +195,11 @@ async function storedAlarm(stub: DurableObjectStub<CodeReviewOrchestrator>) {
   );
 }
 
+function deferredSignal() {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  return { promise, resolve };
+}
+
 const AUTO_RETRY_MIN_DELAY_MS = 2 * 60_000;
 const AUTO_RETRY_MAX_DELAY_MS = 5 * 60_000;
 const AUTO_RETRY_ALARM_UPPER_SLACK_MS = 1_000;
@@ -1607,6 +1612,223 @@ describe('CodeReviewOrchestrator recovery', () => {
       errorMessage: 'Review cancelled: superseded',
     });
     expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+  });
+
+  it('does not prepare a session when the review is cancelled during the first status update', async () => {
+    const stub = getReviewStub();
+    const runningUpdateStarted = deferredSignal();
+    const runningUpdateRelease = deferredSignal();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        const body = JSON.parse(String(init?.body));
+        if (body.status === 'running') {
+          runningUpdateStarted.resolve();
+          await runningUpdateRelease.promise;
+        }
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-unexpected',
+          kiloSessionId: 'ses_unexpected',
+        });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-unexpected', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+
+      const runPromise = instance.runReview();
+      await runningUpdateStarted.promise;
+      await expect(instance.cancel('superseded')).resolves.toBe(true);
+      runningUpdateRelease.resolve();
+      await runPromise;
+    });
+
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(0);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+  });
+
+  it('does not initiate a prepared session when the review is cancelled in flight', async () => {
+    const stub = getReviewStub();
+    const prepareStarted = deferredSignal();
+    const prepareRelease = deferredSignal();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareStarted.resolve();
+        await prepareRelease.promise;
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-cancelled-in-flight',
+          kiloSessionId: 'ses_cancelled_in_flight',
+        });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: false, message: 'No session work to interrupt' });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-cancelled-in-flight', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+
+      const runPromise = instance.runReview();
+      await prepareStarted.promise;
+      await expect(instance.cancel('superseded')).resolves.toBe(true);
+      prepareRelease.resolve();
+      await runPromise;
+    });
+
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toMatchObject({
+      sessionId: 'agent-cancelled-in-flight',
+    });
+
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(stored?.sessionId).toBeUndefined();
+  });
+
+  it('abandons a prepared session when the status update reports a terminal review', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        const body = JSON.parse(String(init?.body));
+        if (body.sessionId === 'agent-terminal') {
+          return Response.json({
+            success: true,
+            message: 'Review already in terminal state',
+            currentStatus: 'cancelled',
+            terminalReason: 'superseded',
+          });
+        }
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-terminal',
+          kiloSessionId: 'ses_terminal',
+        });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: false, message: 'No session work to interrupt' });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-terminal', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    await expect(runDurableObjectAlarm(stub)).resolves.toBe(true);
+
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toMatchObject({
+      sessionId: 'agent-terminal',
+    });
+
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      terminalReason: 'superseded',
+    });
+  });
+
+  it('abandons a follow-up execution when the review is cancelled while the message is sent', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_cancelled_in_flight';
+    const sendStarted = deferredSignal();
+    const sendRelease = deferredSignal();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxId: 'ses-healthy',
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        sendStarted.resolve();
+        await sendRelease.promise;
+        return trpcSuccess({ executionId: 'exec-followup-cancelled', status: 'running' });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionInput: gitlabSessionInput(),
+        })
+      );
+
+      const runPromise = instance.runReview();
+      await sendStarted.promise;
+      await expect(instance.cancel('superseded')).resolves.toBe(true);
+      sendRelease.resolve();
+      await runPromise;
+    });
+
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toMatchObject({
+      sessionId: previousSessionId,
+    });
+
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
   });
 
   it('does not retry billing failures from prepareSession', async () => {

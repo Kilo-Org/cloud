@@ -196,6 +196,60 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
   });
 
+  test('reserves the slot for the app type the organization already holds', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(INSTALLATION_ID),
+      githubAppType: 'lite',
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      platform_installation_id: INSTALLATION_ID,
+      github_app_type: 'standard',
+    });
+  });
+
+  test('keeps the slot for the pair it holds and refreshes it in place', async () => {
+    const owner: Owner = { type: 'org', id: otherOrgId };
+    const liteData = {
+      ...baseInstallData(`${INSTALLATION_ID}-lite`),
+      githubAppType: 'lite' as const,
+    };
+    expect(await upsertPlatformIntegrationForOwner(owner, liteData)).toEqual({ ok: true });
+
+    const refresh = await upsertPlatformIntegrationForOwner(owner, {
+      ...liteData,
+      platformAccountLogin: 'renamed-owner',
+    });
+    expect(refresh).toEqual({ ok: true });
+
+    const standard = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(`${INSTALLATION_ID}-lite`),
+      githubAppType: 'standard',
+    });
+    expect(standard).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      platform_installation_id: `${INSTALLATION_ID}-lite`,
+      github_app_type: 'lite',
+      platform_account_login: 'renamed-owner',
+    });
+  });
+
   test('legacy writer: local disconnect frees a non-allowlisted organization to connect a fresh installation', async () => {
     const owner: Owner = { type: 'org', id: orgId };
     const first = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));

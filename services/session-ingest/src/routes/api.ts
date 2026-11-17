@@ -15,6 +15,7 @@ import {
   sessionIdSchema,
   sessionShareOptionsSchema,
   storedSessionIdSchema,
+  type KiloSdkMessageHistory,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -28,6 +29,9 @@ import {
   parentOrganizationMembershipsTable,
   personalOrInheritedOrganizationCondition,
   zodJsonValidator,
+  DEFAULT_DO_RETRY_CONFIG,
+  isDurableObjectRetryDeadline,
+  isTransientDurableObjectFailure,
   withDORetry,
 } from '@kilocode/worker-utils';
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
@@ -39,7 +43,11 @@ import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { resolveAccessibleKiloSession } from '../services/session-access';
-import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services/session-title';
+import {
+  applyReportedSessionTitle,
+  reportSessionTitleSchema,
+  sessionTitleSchema,
+} from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
@@ -135,6 +143,12 @@ async function deleteOwnedLeafSession(
   sessionId: string
 ) {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // The worktree deletion owns its members' rows while it runs; deleting one
+  // here would race that delete and strand local session state.
+  if (await isWorktreeSessionDeleting(db, kiloUserId, sessionId)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
+
   const existingRows = await db
     .select()
     .from(cli_sessions_v2)
@@ -236,6 +250,29 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
@@ -265,6 +302,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);
@@ -606,6 +680,86 @@ api.get('/session/:sessionId/diff', async c => {
 });
 
 /**
+ * Deadline for the best-effort session-metadata read on the initial page.
+ *
+ * The read runs alongside the history read and the page is complete without
+ * its result, so it may never extend the page. It is a `withDORetry` scope
+ * rather than `withinBudget` because a retry scope also stops the remaining
+ * attempts and aborts the in-flight one; abandoning only our wait would leave
+ * the retry loop running for seconds after the page has already answered.
+ * Comfortably above this read's normal cost and above the history read's own
+ * p95, and far below the budget the control plane allows the page.
+ */
+const SESSION_METADATA_READ_DEADLINE_MS = 2_000;
+
+/**
+ * Budget for one paged history read against the session's Durable Object.
+ * Strictly below the control plane's 8s upstream budget: a read that has not
+ * answered by then is already lost to the caller, so it answers as a
+ * retryable read failure here instead of holding the request open.
+ */
+const SESSION_HISTORY_READ_BUDGET_MS = 5_000;
+
+type SessionHistoryReadOutcome = 'ok' | 'none' | 'too_large' | 'retryable_failure' | 'invalid_data';
+
+type SessionHistoryRead = {
+  history: KiloSdkMessageHistory | null;
+  outcome: SessionHistoryReadOutcome;
+};
+
+/**
+ * The read did not answer, so nothing is known about the stored page: a retry
+ * can still succeed and the caller must not be told its history is gone.
+ */
+const TRANSIENT_HISTORY_READ: SessionHistoryRead = {
+  history: { kind: 'retryable_failure', phase: 'message_scan' },
+  outcome: 'retryable_failure',
+};
+
+/**
+ * A page the contract can validate has no `kind`; every failure variant has one.
+ * A page also carries its next-page cursor, so a body with only a `messages`
+ * array is not a page the worker failed to read — it is a body this worker
+ * cannot attribute to the stored page, and must stay retryable.
+ */
+function isPageShapedHistory(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'messages' in value &&
+    Array.isArray(value.messages) &&
+    'nextCursor' in value
+  );
+}
+
+function historyReadOutcome(history: KiloSdkMessageHistory | null): SessionHistoryReadOutcome {
+  if (history === null) return 'none';
+  return 'kind' in history ? history.kind : 'ok';
+}
+
+/**
+ * Classify what the Durable Object answered.
+ *
+ * Three outcomes are told apart, because the caller's recovery differs:
+ * - a validated typed answer (a page, `too_large`, `retryable_failure`,
+ *   `invalid_data`, or none) is returned verbatim;
+ * - an answer shaped like a page that the contract rejects is the stored page
+ *   itself, so it stays the terminal `invalid_data`;
+ * - anything else — an unknown failure kind, a body this worker cannot read —
+ *   is not evidence that the stored page is unreadable. Retrying a read that
+ *   never answered is always safe, so it is reported as retryable.
+ */
+function classifyHistoryRead(rawHistory: unknown): SessionHistoryRead {
+  const parsed = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+  if (parsed.success) {
+    return { history: parsed.data, outcome: historyReadOutcome(parsed.data) };
+  }
+  return isPageShapedHistory(rawHistory)
+    ? { history: { kind: 'invalid_data' }, outcome: 'invalid_data' }
+    : TRANSIENT_HISTORY_READ;
+}
+
+/**
  * Paginated session-message history for any Kilo session the user owns.
  * Reuses the same `(owner, current organization membership)` check shape as
  * `SessionIngestRPC.findOwnedAccessibleSession` and delegates the bounded
@@ -698,46 +852,96 @@ api.get('/session/:sessionId/messages', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
+  // The initial page also carries the session metadata. That read is
+  // best-effort and independent of the history read, so it starts alongside it
+  // rather than after it: a second serial Durable Object round trip is pure
+  // added latency on the page the caller is waiting for. Its own deadline
+  // means a stalled RPC cannot hold the page open, and the rejection is
+  // absorbed here so a failed metadata read can never fail the page — or
+  // surface as an unhandled rejection when the history read throws first.
+  const sessionInfoPromise =
+    inputParse.data.before === undefined
+      ? withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+          () =>
+            getSessionIngestDO(c.env, {
+              kiloUserId,
+              sessionId: inputParse.data.kiloSessionId,
+            }),
+          stub => stub.readKiloSdkSessionSnapshot(),
+          'SessionIngestDO.readKiloSdkSessionSnapshot',
+          {
+            ...DEFAULT_DO_RETRY_CONFIG,
+            scope: { deadlineAt: Date.now() + SESSION_METADATA_READ_DEADLINE_MS },
+          }
+        ).catch((error: unknown) => {
+          console.warn(
+            `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
+            error instanceof Error ? error.message : error
+          );
+          return undefined;
+        })
+      : undefined;
+
   const readStartedAt = Date.now();
-  let rawHistory: unknown;
-  try {
-    rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-      () =>
-        getSessionIngestDO(c.env, {
-          kiloUserId,
-          sessionId: inputParse.data.kiloSessionId,
-        }),
-      stub =>
-        stub.readKiloSdkMessages({
-          limit: inputParse.data.limit,
-          before: inputParse.data.before,
-        }),
-      'SessionIngestDO.readKiloSdkMessages'
-    );
-  } catch (error) {
-    // A DO isolate reset is `retryable:false` upstream and would otherwise
-    // leave the read unattributable in production. Log it once, then rethrow
-    // so the response is unchanged.
-    console.warn({
-      event: 'kilo_sdk_history_read_failed',
-      sessionId: inputParse.data.kiloSessionId,
-      limit: inputParse.data.limit,
-      hasCursor: inputParse.data.before !== undefined,
-      error: error instanceof Error ? error.message : String(error),
-      durationMs: Date.now() - readStartedAt,
-    });
-    throw error;
+  // One budget for the read and its confirming retry, so neither can push the
+  // answer past what the caller can still use.
+  const readDeadlineAt = readStartedAt + SESSION_HISTORY_READ_BUDGET_MS;
+
+  const readOnce = async (): Promise<SessionHistoryRead | 'transient'> => {
+    try {
+      const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+        () =>
+          getSessionIngestDO(c.env, {
+            kiloUserId,
+            sessionId: inputParse.data.kiloSessionId,
+          }),
+        stub =>
+          stub.readKiloSdkMessages({
+            limit: inputParse.data.limit,
+            before: inputParse.data.before,
+          }),
+        'SessionIngestDO.readKiloSdkMessages',
+        {
+          ...DEFAULT_DO_RETRY_CONFIG,
+          scope: { deadlineAt: readDeadlineAt },
+        }
+      );
+      return classifyHistoryRead(rawHistory);
+    } catch (error) {
+      // A DO isolate reset is `retryable:false` upstream and would otherwise
+      // leave the read unattributable in production. Log it once.
+      console.warn({
+        event: 'kilo_sdk_history_read_failed',
+        sessionId: inputParse.data.kiloSessionId,
+        limit: inputParse.data.limit,
+        hasCursor: inputParse.data.before !== undefined,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - readStartedAt,
+      });
+      // The platform dropped the hop or the read outlived its budget: the read
+      // never answered, which says nothing about the stored page. Answer the
+      // retryable read failure instead of a 500 the caller cannot classify.
+      if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+        throw error;
+      }
+      return 'transient';
+    }
+  };
+
+  let read = await readOnce();
+  if (read !== 'transient' && read.outcome === 'invalid_data') {
+    // Ingest rewrites a session's rows while the client reads them, so one read
+    // can see a page whose stored identities do not line up yet — the same page
+    // then answers a page a moment later. Only an answer that repeats is
+    // evidence the stored page itself is unreadable, and only then may the
+    // caller be told its history is gone.
+    read = await readOnce();
   }
-  const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
-  const page =
-    history.success && history.data !== null && !('kind' in history.data) ? history.data : null;
-  const outcome = !history.success
-    ? 'invalid_data'
-    : history.data === null
-      ? 'none'
-      : 'kind' in history.data
-        ? history.data.kind
-        : 'ok';
+  // A read that never answered on the confirming attempt says nothing about the
+  // stored page either, so it is never reported as the terminal kind.
+  const history = read === 'transient' ? TRANSIENT_HISTORY_READ.history : read.history;
+  const outcome = read === 'transient' ? TRANSIENT_HISTORY_READ.outcome : read.outcome;
+  const page = history !== null && !('kind' in history) ? history : null;
   // Exactly one structured read-outcome line per request, in the same plain
   // object shape as `direct_ingest_ok`, so `cloudflare-logpush` names the read
   // (and its typed outcome) that a stale-transcript report blames.
@@ -761,35 +965,17 @@ api.get('/session/:sessionId/messages', async c => {
   // Best-effort: a snapshot read failure must not fail the message page; the
   // live session events still carry goal updates.
   let sessionMetadata: Record<string, unknown> | null = null;
-  if (inputParse.data.before === undefined) {
-    try {
-      const rawSessionInfo = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-        () =>
-          getSessionIngestDO(c.env, {
-            kiloUserId,
-            sessionId: inputParse.data.kiloSessionId,
-          }),
-        stub => stub.readKiloSdkSessionSnapshot(),
-        'SessionIngestDO.readKiloSdkSessionSnapshot'
-      );
-      if (
-        typeof rawSessionInfo === 'object' &&
-        rawSessionInfo !== null &&
-        (rawSessionInfo as { kind?: unknown }).kind === 'value'
-      ) {
-        const info = (rawSessionInfo as { info?: unknown }).info;
-        if (typeof info === 'object' && info !== null) {
-          const metadata = (info as { metadata?: unknown }).metadata;
-          if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
-            sessionMetadata = metadata as Record<string, unknown>;
-          }
-        }
+  const rawSessionInfo = await sessionInfoPromise;
+  if (typeof rawSessionInfo === 'object' && rawSessionInfo !== null) {
+    const info =
+      'kind' in rawSessionInfo && rawSessionInfo.kind === 'value' && 'info' in rawSessionInfo
+        ? rawSessionInfo.info
+        : undefined;
+    if (typeof info === 'object' && info !== null && 'metadata' in info) {
+      const metadata = info.metadata;
+      if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+        sessionMetadata = metadata as Record<string, unknown>;
       }
-    } catch (error) {
-      console.warn(
-        `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
-        error instanceof Error ? error.message : error
-      );
     }
   }
 
@@ -797,7 +983,7 @@ api.get('/session/:sessionId/messages', async c => {
     {
       success: true,
       kiloSessionId: inputParse.data.kiloSessionId,
-      history: history.success ? history.data : { kind: 'invalid_data' },
+      history,
       sessionMetadata,
     },
     200
@@ -946,7 +1132,10 @@ api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
     ).catch(() => undefined);
   }
 
-  return c.json({ success: true, share_token: shareToken }, 200);
+  /* The capability it just wrote, not only the token: the app compares it with
+     the one a later read reports, which is what says the link it is showing is
+     still the live one. */
+  return c.json({ success: true, share_token: shareToken, public_id: publicId }, 200);
 });
 
 api.post('/session/:sessionId/unshare', async c => {
@@ -1011,7 +1200,7 @@ api.post('/session/:sessionId/unshare', async c => {
   return c.json({ success: true }, 200);
 });
 
-api.post('/session/:sessionId/rename-notify', async c => {
+api.post('/session/:sessionId/rename-notify', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -1019,7 +1208,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   }
 
   const bodyParse = z
-    .object({ title: z.string().trim().min(1) })
+    .object({ title: sessionTitleSchema })
     .safeParse(await c.req.json().catch(() => null));
   if (!bodyParse.success) {
     return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
@@ -1039,7 +1228,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   return c.json({ delivered }, 200);
 });
 
-api.post('/session/:sessionId/title', async c => {
+api.post('/session/:sessionId/title', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -1075,6 +1264,43 @@ api.post('/session/:sessionId/title', async c => {
   return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
 });
 
+/**
+ * Budget for the best-effort `cli_sessions_v2` title overlay on
+ * `/sessions/active`. The heartbeat answer is already complete without it, so
+ * the overlay may never extend the request: a stalled Postgres hop falls back
+ * to the heartbeat titles instead of spending the caller's budget. Generous
+ * against this route's normal p99, and a small fraction of the budget its
+ * control-plane caller allows.
+ */
+const ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS = 1_500;
+
+/**
+ * Resolve with `work` when it settles inside `budgetMs`, otherwise reject with
+ * a budget error. `PromiseLike` rather than `Promise` because the caller passes
+ * a Drizzle query builder, which is thenable but not a platform promise, and
+ * `Promise.resolve` is what normalizes a thenable that forwards its own pending
+ * value onward. `work` keeps its handlers, so an abandoned query that settles
+ * late is consumed instead of surfacing as an unhandled rejection.
+ */
+function withinBudget<T>(work: PromiseLike<T>, budgetMs: number, label: string): Promise<T> {
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const timer = setTimeout(
+    () => reject(new Error(`${label} exceeded its ${budgetMs}ms budget`)),
+    budgetMs
+  );
+  Promise.resolve(work).then(
+    value => {
+      clearTimeout(timer);
+      resolve(value);
+    },
+    error => {
+      clearTimeout(timer);
+      reject(error);
+    }
+  );
+  return promise;
+}
+
 api.get('/sessions/active', async c => {
   const kiloUserId = c.get('user_id');
   const stub = getUserConnectionDO(c.env, { kiloUserId });
@@ -1085,23 +1311,29 @@ api.get('/sessions/active', async c => {
   // only to Postgres) is reflected on the next poll instead of waiting for
   // the CLI's next heartbeat. The overlay is best-effort: a DB failure must
   // not blank the entire Remote section, so we fall back to the heartbeat
-  // titles and return 200.
+  // titles and return 200. It is also bounded: it is an embellishment on an
+  // answer that is already complete, so it may never hold the request open
+  // and spend the caller's budget on a stalled Postgres hop.
   if (sessions.length > 0) {
     const ids = sessions.map(s => s.id);
     try {
       const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-      const titleRows = await db
-        .select({
-          session_id: cli_sessions_v2.session_id,
-          title: cli_sessions_v2.title,
-        })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            inArray(cli_sessions_v2.session_id, ids)
-          )
-        );
+      const titleRows = await withinBudget(
+        db
+          .select({
+            session_id: cli_sessions_v2.session_id,
+            title: cli_sessions_v2.title,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              inArray(cli_sessions_v2.session_id, ids)
+            )
+          ),
+        ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS,
+        'active-session title overlay'
+      );
 
       const titleBySessionId = new Map<string, string>();
       for (const row of titleRows) {
@@ -1178,16 +1410,46 @@ api.get('/user/web', async c => {
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
 // opaque; its object stores { userId, expiresAt, secret } and the websocket
 // upgrade consumes it exactly once.
+//
+// The mint is the caller's only answer, and it targets a fresh — therefore
+// cold — Durable Object, so it is bounded below the control plane's 8s
+// upstream budget: a mint that has not answered by then is answered here as
+// retryable, instead of letting the caller's fetch budget expire with no
+// attributable response.
+const WEB_TICKET_MINT_BUDGET_MS = 3_000;
+
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
   const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  await withDORetry(
-    getStub,
-    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
-    'ConnectionTicketDO.mint'
-  );
+  try {
+    await withDORetry(
+      getStub,
+      stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+      'ConnectionTicketDO.mint',
+      {
+        ...DEFAULT_DO_RETRY_CONFIG,
+        scope: { deadlineAt: Date.now() + WEB_TICKET_MINT_BUDGET_MS },
+      }
+    );
+  } catch (error) {
+    if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+      throw error;
+    }
+    // The mint may not have run, so a retry can still succeed. It may also have
+    // committed: the retry scope re-checks its deadline after the operation
+    // resolves, so an attempt that committed can still be reported here as a
+    // timeout. That is safe because `createConnectionTicket` picks one object id
+    // and one secret before the retry, so every attempt re-mints the same
+    // ticket slot, and this response never returns that secret: an orphaned
+    // ticket is unreachable and expires with its own TTL.
+    console.warn({
+      event: 'web_ticket_mint_unavailable',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'ticket_mint_unavailable' }, 503);
+  }
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

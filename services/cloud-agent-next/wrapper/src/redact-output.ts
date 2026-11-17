@@ -13,12 +13,44 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
     replacement: `$1=${REDACTED}`,
   },
   {
+    // Compact JWS/JWT, for example sandbox transfer grants renewed at runtime.
+    pattern: /\beyJ[A-Za-z0-9_-]{4,}\.eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{16,}/g,
+    replacement: REDACTED,
+  },
+  {
     pattern: /(Authorization\s*:\s*Bearer\s+)(\S+)/gi,
     replacement: `$1${REDACTED}`,
   },
   {
     pattern: /(Authorization\s*:\s*Basic\s+)(\S+)/gi,
     replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern: /(Authorization\s*:\s*)(?!\s*(?:Bearer|Basic)\b)[^\r\n]+/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern:
+      /^(\s*[A-Za-z0-9_-]*(?:secret|token|password|passphrase|credential|api[_-]?key|private[_-]?key|access[_-]?key)[A-Za-z0-9_-]*\s*:[ \t]*)\S[^\r\n]*/gim,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern:
+      /(("|')[A-Za-z0-9_.-]*(?:secret|token|password|passphrase|credential|api[_-]?key|private[_-]?key|access[_-]?key|authorization|cookie)[A-Za-z0-9_.-]*\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
+    pattern: /(("|')(?:key|access|refresh)\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
+    pattern:
+      /(\\+"[A-Za-z0-9_.-]*(?:secret|token|password|passphrase|credential|key|authorization|cookie|access|refresh)[A-Za-z0-9_.-]*\\+"\s*:\s*)[^\r\n]+/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern: /(https?:\/\/[^\s<>"'\\?]+)\?[^\s<>"'\\]*/gi,
+    replacement: `$1?${REDACTED}`,
   },
   {
     pattern: /(https?:\/\/)[^\s/@]+@/gi,
@@ -30,13 +62,27 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   },
   {
     pattern:
-      /\b([A-Za-z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Za-z0-9_]*)\s*=\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
+      /\b([A-Za-z0-9_-]*(?:SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[A-Za-z0-9_-]*)\s*=\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
     replacement: `$1=${REDACTED}`,
   },
   {
     pattern:
       /(--[A-Za-z0-9-]*(?:token|password|secret|key|apikey|api-key|passphrase|credential)[A-Za-z0-9-]*(?:\s+|=))(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
     replacement: `$1${REDACTED}`,
+  },
+  {
+    // npm credential keys (`_authToken`, base64 `_auth`, `_password`) can be
+    // separated from their value by whitespace or `=`.
+    pattern:
+      /(\b_(?:authToken|auth|password)(?:\s*=\s*|\s+))(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    // curl/basic-auth shorthand carries the credential as user:password. A
+    // bare `-u <name>` (for example `git push -u origin`) is not a credential.
+    pattern:
+      /(^|\s)((?:-u|--user)(?:\s+|=))(?:"[^"\r\n]*:[^"\r\n]*"|'[^'\r\n]*:[^'\r\n]*'|[^\s\r\n:]+:[^\s\r\n]+)/gi,
+    replacement: `$1$2${REDACTED}`,
   },
 ];
 

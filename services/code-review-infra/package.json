@@ -21,6 +21,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"

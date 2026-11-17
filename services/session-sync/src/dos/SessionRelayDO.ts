@@ -7,6 +7,7 @@ import { z } from 'zod';
 import migrations from '../../drizzle-relay/migrations';
 import { relayCommands, relayRates, relayState, relayWatches } from '../db/relay-sqlite-schema';
 import type { Env } from '../env';
+import { commandFrame } from '../live/command-frame';
 import {
   LIVE_LIMITS,
   liveMetric,
@@ -19,6 +20,7 @@ import {
 import { verifyTicket, type LiveTicket } from '../live/ticket';
 import { isBoundedJson, sessionIDSchema, tenantSchema, type Tenant } from '../protocol';
 import { getPresenceStub } from './SessionPresenceDO';
+import { diagnostic, metricsEnabled, phase, syncPhase } from '../metrics';
 
 const commandSchema = z.strictObject({
   channel: z.literal('commands'),
@@ -90,23 +92,29 @@ export class SessionRelayDO extends DurableObject<Env> {
   private alarmAt: number | null = null;
   private watchRefreshAt = Date.now() + watchRefreshMs;
   private watchSerial: Promise<void> = Promise.resolve();
+  private watchQueueDepth = 0;
   private runnerRates = new Map<string, { window: number; count: number }>();
   private attachments = new Map<WebSocket, Attachment>();
+  // Highest event sequence handed to each socket. Memory only: after reconstruction the replay floor
+  // already starts at the stored sequence ceiling, so a persisted value could never change replay.
+  private delivered = new WeakMap<WebSocket, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      this.db.insert(relayState).values({ id: 1, seq: 0 }).onConflictDoNothing().run();
-      const state = this.db.select().from(relayState).where(eq(relayState.id, 1)).get();
-      this.seq = state?.seq ?? 0;
-      this.ceiling = this.seq;
-      this.purged = state?.purged ?? false;
-      this.replayFloor = this.seq;
-      this.alarmAt = await ctx.storage.getAlarm();
-      for (const ws of ctx.getWebSockets()) this.attachment(ws);
-    });
+    void ctx.blockConcurrencyWhile(() =>
+      phase(env, 'relayInitialize', 'initialize', async () => {
+        await migrate(this.db, migrations);
+        this.db.insert(relayState).values({ id: 1, seq: 0 }).onConflictDoNothing().run();
+        const state = this.db.select().from(relayState).where(eq(relayState.id, 1)).get();
+        this.seq = state?.seq ?? 0;
+        this.ceiling = this.seq;
+        this.purged = state?.purged ?? false;
+        this.replayFloor = this.seq;
+        this.alarmAt = await ctx.storage.getAlarm();
+        for (const ws of ctx.getWebSockets()) this.attachment(ws);
+      })
+    );
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -232,7 +240,6 @@ export class SessionRelayDO extends DurableObject<Env> {
       await this.schedule();
       return;
     }
-    if (state.ticket.role !== 'runner') this.sweep();
     if (!this.takeRate(state.ticket)) {
       this.control(ws, 'error', { code: 'rate_limit_exceeded' });
       return;
@@ -253,6 +260,16 @@ export class SessionRelayDO extends DurableObject<Env> {
       return;
     }
     const frame = frameSchema.safeParse(value);
+    if (frame.success && frame.data.type === 'subscribe' && state.ticket.role !== 'runner') {
+      // An unchanged subscription leaves the sweep and the presence watch to the alarm.
+      if (this.subscribe(ws, state, frame.data.afterSeq)) {
+        this.sweep();
+        this.ctx.waitUntil(this.notifyWatch(state.ticket));
+      }
+      await this.schedule();
+      return;
+    }
+    if (state.ticket.role !== 'runner') this.sweep();
     if (frame.success) {
       if (frame.data.type === 'reauth') {
         const ticket = await this.authorize(frame.data.ticket);
@@ -276,9 +293,6 @@ export class SessionRelayDO extends DurableObject<Env> {
           });
           if (ticket.role !== 'runner') this.ctx.waitUntil(this.notifyWatch(ticket));
         }
-      } else if (frame.data.type === 'subscribe' && state.ticket.role !== 'runner') {
-        this.subscribe(ws, state, frame.data.afterSeq);
-        this.ctx.waitUntil(this.notifyWatch(state.ticket));
       } else if (frame.data.type === 'ack' && state.ticket.role === 'runner') {
         this.ack(frame.data.commandID);
       } else {
@@ -474,36 +488,74 @@ export class SessionRelayDO extends DurableObject<Env> {
       tenant: ticket.tenant,
       sessionID: ticket.sessionID,
     };
-    this.db
-      .insert(relayWatches)
-      .values({
-        user_id: subject.userID,
-        tenant: subject.tenant,
-        session_id: subject.sessionID,
-      })
-      .onConflictDoNothing()
-      .run();
+    syncPhase(
+      this.env,
+      'relayWatch',
+      'watch_storage',
+      () =>
+        this.db
+          .insert(relayWatches)
+          .values({
+            user_id: subject.userID,
+            tenant: subject.tenant,
+            session_id: subject.sessionID,
+          })
+          .onConflictDoNothing()
+          .run(),
+      subject.tenant.type
+    );
+    const queuedAt = metricsEnabled(this.env) ? performance.now() : 0;
+    this.watchQueueDepth++;
     const task = this.watchSerial
       .then(async () => {
+        diagnostic(this.env, {
+          operation: 'relayWatch',
+          stage: 'watch_queue',
+          tenant: subject.tenant.type,
+          durationMs: queuedAt ? performance.now() - queuedAt : 0,
+          queueDepth: this.watchQueueDepth,
+        });
         const watching =
           !this.purged &&
           this.sockets().some(
             ([, state]) => state.ticket.role !== 'runner' && state.ticket.userID === subject.userID
           );
-        await getPresenceStub(this.env, subject.userID).watch({
-          tenant: subject.tenant,
-          sessionID: subject.sessionID,
-          watching,
-        });
+        await phase(
+          this.env,
+          'relayWatch',
+          'watch_rpc',
+          () =>
+            getPresenceStub(this.env, subject.userID).watch({
+              tenant: subject.tenant,
+              sessionID: subject.sessionID,
+              watching,
+            }),
+          subject.tenant.type
+        );
         const stillWatching =
           !this.purged &&
           this.sockets().some(
             ([, state]) => state.ticket.role !== 'runner' && state.ticket.userID === subject.userID
           );
         if (!watching && !stillWatching)
-          this.db.delete(relayWatches).where(eq(relayWatches.user_id, subject.userID)).run();
+          syncPhase(
+            this.env,
+            'relayWatch',
+            'watch_storage',
+            () =>
+              this.db.delete(relayWatches).where(eq(relayWatches.user_id, subject.userID)).run(),
+            subject.tenant.type
+          );
       })
-      .catch(() => {
+      .catch(error => {
+        diagnostic(this.env, {
+          operation: 'relayWatch',
+          stage: 'watch_queue',
+          tenant: subject.tenant.type,
+          outcome: 'error',
+          error,
+          queueDepth: this.watchQueueDepth,
+        });
         console.error('Relay presence watch failed');
         for (const [ws, state] of this.sockets()) {
           if (state.ticket.role !== 'runner' && state.ticket.userID === subject.userID)
@@ -512,6 +564,9 @@ export class SessionRelayDO extends DurableObject<Env> {
               message: 'Live publishing could not be enabled',
             });
         }
+      })
+      .finally(() => {
+        this.watchQueueDepth--;
       });
     this.watchSerial = task;
     return task;
@@ -531,26 +586,35 @@ export class SessionRelayDO extends DurableObject<Env> {
     }
   }
 
-  private subscribe(ws: WebSocket, state: Attachment, afterSeq: number): void {
+  /** Replays only what this socket has not received; true when its subscription changed. */
+  private subscribe(ws: WebSocket, state: Attachment, afterSeq: number): boolean {
     this.trimRing(Date.now());
+    const wasSubscribed = state.subscribed;
     state.subscribed = afterSeq >= this.replayFloor && afterSeq <= this.seq;
     this.saveAttachment(ws, state);
     if (afterSeq < this.replayFloor || afterSeq > this.seq) {
       this.control(ws, 'reset_required', { seq: this.seq });
-      return;
+      return wasSubscribed;
     }
+    const cursor = Math.max(afterSeq, this.delivered.get(ws) ?? 0);
+    let replayed = false;
     for (const entry of this.ring) {
-      if (entry.seq > afterSeq && !this.sendEncoded(ws, state, entry.encoded)) return;
+      if (entry.seq <= cursor) continue;
+      if (!this.sendText(ws, state, entry.encoded, 'Event delivery failed')) return false;
+      replayed = true;
     }
-    this.control(ws, 'subscribed', { seq: this.seq });
+    this.delivered.set(ws, this.seq);
+    this.control(ws, 'subscribed', { seq: this.seq, cursor });
+    return !wasSubscribed || replayed;
   }
 
-  private sendEncoded(ws: WebSocket, state: Attachment, encoded: string): boolean {
+  /** Sends one encoded frame; a transport failure closes the socket with the caller's reason. */
+  private sendText(ws: WebSocket, state: Attachment, text: string, failure: string): boolean {
     try {
-      ws.send(encoded);
+      ws.send(text);
       return true;
     } catch {
-      this.close(ws, state, 1011, 'Event delivery failed');
+      if (!state.closed) this.close(ws, state, 1011, failure);
       return false;
     }
   }
@@ -588,7 +652,9 @@ export class SessionRelayDO extends DurableObject<Env> {
     let fanout = 0;
     for (const [viewer, state] of this.sockets()) {
       if (state.ticket.role !== 'runner' && state.subscribed) {
-        if (this.sendEncoded(viewer, state, encoded)) fanout++;
+        if (!this.sendText(viewer, state, encoded, 'Event delivery failed')) continue;
+        this.delivered.set(viewer, seq);
+        fanout++;
       }
     }
     liveMetric(this.env, {
@@ -606,21 +672,24 @@ export class SessionRelayDO extends DurableObject<Env> {
     const command = parsed.data;
     const payload = JSON.stringify(command.body);
     const bytes = encoder.encode(JSON.stringify(command)).byteLength;
+    const now = Date.now();
+    const ttl = command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs;
     // Reserve envelope overhead too, so accepted payloads always fit the runner's wire bound.
-    const envelope = this.commandEnvelope({
-      command_id: command.commandID,
-      from: ticket.userID,
-      type: command.type,
-      payload,
-      expires_at: Date.now() + (command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs),
-      live_only: command.liveOnly ?? false,
-      created_at: Date.now(),
-    });
-    if (
-      bytes > LIVE_LIMITS.messageBytes ||
-      encoder.encode(JSON.stringify({ ...envelope, seq: Number.MAX_SAFE_INTEGER })).byteLength >
-        LIVE_LIMITS.messageBytes
-    )
+    const worstCase = encoder.encode(
+      commandFrame(
+        {
+          commandID: command.commandID,
+          from: ticket.userID,
+          type: command.type,
+          payload,
+          expiresAt: now + ttl,
+          liveOnly: command.liveOnly ?? false,
+          createdAt: now,
+        },
+        Number.MAX_SAFE_INTEGER
+      )
+    ).byteLength;
+    if (bytes > LIVE_LIMITS.messageBytes || worstCase > LIVE_LIMITS.messageBytes)
       return error(413, 'message_too_large', 'Command exceeds the relay limit');
     const prior = this.db
       .select()
@@ -642,7 +711,6 @@ export class SessionRelayDO extends DurableObject<Env> {
     )
       return error(503, 'service_overloaded', 'The command mailbox is full');
     this.makeReceiptRoom();
-    const now = Date.now();
     this.db
       .insert(relayCommands)
       .values({
@@ -653,7 +721,7 @@ export class SessionRelayDO extends DurableObject<Env> {
         bytes,
         live_only: command.liveOnly ?? false,
         created_at: now,
-        expires_at: now + (command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs),
+        expires_at: now + ttl,
         delivered_at: null,
         status: 'queued',
         finished_at: null,
@@ -664,7 +732,8 @@ export class SessionRelayDO extends DurableObject<Env> {
       .from(relayCommands)
       .where(eq(relayCommands.command_id, command.commandID))
       .get();
-    const delivered = Boolean(runner && row && this.deliverCommand(runner, row));
+    const delivered =
+      runner && row && row.payload !== null ? this.deliverCommand(runner, row, row.payload) : false;
     liveMetric(this.env, {
       route: 'relay.commands',
       role: ticket.role,
@@ -677,42 +746,28 @@ export class SessionRelayDO extends DurableObject<Env> {
     });
   }
 
-  private commandEnvelope(
-    row: Pick<
-      CommandRow,
-      'command_id' | 'from' | 'type' | 'payload' | 'expires_at' | 'live_only' | 'created_at'
-    >
-  ) {
-    const payload: unknown = row.payload === null ? null : JSON.parse(row.payload);
-    if (!isBoundedJson(payload)) throw new Error('Invalid stored relay command payload');
-    return {
-      v: 1,
-      channel: 'commands',
-      seq: this.seq,
-      from: row.from,
-      at: row.created_at,
-      type: row.type,
-      body: {
+  private deliverCommand(ws: WebSocket, row: CommandRow, payload: string): boolean {
+    const state = this.attachment(ws);
+    if (!state || state.closed) return false;
+    const frame = commandFrame(
+      {
         commandID: row.command_id,
+        from: row.from,
+        type: row.type,
         payload,
-        expiresAt: new Date(row.expires_at).toISOString(),
+        expiresAt: row.expires_at,
         liveOnly: row.live_only,
+        createdAt: row.created_at,
       },
-    };
-  }
-
-  private deliverCommand(ws: WebSocket, row: CommandRow): boolean {
-    if (!send(ws, this.commandEnvelope(row))) {
-      const state = this.attachment(ws);
-      if (state && !state.closed) this.close(ws, state, 1011, 'Command delivery failed');
-      return false;
-    }
+      this.seq
+    );
+    if (!this.sendText(ws, state, frame, 'Command delivery failed')) return false;
+    // Delivery is not acknowledgement: a retained row replays on every runner connection. Only the
+    // first hand-off changes stored state, so a replay writes nothing and announces nothing.
+    if (row.status === 'delivered' && row.delivered_at !== null) return true;
     this.db
       .update(relayCommands)
-      .set({
-        status: 'delivered',
-        delivered_at: row.delivered_at ?? Date.now(),
-      })
+      .set({ status: 'delivered', delivered_at: row.delivered_at ?? Date.now() })
       .where(eq(relayCommands.command_id, row.command_id))
       .run();
     if (row.status !== 'delivered')
@@ -728,7 +783,8 @@ export class SessionRelayDO extends DurableObject<Env> {
       .orderBy(asc(relayCommands.ordinal))
       .all();
     for (const row of rows) {
-      if (!this.attachment(ws)?.closed) this.deliverCommand(ws, row);
+      if (row.payload === null) continue;
+      if (!this.attachment(ws)?.closed) this.deliverCommand(ws, row, row.payload);
     }
   }
 

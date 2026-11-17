@@ -68,6 +68,7 @@ import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
 import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
+import { ComputeUsageSection } from './ComputeUsageSection';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -852,6 +853,20 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                 ) : (
                   <SpendAlertsPanel />
                 )}
+
+                {!isSalesDemo &&
+                  (isOrgContext && effectiveOrgId === null ? (
+                    <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+                      Select one organization to inspect its compute charges.
+                    </p>
+                  ) : (
+                    <ComputeUsageSection
+                      key={`${effectiveOrgId ?? 'personal'}:${effectiveViewAs}:${dateRange.startDate}:${dateRange.endDate}`}
+                      organizationId={effectiveOrgId}
+                      view={effectiveViewAs === 'org-wide' ? 'all' : 'self'}
+                      dateRange={dateRange}
+                    />
+                  ))}
 
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />

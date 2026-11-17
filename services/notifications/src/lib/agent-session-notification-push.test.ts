@@ -29,10 +29,8 @@ const session = { title: 'Refactor auth module', organizationId: null };
 
 const ALL_ON: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,
@@ -113,6 +111,24 @@ describe('buildAgentSessionNotificationContent', () => {
     const personalContent = buildAgentSessionNotificationContent(baseParams, session);
     expect('organizationId' in personalContent).toBe(false);
   });
+
+  it('names the waiting raise so the app answers that raise, and omits it otherwise', () => {
+    const waiting = buildAgentSessionNotificationContent(baseParams, {
+      title: 'Org session',
+      organizationId: null,
+      status: 'permission',
+      statusUpdatedAt: new Date('2026-09-18T21:00:00.000Z'),
+    });
+    expect(waiting.raiseId).toBe('2026-09-18T21:00:00.000Z');
+
+    const working = buildAgentSessionNotificationContent(baseParams, {
+      title: 'Org session',
+      organizationId: null,
+      status: 'busy',
+      statusUpdatedAt: '2026-09-18 21:00:00+00',
+    });
+    expect('raiseId' in working).toBe(false);
+  });
 });
 
 describe('buildAgentSessionNotificationDispatchInput', () => {
@@ -135,6 +151,23 @@ describe('buildAgentSessionNotificationDispatchInput', () => {
       },
       rateLimit: { key: 'agent:ses_abc', limit: 5, windowSeconds: 600 },
     });
+  });
+
+  it('puts the named raise into the dispatched payload', () => {
+    const content = buildAgentSessionNotificationContent(baseParams, {
+      title: 'Refactor auth module',
+      organizationId: null,
+      status: 'question',
+      statusUpdatedAt: '2026-09-18 21:00:00+00',
+    });
+    const input = buildAgentSessionNotificationDispatchInput(baseParams, content);
+    expect(input.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_abc',
+      category: 'attention',
+      raiseId: '2026-09-18T21:00:00.000Z',
+    });
+    expect(pushDataSchema.safeParse(input.push.data).success).toBe(true);
   });
 
   it('classifies the notify_user push as needs-input on every presentation surface', () => {
@@ -236,10 +269,8 @@ describe('dispatchAgentSessionNotificationPush', () => {
         // The push is needs-input now, so the 'Agent updates' toggle no longer
         // governs it; every other category stays irrelevant.
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: true,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
       },
     });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);

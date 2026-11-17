@@ -1,4 +1,10 @@
-import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import {
+  readStoredMetadata,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Which models the partner project can actually serve.
@@ -36,6 +42,14 @@ let failureExpiresAt = 0;
 let inFlight: Promise<Set<string> | null> | null = null;
 
 /**
+ * `Array.isArray` narrows to `any[]`, which would make every element read unsafe; this guard keeps
+ * the elements `unknown` so each one is narrowed where it is read.
+ */
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+/**
  * The served ids in a `/models` body, or null when the body carries no usable
  * list. A 200 whose shape is unrecognizable — an error envelope, a proxy stub, a
  * body without `data` — is a failed lookup, not an empty catalog: caching it as
@@ -46,21 +60,43 @@ let inFlight: Promise<Set<string> | null> | null = null;
 function readServedModelIds(body: unknown): Set<string> | null {
   if (typeof body !== 'object' || body === null || !('data' in body)) return null;
   const { data } = body;
-  if (!Array.isArray(data) || data.length === 0) return null;
+  if (!isUnknownArray(data) || data.length === 0) return null;
 
-  const ids = data
-    .map(model => (typeof model?.id === 'string' ? model.id : null))
-    .filter((id): id is string => id !== null);
+  const ids: string[] = [];
+  for (const entry of data) {
+    if (
+      typeof entry === 'object' &&
+      entry !== null &&
+      'id' in entry &&
+      typeof entry.id === 'string'
+    ) {
+      ids.push(entry.id);
+    }
+  }
   return ids.length === 0 ? null : new Set(ids);
 }
 
+function parseServedModelIds(body: unknown): Set<string> {
+  const ids = readServedModelIds(body);
+  if (!ids) throw new Error('OpenAI /models response has no usable model list');
+  return ids;
+}
+
+export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
+  url: MODELS_URL,
+  headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
+  parse: parseServedModelIds,
+};
+
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
+  const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb);
+  if (stored) return stored;
+
   try {
     const response = await fetch(MODELS_URL, {
-      // The module cache below is the only cache for this lookup. Next's data
-      // cache would otherwise keep answering with the body it already stored for
-      // `CACHE_TTL_SECONDS`, so the short failure window could only repeat an
-      // unusable answer instead of asking the project again.
+      // Bypass Next's data cache: it would otherwise keep answering with the body
+      // it already stored for `CACHE_TTL_SECONDS`, so the short failure window
+      // could only repeat an unusable answer instead of asking the project again.
       cache: 'no-store',
       headers: { authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -80,9 +116,9 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * body returns true: a transient problem must not hide the route, and the
  * upstream then answers exactly as it does today. A failure is remembered for
  * `FAILURE_TTL_MS` so a burst of eligible requests does not each pay the lookup
- * and its timeout. The next lookup after that window asks the project again
- * rather than reusing a stored answer, so a bad answer costs the short window
- * and never the hour a good list is reused for.
+ * and its timeout, so a bad answer costs the short window and never the hour a
+ * good list is reused for. Each lookup reads the list the metadata cache refresh
+ * stored, and asks the project directly only when no usable row exists.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;

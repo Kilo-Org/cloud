@@ -35,9 +35,6 @@ describe('Pashto count-one copy', () => {
     expect(
       i18n.t('agentChat.attachmentPicker.maxFilesAllowed', { count: 1, displayCount: '1' })
     ).toBe('تر 1 فایل پورې اجازه شته.');
-    expect(i18n.t('chat.attachment.limit', { count: 1, displayCount: '1' })).toBe(
-      'تاسو کولی شئ تر 1 پورې فایل ونښلوئ.'
-    );
     expect(i18n.t('prReview.checks.checksCount', { count: 1, displayCount: '1' })).toBe(
       '1 ازموینه'
     );
@@ -77,9 +74,6 @@ describe('Pashto count-one copy', () => {
     expect(
       i18n.t('agentChat.attachmentPicker.maxFilesAllowed', { count: 2, displayCount: '2' })
     ).toBe('تر 2 فایلونو پورې اجازه شته.');
-    expect(i18n.t('chat.attachment.limit', { count: 2, displayCount: '2' })).toBe(
-      'تاسو کولی شئ تر 2 پورې فایلونه ونښلوئ.'
-    );
     expect(i18n.t('prReview.checks.checksCount', { count: 2, displayCount: '2' })).toBe(
       '2 ازموینې'
     );
@@ -112,13 +106,11 @@ describe('Pashto count-one copy', () => {
       'ساړه بیا راوړنه، سناپشاټ پلی شو، بېرته راوړل شوي فایلونه: 1 له 4'
     );
     expect(
-      i18n.t('agentChat.preparation.detailRestoreIncompleteReport', {
+      i18n.t('agentChat.preparation.detailRestoreIncompleteFiles', {
         skipped: '1',
         total: '4',
         reasons: 'the patch did not apply',
       })
-    ).toBe(
-      'د ناستې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)'
-    );
+    ).toBe('بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)');
   });
 });

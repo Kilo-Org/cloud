@@ -1,4 +1,5 @@
 import { readProfileBundle } from '../../session-profile.js';
+import { commandsPayloadSchema } from '../../session/ingest-handlers/commands-available.js';
 import { z } from 'zod';
 import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
 import {
@@ -37,7 +38,16 @@ import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-pr
 import { sessionWorkspace } from './workspace-roots.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+import {
+  CONTROL_PLANE_SANDBOX_PERMISSION,
+  isInteractiveSessionOrigin,
+} from '../../shared/control-plane-permission.js';
+import {
+  narrowProfileAgents,
+  permissionRulesOf,
+  type PermissionMap,
+} from '../../shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -65,6 +75,7 @@ export const controlPlaneSessionRegisterInputSchema = z
   .object({
     metadata: CurrentSessionMetadataSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema,
+    initialCommands: commandsPayloadSchema.optional(),
     runtimeAuthorizationSeal: z
       .string()
       .min(1)
@@ -124,6 +135,8 @@ export function controlPlaneRouteSpecFromAttachPayload(
     directory: payload.directory,
     ...(payload.branch ? { branch: payload.branch } : {}),
     ...(payload.branchMode ? { branchMode: payload.branchMode } : {}),
+    ...(payload.baseBranch ? { baseBranch: payload.baseBranch } : {}),
+    ...(payload.baseSha ? { baseSha: payload.baseSha } : {}),
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
@@ -240,7 +253,7 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets, agents, commands and MCP are withheld.
+  // encrypted profile secrets, instructions, agents, commands and MCP are withheld.
   // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
@@ -249,9 +262,17 @@ export function buildControlPlaneSessionRegistration(
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
   const profile = readProfileBundle(metadata);
   const runtimeProfile = {
+    ...(!readOnlyBitbucketReview && profile.runtimeInstructions?.length
+      ? { runtimeInstructions: profile.runtimeInstructions }
+      : {}),
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
     ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
       ? { runtimeAgents: profile.runtimeAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview &&
+    profile.builtinAgents &&
+    Object.keys(profile.builtinAgents).length > 0
+      ? { builtinAgents: profile.builtinAgents }
       : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }
@@ -268,14 +289,43 @@ export function buildControlPlaneSessionRegistration(
   );
   if (payload.directory === undefined)
     throw new Error('Session attach payload requires a directory');
-  const permission = {
+  const guardPermissions = commandGuard
+    ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
+    : undefined;
+  const permission: PermissionMap = {
     ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
-    ...(commandGuard
-      ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
-      : {}),
+    ...(guardPermissions ?? {}),
   };
+  // The route runs with the platform baseline (`CONTROL_PLANE_SANDBOX_PERMISSION`
+  // and the session policy on top, see `worktree-runtime.ts`), and the runtime
+  // rewrites the same map before it writes the profile entries. Compose the
+  // stored entry against that enforced map, plus the review publisher refusals
+  // when this session publishes through the trusted publisher. A plain
+  // code-review session without a GitHub target composes to the same refusals or
+  // stricter, never wider, so the stored route spec never carries a wider agent
+  // entry than the written `profile.json`. The spec's own `permission` field
+  // stays the session policy alone.
+  const enforcedPermission: PermissionMap = {
+    ...CONTROL_PLANE_SANDBOX_PERMISSION,
+    ...permission,
+  };
+  const reviewPublisherRules =
+    commandGuard?.policyName === 'code-review-read-only' && payload.git?.platform === 'github';
+  const compositionPermission: PermissionMap = reviewPublisherRules
+    ? {
+        ...enforcedPermission,
+        bash: { ...permissionRulesOf(enforcedPermission['bash']), ...buildGitHubReviewBashRules() },
+      }
+    : enforcedPermission;
+  const effectiveProfile =
+    guardPermissions === undefined || runtimeProfile.runtimeAgents === undefined
+      ? runtimeProfile
+      : {
+          ...runtimeProfile,
+          runtimeAgents: narrowProfileAgents(compositionPermission, runtimeProfile.runtimeAgents),
+        };
   const spec = controlPlaneRouteSpecSchema.parse({
-    ...runtimeProfile,
+    ...effectiveProfile,
     ...(metadata.continuation ? { continuation: true } : {}),
     ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...(roots === undefined ? {} : { roots }),

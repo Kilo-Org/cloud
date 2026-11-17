@@ -7,7 +7,7 @@ import {
 import { type Turn, type TurnPart } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
-import { type Question } from './state';
+import { type Displaced, type Question } from './state';
 import { pendingTool, resolvedTool } from './answer-parts';
 
 /**
@@ -140,6 +140,13 @@ function asMessage(
 /** The identifier of the question that has no answer yet. Its Retry hangs off it. */
 export const askedMessageId = (sessionId: string): string => `${sessionId}:asked`;
 
+/**
+ * The identifier of a question a later send kept, which is what its bubble is
+ * drawn under and what its Retry finds it by.
+ */
+export const displacedMessageId = (sessionId: string, id: string): string =>
+  `${sessionId}:displaced:${id}`;
+
 /** A question that is not in the store yet, as the bubble a person sees. */
 function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Question): StoredMessage {
   const message = asMessage({
@@ -163,6 +170,16 @@ function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Questio
  * store, because the store holds a question and its answer together or neither.
  * It is what the Retry hangs off, and it is on screen from the moment it is
  * asked rather than when its answer lands.
+ *
+ * A question a later send kept is drawn among the turns as well, after the ones
+ * that came before it, so the conversation reads in the order it happened: a
+ * failure can sit above the answer that came after it, rather than being pushed
+ * to the bottom under everything said since.
+ *
+ * A kept question asked again is one bubble, not two: the slot names it, and it
+ * stays where it was said while it is being asked, so a later question never
+ * reads above an earlier one. Only a question the transcript does not hold is
+ * drawn from the slot.
  */
 export function asMessages(input: {
   readonly sessionId: string;
@@ -171,6 +188,10 @@ export function asMessages(input: {
   readonly asked: string | null;
   /** The images the pending question carries. */
   readonly askedImages: readonly LocalImage[];
+  /** The kept question the slot is asking again, when it is one. */
+  readonly askedFrom?: string | null;
+  /** The questions a later send took the slot from, oldest first. */
+  readonly displaced?: readonly Displaced[];
   /** Questions typed while an answer was arriving, in the order they go. */
   readonly waiting: readonly Question[];
 }): StoredMessage[] {
@@ -190,10 +211,40 @@ export function asMessages(input: {
       }
     }
   }
-  const drawn = input.turns
-    .map(turn => asMessage(turn, results))
-    .filter(message => message.parts.some(part => part.type !== 'reasoning'));
-  if (input.asked !== null) {
+  /* Where each kept question goes: the count of turns before it is an index
+     into the stored ones, and a count the store has since shrunk below — a
+     compacted conversation — puts it after all of them rather than nowhere. */
+  const keptAfter = new Map<number, Displaced[]>();
+  for (const question of input.displaced ?? []) {
+    const at = Math.min(question.afterTurns, input.turns.length);
+    const held = keptAfter.get(at);
+    if (held === undefined) {
+      keptAfter.set(at, [question]);
+    } else {
+      held.push(question);
+    }
+  }
+  const drawn: StoredMessage[] = [];
+  const heldKept = new Set<string>();
+  const drawKept = (after: number) => {
+    for (const question of keptAfter.get(after) ?? []) {
+      heldKept.add(question.id);
+      const id = displacedMessageId(input.sessionId, question.id);
+      drawn.push(questionMessage({ id, sessionId: input.sessionId }, question));
+    }
+  };
+  for (const [index, turn] of input.turns.entries()) {
+    drawKept(index);
+    const message = asMessage(turn, results);
+    if (message.parts.some(part => part.type !== 'reasoning')) {
+      drawn.push(message);
+    }
+  }
+  drawKept(input.turns.length);
+  /* The slot's question is drawn on its own only when the transcript does not
+     already hold it. A retry of a kept question names it, and that bubble — at
+     the place it was said — is the attempt on screen. */
+  if (input.asked !== null && !(input.askedFrom != null && heldKept.has(input.askedFrom))) {
     const id = askedMessageId(input.sessionId);
     drawn.push(
       questionMessage(
@@ -214,12 +265,17 @@ export function asMessages(input: {
     });
   }
   for (const [index, question] of input.waiting.entries()) {
-    drawn.push(
-      questionMessage(
-        { id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId },
-        question
-      )
-    );
+    /* A question waiting to be asked again is already in the transcript: a
+       second bubble under it would say the same thing twice. */
+    const alreadyDrawn = question.from != null && heldKept.has(question.from);
+    if (!alreadyDrawn) {
+      drawn.push(
+        questionMessage(
+          { id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId },
+          question
+        )
+      );
+    }
   }
   return drawn;
 }

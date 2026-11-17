@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  isPostHogStorageSealed,
-  POSTHOG_STORAGE_FILES,
   posthogCustomStorage,
   purgePostHogPersistence,
   resetPostHogStorageForTests,
@@ -10,16 +8,21 @@ import {
   unsealPostHogStorage,
 } from './posthog-storage';
 
-// ---- mock ----
-
 const expoFileSystemMock = vi.hoisted(() => {
-  const File = vi.fn(function FileMock(_base: string, _name: string) {
+  // Distinct, non-empty payloads per PostHog file. A reader that returns the
+  // wrong file, or invents a value, cannot match both payloads.
+  const fileContents: Record<string, string> = {
+    '.posthog-rn.json': '{"distinct_id":"anon-1"}',
+    '.posthog-rn-logs.json': '[]',
+  };
+
+  const File = vi.fn(function FileMock(_base: string, name: string) {
     const file: MockFileInstance = {
       _exists: true,
       get exists() {
         return (this as { _exists: boolean })._exists;
       },
-      text: vi.fn().mockResolvedValue(''),
+      text: vi.fn().mockResolvedValue(fileContents[name] ?? ''),
       writeSync(value: string) {
         this.content = value;
       },
@@ -29,6 +32,7 @@ const expoFileSystemMock = vi.hoisted(() => {
   });
   return {
     File,
+    fileContents,
     Paths: { cache: 'file:///cache', document: 'file:///document' },
   };
 });
@@ -37,8 +41,6 @@ vi.mock('expo-file-system', () => ({
   File: expoFileSystemMock.File,
   Paths: expoFileSystemMock.Paths,
 }));
-
-// ---- helpers ----
 
 type MockFileInstance = {
   _exists: boolean;
@@ -77,14 +79,16 @@ function makeNextFile(opts?: {
   expoFileSystemMock.File.mockImplementationOnce(function FileMock(
     this: MockFileInstance,
     _base: string,
-    _name: string
+    name: string
   ) {
     const file: MockFileInstance = {
       _exists: exists,
       get exists() {
         return exists;
       },
-      text: textReject ? vi.fn().mockRejectedValue(textReject) : vi.fn().mockResolvedValue(''),
+      text: textReject
+        ? vi.fn().mockRejectedValue(textReject)
+        : vi.fn().mockResolvedValue(expoFileSystemMock.fileContents[name] ?? ''),
       writeSync(value: string) {
         if (writeReject) {
           throw writeReject;
@@ -104,14 +108,6 @@ function makeNextFile(opts?: {
 beforeEach(() => {
   resetPostHogStorageForTests();
   vi.clearAllMocks();
-});
-
-// ---- tests ----
-
-describe('POSTHOG_STORAGE_FILES', () => {
-  it('has two entries matching the SDK storage files', () => {
-    expect(POSTHOG_STORAGE_FILES).toEqual(['.posthog-rn.json', '.posthog-rn-logs.json']);
-  });
 });
 
 describe('posthogCustomStorage', () => {
@@ -139,10 +135,12 @@ describe('posthogCustomStorage', () => {
       }
     });
 
-    it('returns the file content', async () => {
-      const result = await posthogCustomStorage.getItem('.posthog-rn.json');
-      expect(lastFileInstance().text).toHaveBeenCalled();
-      expect(result).toBe('');
+    it('returns the content of the requested file', async () => {
+      const events = await posthogCustomStorage.getItem('.posthog-rn.json');
+      const logs = await posthogCustomStorage.getItem('.posthog-rn-logs.json');
+
+      expect(events).toBe('{"distinct_id":"anon-1"}');
+      expect(logs).toBe('[]');
     });
 
     it('returns null when the file does not exist', async () => {
@@ -197,21 +195,6 @@ describe('posthogCustomStorage', () => {
 });
 
 describe('seal', () => {
-  it('starts unsealed', () => {
-    expect(isPostHogStorageSealed()).toBe(false);
-  });
-
-  it('sealPostHogStorage sets the seal', () => {
-    sealPostHogStorage();
-    expect(isPostHogStorageSealed()).toBe(true);
-  });
-
-  it('unsealPostHogStorage clears the seal', () => {
-    sealPostHogStorage();
-    unsealPostHogStorage();
-    expect(isPostHogStorageSealed()).toBe(false);
-  });
-
   describe('sealed getItem', () => {
     it('returns null when sealed', async () => {
       sealPostHogStorage();
@@ -245,8 +228,8 @@ describe('seal', () => {
     it('getItem reads again', async () => {
       sealPostHogStorage();
       unsealPostHogStorage();
-      await posthogCustomStorage.getItem('.posthog-rn.json');
-      expect(lastFileInstance().text).toHaveBeenCalled();
+      const result = await posthogCustomStorage.getItem('.posthog-rn.json');
+      expect(result).toBe('{"distinct_id":"anon-1"}');
     });
   });
 });
@@ -270,19 +253,8 @@ describe('purgePostHogPersistence', () => {
     expect(paths).toContain('file:///document/.posthog-rn.json');
     expect(paths).toContain('file:///document/.posthog-rn-logs.json');
 
-    // Every File instance had delete() called.
     for (const inst of expoFileSystemMock.File.mock.instances as MockFileInstance[]) {
       expect(inst.delete).toHaveBeenCalled();
     }
-  });
-});
-
-describe('resetPostHogStorageForTests', () => {
-  it('resets the seal', () => {
-    sealPostHogStorage();
-    expect(isPostHogStorageSealed()).toBe(true);
-
-    resetPostHogStorageForTests();
-    expect(isPostHogStorageSealed()).toBe(false);
   });
 });

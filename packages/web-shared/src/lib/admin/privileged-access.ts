@@ -58,6 +58,7 @@ export type AdminStepUpState =
 export type SupportGrantSlot = {
   grantId: string;
   organizationId: string;
+  actionClass: 'support_read' | 'support_write';
   expiresAt: string;
 };
 
@@ -115,8 +116,6 @@ const DELEGATED_WORKLOAD_TOKEN_SOURCES = new Set([
   'mcp-catalog',
   'internal-bot',
   'discord-bot',
-  'gastown',
-  'wasteland',
 ]);
 
 export function deriveCredentialKind(input: CredentialProvenanceInput): PrivilegedCredentialKind {

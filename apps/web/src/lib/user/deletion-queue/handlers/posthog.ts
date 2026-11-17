@@ -344,6 +344,9 @@ async function verifyPersonsGone(
   const lost = await assertCurrentClaim(context);
   if (lost) return lost;
   await recordPosthogActivity(requestId, 'posthog_verify_unconfirmed');
+  // PostHog's deletion process can take multiple days.
+  // After these limited checks, let account deletion continue without waiting for
+  // PostHog to finish.
   return { kind: 'succeeded', progress };
 }
 

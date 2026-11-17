@@ -1,4 +1,4 @@
-import { AlertCircle, Check } from 'lucide-react';
+import { AlertCircle, Check, Square } from 'lucide-react';
 import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import {
@@ -7,6 +7,8 @@ import {
   summarizePreparationAttempt,
   type PreparationRowSummary,
 } from './preparation-summary';
+import { describeFailedCommand, failedCommandRows } from './failed-commands';
+import { readableSessionError } from './session-error-copy';
 
 type PreparationRowProps = {
   attempt: PreparationAttempt;
@@ -19,31 +21,52 @@ type PreparationRowProps = {
  * attempt runs and collapses to a summary once it finishes; clicking it opens
  * the details drawer. While a setup command streams output, a short
  * non-interactive tail of it ticks along underneath.
+ *
+ * A failed session setup or start command is non-fatal, so its attempt can
+ * still complete. Each failure gets its own row beneath the summary and opens
+ * the same drawer, where the command output is stored.
  */
 export function PreparationRow({ attempt, onOpenDetails }: PreparationRowProps) {
   const summary = summarizePreparationAttempt(attempt);
   const tickerLines = extractTickerLines(findRunningSetupCommand(attempt)?.outputTail);
+  const failedCommands = failedCommandRows(attempt);
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpenDetails(attempt.id)}
-      className="group flex w-full cursor-pointer flex-col rounded-md text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span
-        className="text-muted-foreground group-hover:text-foreground flex w-full min-w-0 items-center gap-2 py-2 transition-colors"
-        aria-live="polite"
+    <div className="flex w-full flex-col">
+      <button
+        type="button"
+        onClick={() => onOpenDetails(attempt.id)}
+        className="group flex w-full cursor-pointer flex-col rounded-md text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <AttemptIcon status={attempt.status} summary={summary} />
-        <RowLabel summary={summary} />
-        {summary.kind !== 'failed' && (
-          <span className="shrink-0 underline underline-offset-2 opacity-0 transition-opacity group-focus-visible:opacity-100 group-hover:opacity-100">
-            View details
+        <span
+          className="text-muted-foreground group-hover:text-foreground flex w-full min-w-0 items-center gap-2 py-2 transition-colors"
+          aria-live="polite"
+        >
+          <AttemptIcon status={attempt.status} summary={summary} />
+          <RowLabel summary={summary} />
+          {summary.kind !== 'failed' && (
+            <span className="shrink-0 underline underline-offset-2 opacity-0 transition-opacity group-focus-visible:opacity-100 group-hover:opacity-100">
+              View details
+            </span>
+          )}
+        </span>
+        {tickerLines.length > 0 && <OutputTicker lines={tickerLines} />}
+      </button>
+      {failedCommands.map(row => (
+        <button
+          key={row.stepId}
+          type="button"
+          onClick={() => onOpenDetails(row.attemptId)}
+          className="group flex w-full min-w-0 cursor-pointer items-center gap-2 py-1 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <AlertCircle className="text-status-destructive-icon h-3 w-3 shrink-0" />
+          <span className="text-destructive min-w-0 truncate">{describeFailedCommand(row)}</span>
+          <span className="text-muted-foreground shrink-0 underline underline-offset-2 opacity-0 transition-opacity group-focus-visible:opacity-100 group-hover:opacity-100">
+            View output
           </span>
-        )}
-      </span>
-      {tickerLines.length > 0 && <OutputTicker lines={tickerLines} />}
-    </button>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -75,13 +98,25 @@ function RowLabel({ summary }: { summary: PreparationRowSummary }) {
       </>
     );
   }
+  if (summary.kind === 'stopped') {
+    return (
+      <>
+        <span>Preparation stopped</span>
+        {summary.duration && <span className="shrink-0 tabular-nums">· {summary.duration}</span>}
+      </>
+    );
+  }
   if (summary.kind === 'incomplete') {
     return <span className="text-status-destructive min-w-0 truncate">{summary.text}</span>;
   }
   return (
     <>
-      <span className="text-destructive shrink-0">Preparation failed</span>
-      {summary.error && <span className="text-destructive min-w-0 truncate">{summary.error}</span>}
+      <span className="shrink-0">Preparation failed</span>
+      {summary.error && (
+        <span className="text-foreground-subtle min-w-0 truncate">
+          · {readableSessionError(summary.error)}
+        </span>
+      )}
       <span className="shrink-0 underline underline-offset-2">View details</span>
     </>
   );
@@ -116,6 +151,9 @@ function AttemptIcon({
 }) {
   if (summary.kind === 'incomplete') {
     return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
+  }
+  if (summary.kind === 'stopped') {
+    return <Square className="text-muted-foreground h-3 w-3 shrink-0" />;
   }
   if (status === 'running') return <StatusSpinner className="h-3 w-3 shrink-0" />;
   if (status === 'completed') return <Check className="h-3 w-3 shrink-0" />;

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useCallback, useId } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
-import { MessageSquareWarning, Loader2, Check } from 'lucide-react';
+import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +19,10 @@ import { useManager } from './CloudAgentProvider';
 import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
+import { formatFeedbackTimestamp } from './feedback-history';
+
+/** How many prior submissions the dialog shows. */
+const FEEDBACK_HISTORY_LIMIT = 5;
 
 type FeedbackDialogProps = {
   organizationId?: string;
@@ -38,6 +42,20 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const historyHeadingId = useId();
+
+  // Prior submissions from this account, so the dialog can show that feedback
+  // was already sent instead of starting blank every time. Only fetched while
+  // the dialog is open.
+  const historyQuery = useQuery({
+    ...trpc.cloudAgentNextFeedback.list.queryOptions({ limit: FEEDBACK_HISTORY_LIMIT }),
+    enabled: isOpen,
+  });
+  const history = historyQuery.data ?? [];
+  const historyError = historyQuery.isError;
+  const historyLoading = historyQuery.isPending;
+  const showHistorySection = historyLoading || historyError || history.length > 0;
 
   const {
     mutate,
@@ -48,9 +66,8 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
     trpc.cloudAgentNextFeedback.create.mutationOptions({
       onSuccess: () => {
         setShowSuccess(true);
-        setTimeout(() => {
-          setIsOpen(false);
-        }, 1200);
+        setFeedbackText('');
+        void queryClient.invalidateQueries(trpc.cloudAgentNextFeedback.list.queryFilter());
       },
     })
   );
@@ -67,6 +84,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const handleSubmit = useCallback(() => {
     if (!feedbackText.trim()) return;
+    setShowSuccess(false);
 
     mutate({
       cloud_agent_session_id: currentSessionId ?? undefined,
@@ -105,7 +123,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
           <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
           <DialogDescription>
@@ -114,48 +132,76 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {showSuccess ? (
-            <div className="flex items-center justify-center py-8">
-              <Check className="h-6 w-6 text-green-500" />
-              <span className="ml-2 text-sm text-green-500">Thank you for your feedback!</span>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <Textarea
+            placeholder="What's on your mind?"
+            value={feedbackText}
+            onChange={e => setFeedbackText(e.target.value)}
+            rows={4}
+            disabled={isPending}
+            autoFocus
+          />
+
+          {error && (
+            <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+              {error.data?.code === 'TOO_MANY_REQUESTS'
+                ? error.message
+                : 'Failed to send feedback. Please try again.'}
             </div>
-          ) : (
-            <>
-              <Textarea
-                placeholder="What's on your mind?"
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                rows={4}
-                disabled={isPending}
-                autoFocus
-              />
+          )}
 
-              {error && (
-                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
-                  {error.data?.code === 'TOO_MANY_REQUESTS'
-                    ? error.message
-                    : 'Failed to send feedback. Please try again.'}
-                </div>
+          {showSuccess && (
+            <div className="flex items-center gap-2" role="status" aria-live="polite">
+              <Check className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-500">Thank you for your feedback!</span>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button onClick={handleSubmit} disabled={isPending || !feedbackText.trim()} size="sm">
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Feedback'
               )}
+            </Button>
+          </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isPending || !feedbackText.trim()}
-                  size="sm"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Feedback'
-                  )}
-                </Button>
+          {showHistorySection && (
+            <div className="border-t pt-4">
+              <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
+                <History className="h-3.5 w-3.5" aria-hidden="true" />
+                <h3 id={historyHeadingId} className="text-xs font-medium">
+                  Your recent feedback
+                </h3>
               </div>
-            </>
+              {history.length > 0 ? (
+                <ul aria-labelledby={historyHeadingId} className="space-y-2 pr-1">
+                  {history.map(item => {
+                    const timestamp = formatFeedbackTimestamp(item.created_at);
+                    return (
+                      <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
+                        <p className="text-foreground line-clamp-2 text-sm break-words">
+                          {item.feedback_text}
+                        </p>
+                        {timestamp && (
+                          <p className="text-muted-foreground mt-0.5 text-xs">{timestamp}</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : historyLoading ? (
+                <p className="text-muted-foreground text-xs">Loading recent feedback...</p>
+              ) : historyError ? (
+                <p className="text-muted-foreground text-xs" role="status">
+                  Could not load recent feedback. Close and reopen the dialog to try again.
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
       </DialogContent>

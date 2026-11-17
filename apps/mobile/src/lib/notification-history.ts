@@ -1,6 +1,7 @@
 import {
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
+  pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
   translatePush,
@@ -47,9 +48,11 @@ function translatedPart(
   part: 'title' | 'body'
 ): string {
   const stored = row[part];
-  return row.i18nKey === null
-    ? stored
-    : translatePush(locale, `${row.i18nKey}.${part}`, row.i18nParams ?? undefined, stored);
+  if (row.i18nKey === null) {
+    return stored;
+  }
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
 /**
@@ -81,6 +84,7 @@ export function notificationHistoryCopy(
 
 export type NotificationHistoryTarget = Readonly<{
   data: PushData;
+  /** The app route the row opens, with the push origin marker already dropped. */
   href: string;
 }>;
 
@@ -106,9 +110,8 @@ function withoutPushOrigin(href: string): string {
 
 /**
  * Where a row's tap goes, or null when the stored payload no longer resolves to
- * a destination (a producer shape this app cannot parse). A null target is the
- * one dead destination the list can detect without a request: every recorded
- * kind maps to a route.
+ * a destination — a kind this build does not route, or a payload this build
+ * cannot parse.
  */
 export function notificationHistoryTarget(
   payload: Record<string, unknown>
@@ -117,7 +120,11 @@ export function notificationHistoryTarget(
   if (!parsed.success) {
     return null;
   }
-  return { data: parsed.data, href: withoutPushOrigin(notificationPathForData(parsed.data)) };
+  const href = notificationPathForData(parsed.data);
+  if (href === null) {
+    return null;
+  }
+  return { data: parsed.data, href: withoutPushOrigin(href) };
 }
 
 export type NotificationHistoryFilter = Readonly<{
@@ -132,26 +139,35 @@ export type NotificationHistoryFilter = Readonly<{
  * catalog check can see them.
  */
 const CATEGORY_LABEL_KEYS = {
-  chatMessages: 'notifications.channel.chat',
   agentAttention: 'notifications.category.agentAttentionTitle',
   sessionStatus: 'notifications.category.sessionStatusTitle',
   balanceAlerts: 'notifications.channel.balance',
   spendAlerts: 'notifications.channel.spend',
   securityFindings: 'notifications.channel.security',
-} satisfies Record<NotificationHistoryCategory, string>;
+} as const;
+
+/** A recorded category this build has copy for, so it can draw a chip. */
+type LabeledHistoryCategory = keyof typeof CATEGORY_LABEL_KEYS;
+
+/** The shared list can name a category this build has no chip copy for. */
+function isLabeledCategory(
+  category: NotificationHistoryCategory
+): category is LabeledHistoryCategory {
+  return category in CATEGORY_LABEL_KEYS;
+}
 
 /**
- * Every chip in the order the settings screen lists the categories: "All"
- * first, then one per category the recorder can produce. A category the
- * recorder never writes (there is no recorded push kind for it) has no chip,
- * so no chip can only ever answer an empty page.
+ * Every labelled recorded category behind the "All" chip, in settings order. A
+ * category this build has no copy for gets no filter.
  */
 export const NOTIFICATION_HISTORY_FILTERS: readonly NotificationHistoryFilter[] = [
   { category: null, labelKey: 'common.all' },
-  ...NOTIFICATION_HISTORY_CATEGORIES.map(category => ({
-    category,
-    labelKey: CATEGORY_LABEL_KEYS[category],
-  })),
+  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => isLabeledCategory(category)).map(
+    category => ({
+      category,
+      labelKey: CATEGORY_LABEL_KEYS[category],
+    })
+  ),
 ];
 
 /**

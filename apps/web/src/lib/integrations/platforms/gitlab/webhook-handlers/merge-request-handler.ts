@@ -114,30 +114,32 @@ export async function handleMergeRequestCodeReview(
     );
 
     const config = agentConfig.config as CodeReviewAgentConfig;
-    if (
-      config?.repository_selection_mode === 'selected' &&
-      Array.isArray(config?.selected_repository_ids)
-    ) {
-      const isInSelectedList = config.selected_repository_ids.includes(project.id);
-      const isInManuallyAddedList = Array.isArray(config.manually_added_repositories)
-        ? config.manually_added_repositories.some(repo => repo.id === project.id)
-        : false;
-      const isRepositoryAllowed = isInSelectedList || isInManuallyAddedList;
+    // GitLab code review has no 'all' repository mode, so the allowlist applies to
+    // every delivery: a project is reviewed only when it is selected or was added
+    // manually. A legacy row stored with 'all' therefore reviews nothing until it
+    // selects repositories, which is what the config reads report.
+    const selectedRepositoryIds = Array.isArray(config?.selected_repository_ids)
+      ? config.selected_repository_ids
+      : [];
+    const isInSelectedList = selectedRepositoryIds.includes(project.id);
+    const isInManuallyAddedList = Array.isArray(config?.manually_added_repositories)
+      ? config.manually_added_repositories.some(repo => repo.id === project.id)
+      : false;
+    const isRepositoryAllowed = isInSelectedList || isInManuallyAddedList;
 
-      if (!isRepositoryAllowed) {
-        logExceptInTest(
-          `Project ${project.path_with_namespace} (ID: ${project.id}) not in allowed list for ${owner.type} ${owner.id}`
-        );
-        return NextResponse.json(
-          { message: 'Project not configured for code reviews' },
-          { status: 200 }
-        );
-      }
-
+    if (!isRepositoryAllowed) {
       logExceptInTest(
-        `Project ${project.path_with_namespace} (ID: ${project.id}) is in allowed list, proceeding with review`
+        `Project ${project.path_with_namespace} (ID: ${project.id}) not in allowed list for ${owner.type} ${owner.id}`
+      );
+      return NextResponse.json(
+        { message: 'Project not configured for code reviews' },
+        { status: 200 }
       );
     }
+
+    logExceptInTest(
+      `Project ${project.path_with_namespace} (ID: ${project.id}) is in allowed list, proceeding with review`
+    );
 
     const headSha = mr.last_commit?.id;
     if (!headSha) {

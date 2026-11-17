@@ -4,10 +4,16 @@ import path from 'node:path';
 import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
+  actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
   privilegedGuardTiers,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  SUPPORT_NEVER_KEYS,
+  SUPPORT_READ_ALLOWLIST,
+  SUPPORT_WRITE_ALLOWLIST,
+} from '@kilocode/web-shared/lib/admin/support-access';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const APP_ROOT = path.join(REPO_ROOT, 'apps/web/src/app');
@@ -146,7 +152,9 @@ function discoverRESTRoutes(): DiscoveredRoute[] {
         explicitAdminGuard: source.includes('adminOnly: true'),
         organizationContext:
           source.includes('getAuthorizedOrgContext(') ||
+          source.includes('getAuthorizedOrgContextOrSupport(') ||
           source.includes('ensureOrganizationAccess(') ||
+          source.includes('ensureMemberOrganizationAccess(') ||
           source.includes('ensureOrganizationAccessAndFetchOrg('),
       };
     });
@@ -168,21 +176,11 @@ function discoverServerComponents(): { file: string; route: string }[] {
       const source = fs.readFileSync(file, 'utf8');
       return (
         (route.startsWith('/admin') || route.startsWith('/organizations')) &&
-        (source.includes('adminOnly: true') || source.includes('getAuthorizedOrgContext('))
+        (source.includes('adminOnly: true') ||
+          source.includes('getAuthorizedOrgContext(') ||
+          source.includes('getAuthorizedOrgContextOrSupport('))
       );
     });
-}
-
-function workerAdminProcedureNames(worker: 'gastown' | 'wasteland'): string[] {
-  const file = path.join(REPO_ROOT, `services/${worker}/src/trpc/router.ts`);
-  const source = fs.readFileSync(file, 'utf8');
-  return [...source.matchAll(/^\s*([A-Za-z0-9_]+):\s*adminProcedure\b/gm)].map(
-    match => match[1] as string
-  );
-}
-
-function workerAdminRoute(worker: 'gastown' | 'wasteland', name: string): string {
-  return `${worker}.${name}`;
 }
 
 const procedures = rootRouter._def.procedures as Record<string, ProcedureDef>;
@@ -392,47 +390,6 @@ describe('privileged inventory covers discovered route handlers', () => {
   });
 });
 
-describe('privileged inventory covers Worker admin gates', () => {
-  test.each(['gastown', 'wasteland'] as const)('%s admin procedures are classified', worker => {
-    const names = workerAdminProcedureNames(worker);
-    expect(names.length).toBeGreaterThan(0);
-
-    for (const name of names) {
-      expect(
-        findPrivilegedInventoryEntry({ surface: 'worker', route: workerAdminRoute(worker, name) })
-      ).toBeDefined();
-    }
-  });
-
-  test('the Worker admin procedure list is reviewed as a snapshot', () => {
-    const mapping = (['gastown', 'wasteland'] as const)
-      .flatMap(worker =>
-        workerAdminProcedureNames(worker).map(name => {
-          const route = workerAdminRoute(worker, name);
-          const entry = findPrivilegedInventoryEntry({ surface: 'worker', route });
-          return `${route} -> ${entry?.id ?? 'NONE'}`;
-        })
-      )
-      .sort();
-
-    expect(mapping).toMatchSnapshot('worker-admin-procedures');
-  });
-
-  test('the discovered token-mint entry points are classified', () => {
-    const tokenRoutes = discoverRESTRoutes()
-      .filter(route => /^\/api\/(gastown|wasteland)\/token$/.test(route.route))
-      .map(route => route.route)
-      .sort();
-
-    expect(tokenRoutes).toEqual(['/api/gastown/token', '/api/wasteland/token']);
-    for (const route of tokenRoutes) {
-      expect(
-        findPrivilegedInventoryEntry({ surface: 'rest', route, access: 'write' })
-      ).toBeDefined();
-    }
-  });
-});
-
 describe('privileged inventory covers branch-level admin reads', () => {
   const roots = [
     'packages/web-shared/src',
@@ -445,6 +402,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
     'packages/web-shared/src/lib/admin/admin-access-log.ts',
     'packages/web-shared/src/lib/admin/privileged-access.ts',
     'packages/web-shared/src/lib/admin/privileged-inventory.ts',
+    'packages/web-shared/src/lib/admin/support-access.ts',
   ]);
 
   function serverFiles(): string[] {
@@ -513,5 +471,80 @@ describe('privileged inventory covers branch-level admin reads', () => {
     }
 
     expect(stale).toEqual([]);
+  });
+});
+
+describe('support access allowlists agree with the privileged inventory', () => {
+  const allowlist = [...SUPPORT_READ_ALLOWLIST, ...SUPPORT_WRITE_ALLOWLIST];
+
+  test('every allowlist entry resolves to the matching inventory action class', () => {
+    const problems: string[] = [];
+
+    for (const entry of allowlist) {
+      const access = entry.actionClass === 'support_write' ? 'write' : 'read';
+      const inventory = findPrivilegedInventoryEntry({
+        surface: entry.surface,
+        route: entry.key,
+        access,
+      });
+      if (!inventory) {
+        problems.push(`${entry.surface} ${entry.key} (no inventory entry)`);
+        continue;
+      }
+      const actionClass = actionClassForEntry(inventory, access);
+      if (actionClass !== entry.actionClass) {
+        problems.push(`${entry.key}: allowlist ${entry.actionClass}, inventory ${actionClass}`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('every tRPC allowlist key is a real procedure of the matching type', () => {
+    const problems: string[] = [];
+
+    for (const entry of allowlist) {
+      if (entry.surface !== 'trpc') continue;
+      const procedure = procedures[entry.key];
+      if (!procedure) {
+        problems.push(`${entry.key} (no procedure)`);
+        continue;
+      }
+      const expectedType = entry.actionClass === 'support_write' ? 'mutation' : 'query';
+      const actualType = procedure._def?.type ?? 'query';
+      if (actualType !== expectedType) {
+        problems.push(`${entry.key}: ${actualType}, expected ${expectedType}`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('the never list is disjoint from both allowlists', () => {
+    const keys = new Set(allowlist.map(entry => entry.key));
+    expect(SUPPORT_NEVER_KEYS.filter(key => keys.has(key))).toEqual([]);
+  });
+});
+
+describe('support never-list keys resolve to real surfaces', () => {
+  test('tRPC never keys are real procedures', () => {
+    const missing = SUPPORT_NEVER_KEYS.filter(
+      key => key.startsWith('organizations.') && !procedures[key]
+    );
+    expect(missing).toEqual([]);
+  });
+
+  test('path never keys are real app routes', () => {
+    const routes = new Set(
+      walkFiles(APP_ROOT).map(file => {
+        const relative = path.relative(APP_ROOT, path.resolve(file));
+        const segments = relative.split(path.sep).filter(segment => !/^\(.+\)$/.test(segment));
+        return `/${segments.join('/')}`;
+      })
+    );
+    const missing = SUPPORT_NEVER_KEYS.filter(
+      key => key.startsWith('/') && !routes.has(`${key}/page.tsx`) && !routes.has(`${key}/route.ts`)
+    );
+    expect(missing).toEqual([]);
   });
 });

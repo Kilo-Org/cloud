@@ -172,4 +172,56 @@ describe('withGitHubUserTokenRetry', () => {
       });
     }
   );
+  it('reports a provided-token 401 without attempting App rotation', async () => {
+    const result = connected('provided-token', 'auth_1', 1);
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce({
+        ...result,
+        credential: {
+          ...result.credential,
+          credentialSource: 'provided_token',
+          refreshSupported: false,
+        },
+      })
+      .mockResolvedValueOnce({ status: 'disconnected', reason: 'revoked' });
+    const call = jest.fn().mockRejectedValue(http401());
+    await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'u1', {
+      op: 'reportRejected',
+      authorizationId: 'auth_1',
+      credentialVersion: 1,
+    });
+  });
+  it('uses a concurrent provided-token replacement after a stale 401 without App rotation', async () => {
+    const first = connected('old', 'auth_1', 1);
+    const current = connected('replacement', 'auth_1', 2);
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce({
+        ...first,
+        credential: {
+          ...first.credential,
+          credentialSource: 'provided_token',
+          refreshSupported: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        ...current,
+        credential: {
+          ...current.credential,
+          credentialSource: 'provided_token',
+          refreshSupported: false,
+        },
+      });
+    const call = jest.fn().mockRejectedValueOnce(http401()).mockResolvedValueOnce('recovered');
+    await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).resolves.toBe('recovered');
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'u1', {
+      op: 'reportRejected',
+      authorizationId: 'auth_1',
+      credentialVersion: 1,
+    });
+  });
 });

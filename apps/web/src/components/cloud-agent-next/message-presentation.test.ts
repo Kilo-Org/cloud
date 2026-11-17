@@ -113,9 +113,9 @@ describe('groupConversationMessages', () => {
     ]);
   });
 
-  it.each(['sessionID', 'parentID'] as const)('does not group across a different %s', key => {
+  it('does not group across a different sessionID', () => {
     const first = assistantMessage('assistant-1');
-    const boundary = assistantMessage('assistant-2', { [key]: 'other' });
+    const boundary = assistantMessage('assistant-2', { sessionID: 'other' });
     const third = assistantMessage('assistant-3');
 
     expect(groupConversationMessages([first, boundary, third], noPreparations)).toEqual([
@@ -123,6 +123,35 @@ describe('groupConversationMessages', () => {
       [boundary],
       [third],
     ]);
+  });
+
+  it('does not group across a different parentID whose prompt is in the transcript', () => {
+    const prompt = (id: string): StoredMessage => ({
+      info: {
+        id,
+        sessionID: 'ses-1',
+        role: 'user',
+        time: { created: 0 },
+        agent: 'code',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      },
+      parts: [],
+    });
+    const prompts = [prompt('user-1'), prompt('other')];
+    const first = assistantMessage('assistant-1');
+    const boundary = assistantMessage('assistant-2', { parentID: 'other' });
+    const third = assistantMessage('assistant-3');
+
+    expect(groupConversationMessages([...prompts, first, boundary, third], noPreparations)).toEqual(
+      [[prompts[0]], [prompts[1]], [first], [boundary], [third]]
+    );
+  });
+
+  it('groups across a parentID whose prompt the transcript never shows', () => {
+    const first = assistantMessage('assistant-1');
+    const second = assistantMessage('assistant-2', { parentID: 'kilo-written-prompt' });
+
+    expect(groupConversationMessages([first, second], noPreparations)).toEqual([[first, second]]);
   });
 
   it.each([

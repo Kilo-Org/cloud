@@ -2,7 +2,12 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
+import { getSentryConfig } from '../shared/sentry.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+
+const SESSION_SYNC_HOSTNAME = new URL(CLOUD_AGENT_SESSION_SYNC_ORIGIN).hostname;
 
 export type ContainersOutboundProps = {
   containerId: string;
@@ -11,7 +16,10 @@ export type ContainersOutboundProps = {
   allocationRef?: string;
 };
 
-export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
+export class ContainersOutbound extends WorkerEntrypoint<
+  Cloudflare.Env & Parameters<typeof getSentryConfig>[0],
+  ContainersOutboundProps
+> {
   async fetch(request: Request): Promise<Response> {
     const { containerId, egressAllowlist, egressAudit, allocationRef } = this.ctx.props;
     if (
@@ -29,7 +37,18 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       return new Response('Egress policy unavailable', { status: 502 });
     }
     const url = new URL(request.url);
-    const allowed = policy.data === undefined || isAllowedEgressUrl(url, policy.data);
+    let allowed = policy.data === undefined || isAllowedEgressUrl(url, policy.data);
+    if (!allowed) {
+      const sentry = getSentryConfig(this.env);
+      const dsn = sentry ? new URL(sentry.dsn) : undefined;
+      allowed =
+        dsn !== undefined &&
+        request.method === 'POST' &&
+        url.origin === dsn.origin &&
+        !url.username &&
+        !url.password &&
+        url.pathname === `/api${dsn.pathname}/envelope/`;
+    }
     if (egressAudit === true) {
       try {
         const input = EgressAuditRequestSchema.parse({
@@ -71,6 +90,20 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       const headers = new Headers(request.headers);
       if (policy.data !== undefined) headers.set('Host', url.host);
       request = new Request(request, { headers, redirect: 'manual' });
+    }
+    // Match the allowlist's canonical form so `session-sync.kiloapps.io.` cannot skip the binding.
+    if (egressDomainSchema.safeParse(url.hostname).data === SESSION_SYNC_HOSTNAME) {
+      // The runtime handle must reach Session Sync only through its binding.
+      if (url.origin !== CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
+        return new Response('Session Sync requires HTTPS', { status: 403 });
+      }
+      if (!this.env.SESSION_SYNC) {
+        return Response.json(
+          { error: { code: 'auth_unavailable', retryable: true } },
+          { status: 503 }
+        );
+      }
+      return this.env.SESSION_SYNC.fetch(request);
     }
     return handleManagedScmOutbound(request, this.env, { containerId });
   }

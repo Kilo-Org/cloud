@@ -16,6 +16,7 @@ import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
 } from './kilo/runtime-credential-proxy-routes.js';
 import {
   buildVercelCredentialNetworkPolicy,
@@ -292,6 +293,26 @@ describe('runtime credential proxy', () => {
         fence: { plane: 'legacy', allocationId: 'allocation_2', instanceGeneration: 5 },
       })
     ).toBe(false);
+  });
+
+  it('uses the upstream auth plane for the attestation audience', () => {
+    expect(runtimeProxyAttestationAudience('backend', '/api/user')).toBe('kilo-api');
+    expect(runtimeProxyAttestationAudience('ingest', '/api/session')).toBe('session-ingest');
+    expect(runtimeProxyAttestationAudience('exa', '/api/exa/search')).toBe('kilo-gateway');
+    for (const pathname of [
+      '/api/openrouter/organizations/org_1/models',
+      '/api/gateway/organizations/org_1/models',
+    ]) {
+      expect(runtimeProxyAttestationAudience('provider', pathname)).toBe('kilo-api');
+    }
+    for (const pathname of [
+      '/api/openrouter/models',
+      '/api/openrouter/models/validate',
+      '/api/openrouter/chat/completions',
+      '/api/gateway/v1/chat/completions',
+    ]) {
+      expect(runtimeProxyAttestationAudience('provider', pathname)).toBe('kilo-gateway');
+    }
   });
 
   it('maps only exact method-scoped provider, backend, and ingest routes', () => {

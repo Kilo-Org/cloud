@@ -1,5 +1,8 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import {
+  customerBillingFailureSchema,
+  parseCustomerBillingFailure,
+} from '@kilocode/cloud-agent-sdk';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import * as z from 'zod';
 
@@ -62,6 +65,8 @@ export const TrpcErrorDataSchema = z
         maxAgeSeconds: z.number(),
       })
       .optional(),
+    billingFailure: customerBillingFailureSchema.optional(),
+    supportAccessReason: z.string().optional(),
   })
   .passthrough();
 
@@ -113,6 +118,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
   // Cloud Agent's worker tRPC error is rethrown with a structured cause. Parse
   // it through the SDK contract before exposing it at the browser boundary.
   const billingFailure = parseCustomerBillingFailure({ data: error.cause });
+  const supportAccessReason = readSupportAccessReason(error.cause);
 
   return {
     ...shape,
@@ -134,6 +140,13 @@ export const trpcErrorFormatter = (({ shape, error }) => {
             }
           : undefined,
       ...(billingFailure ? { billingFailure } : {}),
+      ...(supportAccessReason ? { supportAccessReason } : {}),
     },
   };
 }) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;
+
+function readSupportAccessReason(cause: unknown): string | undefined {
+  if (cause === null || typeof cause !== 'object') return undefined;
+  const value = (cause as { supportAccessReason?: unknown }).supportAccessReason;
+  return typeof value === 'string' ? value : undefined;
+}

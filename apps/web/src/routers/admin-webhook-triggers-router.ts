@@ -20,8 +20,11 @@ import {
   getWorkerTrigger,
   listWorkerRequests,
   buildInboundUrl,
-  type EnrichedCapturedRequest,
 } from '@/lib/webhook-agent/webhook-agent-client';
+import {
+  summarizeRequestForAdmin,
+  type AdminWebhookRequestSummary,
+} from '@/lib/webhook-agent/request-projection';
 
 const AdminUserScope = z.object({ scope: z.literal('user'), userId: z.string() });
 const AdminOrgScope = z.object({
@@ -182,7 +185,7 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
 
   listRequests: sessionViewerProcedure
     .input(AdminTriggerRequestsInput)
-    .query(async ({ input }): Promise<EnrichedCapturedRequest[]> => {
+    .query(async ({ input }): Promise<AdminWebhookRequestSummary[]> => {
       const { scope, id } = resolveScope(input);
 
       const whereClause =
@@ -232,11 +235,13 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
 
       const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
 
-      return result.requests.map(request => ({
-        ...request,
-        kiloSessionId: request.cloudAgentSessionId
-          ? (sessionIdMap.get(request.cloudAgentSessionId) ?? null)
-          : null,
-      }));
+      return result.requests.map(request =>
+        summarizeRequestForAdmin({
+          ...request,
+          kiloSessionId: request.cloudAgentSessionId
+            ? (sessionIdMap.get(request.cloudAgentSessionId) ?? null)
+            : null,
+        })
+      );
     }),
 });

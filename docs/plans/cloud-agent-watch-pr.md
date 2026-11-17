@@ -6,8 +6,8 @@ runtime safety prerequisites. Not ready for the MVP release gate.
 
 ## Implementation status (2026-10-27)
 
-The first deliverable is deliberately observation-only. Watch enablement is behind
-the `cloud-agent-watch-pr` release toggle; passive PR hover-card counts are not.
+The first deliverable is deliberately observation-only. Watch enablement is available
+to every eligible owner; passive PR hover-card counts were never gated.
 It does not issue execution credentials, queue repair prompts, create repair chats,
 edit files, or push commits.
 
@@ -142,7 +142,6 @@ must not be presented as proof of success.
 | Runtime | `services/cloud-agent-next/src/control-plane/session/`, `wrapper/src/control-plane/` | Target `workspace_*`; do not add this behavior to legacy `CloudAgentSession.ts`. |
 | Completion | `services/cloud-agent-next/src/control-plane/session/callbacks.ts`, `session-do.ts` | Existing callbacks are session/batch-oriented; add exact watched-message terminal notification rather than overwriting session callback targets. |
 | Durable delivery | `services/cloud-agent-next/wrangler.jsonc` | Existing Worker has queue consumers; a dedicated Watch PR queue can run in this Worker, not a new service. |
-| Automation patterns | `services/gastown/src/dos/town/actions.ts`, `reconciler.ts`, `town-scm.ts` | Reuse feedback batching and conflict-episode concepts, not polling or its readiness evaluator unchanged. |
 
 Important constraints found during research:
 
@@ -244,7 +243,7 @@ Enforce one active Watch PR writer per canonical repository/PR, even if the same
 installation is shared between tenants. Do not reveal another tenant's details
 when rejecting a conflicting watch. Keep authorization tenant-scoped.
 
-Existing Auto Fix/Gastown can also mutate branches. During the MVP, reject or defer
+Existing Auto Fix can also mutate branches. During the MVP, reject or defer
 known competing automation for the watched PR; do not silently run both. Use a
 common branch-writer claim where existing execution paths can participate. Exact
 Git leases remain necessary because human/external writers cannot be locked.

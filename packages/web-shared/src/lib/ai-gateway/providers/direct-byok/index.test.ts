@@ -7,7 +7,9 @@ import {
   type DirectByokUpstream,
 } from './types';
 import type * as DirectByokTypes from './types';
+import type * as OpenCodeGoModule from './opencode-go';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -22,10 +24,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 function enabledKeys(...providerIds: UserByokProviderId[]) {
   return providerIds.map(providerId => ({ providerId, serveCatalogModels: false }));
 }
-
-jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
-  getPreferredModels: jest.fn(async () => []),
-}));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
@@ -106,16 +104,15 @@ describe('createAiSdkProvider session headers', () => {
 
   test('keeps an OpenCode Go probe session stable across SDK retries and isolates new probes', async () => {
     const { createAiSdkProvider } = await import('.');
-    const { directByokProviders } = await loadDirectByokModule();
-    const provider = { ...directByokProviders[0], id: 'opencode-go' as const };
+    const openCodeGo = jest.requireActual<typeof OpenCodeGoModule>('./opencode-go').default;
     const fetchMock = mockCompletions().mockResolvedValueOnce(
       new Response('Temporary failure', { status: 500 })
     );
-    const firstProbe = await createAiSdkProvider(provider, 'test-key', 'test-model');
+    const firstProbe = await createAiSdkProvider(openCodeGo, 'test-key', 'test-model');
 
     await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
     await generateText({
-      model: (await createAiSdkProvider(provider, 'test-key', 'test-model'))('test-model'),
+      model: (await createAiSdkProvider(openCodeGo, 'test-key', 'test-model'))('test-model'),
       prompt: 'Say hi',
       maxRetries: 0,
     });
@@ -172,6 +169,8 @@ describe('createAiSdkProvider resolved upstream', () => {
       openrouter_inference_provider_id: 'chutes',
       supportedChatApis: upstream.supportedChatApis,
       resolveUpstream: async () => upstream,
+      chatCompletionsHeaders: (resolved): Record<string, string> =>
+        resolved.apiKeyHeader ? { [resolved.apiKeyHeader]: resolved.apiKey } : {},
       transformRequest() {},
       models: async () => [],
     };
@@ -194,7 +193,7 @@ describe('createAiSdkProvider resolved upstream', () => {
     const aiSdkProvider = await createAiSdkProvider(providerWith(upstream), 'stored', 'test-model');
     await generateText({ model: aiSdkProvider('test-model'), prompt: 'Say hi', maxRetries: 0 });
     const [url, init] = fetchMock.mock.calls[0];
-    return { url: String(url), headers: new Headers(init?.headers) };
+    return { url: requestUrlOf(url), headers: new Headers(init?.headers) };
   }
 
   test('uses the Chat Completions URL override and the x-api-key header', async () => {
@@ -325,23 +324,48 @@ describe('getDirectByokModel', () => {
     expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
   });
 
+  test("uses a provider's own AI SDK choice over the model-name classification", async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const provider: DirectByokProvider = directByokProviders[0];
+    const previousGetAiSdkProvider = provider.getAiSdkProvider;
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
+    jest.mocked(getAiSdkProvider).mockReturnValue('anthropic');
+
+    try {
+      // The module under test reads its own default export, so the stub has to live on that
+      // shared definition; the finally block restores the value the definition had before.
+      provider.getAiSdkProvider = () => ({ aiSdkProvider: undefined });
+      const models = await getDirectByokModelsForUser('user-id');
+
+      expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual([undefined, undefined]);
+      expect(getAiSdkProvider).not.toHaveBeenCalled();
+    } finally {
+      provider.getAiSdkProvider = previousGetAiSdkProvider;
+      jest.mocked(getAiSdkProvider).mockReset();
+    }
+  });
+
   test('derives the AI SDK provider from the chat API a provider assigns each model', async () => {
     const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
     const provider: DirectByokProvider = directByokProviders[0];
-    provider.getModelChatApi = model =>
-      model.id === 'supported-model' ? 'responses' : 'chat_completions';
+    const previousGetModelChatApi = provider.getModelChatApi;
     jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
 
     try {
+      provider.getModelChatApi = model =>
+        model.id === 'supported-model' ? 'responses' : 'chat_completions';
       const models = await getDirectByokModelsForUser('user-id');
 
       expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['openai', undefined]);
       expect(getAiSdkProvider).not.toHaveBeenCalled();
     } finally {
-      delete provider.getModelChatApi;
+      provider.getModelChatApi = previousGetModelChatApi;
     }
   });
 
@@ -388,6 +412,10 @@ describe('getDirectByokModel', () => {
       'chutes-byok/non-reasoning-model',
     ]);
     expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
+    for (const model of [...userModels, ...organizationModels]) {
+      expect(model.hasUserByokAvailable).toBe(true);
+      expect(model.isFree).toBe(false);
+    }
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(getBYOKforOrganization).not.toHaveBeenCalled();
   });
@@ -405,14 +433,6 @@ describe('getDirectByokModel', () => {
     ]);
   });
 });
-
-function deferred<T>() {
-  const { promise, resolve } = Promise.withResolvers<T>();
-  return { promise, resolve };
-}
-
-/** Lets every pending promise continuation run, however many links the chain has. */
-const flushPromiseChain = () => new Promise<void>(resolveFlush => setImmediate(resolveFlush));
 
 describe('direct BYOK preferred indexes', () => {
   const providerModels = [
@@ -434,47 +454,28 @@ describe('direct BYOK preferred indexes', () => {
     jest.clearAllMocks();
   });
 
-  test('numbers recommended models in declared provider order whatever the settle order', async () => {
-    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    const { getPreferredModels } =
-      await import('@kilocode/web-shared/lib/ai-gateway/preferred-models');
-
-    async function listModels(settleOrder: 'declared' | 'reversed') {
-      const pending = directByokProviders.map(() => deferred<ReadonlyArray<DirectByokModel>>());
-      directByokProviders.forEach((provider, index) => {
-        const modelsMock = provider.models as unknown as jest.Mock<
-          () => Promise<ReadonlyArray<DirectByokModel>>
-        >;
-        modelsMock.mockImplementationOnce(() => pending[index].promise);
+  test.each(['getDirectByokModelsForUser', 'getDirectByokModelsForOrganization'] as const)(
+    '%s omits preferred indexes even for stored recommended models',
+    async method => {
+      const byok = await loadDirectByokModule();
+      const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+      byok.directByokProviders.forEach((provider: DirectByokProvider, index) => {
+        jest.mocked(provider.models).mockResolvedValueOnce(providerModels[index]);
       });
       jest
         .mocked(getEnabledByokProviders)
         .mockResolvedValueOnce(enabledKeys('orcarouter', 'chutes-byok'));
-      jest.mocked(getPreferredModels).mockResolvedValueOnce(['gateway/one', 'gateway/two']);
 
-      const listing = getDirectByokModelsForUser('user-id');
-      await flushPromiseChain();
-      const resolutionOrder = settleOrder === 'declared' ? [0, 1] : [1, 0];
-      for (const index of resolutionOrder) {
-        pending[index].resolve(providerModels[index]);
-        await flushPromiseChain();
+      const models = await byok[method]('owner-id');
+
+      expect(models.map(model => model.id)).toEqual([
+        'chutes-byok/first',
+        'chutes-byok/second',
+        'orcarouter/third',
+      ]);
+      for (const model of models) {
+        expect(model).not.toHaveProperty('preferredIndex');
       }
-
-      return (await listing).map(model => ({
-        id: model.id,
-        preferredIndex: model.preferredIndex,
-      }));
     }
-
-    const declaredSettleOrder = await listModels('declared');
-    const reversedSettleOrder = await listModels('reversed');
-
-    expect(reversedSettleOrder).toEqual(declaredSettleOrder);
-    expect(declaredSettleOrder).toEqual([
-      { id: 'chutes-byok/first', preferredIndex: 2 },
-      { id: 'chutes-byok/second', preferredIndex: 3 },
-      { id: 'orcarouter/third', preferredIndex: 4 },
-    ]);
-  });
+  );
 });

@@ -14,6 +14,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -23,6 +24,15 @@ import { useTRPC } from '@/lib/trpc';
 
 import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionAutoApproveRow } from './session-auto-approve-row';
+import { SessionComputeSection } from './session-compute-section';
+import { formatSessionTotalCost } from './session-list-helpers';
+import { isPermissionDeniedError } from '@/lib/trpc-error';
+import {
+  computeChargesMicrodollars,
+  isCloudAgentSessionId,
+  sessionTotalMicrodollars,
+} from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { ContextUsageRing } from './context-usage-ring';
 import { useOptionalSessionManager } from './session-manager-context';
 import {
@@ -43,9 +53,11 @@ import {
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
+import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
+import { SessionShareSection } from './session-share-section';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -67,6 +79,11 @@ type SessionContextSheetProps = {
   onAutoApproveChange: (enabled: boolean) => void;
   connectionDisplay: SessionConnectionDisplay;
   onRetryConnection: () => void;
+  /** The control-plane session id; null when this session has no sandbox. */
+  cloudAgentSessionId: string | null;
+  /** See `SessionSandboxSection`: only a failed start offers a fresh start. */
+  cloudStatusType: string | null;
+  organizationId: string | undefined;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -80,6 +97,15 @@ const SHEET_RING_STROKE = 8;
 const LazySessionContextPrRow = lazy(async () => {
   const { SessionContextPrRow } = await import('./session-context-pr-row');
   return { default: SessionContextPrRow };
+});
+
+// The preview row owns the sandbox's service scan, the preview-ticket mutation
+// and the in-app browser hand-off. Lazy-loading it keeps those modules out of
+// this sheet's graph until a session that can actually preview renders it, the
+// same reason the PR row above is lazy.
+const LazySessionPreviewRow = lazy(async () => {
+  const { SessionPreviewRow } = await import('./session-preview-row');
+  return { default: SessionPreviewRow };
 });
 
 const TONE_TEXT_CLASS = {
@@ -171,6 +197,9 @@ export function SessionContextSheet({
   onAutoApproveChange,
   connectionDisplay,
   onRetryConnection,
+  cloudAgentSessionId,
+  cloudStatusType,
+  organizationId,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -221,6 +250,23 @@ export function SessionContextSheet({
     breakdown.subagentCostUsd,
     olderActivityCostUsd
   );
+  // The session total is the model cost plus what the sandbox cost. The read is
+  // shared with the session page's pill, which owns its poll timer and stays
+  // mounted behind the sheet, so the sheet only reads the cache entry it keeps
+  // fresh. A session with no compute scope (or another payer) answers nothing
+  // and the model cost stands alone.
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: false,
+  });
+  const totalCostText =
+    formatSessionTotalCost(
+      sessionTotalMicrodollars(
+        totalCostMicrodollars,
+        computeChargesMicrodollars(computeCharges.data)
+      )
+    ) ?? content.cost;
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} dismissible>
@@ -245,7 +291,7 @@ export function SessionContextSheet({
         <Text className="text-xs uppercase tracking-wide text-muted-foreground">
           {t('agentChat.sessionConnection.label')}
         </Text>
-        <View className="flex-row items-center gap-2">
+        <View className="min-h-[28px] flex-row items-center gap-2">
           <Text className="text-sm font-medium text-foreground">{connectionLabel}</Text>
           {connectionDisplay === 'lost' ? (
             <Pressable
@@ -253,7 +299,7 @@ export function SessionContextSheet({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-              className="active:opacity-70"
+              className="min-h-[28px] min-w-[28px] items-center justify-center active:opacity-70"
               testID="session-context-sheet-connection-retry"
             >
               <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>
@@ -266,7 +312,14 @@ export function SessionContextSheet({
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
       <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-        <View className="items-center gap-3 pt-2">
+        {/* The ring sits beside its value, not above it. Stacked, the ring held
+            the sheet's first text a ring-height down the scroll content, which
+            the design gate reads as empty space under the title: the ring draws
+            nothing the accessibility tree reports. Side by side, the ring fills
+            the row and the value centres on the ring's own middle, so the pair
+            reads as one figure and neither half floats off its partner's
+            centre. */}
+        <View className="flex-row items-center justify-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}
             strokeWidth={SHEET_RING_STROKE}
@@ -290,18 +343,17 @@ export function SessionContextSheet({
         <View className="mt-6 gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
-              {content.usedTokens}
-              {content.capacityKnown && content.windowTokens ? (
+              {content.usedTokens ?? '-'}
+              {content.usedTokens !== null ? (
                 <Text className="text-sm text-muted-foreground">
                   {' '}
-                  {t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })}
+                  {content.capacityKnown && content.windowTokens
+                    ? t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })
+                    : t('agentChat.contextUsage.tokens', {
+                        count: content.usedTokensCount ?? 0,
+                      })}
                 </Text>
-              ) : (
-                <Text className="text-sm text-muted-foreground">
-                  {' '}
-                  {t('agentChat.contextUsage.tokens')}
-                </Text>
-              )}
+              ) : null}
             </Text>
           </Row>
 
@@ -374,6 +426,8 @@ export function SessionContextSheet({
             onPress={linkCopy.handlePress}
           />
 
+          <SessionShareSection sessionId={sessionId} visible={visible} />
+
           {runningOn.kind !== 'hidden' ? (
             <Row label={t('agentChat.instancePicker.runOn')}>
               <Text className="text-base font-medium text-foreground">
@@ -382,11 +436,38 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          {content.cost !== null || autoApproveState !== 'unavailable' ? (
+          {/* The sandbox sits beside Run on: both describe where the session
+              runs. Its state and, after a failed start, the fresh-start
+              recovery come from the worker, so a lost or paused sandbox never
+              reads as a healthy session. */}
+          <SessionSandboxSection
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            startFailed={cloudStatusType === 'error'}
+          />
+
+          {/* The row paints the combined total, so its gate is that total, not
+              the model-only figure: a read-only session with no model cost can
+              still owe a workspace's positive sandbox compute, and hiding the
+              row would hide its figure and its sharing note together. */}
+          {totalCostText !== null || autoApproveState !== 'unavailable' ? (
             <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost ?? '-'}
+                {totalCostText ?? '-'}
               </Text>
+              {/* The web session information dialog adds the whole workspace's
+                  recorded compute to its total and names that sharing under the
+                  Compute figure. This total is the same one the header pill
+                  paints, so it carries the same note rather than reading as
+                  this chat's own sandbox spend. */}
+              {computeCharges.data?.scope === 'workspace' ? (
+                <Text
+                  className="text-xs text-muted-foreground"
+                  testID="session-context-sheet-shared-compute"
+                >
+                  {t('cloudAgent.compute.sharedWorkspace')}
+                </Text>
+              ) : null}
             </Row>
           ) : null}
 
@@ -457,6 +538,17 @@ export function SessionContextSheet({
             </Text>
           </View>
         ) : null}
+
+        <SessionComputeSection
+          charges={computeCharges.data}
+          isError={computeCharges.isError && !isPermissionDeniedError(computeCharges.error)}
+          onRetry={() => void computeCharges.refetch()}
+        />
+
+        <SessionPreviewRowSlot
+          cloudAgentSessionId={cloudAgentSessionId}
+          organizationId={organizationId}
+        />
       </ScrollView>
 
       <View style={{ height: insets.bottom }} className="bg-background" />
@@ -491,6 +583,31 @@ function useRunningOnLabel(
   return isRemote && isPending ? { kind: 'pending' } : { kind: 'hidden' };
 }
 
+/**
+ * The preview entry, for a session the control plane can serve a preview for
+ * (`workspace_` ids). An older session would only get a 404 back, so its row is
+ * absent rather than disabled, and the lazy module is never loaded for it.
+ */
+function SessionPreviewRowSlot({
+  cloudAgentSessionId,
+  organizationId,
+}: Readonly<{
+  cloudAgentSessionId: string | null | undefined;
+  organizationId: string | undefined;
+}>) {
+  if (!isCloudAgentSessionId(cloudAgentSessionId)) {
+    return null;
+  }
+  return (
+    <Suspense fallback={null}>
+      <LazySessionPreviewRow
+        cloudAgentSessionId={cloudAgentSessionId}
+        organizationId={organizationId}
+      />
+    </Suspense>
+  );
+}
+
 function CopyRow({
   testID,
   label,
@@ -510,7 +627,7 @@ function CopyRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="gap-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center gap-1 active:opacity-70')}
       testID={testID}
     >
       {/* The row keeps its call-to-action name in every state; the copy
@@ -561,7 +678,10 @@ function SessionChangesRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 active:opacity-70'
+      )}
       testID="session-context-sheet-view-changes"
     >
       <Text className="text-base font-medium text-foreground">{label}</Text>

@@ -1,9 +1,13 @@
+import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ProfileSkillsScreen } from '@/components/profiles/profile-skills-screen';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 /**
  * Shared harness for the Profile Skills mounted tests. The `vi.mock` calls
@@ -74,13 +78,14 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
   });
 }
 
-/** Press the add CTA the empty state renders through its `action` prop. */
+/** Press the empty state's action, the button the manage slot renders for a manager. */
 export function pressEmptyAction(renderer: ReactTestRenderer): void {
-  const action = findOne(renderer.root, 'EmptyState').props.action as {
-    props: { onPress: () => void };
-  };
+  const button = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  if (!button) {
+    throw new Error('the empty state has no action button');
+  }
   act(() => {
-    action.props.onPress();
+    (button.props as { onPress: () => void }).onPress();
   });
 }
 
@@ -129,7 +134,11 @@ export function confirmRequest(confirm: TestConfirmMock): void {
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 export function mountScreen(organizationId?: string) {
   return renderWithProviders(
-    createElement(ProfileSkillsScreen, { profileId: 'profile-1', organizationId })
+    createElement(ProfileSkillsScreen, {
+      profileId: 'profile-1',
+      organizationId,
+      backFallback: PROFILES_LIST_HREF,
+    })
   );
 }
 
@@ -142,7 +151,11 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProfileSkillsScreen, { profileId: 'profile-1', organizationId })
+      createElement(ProfileSkillsScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        backFallback: PROFILES_LIST_HREF,
+      })
     )
   );
 }

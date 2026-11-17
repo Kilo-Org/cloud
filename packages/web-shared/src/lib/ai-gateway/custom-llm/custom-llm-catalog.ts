@@ -1,7 +1,7 @@
 import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
-import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 
@@ -30,9 +30,9 @@ export function isPublicCustomLlm(
  */
 function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
   console.error('Failed to parse custom llm definition', publicId, error);
-  // The claim map is shared with BYOK decrypt failures, whose keys are row ids, so
-  // the key is namespaced (public ids cannot contain `:`).
-  if (!claimFailureReport(`custom-llm:${publicId}`, Date.now())) return;
+  // The claim map is shared with other reports, whose keys are row ids, so the key
+  // is namespaced (public ids cannot contain `:`).
+  if (!claimReportWindow(`custom-llm:${publicId}`, Date.now())) return;
   captureException(error, {
     tags: { source: 'custom_llm_catalog' },
     extra: { public_id: publicId },

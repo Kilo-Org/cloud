@@ -1,18 +1,22 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { byok_api_keys, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+
+useFakeByokKms();
 
 async function seedMiniMaxKey(managementSource: 'user' | 'coding_plan', isEnabled = true) {
   const user = await insertTestUser();
   await db.insert(byok_api_keys).values({
     kilo_user_id: user.id,
     provider_id: 'minimax',
-    encrypted_api_key: encryptApiKey(`minimax-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+    encrypted_api_key_envelope: testByokEnvelope(`minimax-${crypto.randomUUID()}`),
     management_source: managementSource,
     is_enabled: isEnabled,
     created_by: user.id,
@@ -25,7 +29,7 @@ async function seedBytePlusKey(managementSource: 'user' | 'coding_plan', isEnabl
   await db.insert(byok_api_keys).values({
     kilo_user_id: user.id,
     provider_id: 'byteplus-coding',
-    encrypted_api_key: encryptApiKey(`byteplus-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+    encrypted_api_key_envelope: testByokEnvelope(`byteplus-${crypto.randomUUID()}`),
     management_source: managementSource,
     is_enabled: isEnabled,
     created_by: user.id,

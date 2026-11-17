@@ -11,6 +11,7 @@ import {
   type RemoteMcpServerDraft,
   type StoredRemoteMcpServer,
 } from '@/lib/chat/remote-mcp-store';
+import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
 
 import { mcpServerFormError, type McpServerFormErrors } from './mcp-settings-state';
 
@@ -75,6 +76,94 @@ function draftOf(
   return server === undefined ? draft : { ...draft, id: server.id };
 }
 
+/**
+ * The endpoint a URL text names, normalized the way the store normalizes it, or
+ * null when the text names none. The form compares these to decide whether a
+ * bearer value belongs to the endpoint the URL now names.
+ */
+function endpointOf(url: string): string | null {
+  try {
+    return normalizeRemoteMcpUrl(url);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Who owns the token field's text. The field is uncontrolled, so this is the one
+ * place its value lives:
+ *
+ * - `saved`: the field shows the token the server was saved with.
+ * - `typed`: the person typed `text`, for the endpoint the URL named then (null
+ *   while it named none).
+ * - `retargeted`: the field was cleared because the URL left the endpoint that
+ *   value belonged to, and it says why under an empty field.
+ */
+type TokenField =
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'typed'; readonly text: string; readonly endpoint: string | null }
+  | { readonly kind: 'retargeted' };
+
+/** The text the field holds, which is both its default and what a save sends. */
+function tokenText(field: TokenField, savedToken: string): string {
+  switch (field.kind) {
+    case 'saved': {
+      return savedToken;
+    }
+    case 'typed': {
+      return field.text;
+    }
+    case 'retargeted': {
+      return '';
+    }
+    default: {
+      return '';
+    }
+  }
+}
+
+/** The token field a URL edit leaves behind, and whether it has to be mounted again. */
+type TokenFieldRetarget = {
+  readonly field: TokenField;
+  readonly remount: boolean;
+};
+
+/**
+ * What the token field becomes when the URL names `endpoint`, and whether it has
+ * to be mounted again for the new text to show.
+ *
+ * A value belongs to the endpoint the URL named when it was typed; the saved
+ * value belongs to the saved endpoint. A URL that names another endpoint clears
+ * the field rather than carrying a value to a server it was not entered for, and
+ * the saved endpoint brings the saved value back — respelling the saved URL is
+ * not an edit. A value typed while the URL named nothing belongs to the endpoint
+ * the person then names, so that one case keeps it.
+ */
+function retargetTokenField(
+  field: TokenField,
+  savedEndpoint: string | null,
+  endpoint: string | null
+): TokenFieldRetarget {
+  if (field.kind === 'typed') {
+    if (field.endpoint === null) {
+      return { field: { kind: 'typed', text: field.text, endpoint }, remount: false };
+    }
+    if (field.endpoint === endpoint) {
+      return { field, remount: false };
+    }
+    return { field: { kind: 'retargeted' }, remount: true };
+  }
+  if (field.kind === 'retargeted') {
+    return endpoint !== null && endpoint === savedEndpoint
+      ? { field: { kind: 'saved' }, remount: true }
+      : { field, remount: false };
+  }
+  if (endpoint === savedEndpoint) {
+    return { field, remount: false };
+  }
+  return { field: { kind: 'retargeted' }, remount: true };
+}
+
 export function RemoteMcpServerForm({
   server,
   onSave,
@@ -86,19 +175,32 @@ export function RemoteMcpServerForm({
   const initialUrl = server?.url ?? '';
   const initialToken = server?.auth.type === 'bearer' ? (server.auth.token ?? '') : '';
   const initialMethod = server?.auth.type ?? 'none';
+  /** The endpoint the saved URL names, which is what a saved token belongs to. */
+  const savedEndpoint = endpointOf(initialUrl);
   const name = useRef(initialName);
   const url = useRef(initialUrl);
-  const token = useRef(initialToken);
+  /**
+   * The token field's text and who owns it. Held in a ref: the field is
+   * uncontrolled and the text stays out of React state. `retargeted` is the only
+   * member the screen draws, as the reason the field is empty.
+   */
+  const tokenField = useRef<TokenField>({ kind: 'saved' });
+  /**
+   * Bumped only when the field has to show different text than it does — a
+   * retarget, or the saved value coming back. A keystroke never bumps it: the
+   * field already shows what was typed, and remounting it would drop the caret.
+   */
+  const [tokenFieldKey, setTokenFieldKey] = useState(0);
   const [method, setMethod] = useState<AuthMethod>(initialMethod);
   const fieldsWith = useCallback(
     (changed: Partial<DraftFields>): DraftFields => ({
       name: name.current,
       url: url.current,
       method,
-      token: token.current,
+      token: tokenText(tokenField.current, initialToken),
       ...changed,
     }),
-    [method]
+    [method, initialToken]
   );
   const [errors, setErrors] = useState<McpServerFormErrors | null>(() =>
     mcpServerFormError(
@@ -120,6 +222,28 @@ export function RemoteMcpServerForm({
       );
     },
     [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]
+  );
+
+  /**
+   * Points the token field at the endpoint the URL text now names, through the
+   * transitions above. Only a replacement of the text the field shows remounts
+   * it; a keystroke never does.
+   */
+  const retargetToken = useCallback(
+    (nextUrl: string) => {
+      if (server === undefined) {
+        return;
+      }
+      const next = retargetTokenField(tokenField.current, savedEndpoint, endpointOf(nextUrl));
+      if (next.field === tokenField.current) {
+        return;
+      }
+      tokenField.current = next.field;
+      if (next.remount) {
+        setTokenFieldKey(key => key + 1);
+      }
+    },
+    [server, savedEndpoint]
   );
 
   const validateName = useCallback(
@@ -151,7 +275,9 @@ export function RemoteMcpServerForm({
     const found = mcpServerFormError(draft);
     setErrors(found);
     if (found === null) {
-      onSave(draft);
+      // A value is the person's own only when they typed it, and that is what
+      // the store is told.
+      onSave({ ...draft, tokenEntered: tokenField.current.kind === 'typed' });
     }
   }, [fieldsWith, onSave, server]);
 
@@ -178,6 +304,7 @@ export function RemoteMcpServerForm({
         returnKeyType="next"
         onChangeText={value => {
           url.current = value;
+          retargetToken(value);
           refresh();
         }}
         validate={validateUrl}
@@ -202,13 +329,21 @@ export function RemoteMcpServerForm({
       </View>
       {method === 'bearer' ? (
         <FormField
+          key={tokenFieldKey}
           label={t('modelChat.mcpOAuth.fieldToken')}
-          defaultValue={initialToken}
+          defaultValue={tokenText(tokenField.current, initialToken)}
+          error={
+            tokenField.current.kind === 'retargeted' && errors?.token !== undefined
+              ? t(errors.token)
+              : undefined
+          }
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
           onChangeText={value => {
-            token.current = value;
+            /* The field is already showing this text, so it is not mounted
+               again: the value and the reason line update together. */
+            tokenField.current = { kind: 'typed', text: value, endpoint: endpointOf(url.current) };
             refresh();
           }}
           validate={validateToken}

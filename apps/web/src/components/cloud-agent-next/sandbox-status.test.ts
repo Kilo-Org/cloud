@@ -7,6 +7,7 @@ import {
   observeSandboxStatus,
   sandboxStatusPresentation,
   sandboxTypeCapacity,
+  sandboxComputeInstance,
 } from './sandbox-status';
 import { formatSandboxCapacity } from './sandbox-selection';
 
@@ -47,6 +48,48 @@ const eligible = {
   isReadOnly: false,
   fetchedSessionData: { kiloSessionId, cloudAgentSessionId: sessionId, organizationId: null },
 };
+
+describe('observed sandbox compute pricing', () => {
+  it.each([
+    ['containers-standard-3', 'standard-3'],
+    ['containers-standard-4', 'standard-4'],
+  ] as const)('prices only the observed %s allocation', (sandboxType, expected) => {
+    expect(
+      sandboxComputeInstance({
+        ...snapshot,
+        provider: 'Cloudflare Containers',
+        runtime: { ...runtime, sandboxType },
+      })
+    ).toBe(expected);
+  });
+
+  it.each(['Vercel', 'Cloudflare', 'Unknown'] as const)(
+    'does not show Kilo container rates for %s',
+    provider => {
+      expect(
+        sandboxComputeInstance({
+          ...snapshot,
+          provider,
+          runtime: { ...runtime, sandboxType: 'containers-standard-3' },
+        })
+      ).toBeNull();
+    }
+  );
+
+  it.each([
+    undefined,
+    null,
+    {},
+    snapshot,
+    {
+      ...snapshot,
+      provider: 'Cloudflare Containers',
+      runtime,
+    },
+  ])('does not guess a rate for missing or unsupported runtime metadata: %j', data => {
+    expect(sandboxComputeInstance(data)).toBeNull();
+  });
+});
 
 describe('sandbox status eligibility', () => {
   it('requires a resolved owned workspace in the exact route scope', () => {
@@ -155,6 +198,59 @@ describe('sandbox status observation', () => {
 });
 
 describe('sandbox status presentation', () => {
+  it.each([
+    ['active', 'sandbox_ready'],
+    ['sleeping', 'sandbox_stopped'],
+    ['starting', 'sandbox_starting'],
+  ] as const)('shows the saved workspace capture time while %s', (status, detailCode) => {
+    const capturedAt = now - 60_000;
+    const view = sandboxStatusPresentation({
+      ...observation,
+      data: {
+        ...snapshot,
+        status,
+        detailCode,
+        estimatedSleepAt: null,
+        workspaceSnapshot: { capturedAt, snapshotId: 'PRIVATE_SNAPSHOT_ID' },
+      },
+    });
+    expect(view.snapshotCapturedAt).toBe(capturedAt);
+    expect(JSON.stringify(view)).not.toContain('PRIVATE_SNAPSHOT_ID');
+  });
+
+  it('clears the capture time when the current descriptor is removed', () => {
+    expect(
+      sandboxStatusPresentation({
+        ...observation,
+        data: { ...snapshot, workspaceSnapshot: { capturedAt: now - 60_000 } },
+      }).snapshotCapturedAt
+    ).toBe(now - 60_000);
+    expect(sandboxStatusPresentation(observation).snapshotCapturedAt).toBeNull();
+  });
+
+  it.each(['checking', 'paused', 'unavailable'] as const)(
+    'hides cached snapshot metadata when observation is %s',
+    state => {
+      expect(
+        sandboxStatusPresentation({
+          ...observation,
+          observation: state,
+          data: { ...snapshot, workspaceSnapshot: { capturedAt: now - 60_000 } },
+        }).snapshotCapturedAt
+      ).toBeNull();
+    }
+  );
+
+  it('hides snapshot metadata when status is stale', () => {
+    expect(
+      sandboxStatusPresentation({
+        ...observation,
+        data: { ...snapshot, workspaceSnapshot: { capturedAt: now - 60_000 } },
+        now: now + 15_000,
+      }).snapshotCapturedAt
+    ).toBeNull();
+  });
+
   it('does not count request latency toward the two-minute idle reveal delay', () => {
     const input = {
       ...observation,

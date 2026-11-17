@@ -98,4 +98,20 @@ describe('extractSkillZip', () => {
       extractSkillZip(zipFile('deploy.zip', buildZip({ 'deploy/helper.txt': 'x' })))
     ).rejects.toThrow(/SKILL\.md/);
   });
+
+  test('measures companion content in characters, and the message says so', async () => {
+    // 60000 CJK characters are 180000 UTF-8 bytes: accepted, because the limit
+    // counts characters, and the copy must state the enforced unit.
+    const multibyte = '漢'.repeat(60_000);
+    const accepted = await extractSkillZip(
+      zipFile('cjk.zip', buildZip({ 'SKILL.md': '# Big', 'notes.md': multibyte }))
+    );
+    expect(accepted.files['notes.md']).toBe(multibyte);
+
+    await expect(
+      extractSkillZip(
+        zipFile('cjk-over.zip', buildZip({ 'SKILL.md': '# Big', 'notes.md': '漢'.repeat(100_001) }))
+      )
+    ).rejects.toThrow('File "notes.md" exceeds 100000 characters');
+  });
 });

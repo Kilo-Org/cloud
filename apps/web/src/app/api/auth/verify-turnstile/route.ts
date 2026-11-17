@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import { assertNotNullish } from '@/lib/utils';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
 import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 
@@ -12,17 +12,26 @@ import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 const JWT_SECRET = NEXTAUTH_SECRET;
 
 export async function POST(request: NextRequest) {
-  const { token } = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
+  const token =
+    typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string'
+      ? body.token
+      : undefined;
 
   if (!token) {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 });
   }
 
-  // Get client IP address (extract first IP from comma-separated list)
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  assertNotNullish(forwardedFor);
-  const clientIP = forwardedFor.split(',')[0]?.trim() ?? null;
-  assertNotNullish(clientIP);
+  // The verification token binds the sign-in to the address the platform
+  // observed, so the turnstile check and the token use one resolved value.
+  const clientIP = getTrustedSignupClientIp(request.headers);
+  if (!clientIP) {
+    sentryLogger(
+      'turnstile-auth',
+      'warning'
+    )('SECURITY: Unable to resolve the client address for Turnstile verification');
+    return NextResponse.json({ error: 'Client address unavailable' }, { status: 500 });
+  }
 
   const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
@@ -48,7 +57,6 @@ export async function POST(request: NextRequest) {
   const jwtPayload: TurnstileJwtPayload = {
     guid: randomUUID(), // Unique identifier to prevent reuse, will be used as user id
     ip: clientIP,
-    watchwoodIp: getTrustedSignupClientIp(request.headers),
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 60 * 60,
   };

@@ -3,7 +3,7 @@ import { agent_environment_profiles } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import type { AgentConfig } from '@kilocode/db/schema-types';
-import { getEffectiveDefaultProfileId, getDefaultProfile } from './profile-service';
+import { getEffectiveDefaultProfileId, getDefaultProfileId } from './profile-service';
 import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
 import { getCommandsForSession } from './profile-commands-service';
@@ -107,8 +107,8 @@ export type MergeProfileConfigurationResult = {
   /** The environment's start commands. Only an environment supplies them. */
   startCommands?: string[];
   /**
-   * How many leading `setupCommands` are the environment's own. An environment
-   * snapshot already ran them; the rest are the session's.
+   * How many leading `setupCommands` are the environment's build commands.
+   * They run only in an environment build; the rest are session setup commands.
    */
   environmentSetupCommandCount?: number;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
@@ -382,7 +382,7 @@ export async function mergeProfileConfiguration(
     ? null
     : owner.type === 'organization' && userId
       ? await getEffectiveDefaultProfileId(db, userId, owner.id)
-      : ((await getDefaultProfile(db, owner))?.id ?? null);
+      : await getDefaultProfileId(db, owner);
 
   const { base, top } = resolveProfileLayers({
     repoBindingProfileId,
@@ -438,11 +438,10 @@ export async function mergeProfileConfiguration(
   for (const layer of [base, top]) {
     const data = layer ? profileData.find(d => d.profileId === layer.profileId) : undefined;
     if (!data) continue;
-    const profileLayer = profileToLayer(data);
-    // The repository environment owns setup: profile setup commands do not run
-    // beside it, so a setup moved into the environment never runs twice.
-    // Profile variables still apply over it.
-    layers.push(args.environment ? { ...profileLayer, commands: [] } : profileLayer);
+    // Profile setup commands are session setup: they run beside an environment
+    // as non-fatal commands. A command that was also moved into the environment
+    // runs twice; the user can remove the duplicate from the profile.
+    layers.push(profileToLayer(data));
   }
   const inline = inlineToLayer(args);
   if (inline) layers.push(inline);

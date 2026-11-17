@@ -1,9 +1,7 @@
 import 'server-only';
 
-import { eq, sql } from 'drizzle-orm';
-import { user_github_app_tokens } from '@kilocode/db/schema';
-
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { storeGitHubIdentity } from '@/lib/integrations/platforms/github/identity-store';
+import { getGitHubUserAuthorizationStatus } from '@/lib/integrations/platforms/github/user-authorization';
 // Single source of truth for the envelope scheme, active key, and AAD. Reusing
 // the production helper guarantees the seeded row stays decryptable by
 // git-token-service even if the scheme/AAD ever changes.
@@ -38,6 +36,7 @@ export async function seedUserGithubToken(input: {
   const values = {
     kilo_user_id: input.kiloUserId,
     github_app_type: 'standard' as const,
+    credential_source: 'github_app' as const,
     github_user_id: input.githubUserId,
     github_login: input.githubLogin,
     access_token_encrypted: encryptUserGithubTokenEnvelope(input.token, {
@@ -56,29 +55,11 @@ export async function seedUserGithubToken(input: {
     revocation_reason: null,
   };
 
-  const [stored] = await db
-    .insert(user_github_app_tokens)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [user_github_app_tokens.kilo_user_id, user_github_app_tokens.github_app_type],
-      set: {
-        github_user_id: values.github_user_id,
-        github_login: values.github_login,
-        access_token_encrypted: values.access_token_encrypted,
-        access_token_expires_at: values.access_token_expires_at,
-        refresh_token_encrypted: values.refresh_token_encrypted,
-        refresh_token_expires_at: values.refresh_token_expires_at,
-        revoked_at: null,
-        revocation_reason: null,
-        credential_version: sql`${user_github_app_tokens.credential_version} + 1`,
-        updated_at: new Date().toISOString(),
-      },
-      setWhere: eq(user_github_app_tokens.github_user_id, input.githubUserId),
-    })
-    .returning({ id: user_github_app_tokens.id });
+  const expected = await getGitHubUserAuthorizationStatus(input.kiloUserId);
+  const stored = await storeGitHubIdentity(values, expected);
 
   return {
-    upserted: Boolean(stored?.id),
+    upserted: stored.status === 'connected',
     githubLogin: input.githubLogin,
   };
 }

@@ -21,6 +21,7 @@ import { useManager } from './CloudAgentProvider';
 import { commandsForPhase, phaseStatus, phaseStatusLabel } from './preparation-phases';
 import {
   phaseDisplayText,
+  preparationFailureText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
@@ -82,13 +83,10 @@ export function PreparationDrawer({
 function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   const phaseSteps = attempt.steps.filter(step => step.kind === 'phase');
   const commands = attempt.steps.filter(step => step.kind === 'setup_command');
-  const setupPhaseIds = new Set(
-    phaseSteps.filter(step => step.key === 'setup_commands').map(step => step.id)
-  );
+  const phaseIds = new Set(phaseSteps.map(step => step.id));
+  const hasLegacySetupPhase = phaseSteps.some(step => step.key === 'setup_commands');
   const standaloneCommands = commands.filter(command =>
-    command.parentStepId === undefined
-      ? setupPhaseIds.size === 0
-      : !setupPhaseIds.has(command.parentStepId)
+    command.parentStepId === undefined ? !hasLegacySetupPhase : !phaseIds.has(command.parentStepId)
   );
   // A failed command card displays attempt.safeError as its fallback, and a
   // failed phase row displays its own safeError inline — only surface the
@@ -121,7 +119,7 @@ function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
       )}
 
       {attempt.safeError && !errorShownOnStep && (
-        <p className="mt-3 text-status-destructive">{attempt.safeError}</p>
+        <p className="mt-3 text-status-destructive">{preparationFailureText(attempt.safeError)}</p>
       )}
     </>
   );
@@ -164,7 +162,11 @@ function PhaseRow({
           className="ml-auto shrink-0 text-foreground-subtle tabular-nums"
         />
       </div>
-      {step.safeError && <p className="ml-7 mt-0.5 text-status-destructive">{step.safeError}</p>}
+      {step.safeError && (
+        <p className="ml-7 mt-0.5 text-status-destructive">
+          {preparationFailureText(step.safeError)}
+        </p>
+      )}
       {children && <div className="ml-7 mt-2">{children}</div>}
     </li>
   );
@@ -204,7 +206,7 @@ function CommandCard({
   step: PreparationStepSnapshot;
   fallbackError?: string;
 }) {
-  const error = step.safeError ?? fallbackError;
+  const error = preparationFailureText(step.safeError ?? fallbackError);
   const output = useStickToBottom<HTMLPreElement>(step.outputTail);
 
   return (

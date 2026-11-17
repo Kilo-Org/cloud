@@ -1,8 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  isReasoningExplicitlyDisabled,
-  replaceReasoningObjectWithReasoningEffort,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import {
   apiKeyUpstream,
   type DirectByokModel,
@@ -21,7 +18,7 @@ export const BYTEPLUS_CODING_MODELS = [
     name: 'ByteDance-Seed-Code',
     description:
       "ByteDance's latest code model has been deeply optimized for agentic programming tasks.",
-    flags: ['recommended', 'vision', 'reasoning'],
+    flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
     reasoning_options: REASONING_TOGGLE,
@@ -126,10 +123,7 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest(context) {
-    context.request.body.thinking = {
-      type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
-    };
-    replaceReasoningObjectWithReasoningEffort(context.request);
+    applyThinkingToggleAndReasoningEffort(context.request);
   },
   models: () => Promise.resolve(BYTEPLUS_CODING_MODELS),
 } satisfies DirectByokProvider;

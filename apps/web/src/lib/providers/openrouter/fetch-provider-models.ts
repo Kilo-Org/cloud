@@ -4,31 +4,29 @@ import {
   type OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import {
+  getMetadata,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
-export async function fetchModelsForProvider(
-  provider: OpenRouterProvider
-): Promise<OpenRouterModel[]> {
+export function openRouterProviderModelsSource(
+  providerName: string
+): MetadataSource<OpenRouterModel[]> {
   const searchParams = new URLSearchParams({
-    providers: provider.name,
+    providers: providerName,
     fmt: 'cards',
   });
+  return {
+    url: `https://openrouter.ai/api/frontend/v1/models/find?${searchParams}`,
+    headers: () => ATTRIBUTION_HEADERS,
+    parse: raw =>
+      OpenRouterSearchResponse.parse(raw).data.models.filter(
+        model => model.endpoint?.variant !== 'batch'
+      ),
+  };
+}
 
-  const response = await fetch(
-    `https://openrouter.ai/api/frontend/v1/models/find?${searchParams}`,
-    {
-      method: 'GET',
-      headers: ATTRIBUTION_HEADERS,
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models for provider ${provider.name}: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json().then(d => OpenRouterSearchResponse.parse(d));
-  const models = data.data.models.filter(model => model.endpoint?.variant !== 'batch');
-
-  return models;
+export function fetchModelsForProvider(provider: OpenRouterProvider): Promise<OpenRouterModel[]> {
+  return getMetadata(openRouterProviderModelsSource(provider.name), readDb);
 }

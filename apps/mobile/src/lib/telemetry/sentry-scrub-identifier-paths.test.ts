@@ -5,7 +5,8 @@ import { scrubEvent } from './sentry-scrub';
 /**
  * The scrubber keeps word-chain runs only at the app-set identifier paths: the
  * `error.subsystem`, `error.operation`, `trpc.procedure`, `trpc.code`,
- * `auth.cause`, `auth.branch`, `auth.keys` and `turbo_module.method` tags and
+ * `auth.cause`, `auth.branch`, `credits.store-error-name`,
+ * `credits.store-error-code` and `turbo_module.method` tags and
  * `extra.componentStack`. These cases pin that exemption to those exact paths:
  * a matching key name nested anywhere else is payload data and a word-chain
  * secret there is redacted.
@@ -60,17 +61,29 @@ describe('scrubEvent identifier paths', () => {
   it('keeps the auth branch tags the sign-out telemetry reports', () => {
     const event = {
       tags: {
-        'auth.cause': 'credentials_unreadable',
-        'auth.branch': 'refresh_token_unreadable',
-        'auth.keys': 'auth-token,auth-refresh-token,auth-token-expires-at',
+        'auth.cause': 'session_unrenewable',
+        'auth.branch': 'refresh_token_absent',
       },
     };
 
     const result = scrubEvent(event);
 
-    expect(result.tags['auth.cause']).toBe('credentials_unreadable');
-    expect(result.tags['auth.branch']).toBe('refresh_token_unreadable');
-    expect(result.tags['auth.keys']).toBe('auth-token,auth-refresh-token,auth-token-expires-at');
+    expect(result.tags['auth.cause']).toBe('session_unrenewable');
+    expect(result.tags['auth.branch']).toBe('refresh_token_absent');
+  });
+
+  it('keeps the store error name and code tags the credit catalog reports', () => {
+    const event = {
+      tags: {
+        'credits.store-error-name': 'purchase-error',
+        'credits.store-error-code': 'purchase-verification-finish-failed',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.tags['credits.store-error-name']).toBe('purchase-error');
+    expect(result.tags['credits.store-error-code']).toBe('purchase-verification-finish-failed');
   });
 
   it('keeps the TurboModule method tag the Sentry SDK writes', () => {

@@ -60,6 +60,8 @@ const mockSeedUserGithubToken =
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
+const mockListNativelyUninstallableIds =
+  jest.fn<(integrations: readonly PlatformIntegration[]) => Promise<Set<string>>>();
 const mockGetPrimaryGitHubIntegrationForOrganization =
   jest.fn<(organizationId: string) => Promise<PlatformIntegration | null>>();
 const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
@@ -94,6 +96,8 @@ const mockBindGitHubIntegrationToCanonicalInstallation = jest.fn();
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
+  listNativelyUninstallableIds: (integrations: readonly PlatformIntegration[]) =>
+    mockListNativelyUninstallableIds(integrations),
   uninstallApp: () => mockUninstallApp(),
   checkUserPendingInstallation: (userId: string) => mockCheckUserPendingInstallation(userId),
   cancelPendingInstallation: (owner: Owner, integrationId: string) =>
@@ -164,6 +168,7 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
+  provideUserToken: (input: unknown) => Promise<unknown>;
   listIntegrations: (input?: { organizationId?: string }) => Promise<unknown[]>;
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
@@ -218,6 +223,45 @@ let createCaller: (ctx: { user: User }) => {
     integrationId: string;
   }) => Promise<{ success: boolean }>;
 };
+
+describe('personal GitHub token submission', () => {
+  it('returns a fixed error without reflecting secret input or accepting organization ownership', async () => {
+    const caller = createCaller({ user: { id: 'personal-user', is_admin: false } as User });
+    for (const input of [
+      {
+        token: 'ghs_SENTINELSECRET',
+        expected: { authorizationId: null, credentialVersion: null },
+      },
+      {
+        token: 'ghp_SENTINELSECRET',
+        expected: { authorizationId: null, credentialVersion: null },
+        organizationId: 'organization',
+      },
+    ]) {
+      await expect(caller.provideUserToken(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'invalid_github_token_request',
+      });
+    }
+  });
+
+  it('reports GitHub throttling as too many requests', async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 429 }));
+    try {
+      const caller = createCaller({ user: { id: 'personal-user', is_admin: false } as User });
+      await expect(
+        caller.provideUserToken({
+          token: 'ghp_SENTINELSECRET',
+          expected: { authorizationId: null, credentialVersion: null },
+        })
+      ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS', message: 'rate_limited' });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
 
 beforeAll(async () => {
   const mod = await import('./github-apps-router');
@@ -301,6 +345,7 @@ describe('githubAppsRouter organization install capability', () => {
       },
     };
     mockListIntegrations.mockResolvedValue([integration]);
+    mockListNativelyUninstallableIds.mockResolvedValue(new Set([integration.id]));
     const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
     const expected = {
       id: integration.id,
@@ -315,9 +360,11 @@ describe('githubAppsRouter organization install capability', () => {
       installed_at: integration.installed_at,
       created_at: integration.created_at,
       updated_at: integration.updated_at,
+      canUninstallNatively: true,
     };
 
     await expect(caller.listIntegrations({ organizationId })).resolves.toEqual([expected]);
+    expect(mockListNativelyUninstallableIds).toHaveBeenCalledWith([integration]);
     expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
       expect.objectContaining({ user: expect.objectContaining({ id: 'member-user' }) }),
       organizationId,

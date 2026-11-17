@@ -1,9 +1,4 @@
-/* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 8 per-category toggles
- * with their optimistic-mutation + retry + loading patterns. CATEGORY_META still
- * has eight keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
- * Extracting subcomponents would re-encode the same hooks. The screen stays a
- * single rendered surface. */
+/* eslint-disable max-lines -- notification settings keep OS permission, registration, and preference mutations together. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
@@ -14,11 +9,9 @@ import {
   Bot,
   KeyRound,
   ListTodo,
-  MessageSquare,
   RefreshCw,
   ShieldAlert,
   Smartphone,
-  Sparkles,
   Wallet,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,6 +25,7 @@ import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/bri
 import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
+import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,7 +49,6 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
-import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -118,12 +111,6 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
 /** One row per notification category. */
 const CATEGORY_META = [
   {
-    key: 'chatMessages',
-    titleKey: 'notifications.channel.chat',
-    subtitleKey: 'notifications.category.chatMessagesSubtitle',
-    icon: MessageSquare,
-  },
-  {
     key: 'agentAttention',
     titleKey: 'notifications.category.agentAttentionTitle',
     subtitleKey: 'notifications.category.agentAttentionSubtitle',
@@ -140,12 +127,6 @@ const CATEGORY_META = [
     titleKey: 'notifications.category.sessionStatusTitle',
     subtitleKey: 'notifications.category.sessionStatusSubtitle',
     icon: ListTodo,
-  },
-  {
-    key: 'kiloclawActivity',
-    titleKey: 'notifications.channel.kiloclaw',
-    subtitleKey: 'notifications.category.kiloclawActivitySubtitle',
-    icon: Sparkles,
   },
   {
     key: 'balanceAlerts',
@@ -175,16 +156,16 @@ const CATEGORY_META = [
  * The reason each gated category shows while the server marks it unavailable.
  * The response's old `unavailableReason` was an English sentence, so the row
  * renders mobile copy instead: the reason must read in the user's language.
- * Only these three categories can be unavailable
- * (`apps/web/src/routers/user-router.ts:494-505`; the other four are
- * `ALWAYS_AVAILABLE_CAPABILITY`, `:450`).
+ * Of the categories mobile renders, only balance alerts and security findings
+ * carry a gate in the server's capability map
+ * (`apps/web/src/routers/user-router.ts: computeNotificationCapabilities`); the
+ * other four are always available there.
  *
  * This is the fallback for a response that carries no reason code at all — a
  * server predating the code sent the very sentence this copy translates — so
  * such a row keeps the same meaning in the reader's language.
  */
 const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
-  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
   ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
   ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
 ]);
@@ -206,8 +187,7 @@ type UnavailableReasonCode = NonNullable<NotificationCategoryCapability['unavail
 const UNAVAILABLE_REASON_KEY = {
   organizationRequired: 'notifications.category.balanceAlertsUnavailable',
   securityAgentRequired: 'notifications.category.securityFindingsUnavailable',
-  kiloclawInstanceRequired: 'notifications.category.kiloclawActivityUnavailable',
-} satisfies Record<UnavailableReasonCode, string>;
+} satisfies Partial<Record<UnavailableReasonCode, string>>;
 
 /** A code from a newer server must fall back, never render raw. */
 function unavailableReasonKey(code: string | null | undefined): string | undefined {
@@ -216,7 +196,7 @@ function unavailableReasonKey(code: string | null | undefined): string | undefin
   if (code == null || !Object.hasOwn(UNAVAILABLE_REASON_KEY, code)) {
     return undefined;
   }
-  return UNAVAILABLE_REASON_KEY[code as UnavailableReasonCode];
+  return UNAVAILABLE_REASON_KEY[code as keyof typeof UNAVAILABLE_REASON_KEY];
 }
 
 type CategoryRowProps = Readonly<{
@@ -310,17 +290,25 @@ function CategoryRow({
   );
 }
 
+/**
+ * The master push gate's enable flow: one step at a time, so no second tap can
+ * start the OS permission request or the token registration the first one owns.
+ */
+type EnablePhase = 'requesting-permission' | 'registering-token' | null;
+
 export function NotificationsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const showKiloClawActivity = useKiloClawTabVisible();
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
-  const [isTogglingPermission, setIsTogglingPermission] = useState(false);
-  const [isRegisteringToken, setIsRegisteringToken] = useState(false);
+  const [enablePhase, setEnablePhase] = useState<EnablePhase>(null);
+  // The permission read is a native round trip, and the busy flag renders only
+  // after it: a second tap in that window would request the permission and
+  // register the token twice. Only a synchronous lock closes it.
+  const enableLock = useRef(createSubmitLock());
   // The `setNotificationPreferences` mutation object is shared across every
   // category row, and its `isPending` is a single flag for the whole procedure. Two
   // category flips can therefore be in flight at once, so we track the set of
@@ -562,22 +550,26 @@ export function NotificationsScreen() {
   );
 
   const handleEnableNotifications = useCallback(async () => {
-    const currentStatus = await getNotificationPermissionStatus();
-    if (currentStatus === 'denied') {
-      Alert.alert(
-        t('notifications.disabledTitle'),
-        t('notifications.disabledMessage'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-        ],
-        // Android back dismisses, which equals the no-op Cancel.
-        { cancelable: true }
-      );
+    const lock = enableLock.current;
+    if (!lock.acquire()) {
       return;
     }
-    setIsTogglingPermission(true);
+    setEnablePhase('requesting-permission');
     try {
+      const currentStatus = await getNotificationPermissionStatus();
+      if (currentStatus === 'denied') {
+        Alert.alert(
+          t('notifications.disabledTitle'),
+          t('notifications.disabledMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+          ],
+          // Android back dismisses, which equals the no-op Cancel.
+          { cancelable: true }
+        );
+        return;
+      }
       const result = await Notifications.requestPermissionsAsync();
       const granted = result.status === Notifications.PermissionStatus.GRANTED || result.granted;
       // Only a live permission request emits an outcome. A pre-granted status
@@ -588,33 +580,30 @@ export function NotificationsScreen() {
         emitNotificationPermissionResponded(granted);
       }
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
-      if (granted) {
-        // Keep `isTogglingPermission` set through token registration so the
-        // master switch stays busy for the whole enable flow. Clearing it here
-        // (before `isRegisteringToken` is set) would briefly re-enable the
-        // switch mid-flow and allow a re-entrant enable/disable.
-        const token = await registerForPushNotifications();
-        if (!token) {
-          toast.error(t('notifications.registrationFailed'));
-          return;
-        }
-        setIsRegisteringToken(true);
-        try {
-          await registerToken.mutateAsync({
-            token,
-            platform: getPlatform(),
-            appVersion: Application.nativeApplicationVersion ?? undefined,
-            // Without this the row is written with a null locale, so every push
-            // to a device enrolled from this screen arrives in English.
-            locale: getResolvedLanguage(),
-          });
-          emitNotificationTokenUpdated('registered');
-        } catch {
-          // registerToken's onError already surfaced the toast; swallow here so
-          // the outer catch does not double-report the same failure.
-        } finally {
-          setIsRegisteringToken(false);
-        }
+      if (!granted) {
+        return;
+      }
+      const token = await registerForPushNotifications();
+      if (!token) {
+        toast.error(t('notifications.registrationFailed'));
+        return;
+      }
+      // The switch stays busy through token registration: the phase never leaves
+      // `requesting-permission` while the token is being written.
+      setEnablePhase('registering-token');
+      try {
+        await registerToken.mutateAsync({
+          token,
+          platform: getPlatform(),
+          appVersion: Application.nativeApplicationVersion ?? undefined,
+          // Without this the row is written with a null locale, so every push
+          // to a device enrolled from this screen arrives in English.
+          locale: getResolvedLanguage(),
+        });
+        emitNotificationTokenUpdated('registered');
+      } catch {
+        // registerToken's onError already surfaced the toast; swallow here so
+        // the outer catch does not double-report the same failure.
       }
     } catch {
       // A failure here comes from requestPermissionsAsync or
@@ -622,7 +611,8 @@ export function NotificationsScreen() {
       // error above), so surface the feedback the previous card also showed.
       toast.error(t('notifications.couldNotEnable'));
     } finally {
-      setIsTogglingPermission(false);
+      setEnablePhase(null);
+      lock.release();
     }
   }, [queryClient, registerToken, t]);
 
@@ -639,7 +629,7 @@ export function NotificationsScreen() {
     );
   }, [t]);
 
-  const isMasterBusy = isTogglingPermission || isRegisteringToken;
+  const isMasterBusy = enablePhase !== null;
   const masterLeading = deriveMasterGateLeadingPresentation({
     permissionLoading,
     permissionError,
@@ -654,14 +644,6 @@ export function NotificationsScreen() {
   const previewIsFull = previewValue === 'full';
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
-
-  // Old form: CATEGORY_META always rendered kiloclawActivity. Keep the key in
-  // CATEGORY_META and in notification preferences. Hide the row when the user
-  // has no active instance. Remove this filter only when product deletes the
-  // kiloclawActivity preference.
-  const visibleCategoryMeta = CATEGORY_META.filter(
-    meta => meta.key !== 'kiloclawActivity' || showKiloClawActivity
-  );
 
   return (
     <View className="flex-1 bg-background">
@@ -832,7 +814,7 @@ export function NotificationsScreen() {
               </Text>
               {preferencesLoading && (
                 <>
-                  {visibleCategoryMeta.map(meta => (
+                  {CATEGORY_META.map(meta => (
                     <View
                       key={meta.key}
                       className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
@@ -861,7 +843,7 @@ export function NotificationsScreen() {
               )}
               {preferences && (
                 <>
-                  {visibleCategoryMeta.map(meta => (
+                  {CATEGORY_META.map(meta => (
                     <CategoryRow
                       key={meta.key}
                       meta={meta}

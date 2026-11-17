@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   generateSessionId,
   isControlSession,
-  isCodeReviewContainersOwner,
-  isPreviewOwner,
   requiredProviderCapability,
   sessionDoName,
   sessionIdFromDoName,
@@ -16,26 +14,6 @@ import type { SessionStubEnv } from './sandbox-session/session-stub.js';
 const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
 
 describe('session identity', () => {
-  it('keeps code-review provider enrollment independent of session identity', () => {
-    expect(isCodeReviewContainersOwner({}, { userId: 'user' })).toBe(false);
-    expect(
-      isCodeReviewContainersOwner({ CODE_REVIEW_CONTAINERS_ORG_IDS: 'user' }, { userId: 'user' })
-    ).toBe(true);
-    expect(
-      isCodeReviewContainersOwner(
-        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'other, org' },
-        { userId: 'user', orgId: 'org' }
-      )
-    ).toBe(true);
-    expect(
-      isCodeReviewContainersOwner({ CODE_REVIEW_CONTAINERS_ORG_IDS: '*' }, { userId: 'user' })
-    ).toBe(true);
-    expect(
-      isCodeReviewContainersOwner({ CODE_REVIEW_CONTAINERS_ORG_IDS: 'other' }, { userId: 'user' })
-    ).toBe(false);
-    expect(isControlSession(generateSessionId())).toBe(true);
-  });
-
   it('generates only workspace IDs accepted by the public and wrapper contracts', () => {
     const generated = generateSessionId();
     expect(generated).toMatch(/^workspace_/);
@@ -78,14 +56,5 @@ describe('session identity', () => {
     ).toBe('remediation');
     expect(requiredProviderCapability({ createdOnPlatform: 'app-builder' })).toBeUndefined();
     expect(requiredProviderCapability()).toBeUndefined();
-  });
-
-  it('keeps preview enrollment as an independent UI setting', () => {
-    expect(isPreviewOwner({}, { userId: 'user' })).toBe(false);
-    expect(isPreviewOwner({ PREVIEW_ENABLED_IDS: '*' }, { userId: 'user' })).toBe(true);
-    expect(
-      isPreviewOwner({ PREVIEW_ENABLED_IDS: 'other, org' }, { userId: 'user', orgId: 'org' })
-    ).toBe(true);
-    expect(isPreviewOwner({ PREVIEW_ENABLED_IDS: 'other' }, { userId: 'user' })).toBe(false);
   });
 });

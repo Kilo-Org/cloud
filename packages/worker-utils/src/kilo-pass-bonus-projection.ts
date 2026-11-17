@@ -104,6 +104,10 @@ function getSubscriptionRecencyMillis(
   return Number.isFinite(createdAtMillis) ? createdAtMillis : Number.NEGATIVE_INFINITY;
 }
 
+export function isKiloPassSubscriptionEndedStatus(status: string): boolean {
+  return status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired';
+}
+
 function getStatusPriority(row: KiloPassSubscriptionProjectionCandidate): number {
   if (row.status === 'active' && !row.cancelAtPeriodEnd) return 0;
   if (row.status === 'active' && row.cancelAtPeriodEnd) return 1;
@@ -111,9 +115,7 @@ function getStatusPriority(row: KiloPassSubscriptionProjectionCandidate): number
   if (row.status === 'past_due') return 3;
   if (row.status === 'paused') return 4;
   if (row.status === 'incomplete') return 5;
-  if (row.status === 'canceled' || row.status === 'incomplete_expired' || row.status === 'unpaid') {
-    return 6;
-  }
+  if (isKiloPassSubscriptionEndedStatus(row.status)) return 6;
   return 7;
 }
 

@@ -1,6 +1,6 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   faviconIcon,
@@ -19,18 +19,7 @@ export default {
   transformRequest(context) {
     replaceReasoningObjectWithReasoningEffort(context.request, { disableWithNoneEffort: true });
   },
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'edenai',
-    recommendedModels: [
-      {
-        id: 'openai/gpt-5.6-luna',
-        name: 'GPT-5.6 Luna',
-        flags: ['vision', 'reasoning'],
-        context_length: 1_050_000,
-        max_completion_tokens: 128_000,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('edenai'),
   provider_listing: {
     dataPolicy: {
       training: true,

@@ -13,6 +13,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreEditUsage,
   extractEditPromptInfo,
+  extractHeaderAndLimitLength,
   invalidRequestResponse,
   malformedJsonResponse,
   temporarilyUnavailableResponse,
@@ -30,13 +31,20 @@ import {
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
+import {
+  fetchUpstream,
+  UPSTREAM_DURATION_BUDGET_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -172,17 +180,23 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // Edit feeds volume rules only, which do not read a prompt hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // Edit feeds volume rules only, which do not read a prompt hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestBody.model);
+  // This one call is the route's whole access decision. It answers the paid-usage gate, then
+  // the caller's organization model-access policy: the member grant, the enterprise
+  // organization's model deny list, and its provider allow-list, matched against the provider
+  // this route selected for the model. A denial returns `modelNotAllowedResponse` before any
+  // upstream request. Do not resolve that policy again here; `direct-provider-access.ts` is the
+  // single source, so a second resolution can only disagree with it.
   const accessResult = await checkDirectProviderAccess({
     user,
     organizationId,
@@ -193,6 +207,10 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Data-use contract for this route: edit goes straight to Inception, which the gateway's
   // provider data policy classifies as not training on prompts and not retaining them
@@ -234,37 +252,43 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const bodyForUpstream = { ...requestBody, model: upstreamModel };
 
-  const proxyRes = await fetch(INCEPTION_EDIT_URL, {
+  const upstream = await fetchUpstream({
+    provider: { type: editProvider, apiUrl: INCEPTION_EDIT_URL, apiKey, apiKeyHeader: null },
+    path: '',
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(bodyForUpstream),
+    body: bodyForUpstream,
+    signal: request.signal,
+    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.status_code = proxyRes.status;
+  usageContext.status_code = upstream.response.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByokEntry,
-      provider: editProvider,
-      requestedModel: requestBody.model,
-      resolvedModel: requestBody.model,
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: proxyRes.status,
-    },
-    proxyRes.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: false,
+    userByok: !!userByokEntry,
+    provider: editProvider,
+    requestedModel: requestBody.model,
+    resolvedModel: requestBody.model,
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: upstream.response.status,
+    mode: usageContext.mode || undefined,
+  };
+
+  if (upstream.type === 'error') {
+    requestSpan.end();
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstream.response;
+  }
+  const proxyRes = upstream.response;
 
   if (!proxyRes.body) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -286,7 +310,8 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
-  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  const accounting = countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

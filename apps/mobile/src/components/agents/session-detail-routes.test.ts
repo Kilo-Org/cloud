@@ -1,5 +1,6 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { type Href } from 'expo-router';
+import { describe, expect, it } from 'vitest';
 
 import {
   getAgentSessionPath,
@@ -34,13 +35,18 @@ describe('getSpawnedAgentSessionPath', () => {
 });
 
 describe('replaceWithAgentSession', () => {
-  it('still uses the base path (no spawned=1) — spawned param is owned by the spawn path', () => {
-    // Regression: the existing helper is unchanged. Spawned-aware callers
-    // go through `getSpawnedAgentSessionPath` directly so the non-spawn
-    // paths (push notifications, deep links, etc.) keep their original
-    // byte-for-byte navigation target.
-    const router = { replace: vi.fn(() => undefined) };
+  it('replaces with the org-scoped detail path, not the spawn path', () => {
+    // Regression: the non-spawn callers (push notifications, deep links) keep
+    // their original navigation target. `spawned=1` belongs to
+    // `getSpawnedAgentSessionPath`; the literal expectation below fails when
+    // this destination loses its `organizationId` or gains the spawn param.
+    const destinations: Href[] = [];
+    const router = { replace: (href: Href) => destinations.push(href) };
+
     replaceWithAgentSession(router, SESSION_ID, ORG_ID);
-    expect(router.replace).toHaveBeenCalledWith(getAgentSessionPath(SESSION_ID, ORG_ID));
+
+    expect(destinations).toEqual([
+      '/(app)/agent-chat/ses_12345678901234567890123456?organizationId=org_abc123',
+    ]);
   });
 });

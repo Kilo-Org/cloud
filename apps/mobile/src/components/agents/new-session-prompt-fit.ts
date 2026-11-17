@@ -167,3 +167,23 @@ export function resolveNewSessionPromptMinHeight({
   const lines = Math.max(1, Math.floor((available - verticalPadding) / lineHeight));
   return Math.min(preferredMinHeight, lines * lineHeight + verticalPadding);
 }
+
+export function resolveNewSessionFormFrameHeight({
+  containerY,
+  containerHeight,
+  footerHeight,
+  windowHeight,
+  keyboardHeight,
+  keyboardVerticalOffset,
+}: {
+  containerY: number;
+  containerHeight: number;
+  footerHeight: number;
+  windowHeight: number;
+  keyboardHeight: number;
+  keyboardVerticalOffset: number;
+}): number {
+  const keyboardTop = windowHeight - keyboardHeight - keyboardVerticalOffset;
+  const overlap = Math.max(0, containerY + containerHeight - keyboardTop);
+  return Math.max(0, containerHeight - footerHeight - overlap);
+}

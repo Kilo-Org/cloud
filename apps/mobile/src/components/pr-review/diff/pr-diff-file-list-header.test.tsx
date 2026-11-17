@@ -1,8 +1,8 @@
-import { createElement } from 'react';
+import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { PrDiffFileListHeader } from './pr-diff-file-list-header';
 
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -51,10 +51,14 @@ const baseProps = {
   onViewModeChange: vi.fn(),
 };
 
-function mountHeader(): TestRenderer.ReactTestRenderer {
+function mountHeader(
+  overrides: Partial<ComponentProps<typeof PrDiffFileListHeader>> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(PrDiffFileListHeader, baseProps));
+    ref.current = TestRenderer.create(
+      createElement(PrDiffFileListHeader, { ...baseProps, ...overrides })
+    );
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -63,11 +67,63 @@ function mountHeader(): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
+function summaryTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return findNavigatorPressable(renderer.root)
+    .findAllByType('Text')
+    .map(node =>
+      node.children.filter((child): child is string => typeof child === 'string').join('')
+    );
+}
+
 function findNavigatorPressable(
   root: TestRenderer.ReactTestInstance
 ): TestRenderer.ReactTestInstance {
-  return root.findByProps({ accessibilityLabel: 'Open file navigator' });
+  // By test id, not by label: the label is translated.
+  return root.findByProps({ testID: 'pr-files-summary' });
 }
+
+describe('PrDiffFileListHeader summary copy', () => {
+  beforeAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  afterAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('counts the viewed files without repeating the Files label', () => {
+    const renderer = mountHeader({ viewedCount: 0, totalListed: 100 });
+
+    // The Files label sits directly above the row, so the summary opens with
+    // the count instead of naming the screen again.
+    expect(summaryTexts(renderer)).toEqual(['0 of 100 viewed']);
+  });
+
+  it('keeps the listed suffix when the file list is truncated', () => {
+    const renderer = mountHeader({ viewedCount: 2, totalListed: 40, isTruncated: true });
+
+    expect(summaryTexts(renderer)).toEqual(['2 of 40 viewed', '(listed)']);
+  });
+
+  it('agrees the French participle with the listed total', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      // French selects its singular category for 0 and 1, so a one-file list
+      // must render the singular participle the catalogs now carry.
+      expect(summaryTexts(mountHeader({ viewedCount: 0, totalListed: 1 }))).toEqual([
+        '0 sur 1 consulté',
+      ]);
+      expect(summaryTexts(mountHeader({ viewedCount: 3, totalListed: 3 }))).toEqual([
+        '3 sur 3 consultés',
+      ]);
+      expect(
+        summaryTexts(mountHeader({ viewedCount: 1, totalListed: 1, isTruncated: true }))
+      ).toEqual(['1 sur 1 consulté', '(affichés)']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});
 
 describe('PrDiffFileListHeader side insets (landscape)', () => {
   beforeEach(() => {

@@ -32,6 +32,7 @@ function createFetchPermission(permission: Permission) {
 }
 
 beforeEach(() => {
+  jest.clearAllMocks();
   mockedAssertAuthorized.mockResolvedValue(undefined);
 });
 
@@ -126,18 +127,70 @@ describe('authorizeGitHubRepository', () => {
     expect(fetchPermission).not.toHaveBeenCalled();
   });
 
-  test('non-GitHub integrations are unaffected', async () => {
-    const fetchPermission = createFetchPermission('none');
+  describe('chat integration repositories', () => {
+    test.each(['slack', 'linear'] as const)(
+      'allows an organization-owned %s integration without a linked GitHub identity',
+      async platform => {
+        const fetchPermission = createFetchPermission('none');
 
-    const result = await authorizeGitHubRepository({
-      platformIntegration: createIntegration({ platform: 'slack' }),
-      repository: 'acme/slack',
-      actorLogin: 'U123',
-      fetchPermission,
+        const result = await authorizeGitHubRepository({
+          platformIntegration: createIntegration({ platform, platform_installation_id: null }),
+          repository: 'acme/no-identity',
+          fetchPermission,
+        });
+
+        expect(result).toEqual({ allowed: true });
+        expect(fetchPermission).not.toHaveBeenCalled();
+        expect(mockedAssertAuthorized).not.toHaveBeenCalled();
+      }
+    );
+
+    test.each(['slack', 'linear'] as const)(
+      "does not check an actor's GitHub write access for a %s integration",
+      async platform => {
+        const fetchPermission = createFetchPermission('read');
+
+        const result = await authorizeGitHubRepository({
+          platformIntegration: createIntegration({ platform }),
+          repository: 'acme/read-only',
+          actorLogin: 'read-only-user',
+          fetchPermission,
+        });
+
+        expect(result).toEqual({ allowed: true });
+        expect(fetchPermission).not.toHaveBeenCalled();
+      }
+    );
+
+    test('allows a chat integration call without a repository', async () => {
+      const fetchPermission = createFetchPermission('none');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: createIntegration({ platform: 'slack' }),
+        repository: null,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(fetchPermission).not.toHaveBeenCalled();
     });
 
-    expect(result).toEqual({ allowed: true });
-    expect(fetchPermission).not.toHaveBeenCalled();
+    test('keeps personally owned chat integrations owner-controlled', async () => {
+      const fetchPermission = createFetchPermission('none');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: createIntegration({
+          platform: 'slack',
+          owned_by_organization_id: null,
+          owned_by_user_id: 'user_1',
+        }),
+        repository: 'acme/personal',
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
   });
 
   test('a missing triggering login may only use the conversation repository', async () => {

@@ -4,10 +4,7 @@ import {
   COMPATIBLE_USER_AGENT,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import {
-  isReasoningExplicitlyDisabled,
-  replaceReasoningObjectWithReasoningEffort,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'kimi-coding',
@@ -18,11 +15,7 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest(context) {
-    const reasoningDisabled = isReasoningExplicitlyDisabled(context.request);
-    context.request.body.thinking = {
-      type: reasoningDisabled ? 'disabled' : 'enabled',
-    };
-    replaceReasoningObjectWithReasoningEffort(context.request);
+    applyThinkingToggleAndReasoningEffort(context.request);
     if (
       context.request.kind === 'chat_completions' &&
       context.request.body.reasoning_effort === 'none'
@@ -36,7 +29,7 @@ export default {
       {
         id: 'kimi-for-coding',
         name: 'Kimi for Coding',
-        flags: ['recommended', 'vision', 'reasoning'],
+        flags: ['vision', 'reasoning'],
         context_length: 262144,
         max_completion_tokens: 32768,
         description:

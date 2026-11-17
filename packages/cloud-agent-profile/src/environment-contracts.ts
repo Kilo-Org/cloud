@@ -79,6 +79,10 @@ const RESERVED_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'CONTROL_LOG_UPLOAD_URL',
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
+  'CLOUD_AGENT_SENTRY_DSN',
+  'CLOUD_AGENT_SENTRY_ENVIRONMENT',
+  'SANDBOX_TRANSFER_URL',
+  'SANDBOX_TRANSFER_GRANT',
 ]);
 
 const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
@@ -231,6 +235,11 @@ type EnvironmentBuildInputBase = {
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
+  /**
+   * The environment's saved allocation key, unvalidated. Build admission
+   * resolves it with the repository and context settings to pin one target.
+   */
+  sandboxAllocation: string | null;
 };
 
 /**

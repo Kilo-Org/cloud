@@ -6,10 +6,11 @@
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",
+    "./text": "./src/text.ts",
     "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
-    "./code-reviews": "./src/code-reviews/index.ts",
     "./organizations": "./src/organizations/index.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
@@ -17,6 +18,7 @@
     "./images-schema": "./src/images-schema.ts",
     "./cloud-agent": "./src/cloud-agent.ts",
     "./analytics": "./src/analytics/index.ts",
+    "./feature-flags": "./src/feature-flags.ts",
     "./app-version": "./src/app-version.ts",
     "./control-plane": "./src/control-plane.ts",
     "./pr-review": "./src/pr-review/index.ts",
@@ -27,11 +29,16 @@
     "./model-data-disclosure": "./src/model-data-disclosure.ts",
     "./agent-briefing": "./src/agent-briefing.ts",
     "./agent-profile": "./src/agent-profile.ts",
+    "./approval-key": "./src/approval-key.ts",
+    "./cloud-agent-error": "./src/cloud-agent-error.ts",
+    "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
-    "./tool-detail": "./src/tool-detail/index.ts"
+    "./display-text": "./src/display-text.ts",
+    "./tool-detail": "./src/tool-detail/index.ts",
+    "./worktree-review": "./src/worktree-review/index.ts"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo",
     "test": "vitest run",
     "test:watch": "vitest"
   },

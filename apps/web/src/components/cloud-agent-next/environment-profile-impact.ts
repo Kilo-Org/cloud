@@ -1,7 +1,6 @@
 type ProfileSetup = {
   id: string;
   name: string;
-  commands: readonly unknown[];
   vars: readonly { key: string }[];
 };
 
@@ -10,9 +9,6 @@ export function describeEnvironmentProfileImpact(
   profiles: readonly ProfileSetup[],
   environmentKeys: readonly string[]
 ) {
-  const commandProfiles = profiles
-    .filter(profile => profile.commands.length > 0)
-    .map(profile => profile.name);
   const overrides = new Map<string, string>();
   const keys = new Set(environmentKeys);
   for (const profile of profiles) {
@@ -21,7 +17,6 @@ export function describeEnvironmentProfileImpact(
     }
   }
   return {
-    commandProfiles,
     overrides: [...overrides].map(([key, profileName]) => ({ key, profileName })),
   };
 }

@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Таны агентын сессид шинэчлэлт бий",
-      "chatMessage": "Танд шинэ мэдээлэл ирлээ",
-      "instanceLifecycle": "Таны инстанц шинэчлэлттэй байна",
-      "scheduledAction": "Төлөвлөсөн үйлдэл шинэчлэлттэй байна",
       "lowBalance": "Таны үлдэгдэл анхаарал шаарддаг",
       "spendAlert": "Таны зарлага анхаарал шаарддаг",
       "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Даалгавар дууссан"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Амжилтгүй: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Тасарсан: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Гарчиггүй",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Зарлагын дохиолол",
       "body": "{{scopeName}}-ийн зарлага ${{amountUsd}}-аас хэтэрсэн"
     },
-    "securityFindingNew": {
-      "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}}-д {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA анхааруулга",
-      "body": "{{repoFullName}}-д {{findingTitle}}"
+      "title": "SLA анхааруулга"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA зөрчил",
-      "body": "{{repoFullName}}-д {{findingTitle}}"
+      "title": "SLA зөрчил"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Аюулгүй байдлын шалгалт шинэчлэлттэй байна"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} бэлэн боллоо",
-      "body": "Чатаа эхлүүлэхийн тулд товшино уу."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} эхлэлт амжилтгүй боллоо",
-      "body": "Эхлэлт амжилтгүй боллоо."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} удахгүй дахин эхлэх болно",
-      "body": "{{when}} цагт дахин эхлэхээр төлөвлөгдсөн."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} дахин эхлэлт цуцлагдлаа",
-      "body": "Өмнө төлөвлөсөн дахин эхлэлт цуцлагдсан."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} удахгүй шинэчлэгдэх болно",
-      "bodyWithTag": "{{when}} цагт {{targetImageTag}} руу шинэчлэлт.",
-      "bodyWithoutTag": "{{when}} цагт төлөвлөсөн шинэчлэлт."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} шинэчлэлт цуцлагдлаа",
-      "body": "Өмнө төлөвлөсөн шинэчлэлт цуцлагдсан."
     }
   },
   "sessionReady": {

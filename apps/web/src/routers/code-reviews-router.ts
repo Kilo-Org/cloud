@@ -12,6 +12,8 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
+import { ReviewGuidelineSourceRepositoriesSchema } from '@kilocode/db/schema-types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
@@ -39,6 +41,7 @@ import {
   type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -57,12 +60,7 @@ const RepositoryModelOverrideInputSchema = z.object({
   // so an over-long slug is rejected at save time rather than failing the config's
   // canonical parse on read.
   modelSlug: z.string().max(512),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
 });
 
 // Bound the overrides array so a caller cannot grow the JSONB config unbounded, and
@@ -96,12 +94,7 @@ const SaveReviewConfigInputSchema = z.object({
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
   modelSlug: z.string(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
@@ -111,6 +104,7 @@ const SaveReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
@@ -129,12 +123,7 @@ const PatchReviewConfigInputSchema = z.object({
   focusAreas: z.array(z.string()).optional(),
   customInstructions: z.string().optional(),
   modelSlug: z.string().optional(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   // Compatibility: selectedRepositoryIds full-array input kept for web save and mobile clients before delta support; remove when web and all shipped mobile clients send deltas.
@@ -151,6 +140,10 @@ const PatchReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
+  // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
+  // the stored value (field-merge); mobile exposes this toggle.
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks. Only consulted when
   // `selectedRepositoryIds` or `selectedRepositoryDelta` is also present in
@@ -265,6 +258,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
       const platform = input?.platform ?? 'github';
       const config = await getAgentConfigForOwner(owner, 'code_review', platform);
+      // GitLab code review has no 'all' repository mode: the webhook handler
+      // reviews only selected or manually added projects, so the reported mode
+      // must not promise 'all' for a stored row or for the default config.
+      const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
         // Return default configuration
@@ -276,13 +273,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
           modelSlug: PRIMARY_DEFAULT_MODEL,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
-          repositorySelectionMode: 'all' as const,
+          repositorySelectionMode: isGitLab ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          reviewGuidelineSourceRepositories: [],
           skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -298,7 +296,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
-        repositorySelectionMode: cfg.repository_selection_mode || 'all',
+        repositorySelectionMode: isGitLab
+          ? ('selected' as const)
+          : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: (cfg.selected_repository_ids ?? []).filter(
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         ),
@@ -315,6 +315,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: cfg.disable_review_md ?? true,
+        reviewGuidelineSourceRepositories: cfg.review_guideline_source_repositories ?? [],
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         // Council is org-only; personal configs never set it, but expose it so the query shape
         // matches the org query (the form's `configData` is a union of the two).
@@ -335,6 +336,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
       try {
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
+
+        // GitLab code review has no 'all' repository mode: the webhook handler
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = repositoryModeForPlatform(
+          platform,
+          input.repositorySelectionMode
+        );
 
         // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
@@ -366,11 +375,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: input.gateThreshold ?? 'off',
-            repository_selection_mode: input.repositorySelectionMode || 'all',
+            repository_selection_mode: repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
+            review_guideline_source_repositories: input.reviewGuidelineSourceRepositories ?? [],
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
@@ -384,7 +394,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         if (
           platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
-          input.repositorySelectionMode === 'selected'
+          repositorySelectionMode === 'selected'
         ) {
           const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
           if (integration) {
@@ -549,6 +559,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: prevCfg.disable_review_md ?? true,
+          reviewGuidelineSourceRepositories: prevCfg.review_guideline_source_repositories ?? [],
+          skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: prevCfg.manually_added_repositories || [],
         };
 
@@ -604,11 +616,11 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: merged.manuallyAddedRepositories ?? [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: merged.disableReviewMd ?? true,
-            // The patch schema never carries `skipBotPullRequests` (a
-            // web-only setting from the full save). Pass the stored value
-            // through so a PATCH can't silently reset it to the default —
-            // same field-merge contract as every other omitted field.
-            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            review_guideline_source_repositories: merged.reviewGuidelineSourceRepositories ?? [],
+            // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
+            // patch schema accepts it; a patch that omits it keeps the stored
+            // value (field-merge), never the bare default.
+            skip_bot_pull_requests: merged.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

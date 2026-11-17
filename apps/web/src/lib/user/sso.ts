@@ -15,6 +15,7 @@ import { sendOrgSSOUserJoinedEmail } from '@kilocode/web-shared/lib/email';
 import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
 import { authFailureRedirectUrl } from '@/lib/auth/redirect-urls';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -22,7 +23,8 @@ async function processSSOInternal(
   args: CreateOrUpdateUserArgs,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  invitationToken?: string
 ): Promise<string | true> {
   if (args.provider !== 'workos') {
     throw new Error('Only SSO logins supported');
@@ -84,14 +86,17 @@ async function processSSOInternal(
     }
     throw new Error(res.error);
   }
-  if (res.user.blocked_reason) {
-    throw new Error('User is blocked: ' + res.user.blocked_reason);
+  if (isBlockedAccount(res.user)) {
+    throw new Error(
+      `User is blocked${res.user.blocked_reason ? `: ${res.user.blocked_reason}` : ''}`
+    );
   }
 
   const savedUser = res.user;
   // add user to organization since its been fully created
   const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id, {
     isNewUser: res.isNew,
+    ...(invitationToken ? { invitationToken } : {}),
   });
   if (added) {
     // Users who join through SSO should not be asked how they heard about Kilo.
@@ -137,10 +142,17 @@ export async function processSSOUserLogin(
   args: CreateOrUpdateUserArgs,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  invitationToken?: string
 ) {
   try {
-    return await processSSOInternal(args, requestHeaders, affiliateTrackingId, trackingContext);
+    return await processSSOInternal(
+      args,
+      requestHeaders,
+      affiliateTrackingId,
+      trackingContext,
+      invitationToken
+    );
   } catch (error) {
     console.error('Error processing SSO login:', error);
     captureException(error, {

@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 
 export type CloudAgentSettingsRepositoryRow = {
   repositoryFullName: string;
@@ -35,6 +36,17 @@ export function useCloudAgentSettings(options: UseCloudAgentSettingsOptions = {}
 }
 
 export type CloudAgentSettingsData = NonNullable<ReturnType<typeof useCloudAgentSettings>['data']>;
+
+export function useBuiltinAgentSettings() {
+  const trpc = useTRPC();
+
+  return useQuery(
+    trpc.cloudAgentSettings.getBuiltinAgents.queryOptions(undefined, {
+      staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+      gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    })
+  );
+}
 
 export function useCloudAgentSettingsCanManage(options: UseCloudAgentSettingsOptions = {}) {
   const { organizationId, enabled = true } = options;
@@ -96,6 +108,27 @@ export function useRemoveRepositorySettingsMutation(organizationId?: string) {
   return useMutation(
     trpc.cloudAgentSettings.removeRepositorySettings.mutationOptions({
       onSuccess: invalidate,
+    })
+  );
+}
+
+/**
+ * Built-in agent overrides are personal (user-scoped) even when the dialog is
+ * showing organization settings, so this mutation records the user's settings
+ * and refreshes both the current context and the personal settings query.
+ */
+export function useSetBuiltinAgentsMutation(organizationId?: string) {
+  const invalidateCurrent = useInvalidateCloudAgentSettings(organizationId);
+  const invalidatePersonal = useInvalidateCloudAgentSettings();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.cloudAgentSettings.setBuiltinAgents.mutationOptions({
+      onSuccess: async ({ agents }) => {
+        queryClient.setQueryData(trpc.cloudAgentSettings.getBuiltinAgents.queryKey(), agents);
+        await Promise.all([invalidateCurrent(), invalidatePersonal()]);
+      },
     })
   );
 }

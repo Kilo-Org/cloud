@@ -1,5 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { readUpstreamFailureEvidence } from './runtime-credential-proxy-diagnostics.js';
+import {
+  readUpstreamFailureEvidence,
+  runtimeProxyRequestShape,
+} from './runtime-credential-proxy-diagnostics.js';
+
+describe('runtimeProxyRequestShape', () => {
+  it('names the session ids and masks every other id segment', () => {
+    expect(
+      runtimeProxyRequestShape({
+        route: 'ingest',
+        method: 'POST',
+        path: '/api/session/ses_Own123/ingest',
+        kiloSessionId: 'ses_Own123',
+      })
+    ).toEqual({
+      proxyRoute: 'ingest',
+      requestMethod: 'POST',
+      pathShape: '/api/session/:kiloSessionId/ingest',
+    });
+    expect(
+      runtimeProxyRequestShape({
+        route: 'backend',
+        method: 'GET',
+        path: '/api/organizations/org_1/models/ses_Other456',
+        organizationId: 'org_1',
+        kiloSessionId: 'ses_Own123',
+      }).pathShape
+    ).toBe('/api/organizations/:organizationId/models/:id');
+  });
+
+  it('keeps version words and masks encoded or traversal segments', () => {
+    expect(
+      runtimeProxyRequestShape({
+        route: 'provider',
+        method: 'POST',
+        path: '/api/gateway/v1/chat/completions',
+      }).pathShape
+    ).toBe('/api/gateway/v1/chat/completions');
+    expect(
+      runtimeProxyRequestShape({
+        route: 'provider',
+        method: 'GET',
+        path: '/api/openrouter/%2e%2e/../Models/',
+      }).pathShape
+    ).toBe('/api/openrouter/:id/:id/:id/');
+  });
+
+  it('maps unknown methods to one value and caps the segment count', () => {
+    const shape = runtimeProxyRequestShape({
+      route: 'backend',
+      method: 'PROPFIND',
+      path: `/${Array.from({ length: 12 }, () => 'segment').join('/')}`,
+    });
+    expect(shape.requestMethod).toBe('OTHER');
+    expect(shape.pathShape).toBe(`/${Array.from({ length: 8 }, () => 'segment').join('/')}/...`);
+  });
+});
 
 describe('readUpstreamFailureEvidence', () => {
   it('captures the application error reason from a JSON body', async () => {

@@ -460,7 +460,12 @@ async function applyProductionAdmissionBatch(opts: {
   await (orm as unknown as { batch: (s: typeof stmts) => Promise<void> }).batch(stmts);
 }
 
-const config = { deciderRepetitions: REPS };
+const config = {
+  minAccuracy: 0.7,
+  accuracyNoiseBand: 0.05,
+  productionTokenProfile: null,
+  switchHorizonTurns: null,
+};
 
 beforeEach(() => {
   store.reset();

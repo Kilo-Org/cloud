@@ -8,6 +8,7 @@ import type { InstallationToken } from '@/lib/integrations/core/types';
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
+import { lastLinkedPage } from './link-header';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
@@ -78,21 +79,26 @@ export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string,
-  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   await assertGitHubInstallationRuntimeAuthorized(
     installationId,
     appType,
     expectedIntegrationId,
     purpose
   );
-  return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+  signal?.throwIfAborted();
+  return await generateGitHubInstallationTokenForMaintenance(installationId, appType, signal);
 }
 
 export async function generateGitHubInstallationTokenForMaintenance(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -103,6 +109,7 @@ export async function generateGitHubInstallationTokenForMaintenance(
     appId: credentials.appId,
     privateKey: credentials.privateKey,
     installationId,
+    ...(signal ? { request: new Octokit({ request: { signal } }).request } : {}),
   });
 
   const authResult = await auth({ type: 'installation' });
@@ -197,6 +204,42 @@ type GitHubBranch = {
   isDefault: boolean;
 };
 
+/**
+ * One paged read of the repositories an app installation can reach.
+ *
+ * Both callers mint their own token, so this takes the authenticated client and
+ * keeps the archived filter, the projection and the stop condition in one place.
+ */
+async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRepository[]> {
+  const perPage = 100;
+  const repositories: GitHubRepository[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data } = await octokit.apps.listReposAccessibleToInstallation({
+      per_page: perPage,
+      page,
+    });
+
+    repositories.push(
+      ...data.repositories
+        .filter(repository => !repository.archived)
+        .map(repository => ({
+          id: repository.id,
+          name: repository.name,
+          full_name: repository.full_name,
+          private: repository.private,
+          created_at: repository.created_at ?? new Date().toISOString(),
+        }))
+    );
+
+    if (data.repositories.length < perPage) break;
+    page++;
+  }
+
+  return repositories;
+}
+
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -209,35 +252,7 @@ export async function fetchGitHubRepositories(
     expectedIntegrationId,
     purpose
   );
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  const perPage = 100;
-
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: 100,
-      page,
-    });
-
-    repositories.push(
-      ...data.repositories
-        .filter(repo => !repo.archived)
-        .map(repo => ({
-          id: repo.id,
-          name: repo.name,
-          full_name: repo.full_name,
-          private: repo.private,
-          created_at: repo.created_at ?? new Date().toISOString(),
-        }))
-    );
-
-    if (data.repositories.length < perPage) break;
-    page++;
-  }
-
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubRepositoriesForMaintenance(
@@ -245,26 +260,7 @@ export async function fetchGitHubRepositoriesForMaintenance(
   appType: GitHubAppType
 ): Promise<GitHubRepository[]> {
   const tokenData = await generateGitHubInstallationTokenForMaintenance(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  while (true) {
-    const response = await octokit.apps.listReposAccessibleToInstallation({ per_page: 100, page });
-    repositories.push(
-      ...response.data.repositories
-        .filter(repository => !repository.archived)
-        .map(repository => ({
-          id: repository.id,
-          name: repository.name,
-          full_name: repository.full_name,
-          private: repository.private,
-          created_at: repository.created_at ?? new Date().toISOString(),
-        }))
-    );
-    if (response.data.repositories.length < 100) break;
-    page += 1;
-  }
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubBranches(
@@ -428,9 +424,7 @@ export async function hasPRCommentWithMarker(
 
   const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
-  const found = comments.some(
-    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
-  );
+  const found = comments.some(c => c.body?.includes(marker) && isAuthoredByApp(c, appId));
 
   logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
@@ -607,6 +601,16 @@ type PRIssueComment = {
   performed_via_github_app?: { id?: number | string } | null;
 };
 
+type GitHubAppAuthorship = { performed_via_github_app?: { id?: number | string | null } | null };
+
+/**
+ * Reports whether the app that owns this credential created the comment.
+ * GitHub returns the app id as a number, so compare the string forms.
+ */
+function isAuthoredByApp(comment: GitHubAppAuthorship, appId: string): boolean {
+  return String(comment.performed_via_github_app?.id ?? '') === appId;
+}
+
 /**
  * Reads pull-request issue comments from both ends of the list within the
  * MAX_KILO_REVIEW_COMMENT_PAGES budget: the first pages and the last pages.
@@ -631,7 +635,7 @@ async function scanPRIssueComments(
   };
 
   const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
   const comments: PRIssueComment[] = [...firstResponse.data];
 
   if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
@@ -659,21 +663,6 @@ async function scanPRIssueComments(
 }
 
 /**
- * Reads the `rel="last"` page number from a `Link` response header.
- */
-function lastIssueCommentPage(linkHeader: string | undefined): number {
-  if (!linkHeader) return 1;
-
-  for (const segment of linkHeader.split(',')) {
-    if (!segment.includes('rel="last"')) continue;
-    const page = segment.match(/[?&]page=(\d+)/);
-    if (page) return Number(page[1]);
-  }
-
-  return 1;
-}
-
-/**
  * Looks for the <!-- kilo-review --> marker in issue comments.
  */
 export async function findKiloReviewComment(
@@ -697,9 +686,7 @@ export async function findKiloReviewComment(
   });
 
   const markedComments = comments.filter(
-    c =>
-      c.body?.includes('<!-- kilo-review -->') &&
-      String(c.performed_via_github_app?.id ?? '') === appId
+    c => c.body?.includes('<!-- kilo-review -->') && isAuthoredByApp(c, appId)
   );
 
   if (markedComments.length > 0) {
@@ -768,8 +755,8 @@ type ReviewCommentExtras = {
 /**
  * Used to detect duplicates and track outdated inline comments.
  *
- * `authoredByKilo` reports whether this app identity created the comment, following the same
- * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
+ * `authoredByKilo` reports whether this app identity created the comment, through the same
+ * `isAuthoredByApp` predicate the summary readers use.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -790,7 +777,7 @@ export async function fetchPRInlineComments(
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
-  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -829,7 +816,7 @@ export async function fetchPRInlineComments(
         line: c.line ?? null,
         body,
         isOutdated: c.position == null,
-        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
+        authoredByKilo: isAuthoredByApp(c, appId),
         user: { login: c.user?.login ?? 'unknown' },
       });
 
@@ -912,6 +899,7 @@ export async function fetchGitHubRootTextFileAtRef(params: {
       repo,
       path,
       ref,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
 
     if (Array.isArray(data)) return null;
@@ -937,8 +925,28 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
 }): Promise<string> {
   const { token, owner, repo } = params;
   const octokit = new Octokit({ auth: token });
-  const { data } = await octokit.repos.get({ owner, repo });
+  const { data } = await octokit.repos.get({
+    owner,
+    repo,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
   return data.default_branch;
+}
+
+export async function fetchGitHubRepositoryDefaultBranchSha(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const branch = await fetchGitHubRepositoryDefaultBranch(params);
+  const octokit = new Octokit({ auth: params.token });
+  const { data } = await octokit.git.getRef({
+    owner: params.owner,
+    repo: params.repo,
+    ref: `heads/${branch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+  return data.object.sha;
 }
 
 export async function fetchGitHubRepositorySize(params: {
@@ -1062,6 +1070,10 @@ export async function getGitHubReviewComment(
   id: number;
   body: string;
   userLogin: string | null;
+  /** GitHub account type of the comment author: 'User' | 'Bot' | 'Organization'. */
+  userType: string | null;
+  /** Numeric GitHub user id of the comment author; survives an App rename. */
+  userId: number | null;
   inReplyToId: number | null;
 } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -1077,6 +1089,8 @@ export async function getGitHubReviewComment(
       id: data.id,
       body: data.body,
       userLogin: data.user?.login ?? null,
+      userType: data.user?.type ?? null,
+      userId: data.user?.id ?? null,
       inReplyToId: data.in_reply_to_id ?? null,
     };
   } catch (error) {
@@ -1120,6 +1134,14 @@ export type AssociatedPullRequest = {
   headRepoFullName?: string;
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
+  baseSha?: string;
+  /** Branch the PR targets, as reported by GitHub. */
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
+  stackNumber?: number | null;
+  stackPosition?: number | null;
+  stackSize?: number | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1161,15 +1183,39 @@ function getResponseHeader(error: unknown, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function parseRateLimitResetAt(error: unknown): Date {
-  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
-  const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
-  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
-    return new Date(resetSeconds * 1000);
+function retryAfterDeadlineMs(error: unknown, now: number): number | null {
+  const header = getResponseHeader(error, 'retry-after')?.trim();
+  if (!header) return null;
+  // A bare number is a delta in seconds; anything else is an HTTP date.
+  if (/^\d+$/.test(header)) {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? now + seconds * 1000 : null;
   }
-  // Fall back to "retry in 60s" if the header is missing/invalid, so callers
-  // always have a usable Date to show.
-  return new Date(Date.now() + 60_000);
+  const timestamp = Date.parse(header);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function primaryResetDeadlineMs(error: unknown): number | null {
+  // The primary reset only applies once the quota is exhausted; otherwise the
+  // future reset of a still-usable quota would over-wait secondary limits.
+  if (getResponseHeader(error, 'x-ratelimit-remaining') !== '0') return null;
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetSeconds) || resetSeconds <= 0) return null;
+  return resetSeconds * 1000;
+}
+
+function parseRateLimitResetAt(error: unknown, now = Date.now()): Date {
+  const deadlines = [retryAfterDeadlineMs(error, now), primaryResetDeadlineMs(error)].filter(
+    (deadline): deadline is number =>
+      deadline !== null && Number.isFinite(new Date(deadline).getTime())
+  );
+  // Retry-After applies to secondary limits; the primary reset applies while
+  // the quota is exhausted. When both apply, wait for the later deadline.
+  // Without a usable signal, wait the documented minimum.
+  if (deadlines.length === 0) return new Date(now + 60_000);
+  return new Date(Math.max(...deadlines));
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1192,10 +1238,10 @@ export function isGitHubRateLimitError(error: unknown): boolean {
   const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
   if (remaining === '0') return true;
   // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
-  // denial (e.g. installation lacks pull request access). Only treat 403 as
-  // rate-limited when the message indicates so, so that genuine permission
-  // failures are surfaced to the caller.
+  // denial (e.g. installation lacks pull request access). A Retry-After header
+  // is GitHub's secondary-limit signal even when the message omits the phrase.
   if (error.status === 403) {
+    if (getResponseHeader(error, 'retry-after') !== undefined) return true;
     const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes('rate limit') ||
@@ -1204,6 +1250,18 @@ export function isGitHubRateLimitError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+/**
+ * Normalize a GitHub failure into the typed rate-limit error that callers
+ * propagate across refresh legs. Returns `null` when the failure is not a rate
+ * limit, and returns the existing error unchanged when it is already typed so
+ * its deadline is not recomputed or lost.
+ */
+export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | null {
+  if (error instanceof GitHubRateLimitError) return error;
+  if (!isGitHubRateLimitError(error)) return null;
+  return new GitHubRateLimitError(parseRateLimitResetAt(error));
 }
 
 /**
@@ -1236,6 +1294,12 @@ export async function fetchPullRequestByNumber(params: {
    * `MAX_COMMIT_PAGES`.
    */
   expectedHeadSha?: string | null;
+  /**
+   * Shared deadline for every GitHub request this call makes, including the
+   * installation-token mint. Optional so existing callers keep their current
+   * behaviour.
+   */
+  signal?: AbortSignal;
 }): Promise<AssociatedPullRequest | null> {
   const {
     installationId,
@@ -1245,9 +1309,19 @@ export async function fetchPullRequestByNumber(params: {
     appType,
     includeCommits = false,
     expectedHeadSha = null,
+    signal,
   } = params;
 
-  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    String(installationId),
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
@@ -1255,6 +1329,7 @@ export async function fetchPullRequestByNumber(params: {
       owner,
       repo,
       pull_number: number,
+      ...requestOptions,
     });
 
     const state: AssociatedPullRequest['state'] =
@@ -1283,6 +1358,7 @@ export async function fetchPullRequestByNumber(params: {
             pull_number: number,
             per_page: COMMITS_PER_PAGE,
             page,
+            ...requestOptions,
           });
           for (const commit of data) {
             if (typeof commit.sha === 'string') commitShas.push(commit.sha);
@@ -1292,6 +1368,11 @@ export async function fetchPullRequestByNumber(params: {
       }
     }
 
+    const stack = (
+      pr as typeof pr & {
+        stack?: { number?: number | null; position?: number | null; size?: number | null } | null;
+      }
+    ).stack;
     return {
       number: pr.number,
       htmlUrl: pr.html_url,
@@ -1303,12 +1384,18 @@ export async function fetchPullRequestByNumber(params: {
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,
+      baseSha: pr.base.sha,
+      baseRef: pr.base.ref,
+      mergeable: pr.mergeable,
+      mergeableState: pr.mergeable_state,
+      stackNumber: stack?.number ?? null,
+      stackPosition: stack?.position ?? null,
+      stackSize: stack?.size ?? null,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     if (isHttpError(error) && error.status === 404) {
       warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
         owner,
@@ -1318,6 +1405,103 @@ export async function fetchPullRequestByNumber(params: {
       return null;
     }
     throw error;
+  }
+}
+
+/** One open pull request a recovery sweep may reconsider. */
+export type OpenPullRequest = {
+  number: number;
+  title: string;
+  body: string | null;
+  draft: boolean;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: number;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  authorType: string;
+  labels: string[];
+  headSha: string;
+  headRef: string;
+  headRepoFullName: string | null;
+  headRepoCloneUrl: string | null;
+  headRepoHtmlUrl: string | null;
+  baseSha: string;
+  baseRef: string;
+  baseRepoId: number;
+  baseRepoName: string;
+  baseRepoFullName: string;
+};
+
+/**
+ * Lists the most recently updated open pull requests of one repository, newest
+ * first. A recovery sweep reads this to reach a pull request whose review never
+ * started, which no webhook delivery will report again.
+ *
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchOpenPullRequests(params: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  limit: number;
+  appType?: GitHubAppType;
+  signal?: AbortSignal;
+}): Promise<OpenPullRequest[]> {
+  const { installationId, owner, repo, limit, appType = 'standard', signal } = params;
+
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: limit,
+      ...requestOptions,
+    });
+
+    return data.map(pull => ({
+      number: pull.number,
+      title: pull.title,
+      body: pull.body ?? null,
+      draft: pull.draft === true,
+      htmlUrl: pull.html_url,
+      createdAt: pull.created_at,
+      updatedAt: pull.updated_at,
+      authorId: pull.user?.id ?? 0,
+      authorLogin: pull.user?.login ?? '',
+      authorAvatarUrl: pull.user?.avatar_url ?? '',
+      authorType: pull.user?.type ?? 'User',
+      labels: pull.labels
+        .map(label => (typeof label === 'string' ? label : (label.name ?? '')))
+        .filter(name => name !== ''),
+      headSha: pull.head.sha,
+      headRef: pull.head.ref,
+      headRepoFullName: pull.head.repo?.full_name ?? null,
+      headRepoCloneUrl: pull.head.repo?.clone_url ?? null,
+      headRepoHtmlUrl: pull.head.repo?.html_url ?? null,
+      baseSha: pull.base.sha,
+      baseRef: pull.base.ref,
+      baseRepoId: pull.base.repo.id,
+      baseRepoName: pull.base.repo.name,
+      baseRepoFullName: pull.base.repo.full_name,
+    }));
+  } catch (error) {
+    throw toGitHubRateLimitError(error) ?? error;
   }
 }
 
@@ -1439,9 +1623,8 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     throw error;
   }
 }
@@ -1748,7 +1931,7 @@ export async function createCheckRun(
   const { data } = await octokit.checks.create({
     owner,
     repo,
-    name: 'Kilo Code Review',
+    name: CHECK_RUN_NAME,
     head_sha: headSha,
     status: completed ? 'completed' : 'queued',
     ...(options.conclusion ? { conclusion: options.conclusion } : {}),
@@ -1766,6 +1949,42 @@ export async function createCheckRun(
   });
 
   return data.id;
+}
+
+/** The check run name the Kilo Code Review creates on a pull request head. */
+const CHECK_RUN_NAME = 'Kilo Code Review';
+
+/**
+ * The id of the latest Kilo Code Review run that already exists on a commit, or
+ * undefined when the commit carries none. A read failure also answers
+ * undefined after it is logged, so the caller cannot tell it from "no run"; the
+ * caller's fallback is a re-gate, and a decided duplicate run answers 422,
+ * which the create path logs and leaves in place.
+ */
+export async function findLatestCheckRunId(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<number | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.listForRef({
+      owner,
+      repo,
+      ref: headSha,
+      check_name: CHECK_RUN_NAME,
+      filter: 'latest',
+      per_page: 1,
+    });
+    const [latest] = data.check_runs;
+    return latest?.id;
+  } catch (error) {
+    logExceptInTest('[findLatestCheckRunId] Failed to list check runs:', error);
+    return undefined;
+  }
 }
 
 /**

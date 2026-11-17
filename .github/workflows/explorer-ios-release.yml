@@ -25,8 +25,73 @@ concurrency:
   cancel-in-progress: false
 permissions:
   contents: read
+# The probe and the upload decide on one object, so its location is defined once:
+# ARTIFACT_OBJECT is the URL-encoded name `explorers/ios/<build key>.app.tar.gz`.
+env:
+  ARTIFACT_BUCKET: kwf-planner-kilocode-us-central1
+  ARTIFACT_OBJECT: explorers%2Fios%2F${{ inputs.fingerprint }}.app.tar.gz
 jobs:
+  # A dispatch whose immutable object already exists has nothing to build: the
+  # upload below already treats that object as success. The probe names the same
+  # object for the same build key and runs with the upload job's identity, so
+  # `build` keeps its steps free of any OIDC credential.
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      exists: ${{ steps.metadata.outputs.exists }}
+    env:
+      FINGERPRINT: ${{ inputs.fingerprint }}
+    steps:
+      - name: Require the build key format
+        run: |
+          set -euo pipefail
+          [[ "$FINGERPRINT" =~ ^explorer-[0-9a-f]{12}-[0-9a-f]{16}$ ]] || { echo '::error::Invalid explorer build key'; exit 1; }
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        id: auth
+        # A probe that cannot mint its token has no answer, and no answer means build:
+        # without this the run would end `failure` after a build and upload that
+        # succeeded, which is worse than the dispatch behaviour it replaces. A broken
+        # identity still reports itself, one build later, in `upload`, which mints the
+        # same identity without a fail-open path.
+        continue-on-error: true
+        with:
+          workload_identity_provider: ${{ vars.KWF_IOS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.KWF_IOS_UPLOAD_SERVICE_ACCOUNT }}
+          token_format: access_token
+          # The probe reads one output of this action and needs no credentials file.
+          create_credentials_file: false
+      - name: Check whether the immutable artifact already exists
+        id: metadata
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          # Fail open: only a confirmed object skips the build, so a lookup that
+          # cannot answer costs the build that runs today.
+          if [[ -z "${ACCESS_TOKEN:-}" ]]; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::Explorer artifact lookup has no token; building'
+            exit 0
+          fi
+          url="https://storage.googleapis.com/storage/v1/b/${ARTIFACT_BUCKET}/o/${ARTIFACT_OBJECT}"
+          status=$(curl -sS --retry 3 --retry-connrefused -o "$RUNNER_TEMP/metadata-response" -w '%{http_code}' \
+            -H "Authorization: Bearer $ACCESS_TOKEN" "$url") || status=000
+          case "$status" in
+            200) echo 'exists=true' >> "$GITHUB_OUTPUT"; echo '::notice::Immutable explorer artifact already published' ;;
+            *) echo 'exists=false' >> "$GITHUB_OUTPUT"; echo "::notice::Explorer artifact lookup returned HTTP $status; building" ;;
+          esac
   build:
+    needs: probe
+    # A probe that failed publishes no output, and then the build runs: the
+    # probe can only skip work it has proven is already done. The condition sits
+    # on the job, so a probe hit reserves no runner at all; a step condition
+    # would still pay for one. `!cancelled()` is a status check, so a failed
+    # probe reaches the build instead of skipping through an implicit success().
+    if: ${{ !cancelled() && needs.probe.outputs.exists != 'true' }}
     runs-on: macos-26
     # A cold Release build takes about 56 minutes and one needed 83. The explorer client waits 160 minutes,
     # so this limit reports its own failure first.
@@ -76,6 +141,8 @@ jobs:
           }
           NODE
           # The env is data consumed by Expo, never sourced as shell code.
+      # Every step below belongs to a build: the job condition above already
+      # skipped a dispatch whose object the probe found.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.cloud_ref }}
@@ -210,7 +277,12 @@ jobs:
           retention-days: 1
           if-no-files-found: error
   upload:
-    needs: build
+    needs: [probe, build]
+    # A probe that failed still ran the build, so this job publishes that artifact: only a probe
+    # that found the object skips the upload, and a build that a probe hit skipped leaves no
+    # success to publish. `!cancelled()` is a status check, so a failed probe does not skip the
+    # job through an implicit success() on `needs`.
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.probe.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -241,7 +313,7 @@ jobs:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           set -euo pipefail
-          url="https://storage.googleapis.com/upload/storage/v1/b/kwf-planner-kilocode-us-central1/o?uploadType=media&ifGenerationMatch=0&name=explorers%2Fios%2F${FINGERPRINT}.app.tar.gz"
+          url="https://storage.googleapis.com/upload/storage/v1/b/${ARTIFACT_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${ARTIFACT_OBJECT}"
           status=$(curl -sS --retry 3 --retry-connrefused -o "$RUNNER_TEMP/upload-response" -w '%{http_code}' \
             -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/gzip' \
             --data-binary "@$RUNNER_TEMP/explorer-artifact/explorer.app.tar.gz" "$url")

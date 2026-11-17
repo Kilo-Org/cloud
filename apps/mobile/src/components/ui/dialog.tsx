@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { useModalSurfaceHold } from '@/lib/modal-surface-veil';
 import { cn } from '@/lib/utils';
 
 /**
@@ -38,6 +39,10 @@ export function DialogCard({
   placement = 'centred',
   children,
 }: Readonly<DialogCardProps>) {
+  // A portal card renders inside the app window, so the screen it covers must be
+  // taken out of the app's own tree by the root: Android ignores
+  // `accessibilityViewIsModal`, which is set on the card's content below.
+  useModalSurfaceHold();
   return (
     <Root
       open
@@ -115,7 +120,19 @@ export function useConfirmDialog() {
         message={request.message}
         confirmLabel={request.confirmLabel}
         cancelLabel={request.cancelLabel}
-        extraAction={request.extraAction}
+        extraAction={
+          // Cleared like `onConfirm` and `onCancel`: the dialog runs this after
+          // the sheet finished dismissing, and a request left behind would keep
+          // a dismissed sheet mounted, so the next `confirm` would reuse that
+          // instance and start it already closed.
+          request.extraAction && {
+            label: request.extraAction.label,
+            onPress: () => {
+              setRequest(null);
+              request.extraAction?.onPress();
+            },
+          }
+        }
         onConfirm={() => {
           setRequest(null);
           request.onConfirm();

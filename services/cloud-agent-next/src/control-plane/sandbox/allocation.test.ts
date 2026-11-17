@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONTROL_PLANE_TIMERS } from '../../shared/control-plane-timers.js';
 import {
+  CREATE_ATTEMPT_LIMIT,
   initialAllocationState,
   nextAllocationAlarmAt,
   reduceAllocation,
@@ -91,6 +92,55 @@ describe('allocation stop-ladder exhaustion', () => {
     const { state: next } = reduceAllocation(stopped, { type: 'provider-gone', at: 0 }, TIMERS);
     expect(next.kind).toBe('stopped');
     expect(next.unconfirmedProviderRef).toBeNull();
+  });
+});
+
+describe('allocation snapshot launch retry', () => {
+  const creating: AllocationState = {
+    ...initialAllocationState(),
+    kind: 'creating',
+    allocationId: 'alloc-1',
+    providerRef: 'ref-1',
+    createDeadlineAt: 300_000,
+    createAttempt: 1,
+  };
+
+  it('moves the create deadline to the retry bound', () => {
+    const reduction = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toEqual({ ...creating, createDeadlineAt: 610_000 });
+    expect(reduction.effects).toEqual([]);
+  });
+
+  it('keeps the retry from expiring at the first attempt deadline', () => {
+    const { state } = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    const tick = reduceAllocation(
+      state,
+      { type: 'tick', at: 320_000, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(tick.state).toBe(state);
+    expect(tick.effects).toEqual([]);
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(610_000);
+  });
+
+  it.each([
+    ['another allocation', { ...creating, allocationId: 'alloc-2' }],
+    ['a connected allocation', { ...creating, kind: 'connected' as const }],
+  ])('ignores a retry for %s', (_name, state) => {
+    const reduction = reduceAllocation(
+      state,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toBe(state);
   });
 });
 
@@ -267,6 +317,7 @@ describe('allocation create retry', () => {
       kind: 'creating',
       allocationId: 'alloc-1',
       createDeadlineAt: CREATE_FAILED_AT,
+      createAttempt: 1,
     };
   }
 
@@ -310,10 +361,121 @@ describe('allocation create retry', () => {
     expect(due.state.createDeadlineAt).toBe(retryAt + TIMERS.providerCreateMs);
   });
 
+  it('does not wait beyond an admission deadline during the create retry pause', () => {
+    const retryDeadlineAt = CREATE_FAILED_AT + 5_000;
+    const { state } = reduceAllocation(
+      creatingState(),
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        retryDeadlineAt,
+      },
+      TIMERS
+    );
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(retryDeadlineAt);
+  });
+
   it('stops instead of retrying when no route attempt time remains', () => {
     const { state, effects } = failCreate(false);
     expect(state).toEqual(initialAllocationState());
     expect(effects).toEqual([]);
+  });
+
+  it('retries exactly once inside the attempt budget', () => {
+    // Attempt 1 fails: the budget allows the one retry.
+    const first = failCreate(true);
+    expect(first.state.createAttempt).toBe(1);
+    expect(first.routeFailure).toBeUndefined();
+
+    // The retry (attempt 2) fails: the budget is spent, so the routes are told
+    // now instead of waiting out the attempt deadline.
+    const retrying: AllocationState = {
+      ...first.state,
+      allocationId: 'alloc-2',
+      createAttempt: 2,
+      createDeadlineAt: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+    };
+    const second = reduceAllocation(
+      retrying,
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        allocationId: 'alloc-2',
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(second.state).toEqual(initialAllocationState());
+    expect(second.routeFailure).toBe('sandbox_create_failed');
+
+    // A deadline tick after the budget is spent does not start a third create
+    // either, even before the failed create is dispatched.
+    const third = reduceAllocation(
+      retrying,
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(third.state).toEqual(initialAllocationState());
+    expect(third.routeFailure).toBe('sandbox_create_failed');
+  });
+
+  it('reports the route failure only while the routes still had attempt time', () => {
+    const state = { ...creatingState(), createAttempt: CREATE_ATTEMPT_LIMIT };
+    const expired = reduceAllocation(
+      state,
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: false,
+      },
+      TIMERS
+    );
+    expect(expired.state).toEqual(initialAllocationState());
+    expect(expired.routeFailure).toBeUndefined();
+
+    const tickExpired = reduceAllocation(
+      state,
+      { type: 'tick', at: CREATE_FAILED_AT, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(tickExpired.state).toEqual(initialAllocationState());
+    expect(tickExpired.routeFailure).toBeUndefined();
+  });
+
+  it('denies a third create even before its result could arrive', () => {
+    // The budget's second create is in flight (attempt 2, retry pause over).
+    const retrying: AllocationState = {
+      ...creatingState(),
+      allocationId: 'alloc-2',
+      createAttempt: 2,
+      createDeadlineAt: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+    };
+    // The budget denies the third create and ends the episode without waiting
+    // for the in-flight result.
+    const due = reduceAllocation(
+      retrying,
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT + TIMERS.providerCreateRetryMs,
+        nextAllocationId: 'alloc-3',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(due.effects).toEqual([]);
+    expect(due.state.kind).toBe('stopped');
+    expect(due.routeFailure).toBe('sandbox_create_failed');
   });
 });
 

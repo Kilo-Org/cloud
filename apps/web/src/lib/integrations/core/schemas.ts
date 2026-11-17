@@ -21,9 +21,16 @@ export const PlatformRepositoryCacheSchema = z
   )
   .nullable();
 
-export function parsePlatformRepositoryCache(value: unknown): PlatformRepository[] {
+export function parsePlatformRepositoryCache(
+  value: unknown,
+  onInvalid?: () => void
+): PlatformRepository[] {
   const parsed = PlatformRepositoryCacheSchema.safeParse(value ?? null);
-  return parsed.success ? (parsed.data ?? []) : [];
+  if (!parsed.success) {
+    onInvalid?.();
+    return [];
+  }
+  return parsed.data ?? [];
 }
 
 /**
@@ -33,6 +40,9 @@ export const GitHubRequesterSchema = z.object({
   id: z.string(),
   login: z.string(),
 });
+
+/** The persisted GitHub requester shape. Its runtime schema is the single declaration. */
+export type GitHubRequester = z.infer<typeof GitHubRequesterSchema>;
 
 /**
  * Kilo User requester schema
@@ -44,6 +54,9 @@ export const KiloRequesterSchema = z.object({
   requested_at: z.string(),
 });
 
+/** The persisted Kilo requester shape. Its runtime schema is the single declaration. */
+export type KiloRequester = z.infer<typeof KiloRequesterSchema>;
+
 /**
  * Pending approval metadata schema
  */
@@ -53,6 +66,12 @@ export const PendingApprovalMetadataSchema = z.object({
   github_requester: GitHubRequesterSchema.optional(),
   github_request_id: z.string().optional(),
 });
+
+/**
+ * The persisted pending-approval metadata shape. Its runtime schema is the
+ * single declaration.
+ */
+export type PendingApprovalMetadata = z.infer<typeof PendingApprovalMetadataSchema>;
 
 /**
  * Completed installation metadata schema

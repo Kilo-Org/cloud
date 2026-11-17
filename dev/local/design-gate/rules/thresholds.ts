@@ -18,3 +18,11 @@ export const INSET_MIN_ASYMMETRY_DP = 2;
 export const INSET_ASYMMETRY_RATIO = 0.15;
 export const INSET_MAX_HEIGHT_SHARE = 0.5;
 export const INSET_MIN_WIDTH_SHARE = 0.6;
+/**
+ * Empty space allowed between a scrolling screen's top padding and its first
+ * painted node: one section break. A first section header that keeps the same
+ * air above its label as every later header (Home's, 23 dp) keeps the screen's
+ * rhythm. More than that is a box that draws nothing (a control's touch frame,
+ * usually) adding a hole under the header, as Profile's 31 dp did.
+ */
+export const LEADING_GAP_MAX_DP = 24;

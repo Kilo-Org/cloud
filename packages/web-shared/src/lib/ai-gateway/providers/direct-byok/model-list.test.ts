@@ -4,7 +4,7 @@ import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
-import { cachedEnhancedDirectByokModelList } from './model-list';
+import { cachedDirectByokModelList } from './model-list';
 import { FAILURE_BACKOFF_MS as failureBackoffMs } from '@kilocode/web-shared/lib/cached-fetch';
 import type { DirectByokModel } from './types';
 
@@ -32,15 +32,13 @@ function model(id: string, overrides: Partial<DirectByokModel> = {}): DirectByok
   return { id, name: id, context_length: 4096, max_completion_tokens: 1024, ...overrides };
 }
 
-const recommended = model('recommended', { flags: ['vision'] });
-const recommendedModels: ReadonlyArray<DirectByokModel> = [recommended];
 const failures = [
   { name: 'malformed JSONB', failure: [model('valid'), { id: 'invalid' }] },
   { name: 'null JSONB', failure: null },
   { name: 'replica read error', failure: new Error('replica unavailable') },
 ];
 let now: number;
-let getModels: ReturnType<typeof cachedEnhancedDirectByokModelList>;
+let getModels: ReturnType<typeof cachedDirectByokModelList>;
 
 function failNextRead(failure: unknown) {
   if (failure instanceof Error) {
@@ -74,7 +72,7 @@ beforeEach(() => {
   mockWhere.mockReturnValue({ limit: mockLimit });
   mockFrom.mockReturnValue({ where: mockWhere });
   mockReplicaSelect.mockReturnValue({ from: mockFrom });
-  getModels = cachedEnhancedDirectByokModelList({ providerId: 'codestral', recommendedModels });
+  getModels = cachedDirectByokModelList('chutes-byok');
 });
 
 afterEach(() => {
@@ -83,82 +81,39 @@ afterEach(() => {
   expect(redisClient.get).not.toHaveBeenCalled();
 });
 
-describe('cachedEnhancedDirectByokModelList', () => {
+describe('cachedDirectByokModelList', () => {
   test.each([
     { name: 'missing row', rows: [] },
     { name: 'empty list', rows: [{ models: [] }] },
-  ])('enhances recommendations for a $name using only the replica', async ({ rows }) => {
+  ])('returns no models for a $name using only the replica', async ({ rows }) => {
     mockLimit.mockResolvedValueOnce(rows);
 
     const result = await getModels();
 
-    expect(result).toStrictEqual([
-      {
-        ...recommended,
-        flags: ['vision', 'recommended'],
-        reasoning_options: undefined,
-        catalog_model_id: undefined,
-      },
-    ]);
-    expect(result).not.toBe(recommendedModels);
-    expect(recommended.flags).toEqual(['vision']);
+    expect(result).toStrictEqual([]);
     now += ttl - 1;
     await expect(getModels()).resolves.toBe(result);
-    expectProviderReads('codestral');
+    expectProviderReads('chutes-byok');
   });
 
-  test('merges ordered metadata, deduplicated flags, reasoning option and catalog ID precedence', async () => {
-    const syncedOptions = [{ type: 'effort' as const, values: ['high' as const] }];
-    const beta = model('beta', {
-      name: 'Curated beta',
-      flags: ['vision', 'vision', 'recommended'],
-    });
-    const alpha = model('alpha', {
-      reasoning_options: [{ type: 'toggle' }],
-      catalog_model_id: 'vendor/curated-alpha',
-    });
-    const empty = model('empty', { reasoning_options: [] });
-    const zeta = model('zeta', { flags: [] });
-    const gamma = model('gamma', { flags: ['reasoning', 'reasoning'] });
-    const curated = [beta, alpha, empty, model('beta', { name: 'Discarded recommendation' })];
+  test('returns only synced models with their metadata and order unchanged', async () => {
     const synced = [
-      zeta,
       model('beta', {
         name: 'Synced beta',
         context_length: 9999,
         max_completion_tokens: 8888,
-        flags: ['reasoning'],
+        flags: ['vision', 'reasoning'],
         reasoning_options: [{ type: 'effort', values: ['low'] }],
+        catalog_model_id: 'vendor/beta',
       }),
-      model('alpha', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/alpha' }),
-      model('beta', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/beta' }),
-      model('empty', { reasoning_options: syncedOptions }),
-      model('zeta', { name: 'Discarded synced duplicate' }),
-      gamma,
+      model('alpha', { reasoning_options: [], catalog_model_id: 'vendor/alpha' }),
     ];
-    const originalCurated = structuredClone(curated);
     const originalSynced = structuredClone(synced);
-    const getMerged = cachedEnhancedDirectByokModelList({
-      providerId: 'codestral',
-      recommendedModels: curated,
-    });
     mockLimit.mockResolvedValueOnce([{ models: synced }]);
 
-    await expect(getMerged()).resolves.toStrictEqual([
-      {
-        ...beta,
-        flags: ['vision', 'recommended'],
-        reasoning_options: syncedOptions,
-        catalog_model_id: 'vendor/beta',
-      },
-      { ...alpha, flags: ['recommended'] },
-      { ...empty, flags: ['recommended'], catalog_model_id: undefined },
-      { ...zeta, flags: undefined, reasoning_options: undefined, catalog_model_id: undefined },
-      { ...gamma, flags: ['reasoning'], reasoning_options: undefined, catalog_model_id: undefined },
-    ]);
-    expect(curated).toEqual(originalCurated);
+    await expect(getModels()).resolves.toStrictEqual(synced);
     expect(synced).toEqual(originalSynced);
-    expectProviderReads('codestral');
+    expectProviderReads('chutes-byok');
   });
 
   test.each(failures)(
@@ -166,37 +121,21 @@ describe('cachedEnhancedDirectByokModelList', () => {
     async ({ failure }) => {
       failNextRead(failure);
 
-      await expect(getModels()).resolves.toBe(recommendedModels);
-      expect(recommended.flags).toEqual(['vision']);
-      expectProviderReads('codestral');
+      const fallback = await getModels();
+      expect(fallback).toStrictEqual([]);
+      expectProviderReads('chutes-byok');
 
-      // The failed read is negatively cached; the next call inside the window
-      // still receives the default without a second read.
       now += failureBackoffMs - 1;
-      await expect(getModels()).resolves.toBe(recommendedModels);
-      expectProviderReads('codestral');
+      await expect(getModels()).resolves.toBe(fallback);
+      expectProviderReads('chutes-byok');
 
-      // At the deadline the refresh is attempted again.
       now += 1;
 
       mockLimit.mockResolvedValueOnce([{ models: [model('recovered')] }]);
       const recovered = await getModels();
-      expect(recovered).toStrictEqual([
-        {
-          ...recommended,
-          flags: ['vision', 'recommended'],
-          reasoning_options: undefined,
-          catalog_model_id: undefined,
-        },
-        {
-          ...model('recovered'),
-          flags: undefined,
-          reasoning_options: undefined,
-          catalog_model_id: undefined,
-        },
-      ]);
+      expect(recovered).toStrictEqual([model('recovered')]);
       await expect(getModels()).resolves.toBe(recovered);
-      expectProviderReads('codestral', 'codestral');
+      expectProviderReads('chutes-byok', 'chutes-byok');
     }
   );
 
@@ -205,79 +144,70 @@ describe('cachedEnhancedDirectByokModelList', () => {
     async ({ failure }) => {
       mockLimit.mockResolvedValueOnce([{ models: [model('last-good')] }]);
       const lastGood = await getModels();
-      expect(lastGood.map(entry => entry.id)).toEqual(['recommended', 'last-good']);
+      expect(lastGood.map(entry => entry.id)).toEqual(['last-good']);
 
       now += ttl - 1;
       await expect(getModels()).resolves.toBe(lastGood);
-      expectProviderReads('codestral');
+      expectProviderReads('chutes-byok');
 
       now += 1;
       failNextRead(failure);
       await expect(getModels()).resolves.toBe(lastGood);
-      expectProviderReads('codestral', 'codestral');
+      expectProviderReads('chutes-byok', 'chutes-byok');
 
-      // Inside the backoff window the failing read is not retried.
       now += failureBackoffMs - 1;
       await expect(getModels()).resolves.toBe(lastGood);
-      expectProviderReads('codestral', 'codestral');
+      expectProviderReads('chutes-byok', 'chutes-byok');
 
-      // At the deadline the refresh is attempted again.
       now += 1;
 
       mockLimit.mockResolvedValueOnce([{ models: [model('recovered')] }]);
       const recovered = await getModels();
-      expect(recovered.map(entry => entry.id)).toEqual(['recommended', 'recovered']);
+      expect(recovered.map(entry => entry.id)).toEqual(['recovered']);
       expect(recovered).not.toBe(lastGood);
-      expectProviderReads('codestral', 'codestral', 'codestral');
+      expectProviderReads('chutes-byok', 'chutes-byok', 'chutes-byok');
 
       now += ttl - 1;
       await expect(getModels()).resolves.toBe(recovered);
-      expectProviderReads('codestral', 'codestral', 'codestral');
+      expectProviderReads('chutes-byok', 'chutes-byok', 'chutes-byok');
       now += 1;
       mockLimit.mockResolvedValueOnce([{ models: [model('refreshed')] }]);
-      expect((await getModels()).map(entry => entry.id)).toEqual(['recommended', 'refreshed']);
-      expectProviderReads('codestral', 'codestral', 'codestral', 'codestral');
+      expect((await getModels()).map(entry => entry.id)).toEqual(['refreshed']);
+      expectProviderReads('chutes-byok', 'chutes-byok', 'chutes-byok', 'chutes-byok');
     }
   );
 
   test('isolates provider predicates, cached models, expiry and stale fallback', async () => {
-    const kimiRecommendation = model('recommended', { name: 'Kimi recommendation' });
-    const getKimi = cachedEnhancedDirectByokModelList({
-      providerId: 'kimi-coding',
-      recommendedModels: [kimiRecommendation],
-    });
-    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Codestral model' })] }]);
-    const codestral = await getModels();
-    expect(codestral.map(entry => entry.name)).toEqual(['recommended', 'Codestral model']);
+    const getSynthetic = cachedDirectByokModelList('synthetic');
+    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Chutes model' })] }]);
+    const chutes = await getModels();
+    expect(chutes.map(entry => entry.name)).toEqual(['Chutes model']);
 
     now += 100;
-    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Kimi model' })] }]);
-    const kimi = await getKimi();
-    expect(kimi.map(entry => entry.name)).toEqual(['Kimi recommendation', 'Kimi model']);
-    await expect(getModels()).resolves.toBe(codestral);
-    expectProviderReads('codestral', 'kimi-coding');
+    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Synthetic model' })] }]);
+    const synthetic = await getSynthetic();
+    expect(synthetic.map(entry => entry.name)).toEqual(['Synthetic model']);
+    await expect(getModels()).resolves.toBe(chutes);
+    expectProviderReads('chutes-byok', 'synthetic');
 
     now += ttl - 100;
-    mockLimit.mockRejectedValueOnce(new Error('codestral read failed'));
-    await expect(getModels()).resolves.toBe(codestral);
-    await expect(getKimi()).resolves.toBe(kimi);
-    expectProviderReads('codestral', 'kimi-coding', 'codestral');
+    mockLimit.mockRejectedValueOnce(new Error('chutes read failed'));
+    await expect(getModels()).resolves.toBe(chutes);
+    await expect(getSynthetic()).resolves.toBe(synthetic);
+    expectProviderReads('chutes-byok', 'synthetic', 'chutes-byok');
 
-    // The failed codestral read backs off. The kimi loader is unaffected and
-    // refreshes normally once its own TTL passes.
     now += failureBackoffMs - 1;
-    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Kimi model' })] }]);
-    const kimiRefreshed = await getKimi();
-    expect(kimiRefreshed.map(entry => entry.name)).toEqual(['Kimi recommendation', 'Kimi model']);
-    await expect(getModels()).resolves.toBe(codestral);
-    expectProviderReads('codestral', 'kimi-coding', 'codestral', 'kimi-coding');
+    mockLimit.mockResolvedValueOnce([{ models: [model('shared', { name: 'Synthetic model' })] }]);
+    const syntheticRefreshed = await getSynthetic();
+    expect(syntheticRefreshed.map(entry => entry.name)).toEqual(['Synthetic model']);
+    await expect(getModels()).resolves.toBe(chutes);
+    expectProviderReads('chutes-byok', 'synthetic', 'chutes-byok', 'synthetic');
 
-    // At the deadline the codestral refresh is attempted again.
     now += 1;
 
     mockLimit.mockResolvedValueOnce([{ models: [model('recovered')] }]);
-    expect((await getModels()).map(entry => entry.id)).toEqual(['recommended', 'recovered']);
-    await expect(getKimi()).resolves.toBe(kimiRefreshed);
-    expectProviderReads('codestral', 'kimi-coding', 'codestral', 'kimi-coding', 'codestral');
+    expect((await getModels()).map(entry => entry.id)).toEqual(['recovered']);
+    await expect(getSynthetic()).resolves.toBe(syntheticRefreshed);
+    expectProviderReads('chutes-byok', 'synthetic', 'chutes-byok', 'synthetic', 'chutes-byok');
   });
 });

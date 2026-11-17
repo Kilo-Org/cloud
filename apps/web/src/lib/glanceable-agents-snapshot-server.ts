@@ -3,6 +3,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { timestampToIso } from '@kilocode/app-shared/utils';
 import {
   buildHomeWidgetData,
   buildHomeWidgetPresentation,
@@ -11,11 +12,7 @@ import {
   type HomeWidgetResponse,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
-import {
-  cli_sessions_v2,
-  github_branch_pull_requests,
-  user_activity_tokens,
-} from '@kilocode/db/schema';
+import { cli_sessions_v2, user_activity_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications/schemas';
 import {
@@ -25,8 +22,8 @@ import {
 import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
-import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { sessionPrJoinPredicate } from '@/routers/cli-sessions-v2-router';
+import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
+import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 
 type HomeWidgetScope = { userId: string; organizationId: string | null };
 
@@ -186,11 +183,6 @@ export type GlanceableDelivery = {
   sessionCards: GlanceableSessionCardSource[];
 };
 
-function isoOrNull(value: string | null): string | null {
-  const at = value === null ? Number.NaN : Date.parse(value);
-  return Number.isFinite(at) ? new Date(at).toISOString() : null;
-}
-
 /**
  * The pull request states the session card reports as "Pull request opened".
  * `unknown` is a link GitHub verified whose state the webhook has not synced
@@ -238,10 +230,11 @@ async function readSessionCards(
             prVerifiedAt: cli_sessions_v2.pr_link_verified_at,
             // Null when no verified link joins a cache row, or the cache has
             // not synced the pull request yet.
-            prState: github_branch_pull_requests.pr_state,
+            prState: sessionAssociatedPr.pr_state,
+            prFromWorkspace: sessionAssociatedPr.pr_from_workspace,
           })
           .from(cli_sessions_v2)
-          .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+          .leftJoinLateral(sessionAssociatedPr, sql`true`)
           .where(
             and(
               inArray(cli_sessions_v2.session_id, ids),
@@ -259,14 +252,14 @@ async function readSessionCards(
       const kept = storedById.get(sessionId);
       if (row === undefined && kept === undefined) return { sessionId, row: null };
       const summary = liveSummaryOrNull(kept?.summary);
-      const lastActivityAt = isoOrNull(row?.lastActivityAt ?? kept?.lastActivityAt ?? null);
+      const lastActivityAt = timestampToIso(row?.lastActivityAt ?? kept?.lastActivityAt ?? null);
       const costMicrodollars = row?.totalCostMicrodollars ?? kept?.costMicrodollars ?? null;
-      const startedAt = isoOrNull(row?.createdAt ?? kept?.createdAt ?? null);
+      const startedAt = timestampToIso(row?.createdAt ?? kept?.createdAt ?? null);
       // A listed row's `associatedPr` is present only for a verified link.
       const prOpened =
         row?.associatedPr === undefined
           ? isSessionCardPrOpened({
-              verified: (kept?.prVerifiedAt ?? null) !== null,
+              verified: (kept?.prVerifiedAt ?? null) !== null || kept?.prFromWorkspace === true,
               state: kept?.prState ?? null,
             })
           : isSessionCardPrOpened({ verified: true, state: row.associatedPr.state });
@@ -278,7 +271,8 @@ async function readSessionCards(
             title: kept?.title ?? null,
             status: 'idle',
             statusUpdatedAt:
-              isoOrNull(kept?.statusUpdatedAt ?? null) ?? isoOrNull(kept?.updatedAt ?? null),
+              timestampToIso(kept?.statusUpdatedAt ?? null) ??
+              timestampToIso(kept?.updatedAt ?? null),
             scheduledAt: null,
             approvalKey: null,
             summary,
@@ -304,7 +298,8 @@ async function readSessionCards(
           title: row.title,
           status: row.status,
           statusUpdatedAt:
-            isoOrNull(row.statusUpdatedAt ?? null) ?? isoOrNull(kept?.statusUpdatedAt ?? null),
+            timestampToIso(row.statusUpdatedAt ?? null) ??
+            timestampToIso(kept?.statusUpdatedAt ?? null),
           scheduledAt: row.scheduledAt ?? null,
           approvalKey: approval.approvalKey,
           summary,

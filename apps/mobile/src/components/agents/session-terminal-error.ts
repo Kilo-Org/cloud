@@ -280,9 +280,17 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   if (failure.detailKey !== null && copy === i18n.t(failure.detailKey)) {
     return true;
   }
+  // A credits refusal states its cause on the row, and the row's Add credits
+  // action is the recovery; the footer's credits line names the same cause and
+  // would restate it. The two lines are worded for their own surface — the row
+  // keeps the cause, the footer adds the instruction — so they are compared by
+  // class, not by string.
+  if (failure.canAddCredits && copy === i18n.t('agentChat.session.notEnoughCredits')) {
+    return true;
+  }
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts) while the SDK's status indicator for it is the
-  // delivery-failed line ("Message delivery failed" -> "Failed to deliver",
+  // delivery-failed line ("Message delivery failed" -> "Message not sent",
   // normalizer.ts). The row already states that failed run, so the delivery
   // line would restate it.
   if (
@@ -391,6 +399,13 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * retryable connection failure; any other `statusIndicator` of type `error` is
  * classified by its message.
  *
+ * A failed preparation row counts as content. A run whose sandbox preparation
+ * failed has zero messages, so `messageCount` alone reads it as a failed open:
+ * the failed group is the run's own statement of what went wrong — the failed
+ * stage and the reason, with the question row's Retry and Copy — and the
+ * page-load card would replace both with a failure that did not happen. Only a
+ * FAILED attempt counts; a running or completed one still lets the card show.
+ *
  * `connectionLost` is the app-wide transport leg's answer (`reconnectExhausted`)
  * for a session whose own status atom carries nothing yet. It only counts while
  * nothing has loaded: a transcript already on screen keeps its rows and its own
@@ -400,26 +415,54 @@ export function resolveSessionTerminalError(input: {
   error: string | null;
   statusIndicator: { type: string; message: string; code?: SdkStatusMessageCode } | null;
   messageCount: number;
+  hasFailedPreparation: boolean;
   connectionLost?: boolean;
 }): SessionTerminalError | null {
-  if (input.messageCount > 0) {
+  // A session with rows on screen is not a failed open. A failed preparation
+  // group is the run's own statement of what went wrong, with the failed stage
+  // and the reason, and the question row keeps its Retry and Copy actions; the
+  // page-load card would replace both with a failure that did not happen.
+  if (input.messageCount > 0 || input.hasFailedPreparation) {
     return null;
   }
   if (input.error !== null) {
-    // The atom carries the transport's own English text. Show the reader a
-    // translated line and keep the original for the clipboard.
+    // The atom carries the transport's own English text: an SDK fixed string,
+    // or a server failure the transport forwards. Show the reader translated
+    // copy and keep the original for the clipboard.
     //
-    // A typed transcript failure that a retry cannot recover (the stored page
-    // is oversize or unreadable) is the same permanent state as a denial: the
-    // same read answers the same way every time, so a Retry would only repeat
-    // it. Every other error keeps its Retry, which is what recovers a lost
-    // connection or a transient server failure.
-    const terminalTranscript = TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error);
+    // The class decides the Retry. A typed transcript failure that a retry
+    // cannot recover (the stored page is oversize or unreadable) answers the
+    // same way every time; a denial, an empty wallet, a model the agent cannot
+    // use and a session the server no longer has each need the reader to
+    // change something first. Those keep their own copy and offer no Retry,
+    // which could only repeat them. An unclassifiable failure keeps its Retry:
+    // only the transport can recover one the app cannot name.
+    if (TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error)) {
+      return {
+        variant: 'server',
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        message: i18n.t('agentChat.session.failedToLoadDetails'),
+        retryable: false,
+        retryWith: 'session',
+        detail: input.error,
+      };
+    }
+    const failureClass = classifyTerminalError(input.error);
+    if (!retryableClass(failureClass) && failureClass !== 'unknown') {
+      return {
+        variant: variantForClass(failureClass),
+        title: titleForClass(failureClass),
+        message: messageForClass(failureClass),
+        retryable: false,
+        retryWith: 'session',
+        detail: input.error,
+      };
+    }
     return {
       variant: 'server',
       title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
-      retryable: !terminalTranscript,
+      retryable: true,
       retryWith: 'session',
       detail: input.error,
     };

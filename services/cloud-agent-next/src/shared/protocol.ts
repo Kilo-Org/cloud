@@ -37,6 +37,7 @@ export type StreamEventType =
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
   | 'cloud.sandbox.status'
   | 'cloud.worktree.changes.ready'
+  | 'cloud.workspace.artifacts.changed'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue
   | 'cloud.message.sent' // Queued user message delivered to Kilo
@@ -140,6 +141,8 @@ export type PreparingStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
@@ -167,6 +170,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number;
   revision: number;
   latestDetail?: string;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number;
   safeError?: string;
   command?: string;
   commandIndex?: number;
@@ -211,7 +216,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         commandCount?: number;
         parentStepId?: string;
       }
-    | { action: 'step_progress'; stepId: string; detail: string }
+    | { action: 'step_progress'; stepId: string; detail: string; snapshotCapturedAt?: number }
     | { action: 'step_output'; stepId: string; output: string }
     | { action: 'step_completed'; stepId: string; exitCode?: number }
     | { action: 'step_failed'; stepId: string; safeError: string; exitCode?: number }

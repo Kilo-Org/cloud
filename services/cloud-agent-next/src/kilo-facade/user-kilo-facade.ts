@@ -1539,6 +1539,15 @@ async function admitHostedCommand(params: {
   if (!params.authToken) {
     return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
   }
+  const balance = await (params.deps?.validatePromptBalance ?? defaultValidatePromptBalance)({
+    env: params.env,
+    authToken: params.authToken,
+    userId: params.userId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+  });
+  if (!balance.success) {
+    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+  }
   const messageId = params.body.messageID ?? createMessageId();
   const command = {
     turn: {

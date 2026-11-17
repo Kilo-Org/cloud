@@ -1,9 +1,11 @@
+import { ContainerUsageAdmissionError } from '@kilocode/container-usage';
 import { describe, expect, it } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SandboxId } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
+  billingAdmissionFailureFromError,
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   parseSandboxBillingInput,
@@ -28,6 +30,24 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 }
 
 describe('container usage context', () => {
+  it('retains the trusted acting user for native organization bot compute only', () => {
+    const session = metadata({
+      sessionId: 'workspace_test',
+      userId: 'org-bot-user',
+      orgId: 'org_1',
+      botId: 'webhook',
+    });
+    session.workspace = { sandboxProvider: 'cloudflare-containers' };
+    const native = buildSandboxBillingInput(session, 'ses-abcdef');
+    expect(native.metadata?.billingUserId).toBe('org-bot-user');
+    expect(native.onBehalfOf).toEqual({ type: 'org', id: 'org_1' });
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxContainersStandard3', native)
+    ).not.toThrow();
+    session.workspace.sandboxProvider = 'vercel';
+    expect(buildSandboxBillingInput(session, 'ses-abcdef').metadata).toEqual({ origin: 'other' });
+  });
+
   it('bills the code-review containers instance at the code-review capacity', () => {
     expect(containersBillingIdentity('code-review')).toEqual({
       className: 'SandboxContainersCodeReview',
@@ -353,7 +373,7 @@ describe('container usage context', () => {
       expect(input.sessionId).toBe(sessionScoped ? 'workspace_placed' : undefined);
       expect(() => assertSandboxBillingAllocation(className, input)).not.toThrow();
       // The kind survives the strict envelope without reaching the usage context.
-      expect(parseSandboxBillingInput(input)).toEqual({ ...input, enforcementRequested: false });
+      expect(parseSandboxBillingInput(input)).toEqual(input);
     }
   );
 
@@ -485,4 +505,25 @@ describe('container usage context', () => {
       })
     ).toThrow('SandboxSmallContainment billing received an incompatible sandbox ID');
   });
+  it('drops the retired enforcement flag from persisted billing input', () => {
+    const input = {
+      sandboxId: 'ses-abcdef',
+      subject: { type: 'user', id: 'user_1' },
+      actor: { type: 'user', id: 'user_1' },
+      sessionId: 'agent_1',
+      metadata: { origin: 'cloud-agent' },
+    };
+    expect(parseSandboxBillingInput({ ...input, enforcementRequested: true })).toEqual(input);
+  });
+});
+
+it.each([
+  'sku_not_found',
+  'sku_unit_mismatch',
+  'sku_not_accepting_new_usage',
+  'invalid_billing_attribution',
+] as const)('classifies permanent billing rejection %s without retrying', code => {
+  expect(
+    billingAdmissionFailureFromError(new ContainerUsageAdmissionError(code, 'Rejected'))
+  ).toMatchObject({ success: false, code: 'invalid_configuration' });
 });

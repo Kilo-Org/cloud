@@ -43,6 +43,18 @@ describe('phaseStatus', () => {
     expect(phaseStatus(phase, [completed, failed])).toBe('failed');
   });
 
+  it('keeps a non-fatal command failure from failing its session setup or start phase', () => {
+    for (const key of ['session_setup_commands', 'start_commands']) {
+      const phase = step({ key, label: key });
+      const completed = step({ kind: 'setup_command', status: 'completed' });
+      const failed = step({ kind: 'setup_command', status: 'failed' });
+      const running = step({ kind: 'setup_command', status: 'running' });
+      expect(phaseStatus(phase, [completed])).toBe('completed');
+      expect(phaseStatus(phase, [completed, running])).toBe('running');
+      expect(phaseStatus(phase, [completed, failed])).toBe('completed');
+    }
+  });
+
   it('falls back to the step status for setup_commands without observed commands', () => {
     expect(phaseStatus(step({ key: 'setup_commands', status: 'running' }), [])).toBe('running');
   });
@@ -83,6 +95,28 @@ describe('commandsForPhase', () => {
 
     expect(commandsForPhase(firstPhase, steps)).toEqual([command]);
     expect(commandsForPhase(retryPhase, steps)).toEqual([]);
+  });
+
+  it('keeps session setup and start commands under their own phases', () => {
+    const sessionSetup = step({ id: 'session', key: 'session_setup_commands' });
+    const start = step({ id: 'start', key: 'start_commands' });
+    const sessionCommand = step({
+      id: 'session-command',
+      kind: 'setup_command',
+      parentStepId: sessionSetup.id,
+      commandIndex: 0,
+    });
+    const startCommand = step({
+      id: 'start-command',
+      kind: 'setup_command',
+      parentStepId: start.id,
+      commandIndex: 0,
+    });
+    const steps = [sessionSetup, sessionCommand, start, startCommand];
+
+    expect(commandsForPhase(sessionSetup, steps)).toEqual([sessionCommand]);
+    expect(commandsForPhase(start, steps)).toEqual([startCommand]);
+    expect(commandsForPhase(step({ key: 'sandbox_boot' }), steps)).toEqual([]);
   });
 });
 

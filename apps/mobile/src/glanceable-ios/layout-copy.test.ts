@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
@@ -67,16 +67,15 @@ describe('withGlanceableCopy', () => {
     // The baked parts rebuild the app's own label for a four-figure cost.
     expect(
       english.costTemplate.split('#').join(`1${english.group}234${english.costDecimal}50`)
-    ).toBe(formatCurrency(1234.5, 'en', 2));
+    ).toBe(formatPrefixedMoney(1234.5, 'en'));
     const previous = i18n.language;
     try {
       await i18n.changeLanguage('de');
-      // German writes the amount first and a decimal comma.
+      // German keeps its decimal comma behind a symbol that still leads the
+      // number.
       const german = glanceableLayoutCopy();
       expect(german.costDecimal).toBe(',');
-      expect(german.costTemplate).toContain('#');
-      expect(german.costTemplate).toContain('$');
-      expect(german.costTemplate.indexOf('#')).toBeLessThan(german.costTemplate.indexOf('$'));
+      expect(german.costTemplate).toBe('$#');
       await i18n.changeLanguage('ar');
       // The decimal separator and the template come from the same formatter
       // that writes the app's cost labels in this language.
@@ -129,6 +128,16 @@ describe('withGlanceableCopy', () => {
     const copy = glanceableLayoutCopy();
     expect(copy.approve).toBe(i18n.t('common.approve'));
     expect(copy.approve).not.toBe('common.approve');
+  });
+
+  it('bakes the plan-progress and finished-in templates, not bare separators', () => {
+    // Both used to be bare fragments the layout placed itself; they are whole
+    // patterns now, so the layout can hand each language's word order back.
+    const copy = glanceableLayoutCopy();
+    expect(copy.planProgress).toBe(i18n.t('glanceable.planProgress'));
+    expect(copy.planProgress).toContain('{{done}}');
+    expect(copy.planProgress).toContain('{{total}}');
+    expect(copy.finishedIn).toContain('{{duration}}');
   });
 
   it('bakes the scheduled row label from the reviewed key', () => {

@@ -1617,6 +1617,39 @@ describe('GitHub installation persistence', () => {
     }
   );
 
+  test('treats the installation id and app type as one slot for a non-allowlisted organization', async () => {
+    const organization = await createTestOrganization('Installation slot identity', ownerId, 0);
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('321321'))
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        { ...data('321321'), githubAppType: 'lite' }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    // The pair the organization holds still refreshes in place.
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        { ...data('321321'), platformAccountLogin: 'acme-renamed' }
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(associations).toHaveLength(1);
+    expect(associations[0]).toMatchObject({
+      platform_installation_id: '321321',
+      github_app_type: 'standard',
+      platform_account_login: 'acme-renamed',
+    });
+  });
+
   test('rejects a new personal claimant while another personal owner is actively connected', async () => {
     const first = await connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data());
     expect(first).toMatchObject({ ok: true });

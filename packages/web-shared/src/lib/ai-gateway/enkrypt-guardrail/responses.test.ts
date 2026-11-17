@@ -7,6 +7,8 @@ import {
 } from './responses';
 
 const block = { action: 'block', message: 'Blocked: prompt injection.' } as const;
+const blockWithRevertGuidance =
+  'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI).';
 
 describe('enkryptGuardrailRejectionResponse', () => {
   it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {
@@ -22,7 +24,7 @@ describe('enkryptGuardrailRejectionResponse', () => {
       expect(response?.headers.get('x-should-retry')).toBe('false');
       expect(await response?.json()).toEqual({
         error: {
-          message: 'Blocked: prompt injection.',
+          message: blockWithRevertGuidance,
           type: 'invalid_request_error',
           code: 'guardrail_blocked',
           param: null,
@@ -38,7 +40,7 @@ describe('enkryptGuardrailRejectionResponse', () => {
     expect(response?.status).toBe(400);
     expect(await response?.json()).toEqual({
       type: 'error',
-      error: { type: 'invalid_request_error', message: 'Blocked: prompt injection.' },
+      error: { type: 'invalid_request_error', message: blockWithRevertGuidance },
       error_type: 'guardrail_blocked',
     });
   });
@@ -122,25 +124,16 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
   };
 
   it.each([
-    ['skip', false],
-    ['skip', true],
-    ['allow', false],
-    ['allow', true],
-  ] as const)('releases the response on %s (stream: %s)', (action, stream) => {
-    expect(enkryptOutputGuardrailRejectionResponse('responses', { action }, stream)).toBeNull();
-  });
-
-  it.each([
     ['chat_completions', openAiBlocked],
     ['messages', anthropicBlocked],
     ['responses', openAiBlocked],
   ] as const)('returns a native JSON error for a non-streamed %s block', async (kind, body) => {
     const response = enkryptOutputGuardrailRejectionResponse(kind, outputBlock, false);
 
-    expect(response?.status).toBe(400);
-    expect(response?.headers.get('content-type')).toContain('application/json');
-    expect(response?.headers.get('x-should-retry')).toBe('false');
-    expect(await response?.json()).toEqual(body);
+    expect(response.status).toBe(400);
+    expect(response.headers.get('content-type')).toContain('application/json');
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    expect(await response.json()).toEqual(body);
   });
 
   it.each([
@@ -166,12 +159,12 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
   ] as const)('returns one SSE error event for a streamed %s block', async (kind, body) => {
     const response = enkryptOutputGuardrailRejectionResponse(kind, outputBlock, true);
 
-    expect(response?.status).toBe(200);
-    expect(response?.headers.get('content-type')).toBe('text/event-stream');
-    expect(response?.headers.get('content-encoding')).toBe('identity');
-    expect(response?.headers.get('cache-control')).toBe('no-cache, no-transform');
-    expect(response?.headers.get('x-should-retry')).toBe('false');
-    expect(await response?.text()).toBe(body);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/event-stream');
+    expect(response.headers.get('content-encoding')).toBe('identity');
+    expect(response.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    expect(await response.text()).toBe(body);
   });
 
   it.each([false, true])(
@@ -183,10 +176,10 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
         stream
       );
 
-      expect(response?.status).toBe(stream ? 200 : 503);
-      expect(response?.headers.get('retry-after')).toBe('1');
-      expect(response?.headers.get('x-should-retry')).toBeNull();
-      const text = (await response?.text()) ?? '';
+      expect(response.status).toBe(stream ? 200 : 503);
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(response.headers.get('x-should-retry')).toBeNull();
+      const text = await response.text();
       expect(text).toContain(
         "could not check the model's response, so it was withheld. Please retry."
       );
@@ -206,10 +199,10 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
         false
       );
 
-      expect(response?.status).toBe(503);
-      expect(response?.headers.get('retry-after')).toBeNull();
-      expect(response?.headers.get('x-should-retry')).toBe('false');
-      expect(await response?.json()).toEqual({
+      expect(response.status).toBe(503);
+      expect(response.headers.get('retry-after')).toBeNull();
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      expect(await response.json()).toEqual({
         type: 'error',
         error: { type: 'api_error', message: expect.stringMatching(message) },
         error_type: 'guardrail_unavailable',
@@ -224,8 +217,8 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
       true
     );
 
-    expect(response?.headers.get('x-should-retry')).toBe('false');
-    const text = (await response?.text()) ?? '';
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    const text = await response.text();
     expect(text.startsWith('event: error\ndata: ')).toBe(true);
     expect(JSON.parse(text.slice('event: error\ndata: '.length))).toEqual({
       type: 'error',

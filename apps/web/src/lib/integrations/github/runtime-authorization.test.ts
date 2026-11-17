@@ -29,6 +29,7 @@ const association = {
   },
   organizationDeletedAt: null,
   userRecordId: 'user-1',
+  userBlockedAt: null,
   userBlockedReason: null,
 } as const;
 
@@ -67,6 +68,69 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     expect(
       getGitHubRuntimeAssociationRejectionReason(shared, { purpose: 'management' })
     ).toBeNull();
+  });
+
+  it('accepts a roleless organization association that the workflow definition resolved', () => {
+    const resolved = {
+      ...association,
+      integration: {
+        ...association.integration,
+        owned_by_user_id: null,
+        owned_by_organization_id: 'organization-1',
+        github_connection_role: null,
+      },
+      userRecordId: null,
+    };
+
+    // Without the caller stating that the definition resolved the row, a
+    // missing role is still a sharing decision this path must refuse.
+    expect(getGitHubRuntimeAssociationRejectionReason(resolved)).toBe('sharing_not_allowed');
+    expect(
+      getGitHubRuntimeAssociationRejectionReason(resolved, {
+        resolvedOrganizationWorkflowConnection: true,
+      })
+    ).toBeNull();
+    expect(
+      isGitHubRuntimeAssociationAuthorized(resolved, {
+        resolvedOrganizationWorkflowConnection: true,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a roleless personal association refused even when a caller states the definition resolved it', () => {
+    const rolelessPersonal = {
+      ...association,
+      integration: { ...association.integration, github_connection_role: null },
+    };
+
+    // Personal associations always store their role, so the definition cannot
+    // have resolved one; the claim alone must not widen this gate.
+    expect(
+      getGitHubRuntimeAssociationRejectionReason(rolelessPersonal, {
+        resolvedOrganizationWorkflowConnection: true,
+      })
+    ).toBe('sharing_not_allowed');
+  });
+
+  it('keeps an agent-only association refused on the workflow path when the definition is in play', () => {
+    const shared = {
+      ...association,
+      integration: {
+        ...association.integration,
+        owned_by_user_id: null,
+        owned_by_organization_id: 'organization-1',
+        github_connection_role: 'agent_only' as const,
+      },
+      userRecordId: null,
+      installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
+    };
+
+    expect(
+      getGitHubRuntimeAssociationRejectionReason(shared, {
+        purpose: 'workflow',
+        resolvedOrganizationWorkflowConnection: true,
+      })
+    ).toBe('sharing_not_allowed');
   });
 
   it('still enforces lifecycle health for agent consumers', () => {
@@ -111,6 +175,16 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     expect(
       isGitHubRuntimeAssociationAuthorized({ ...association, userBlockedReason: 'blocked' })
     ).toBe(false);
+  });
+
+  it('denies a personal owner whose account carries a block timestamp', () => {
+    const candidate = {
+      ...association,
+      userBlockedAt: new Date().toISOString(),
+      userBlockedReason: null,
+    };
+    expect(getGitHubRuntimeAssociationRejectionReason(candidate)).toBe('blocked_personal_owner');
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(false);
   });
 
   it('denies deleted owners and unhealthy canonical installations', () => {

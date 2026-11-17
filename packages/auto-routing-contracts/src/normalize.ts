@@ -16,6 +16,11 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
+// The node budget limits how many values a snapshot holds. This limit caps how
+// long each kept string value and each kept property name may be, so the
+// serialized snapshot stays within the node budget times this length. Routing
+// hints are short identifiers, so ordinary hints are copied unchanged.
+const PROVIDER_HINTS_MAX_STRING_LENGTH = 256;
 // Message content, and the Responses input, are client-supplied JSON of
 // unbounded depth: no schema below `content: z.unknown()` constrains their
 // shape. Every walk this module does over them stays inside a fixed amount of
@@ -49,11 +54,19 @@ const SENSITIVE_KEY_WORDS = [
   'cookie',
   'credential',
   'key',
+  'pass',
+  'passkey',
+  'passphrase',
   'password',
   'passwd',
+  'pwd',
   'secret',
   'token',
 ];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
 const SENSITIVE_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -61,20 +74,33 @@ const SENSITIVE_KEY_QUALIFIERS = [
   'app',
   'auth',
   'client',
+  'db',
   'encryption',
   'master',
+  'mongo',
+  'mssql',
+  'mysql',
+  'oracle',
+  'pg',
+  'postgres',
+  'postgresql',
   'private',
   'public',
+  'redis',
   'root',
   'secret',
   'service',
   'session',
   'signing',
+  'sql',
   'subscription',
 ];
 // A qualifier only counts when it ends immediately before a credential word, so
 // the scan before each occurrence never needs more than the longest qualifier.
 const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
+// These words also begin common English words, so they count only as an exact
+// token or a qualified occurrence, not at any token start.
+const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -480,7 +506,13 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
     return null;
   }
 
-  if (typeof value === 'string' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    return value.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+      ? value.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH) + TRUNCATED_VALUE
+      : value;
+  }
+
+  if (typeof value === 'boolean') {
     return value;
   }
 
@@ -514,10 +546,30 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
       break;
     }
     budget.remaining -= 1;
-    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
+    result[keptKey(key)] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
   }
 
   return result;
+}
+
+// Property names reach the snapshot too, so the same cap applies to them. The
+// sensitive-key check above still reads the caller's original name. Names that
+// share their first characters keep distinct entries through the fingerprint.
+function keptKey(key: string) {
+  return key.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+    ? `${key.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH)}[truncated:${keyFingerprint(key)}]`
+    : key;
+}
+
+// FNV-1a over the whole name: synchronous, dependency-free, and stable across
+// the gateway and the worker.
+function keyFingerprint(key: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function isSensitiveKey(key: string) {
@@ -538,8 +590,9 @@ function isSensitiveToken(token: string) {
   if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
-      // A token that starts with a credential word is a credential key.
-      if (index === 0) return true;
+      // A token that starts with a credential word is a credential key, unless
+      // the word is one that also begins ordinary words.
+      if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
       // A qualifier counts only when it ends immediately before the occurrence,
       // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
       // can match one.
@@ -565,7 +618,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // are silently ignored; the caller treats an empty result as "text only".
 export function detectRequiredInputModalities(body: unknown): string[] {
   const found = new Set<string>();
-  collectModalities(body, found, 0);
+  collectModalities(body, found, 0, 'body');
 
   if (found.size === 0) {
     return [];
@@ -574,6 +627,32 @@ export function detectRequiredInputModalities(body: unknown): string[] {
   return [...found].sort();
 }
 
+// The role of a record in a request body. A key name means different things at
+// different levels, and the role picks the meaning.
+type ModalityRole = 'body' | 'message' | 'part';
+
+// Child keys per role, with the role of the records each key holds.
+const MODALITY_CHILD_ROLES: Record<ModalityRole, Record<string, ModalityRole>> = {
+  body: { messages: 'message', input: 'message', system: 'part' },
+  message: { content: 'part', parts: 'part' },
+  part: { parts: 'part' },
+};
+
+type MediaPartModality = 'image' | 'file';
+
+// Content-part `type` values that carry media rather than text, and the input
+// modality each one requires. The modality walk and the routing token
+// estimator both read this one map, so the estimate excludes exactly the types
+// the capability gate recognizes.
+const MEDIA_PART_MODALITY: Record<string, MediaPartModality | undefined> = {
+  image_url: 'image',
+  image: 'image',
+  input_image: 'image',
+  file: 'file',
+  input_file: 'file',
+  document: 'file',
+};
+
 // The same body reaches this walk as reaches the text walk, with the same
 // unbounded nesting. Its work is already linear in the parsed body, which the
 // request size bounds, and every level costs one node per message, so the
@@ -581,48 +660,75 @@ export function detectRequiredInputModalities(body: unknown): string[] {
 // conversation and silently drop a modality from the newest turn. A value
 // nested past the depth limit keeps what was found before it, which is the
 // documented "malformed shapes are ignored" result.
-function collectModalities(value: unknown, out: Set<string>, depth: number): void {
+function collectModalities(
+  value: unknown,
+  out: Set<string>,
+  depth: number,
+  role: ModalityRole
+): void {
   if (value === null || value === undefined) return;
   if (depth > PROMPT_WALK_MAX_DEPTH) return;
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectModalities(item, out, depth + 1);
+      collectModalities(item, out, depth + 1, role);
     }
     return;
   }
 
   if (!isRecord(value)) return;
 
-  // Walk known container fields so message arrays and content parts are
-  // visited. Bodies use different keys per provider:
-  //   * OpenAI chat completions / Anthropic: `messages[]`
-  //   * OpenAI Responses: `input` (string or array)
-  // Content parts live under `content` (chat / Anthropic) or `parts`
-  // (Responses). We do NOT recurse into every key — that would over-walk
-  // tools, metadata, and provider hints — only into the known structural
-  // containers.
-  for (const key of MODALITY_CONTAINER_KEYS) {
-    collectModalities(value[key], out, depth + 1);
+  // The walk follows the request structure by role, instead of visiting the
+  // same key names at every level. A body holds its messages under `messages`
+  // or `input`, and its system prompt under `system`. A message holds its
+  // content parts under `content` or `parts`. A part holds nested parts under
+  // `parts`. `input` is a message list only on a body. On a `tool_use` record
+  // it holds tool arguments. `content` is a part list only on a message. On a
+  // `tool_result` record it usually holds tool output. Keying the walk by role
+  // keeps it out of tool payloads, which reuse these names.
+  const childRoles = MODALITY_CHILD_ROLES[role];
+  for (const key of Object.keys(childRoles)) {
+    collectModalities(value[key], out, depth + 1, childRoles[key]);
   }
 
+  // A tool record can list content blocks that the model receives, and those
+  // blocks can be images. An Anthropic `tool_result` part holds them under
+  // `content`; an OpenAI Responses `function_call_output` item holds them
+  // under `output`. Only an array is such a list. A string or an object is
+  // tool payload, so the walk leaves it alone.
+  if (role === 'part' && Array.isArray(value.content)) {
+    collectModalities(value.content, out, depth + 1, 'part');
+  }
+  if (role === 'message' && Array.isArray(value.output)) {
+    collectModalities(value.output, out, depth + 1, 'part');
+  }
+
+  // Media detection runs only on a content part. Nothing else in the body
+  // describes what the model must accept.
+  if (role !== 'part') return;
+
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
-  // OpenAI chat `image_url`, Anthropic `image` / `document`.
+  // OpenAI chat `image_url`, Anthropic `image` / `document`. `type` is
+  // client-supplied, so the lookup takes an own key only: an index read would
+  // also answer for inherited keys such as `constructor` or `toString`.
   const type = value.type;
   if (typeof type === 'string') {
-    if (type === 'image_url' || type === 'image' || type === 'input_image') {
-      out.add('image');
-    } else if (type === 'file' || type === 'input_file' || type === 'document') {
-      out.add('file');
+    const modality = Object.hasOwn(MEDIA_PART_MODALITY, type)
+      ? MEDIA_PART_MODALITY[type]
+      : undefined;
+    if (modality !== undefined) {
+      out.add(modality);
     }
   }
 
-  // Guards against callers that omit the `type` discriminator — the
-  // presence of a known media field is itself sufficient signal. We do NOT
-  // treat a bare `file` key as a signal: it collides with ordinary tool
-  // output (e.g. a `read_file` result whose `content` is `{ file: ... }`),
-  // and the typed `file`/`input_file`/`document` cases above already cover
-  // the real Responses/Anthropic file shapes.
+  // Guards against callers that omit the `type` discriminator on a part. The
+  // presence of a known media field on that part is itself sufficient signal.
+  // A bare `image_url` / `input_image` / `input_file` key counts only on a
+  // part, because tool arguments and tool output use those names for ordinary
+  // payloads. We do NOT treat a bare `file` key as a signal: it collides with
+  // ordinary tool output (e.g. a `read_file` result whose `content` is
+  // `{ file: ... }`), and the typed `file`/`input_file`/`document` cases above
+  // already cover the real Responses/Anthropic file shapes.
   if ('image_url' in value || 'input_image' in value) {
     out.add('image');
   }
@@ -630,8 +736,6 @@ function collectModalities(value: unknown, out: Set<string>, depth: number): voi
     out.add('file');
   }
 }
-
-const MODALITY_CONTAINER_KEYS = ['messages', 'input', 'content', 'parts', 'system'];
 
 // Routing-only token estimator. Deliberately distinct from the gateway's
 // per-request `estimateTokenCount`, which mis-counts base64 image payloads
@@ -734,16 +838,10 @@ function sumContentPartTextChars(part: unknown, depth: number): number {
 
   const type = part.type;
 
-  // Media parts: zero contribution regardless of payload size
+  // Media parts: zero contribution regardless of payload size. The own-key
+  // check keeps an inherited key such as `constructor` from reading as media.
   if (typeof type === 'string') {
-    if (
-      type === 'image_url' ||
-      type === 'image' ||
-      type === 'input_image' ||
-      type === 'file' ||
-      type === 'input_file' ||
-      type === 'document'
-    ) {
+    if (Object.hasOwn(MEDIA_PART_MODALITY, type)) {
       return 0;
     }
 

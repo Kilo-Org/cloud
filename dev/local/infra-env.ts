@@ -88,9 +88,25 @@ export function buildAppEnv(ports: Record<string, number>): Record<string, strin
   };
 }
 
-const DEV_BYOK_KMS_SERVICE_TOKEN = 'dev-byok-kms-token';
+/** Bearer token `dev/byok-kms/server.ts` accepts when `BYOK_KMS_SERVICE_TOKEN` is unset. */
+export const DEV_BYOK_KMS_SERVICE_TOKEN = 'dev-byok-kms-token';
 
-/** Keys whose blank placeholder in `.env.local.example` is filled in rather than treated as an override. */
+/**
+ * Where this worktree's `byok-kms` service listens and the token it accepts.
+ * Callers that cannot rely on `.env.local` having been synced (`dev:seed`) use
+ * it as the fallback, so it stays the single source of these values.
+ */
+export function localByokKmsServiceConfig(offset: number = portOffset): {
+  url: string;
+  token: string;
+} {
+  return {
+    url: `http://127.0.0.1:${byokKmsServicePort(offset)}`,
+    token: DEV_BYOK_KMS_SERVICE_TOKEN,
+  };
+}
+
+/** Keys whose blank value (left by an older `.env.local.example` or a hand-made file) is filled in rather than treated as an override. */
 const FILL_WHEN_EMPTY = new Set(['BYOK_KMS_SERVICE_URL']);
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);

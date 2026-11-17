@@ -10,8 +10,10 @@ import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizat
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AdminActionAuditAction, AdminActionAuditTargetType } from '@kilocode/db/schema-types';
 import {
+  adminTierFor,
   authViaTokenFromHeaders,
   clientIpFromHeaders,
+  type AdminAccessAttribution,
   type AdminAuditContext,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -34,7 +36,9 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  *
  * `message` and `metadata` are stored and logged verbatim. Never include
  * tokens, credentials, or customer email addresses; reference users and
- * organizations by ID through `target`.
+ * organizations by ID through `target`. Operator-typed free text can name a
+ * customer, so pass it through {@link redactEmailAddressesInAuditText} before it
+ * becomes part of an entry.
  */
 
 export type AdminActionContext = Omit<AdminAuditContext, 'user'> & {
@@ -53,18 +57,14 @@ export type AdminActionEntry = {
   metadata?: Record<string, unknown>;
 };
 
-export type AdminActionEvent = {
+export type AdminActionEvent = Pick<
+  AdminAccessAttribution,
+  'kiloUserId' | 'email' | 'adminTier' | 'authVia' | 'tokenSource' | 'route' | 'ip'
+> & {
   event: 'admin_action';
   action: AdminActionAuditAction;
   auditLogId: string | null;
   persisted: boolean;
-  kiloUserId: string;
-  email: string;
-  adminTier: 'super_admin' | 'platform_admin';
-  authVia: 'token' | 'session';
-  tokenSource: string | null;
-  route: string | null;
-  ip: string | null;
   targetType: AdminActionAuditTargetType | null;
   targetId: string | null;
   message: string;
@@ -134,7 +134,7 @@ export async function recordAdminActions(
       persisted: index < insertedIds.length,
       kiloUserId: ctx.user.id,
       email: ctx.user.google_user_email,
-      adminTier: ctx.user.is_super_admin ? 'super_admin' : 'platform_admin',
+      adminTier: adminTierFor(ctx.user),
       authVia: ctx.authViaToken ? 'token' : 'session',
       tokenSource: ctx.tokenSource ?? null,
       route: ctx.trpcPath ?? null,
@@ -157,6 +157,32 @@ function emit(event: AdminActionEvent): void {
 
 export function userActionTarget(userId: string): AdminActionTarget {
   return { type: 'user', id: userId };
+}
+
+// A local part starts with a letter or a digit, so punctuation that precedes a
+// pasted address in prose stays in the text: brackets, quotes, an ellipsis, a
+// dash, a question or exclamation mark, and a slash. Everything after that first
+// character is replaced, whatever it is, so no fragment of the local part
+// survives.
+const EMAIL_ADDRESS_PATTERN = /[\p{L}\p{N}][^\s@]*@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
+
+/**
+ * Replaces email addresses in operator-typed free text, such as the reason an
+ * admin gives for a refund. Apply it at the boundary where operator text enters
+ * and use the result for every record written from it: the audit table is
+ * browsable by every platform admin, and the target user records hold block
+ * reason, admin note and credit transaction description that admins read too.
+ *
+ * The local part is the whole non-space run after its first letter or digit, so
+ * no fragment of it survives whatever form the address was pasted in, while
+ * prose punctuation that precedes the address stays in the text. The domain
+ * match accepts Unicode letters and combining marks. The
+ * match requires a dotted domain of at least two letters: an intranet host
+ * without a dot, and a bracketed IP literal, are not treated as customer
+ * addresses and stay in the text.
+ */
+export function redactEmailAddressesInAuditText(text: string): string {
+  return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');
 }
 
 export function organizationActionTarget(organizationId: string): AdminActionTarget {

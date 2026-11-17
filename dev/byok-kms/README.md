@@ -8,7 +8,10 @@ KMS uses the same code path.
 
 `pnpm dev:start` starts `local-kms` and this service (`byok-kms`) as part of the
 core group, and points `BYOK_KMS_SERVICE_URL` / `BYOK_KMS_SERVICE_TOKEN` in
-`.env.local` at it, using the worktree's port offset. To run it by hand:
+`.env.local` at it, using the worktree's port offset. `pnpm dev:seed` topics that
+store a BYOK key call this service too; if `.env.local` leaves both variables blank
+they use the same local URL and token (`localByokKmsServiceConfig` in
+`dev/local/infra-env.ts`). To run it by hand:
 
 ```bash
 docker compose -f dev/docker-compose.yml up -d local-kms

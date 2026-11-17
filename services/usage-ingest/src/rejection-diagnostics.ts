@@ -181,3 +181,24 @@ export function schemaRejectionDetails(error: ValidationError, parsedJson: unkno
     omitted_issue_count: Math.max(0, error.issues.length - MAX_ISSUES),
   };
 }
+
+/** Tagged records are flat, so only a top-level schema key is named; deeper segments are redacted. */
+function flatRecordPath(path: PropertyKey[], fields: readonly string[]): string[] {
+  const [field, ...rest] = path;
+  if (field === undefined) return [];
+  if (typeof field !== 'string' || !fields.includes(field)) return ['[redacted]'];
+  return rest.length === 0 ? [field] : [field, '[redacted]'];
+}
+
+export function flatRecordRejectionDetails(
+  error: Pick<ValidationError, 'issues'>,
+  fields: readonly string[]
+): object {
+  return {
+    issues: error.issues.slice(0, MAX_ISSUES).map(issue => ({
+      code: issueCode(issue.code),
+      path: flatRecordPath(issue.path, fields),
+    })),
+    omitted_issue_count: Math.max(0, error.issues.length - MAX_ISSUES),
+  };
+}

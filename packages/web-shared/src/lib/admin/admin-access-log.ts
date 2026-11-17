@@ -7,7 +7,9 @@ import type {
   PrivilegedActionClass,
   PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type { SupportDecision } from '@kilocode/web-shared/lib/admin/support-access';
 import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { firstForwardedHop } from '@kilocode/web-shared/lib/http/forwarded-hop';
 
 /**
  * Per-request, identity-attributed audit telemetry for Kilocode admin access.
@@ -52,6 +54,8 @@ import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-
 
 export type AdminAccessSurface = 'rest' | 'trpc' | 'server-component';
 
+export type AdminAccessTier = 'super_admin' | 'platform_admin';
+
 /**
  * Why an `is_admin` elevation fired. A closed union so the values stay stable
  * and queryable in Axiom, and so a typo cannot silently create a new bucket.
@@ -89,7 +93,7 @@ export type AdminAccessAttribution = {
   surface: AdminAccessSurface;
   kiloUserId: string;
   email: string;
-  adminTier: 'super_admin' | 'platform_admin';
+  adminTier: AdminAccessTier;
   /**
    * `"token"` when the request authenticated via an API bearer token (any
    * `Authorization` header), else `"session"` (web-console cookie). This is the
@@ -135,6 +139,16 @@ export type AdminAccessAttribution = {
    */
   method: string | null;
   ip: string | null;
+  /** Resolution verdict for explicit support-organization access. */
+  supportDecision: SupportDecision | null;
+  supportGrantId: string | null;
+  supportActionId: string | null;
+  inventoryId: string | null;
+  /**
+   * The parent organization whose grant admitted the target organization, when
+   * a support grant on a parent applied to a child. Null for a direct grant.
+   */
+  supportInheritedFromOrganizationId: string | null;
 };
 
 /**
@@ -148,7 +162,7 @@ export type PrivilegedAccessAttribution = Omit<
 > & {
   kiloUserId: string | null;
   email: string | null;
-  adminTier: 'super_admin' | 'platform_admin' | null;
+  adminTier: AdminAccessTier | null;
 };
 
 /**
@@ -207,60 +221,57 @@ export function setAdminAccessSinkForTest(sink: AdminAccessSink | null): void {
 
 type AdminAccessUser = Pick<User, 'id' | 'google_user_email' | 'is_super_admin' | 'is_admin'>;
 
-/**
- * Input of {@link emitAdminAccessEvent}: the transport and identity fields plus
- * the same `kind`-discriminated attribution as {@link AdminAccessEvent}. A guard
- * caller cannot pass a `reason` or `target`, and an elevation caller cannot omit
- * them.
- */
-export type AdminAccessEventInput = {
+/** Request/envelope fields every `admin_access` input carries, whatever kind it is. */
+type AdminAccessEventEnvelope = {
   surface: AdminAccessSurface;
-  authViaToken: boolean;
   tokenSource: string | null;
-  credential?: PrivilegedCredentialKind;
-  membershipRole?: string | null;
-  wouldPassWithoutAdmin?: boolean | null;
   wouldBlock?: boolean;
   userAgentProduct?: string | null;
   route: string | null;
   method: string | null;
   ip: string | null;
-} & (
-  | { kind: 'admin_guard'; user: AdminAccessUser }
-  | {
-      kind: 'kilo_admin_elevation';
-      user: AdminAccessUser;
-      reason: KiloAdminElevationReason;
-      target: string;
-      issuanceId?: string | null;
-    }
-  | {
-      kind: 'privileged_access';
-      /** Null when the credential was refused before a user could be resolved. */
-      user?: AdminAccessUser;
-      credential: PrivilegedCredentialKind;
-      outcome: 'succeeded' | 'denied' | 'failed';
-      actionClass: PrivilegedActionClass;
-      actionId?: string | null;
-      target?: string | null;
-    }
-);
+};
 
-export type PrivilegedAccessEventInput = {
-  surface: AdminAccessSurface;
+/** The fields the `kind: 'privileged_access'` arm carries, without its discriminator. */
+type PrivilegedAccessArm = {
+  /** Null when the credential was refused before a user could be resolved. */
   user?: AdminAccessUser;
   credential: PrivilegedCredentialKind;
   outcome: 'succeeded' | 'denied' | 'failed';
   actionClass: PrivilegedActionClass;
   actionId?: string | null;
   target?: string | null;
-  wouldBlock?: boolean;
-  userAgentProduct?: string | null;
-  tokenSource: string | null;
-  route: string | null;
-  method: string | null;
-  ip: string | null;
 };
+
+/**
+ * Input of {@link emitAdminAccessEvent}: the transport and identity fields plus
+ * the same `kind`-discriminated attribution as {@link AdminAccessEvent}. A guard
+ * caller cannot pass a `reason` or `target`, and an elevation caller cannot omit
+ * them.
+ */
+export type AdminAccessEventInput = AdminAccessEventEnvelope & {
+  authViaToken: boolean;
+  credential?: PrivilegedCredentialKind;
+  membershipRole?: string | null;
+  wouldPassWithoutAdmin?: boolean | null;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
+  supportInheritedFromOrganizationId?: string | null;
+} & (
+    | { kind: 'admin_guard'; user: AdminAccessUser }
+    | {
+        kind: 'kilo_admin_elevation';
+        user: AdminAccessUser;
+        reason: KiloAdminElevationReason;
+        target: string;
+        issuanceId?: string | null;
+      }
+    | (PrivilegedAccessArm & { kind: 'privileged_access' })
+  );
+
+export type PrivilegedAccessEventInput = AdminAccessEventEnvelope & PrivilegedAccessArm;
 
 /**
  * Build and emit an `admin_access` event. Called from both admin guard choke
@@ -285,6 +296,11 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
     route: params.route,
     method: params.method,
     ip: params.ip,
+    supportDecision: params.supportDecision ?? null,
+    supportGrantId: params.supportGrantId ?? null,
+    supportActionId: params.supportActionId ?? null,
+    inventoryId: params.inventoryId ?? null,
+    supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId ?? null,
   };
   // Audit logging is a side effect that must never deny a legitimate admin
   // action: swallow (and report) any sink failure rather than propagate it.
@@ -331,11 +347,16 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
   }
 }
 
+/** The admin tier label one actor carries in the audit streams. */
+export function adminTierFor(user: Pick<User, 'is_super_admin'>): AdminAccessTier {
+  return user.is_super_admin ? 'super_admin' : 'platform_admin';
+}
+
 function attributionFor(user: AdminAccessUser) {
   return {
     kiloUserId: user.id,
     email: user.google_user_email,
-    adminTier: user.is_super_admin ? ('super_admin' as const) : ('platform_admin' as const),
+    adminTier: adminTierFor(user),
   };
 }
 
@@ -387,6 +408,11 @@ export type AdminAuditContext = {
   headersList?: Headers;
   trpcPath?: string;
   trpcType?: string;
+  /** REST/server-component surface when the caller already knows it. */
+  auditSurface?: AdminAccessSurface;
+  /** Actual request method for a REST caller. */
+  auditMethod?: string;
+  delegatedWorkload?: boolean;
 };
 
 /** Membership observation carried by an elevation event. */
@@ -396,6 +422,129 @@ export type ElevationMembershipObservation = {
   /** Whether that real role alone would have authorized the request. */
   wouldPassWithoutAdmin?: boolean | null;
 };
+
+/**
+ * Request and credential attribution every elevation event carries, resolved
+ * once from whichever transport produced the elevation.
+ */
+type ElevationAttribution = {
+  surface: AdminAccessSurface;
+  authViaToken: boolean;
+  tokenSource: string | null;
+  credential: PrivilegedCredentialKind;
+  route: string | null;
+  method: string | null;
+  ip: string | null;
+  userAgentProduct: string | null;
+};
+
+/** What an elevation reached and under which posture. Transport-independent. */
+type ElevationRecord = {
+  reason: KiloAdminElevationReason;
+  target: string;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
+  supportInheritedFromOrganizationId?: string | null;
+  issuanceId?: string | null;
+} & ElevationMembershipObservation;
+
+function attributionFromContext(ctx: AdminAuditContext): ElevationAttribution {
+  const authViaToken = ctx.authViaToken ?? false;
+  const tokenSource = ctx.tokenSource ?? null;
+  return {
+    surface: 'trpc',
+    authViaToken,
+    tokenSource,
+    // `ctx.credential` is derived once at the tRPC boundary from the same
+    // inputs; the fallback must use them all, or a context built without that
+    // boundary attributes the credential differently from the header path.
+    credential:
+      ctx.credential ??
+      deriveCredentialKind({
+        authViaToken,
+        tokenSource,
+        internalApiUse: ctx.internalApiUse,
+        delegatedWorkload: ctx.delegatedWorkload,
+      }),
+    route: ctx.trpcPath ?? null,
+    method: ctx.trpcType ?? null,
+    ip: ctx.ip ?? null,
+    userAgentProduct: ctx.headersList ? userAgentProductFromHeaders(ctx.headersList) : null,
+  };
+}
+
+function attributionFromHeaders(params: {
+  headersList: Headers;
+  surface?: AdminAccessSurface;
+  method?: string;
+  tokenSource?: string | null;
+  internalApiUse?: boolean;
+  delegatedWorkload?: boolean;
+}): ElevationAttribution {
+  const authViaToken = authViaTokenFromHeaders(params.headersList);
+  const tokenSource = params.tokenSource ?? null;
+  return {
+    surface: params.surface ?? 'rest',
+    authViaToken,
+    tokenSource,
+    credential: deriveCredentialKind({
+      authViaToken,
+      tokenSource,
+      internalApiUse: params.internalApiUse,
+      delegatedWorkload: params.delegatedWorkload,
+    }),
+    route: routeFromHeaders(params.headersList),
+    method: params.method ?? methodFromHeaders(params.headersList),
+    ip: clientIpFromHeaders(params.headersList),
+    userAgentProduct: userAgentProductFromHeaders(params.headersList),
+  };
+}
+
+/**
+ * Emit the elevation pair from one attribution record: the
+ * `kilo_admin_elevation` event every elevation produces, and the observe-only
+ * `privileged_access` event a bearer credential also produces.
+ */
+function emitElevation(
+  attribution: ElevationAttribution,
+  user: AdminAccessUser,
+  params: ElevationRecord
+): void {
+  emitAdminAccessEvent({
+    ...attribution,
+    kind: 'kilo_admin_elevation',
+    user,
+    wouldBlock: attribution.credential !== 'session',
+    membershipRole: params.membershipRole ?? null,
+    wouldPassWithoutAdmin: params.wouldPassWithoutAdmin ?? null,
+    supportDecision: params.supportDecision,
+    supportGrantId: params.supportGrantId,
+    supportActionId: params.supportActionId,
+    inventoryId: params.inventoryId,
+    supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
+    issuanceId: params.issuanceId ?? null,
+    reason: params.reason,
+    target: params.target,
+  });
+  if (!attribution.authViaToken) return;
+  emitPrivilegedAccessEvent({
+    surface: attribution.surface,
+    user,
+    credential: attribution.credential,
+    outcome: 'succeeded',
+    actionClass: actionClassForElevation(params.reason, attribution.method),
+    actionId: null,
+    target: params.target,
+    wouldBlock: true,
+    userAgentProduct: attribution.userAgentProduct,
+    tokenSource: attribution.tokenSource,
+    route: attribution.route,
+    method: attribution.method,
+    ip: attribution.ip,
+  });
+}
 
 /**
  * Record that the `is_admin` escape hatch granted a Kilo employee access to
@@ -418,11 +567,7 @@ export type ElevationMembershipObservation = {
  */
 export async function recordKiloAdminElevation(
   ctx: AdminAuditContext,
-  params: {
-    reason: KiloAdminElevationReason;
-    target: string;
-    issuanceId?: string | null;
-  } & ElevationMembershipObservation
+  params: ElevationRecord
 ): Promise<void> {
   if (ctx.trpcPath === undefined) {
     // `tokenSource` is only preserved when the caller put it on the context.
@@ -437,53 +582,21 @@ export async function recordKiloAdminElevation(
       internalApiUse: ctx.internalApiUse,
       reason: params.reason,
       target: params.target,
+      surface: ctx.auditSurface,
+      method: ctx.auditMethod,
+      delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
+      supportDecision: params.supportDecision,
+      supportGrantId: params.supportGrantId,
+      supportActionId: params.supportActionId,
+      inventoryId: params.inventoryId,
+      supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
       issuanceId: params.issuanceId,
     });
     return;
   }
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-    });
-  emitAdminAccessEvent({
-    surface: 'trpc',
-    kind: 'kilo_admin_elevation',
-    user: ctx.user,
-    authViaToken: ctx.authViaToken ?? false,
-    tokenSource: ctx.tokenSource ?? null,
-    credential,
-    membershipRole: params.membershipRole ?? null,
-    wouldPassWithoutAdmin: params.wouldPassWithoutAdmin ?? null,
-    wouldBlock: credential !== 'session',
-    userAgentProduct: ctx.headersList ? userAgentProductFromHeaders(ctx.headersList) : null,
-    route: ctx.trpcPath,
-    method: ctx.trpcType ?? null,
-    ip: ctx.ip ?? null,
-    reason: params.reason,
-    target: params.target,
-    issuanceId: params.issuanceId ?? null,
-  });
-  if (ctx.authViaToken) {
-    emitPrivilegedAccessEvent({
-      surface: 'trpc',
-      user: ctx.user,
-      credential,
-      outcome: 'succeeded',
-      actionClass: actionClassForElevation(params.reason, ctx.trpcType ?? null),
-      actionId: null,
-      target: params.target,
-      wouldBlock: true,
-      userAgentProduct: ctx.headersList ? userAgentProductFromHeaders(ctx.headersList) : null,
-      tokenSource: ctx.tokenSource ?? null,
-      route: ctx.trpcPath,
-      method: ctx.trpcType ?? null,
-      ip: ctx.ip ?? null,
-    });
-  }
+  emitElevation(attributionFromContext(ctx), ctx.user, params);
 }
 
 /**
@@ -519,6 +632,26 @@ export async function elevateViaKiloAdmin<const TGrant>(
   return params.grant;
 }
 
+export type KiloAdminElevationRequestParams = {
+  user: AdminAccessUser;
+  tokenSource?: string | null;
+  reason: KiloAdminElevationReason;
+  target: string;
+  surface?: AdminAccessSurface;
+  /** The actual Request method when the caller has one. */
+  method?: string;
+  /** Use the caller's request headers instead of the ambient header store. */
+  headersList?: Headers;
+  internalApiUse?: boolean;
+  delegatedWorkload?: boolean;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
+  supportInheritedFromOrganizationId?: string | null;
+  issuanceId?: string | null;
+} & ElevationMembershipObservation;
+
 /**
  * {@link recordKiloAdminElevation} for route handlers and server components,
  * which have request headers instead of a tRPC context. Call it directly from
@@ -536,20 +669,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
  * rule that audit logging never denies a legitimate admin action.
  */
 export async function recordKiloAdminElevationForRequest(
-  params: {
-    user: AdminAccessUser;
-    tokenSource?: string | null;
-    reason: KiloAdminElevationReason;
-    target: string;
-    surface?: AdminAccessSurface;
-    /** The actual Request method when the caller has one. */
-    method?: string;
-    /** Use the caller's request headers instead of the ambient header store. */
-    headersList?: Headers;
-    internalApiUse?: boolean;
-    delegatedWorkload?: boolean;
-    issuanceId?: string | null;
-  } & ElevationMembershipObservation
+  params: KiloAdminElevationRequestParams
 ): Promise<void> {
   let headersList = params.headersList;
   if (!headersList) {
@@ -563,63 +683,9 @@ export async function recordKiloAdminElevationForRequest(
 }
 
 function recordKiloAdminElevationFromHeaders(
-  params: {
-    user: AdminAccessUser;
-    headersList: Headers;
-    tokenSource?: string | null;
-    reason: KiloAdminElevationReason;
-    target: string;
-    surface?: AdminAccessSurface;
-    method?: string;
-    internalApiUse?: boolean;
-    delegatedWorkload?: boolean;
-    issuanceId?: string | null;
-  } & ElevationMembershipObservation
+  params: KiloAdminElevationRequestParams & { headersList: Headers }
 ): void {
-  const authViaToken = authViaTokenFromHeaders(params.headersList);
-  const route = routeFromHeaders(params.headersList);
-  const method = params.method ?? methodFromHeaders(params.headersList);
-  const credential = deriveCredentialKind({
-    authViaToken,
-    tokenSource: params.tokenSource ?? null,
-    internalApiUse: params.internalApiUse,
-    delegatedWorkload: params.delegatedWorkload,
-  });
-  emitAdminAccessEvent({
-    surface: params.surface ?? 'rest',
-    kind: 'kilo_admin_elevation',
-    user: params.user,
-    authViaToken,
-    tokenSource: params.tokenSource ?? null,
-    credential,
-    membershipRole: params.membershipRole ?? null,
-    wouldPassWithoutAdmin: params.wouldPassWithoutAdmin ?? null,
-    wouldBlock: credential !== 'session',
-    route,
-    method,
-    userAgentProduct: userAgentProductFromHeaders(params.headersList),
-    ip: clientIpFromHeaders(params.headersList),
-    reason: params.reason,
-    target: params.target,
-    issuanceId: params.issuanceId ?? null,
-  });
-  if (authViaToken) {
-    emitPrivilegedAccessEvent({
-      surface: params.surface ?? 'rest',
-      user: params.user,
-      credential,
-      outcome: 'succeeded',
-      actionClass: actionClassForElevation(params.reason, method),
-      actionId: null,
-      target: params.target,
-      wouldBlock: true,
-      userAgentProduct: userAgentProductFromHeaders(params.headersList),
-      tokenSource: params.tokenSource ?? null,
-      route,
-      method,
-      ip: clientIpFromHeaders(params.headersList),
-    });
-  }
+  emitElevation(attributionFromHeaders(params), params.user, params);
 }
 
 function actionClassForElevation(
@@ -721,10 +787,17 @@ export function userAgentProductFromHeaders(headersList: Headers): string | null
 }
 
 /**
- * Extract the client IP from request headers. Prefers `x-forwarded-for`, with
- * `x-vercel-forwarded-for` as a fallback; returns the first hop or null.
+ * Extract the client IP from request headers.
+ *
+ * `x-vercel-forwarded-for` is the address the platform observed, so it is read
+ * first: `x-forwarded-for` can be rewritten by a proxy in front of the platform.
+ * `x-forwarded-for` is the fallback for a request the platform did not label
+ * (local development, a direct origin hit). Null when neither header carries a
+ * usable hop, so the event records an explicitly unavailable address.
  */
 export function clientIpFromHeaders(headersList: Headers): string | null {
-  const forwarded = headersList.get('x-forwarded-for') ?? headersList.get('x-vercel-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || null;
+  return (
+    firstForwardedHop(headersList.get('x-vercel-forwarded-for')) ??
+    firstForwardedHop(headersList.get('x-forwarded-for'))
+  );
 }

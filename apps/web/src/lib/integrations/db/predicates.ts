@@ -25,3 +25,36 @@ export function effectiveAppTypeCondition(appType: GitHubAppType) {
     ? sql`(${platform_integrations.github_app_type} = 'standard' OR ${platform_integrations.github_app_type} IS NULL)`
     : eq(platform_integrations.github_app_type, 'lite');
 }
+
+/**
+ * One live GitHub association of an owner, reduced to the identity of the
+ * installation slot it occupies.
+ */
+export type GitHubInstallationSlot = {
+  installationId: string | null;
+  appType: GitHubAppType | null;
+};
+
+/**
+ * Whether a live association of the owner occupies an installation slot that
+ * the association being written must not share.
+ *
+ * A GitHub installation slot is the installation id together with the app
+ * type, which is what `github_app_installations` keys on, what the peer
+ * lookups scope by, and what the primary-association selection compares. A
+ * row without an installation id occupies no slot, and a row written before
+ * `github_app_type` existed is a Standard row.
+ *
+ * Every writer that applies the organization single-installation rule calls
+ * this, so the rule has one definition.
+ */
+export function occupiesAnotherGitHubInstallationSlot(
+  existing: GitHubInstallationSlot,
+  candidate: { installationId: string; appType: GitHubAppType }
+): boolean {
+  if (existing.installationId === null) return false;
+  return (
+    existing.installationId !== candidate.installationId ||
+    (existing.appType ?? 'standard') !== candidate.appType
+  );
+}

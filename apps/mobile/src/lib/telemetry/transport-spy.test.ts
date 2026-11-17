@@ -4,8 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SENTRY_NATIVE_OPTIONS } from '@/lib/sentry-dsn';
 import { type SentryInitExtras } from '@/lib/sentry-init';
 
-// ---- shared hoisted mocks ----
-
 const hoisted = vi.hoisted(() => {
   const usHost = 'https://us.i.posthog.com';
 
@@ -85,8 +83,6 @@ const hoisted = vi.hoisted(() => {
     storage,
   };
 });
-
-// ---- all vi.mock calls at top level ----
 
 vi.mock('posthog-react-native', () => ({
   default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
@@ -171,8 +167,6 @@ vi.mock('@sentry/react-native', () => ({
 
 vi.stubGlobal('__DEV__', false);
 
-// ---- loaders ----
-
 // Load posthog + appsflyer + the real controller from one module registry so
 // the SDK modules and the controller share a single decision/generation state.
 // oxlint-disable-next-line require-await -- async required by promise-function-async
@@ -189,8 +183,6 @@ async function loadSentryInit() {
   vi.resetModules();
   return import('@/lib/sentry-init');
 }
-
-// ---- PostHog transport ----
 
 describe('PostHog transport spy', () => {
   beforeEach(() => {
@@ -296,8 +288,6 @@ describe('PostHog transport spy', () => {
   });
 });
 
-// ---- AppsFlyer transport ----
-
 describe('AppsFlyer transport spy', () => {
   const logEventSpy =
     vi.fn<(eventName: string, eventValues: Record<string, string>) => Promise<void>>();
@@ -398,8 +388,6 @@ function profilerNames(initOptions: Record<string, unknown> | undefined): string
     .map(integration => integration.name)
     .filter((name): name is string => name?.startsWith('HermesProfiling') ?? false);
 }
-
-// ---- Sentry transport ----
 
 describe('Sentry transport spy', () => {
   beforeEach(() => {

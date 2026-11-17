@@ -112,6 +112,7 @@ export type ProfileDetails = {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt: string | null;
   vars: ProfileVar[];
   commands: ProfileCommand[];
   mcpServers: ProfileMcpServer[];

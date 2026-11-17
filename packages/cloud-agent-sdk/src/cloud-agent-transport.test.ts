@@ -969,6 +969,63 @@ describe('CloudAgentTransport unexpected disconnect', () => {
 });
 
 describe('CloudAgentTransport ticket handling', () => {
+  it('paints an authorized history page while the stream ticket is still pending', async () => {
+    let resolveTicket: ((ticket: string) => void) | undefined;
+    const ticket = new Promise<string>(resolve => {
+      resolveTicket = resolve;
+    });
+    const onInitialPageLoaded = jest.fn();
+    const page = {
+      kind: 'success' as const,
+      info: { id: 'ses-1' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    };
+    const transport = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => ticket,
+      fetchSnapshotPage: async () => page,
+      onInitialPageLoaded,
+      websocketBaseUrl: 'ws://localhost:9999',
+    })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+
+    transport.connect();
+    await flushPromises();
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+
+    resolveTicket?.('ticket');
+    await flushPromises();
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it.each([
+    [undefined, null],
+    ['full', null],
+    ['preview', 'preview'],
+  ] as const)('requests replay tool display %s as %s', async (toolDisplay, expected) => {
+    const transport = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'ticket',
+      fetchSnapshot: () => Promise.resolve(emptySnapshot),
+      websocketBaseUrl: 'ws://localhost:9999',
+      ...(toolDisplay === undefined ? {} : { toolDisplay }),
+    })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+    transport.connect();
+    await flushPromises();
+    expect(new URL(webSocketConstructor.mock.calls[0][0]).searchParams.get('toolDisplay')).toBe(
+      expected
+    );
+    transport.destroy();
+  });
+
   it('calls getTicket with sessionId', () => {
     const getTicket = jest.fn((_sessionId: string) => 'ticket-abc');
     const { transport } = createTransportWithSinks(getTicket);
@@ -979,6 +1036,42 @@ describe('CloudAgentTransport ticket handling', () => {
 
     transport.destroy();
   });
+
+  it.each(['disconnect', 'destroy', 'ticket-error'] as const)(
+    'does not paint a late history page after %s',
+    async outcome => {
+      let resolvePage: ((page: SessionSnapshotPageOutcome) => void) | undefined;
+      const pendingPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+        resolvePage = resolve;
+      });
+      const onInitialPageLoaded = jest.fn();
+      const transport = createCloudAgentTransport({
+        sessionId: cloudAgentId('ses-1'),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () =>
+          outcome === 'ticket-error' ? Promise.reject(new Error('Ticket denied')) : 'ticket',
+        fetchSnapshotPage: () => pendingPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+        onError: jest.fn(),
+      })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+      transport.connect();
+      await flushPromises();
+      if (outcome !== 'ticket-error') transport[outcome]();
+      resolvePage?.({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      await flushPromises();
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+      transport.destroy();
+    }
+  );
 
   it('handles async getTicket', async () => {
     const getTicket = jest.fn((_sessionId: string) => Promise.resolve('async-ticket'));
@@ -1121,6 +1214,76 @@ describe('CloudAgentTransport command delegation', () => {
         mode: 'code',
         model: 'gpt-4',
       },
+    });
+
+    transport.destroy();
+  });
+
+  it('converts a Kilo model ref and forwards mode and variant for a command', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+        variant: 'high',
+      },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'gpt-4',
+        variant: 'high',
+      },
+    });
+
+    transport.destroy();
+  });
+
+  it('rejects a non-Kilo model ref on a command before calling the Cloud Agent API', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await expect(
+      transport.send!({
+        messageId: 'msg_123456789abc123456789AB009',
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(api.send).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('keeps a command without overrides backward compatible on the wire', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
     });
 
     transport.destroy();
@@ -1621,6 +1784,84 @@ describe('CloudAgentTransport page-seam', () => {
     // Terminal typed failures still leave the websocket available so the user
     // can recover via live events; this is the intended transport behavior.
     expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('replays a failed queued turn from the page without a socket frame', async () => {
+    const storage = createMemoryStorage();
+    const processor = createChatProcessor(storage);
+    const state = createServiceState({ rootSessionId: 'ses-1' });
+    const page = {
+      kind: 'success' as const,
+      ...makeSnapshot({ id: 'ses-1' }),
+      nextCursor: null,
+      omittedItemCount: 0,
+      queuedMessages: [
+        {
+          messageId: 'msg-queued',
+          content: 'Fix the build',
+          timestamp: 100,
+          terminalFailure: {
+            messageId: 'msg-queued',
+            status: 'failed',
+            delivery: 'queued' as const,
+            accepted: false,
+            error: 'Workspace setup failed',
+            reason: 'workspace_setup_failed',
+            timestamp: 120,
+          },
+        },
+        // A settled command and a turn that is only queued carry no event of
+        // their own, exactly as the stream's own snapshot reports them.
+        { messageId: 'msg-done', content: '', timestamp: 60, completedAt: 70 },
+        { messageId: 'msg-pending', content: 'Next prompt', timestamp: 80 },
+      ],
+    };
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+      fetchSnapshotPage: () => Promise.resolve(page),
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+    const transport = factory({
+      onChatEvent: event => {
+        processor.process(event);
+      },
+      onServiceEvent: event => {
+        state.process(event);
+        // The session sink materializes the prompt row from the queued event.
+        if (event.type === 'cloud.message.queued') {
+          processor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: 'ses-1',
+            content: event.content,
+            createdAt: event.createdAt,
+          });
+        }
+      },
+    });
+
+    // The socket never delivers a frame: the page alone must produce both the
+    // failed pending entry and the prompt row.
+    transport.connect();
+    await flushPromises();
+
+    expect(state.getPendingMessages().get('msg-queued')).toMatchObject({
+      status: 'failed',
+      error: 'Workspace setup failed',
+      reason: 'execution',
+    });
+    expect(storage.getMessageInfo('msg-queued')).toMatchObject({ role: 'user', synthetic: true });
+    expect(storage.getParts('msg-queued')).toEqual([
+      expect.objectContaining({ type: 'text', text: 'Fix the build' }),
+    ]);
+    expect(state.getPendingMessages().has('msg-done')).toBe(false);
+    expect(state.getPendingMessages().has('msg-pending')).toBe(false);
+    expect(storage.getMessageInfo('msg-pending')).toBeUndefined();
 
     transport.destroy();
   });

@@ -75,6 +75,27 @@ describe('SandboxStatusSessionIdSchema', () => {
 });
 
 describe('sandbox status public contract', () => {
+  it('exposes only the optional workspace snapshot capture timestamp', () => {
+    const parsed = SandboxStatusSnapshotSchema.parse({
+      ...snapshot,
+      workspaceSnapshot: { capturedAt: observedAt, ...privateFields, snapshotId: 'private-handle' },
+    });
+    expect(parsed.workspaceSnapshot).toEqual({ capturedAt: observedAt });
+    expect(SandboxStatusSnapshotSchema.parse(snapshot)).not.toHaveProperty('workspaceSnapshot');
+  });
+
+  it.each([...invalidNumbers, 8_640_000_000_000_001])(
+    'rejects invalid workspace snapshot capture timestamp %s',
+    capturedAt => {
+      expect(
+        SandboxStatusSnapshotSchema.safeParse({
+          ...snapshot,
+          workspaceSnapshot: { capturedAt },
+        }).success
+      ).toBe(false);
+    }
+  );
+
   it.each(lifecycleCases)('accepts $status with $detailCode', lifecycle => {
     const input = { ...snapshot, ...lifecycle };
     expect(SandboxStatusSnapshotSchema.parse(input)).toEqual(input);
@@ -272,12 +293,16 @@ describe('optional sandbox runtime metadata', () => {
     }
   );
 
-  it.each(['7.4.20', '2.4.0', '0.0.0-dev-20260902123456', '7.4.20-rc.1', '7.4.20-canary'])(
-    'accepts a bounded version %s',
-    version => {
-      expect(safeSandboxRuntimeVersion(version)).toBe(version);
-    }
-  );
+  it.each([
+    '7.4.20',
+    '2.4.0',
+    '0.0.0-dev-20260902123456',
+    '7.4.20-rc.1',
+    '7.4.20-canary',
+    '0.0.0-v2-25',
+  ])('accepts a bounded version %s', version => {
+    expect(safeSandboxRuntimeVersion(version)).toBe(version);
+  });
 
   it.each([
     '',
@@ -292,6 +317,10 @@ describe('optional sandbox runtime metadata', () => {
     ' 7.4.20',
     '1234567.1.1',
     '1.2.3-rc.123456789012345',
+    '0.0.0-v2-123456789012345',
+    '0.0.0-v2-private-instance',
+    '0.0.0-v2-25\n',
+    'kilo2 v0.0.0-v2-25',
     '1'.repeat(128),
     null,
     undefined,

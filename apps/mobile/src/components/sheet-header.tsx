@@ -20,6 +20,7 @@ export function SheetHeader({
   disabled = false,
   doneDisabled = false,
   topInset = 'always',
+  surfaceClassName = 'bg-background',
 }: {
   title: string;
   /**
@@ -46,12 +47,19 @@ export function SheetHeader({
    */
   doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
+  /**
+   * The surface the sheet paints behind the header. A sheet that sits on the
+   * raised dark surface passes `bg-card` so its top edge separates from the
+   * near-black window behind it; the app canvas colour is the default.
+   */
+  surfaceClassName?: string;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
+  const doneUnavailable = disabled || doneDisabled;
   // The top clearance comes from the same rule (and the same inputs) as the
   // detent cap, so the header and the sheet edge cannot disagree about who
   // clears the status bar. It is known before the first frame, so the header
@@ -71,7 +79,10 @@ export function SheetHeader({
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
-    <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
+    <View
+      collapsable={false}
+      className={cn('border-b border-border px-4 pb-3 pt-4', surfaceClassName)}
+    >
       <View style={safeAreaStyle}>
         <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined ? (
@@ -125,14 +136,21 @@ export function SheetHeader({
               neutral label. Both keep the same hit box. */}
           <Pressable
             onPress={onDone}
-            disabled={disabled || doneDisabled}
+            disabled={doneUnavailable}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
             className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
+            {/* The muted ink alone is a mid gray; the control's disabled
+                opacity is what makes it read as unavailable. The enabled label
+                keeps the accent at full strength, so the accent is the only
+                state that reads ready. */}
             <Text
-              className="text-center text-base font-semibold text-primary"
+              className={cn(
+                'text-center text-base font-semibold',
+                doneUnavailable ? 'text-muted-foreground' : 'text-primary'
+              )}
               numberOfLines={1}
               ellipsizeMode="clip"
             >

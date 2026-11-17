@@ -12,12 +12,19 @@ concurrency:
 
 jobs:
   verify-main:
+    # This job holds no secrets, so it can report the reason a dispatch is
+    # rejected instead of being silently skipped. The jobs that use repo
+    # secrets carry the canonical-repo guard.
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
     steps:
       - name: Verify main branch
         run: |
+          if [ "$GITHUB_REPOSITORY" != "Kilo-Org/cloud" ]; then
+            echo "::error::This workflow must be run from the canonical Kilo-Org/cloud repository. Got: $GITHUB_REPOSITORY"
+            exit 1
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
             exit 1
@@ -25,6 +32,8 @@ jobs:
 
   stage-secure-proxy:
     needs: verify-main
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -34,6 +43,8 @@ jobs:
 
   promote-secure-proxy:
     needs: stage-secure-proxy
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}

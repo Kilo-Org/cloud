@@ -107,9 +107,9 @@ const EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT = 17.5;
  * `titleLines` and `descriptionLines` are the line counts at `fontScale === 1`.
  * The title fits one line; the live description
  * (`agents.sessionList.noSessionsYetDescription`) is longer than one line at
- * phone width, so it defaults to two. `secondaryAction` adds the live empty
- * state's stacked history link; the no-match state renders a single action and
- * leaves it false.
+ * phone width, so it defaults to two. `secondaryAction` reserves a second action
+ * row: the live empty state's stacked history link, and the no-match state when a
+ * search and a filter are both active and it renders one clear control per cause.
  */
 export function getEmptyStateFullHeight({
   fontScale = 1,

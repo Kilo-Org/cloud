@@ -20,6 +20,8 @@ const OUTCOME_BUCKET_MS = OUTCOME_BUCKET_MINUTES * 60 * 1000;
 export const EXPECTED_GENERATIONS = ['legacy', 'control'] as const;
 export const EXPECTED_ROLES = ['initial', 'follow_up'] as const;
 export const PRODUCT_ORIGINS = ['code-review', 'other', 'unknown'] as const;
+/** The Kilo runtime that ran the turn; `unknown` covers runs without a reported runtime. */
+export const RUNTIME_HARNESS_BUCKETS = ['kilo', 'kilo2', 'unknown'] as const;
 
 export const AGENT_EXECUTION_METRIC = 'agent_execution';
 export const AGENT_FAILURE_METRIC = 'agent_failure';
@@ -30,6 +32,7 @@ export const COLLECTION_METRIC = 'collection';
 export type OutcomeGeneration = (typeof EXPECTED_GENERATIONS)[number];
 export type OutcomeRole = (typeof EXPECTED_ROLES)[number];
 export type ProductOrigin = (typeof PRODUCT_ORIGINS)[number];
+export type RuntimeHarnessBucket = (typeof RUNTIME_HARNESS_BUCKETS)[number];
 export type FailureResponsibility = 'platform' | 'provider' | 'user' | 'unknown';
 
 export type OutcomeWindow = { start: string; end: string };
@@ -38,6 +41,7 @@ export type RunCountRow = {
   generation: OutcomeGeneration;
   role: OutcomeRole;
   origin: ProductOrigin;
+  runtimeHarness: RuntimeHarnessBucket;
   status: CloudAgentSessionRunStatus;
   responsibility: FailureResponsibility;
   failureStage: string;
@@ -63,6 +67,7 @@ export type AgentExecutionHeadline = {
   generation: OutcomeGeneration;
   role: OutcomeRole;
   productOrigin: ProductOrigin;
+  runtimeHarness: RuntimeHarnessBucket;
   completed: number;
   platformFailed: number;
   providerFailed: number;
@@ -75,6 +80,7 @@ export type AgentFailureRow = {
   generation: OutcomeGeneration;
   role: OutcomeRole;
   productOrigin: ProductOrigin;
+  runtimeHarness: RuntimeHarnessBucket;
   responsibility: FailureResponsibility;
   stage: string;
   code: string;
@@ -99,6 +105,8 @@ const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.fail
 export function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
   return sql<OutcomeGeneration>`case when left(${sessionId}, ${CONTROL_PLANE_SESSION_PREFIX.length}) = ${CONTROL_PLANE_SESSION_PREFIX} then 'control' else 'legacy' end`;
 }
+
+const runtimeHarnessExpression: SQL<RuntimeHarnessBucket> = sql<RuntimeHarnessBucket>`case when ${cloud_agent_session_runs.container}->>'runtimeHarness' in ('kilo', 'kilo2') then ${cloud_agent_session_runs.container}->>'runtimeHarness' else 'unknown' end`;
 
 const roleExpression: SQL<OutcomeRole> = sql<OutcomeRole>`case when ${cloud_agent_session_runs.message_id} = ${cloud_agent_sessions.initial_message_id} then 'initial' else 'follow_up' end`;
 
@@ -134,6 +142,7 @@ function readRunCounts(
       generation: generationExpression(cloud_agent_session_runs.cloud_agent_session_id),
       role: roleExpression,
       origin: originBucketExpression,
+      runtimeHarness: runtimeHarnessExpression,
       status: cloud_agent_session_runs.status,
       responsibility: responsibilityBucketExpression,
       failureStage: runFailureStageExpression,
@@ -154,7 +163,7 @@ function readRunCounts(
       eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
     )
     .where(retainedWindow(cloud_agent_session_runs.terminal_at, window, retentionCutoffIso))
-    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`, sql`8`);
+    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`, sql`8`, sql`9`);
 }
 
 function readSessionSetupFailures(
@@ -194,35 +203,50 @@ export function assembleExecutionHeadlines(runCounts: RunCountRow[]): AgentExecu
   for (const generation of EXPECTED_GENERATIONS) {
     for (const role of EXPECTED_ROLES) {
       for (const productOrigin of PRODUCT_ORIGINS) {
-        const headline: AgentExecutionHeadline = {
-          generation,
-          role,
-          productOrigin,
-          completed: 0,
-          platformFailed: 0,
-          providerFailed: 0,
-          userFailed: 0,
-          unknownFailed: 0,
-          interrupted: 0,
-        };
-        for (const row of runCounts) {
-          if (row.generation !== generation || row.role !== role || row.origin !== productOrigin) {
-            continue;
-          }
-          if (row.status === 'completed') headline.completed += row.runCount;
-          else if (row.status === 'interrupted') headline.interrupted += row.runCount;
-          else if (row.status === 'failed') {
-            if (row.responsibility === 'platform') headline.platformFailed += row.runCount;
-            else if (row.responsibility === 'provider') headline.providerFailed += row.runCount;
-            else if (row.responsibility === 'user') headline.userFailed += row.runCount;
-            else headline.unknownFailed += row.runCount;
-          }
+        for (const runtimeHarness of RUNTIME_HARNESS_BUCKETS) {
+          headlines.push(
+            executionHeadline(
+              { generation, role, productOrigin, runtimeHarness },
+              runCounts.filter(
+                row =>
+                  row.generation === generation &&
+                  row.role === role &&
+                  row.origin === productOrigin &&
+                  row.runtimeHarness === runtimeHarness
+              )
+            )
+          );
         }
-        headlines.push(headline);
       }
     }
   }
   return headlines;
+}
+
+function executionHeadline(
+  cell: Pick<AgentExecutionHeadline, 'generation' | 'role' | 'productOrigin' | 'runtimeHarness'>,
+  rows: RunCountRow[]
+): AgentExecutionHeadline {
+  const headline: AgentExecutionHeadline = {
+    ...cell,
+    completed: 0,
+    platformFailed: 0,
+    providerFailed: 0,
+    userFailed: 0,
+    unknownFailed: 0,
+    interrupted: 0,
+  };
+  for (const row of rows) {
+    if (row.status === 'completed') headline.completed += row.runCount;
+    else if (row.status === 'interrupted') headline.interrupted += row.runCount;
+    else if (row.status === 'failed') {
+      if (row.responsibility === 'platform') headline.platformFailed += row.runCount;
+      else if (row.responsibility === 'provider') headline.providerFailed += row.runCount;
+      else if (row.responsibility === 'user') headline.userFailed += row.runCount;
+      else headline.unknownFailed += row.runCount;
+    }
+  }
+  return headline;
 }
 
 function compareByOrigin(
@@ -244,6 +268,7 @@ export function assembleFailureRows(runCounts: RunCountRow[]): AgentFailureRow[]
       generation: row.generation,
       role: row.role,
       productOrigin: row.origin,
+      runtimeHarness: row.runtimeHarness,
       responsibility: row.responsibility,
       stage: row.failureStage,
       code: row.failureCode,
@@ -254,6 +279,9 @@ export function assembleFailureRows(runCounts: RunCountRow[]): AgentFailureRow[]
       const byOrigin = compareByOrigin(left, right);
       if (byOrigin !== 0) return byOrigin;
       if (left.role !== right.role) return left.role < right.role ? -1 : 1;
+      if (left.runtimeHarness !== right.runtimeHarness) {
+        return left.runtimeHarness < right.runtimeHarness ? -1 : 1;
+      }
       if (left.responsibility !== right.responsibility) {
         return left.responsibility < right.responsibility ? -1 : 1;
       }

@@ -12,6 +12,7 @@ import {
   recordAdminAction,
   recordElevatedOrganizationAdminAction,
   recordAdminActions,
+  redactEmailAddressesInAuditText,
   setAdminActionSinkForTest,
   userActionTarget,
   type AdminActionContext,
@@ -154,6 +155,66 @@ describe('recordAdminAction', () => {
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('redactEmailAddressesInAuditText', () => {
+  test('replaces ASCII and non-ASCII addresses and leaves other text alone', () => {
+    expect(
+      redactEmailAddressesInAuditText(
+        'chargeback, contacted by victim@example.com and josé.muñoz@example.co.uk'
+      )
+    ).toBe('chargeback, contacted by [redacted-email] and [redacted-email]');
+
+    expect(redactEmailAddressesInAuditText('politique: jean-zoe\u0301@example.com')).toBe(
+      'politique: [redacted-email]'
+    );
+
+    expect(redactEmailAddressesInAuditText("blocked after o'brien@example.com wrote in")).toBe(
+      'blocked after [redacted-email] wrote in'
+    );
+
+    expect(redactEmailAddressesInAuditText('policy violation, tier_19, 2nd offence')).toBe(
+      'policy violation, tier_19, 2nd offence'
+    );
+  });
+
+  test('keeps the bracket or quote around a pasted address', () => {
+    expect(redactEmailAddressesInAuditText('see (victim@example.com) in the thread')).toBe(
+      'see ([redacted-email]) in the thread'
+    );
+
+    expect(redactEmailAddressesInAuditText('quoted "victim@example.com" here')).toBe(
+      'quoted "[redacted-email]" here'
+    );
+
+    expect(redactEmailAddressesInAuditText('list: <victim@example.com>, ok')).toBe(
+      'list: <[redacted-email]>, ok'
+    );
+  });
+
+  test('keeps prose punctuation that runs into a pasted address', () => {
+    expect(redactEmailAddressesInAuditText('refund for ...victim@example.com')).toBe(
+      'refund for ...[redacted-email]'
+    );
+
+    expect(redactEmailAddressesInAuditText('blocked -victim@example.com for fraud')).toBe(
+      'blocked -[redacted-email] for fraud'
+    );
+
+    expect(redactEmailAddressesInAuditText('watch victim@example.com! and ?two/more')).toBe(
+      'watch [redacted-email]! and ?two/more'
+    );
+
+    expect(redactEmailAddressesInAuditText('forward /victim@example.com to abuse')).toBe(
+      'forward /[redacted-email] to abuse'
+    );
+  });
+
+  test('leaves host forms without a dotted domain alone', () => {
+    expect(redactEmailAddressesInAuditText('intranet user@localhost and user@[192.0.2.1]')).toBe(
+      'intranet user@localhost and user@[192.0.2.1]'
+    );
   });
 });
 

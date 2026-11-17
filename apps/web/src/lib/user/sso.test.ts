@@ -116,6 +116,39 @@ describe('processSSOUserLogin', () => {
     });
   });
 
+  it.each([true, false])(
+    'forwards the invitation token for a WorkOS login with isNew=%s',
+    async isNew => {
+      mockCreateOrUpdateUser.mockResolvedValueOnce({
+        success: true,
+        user: {
+          id: 'user-workos',
+          google_user_email: 'new-user@example.com',
+          google_user_name: 'New User',
+          blocked_reason: null,
+        },
+        isNew,
+      } as Awaited<ReturnType<typeof createOrUpdateUser>>);
+      const accountInfo = {
+        google_user_email: 'new-user@example.com',
+        google_user_name: 'New User',
+        google_user_image_url: 'https://example.com/avatar.png',
+        hosted_domain: 'example.com',
+        provider: 'workos' as const,
+        provider_account_id: 'workos-user-123',
+      };
+
+      await expect(
+        processSSOUserLogin(accountInfo, undefined, undefined, undefined, 'invite-token')
+      ).resolves.toBe(true);
+      expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos', {
+        isNewUser: isNew,
+        invitationToken: 'invite-token',
+      });
+      expect(mockSkipCustomerSourceSurveyForOrgJoin).not.toHaveBeenCalled();
+    }
+  );
+
   it('skips the customer-source survey when the user joins the org via SSO', async () => {
     mockAddSsoUserToOrganization.mockResolvedValueOnce(true);
     const accountInfo = {

@@ -29,8 +29,19 @@ const mocks = vi.hoisted(() => {
     addListener: vi.fn<(listener: () => void) => { remove: () => void } | null>(() => ({
       remove: vi.fn<() => void>(),
     })),
+    toastError: vi.fn<(title: string, options?: unknown) => string | number>(() => 'toast-id'),
   };
 });
+
+// The toast adapter renders `sonner-native` (and reanimated with it); the suite
+// asserts the call the routing makes, and a device proof covers the rendering.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: mocks.toastError,
+    success: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+    warning: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+  },
+}));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -245,6 +256,7 @@ describe('system-search-route', () => {
         'error.operation': 'consume-route',
       });
       expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.toastError).not.toHaveBeenCalled();
     });
   });
 

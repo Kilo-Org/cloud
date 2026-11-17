@@ -292,6 +292,41 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it('paints a disabled Done in the inactive ink instead of the accent', async () => {
+    const props = {
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    };
+    const renderer = await mount({ ...props, doneDisabled: true });
+
+    // The muted ink at full strength reads as a mid gray that matches neither
+    // state, so the waiting shade is the ink plus the control's own disabled
+    // paint: the control must be disabled for that paint to reach the screen,
+    // and the class that carries the paint must stay on it.
+    const waitingDone = pressablesByLabel(renderer.root, 'Done')[0];
+    expect(waitingDone?.props.disabled).toBe(true);
+    expect(String(waitingDone?.props.className)).toContain('disabled:opacity-50');
+    const disabledInk = String(
+      renderer.root.findByProps({ children: 'Done' }).props.className
+    ).split(' ');
+    expect(disabledInk).toContain('text-muted-foreground');
+    expect(disabledInk).not.toContain('text-primary');
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(SheetHeader, { ...props, doneDisabled: false }));
+    });
+    const enabledInk = String(
+      renderer.root.findByProps({ children: 'Done' }).props.className
+    ).split(' ');
+    expect(enabledInk).toContain('text-primary');
+    expect(enabledInk).not.toContain('text-primary-disabled');
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.props.disabled).toBe(false);
+
+    renderer.unmount();
+  });
+
   it('labels the leading control with cancelLabel so Back is not announced as Cancel', async () => {
     const renderer = await mount({
       title: 'report.pdf',

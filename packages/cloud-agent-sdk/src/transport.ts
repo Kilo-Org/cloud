@@ -105,6 +105,9 @@ type SendCommandPayload = {
   command: string;
   /** Verbatim args after the command name; kilo expands $1/$2/$ARGUMENTS. */
   arguments: string;
+  mode?: string;
+  model?: ModelRef;
+  variant?: string;
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
@@ -115,7 +118,15 @@ type CloudAgentPromptPayload = {
   model: string;
   variant?: string;
 };
-type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
+type CloudAgentCommandPayload = {
+  type: 'command';
+  command: string;
+  arguments: string;
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+type CloudAgentSendPayload = CloudAgentPromptPayload | CloudAgentCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
@@ -145,6 +156,7 @@ type Transport = {
   retryRemoteModels?: () => void;
   /** Re-discover the remote slash command catalog for the current owner. No-op when no owner is known or a request is already in flight. */
   retryRemoteCommands?: () => void;
+  retryBackgroundActivity?: () => void;
   /**
    * Ask the currently connected CLI owner to create a new remote session and
    * return its branded `KiloSessionId`. Session-scoped: the current Kilo
@@ -194,6 +206,10 @@ type TransportFactory = (sink: TransportSink) => Transport;
  * by closing over the cloudAgentSessionId.
  */
 type CloudAgentApi = {
+  getBackgroundActivity?: (payload: {
+    sessionId: CloudAgentSessionId;
+    signal?: AbortSignal;
+  }) => Promise<unknown>;
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
@@ -230,6 +246,7 @@ type CloudAgentApi = {
 
 export type {
   CloudAgentApi,
+  CloudAgentCommandPayload,
   CloudAgentPromptPayload,
   CloudAgentSendPayload,
   CloudAgentStreamTicket,

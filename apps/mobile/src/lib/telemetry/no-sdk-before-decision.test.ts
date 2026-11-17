@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 // Static import of the mobile package manifest — no file-system walk.
 import pkg from '../../../package.json';
 
-// ---- shared hoisted mocks ----
-
 const hoisted = vi.hoisted(() => {
   const client = {
     register: vi.fn(),
@@ -32,22 +30,17 @@ const hoisted = vi.hoisted(() => {
 
   const device = { deviceType: null as number | null };
 
-  let sealedState = false;
   const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
+    sealPostHogStorage: vi.fn(),
+    unsealPostHogStorage: vi.fn(),
     purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
     // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
     posthogCustomStorage: {} as Record<string, unknown>,
   };
 
   // Fresh controller — no decision set.
   const controller = {
+    allowsMandatory: vi.fn().mockReturnValue(false),
     allowsOptional: vi.fn().mockReturnValue(false),
     currentGeneration: vi.fn().mockReturnValue(0),
   };
@@ -55,10 +48,10 @@ const hoisted = vi.hoisted(() => {
   return { client, appsFlyer, device, storage, controller };
 });
 
-// ---- vi.mock calls ----
-
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(() => hoisted.client),
+  default: vi.fn(function PostHogMock() {
+    return hoisted.client;
+  }),
   PostHogPersistedProperty: {
     Queue: 'queue',
     LogsQueue: 'logs_queue',
@@ -90,6 +83,7 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
+  allowsMandatory: hoisted.controller.allowsMandatory,
   allowsOptional: hoisted.controller.allowsOptional,
   currentGeneration: hoisted.controller.currentGeneration,
 }));
@@ -98,7 +92,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
@@ -128,8 +121,6 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.stubGlobal('__DEV__', false);
 
-// ---- loaders ----
-
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadPostHogModule() {
   vi.resetModules();
@@ -142,8 +133,6 @@ async function loadAppsFlyerModule() {
   return import('../appsflyer');
 }
 
-// ---- tests ----
-
 describe('no SDK starts before a telemetry decision', () => {
   it('has no expo-insights in the mobile package dependencies', () => {
     expect((pkg as { name?: string }).name).toBe('kilo-app');
@@ -152,6 +141,7 @@ describe('no SDK starts before a telemetry decision', () => {
   });
 
   it('importing posthog does not construct PostHog', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
@@ -174,6 +164,7 @@ describe('no SDK starts before a telemetry decision', () => {
   });
 
   it('initPostHog with a fresh controller does not construct PostHog', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
@@ -183,6 +174,23 @@ describe('no SDK starts before a telemetry decision', () => {
 
     const PostHogModule = await import('posthog-react-native');
     expect(PostHogModule.default).not.toHaveBeenCalled();
+  });
+
+  it('initPostHog after the consent decision constructs a capture-free client', async () => {
+    // The invariant is "no SDK before the decision", not "no SDK without
+    // optional consent": a decided account still evaluates feature flags, with
+    // every capture path closed.
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.clearAllMocks();
+
+    const posthog = await loadPostHogModule();
+    posthog.initPostHog();
+
+    const PostHogModule = await import('posthog-react-native');
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
   });
 
   it('initAppsFlyer with a fresh controller does not call the SDK', async () => {

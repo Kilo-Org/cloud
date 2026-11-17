@@ -142,6 +142,26 @@ it('withholds an excerpt that screening cannot clear and keeps a cleared one', (
   );
 });
 
+it('screens assigned values under prefixed credential key names', () => {
+  const facts = buildBriefingSnapshot([
+    {
+      ...session(0),
+      title: 'MYSQL_' + 'PWD=' + 'hunter' + '2',
+      briefing_excerpt: {
+        messageId: 'done',
+        completedAt: '2026-10-28T07:00:00.000Z',
+        text:
+          'Configured DB_' + 'PASS=' + 'hunter' + '2 and ' + 'redispassphrase=' + 'hunter' + '2.',
+      },
+    },
+  ]);
+  expect(JSON.stringify(facts)).not.toContain('hunter' + '2');
+  expect(facts.sessions[0]?.title).toBe('[redacted credential]');
+  expect(facts.sources.find(source => source.kind === 'activity')?.excerpt).toContain(
+    '[redacted credential]'
+  );
+});
+
 it('counts a verified pull request once across selected sessions', () => {
   const facts = buildBriefingSnapshot(
     [0, 1].map(index => ({

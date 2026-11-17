@@ -1,6 +1,5 @@
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
-import * as WebBrowser from 'expo-web-browser';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -47,13 +46,13 @@ const mockedBack = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   LineChart: 'LineChart',
   MessageSquare: 'MessageSquare',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
+  Sparkles: 'Sparkles',
   User: 'User',
 }));
 vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
@@ -61,7 +60,6 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({
-  PRIVACY_URL: 'https://kilo.ai/privacy-app',
   WEB_BASE_URL: 'https://kilo.ai',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -221,6 +219,15 @@ describe('ConsentCard', () => {
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+
+    // The feature-rollout disclosure belongs to the required group, so it is
+    // visible before the user has to open the full details.
+    const rows = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ConsentRow'
+    );
+    const featureRow = rows.find(node => (node.props.title as string) === 'Feature rollout');
+    expect(featureRow).toBeDefined();
+    expect(featureRow?.props.description as string).toContain('PostHog');
   });
 
   it('names the brand with the header mark instead of repeating it as text', () => {
@@ -253,9 +260,81 @@ describe('ConsentCard', () => {
     expect(revoke.props.variant).toBe('outline-destructive');
   });
 
-  it('defaults the optional switch to on', () => {
+  it('defaults the optional switch to on', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('starts the switch from the choice an older consent record carries', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: false,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    // Accepting the updated disclosure keeps the choice the user already made.
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', false);
+  });
+
+  it('keeps an on choice carried from an older consent record', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: true,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('keeps an onboarding toggle made before the account id resolves', async () => {
+    currentUserId.value = undefined;
+    const load = Promise.withResolvers<{
+      mandatory: boolean;
+      optional: boolean;
+      previousOptional?: boolean;
+    }>();
+    mockedReadConsent.mockReturnValue(load.promise);
+
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    // No account id yet, so nothing has been read: the switch stays operable and
+    // its position is the user's own answer.
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    const sw = singleSwitch(renderer.root);
+    expect(sw.props.value).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      (sw.props.onValueChange as (v: boolean) => void)(false);
+    });
+
+    // The account id resolves, and then the stored record arrives carrying the
+    // opposite choice.
+    currentUserId.value = 'test-user-1';
+    await act(async () => {
+      renderer.update(createElement(ConsentCard, { mode: 'onboarding' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      load.resolve({ mandatory: false, optional: false, previousOptional: true });
+      await Promise.resolve();
+    });
+    await act(flush);
+
+    // The user's toggle survives the late read.
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
   });
 
   it('keeps the privacy line clear of the pinned actions', () => {
@@ -288,6 +367,7 @@ describe('ConsentCard', () => {
 
   it('accepts with optional on when the switch is untouched', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
@@ -298,6 +378,7 @@ describe('ConsentCard', () => {
 
   it('calls acceptConsent with optional value on primary action', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const sw = singleSwitch(renderer.root);
     await act(async () => {
       await Promise.resolve();
@@ -406,10 +487,13 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(false);
   });
 
-  it('does not call readConsent in onboarding mode', async () => {
-    mountCard('onboarding');
+  it('reads the stored choice in onboarding so an older record can carry it', async () => {
+    const renderer = mountCard('onboarding');
     await act(flush);
-    expect(mockedReadConsent).not.toHaveBeenCalled();
+
+    expect(mockedReadConsent).toHaveBeenCalledWith('test-user-1');
+    // No older record: onboarding keeps its on-by-default.
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
   it('clears error when optional toggle succeeds after a prior failure', async () => {
@@ -549,8 +633,8 @@ describe('ConsentCard', () => {
     }
   });
 
-  it('gives the pinned disclosure privacy link a full target and opens the policy', async () => {
-    vi.mocked(WebBrowser.openBrowserAsync).mockClear();
+  it('gives the pinned disclosure privacy link a full target and opens the policy natively', async () => {
+    mockedPush.mockClear();
     const links = (['onboarding', 'review'] as const).map(mode => {
       const root = mountCard(mode).root;
       const found = root.findAll(
@@ -586,8 +670,10 @@ describe('ConsentCard', () => {
       }
     });
 
-    const openBrowser = vi.mocked(WebBrowser.openBrowserAsync);
-    expect(openBrowser).toHaveBeenCalledTimes(2);
-    expect(openBrowser).toHaveBeenCalledWith('https://kilo.ai/privacy-app');
+    expect(mockedPush).toHaveBeenCalledTimes(2);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 });

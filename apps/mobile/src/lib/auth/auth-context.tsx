@@ -23,7 +23,13 @@ import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
-import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import {
+  clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot,
+  setCurrentDeepLinkUserId,
+  setPendingDeepLink,
+} from '@/lib/deep-link-launch';
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
@@ -56,6 +62,7 @@ import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/prot
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
+import { clearEnvironmentChoices } from '@/lib/hooks/environment-choice';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
@@ -67,12 +74,8 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
-import { clearLastActiveInstance } from '@/lib/last-active-instance';
-import { clearLastRoute } from '@/lib/last-route';
-import { clearLastOpenedSession } from '@/lib/last-opened-session';
-import { clearLoginDrafts } from '@/lib/login-draft';
-import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
+import { retireLoginAttempt } from '@/lib/login-draft';
+import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
@@ -156,19 +159,6 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
- * independent: a throw in one must never abort the transition or reject
- * `signOut`, so each call site is guarded by this wrapper.
- */
-function runBestEffortTeardown(step: () => void): void {
-  try {
-    step();
-  } catch {
-    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -465,13 +455,33 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
+        // A Quick Action tapped while the app was signed out parks its launch
+        // URL natively, and the signed-in launcher mount is its only reader.
+        // Take the account-independent destination before the teardown below
+        // clears the launcher surfaces, and stage it for the account that just
+        // signed in, so the tap still lands where it points. The parked URL has
+        // no deadline while a captured link is live, so an occupied slot keeps
+        // the destination the person actually opened.
+        const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+        const parkedLaunchHref =
+          parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+        if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
+          setPendingDeepLink(parkedLaunchHref, 'universal-link');
+        }
+        // Every account boundary drops the session-scoped local state: trusted
+        // hosts, image confirms, media caches, temp copies, and the device-wide
+        // records that belong to an account (the OS launcher surfaces and the
+        // durable last-opened-session and last-route records). It runs in the
+        // same synchronous block as the token publish, ahead of every read a
+        // derived surface performs.
         clearSessionScopedState();
         // The sign-in form's drafts belong to the attempt that just succeeded,
         // whatever provider finished it; a later signed-out screen must not
-        // prefill the previous attempt's address or SSO banner.
-        clearLoginDrafts();
+        // prefill the previous attempt's address or SSO banner. The token is
+        // already published, so a keychain write that fails here may not undo
+        // the sign-in: the retirement is left as an obligation, reported, and
+        // retried on the sign-out path before that screen can draw.
+        await retireLoginAttempt();
       });
     },
     []
@@ -521,18 +531,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // synchronous; the persisted delete chains behind any in-flight persist.
       clearAccountBoundPendingDeepLink();
       try {
-        // Close ownership persistence before any await so a late list
-        // response cannot write the previous account's answer during
-        // teardown.
-        gateKiloClawOwned();
         // Record the branch that fired immediately before the logout event,
         // so exactly one row lands per actual sign-out — a deduped sign-out
         // returned above and writes nothing — and it is attributed to the
-        // user. A server-refused refresh is the only ended-session path.
-        reportAuthBranch({
-          cause,
-          branch: cause === 'session_ended' ? 'refresh_401' : 'explicit',
-        });
+        // user.
+        reportAuthBranch({ cause });
         // Capture the logout event before any telemetry teardown step.
         captureEvent(LOGOUT_EVENT);
         // Remote cleanup (session revoke + push unregister + tombstone)
@@ -613,8 +616,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // and an unknown one takes every chat rather than leaving one
             // account's conversations for the next person to sign in.
             clearChatsForSignOut(readCachedUserId(queryClient)),
-            clearLastActiveInstance(),
-            clearKiloClawOwned(),
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
@@ -641,6 +642,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // the next signed-in account.
           clearAgentModelPreference();
           clearRunOnDestinationPreference();
+          clearEnvironmentChoices();
           clearReasoningPreference();
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
@@ -656,15 +658,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
-          // The launcher surfaces belong to the signed-out account: drop the
-          // dynamic shortcuts/tile natively and the durable last-opened record,
-          // so the next account never sees the previous account's session.
-          // Both are synchronous best-effort clears, guarded so neither can
-          // throw into sign-out.
-          runBestEffortTeardown(clearLauncherSurfaces);
-          runBestEffortTeardown(clearLastOpenedSession);
-          runBestEffortTeardown(clearLastRoute);
         } finally {
+          /* Still inside the auth-transition run and ahead of the token
+             clearing below, so the signed-out login screen cannot mount, let
+             alone restore, before a retirement this process owes is retried.
+             It never rejects: a sign-out may not fail on a keychain write. */
+          await retireLoginAttempt();
           queryClient.clear();
           setSessionEnded(ended);
           setToken(undefined);
@@ -680,7 +679,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const handler = async () => {
       const outcome = await performRefresh();
 
-      if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+      if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
         setToken(outcome.token);
         // Invalidate all queries so failed authenticated work recovers
         // with the new token. UNAUTHORIZED errors have retry=0, so a
@@ -689,27 +688,23 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
-      // A refresh-token read that spent its budget on null while another
-      // member of the credential set is present is an unreadable credential
-      // read, not an absent session: never sign out, surface the existing
-      // retryable restore error, and record the branch. An EMPTY credential
-      // set is not an unreadable member — it is genuinely no session, and the
-      // bootstrap gate already routes to login — so it must never raise the
-      // restore error. A sign-out that owns the tree also owns this surface:
-      // its escape hatch already cleared the flag, and a deduped second
-      // sign-out (isSignedOutReference) would dead-end the overlay's Sign out.
+      // A reliable credential read found an access token and no refresh token:
+      // the set can never rotate, so the 401 ends the session for good, and
+      // ending it here once is what stops the retry loop. A 401 from a request
+      // that carried no bearer proves nothing about the stored token — the
+      // keychain could not supply one — so it leaves the session alone and the
+      // next authenticated request decides. An empty credential set is no
+      // session at all: the bootstrap gate already routes it to login, so it
+      // reaches neither branch here.
       if (
-        !outcome.ok &&
-        outcome.unreadable &&
-        outcome.presentKeys.length > 0 &&
+        outcome.kind === 'unrenewable' &&
+        isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
-        reportAuthBranch({
-          cause: 'credentials_unreadable',
-          branch: 'refresh_token_unreadable',
-          keyNames: outcome.presentKeys,
-        });
-        setRestoreFailed(true);
+        if (getActiveToken() === null) {
+          return;
+        }
+        await signOut(true, 'session_unrenewable');
         return;
       }
 
@@ -718,8 +713,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // refresh from an older session — so re-check before tearing down: a
       // newer session must not be signed out by an older refusal.
       if (
-        !outcome.ok &&
-        outcome.refused &&
+        outcome.kind === 'refused' &&
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
@@ -764,7 +758,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           const outcome = await performRefresh();
 
-          if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+          if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);
             return;
           }
@@ -777,12 +771,21 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // inside the refresh awaits, so a refusal from a superseded session
           // must not sign out the newer one.
           if (
-            !outcome.ok &&
-            outcome.refused &&
+            outcome.kind === 'refused' &&
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {
             await signOut(true, 'session_ended');
+          }
+          // A set that cannot rotate is a session that cannot outlive this
+          // token. End it now, once, instead of letting every later request
+          // fail against a token nothing can renew.
+          if (
+            outcome.kind === 'unrenewable' &&
+            isCurrentAuthEpoch(outcome.sessionVersion) &&
+            !isSignedOutReference.current
+          ) {
+            await signOut(true, 'session_unrenewable');
           }
         } catch {
           // A rejected expiry read (or refresh) must not escape as an

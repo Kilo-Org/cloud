@@ -6,6 +6,7 @@ import {
   formatPricePerToken,
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 
 type Pricing = CustomPricingTiers[number]['pricing'];
 
@@ -114,7 +115,12 @@ export function calculateTieredCost_mUsd(
   usage: JustTheCostsUsageStats
 ): number {
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
-  if (uncachedInputTokens < 0) {
+  // A model that keeps reporting impossible token counts would otherwise add one Sentry event per
+  // usage, so the anomaly reports once per model per window.
+  if (
+    uncachedInputTokens < 0 &&
+    claimReportWindow(`custom-pricing:negative-uncached:${modelId}`, Date.now())
+  ) {
     captureMessage('SUSPICIOUS: negative uncached input tokens for custom pricing', {
       level: 'error',
       tags: { source: 'usage_processing' },

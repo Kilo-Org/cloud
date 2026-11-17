@@ -77,10 +77,13 @@ vi.mock('@/lib/persist/use-draft-flush', () => ({ useDraftFlushOnBackground: () 
 
 type HookState = UseSessionSearchInputResult;
 const latest = { current: null as HookState | null };
+/** Every render's body-driving values, in commit order. */
+const renders: { restorePending: boolean; searchQuery: string }[] = [];
 
 function Probe(props: UseSessionSearchInputParams): ReactElement {
   const state = useSessionSearchInput(props);
   latest.current = state;
+  renders.push({ restorePending: state.restorePending, searchQuery: state.searchQuery });
   return createElement(SessionListSearchHeader, {
     inputRef: state.searchInputRef,
     hasText: state.hasText,
@@ -122,6 +125,7 @@ describe('useSessionSearchInput visible text', () => {
     input.focused = true;
     input.mounts.length = 0;
     latest.current = null;
+    renders.length = 0;
   });
   afterEach(() => {
     act(() => {
@@ -197,5 +201,94 @@ describe('useSessionSearchInput visible text', () => {
     expect(input.mounts.at(-1)?.defaultValue).toBe('');
     expect(hook().hasText).toBe(false);
     expect(hook().searchQuery).toBe('');
+    // The user's clear wins: no restore is pending, so the body stays on the
+    // cleared (no-query) state instead of loading for a draft it will ignore.
+    expect(hook().restorePending).toBe(false);
+  });
+
+  it('reports a pending restore until the saved search reaches the query state', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    expect(hook().restorePending).toBe(true);
+    expect(hook().searchQuery).toBe('');
+
+    // The draft settles. The seed lands in the render after this one, so that
+    // render still carries an empty query and a pending restore: a list body
+    // that read the query there would paint the no-query state and replace it
+    // one frame later.
+    renders.length = 0;
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: 'Zebra', restoreSettled: true })
+      );
+    });
+    expect(renders).toContainEqual({ restorePending: true, searchQuery: '' });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('Zebra');
+    expect(hook().hasText).toBe(true);
+    expect(input.mounts.at(-1)?.defaultValue).toBe('Zebra');
+  });
+
+  it('clears the pending restore when an empty saved draft settles', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    expect(hook().restorePending).toBe(true);
+
+    // The saved draft is empty (a clear the last mount persisted). Nothing the
+    // seed writes changes this render's values, so the flag alone has to end
+    // the loading body; otherwise the screen waits for a render that never
+    // comes.
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '', restoreSettled: true })
+      );
+    });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('');
+    expect(hook().hasText).toBe(false);
+  });
+
+  it('does not wait on the draft once the user types', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      hook().handleSearchInputChange('Zeb');
+    });
+    expect(hook().restorePending).toBe(false);
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: 'Zebra', restoreSettled: true })
+      );
+    });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('');
+  });
+
+  it('commits a restored whitespace-only draft as no search and keeps the spaces visible', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '     ', restoreSettled: true })
+      );
+    });
+
+    // Typing five spaces commits '' and lists every session; the restored
+    // draft must commit the same query, or the list reads as empty while the
+    // field looks blank.
+    expect(hook().searchQuery).toBe('');
+    expect(input.mounts.at(-1)?.defaultValue).toBe('     ');
+    expect(hook().hasText).toBe(true);
+    expect(hook().awaitingCommit).toBe(false);
+  });
+
+  it('commits a restored padded draft as its trimmed term and keeps the padding visible', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '  alpha ', restoreSettled: true })
+      );
+    });
+
+    expect(hook().searchQuery).toBe('alpha');
+    expect(input.mounts.at(-1)?.defaultValue).toBe('  alpha ');
+    expect(hook().hasText).toBe(true);
+    expect(hook().awaitingCommit).toBe(false);
   });
 });

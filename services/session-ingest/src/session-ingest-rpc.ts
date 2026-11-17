@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   activeOrganizationJoinCondition,
+  hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -34,6 +35,10 @@ import {
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
+  publishCloudAgentSessionStatusSchema,
+  type PublishCloudAgentSessionStatusParams,
+  recordCloudAgentSessionHarnessSchema,
+  type RecordCloudAgentSessionHarnessParams,
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
@@ -114,6 +119,7 @@ import {
   beginWorktreeDeletion,
   recordWorktreeCleanup,
   completeWorktreeDeletion,
+  deleteWorktreeContent,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
@@ -126,7 +132,9 @@ import {
   HostedWorkspaceSessionDeleteError,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
+import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
+import { applyMetadataChanges } from './ingest/metadata';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -263,6 +271,14 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     );
   }
 
+  async deleteCloudAgentWorktreeContent(params: CloudAgentWorktreeDeletionParams) {
+    return deleteWorktreeContent(
+      this.env,
+      cloudAgentWorktreeDeletionSchema.parse(params),
+      this.ctx
+    );
+  }
+
   async canDestroyCloudAgentWorktreeSandbox(params: CanDestroyCloudAgentWorktreeSandboxParams) {
     return canDestroyWorktreeSandbox(
       this.env,
@@ -302,7 +318,49 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: CreateSessionForCloudAgentParams
   ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+
+    // The row and its worktree both carry this organization, so the create
+    // confirms the acting user may act for it before any attribution. The
+    // check runs before the clone so a refused create leaves no destination
+    // work behind.
+    if (parsed.organizationId !== undefined) {
+      const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      if (
+        !(await hasOrganizationAccess(db, {
+          kiloUserId: parsed.kiloUserId,
+          organizationId: parsed.organizationId,
+        }))
+      ) {
+        return { status: 'rejected', code: 'organization_access_denied' };
+      }
+    }
+
     const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
+
+    // Require available ingest storage before any clone or row write, so the
+    // caller learns the destination cannot accept data instead of receiving a
+    // ready result it cannot use. A probe error keeps create available.
+    let destinationRetired = false;
+    try {
+      destinationRetired = await withDORetry(
+        () =>
+          getSessionIngestDO(this.env, {
+            kiloUserId: parsed.kiloUserId,
+            sessionId: parsed.sessionId,
+          }),
+        stub => stub.isDeleted(),
+        'SessionIngestDO.isDeleted'
+      );
+    } catch (error) {
+      console.error('Failed to probe destination availability before Cloud Agent session create', {
+        kiloUserId: parsed.kiloUserId,
+        sessionId: parsed.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (destinationRetired) {
+      return { status: 'rejected', code: 'session_retired' };
+    }
 
     let copiedItemCount = 0;
     if (parsed.cloneFromKiloSessionId !== undefined) {
@@ -549,6 +607,31 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const existing = rows[0];
     if (!existing) return 'missing';
     return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
+  }
+
+  async publishCloudAgentSessionStatus(
+    params: PublishCloudAgentSessionStatusParams
+  ): Promise<void> {
+    const input = publishCloudAgentSessionStatusSchema.parse(params);
+    await applyMetadataChanges(
+      this.env,
+      input.kiloUserId,
+      input.sessionId,
+      new Map([
+        ['status', input.status],
+        ['statusOccurredAt', input.occurredAt],
+        ['statusTransitionId', input.transitionId],
+      ]),
+      this.ctx,
+      input.cloudAgentSessionId
+    );
+  }
+
+  async recordCloudAgentSessionHarness(
+    params: RecordCloudAgentSessionHarnessParams
+  ): Promise<boolean> {
+    const input = recordCloudAgentSessionHarnessSchema.parse(params);
+    return setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
   async setGeneratedTitleForCloudAgent(params: {

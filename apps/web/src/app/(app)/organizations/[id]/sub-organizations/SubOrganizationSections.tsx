@@ -218,7 +218,9 @@ export function PeopleSection({ data }: { data: People }) {
         <CardHeader>
           <CardTitle>People by sub-organization</CardTitle>
           <CardDescription>
-            Direct memberships remain independent in every organization.
+            Users with administrative permissions in the parent organization retain those
+            permissions in its sub-organizations, regardless of whether they have a direct
+            membership.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -229,7 +231,7 @@ export function PeopleSection({ data }: { data: People }) {
                 <TableHead className="text-right">Members</TableHead>
                 <TableHead className="text-right">Pending invites</TableHead>
                 <TableHead className="text-right">Seats</TableHead>
-                <TableHead>Owners</TableHead>
+                <TableHead>Direct owners</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -244,7 +246,7 @@ export function PeopleSection({ data }: { data: People }) {
                     {child.seatCount.used} / {child.seatCount.total}
                   </TableCell>
                   <TableCell className="max-w-64 truncate">
-                    {child.owners.map(owner => owner.name).join(', ') || 'No owner'}
+                    {child.owners.map(owner => owner.name).join(', ') || 'No direct owner'}
                   </TableCell>
                 </TableRow>
               ))}

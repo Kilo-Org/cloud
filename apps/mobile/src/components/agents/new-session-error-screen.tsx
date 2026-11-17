@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { clearSharePayload } from '@/lib/share-payload';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +55,7 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
               router.back();
               return;
             }
-            router.replace(AGENTS_SESSIONS_HREF);
+            router.replace(AGENTS_SESSIONS_INDEX_HREF);
           }}
         >
           <Text className="text-sm font-semibold text-foreground">{t('common.back')}</Text>

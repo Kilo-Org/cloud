@@ -7,7 +7,6 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
@@ -78,12 +77,7 @@ export async function observeWatchPrWebhook(input: {
       candidate.repositoryAccess === 'all' ||
       (candidate.repositoryAccess === 'selected' &&
         candidate.repositories?.some(repo => String(repo.id) === event.repositoryId));
-    if (
-      !ownerMatches ||
-      !repositoryAllowed ||
-      !(await isReleaseToggleEnabled('cloud-agent-watch-pr', watch.kilo_user_id))
-    )
-      continue;
+    if (!ownerMatches || !repositoryAllowed) continue;
     try {
       await assertGitHubInstallationRuntimeAuthorized(
         event.installationId,

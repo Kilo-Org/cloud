@@ -16,16 +16,6 @@ describe('cloud data export UI flag', () => {
     jest.clearAllMocks();
   });
 
-  it('uses the same email distinct ID as browser PostHog identification', async () => {
-    mockGetFeatureFlag.mockResolvedValue(true);
-
-    await expect(isCloudDataExportUIEnabled('export-user@example.com')).resolves.toBe(true);
-    expect(mockGetFeatureFlag).toHaveBeenCalledWith(
-      'cloud-data-export-ui',
-      'export-user@example.com'
-    );
-  });
-
   it.each([false, undefined, 'enabled'])('fails closed for %s', async value => {
     mockGetFeatureFlag.mockResolvedValue(value);
 

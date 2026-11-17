@@ -32,6 +32,12 @@ type ProbeEnv = Readonly<{
   platform: string;
   osVersion: string;
   route: string;
+  /**
+   * The focused route with its groups. A URL drops every group segment, so
+   * every tab of a tab navigator reports the same route (`/`); this key names
+   * the screen the platform has on top.
+   */
+  screen: string;
   window: Readonly<{ width: number; height: number }>;
   pixelRatio: number;
   fontScale: number;
@@ -48,6 +54,7 @@ type ProbeDump = Readonly<{ version: 1; env: ProbeEnv; nodes: readonly ProbeNode
 type ProbeSource = Readonly<{
   document: () => Document | null;
   route: () => string;
+  screen: () => string;
   safeArea: () => Insets;
 }>;
 
@@ -57,6 +64,7 @@ function environment(source: ProbeSource): ProbeEnv {
     platform: Platform.OS,
     osVersion: String(Platform.Version),
     route: source.route(),
+    screen: source.screen(),
     window: { width: window.width, height: window.height },
     pixelRatio: PixelRatio.get(),
     fontScale: PixelRatio.getFontScale(),
@@ -109,7 +117,13 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
     ready: () => source.document() !== null,
     dump: () => JSON.stringify(snapshot()),
     startSampling: (intervalMs, maxMs) => {
-      sampler.start(intervalMs, maxMs);
+      // One in-app sample walks and serializes the whole document twice.
+      // Measured on the emulator: ~150 ms per tick on a mid-size screen, so a
+      // 120 ms cadence asks for more than the JS thread has and the app cannot
+      // finish hydrating while a cell samples it — the gate then measures a
+      // screen stuck on its own loading skeleton. The device never samples
+      // faster than it can measure.
+      sampler.start(Math.max(intervalMs, 250), maxMs);
     },
     stopSampling: () => JSON.stringify({ samples: sampler.stop(), truncated: sampler.truncated() }),
     dispose: () => {

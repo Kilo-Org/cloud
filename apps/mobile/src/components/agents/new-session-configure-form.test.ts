@@ -10,12 +10,13 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import '@/i18n';
+import { i18n as appI18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -54,8 +55,6 @@ const keyboardSubscribers = vi.hoisted(() => ({
   show: null as (() => void) | null,
   hide: null as (() => void) | null,
 }));
-// The base cell's window; a case can swap in a short one.
-const windowSize = vi.hoisted(() => ({ width: 411, height: 891 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The profile row and the environment row render the reanimated `Skeleton`
@@ -89,7 +88,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
-  useWindowDimensions: () => ({ ...windowSize, scale: 1, fontScale: 1 }),
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -129,6 +127,14 @@ vi.mock('@/components/agents/folder-selector', () => ({
 
 vi.mock('@/components/agents/new-session-start-button', () => ({
   NewSessionStartButton: 'NewSessionStartButton',
+}));
+
+// The lift renders the form's body and pinned footer inside one animated
+// container and reads the keyboard's motion value, which needs the app's
+// KeyboardMotionProvider; the tree assertions only need its position, so the
+// string host keeps them type-exact without the animation stack.
+vi.mock('@/components/keyboard-lift-view', () => ({
+  KeyboardLiftView: 'KeyboardLiftView',
 }));
 
 vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
@@ -325,11 +331,13 @@ function defaultProps() {
     isFetchingInstances: false,
     onRefreshInstances: vi.fn(),
     onChangeRunOnInstance: vi.fn(),
+    pendingComputer: false,
     showInstanceDisconnectedNote: false,
     folderPath: '',
     onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
+    repositoryRegionSettled: true,
     onChangeRepo: vi.fn(),
     onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
@@ -406,7 +414,7 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollBody).not.toBeNull();
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
-    const lift = findElement(element, 'KeyboardAvoidingView');
+    const lift = findElement(element, 'KeyboardLiftView');
     expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
 
     // Switching the target to a computer must not surface the stale failure.
@@ -433,19 +441,73 @@ describe('NewSessionConfigureForm', () => {
     // A three-line explanation in the pinned footer shrinks the scroll frame
     // and cuts the launch folder on a compact screen, so the body carries it.
     const scrollBody = findElement(element, 'ScrollView');
-    expect(findElementByComponent(scrollBody, NewSessionPlanRefusal)).toMatchObject({
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
       message: 'The organization trial has ended.',
     });
     // The footer keeps only the start-blocked reason (its own component): the
     // refusal must not take height from the form a second time. The pinned
-    // footer is the KeyboardAvoidingView's second child, after the scroll body,
-    // and it must be found for the negative assertion to mean anything.
-    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    // footer is the lift's second child, after the scroll body, and it must be
+    // found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardLiftView');
     const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
-    expect(findElementByComponent(footer, NewSessionPlanRefusal)).toBeNull();
+    expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The reported build: a repository is resolved, the prompt is typed, the
+    // attachment chip already shows its uploaded file, and the upload flag is
+    // still true. Start stays disabled with a prompt on screen, so the footer
+    // has to say what it waits for.
+    const reason = resolveNewSessionStartBlockedReason({
+      entry: 'new-session',
+      hasRepositories: true,
+      hasConnectableProvider: false,
+      isLoadingRepositories: false,
+      isRemoteTargetSelected: false,
+      selectedRepo: 'org/repo',
+      hasAttachments: true,
+      selectedRepositoryResolved: true,
+      gate: {
+        attachmentsHasFailed: false,
+        attachmentsIsUploading: true,
+        hasPrompt: true,
+        isCreating: false,
+        isRemoteTargetSelected: false,
+        isSubmitting: false,
+        model: 'claude-opus-4-7',
+        isProfileLoading: false,
+      },
+    });
+    expect(reason).toBe('attachment-uploading');
+
+    // The footer names the escape the chip offers — dropping the attachment
+    // starts the session without it — while the composer keeps its own copy for
+    // the send it refuses to make.
+    const copy = appI18n.t('agentChat.newSession.attachmentUploadingToStart');
+    expect(copy).toBe('An attachment is still uploading. Remove it to start without it.');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      selectedRepo: 'org/repo',
+      isStartDisabled: true,
+      startBlockedReason: copy,
+    }) as Node;
+
+    // The reason rides the lift with Start, not the scroll body above it, so
+    // the keyboard cannot hide the explanation and the control together.
+    const lift = findElement(element, 'KeyboardLiftView');
+    expect(findElementByType(lift, 'NewSessionStartButton')).toMatchObject({
+      isStartDisabled: true,
+      startBlockedReason: copy,
+      // These reasons are a wait or a file fix; neither needs a second control.
+      startBlockedAction: null,
+    });
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -609,12 +671,63 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
+    // The bound instance already runs Kilo, and the Run on row and the Folder
+    // field above already name the computer, its project and its folder, so the
+    // slot stays empty instead of repeating them.
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(false);
+  });
+
+  // ── Case 3b: a refused spawn resets the target, and the disconnected note owns the copy ──
+  it('leaves the disconnected note alone after a refused spawn resets the computer target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: true,
+      showInstanceDisconnectedNote: true,
+    }) as Node;
+
+    expect(
+      findTextContent(element, t =>
+        t.includes('The selected instance disconnected. Start a session on Cloud Agent')
+      )
+    ).toBe(true);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+  });
+
+  // ── Case 3c: the unbound computer target keeps the setup sentence ──
+  it('keeps the setup sentence while the computer target has no instance bound', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: true,
+    }) as Node;
+
     expect(
       findTextContent(
         element,
         t => t === 'To run on your computer, start Kilo there and leave it running.'
       )
     ).toBe(true);
+    expect(findElementByType(element, 'LaunchFolderField')).not.toBeNull();
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -1048,8 +1161,34 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──
-  it('renders the plain help sentence for a remote target and never for the cloud target', async () => {
+  it('holds the rows below the repository section until its final height is known', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unsettled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: false,
+    }) as Node;
+
+    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
+    expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const settled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: true,
+    }) as Node;
+
+    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
+    expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
+  });
+
+  // ── Case 12: the Run on helper sentence stays in plain language, and only under an unbound computer target ──
+  it('renders the plain help sentence for an unbound computer target and never for a bound instance or the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -1070,20 +1209,33 @@ describe('NewSessionConfigureForm', () => {
     }
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
+    // The sentence answers "how do I get a computer connected", so it belongs
+    // to the computer target that has none yet.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unboundComputer = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: false,
+    }) as Node;
+    expect(findTextContent(unboundComputer, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(unboundComputer, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    expect(findTextContent(unboundComputer, t => t.includes('`'))).toBe(false);
+
+    // A bound instance needs no setup sentence: it is already running Kilo.
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
       ...defaultProps(),
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
-    for (const term of cliTerms) {
-      expect(
-        findTextContent(remote, t => t.includes(term)),
-        term
-      ).toBe(false);
-    }
-    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(false);
+    expect(findTextContent(remote, t => t === 'laptop on kilo')).toBe(false);
   });
 
   // ── Case 13: reorder wiring lock ──
@@ -1128,37 +1280,5 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
-  });
-
-  // ── Case 15: the scroll frame is measured and handed to the prompt ──
-  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    // The ScrollView reports its height so the prompt can yield its floor to it.
-    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
-    // The mocked useState holds the initial measurement (0) and never setStates.
-    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
-  });
-
-  // ── Case 16: a short window lowers the prompt's floor ──
-  it("asks the prompt for one line on a window too short for the form's first screenful", async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    windowSize.width = 360;
-    windowSize.height = 640;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-      // Start needs a repository, so the picker below the card must stay on the
-      // first screenful of the 360x640 compact cell.
-      expect(findElementByType(element, 'NewSessionPrompt')?.lineCount).toBe(1);
-    } finally {
-      windowSize.width = 411;
-      windowSize.height = 891;
-    }
   });
 });

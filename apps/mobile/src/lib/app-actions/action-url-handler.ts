@@ -60,9 +60,11 @@ export function handleAppActionPath({
     return true;
   }
   if (!opensDestination(resolved)) {
-    // A session destination the route cannot open is not a destination: the
+    // A session destination the route cannot address is not a destination: the
     // same rule `deep-link-handler.ts` applies, so a hand-built action URL
-    // cannot replace the current screen with the composer. Nothing opens.
+    // cannot replace the current screen with a screen that cannot exist. An
+    // addressable id that does not resolve still opens; the route shows its
+    // not-found state for it.
     return true;
   }
   if (initial ? !wasLaunchLinkHandled() : true) {

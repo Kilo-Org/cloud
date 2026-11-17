@@ -73,6 +73,22 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.settings.updateGatewaySettings': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
+  // Stores a raw GitHub credential as the user's personal identity.
+  'githubApps.provideUserToken': true,
+  // "Start fresh" irreversibly discards a workspace's changes behind an in-app confirmation.
+  'cloudAgentNext.removeWorkspaceSnapshot': true,
+  'organizations.cloudAgentNext.removeWorkspaceSnapshot': true,
+  // Artifact deletion confirms per file and treats the expected hash as a staleness guard,
+  // so an MCP caller must not bypass that in-app confirmation.
+  'cloudAgentNext.deleteWorkspaceArtifact': true,
+  'organizations.cloudAgentNext.deleteWorkspaceArtifact': true,
+  // Sharing a Claude payer binds a paid Claude organization to another Kilo scope.
+  'claudeBilling.share': true,
+  'claudeBilling.sharePersonal': true,
+  // Mints a one-time token for a page the native app opens in its in-app browser. The
+  // token is only useful with the browser that receives the shell cookie, so it is an
+  // app-internal hand-off, not an API for agents.
+  'appShell.mintHandoff': true,
 };
 
 /**

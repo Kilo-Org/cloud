@@ -16,6 +16,8 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
+import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -292,15 +294,13 @@ describe('convertProviderOptions', () => {
 const unrestrictedRouting = {
   requestedModel: 'anthropic/claude-sonnet-4.5',
   boundedSpending: false,
-  organizationDisabledVercelAiGateway: false,
 };
 
 describe('shouldRouteToVercel', () => {
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
+  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelEnabled: options?.enabled ?? true,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
       })),
     }));
@@ -344,22 +344,12 @@ describe('shouldRouteToVercel', () => {
     );
   });
 
-  it('routes eligible traffic to Vercel without per-user randomization when switched on', async () => {
+  it('routes eligible traffic to Vercel without per-user randomization', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(shouldRouteToVercel(unrestrictedRouting, async () => undefined)).resolves.toBe(
       true
     );
-  });
-
-  it('does not route to Vercel or resolve provider policy when switched off', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel({ enabled: false });
-    const getRoutingProviderConfig = jest.fn(async () => undefined);
-
-    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
-      false
-    );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
   it('does not resolve provider policy for models opted out of Vercel routing', async () => {
@@ -369,19 +359,6 @@ describe('shouldRouteToVercel', () => {
     await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
       false
     );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
-  });
-
-  it('leaves an organization that disabled the Vercel AI Gateway on OpenRouter', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel();
-    const getRoutingProviderConfig = jest.fn(async () => undefined);
-
-    await expect(
-      shouldRouteToVercel(
-        { ...unrestrictedRouting, organizationDisabledVercelAiGateway: true },
-        getRoutingProviderConfig
-      )
-    ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
@@ -396,6 +373,61 @@ describe('shouldRouteToVercel', () => {
       )
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+
+  describe('with OpenRouter disabled', () => {
+    const openRouterDisabled = { ...unrestrictedRouting, openRouterDisabled: true };
+
+    it('routes a model opted out of Vercel routing to Vercel', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(shouldRouteToVercel(openRouterDisabled, async () => undefined)).resolves.toBe(
+        true
+      );
+    });
+
+    it('still honors the opt-out list when OpenRouter is not disabled', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(
+          { ...unrestrictedRouting, openRouterDisabled: false },
+          async () => undefined
+        )
+      ).resolves.toBe(false);
+    });
+
+    it('leaves a spend-bounded request off Vercel', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+      const getRoutingProviderConfig = jest.fn(async () => undefined);
+
+      await expect(
+        shouldRouteToVercel(
+          { ...openRouterDisabled, boundedSpending: true },
+          getRoutingProviderConfig
+        )
+      ).resolves.toBe(false);
+      expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+    });
+
+    it('does not route a model Vercel does not serve', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(
+          { ...openRouterDisabled, requestedModel: 'vendor/unknown-model' },
+          async () => undefined
+        )
+      ).resolves.toBe(false);
+    });
+
+    it('still applies the resolved provider policy', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(openRouterDisabled, async () => ({ only: ['google-vertex'] }))
+      ).resolves.toBe(false);
+    });
   });
 });
 
@@ -442,6 +474,138 @@ describe('canRouteToVercel', () => {
         ignore: ['amazon-bedrock'],
       }))
     ).resolves.toBe(true);
+  });
+});
+
+describe('isValidVercelModelId', () => {
+  async function loadIsValidVercelModelId({
+    vercelModelIds,
+    openRouterModelIds = [],
+    overrides = [],
+    aliases = {},
+  }: {
+    vercelModelIds: string[];
+    openRouterModelIds?: string[];
+    overrides?: [string, string][];
+    aliases?: Record<string, string>;
+  }) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      isValidOpenRouterModelId: jest.fn(
+        async (modelId: string) =>
+          legacyOpenRouterAliases.has(modelId) || openRouterModelIds.includes(modelId)
+      ),
+    }));
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
+      const actual = jest.requireActual<typeof MapModelIdToVercelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+      );
+      const overrideMap = new Map(overrides);
+      return {
+        ...actual,
+        getVercelModelIdOverrides: jest.fn(async () => overrideMap),
+        mapModelIdToVercel: jest.fn(async (modelId: string) =>
+          actual.mapResolvedModelIdToVercel(aliases[modelId] ?? modelId, overrideMap)
+        ),
+      };
+    });
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .isValidVercelModelId;
+  }
+
+  it('accepts a model whose Vercel id is listed and rejects one that is not', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['alibaba/qwen3.5-flash'],
+    });
+
+    await expect(isValidVercelModelId('qwen/qwen3.5-flash')).resolves.toBe(true);
+    await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(false);
+  });
+
+  it.each([
+    ['zai/glm-5', 'z-ai/glm-5'],
+    ['alibaba/qwen3-coder', 'qwen/qwen3-coder'],
+    ['mistral/mistral-small', 'mistralai/mistral-small'],
+    ['spacexai/grok-5', 'x-ai/grok-5'],
+    ['bytedance/seed-2.0', 'bytedance-seed/seed-2.0'],
+  ])('rejects the raw Vercel id %s but accepts %s', async (vercelId, kiloId) => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: [vercelId],
+      openRouterModelIds: [kiloId],
+    });
+
+    await expect(isValidVercelModelId(vercelId)).resolves.toBe(false);
+    await expect(isValidVercelModelId(kiloId)).resolves.toBe(true);
+  });
+
+  it('accepts a Vercel-only model under its OpenRouter-style id only', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-vercel-only', 'reflection/beta'],
+    });
+
+    await expect(isValidVercelModelId('z-ai/glm-vercel-only')).resolves.toBe(true);
+    await expect(isValidVercelModelId('zai/glm-vercel-only')).resolves.toBe(false);
+    await expect(isValidVercelModelId('reflection/beta')).resolves.toBe(true);
+  });
+
+  it('rejects the Vercel id an override maps to', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['meta/muse-wonder-1.0'],
+      openRouterModelIds: ['meta/muse-wonder'],
+      overrides: [['meta/muse-wonder', 'meta/muse-wonder-1.0']],
+    });
+
+    await expect(isValidVercelModelId('meta/muse-wonder')).resolves.toBe(true);
+    await expect(isValidVercelModelId('meta/muse-wonder-1.0')).resolves.toBe(false);
+  });
+
+  it('accepts every Kilo id that shares a Vercel model', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['anthropic/claude-haiku-4.5'],
+      openRouterModelIds: ['anthropic/claude-haiku-4.5'],
+      overrides: [['anthropic/claude-haiku-4-5', 'anthropic/claude-haiku-4.5']],
+    });
+
+    await expect(isValidVercelModelId('anthropic/claude-haiku-4-5')).resolves.toBe(true);
+    await expect(isValidVercelModelId('anthropic/claude-haiku-4.5')).resolves.toBe(true);
+  });
+
+  it.each(['zai/glm-5.3', 'zai/glm-5.3-flash'])(
+    'accepts the retained legacy alias %s that uses the Vercel spelling',
+    async modelId => {
+      const isValidVercelModelId = await loadIsValidVercelModelId({ vercelModelIds: [modelId] });
+
+      await expect(isValidVercelModelId(modelId)).resolves.toBe(true);
+    }
+  );
+
+  it('accepts a retained legacy alias that an override also targets', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['nvidia/nemotron-3.5-lightning-free'],
+      openRouterModelIds: ['nvidia/nemotron-3.5-lightning:free'],
+      overrides: [['nvidia/nemotron-3.5-lightning:free', 'nvidia/nemotron-3.5-lightning-free']],
+    });
+
+    await expect(isValidVercelModelId('nvidia/nemotron-3.5-lightning:free')).resolves.toBe(true);
+    await expect(isValidVercelModelId('nvidia/nemotron-3.5-lightning-free')).resolves.toBe(true);
+  });
+
+  it('accepts a latest alias that resolves to a model Vercel serves', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-5'],
+      openRouterModelIds: ['~z-ai/glm-latest', 'z-ai/glm-5'],
+      aliases: { '~z-ai/glm-latest': 'z-ai/glm-5' },
+    });
+
+    await expect(isValidVercelModelId('~z-ai/glm-latest')).resolves.toBe(true);
+  });
+
+  it("assumes a model is valid while Vercel's model list is unavailable", async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({ vercelModelIds: [] });
+
+    await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(true);
+    await expect(isValidVercelModelId('zai/glm-5')).resolves.toBe(true);
   });
 });
 
@@ -1065,5 +1229,74 @@ describe('isVercelRoutingOptOut', () => {
 
     expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
     expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
+  });
+});
+
+describe('getUsageEndpointGatewayOptions', () => {
+  async function loadGetOptions(vercelInferenceProviders: string[] | null) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+      getVercelModelsFromDatabase: jest.fn(),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .getUsageEndpointGatewayOptions;
+  }
+
+  it("applies the request's ignore list to Kilo's route", async () => {
+    const getOptions = await loadGetOptions(['openai', 'azure']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { ignore: ['openai'], order: ['azure'] },
+        dataRegion: 'eu',
+      })
+    ).resolves.toEqual({
+      only: ['azure'],
+      order: ['azure'],
+      zeroDataRetention: undefined,
+      disallowPromptTraining: undefined,
+      inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+    });
+  });
+
+  it("translates TypeSafe's OpenRouter slug in the provider allow-list", async () => {
+    const getOptions = await loadGetOptions(['typesafe-ai', 'digitalocean']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'typesafe-ai/jev',
+        userByok: null,
+        provider: { only: ['typesafe'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ only: ['typesafe-ai'] });
+  });
+
+  it('drops an ignored provider key unless it is the last one', async () => {
+    const getOptions = await loadGetOptions(null);
+    const userByok = [
+      { decryptedAPIKey: 'sk-openai', providerId: 'openai' },
+      { decryptedAPIKey: 'sk-mistral', providerId: 'mistral' },
+    ] as const;
+
+    const some = await getOptions({
+      vercelModelId: 'openai/text-embedding-3-small',
+      userByok: [...userByok],
+      provider: { ignore: ['openai'] },
+      dataRegion: 'eu',
+    });
+    expect(some.only).toEqual(['mistral']);
+    expect(some).not.toHaveProperty('inferenceRegion');
+
+    const all = await getOptions({
+      vercelModelId: 'openai/text-embedding-3-small',
+      userByok: [userByok[0]],
+      provider: { ignore: ['openai'] },
+      dataRegion: null,
+    });
+    expect(all.only).toEqual(['openai']);
   });
 });

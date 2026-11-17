@@ -284,6 +284,85 @@ export function resolvePrefillRepo(
 }
 
 /**
+ * Whether a route prefill can still select a repository, so the new-session
+ * form must not treat its repository region as final.
+ *
+ * Only a prefill that names a repository seeds one, and it can only land while
+ * a provider query is still in flight: `useNewSessionPrefillTargets` seeds in
+ * the render `reposSettled` turns true, which needs every query to finish
+ * without error and the lists to have rows. Once the queries resolve, a prefill
+ * the lists cannot satisfy — a failed query, a disconnected provider, an empty
+ * account — never seeds, so the region must settle rather than hold the form's
+ * rows off and leave the repository section without its retry controls.
+ * Without a request in the route, a form with rows and no selection is already
+ * final — nothing will arrive later.
+ *
+ * The signal it reads is the region's BOUNDED one, so a list that never answers
+ * cannot withhold the form's rows on a prefilled entry either. A request the
+ * lists cannot answer before the bound expires is given up instead of deferred;
+ * `shouldAbandonRepoSeed` is that decision, and it runs before the seed so a
+ * late answer cannot mount a repository the region already painted without.
+ */
+export function isRepoSeedPending(input: {
+  /** The repository the route asked for, if any. */
+  prefillRepo: string | undefined;
+  /** Whether the seed has already run for this mount. */
+  applied: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /**
+   * Whether the repository region may stop withholding its rows: every provider
+   * query finished its first load, or the settle bound expired while one was
+   * still loading. A paused or disabled query counts as resolved.
+   */
+  providerQueriesResolved: boolean;
+}): boolean {
+  return (
+    input.prefillRepo !== undefined &&
+    !input.applied &&
+    input.selectedRepo === '' &&
+    !input.providerQueriesResolved
+  );
+}
+
+/**
+ * Whether a route prefill must be given up because the repository region has
+ * already been declared final without it.
+ *
+ * The seed runs in the one render `reposSettled` turns true, and a provider list
+ * that outlived the settle bound may answer after the region settled. Seeding
+ * then would mount a repository the form already painted without: the branch row
+ * and the Environment row would appear after the rows had settled, and the
+ * prompt would take focus on a screen treated as complete. So a request that is
+ * still unanswered when the bound expires is dropped rather than deferred, and
+ * the caller records it as applied so the seed cannot run later.
+ *
+ * `reposSettled` wins over the bound in the same render: that render is the one
+ * in which the seed runs, so dropping it there would lose a prefill the lists
+ * can satisfy.
+ */
+export function shouldAbandonRepoSeed(input: {
+  /** The repository the route asked for, if any. */
+  prefillRepo: string | undefined;
+  /** Whether the seed has already run, or been abandoned, for this mount. */
+  applied: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /** The lists answered with rows, so the seed can still run in this render. */
+  reposSettled: boolean;
+  /** The bounded region signal. */
+  providerQueriesResolved: boolean;
+}): boolean {
+  return (
+    input.prefillRepo !== undefined &&
+    !input.applied &&
+    input.selectedRepo === '' &&
+    !input.reposSettled &&
+    input.providerQueriesResolved
+  );
+}
+
+/**
  * Resolve a prefill repository to a platform-qualified picker key
  * `platform:fullName`. Continuation prefill is GitHub-only (see
  * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may

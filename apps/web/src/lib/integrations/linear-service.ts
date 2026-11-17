@@ -12,6 +12,7 @@ import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
@@ -323,6 +324,21 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
   return null;
 }
 
+export type PreviousLinearWorkspace = {
+  organizationId: string;
+  accessToken: string | null;
+};
+
+export type UpsertLinearInstallationResult = {
+  integration: PlatformIntegration;
+  /**
+   * The workspace this install replaces, when the owner reinstalls onto a
+   * different Linear workspace. The caller retires it after its transaction
+   * has committed; see `retirePreviousLinearWorkspace`.
+   */
+  previousWorkspace: PreviousLinearWorkspace | null;
+};
+
 type LinearUpsertOptions = {
   /**
    * Model resolved by the caller before the install transaction. `null` means the
@@ -330,8 +346,6 @@ type LinearUpsertOptions = {
    */
   defaultModel?: string | null;
   getChatSdkAccessToken?: (organizationId: string) => Promise<string | null>;
-  deleteChatSdkInstallation?: (organizationId: string) => Promise<void>;
-  deleteChatSdkIdentityCache?: (organizationId: string) => Promise<void>;
 };
 
 /**
@@ -342,12 +356,12 @@ type LinearUpsertOptions = {
  * tRPC router / UI and to gate bot processing via `metadata.bot_enabled`.
  *
  * When the same Kilo owner reinstalls onto a *different* Linear workspace
- * (`existing.platform_installation_id !== organizationId`), the optional
- * cleanup callbacks are invoked to revoke the OAuth token Linear-side and
- * to drop the Chat SDK installation + identity cache for the previous
- * workspace. Without this, the old workspace stays authorized and keeps
- * sending webhooks to us with stale credentials, while no DB row connects
- * that organizationId back to a Kilo owner.
+ * (`existing.platform_installation_id !== organizationId`), this returns the
+ * previous workspace so the caller can retire it — revoke the OAuth token
+ * Linear-side and drop the Chat SDK installation and identity cache — once the
+ * connection write has committed. That retirement keeps the workspace list in
+ * the connection settings accurate: after it, no DB row connects that
+ * organizationId back to a Kilo owner.
  */
 export async function upsertLinearInstallation(
   {
@@ -363,7 +377,7 @@ export async function upsertLinearInstallation(
   },
   options: LinearUpsertOptions = {},
   database: typeof db | DrizzleTransaction = db
-): Promise<PlatformIntegration> {
+): Promise<UpsertLinearInstallationResult> {
   const existing = await getInstallation(owner, database);
 
   const conflicting = await getConflictingLinearInstallation(owner, organizationId, database);
@@ -371,19 +385,16 @@ export async function upsertLinearInstallation(
     throw new LinearWorkspaceAlreadyConnectedError(organizationName);
   }
 
-  if (
+  const previousWorkspace =
     existing &&
     existing.platform_installation_id &&
     existing.platform_installation_id !== organizationId
-  ) {
-    const previousOrganizationId = existing.platform_installation_id;
-    const previousAccessToken = await options.getChatSdkAccessToken?.(previousOrganizationId);
-    if (previousAccessToken) {
-      await revokeLinearToken(previousAccessToken);
-    }
-    await options.deleteChatSdkInstallation?.(previousOrganizationId);
-    await options.deleteChatSdkIdentityCache?.(previousOrganizationId);
-  }
+      ? {
+          organizationId: existing.platform_installation_id,
+          accessToken:
+            (await options.getChatSdkAccessToken?.(existing.platform_installation_id)) ?? null,
+        }
+      : null;
 
   // For org integrations, get a model that respects org access policy. A null
   // result means the policy allows none of the candidates, so the installation
@@ -434,7 +445,7 @@ export async function upsertLinearInstallation(
         .where(eq(platform_integrations.id, existing.id))
         .returning();
 
-      return updated;
+      return { integration: updated, previousWorkspace };
     } catch (error) {
       if (isLinearWorkspaceUniqueViolation(error)) {
         throw new LinearWorkspaceAlreadyConnectedError(organizationName);
@@ -461,12 +472,39 @@ export async function upsertLinearInstallation(
       })
       .returning();
 
-    return created;
+    return { integration: created, previousWorkspace };
   } catch (error) {
     if (isLinearWorkspaceUniqueViolation(error)) {
       throw new LinearWorkspaceAlreadyConnectedError(organizationName);
     }
     throw error;
+  }
+}
+
+/**
+ * Retire the workspace a successful install replaced. Call this only after the
+ * caller's transaction has committed: one write performs the retirement and the
+ * other the connection row, so neither undoes the other.
+ */
+export async function retirePreviousLinearWorkspace(
+  previous: PreviousLinearWorkspace,
+  options: {
+    deleteChatSdkInstallation?: (organizationId: string) => Promise<void>;
+    deleteChatSdkIdentityCache?: (organizationId: string) => Promise<void>;
+  } = {}
+): Promise<void> {
+  try {
+    if (previous.accessToken) {
+      await revokeLinearToken(previous.accessToken);
+    }
+    await options.deleteChatSdkInstallation?.(previous.organizationId);
+    await options.deleteChatSdkIdentityCache?.(previous.organizationId);
+  } catch (error) {
+    // The new connection is already committed; this cleanup runs beside it.
+    captureException(error, {
+      tags: { source: 'linear_oauth', op: 'retire_previous_workspace' },
+      extra: { organizationId: previous.organizationId },
+    });
   }
 }
 
@@ -592,5 +630,10 @@ export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
   if (!integration) return null;
   const metadata = integration.metadata as { model_slug?: string } | null;
-  return metadata?.model_slug || null;
+  const storedModelSlug = metadata?.model_slug || null;
+  if (!storedModelSlug) return null;
+  return resolveOrganizationBotModel({
+    organizationId: owner.type === 'org' ? owner.id : null,
+    storedModelSlug,
+  });
 }

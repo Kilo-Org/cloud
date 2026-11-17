@@ -11,16 +11,8 @@ import {
 } from './gateway-config';
 
 describe('GatewayRoutingConfigSchema', () => {
-  test('defaults Vercel routing to on for an empty configuration', () => {
+  test('defaults to no model opt-outs for an empty configuration', () => {
     expect(GatewayRoutingConfigSchema.parse({})).toEqual({
-      vercel_routing_enabled: true,
-      vercel_routing_opt_out_models: [],
-    });
-  });
-
-  test('accepts Vercel routing switched off', () => {
-    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_enabled: false })).toEqual({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: [],
     });
   });
@@ -28,24 +20,23 @@ describe('GatewayRoutingConfigSchema', () => {
   test('accepts model opt-outs', () => {
     expect(
       GatewayRoutingConfigSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
       })
     ).toEqual({
-      vercel_routing_enabled: true,
       vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
     });
   });
 
-  test('rejects a non-boolean switch value', () => {
-    expect(() => GatewayRoutingConfigSchema.parse({ vercel_routing_enabled: 50 })).toThrow();
+  test('ignores the removed Vercel routing switch', () => {
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_enabled: false })).toEqual({
+      vercel_routing_opt_out_models: [],
+    });
   });
 });
 
 describe('GatewayConfigSchema', () => {
   test('defaults note to null for saved entries without the field', () => {
     const parsed = GatewayConfigSchema.parse({
-      vercel_routing_enabled: true,
       updated_at: '2026-01-01T00:00:00.000Z',
       updated_by: 'u1',
       updated_by_email: 'a@example.com',
@@ -56,7 +47,6 @@ describe('GatewayConfigSchema', () => {
 
   test('round-trips a note', () => {
     const parsed = GatewayConfigSchema.parse({
-      vercel_routing_enabled: false,
       updated_at: '2026-01-01T00:00:00.000Z',
       updated_by: 'u1',
       updated_by_email: 'a@example.com',
@@ -70,43 +60,39 @@ describe('saved gateway configuration compatibility', () => {
   test.each([
     { name: 'runtime routing', schema: GatewayRoutingConfigSchema },
     { name: 'admin configuration', schema: GatewayConfigSchema },
-  ])(
-    '$name turns Vercel routing on and keeps opt-outs for saved percentage configurations',
-    ({ schema }) => {
-      const savedJson = JSON.stringify({
-        vercel_routing_percentage: 0,
-        vercel_routing_percentage_free: 0,
-        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-        friendli_routing_percentage: 10,
-        updated_at: '2026-01-01T00:00:00.000Z',
-        updated_by: 'u1',
-        updated_by_email: 'a@example.com',
-        note: 'Existing routing overrides',
-      });
+  ])('$name keeps opt-outs and drops obsolete fields from saved configurations', ({ schema }) => {
+    const savedJson = JSON.stringify({
+      vercel_routing_enabled: false,
+      vercel_routing_percentage: 0,
+      vercel_routing_percentage_free: 0,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      friendli_routing_percentage: 10,
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'u1',
+      updated_by_email: 'a@example.com',
+      note: 'Existing routing overrides',
+    });
 
-      const parsed = schema.parse(JSON.parse(savedJson));
+    const parsed = schema.parse(JSON.parse(savedJson));
 
-      expect(parsed).toMatchObject({
-        vercel_routing_enabled: true,
-        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-      });
-      expect(parsed).not.toHaveProperty('vercel_routing_percentage');
-      expect(parsed).not.toHaveProperty('vercel_routing_percentage_free');
-      expect(parsed).not.toHaveProperty('friendli_routing_percentage');
-    }
-  );
+    expect(parsed).toMatchObject({
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+    });
+    expect(parsed).not.toHaveProperty('vercel_routing_enabled');
+    expect(parsed).not.toHaveProperty('vercel_routing_percentage');
+    expect(parsed).not.toHaveProperty('vercel_routing_percentage_free');
+    expect(parsed).not.toHaveProperty('friendli_routing_percentage');
+  });
 });
 
 describe('GatewayConfigInputSchema', () => {
-  test('accepts a note alongside the switch', () => {
+  test('accepts a note alongside the opt-outs', () => {
     expect(
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
         note: 'Rollout stable',
       })
     ).toEqual({
-      vercel_routing_enabled: true,
       vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
       note: 'Rollout stable',
     });
@@ -115,30 +101,18 @@ describe('GatewayConfigInputSchema', () => {
   test('accepts a null note', () => {
     expect(
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: false,
         vercel_routing_opt_out_models: [],
         note: null,
       })
     ).toEqual({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: [],
       note: null,
     });
   });
 
-  test('requires the switch value', () => {
-    expect(() =>
-      GatewayConfigInputSchema.parse({
-        vercel_routing_opt_out_models: [],
-        note: null,
-      })
-    ).toThrow();
-  });
-
   test('rejects notes longer than the maximum', () => {
     expect(() =>
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: [],
         note: 'x'.repeat(NOTE_MAX_LENGTH + 1),
       })
@@ -148,7 +122,6 @@ describe('GatewayConfigInputSchema', () => {
   test.each(['', '   ', '\t'])('rejects the blank opt-out entry %p', entry => {
     expect(() =>
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: ['moonshotai/kimi-k3', entry],
         note: null,
       })
@@ -158,7 +131,6 @@ describe('GatewayConfigInputSchema', () => {
   test('rejects an opt-out entry longer than the maximum', () => {
     expect(() =>
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: ['x'.repeat(VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH + 1)],
         note: null,
       })
@@ -169,7 +141,6 @@ describe('GatewayConfigInputSchema', () => {
     const model = 'x'.repeat(VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH);
     expect(
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: [model],
         note: null,
       }).vercel_routing_opt_out_models
@@ -183,7 +154,6 @@ describe('GatewayConfigInputSchema', () => {
     );
     expect(() =>
       GatewayConfigInputSchema.parse({
-        vercel_routing_enabled: true,
         vercel_routing_opt_out_models: models,
         note: null,
       })
@@ -192,7 +162,6 @@ describe('GatewayConfigInputSchema', () => {
 
   test('trims, lowercases, and collapses duplicate opt-out entries', () => {
     const parsed = GatewayConfigInputSchema.parse({
-      vercel_routing_enabled: true,
       vercel_routing_opt_out_models: [
         '  MoonshotAI/Kimi-K3  ',
         'moonshotai/kimi-k3',
@@ -209,12 +178,10 @@ describe('GatewayConfigInputSchema', () => {
 
   test('round-trips an accepted input through the stored-config and hot-path schemas', () => {
     const input = GatewayConfigInputSchema.parse({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: [' MoonshotAI/Kimi-K3 ', 'moonshotai/kimi-k3', 'openai/gpt-6'],
       note: 'Holding opt-outs',
     });
     const storedJson = JSON.stringify({
-      vercel_routing_enabled: input.vercel_routing_enabled,
       vercel_routing_opt_out_models: input.vercel_routing_opt_out_models,
       updated_at: '2026-01-01T00:00:00.000Z',
       updated_by: 'u1',
@@ -233,10 +200,11 @@ describe('GatewayConfigInputSchema', () => {
 
 describe('GatewayOrganizationFeaturesConfigSchema', () => {
   test('enables no feature for a configuration without organization features', () => {
-    expect(
-      GatewayOrganizationFeaturesConfigSchema.parse({ vercel_routing_enabled: true })
-        .organization_features
-    ).toEqual({ experimental_byok: [], gateway_settings: [], request_logs: [] });
+    expect(GatewayOrganizationFeaturesConfigSchema.parse({}).organization_features).toEqual({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
   });
 
   test('fills features missing from a saved configuration', () => {
@@ -246,8 +214,23 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       }).organization_features
     ).toEqual({
       experimental_byok: ['00000000-0000-4000-8000-000000000001'],
+      enkrypt_output_guardrail: [],
       gateway_settings: [],
-      request_logs: [],
+    });
+  });
+
+  test('strips removed features from saved configurations', () => {
+    expect(
+      GatewayOrganizationFeaturesConfigSchema.parse({
+        organization_features: {
+          experimental_byok: [],
+          request_logs: ['00000000-0000-4000-8000-000000000001'],
+        },
+      }).organization_features
+    ).toEqual({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
     });
   });
 });
@@ -255,9 +238,16 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
 test('lowercases stored organization IDs', () => {
   expect(
     GatewayOrganizationFeaturesConfigSchema.parse({
-      organization_features: { gateway_settings: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'] },
-    }).organization_features.gateway_settings
-  ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+      organization_features: {
+        gateway_settings: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
+        enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
+      },
+    }).organization_features
+  ).toEqual({
+    experimental_byok: [],
+    enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+    gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+  });
 });
 
 describe('OrganizationFeaturesInputSchema', () => {
@@ -268,18 +258,22 @@ describe('OrganizationFeaturesInputSchema', () => {
           '9D278969-5453-4AE3-A51F-A8D2274A7B56',
           '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         ],
+        enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
         gateway_settings: [],
-        request_logs: [],
-      }).experimental_byok
-    ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+      })
+    ).toEqual({
+      experimental_byok: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      gateway_settings: [],
+    });
   });
 
   test('rejects an entry that is not an organization ID', () => {
     expect(
       OrganizationFeaturesInputSchema.safeParse({
         experimental_byok: ['kilo'],
+        enkrypt_output_guardrail: [],
         gateway_settings: [],
-        request_logs: [],
       }).success
     ).toBe(false);
   });

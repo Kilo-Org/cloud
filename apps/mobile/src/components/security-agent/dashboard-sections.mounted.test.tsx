@@ -491,9 +491,8 @@ describe('DashboardSectionsSkeleton', () => {
     const loaded = renderSections({ slaEnabled }).root.findAllByType(Section);
     const placeholders = renderSkeleton(slaEnabled).root.findAllByType(Section);
 
-      expect(placeholders).toHaveLength(loaded.length);
-    }
-  );
+    expect(placeholders).toHaveLength(loaded.length);
+  });
 
   it('names nothing it has not measured', () => {
     const placeholders = cards(renderSkeleton(true).root);

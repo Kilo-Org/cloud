@@ -144,7 +144,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = true;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(reanimated.withTiming).not.toHaveBeenCalled();
     expect(rotationValue()).toBe(0);
 
@@ -172,7 +172,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = false;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
 
     toggle(renderer);
     expect(animatedView(renderer, BODY_CLASSES).props.entering).toEqual({ __fadeIn: 150 });
@@ -267,7 +267,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
     const onToggle = vi.fn<() => void>();
     const renderer = mountSection({ expanded: true, onToggle, animateLayout: false });
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(title(renderer).props.children).toBe('Source');
     expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
 
@@ -279,7 +279,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
   it('keeps the layout transition by default', () => {
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
   });
 });
 

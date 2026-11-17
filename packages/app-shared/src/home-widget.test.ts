@@ -4,7 +4,7 @@ import {
   buildHomeWidgetDetails,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
@@ -355,7 +355,7 @@ describe('Home-only widget policy', () => {
     const second = buildHomeWidgetData({ ...scope, sessions: [], status: 'privacy' });
     first.details.waitingAgents.push({ title: 'Private', kind: 'permission' });
     expect(second.details.waitingAgents).toEqual([]);
-    expect(EMPTY_HOME_WIDGET_DETAILS.waitingAgents).toEqual([]);
+    expect(emptyHomeWidgetDetails().waitingAgents).toEqual([]);
   });
 
   it('requests active/quiet cadence and an earlier future wake without tight overdue polling', () => {

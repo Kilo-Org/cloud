@@ -674,8 +674,10 @@ Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`,
 `E2E_BACKEND_URL=https://api.kilo.ai`, `FAKE_LLM_URL`, and a user token from
 either `E2E_USER_TOKEN` or `E2E_AUTH_FILE`; optional `E2E_MODEL` (default
 `kilo/fake-deterministic`) and `E2E_GIT_URL`. `E2E_USER_TOKEN`, when set and
-non-empty, is an ordinary personal Kilo API token presented verbatim; it needs
-no separate `userId` or `email`. Otherwise `E2E_AUTH_FILE` must name a mode-600
+non-empty, is an ordinary personal Kilo API token used as the source credential;
+it needs no separate `userId` or `email`. The driver exchanges it for
+short-lived control tokens and uses it directly for backend requests,
+including stream tickets. Otherwise `E2E_AUTH_FILE` must name a mode-600
 JSON file carrying the `token` field. When neither supplies a token the run fails
 and names both variables. An empty value counts as unset; a whitespace-padded
 value is present but rejected, never trimmed.
@@ -878,9 +880,11 @@ scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
 
 The `cloud-agent-e2e-tests` GitHub workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`) is `workflow_dispatch`-only and
-runs `e2e:parallel` as ONE job — no `plan`, matrix, or `aggregate` jobs — with
-`E2E_PARALLEL=4`, and uploads `e2e.log`. Job failure is the runner's exit code.
+(`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
+and `workflow_call`. The `cloud-agent-e2e-nightly` workflow calls it after
+deploying the e2e stack at 03:37 UTC each day. It runs `e2e:parallel` as one
+job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
+`E2E_PARALLEL`; `only` selects scenarios. Job failure is the runner's exit code.
 The workflow keeps its workflow-level `concurrency` only. Use `run.ts <name> _`
 for a focused single scenario.
 
@@ -890,6 +894,9 @@ not proof the container was destroyed — a returned teardown can leave the
 allocation `stopping`. Capability gaps are reported as `unsupported`, not
 failures: the deployed profile marks a Docker-only flow (`sandboxFaults`,
 `gates`) `unsupported` and does not spawn it.
+When the last root session requires workspace deletion, the gate reads its
+workspace and Kilo session ids, then calls `deleteWorktree` with a sole-session
+fence and a separate 90 s client budget.
 
 Cold boots contend on container provisioning, so `all` maximises the chance of a
 container cold-start timeout showing up as a false failure; the default trades

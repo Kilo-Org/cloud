@@ -68,6 +68,8 @@ const CLEANUP_TIMEOUT_MS = 15_000;
  * retirement.
  */
 const DELETE_SESSION_TIMEOUT_MS = 45_000;
+/** Workspace teardown also releases runtime locations, sandboxes and session rows. */
+const WORKSPACE_DELETE_TIMEOUT_MS = 90_000;
 /** Bound for each direct HTTPS auth probe in `auth-reject`. */
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 /** Wrong secret for the bad-signature probe; never the deployed `NEXTAUTH_SECRET`. */
@@ -461,7 +463,7 @@ async function deleteOwningWorkspace(
     await deleteWorktree(
       config,
       { worktreeId, onlyIfSoleSessionId: kiloSessionId },
-      AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS)
+      AbortSignal.timeout(WORKSPACE_DELETE_TIMEOUT_MS)
     );
     return null;
   } catch (error) {

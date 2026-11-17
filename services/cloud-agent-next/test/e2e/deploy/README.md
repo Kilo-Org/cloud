@@ -173,7 +173,7 @@ script never falls back to another token and never prints the token value.
 | Name | Required | Meaning |
 |---|---|---|
 | `E2E_AUTH_FILE` | no | Optional mode-600 JSON file for a deployed run: `{ token, userId?, email?, fakeLlmAdminToken?, e2eInternalApiSecret? }`. Supplies the user token when `E2E_USER_TOKEN` is unset or empty, and the identity (`userId` derived from the token when omitted; `email` optional). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty; `deploy-e2e-worker.sh` and the deployed driver read its `e2eInternalApiSecret` field when `E2E_INTERNAL_API_SECRET` is unset or empty. |
-| `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token for the driver, presented verbatim. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
+| `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token. The driver exchanges it for short-lived control tokens and uses it directly for backend requests, including stream tickets. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
 | `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |
@@ -187,7 +187,7 @@ The deployed fake has two separate credential boundaries:
 | Route | Credential |
 |---|---|
 | `/health` | none |
-| `GET /api/openrouter/models`, `POST .../models/validate`, `POST .../chat/completions`, `POST .../audio/transcriptions` | A valid Kilo JWT signed with the `NEXTAUTH_SECRET` Secrets Store binding, carrying `apiTokenPepper`, and carrying none of `aud`, `tokenPurpose`, `credentialExchange`, `runtimeAdmission`, `runtimeAuthorization`, `organizationId`, `organizationRole`. |
+| `GET /api/openrouter/models`, `POST .../models/validate`, `POST .../chat/completions`, `POST .../audio/transcriptions` | A valid Kilo JWT signed with the `NEXTAUTH_SECRET` Secrets Store binding, with `apiTokenPepper` present. Accepts no audience or an audience matching `cloud-agent-next`, `kilo-api` or `kilo-gateway`. Allows `tokenPurpose`, `credentialExchange`, `runtimeAdmission` and `runtimeAuthorization`; rejects `organizationId` and `organizationRole`. |
 | `/test/*` | `Authorization: Bearer $FAKE_LLM_ADMIN_TOKEN` |
 
 The model routes are enforced in the Worker entry; the `/test/*` guard is
@@ -237,17 +237,23 @@ image paths are rebased for the generated configuration directory.
 
 ## Token requirement
 
-The driver must present an ordinary personal Kilo API token from the
+The driver requires an ordinary personal Kilo API token from the
 `generateApiToken` family, supplied as `E2E_USER_TOKEN` or as the `token` field of
 the auth file named by `E2E_AUTH_FILE`. Obtain one from the user's personal API
 key in the Kilo web app or the CLI token flow. Never print the token.
 
-Session/control tokens, organization tokens, and delegated/runtime tokens take
-the runtime-authorization path. Admission then fails closed with
-`Model catalog authentication unavailable`, because the fake catalog URL is
-never the official one. Turning containment off is not a remedy. The fake's
-model routes also reject those tokens directly, so the failure is visible at the
-credential boundary as a 401.
+The driver exchanges this source token for short-lived Cloud Agent control
+tokens through the backend's `/api/cloud-agent-next/token` route.
+It presents the control token to the Worker and refreshes it before expiry.
+Backend requests, including stream tickets, still use the source token.
+The driver rejects session/control, organization and delegated/runtime tokens
+as source credentials before it sends a request.
+
+The renderer sets `E2E_MODEL_VALIDATION_BASE_URL` to the fake Worker origin.
+Model validation accepts this base only when its origin matches
+`KILO_OPENROUTER_BASE`, so the fake catalogue is the official validation route
+for this e2e Worker. The fake model routes accept personal control and runtime
+tokens with the audiences listed above, and reject organization claims.
 
 ## State model
 
@@ -303,9 +309,12 @@ profile's expected unsupported. The summary separates passed / failed / unsuppor
 `1` if any scenario failed, else `0`; a capability gap is filtered out before
 spawn and reported as a skip, not a failure.
 
-The `workflow_dispatch`-only `Cloud Agent E2E tests` workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`) runs the parallel runner
-(`e2e:parallel`) as ONE job with `E2E_PARALLEL=4`. See
+The `Cloud Agent E2E tests` workflow
+(`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
+and `workflow_call`. The `Cloud Agent E2E nightly` workflow calls it after
+deploying the e2e stack at 03:37 UTC each day. The tests workflow runs the
+parallel runner (`e2e:parallel`) as one job. Its `parallel` input defaults to
+`4` and sets `E2E_PARALLEL`; `only` selects scenarios. See
 [`../README.md`](../README.md#the-matrix-runner) for the scenario matrix
 and the env contract.
 
@@ -314,6 +323,9 @@ that did not previously delete its session now releases its sandbox:
 `interruptSession` then `deleteSession`, newest first, with the delete on a 45 s
 client budget. That budget bounds the client request, not the container's
 destruction.
+When the last root session requires workspace deletion, the gate reads its
+workspace and Kilo session ids, then calls `deleteWorktree` with a sole-session
+fence and a separate 90 s client budget.
 
 Aggregate-runtime risk: the four public-surface scenarios have declared
 ceilings of 10 + 25 + 12 + 30 minutes, plus cleanup (up to about 2.5 minutes)

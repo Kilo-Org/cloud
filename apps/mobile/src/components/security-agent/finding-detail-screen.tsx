@@ -14,6 +14,7 @@ import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boun
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
+import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -172,12 +173,15 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // control, so that line moves the title down by half its height — 7.6 dp
   // measured on the Android emulator — in the frame the payload lands. Reserving
   // the line here puts the title where the payload will leave it, so it holds
-  // still from the first paint instead of being pushed down later.
+  // still from the first paint instead of being pushed down later, and the
+  // placeholder bar occupies the line instead of leaving it reading as a slot
+  // the screen forgot to fill.
   const loadingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
       reserveEyebrow
+      eyebrowPlaceholder={<EyebrowPlaceholder />}
       showBackButton
       onBack={handleBack}
     />

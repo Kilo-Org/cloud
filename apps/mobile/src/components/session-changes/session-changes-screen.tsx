@@ -11,7 +11,7 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader, type HeaderEyebrow } from '@/components/screen-header';
 import { SessionChangesBody } from '@/components/session-changes/session-changes-body';
 import { SessionChangesCommentDialog } from '@/components/session-changes/session-changes-comment-dialog';
 import { SessionChangesReviewSheet } from '@/components/session-changes/session-changes-review-sheet';
@@ -19,6 +19,7 @@ import { useSessionChangesData } from '@/components/session-changes/use-session-
 import { useSessionChangesFile } from '@/components/session-changes/use-session-changes-file';
 import { useSessionChangesReview } from '@/components/session-changes/use-session-changes-review';
 import { Button } from '@/components/ui/button';
+import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -141,12 +142,41 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     return undefined;
   }, [snapshot, legacyDiffQuery.isSuccess, legacyDiffQuery.dataUpdatedAt, t]);
 
+  // The eyebrow is the capture time above the title. Reserve its line only
+  // while a read can still answer with one: the session decides whether this
+  // screen has a Cloud Agent capture or a read-only session diff, and a read
+  // that settled without either leaves the title to centre alone instead of
+  // keeping a line no label fills.
+  const eyebrow = useMemo<HeaderEyebrow>(() => {
+    if (asOf !== undefined) {
+      return { kind: 'ready', text: asOf };
+    }
+    if (sessionQuery.isPending) {
+      return { kind: 'loading' };
+    }
+    if (cloudAgentSessionId !== null) {
+      return changesQuery.isPending ? { kind: 'loading' } : { kind: 'none' };
+    }
+    if (readOnly) {
+      return legacyDiffQuery.isPending ? { kind: 'loading' } : { kind: 'none' };
+    }
+    return { kind: 'none' };
+  }, [
+    asOf,
+    sessionQuery.isPending,
+    cloudAgentSessionId,
+    changesQuery.isPending,
+    readOnly,
+    legacyDiffQuery.isPending,
+  ]);
+
   return (
     <View className="flex-1 bg-background" testID="session-changes-screen">
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
-        eyebrow={asOf}
-        reserveEyebrow
+        eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
+        reserveEyebrow={eyebrow.kind === 'loading'}
+        eyebrowPlaceholder={eyebrow.kind === 'loading' ? <EyebrowPlaceholder /> : undefined}
         titleNumberOfLines={1}
         onBack={
           openFile === null

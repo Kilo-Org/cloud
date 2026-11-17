@@ -6,7 +6,8 @@ import { View } from 'react-native';
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader, type HeaderEyebrow } from '@/components/screen-header';
+import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { trpcErrorVariant } from '@/lib/trpc-error';
@@ -69,6 +70,16 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     void query.refetch();
   };
 
+  // The eyebrow is the shared session's repository, which the payload carries
+  // only when the session had a git URL. The line is reserved while the read can
+  // still answer with one and dropped when it settled without, so a session with
+  // no repository centres its title alone.
+  const eyebrow: HeaderEyebrow = repoLabel
+    ? { kind: 'ready', text: repoLabel }
+    : query.isPending
+      ? { kind: 'loading' }
+      : { kind: 'none' };
+
   let body: ReactNode = null;
   if (query.isError) {
     // A dead link is terminal: NOT_FOUND is the expired/revoked/rotated-out
@@ -112,8 +123,9 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     <View className="flex-1 bg-background" testID="shared-session-screen">
       <ScreenHeader
         title={metadata?.title ?? t('sharedSession.title')}
-        eyebrow={repoLabel ?? undefined}
-        reserveEyebrow
+        eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
+        reserveEyebrow={eyebrow.kind === 'loading'}
+        eyebrowPlaceholder={eyebrow.kind === 'loading' ? <EyebrowPlaceholder /> : undefined}
         subtitle={query.data ? subtitle : undefined}
         reserveSubtitle
         titleNumberOfLines={2}

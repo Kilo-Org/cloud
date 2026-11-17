@@ -14,6 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
+import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
 import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,13 +165,20 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
   }
 
+  // The loaded screen draws the to-do's list on the eyebrow line. A to-do that
+  // loads always carries its list, so the reserve belongs to the read that can
+  // still answer with it; a failed read never gains a label, and its header
+  // drops the line so the empty title centres on the back control alone.
+  const reserveEyebrow = !query.isError;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title=""
         titleNumberOfLines={2}
         reserveTitleSpace
-        reserveEyebrow
+        reserveEyebrow={reserveEyebrow}
+        eyebrowPlaceholder={reserveEyebrow ? <EyebrowPlaceholder /> : undefined}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (

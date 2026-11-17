@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { Pressable, View, type AccessibilityState } from 'react-native';
+import { type AccessibilityState, Pressable, View } from 'react-native';
 
 import { RowCheck } from '@/components/ui/row-check';
 import { RowChevron } from '@/components/ui/row-chevron';

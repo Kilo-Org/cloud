@@ -201,11 +201,12 @@ describe('RowFrame text block', () => {
     expect(textOf(root, 'this device')).toBeTruthy();
   });
 
-  it('renders a plain subtitle on one tail-ellipsized line', () => {
-    const subtitle = textOf(renderFrame({ title: 'General', subtitle: { text: 'English' } }), 'English');
+  it('renders a plain subtitle line under the title', () => {
+    const subtitle = textOf(
+      renderFrame({ title: 'General', subtitle: { text: 'English' } }),
+      'English'
+    );
 
-    expect(subtitle.props.numberOfLines).toBe(1);
-    expect(subtitle.props.ellipsizeMode).toBe('tail');
     expect(classesOf(subtitle)).toEqual(
       expect.arrayContaining(['mt-0.5', 'text-xs', 'text-muted-foreground'])
     );

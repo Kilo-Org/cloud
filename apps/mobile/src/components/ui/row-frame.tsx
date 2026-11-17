@@ -1,11 +1,11 @@
 import { type ComponentType, type ReactNode } from 'react';
 import {
-  Pressable,
-  View,
   type AccessibilityRole,
   type AccessibilityState,
   type AccessibilityValue,
   type Insets,
+  Pressable,
+  View,
   type ViewProps,
 } from 'react-native';
 
@@ -153,7 +153,7 @@ export function RowFrame({
       <IconTile icon={icon} tint={iconTint} content={iconContent} />
     ));
 
-  let bodyText: ReactNode;
+  let bodyText: ReactNode = null;
   if (children !== undefined) {
     bodyText = children;
   } else {
@@ -198,7 +198,7 @@ export function RowFrame({
     title !== undefined ||
     subtitle !== undefined ||
     secondSubtitle !== undefined ||
-    (subtitle === undefined && subtitlePlaceholder !== undefined);
+    subtitlePlaceholder !== undefined;
 
   // The text column owns the free width; a row that carries only a label and a
   // value (a `KvRow`) leaves it out, and `justify-between` holds the value at

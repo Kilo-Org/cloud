@@ -120,7 +120,7 @@ export function ConfigureRow({
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
-  let rowTrailing: RowTrailingSpec | undefined;
+  let rowTrailing: RowTrailingSpec | undefined = undefined;
   if (trailing !== undefined) {
     rowTrailing = { kind: 'node', node: trailing };
   } else if (showChevron) {

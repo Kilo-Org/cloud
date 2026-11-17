@@ -83,8 +83,7 @@ function renderRow(
 /** The classes of the row body: the one element that carries the row padding. */
 function rowClasses(root: TestRenderer.ReactTestInstance): string[] {
   const body = root.find(
-    node =>
-      typeof node.props.className === 'string' && node.props.className.includes('py-3')
+    node => typeof node.props.className === 'string' && node.props.className.includes('py-3')
   );
   return String(body.props.className).split(' ');
 }

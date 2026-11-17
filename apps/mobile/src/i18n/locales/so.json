@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Xiriirka Bitbucket ee ururkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
-      "tokenPlaceholder": "Summadda gelitaanka goobta shaqada"
+      "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
+      "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
     },
     "scopeList": {
       "personalStillAvailable": "Kaydadkaaga shakhsiga ah weli hoos ayaa laga heli karaa.",

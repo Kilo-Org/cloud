@@ -1400,7 +1400,8 @@
       "managedOnWeb": "Povezava Bitbucket za to organizacijo se upravlja v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora z zahtevanimi dovoljenji in ga prilepi spodaj.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
-      "tokenPlaceholder": "Žeton za dostop do delovnega prostora"
+      "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
+      "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
     },
     "scopeList": {
       "personalStillAvailable": "Osebna skladišča so še vedno na voljo spodaj.",

@@ -4606,6 +4606,8 @@
     "topModels": "Models més usats",
     "topFeatures": "Funcions més usades",
     "emptyTitle": "Cap ús en aquest període",
+    "unavailableTitle": "Ús no disponible",
+    "unavailableDescription": "Aquest espai de treball no informa de l'ús. Tornar-ho a provar no ajudarà.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
     "viewDetails": "Mostra els detalls d'ús"
   },

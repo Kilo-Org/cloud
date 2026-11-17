@@ -4536,6 +4536,8 @@
     "topModels": "Ngā tauira matua",
     "topFeatures": "Ngā āhuatanga matua",
     "emptyTitle": "Kāore he whakamahinga i tēnei wā",
+    "unavailableTitle": "Kāore te whakamahinga i te wātea",
+    "unavailableDescription": "Kāore tēnei wāhi mahi e pūrongo whakamahinga. Kāore e whai hua te ngana anō.",
     "orgSelfNotice": "Ko tāu ake whakamahinga i tēnei whakahaere e kitea ana e koe.",
     "viewDetails": "Tirohia ngā taipitopito whakamahinga"
   },

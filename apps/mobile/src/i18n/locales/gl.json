@@ -4536,6 +4536,8 @@
     "topModels": "Modelos principais",
     "topFeatures": "Funcións principais",
     "emptyTitle": "Sen uso neste período",
+    "unavailableTitle": "Uso non dispoñible",
+    "unavailableDescription": "Este espazo de traballo non informa de uso. Volver intentalo non axudará.",
     "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
     "viewDetails": "Ver detalles do uso"
   },

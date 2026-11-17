@@ -4746,6 +4746,8 @@
     "topModels": "Samhlacha is mó úsáid",
     "topFeatures": "Gnéithe is mó úsáid",
     "emptyTitle": "Níl aon úsáid sa tréimhse seo",
+    "unavailableTitle": "Níl úsáid ar fáil",
+    "unavailableDescription": "Ní thuairiscíonn an spás oibre seo úsáid. Ní chabhróidh sé triail a bhaint as arís.",
     "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
     "viewDetails": "Féach ar shonraí úsáide"
   },

@@ -4612,6 +4612,8 @@
     "topModels": "Principais modelos",
     "topFeatures": "Principais recursos",
     "emptyTitle": "Nenhum uso neste período",
+    "unavailableTitle": "Uso indisponível",
+    "unavailableDescription": "Este workspace não está reportando uso. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Você está vendo seu próprio uso nesta organização.",
     "viewDetails": "Ver detalhes de uso"
   },

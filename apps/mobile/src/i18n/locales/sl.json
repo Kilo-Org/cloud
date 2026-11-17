@@ -4676,6 +4676,8 @@
     "topModels": "Najpogostejši modeli",
     "topFeatures": "Najpogostejše funkcije",
     "emptyTitle": "V tem obdobju ni porabe",
+    "unavailableTitle": "Poraba ni na voljo",
+    "unavailableDescription": "Ta delovni prostor ne poroča o porabi. Ponovni poskus ne bo pomagal.",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
     "viewDetails": "Ogled podrobnosti porabe"
   },

@@ -4536,6 +4536,8 @@
     "topModels": "上位のモデル",
     "topFeatures": "上位の機能",
     "emptyTitle": "この期間の使用はありません",
+    "unavailableTitle": "使用状況を利用できません",
+    "unavailableDescription": "このワークスペースは使用状況を報告していません。再試行しても解決しません。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
   },

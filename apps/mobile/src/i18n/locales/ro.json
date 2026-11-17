@@ -4606,6 +4606,8 @@
     "topModels": "Modele principale",
     "topFeatures": "Funcții principale",
     "emptyTitle": "Nicio utilizare în această perioadă",
+    "unavailableTitle": "Utilizarea nu este disponibilă",
+    "unavailableDescription": "Acest spațiu de lucru nu raportează utilizare. Reîncercarea nu va ajuta.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
   },

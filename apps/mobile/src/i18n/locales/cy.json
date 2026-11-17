@@ -4816,6 +4816,8 @@
     "topModels": "Prif fodelau",
     "topFeatures": "Prif nodweddion",
     "emptyTitle": "Dim defnydd yn y cyfnod hwn",
+    "unavailableTitle": "Nid yw defnydd ar gael",
+    "unavailableDescription": "Nid yw'r weithfan hon yn adrodd defnydd. Ni fydd ceisio eto yn helpu.",
     "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
     "viewDetails": "Gweld manylion defnydd"
   },

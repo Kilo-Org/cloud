@@ -4536,6 +4536,8 @@
     "topModels": "En çok kullanılan modeller",
     "topFeatures": "En çok kullanılan özellikler",
     "emptyTitle": "Bu dönemde kullanım yok",
+    "unavailableTitle": "Kullanım kullanılamıyor",
+    "unavailableDescription": "Bu çalışma alanı kullanım bildirmiyor. Yeniden denemek işe yaramaz.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
     "viewDetails": "Kullanım ayrıntılarını görüntüle"
   },

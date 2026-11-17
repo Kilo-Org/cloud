@@ -4536,6 +4536,8 @@
     "topModels": "Topmodellen",
     "topFeatures": "Topfuncties",
     "emptyTitle": "Geen gebruik in deze periode",
+    "unavailableTitle": "Gebruik niet beschikbaar",
+    "unavailableDescription": "Deze workspace rapporteert geen gebruik. Opnieuw proberen helpt niet.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
     "viewDetails": "Gebruiksdetails bekijken"
   },

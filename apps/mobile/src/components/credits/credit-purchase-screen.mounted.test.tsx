@@ -83,10 +83,6 @@ function answerRead(state: 'ok' | 'pending' | 'error', answer: unknown): Promise
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
-// The legal links are the only caller of this module on the screen, so the mock
-// is the destination each link opened.
-const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
-
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
 // Android's live region) is the only thing a screen reader can hear.
@@ -134,14 +130,9 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));
 
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => externalLink);
-vi.mock('@/lib/iap/legal-links', () => ({
-  getStoreLegalLinks: () => [
-    { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
-    { url: 'https://example.com/terms-app', label: 'Terms of Use (EULA)' },
-  ],
-}));
+const legalNavigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: legalNavigation.push }) }));
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   useInlinePurchaseErrorOwnership: vi.fn(),
 }));
@@ -1729,7 +1720,7 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('gives each store legal link a full legal-link target and its own destination', async () => {
+  it('gives each store legal link a full legal-link target and opens it natively', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
@@ -1758,19 +1749,15 @@ describe('CreditPurchaseScreen', () => {
       (privacyLink.props as { onPress: () => void }).onPress();
     });
 
-    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      1,
-      'https://example.com/terms-app',
-      {
-        label: 'Terms of Use (EULA)',
-      }
-    );
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      2,
-      'https://example.com/privacy-app',
-      { label: 'Privacy Policy' }
-    );
+    expect(legalNavigation.push).toHaveBeenCalledTimes(2);
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
     unmount();
   });
 });

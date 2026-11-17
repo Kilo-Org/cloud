@@ -25,8 +25,8 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 # Always the local Next.js gateway. Selecting `fake-deterministic` routes
 # through Next.js to the fake-llm service; do not point this at fake-llm.
-# @url nextjs/api/openrouter
-KILO_OPENROUTER_BASE=http://localhost:3000/api/openrouter
+# @url nextjs/api
+KILO_OPENROUTER_BASE=http://localhost:3000/api
 
 # Scoped subagent-launch MCP endpoint for parent sessions that opt in with
 # allowSubagentSessions. Local dev points the grant at the local kilo-mcp

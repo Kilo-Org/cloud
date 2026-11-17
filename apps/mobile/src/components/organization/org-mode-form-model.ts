@@ -129,6 +129,22 @@ export function validateOrgModeForm(
 }
 
 /**
+ * The values a save reads. A create whose identifier the person left empty
+ * follows the name, as the web form derives one; an update derives nothing, so
+ * clearing the identifier is reported as missing instead of silently renaming a
+ * mode whose slug overrides a built-in or carries an Organization Auto route.
+ */
+export function orgModeFormSaveValues(
+  values: OrgModeFormValues,
+  mode: 'create' | 'update'
+): OrgModeFormValues {
+  if (mode === 'update' || values.slug.trim().length > 0) {
+    return values;
+  }
+  return { ...values, slug: modeSlugFromName(values.name) };
+}
+
+/**
  * Whether the form holds a change. A create form starts empty, so any typed text
  * counts; an edit form compares against the mode it opened with.
  */

@@ -5,6 +5,7 @@ import {
   modeSlugFromName,
   type OrgMode,
   orgModeConfigInput,
+  orgModeFormSaveValues,
   orgModeFormValues,
   type OrgModeFormValues,
   validateOrgModeForm,
@@ -105,6 +106,25 @@ describe('validateOrgModeForm', () => {
     expect(
       validateOrgModeForm(values({ slug: 'auditor', editFileRegex: '\\.md$' }), existing)
     ).toEqual({});
+  });
+});
+
+describe('orgModeFormSaveValues', () => {
+  it('derives an empty identifier from the name on create', () => {
+    expect(
+      orgModeFormSaveValues(values({ slug: '', name: 'Security Reviewer' }), 'create').slug
+    ).toBe('security-reviewer');
+  });
+
+  it('keeps an identifier the person typed on create', () => {
+    expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create').slug).toBe('auditor');
+  });
+
+  it('never derives one on update, so a cleared identifier is reported missing', () => {
+    const cleared = values({ slug: '' });
+    const saved = orgModeFormSaveValues(cleared, 'update');
+    expect(saved.slug).toBe('');
+    expect(validateOrgModeForm(saved, [])).toEqual({ slug: 'identifierRequired' });
   });
 });
 

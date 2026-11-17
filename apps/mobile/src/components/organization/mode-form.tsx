@@ -14,6 +14,7 @@ import {
   orgModeConfigInput,
   type OrgModeFormErrorCode,
   type OrgModeFormErrors,
+  orgModeFormSaveValues,
   type OrgModeFormValues,
   orgModeFormValues,
   validateOrgModeForm,
@@ -90,16 +91,13 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   const values = useRef<MutableModeValues>({ ...(initial ?? EMPTY_VALUES) }).current;
   const [groups, setGroups] = useState<readonly ModeToolGroup[]>(initial?.groups ?? []);
   const [errors, setErrors] = useState<OrgModeFormErrors>({});
-  const [derivedSlug, setDerivedSlug] = useState(initial?.slug ?? '');
+  const [derivedSlug, setDerivedSlug] = useState('');
   const [dirty, setDirty] = useState(false);
   const guard = useMetadataLeaveGuard({ enabled: true });
   const { confirm, dialog } = useConfirmDialog();
 
   const currentValues = (nextGroups: readonly ModeToolGroup[] = groups): OrgModeFormValues => ({
     ...values,
-    // An empty identifier follows the name, which is how the web form derives
-    // one; the field itself stays empty until the person replaces it.
-    slug: values.slug.length > 0 ? values.slug : modeSlugFromName(values.name),
     groups: nextGroups,
   });
 
@@ -127,7 +125,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   };
 
   const save = () => {
-    const next = currentValues();
+    const next = orgModeFormSaveValues(currentValues(), mode === undefined ? 'create' : 'update');
     const found = validateOrgModeForm(next, existingModes, mode?.id);
     setErrors(found);
     const failed = Object.keys(found).length > 0;
@@ -186,7 +184,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
               if (errors.name !== undefined) {
                 setErrors(previous => ({ ...previous, name: undefined }));
               }
-              if (values.slug.length === 0) {
+              if (mode === undefined && values.slug.length === 0) {
                 setDerivedSlug(modeSlugFromName(value));
               }
             }}

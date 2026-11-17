@@ -91,7 +91,7 @@ export function OrganizationProvidersAndModelsScreen() {
     void gateway.refetch();
   };
 
-  if ((models.isError && models.data == null) || (catalog.isError && catalog.data == null)) {
+  if (models.isError && models.data == null) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
@@ -99,12 +99,16 @@ export function OrganizationProvidersAndModelsScreen() {
           className="bg-background"
           message={t('organizationModelAccess.loadError')}
           onRetry={retry}
-          isRetrying={models.isFetching || catalog.isFetching}
+          isRetrying={models.isFetching}
         />
       </View>
     );
   }
 
+  // The catalog is the heaviest call on the screen and the one the saved lists
+  // do not need: the organization's own models and both saved lists come from
+  // the membership and available-models payloads. When it fails, the form still
+  // opens on what the phone already has and offers a retry for the rest.
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t(TITLE_KEY)} />
@@ -112,7 +116,10 @@ export function OrganizationProvidersAndModelsScreen() {
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
         models={models.data.data}
-        catalog={catalog.data}
+        catalog={catalog.data ?? []}
+        catalogUnavailable={catalog.data == null && catalog.isError}
+        catalogIsFetching={catalog.isFetching}
+        onRetryCatalog={() => void catalog.refetch()}
         providerAllowList={membership.data.settings.provider_allow_list}
         modelDenyList={membership.data.settings.model_deny_list}
         gateway={gateway.data}

@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Mpaghara ntule",
     "inferenceRegionDescription": "Na-agbanye arịrịọ Vercel AI Gateway na mpaghara a. Ihe nlere na-adịghị ebe ahụ na-ada.",
     "disableOpenrouterNote": "Igbochi OpenRouter na-egbochikwa igodo BYOK na-eziga arịrịọ site na ya.",
+    "emptyModelList": "Hapụ ma ọ dịkarịa ala otu ihe nlere ka ọ gbanye. Ịjụ ihe nlere niile na-eme ka ndị otu ghara inwe ihe ọ bụla ha ga-eji.",
+    "catalogUnavailable": "Katalọgụ ihe nlere zuru ezu ebughị, n'ihi ya, ọ bụ naanị ndepụta ndị i chekwara ka egosiri. Nwaa ọzọ ka ibulite ihe nlere niile.",
     "region": {
       "global": "Ụwa niile",
       "us": "Njikọta Steeti",

@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Következtetési régió",
     "inferenceRegionDescription": "A Vercel AI Gateway használatával érkező kéréseket ehhez a régióhoz rögzíti. Az ott nem elérhető modell sikertelen lesz.",
     "disableOpenrouterNote": "Az OpenRouter letiltása azokat a BYOK kulcsokat is blokkolja, amelyek rajta keresztül irányítják a kéréseket.",
+    "emptyModelList": "Hagyjon legalább egy modellt bekapcsolva. Ha minden modellt letilt, a tagok semmit sem tudnak használni.",
+    "catalogUnavailable": "A teljes modellkatalógus nem töltődött be, ezért csak a mentett listái láthatók. Próbálja újra az összes modell betöltéséhez.",
     "region": {
       "global": "Globális",
       "us": "Egyesült Államok",

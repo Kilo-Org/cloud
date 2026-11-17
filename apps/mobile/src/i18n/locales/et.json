@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Järeldusepiirkond",
     "inferenceRegionDescription": "Seob Vercel AI Gateway päringud selle piirkonnaga. Kui mudel pole seal saadaval, päring nurjub.",
     "disableOpenrouterNote": "OpenRouteri väljalülitamine blokeerib ka BYOK-võtmed, mis suunavad päringuid selle kaudu.",
+    "emptyModelList": "Jäta vähemalt üks mudel sisse lülitatuks. Kui keelad kõik mudelid, pole liikmetel midagi kasutada.",
+    "catalogUnavailable": "Täielikku mudelikataloogi ei laaditud, seega kuvatakse ainult sinu salvestatud loendid. Kõigi mudelite laadimiseks proovi uuesti.",
     "region": {
       "global": "Globaalne",
       "us": "Ameerika Ühendriigid",

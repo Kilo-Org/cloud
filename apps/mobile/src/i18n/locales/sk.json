@@ -4972,6 +4972,8 @@
     "inferenceRegion": "Región inferencie",
     "inferenceRegionDescription": "Pripína požiadavky Vercel AI Gateway k tomuto regiónu. Model, ktorý tam nie je dostupný, zlyhá.",
     "disableOpenrouterNote": "Vypnutie OpenRouter tiež zablokuje kľúče BYOK, ktoré smerujú požiadavky cez neho.",
+    "emptyModelList": "Nechajte zapnutý aspoň jeden model. Ak zakážete všetky modely, členovia nebudú mať čo používať.",
+    "catalogUnavailable": "Úplný katalóg modelov sa nenačítal, preto sa zobrazujú iba vaše uložené zoznamy. Skúste to znova a načítajte všetky modely.",
     "region": {
       "global": "Globálny",
       "us": "Spojené štáty",

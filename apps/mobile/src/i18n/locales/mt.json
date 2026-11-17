@@ -5042,6 +5042,8 @@
     "inferenceRegion": "Reġjun tal-inferenza",
     "inferenceRegionDescription": "Jorbot it-talbiet ta' Vercel AI Gateway ma' dan ir-reġjun. Mudell li mhux disponibbli hemmhekk jfalli.",
     "disableOpenrouterNote": "Id-diżattivazzjoni ta' OpenRouter timblokka wkoll iċ-ċwievet BYOK li jidderieġu t-talbiet permezz tiegħu.",
+    "emptyModelList": "Ħalli mill-inqas mudell wieħed attiv. Jekk tiċħad il-mudelli kollha, il-membri ma jibqgħalhom xejn x'jużaw.",
+    "catalogUnavailable": "Il-katalgu sħiħ tal-mudelli ma tgħabbiex, għalhekk qed jintwerew biss il-listi salvati tiegħek. Erġa' pprova biex jitgħabbew il-mudelli kollha.",
     "region": {
       "global": "Globali",
       "us": "Stati Uniti",

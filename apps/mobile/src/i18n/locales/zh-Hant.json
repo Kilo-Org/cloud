@@ -4832,6 +4832,8 @@
     "inferenceRegion": "推論區域",
     "inferenceRegionDescription": "將 Vercel AI Gateway 請求固定到此區域。在該區域無法使用的模型會失敗。",
     "disableOpenrouterNote": "停用 OpenRouter 也會封鎖透過其路由請求的 BYOK 金鑰。",
+    "emptyModelList": "請至少保留一個已啟用的模型。拒絕所有模型會導致成員沒有可用的模型。",
+    "catalogUnavailable": "未能載入完整的模型目錄，因此僅顯示已儲存的清單。請重試以載入所有模型。",
     "region": {
       "global": "全球",
       "us": "美國",

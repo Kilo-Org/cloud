@@ -37,6 +37,9 @@ export function ModelAccessForm({
   canEdit,
   models,
   catalog,
+  catalogUnavailable,
+  catalogIsFetching,
+  onRetryCatalog,
   providerAllowList,
   modelDenyList,
   gateway,
@@ -47,7 +50,15 @@ export function ModelAccessForm({
   organizationId: string;
   canEdit: boolean;
   models: readonly AvailableModel[];
+  /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
+  /**
+   * The catalog's own query failed, so the form shows the saved lists and the
+   * organization's models and offers a retry instead of a full-screen error.
+   */
+  catalogUnavailable: boolean;
+  catalogIsFetching: boolean;
+  onRetryCatalog: () => void;
   providerAllowList: readonly string[] | undefined;
   modelDenyList: readonly string[] | undefined;
   gateway: OrgGatewaySettings | undefined;
@@ -97,11 +108,14 @@ export function ModelAccessForm({
     savedAllowList: providerAllowList,
     baseline,
     draft,
+    models: [...catalog, ...models],
   });
   const blockingIssue =
     savePayload.kind === 'empty-provider-list'
       ? t('organizationModelAccess.emptyProviderList')
-      : null;
+      : savePayload.kind === 'empty-model-list'
+        ? t('organizationModelAccess.emptyModelList')
+        : null;
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
@@ -157,6 +171,21 @@ export function ModelAccessForm({
   return (
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
+        {catalogUnavailable ? (
+          <View className="flex-row items-center gap-3 rounded-lg bg-muted-soft px-3 py-2">
+            <Text className="flex-1 text-xs text-muted-foreground">
+              {t('organizationModelAccess.catalogUnavailable')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              loading={catalogIsFetching}
+              onPress={onRetryCatalog}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        ) : null}
         <SegmentedControl
           options={[
             { value: 'models' as const, label: t('organizationModelAccess.tabModels') },

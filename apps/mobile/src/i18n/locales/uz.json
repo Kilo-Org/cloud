@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Xulosa chiqarish hududi",
     "inferenceRegionDescription": "Vercel AI Gateway so'rovlarini shu hududga qat'iy biriktiradi. U yerda mavjud bo'lmagan model ishlamaydi.",
     "disableOpenrouterNote": "OpenRouter'ni o'chirish, so'rovlarni u orqali yo'naltiruvchi BYOK kalitlarini ham bloklaydi.",
+    "emptyModelList": "Kamida bitta modelni yoqilgan holda qoldiring. Barcha modellarni rad etsangiz, a'zolarda foydalanish uchun hech narsa qolmaydi.",
+    "catalogUnavailable": "To'liq modellar katalogi yuklanmadi, shuning uchun faqat saqlangan ro'yxatlaringiz ko'rsatilmoqda. Barcha modellarni yuklash uchun qayta urinib ko'ring.",
     "region": {
       "global": "Butun dunyo",
       "us": "Qo'shma Shtatlar",

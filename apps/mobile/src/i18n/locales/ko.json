@@ -4832,6 +4832,8 @@
     "inferenceRegion": "추론 리전",
     "inferenceRegionDescription": "Vercel AI Gateway 요청을 이 리전에 고정합니다. 해당 리전에서 사용할 수 없는 모델은 실패합니다.",
     "disableOpenrouterNote": "OpenRouter를 비활성화하면 이를 통해 요청을 라우팅하는 BYOK 키도 차단됩니다.",
+    "emptyModelList": "모델을 하나 이상 켜 두세요. 모든 모델을 거부하면 멤버가 사용할 수 있는 모델이 없게 됩니다.",
+    "catalogUnavailable": "전체 모델 카탈로그를 불러오지 못해 저장된 목록만 표시됩니다. 모든 모델을 불러오려면 다시 시도하세요.",
     "region": {
       "global": "글로벌",
       "us": "미국",

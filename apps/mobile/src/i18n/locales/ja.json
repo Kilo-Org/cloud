@@ -4832,6 +4832,8 @@
     "inferenceRegion": "推論リージョン",
     "inferenceRegionDescription": "Vercel AI Gatewayのリクエストをこのリージョンに固定します。そこで利用できないモデルは失敗します。",
     "disableOpenrouterNote": "OpenRouterを無効にすると、それを経由してリクエストをルーティングするBYOKキーもブロックされます。",
+    "emptyModelList": "少なくとも1つのモデルをオンのままにしてください。すべてのモデルを拒否すると、メンバーが使用できるものがなくなります。",
+    "catalogUnavailable": "モデルカタログ全体を読み込めなかったため、保存済みのリストのみを表示しています。すべてのモデルを読み込むには再試行してください。",
     "region": {
       "global": "グローバル",
       "us": "アメリカ合衆国",

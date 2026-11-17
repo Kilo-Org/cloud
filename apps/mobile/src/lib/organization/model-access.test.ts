@@ -14,6 +14,7 @@ import {
   setProvidersAllowed,
   toggleModel,
   toggleProvider,
+  usableModelIds,
 } from '@/lib/organization/model-access';
 
 function model(id: string, providers: readonly string[]): CatalogModel {
@@ -161,15 +162,76 @@ describe('draftsEqual', () => {
   });
 });
 
+describe('usableModelIds', () => {
+  it('drops denied models and models whose every provider the draft turned off', () => {
+    expect(
+      usableModelIds({
+        models: MODELS,
+        draft: { providerAllowList: ['anthropic', 'azure'], modelDenyList: ['openai/gpt'] },
+      })
+    ).toEqual(['anthropic/claude']);
+  });
+
+  it('keeps a model that names no provider, since the allow list only gates providers', () => {
+    expect(
+      usableModelIds({
+        models: [{ id: 'auto', name: 'Auto' }],
+        draft: { providerAllowList: [], modelDenyList: [] },
+      })
+    ).toEqual(['auto']);
+  });
+});
+
 describe('modelAccessSave', () => {
+  const everyModelDenied = MODELS.map(entry => normalizeModelId(entry.id)).sort();
+  const everyProvider = ['amazon-bedrock', 'anthropic', 'azure', 'openai'];
+
   it('keeps an already empty saved list writable, since the list itself did not change', () => {
     expect(
       modelAccessSave({
         savedAllowList: [],
         baseline: { providerAllowList: [], modelDenyList: [] },
         draft: { providerAllowList: [], modelDenyList: ['openai/gpt'] },
+        models: MODELS,
       })
     ).toEqual({ kind: 'ready', providerAllowList: [], modelDenyList: ['openai/gpt'] });
+  });
+
+  it('refuses a deny list that would leave no model any member could use', () => {
+    expect(
+      modelAccessSave({
+        savedAllowList: undefined,
+        baseline: { providerAllowList: everyProvider, modelDenyList: [] },
+        draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
+        models: MODELS,
+      })
+    ).toEqual({ kind: 'empty-model-list' });
+  });
+
+  it('keeps a policy that already denied every model writable, since the draft does not empty it', () => {
+    expect(
+      modelAccessSave({
+        savedAllowList: undefined,
+        baseline: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
+        draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
+        models: MODELS,
+      })
+    ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: everyModelDenied });
+  });
+
+  it('leaves the model guard inert while the catalog is unavailable', () => {
+    expect(
+      modelAccessSave({
+        savedAllowList: undefined,
+        baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
+        draft: { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] },
+        models: [],
+      })
+    ).toEqual({
+      kind: 'ready',
+      providerAllowList: undefined,
+      modelDenyList: ['anthropic/claude'],
+    });
   });
 });
 

@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Inferentzia-eskualdea",
     "inferenceRegionDescription": "Vercel AI Gateway eskaerak eskualde honi lotzen dizkio. Bertan erabilgarri ez dagoen ereduak huts egiten du.",
     "disableOpenrouterNote": "OpenRouter desgaitzen baduzu, haren bidez eskaerak bideratzen dituzten BYOK gakoak ere blokeatzen dira.",
+    "emptyModelList": "Utzi gutxienez eredu bat aktibatuta. Eredu guztiak ukatzen badituzu, kideek ez dute ezer izango erabiltzeko.",
+    "catalogUnavailable": "Ereduen katalogo osoa ez da kargatu; beraz, gordetako zerrendak soilik erakusten dira. Saiatu berriro eredu guztiak kargatzeko.",
     "region": {
       "global": "Globala",
       "us": "Ameriketako Estatu Batuak",

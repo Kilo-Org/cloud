@@ -4825,6 +4825,8 @@
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",
+    "emptyModelList": "Leave at least one model on. Denying every model leaves members with nothing to use.",
+    "catalogUnavailable": "The full model catalog didn't load, so only your saved lists are shown. Retry to load every model.",
     "gatewaysDescription": "Kilo routes model requests through the Vercel AI Gateway or OpenRouter. Requests that end up on a disabled gateway fail with an error.",
     "gatewaysUnavailable": "Gateway settings aren't available for this organization.",
     "openrouter": "OpenRouter",

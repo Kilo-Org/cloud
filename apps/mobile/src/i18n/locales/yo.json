@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Ẹkùn ìṣàyẹ̀wò àwòṣe",
     "inferenceRegionDescription": "Sọ àwọn ìbéèrè Vercel AI Gateway mọ́ ẹkùn yìí. Àwòṣe tí kò sí níbẹ̀ yóò kùnà.",
     "disableOpenrouterNote": "Pípa OpenRouter dà yóò tún dínà àwọn kọ́kọ́rọ́ BYOK tí ń gbé àwọn ìbéèrè kọjá nípasẹ̀ rẹ̀.",
+    "emptyModelList": "Fi ó kéré tán àwòṣe kan sílẹ̀ ní títàn. Kíkọ gbogbo àwòṣe yóò fi àwọn ọmọ ẹgbẹ́ sílẹ̀ láìní nǹkan kan láti lò.",
+    "catalogUnavailable": "Àkójọ kíkún àwọn àwòṣe kò gbé wọlé, nítorí náà àwọn àtòkọ tí o ti fipamọ́ nìkan ni a ń fihàn. Gbìyànjú lẹ́ẹ̀kan sí i láti gbé gbogbo àwòṣe wọlé.",
     "region": {
       "global": "Àgbáyé",
       "us": "Orílẹ̀-èdè Amẹ́ríkà",

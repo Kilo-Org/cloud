@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Eneo la utambuzi",
     "inferenceRegionDescription": "Hufunga maombi ya Vercel AI Gateway kwenye eneo hili. Modeli ambayo haipatikani hapo hushindwa.",
     "disableOpenrouterNote": "Kuzima OpenRouter pia huzuia funguo za BYOK zinazopeleka maombi kupitia hiyo.",
+    "emptyModelList": "Acha angalau modeli moja ikiwa imewashwa. Kukataa kila modeli kunawaacha wanachama bila chochote cha kutumia.",
+    "catalogUnavailable": "Katalogi kamili ya modeli haikupakiwa, kwa hivyo ni orodha zako zilizohifadhiwa pekee zinazoonyeshwa. Jaribu tena ili kupakia modeli zote.",
     "region": {
       "global": "Dunia nzima",
       "us": "Marekani",

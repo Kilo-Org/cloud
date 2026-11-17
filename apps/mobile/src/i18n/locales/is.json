@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Ályktunarsvæði",
     "inferenceRegionDescription": "Bindur beiðnir Vercel AI Gateway við þetta svæði. Líkan sem er ekki tiltækt þar mistekst.",
     "disableOpenrouterNote": "Að slökkva á OpenRouter blokkar einnig BYOK-lykla sem beina beiðnum í gegnum það.",
+    "emptyModelList": "Hafðu að minnsta kosti eitt líkan virkt. Ef öllum líkönum er hafnað hafa meðlimir ekkert til að nota.",
+    "catalogUnavailable": "Heildarlíkanaskráin hlóðst ekki, svo aðeins vistaðir listar þínir eru sýndir. Reyndu aftur til að hlaða öllum líkönum.",
     "region": {
       "global": "Alheims",
       "us": "Bandaríkin",

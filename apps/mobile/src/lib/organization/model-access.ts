@@ -192,6 +192,33 @@ export function draftsEqual(a: ModelAccessDraft, b: ModelAccessDraft): boolean {
 }
 
 /**
+ * The models a draft leaves a member able to use: every model the editor knows
+ * whose id the deny list does not name, and that a permitted provider serves. A
+ * model that names no inference provider is not gated by the provider allow
+ * list, so only a denial removes it.
+ */
+export function usableModelIds(params: {
+  models: readonly CatalogModel[];
+  draft: ModelAccessDraft;
+}): string[] {
+  const allowedProviders = new Set(params.draft.providerAllowList);
+  const denied = new Set(params.draft.modelDenyList);
+  const usable = new Set<string>();
+  for (const model of params.models) {
+    const id = normalizeModelId(model.id);
+    if (denied.has(id)) {
+      continue;
+    }
+    const providers = model.inference_provider_ids ?? [];
+    if (providers.length > 0 && !providers.some(slug => allowedProviders.has(slug))) {
+      continue;
+    }
+    usable.add(id);
+  }
+  return [...usable].sort((a, b) => a.localeCompare(b));
+}
+
+/**
  * What a save writes. `providerAllowList` is absent when the save leaves the
  * saved list alone: `updateAllowLists` treats an omitted list as unchanged
  * (`provider_allow_list !== undefined` in
@@ -204,7 +231,9 @@ export type ModelAccessSave =
       modelDenyList: readonly string[];
     }
   /** The organization would be left with no allowed provider, blocking every route. */
-  | { kind: 'empty-provider-list' };
+  | { kind: 'empty-provider-list' }
+  /** The organization would be left with no model any member could route to. */
+  | { kind: 'empty-model-list' };
 
 /**
  * The two lists a save writes, or the refusal that keeps it from writing them.
@@ -218,14 +247,21 @@ export type ModelAccessSave =
  * Providers tab omits the list and leaves it unset. The rows behind an edit
  * include every saved slug (`providerRows`), so an explicit write keeps them.
  *
- * An empty list is refused unless the organization's saved list was already
- * empty: it stops every Kilo route, which no toggle on this form should do by
- * accident.
+ * An empty provider list is refused unless the organization's saved list was
+ * already empty: it stops every Kilo route, which no toggle on this form should
+ * do by accident. A deny list that covers every model is refused the same way:
+ * the members would have a permitted provider and nothing to route to.
  */
 export function modelAccessSave(params: {
   savedAllowList: readonly string[] | undefined;
   baseline: ModelAccessDraft;
   draft: ModelAccessDraft;
+  /**
+   * Every model the form knows: the gateway catalog plus the organization's own
+   * list. Empty while the catalog is unavailable, which leaves the model guard
+   * inert instead of refusing a save it cannot judge.
+   */
+  models: readonly CatalogModel[];
 }): ModelAccessSave {
   const providersChanged =
     params.draft.providerAllowList.join('\n') !== params.baseline.providerAllowList.join('\n');
@@ -235,6 +271,12 @@ export function modelAccessSave(params: {
       : [...params.draft.providerAllowList];
   if (providerAllowList?.length === 0 && params.baseline.providerAllowList.length > 0) {
     return { kind: 'empty-provider-list' };
+  }
+  if (
+    usableModelIds({ models: params.models, draft: params.draft }).length === 0 &&
+    usableModelIds({ models: params.models, draft: params.baseline }).length > 0
+  ) {
+    return { kind: 'empty-model-list' };
   }
   return {
     kind: 'ready',

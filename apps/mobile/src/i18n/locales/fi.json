@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Päättelyalue",
     "inferenceRegionDescription": "Sitoo Vercel AI Gateway -pyynnöt tähän alueeseen. Pyynnöt malleille, jotka eivät ole saatavilla alueella, epäonnistuvat.",
     "disableOpenrouterNote": "OpenRouterin poistaminen käytöstä estää myös BYOK-avaimet, jotka reitittävät pyyntöjä sen kautta.",
+    "emptyModelList": "Jätä vähintään yksi malli käyttöön. Jos estät kaikki mallit, jäsenillä ei ole mitään käytettävää.",
+    "catalogUnavailable": "Koko malliluettelo ei latautunut, joten vain tallennetut luettelosi näytetään. Yritä uudelleen ladataksesi kaikki mallit.",
     "region": {
       "global": "Maailmanlaajuinen",
       "us": "Yhdysvallat",

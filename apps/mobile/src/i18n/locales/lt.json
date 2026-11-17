@@ -4972,6 +4972,8 @@
     "inferenceRegion": "Inferencijos regionas",
     "inferenceRegionDescription": "Pririša Vercel AI Gateway užklausas prie šio regiono. Jei modelis ten nepasiekiamas, užklausa nepavyksta.",
     "disableOpenrouterNote": "Išjungus OpenRouter taip pat blokuojami BYOK raktai, kurie nukreipia užklausas per jį.",
+    "emptyModelList": "Palikite įjungtą bent vieną modelį. Uždraudus visus modelius, nariai neturės ką naudoti.",
+    "catalogUnavailable": "Nepavyko įkelti viso modelių katalogo, todėl rodomi tik jūsų išsaugoti sąrašai. Bandykite dar kartą, kad įkeltumėte visus modelius.",
     "region": {
       "global": "Pasaulinis",
       "us": "Jungtinės Valstijos",

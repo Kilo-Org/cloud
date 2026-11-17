@@ -4902,6 +4902,8 @@
     "inferenceRegion": "Région d'inférence",
     "inferenceRegionDescription": "Rattache les requêtes Vercel AI Gateway à cette région. Un modèle qui n'y est pas disponible échoue.",
     "disableOpenrouterNote": "Désactiver OpenRouter bloque aussi les clés BYOK qui acheminent les requêtes par son intermédiaire.",
+    "emptyModelList": "Laissez au moins un modèle activé. Si vous refusez tous les modèles, les membres n'auront plus rien à utiliser.",
+    "catalogUnavailable": "Le catalogue complet des modèles n'a pas pu être chargé ; seules vos listes enregistrées sont affichées. Réessayez pour charger tous les modèles.",
     "region": {
       "global": "Mondial",
       "us": "États-Unis",

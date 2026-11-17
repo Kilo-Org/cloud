@@ -5112,6 +5112,8 @@
     "inferenceRegion": "Rhanbarth casgliadu",
     "inferenceRegionDescription": "Mae'n pinio ceisiadau Vercel AI Gateway i'r rhanbarth hwn. Bydd model nad yw ar gael yno yn methu.",
     "disableOpenrouterNote": "Mae analluogi OpenRouter hefyd yn blocio allweddi BYOK sy'n anfon ceisiadau drwyddo.",
+    "emptyModelList": "Gadewch o leiaf un model ymlaen. Os gwrthodwch bob model, ni fydd gan aelodau ddim i'w ddefnyddio.",
+    "catalogUnavailable": "Ni lwythodd y catalog modelau llawn, felly dim ond eich rhestrau sydd wedi'u cadw sy'n cael eu dangos. Rhowch gynnig arall arni i lwytho pob model.",
     "region": {
       "global": "Byd-eang",
       "us": "Unol Daleithiau",

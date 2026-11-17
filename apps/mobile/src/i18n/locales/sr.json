@@ -4902,6 +4902,8 @@
     "inferenceRegion": "Region izvršavanja",
     "inferenceRegionDescription": "Vezuje zahteve za Vercel AI Gateway za ovaj region. Model koji tamo nije dostupan neće uspeti.",
     "disableOpenrouterNote": "Ako onemogućite OpenRouter, to takođe blokira BYOK ključeve koji kroz njega usmeravaju zahteve.",
+    "emptyModelList": "Ostavite uključen bar jedan model. Ako odbijete sve modele, članovima neće ostati ništa za korišćenje.",
+    "catalogUnavailable": "Kompletan katalog modela nije učitan, pa su prikazane samo vaše sačuvane liste. Pokušajte ponovo da biste učitali sve modele.",
     "region": {
       "global": "Globalno",
       "us": "Sjedinjene Američke Države",

@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Yankin yin hasashe",
     "inferenceRegionDescription": "Yana kulle buƙatun Vercel AI Gateway ga wannan yankin. Samfurin da ba ya samuwa a can zai gaza.",
     "disableOpenrouterNote": "Kashe OpenRouter yana kuma toshe maɓallan BYOK waɗanda ke tura buƙatu ta hanyar sa.",
+    "emptyModelList": "Bar aƙalla samfuri ɗaya a kunne. Hana duk samfuran zai bar mambobi ba tare da komai da za su yi amfani da shi ba.",
+    "catalogUnavailable": "Cikakken kundin samfuran bai loda ba, don haka jerin da ka adana kawai ake nunawa. Sake gwadawa don loda duk samfuran.",
     "region": {
       "global": "Duniya",
       "us": "Amurka",

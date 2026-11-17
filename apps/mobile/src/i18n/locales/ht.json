@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Rejyon enferans",
     "inferenceRegionDescription": "Fikse demann Vercel AI Gateway yo sou rejyon sa a. Yon modèl ki pa disponib la echwe.",
     "disableOpenrouterNote": "Dezaktive OpenRouter bloke tou kle BYOK ki dirije demann yo atravè li.",
+    "emptyModelList": "Kite omwen yon modèl aktive. Si ou refize tout modèl yo, manm yo p ap gen anyen pou yo itilize.",
+    "catalogUnavailable": "Katalòg konplè modèl yo pa chaje, kidonk se sèlman lis ou anrejistre yo ki parèt. Eseye ankò pou chaje tout modèl yo.",
     "region": {
       "global": "Mondyal",
       "us": "Etazini",

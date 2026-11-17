@@ -4832,6 +4832,8 @@
     "inferenceRegion": "İnferens regionu",
     "inferenceRegionDescription": "Vercel AI Gateway sorğularını bu regiona bağlayır. Orada əlçatan olmayan modelə sorğular uğursuz olur.",
     "disableOpenrouterNote": "OpenRouter deaktiv edildikdə, sorğuları onun vasitəsilə yönləndirən BYOK açarları da bloklanır.",
+    "emptyModelList": "Ən azı bir modeli aktiv saxlayın. Bütün modelləri rədd etsəniz, üzvlərin istifadə edəcəyi heç nə qalmaz.",
+    "catalogUnavailable": "Tam model kataloqu yüklənmədi, buna görə yalnız yadda saxlanmış siyahılarınız göstərilir. Bütün modelləri yükləmək üçün yenidən cəhd edin.",
     "region": {
       "global": "Qlobal",
       "us": "Amerika Birləşmiş Ştatları",

@@ -4832,6 +4832,8 @@
     "inferenceRegion": "የኢንፈረንስ ክልል",
     "inferenceRegionDescription": "የVercel AI Gateway ጥያቄዎችን ከዚህ ክልል ጋር ያቆራኛል። እዚያ የማይገኝ ሞዴል ይከሽፋል።",
     "disableOpenrouterNote": "OpenRouterን ማሰናከል ጥያቄዎችን በእሱ በኩል የሚያዘዋውሩ የBYOK ቁልፎችንም ያግዳል።",
+    "emptyModelList": "ቢያንስ አንድ ሞዴል እንደበራ ይተዉ። ሁሉንም ሞዴሎች መከልከል አባላት የሚጠቀሙበት ምንም ነገር እንዳይኖራቸው ያደርጋል።",
+    "catalogUnavailable": "ሙሉ የሞዴል ካታሎግ አልተጫነም፣ ስለዚህ የተቀመጡ ዝርዝሮችዎ ብቻ ናቸው የሚታዩት። ሁሉንም ሞዴሎች ለመጫን እንደገና ይሞክሩ።",
     "region": {
       "global": "ዓለም አቀፍ",
       "us": "ዩናይትድ ስቴትስ",

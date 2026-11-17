@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Gobolka falanqaynta",
     "inferenceRegionDescription": "Wuxuu codsiyada Vercel AI Gateway ku xidhaa gobolkan. Moodeel aan halkaas laga heli karin wuu fashilmaa.",
     "disableOpenrouterNote": "Dami OpenRouter waxay sidoo kale xannibtaa furayaasha BYOK ee codsiyada u mara iyada.",
+    "emptyModelList": "Ka tag ugu yaraan hal moodeel oo shidan. Haddii aad diiddo moodeel kasta, xubnuhu ma heli doonaan wax ay isticmaalaan.",
+    "catalogUnavailable": "Kataloogga buuxa ee moodeelada lama soo rarin, sidaa darteed waxaa la muujinayaa oo keliya liisaskaaga la keydiyay. Isku day mar kale si aad u soo rarto moodeel kasta.",
     "region": {
       "global": "Caalami",
       "us": "Maraykanka",

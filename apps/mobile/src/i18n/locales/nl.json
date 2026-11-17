@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Inferentieregio",
     "inferenceRegionDescription": "Koppelt verzoeken via Vercel AI Gateway vast aan deze regio. Een model dat daar niet beschikbaar is, mislukt.",
     "disableOpenrouterNote": "Als u OpenRouter uitschakelt, worden ook BYOK-sleutels geblokkeerd die verzoeken erdoorheen routeren.",
+    "emptyModelList": "Laat minstens één model ingeschakeld. Als je alle modellen weigert, hebben leden niets meer om te gebruiken.",
+    "catalogUnavailable": "De volledige modelcatalogus is niet geladen, dus alleen je opgeslagen lijsten worden getoond. Probeer het opnieuw om alle modellen te laden.",
     "region": {
       "global": "Wereldwijd",
       "us": "Verenigde Staten",

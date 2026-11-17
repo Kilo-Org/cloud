@@ -5042,6 +5042,8 @@
     "inferenceRegion": "Réigiún tátail",
     "inferenceRegionDescription": "Ceanglaíonn sé iarratais Vercel AI Gateway leis an réigiún seo. Teipeann samhail nach bhfuil ar fáil ansin.",
     "disableOpenrouterNote": "Má mhúchann tú OpenRouter, cuirtear bac freisin ar eochracha BYOK a ródálann iarratais tríd.",
+    "emptyModelList": "Fág samhail amháin ar a laghad ar siúl. Má dhiúltaítear do gach samhail, ní bheidh aon rud ag baill le húsáid.",
+    "catalogUnavailable": "Níor lódáil catalóg iomlán na samhlacha, mar sin ní thaispeántar ach na liostaí atá sábháilte agat. Bain triail eile as chun gach samhail a lódáil.",
     "region": {
       "global": "Domhanda",
       "us": "Stáit Aontaithe Mheiriceá",

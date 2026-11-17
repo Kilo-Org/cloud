@@ -4902,6 +4902,8 @@
     "inferenceRegion": "Secināšanas reģions",
     "inferenceRegionDescription": "Piesaista Vercel AI Gateway pieprasījumus šim reģionam. Modelis, kas tur nav pieejams, izraisa pieprasījuma kļūdu.",
     "disableOpenrouterNote": "OpenRouter atspējošana bloķē arī BYOK atslēgas, kas maršrutē pieprasījumus caur to.",
+    "emptyModelList": "Atstājiet ieslēgtu vismaz vienu modeli. Ja tiek liegti visi modeļi, dalībniekiem nav ko izmantot.",
+    "catalogUnavailable": "Pilnais modeļu katalogs netika ielādēts, tāpēc tiek rādīti tikai jūsu saglabātie saraksti. Mēģiniet vēlreiz, lai ielādētu visus modeļus.",
     "region": {
       "global": "Globāls",
       "us": "Amerikas Savienotās Valstis",

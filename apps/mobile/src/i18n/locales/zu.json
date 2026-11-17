@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Isifunda sokucabanga",
     "inferenceRegionDescription": "Ibophela izicelo ze-Vercel AI Gateway kulesi sifunda. Imodeli engatholakali lapho iyahluleka.",
     "disableOpenrouterNote": "Ukucisha i-OpenRouter kuvimba futhi okhiye be-BYOK abadlulisa izicelo ngayo.",
+    "emptyModelList": "Shiya okungenani imodeli eyodwa ivuliwe. Ukwenqaba wonke amamodeli kushiya amalungu engenalutho angalusebenzisa.",
+    "catalogUnavailable": "Ikhathalogi ephelele yamamodeli ayilayishekanga, ngakho kuboniswa kuphela izinhlu zakho ezilondoloziwe. Zama futhi ukuze ulayishe wonke amamodeli.",
     "region": {
       "global": "Emhlabeni wonke",
       "us": "IMelika",

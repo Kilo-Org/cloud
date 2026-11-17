@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Inferensiestreek",
     "inferenceRegionDescription": "Pen Vercel AI Gateway-versoeke aan hierdie streek vas. 'n Model wat nie daar beskikbaar is nie, misluk.",
     "disableOpenrouterNote": "As jy OpenRouter afskakel, word BYOK-sleutels wat versoeke daardeur roeteer ook geblokkeer.",
+    "emptyModelList": "Laat ten minste een model aangeskakel. As elke model geweier word, het lede niks om te gebruik nie.",
+    "catalogUnavailable": "Die volledige modelkatalogus het nie gelaai nie, dus word slegs jou gestoorde lyste gewys. Probeer weer om elke model te laai.",
     "region": {
       "global": "Globaal",
       "us": "Verenigde State",

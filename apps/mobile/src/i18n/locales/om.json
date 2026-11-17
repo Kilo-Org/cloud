@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Naannoo raawwii",
     "inferenceRegionDescription": "Gaaffiiwwan Vercel AI Gateway naannoo kanaatti ni hidha. Moodelaan achitti hin jiraanne ni kasaasa.",
     "disableOpenrouterNote": "OpenRouter cufuun furtuulee BYOK gaaffiiwwan isa keessa geessanis ni dhorka.",
+    "emptyModelList": "Yoo xiqqaate moodela tokko banaa dhiisi. Moodela hunda yoo dide, miseensonni waan itti fayyadaman hin qaban.",
+    "catalogUnavailable": "Kaataalogiin moodelaa guutuun hin fe'amne, kanaaf tarreewwan kee olkaa'aman qofatu mul'ata. Moodela hunda fe'uuf irra deebi'ii yaali.",
     "region": {
       "global": "Addunyaa",
       "us": "Istaatawwan Ameerikaa",

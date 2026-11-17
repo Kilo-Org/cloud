@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Khu vực suy luận",
     "inferenceRegionDescription": "Ghim các yêu cầu Vercel AI Gateway vào khu vực này. Mô hình không khả dụng ở đó sẽ thất bại.",
     "disableOpenrouterNote": "Tắt OpenRouter cũng chặn các khóa BYOK định tuyến yêu cầu qua đó.",
+    "emptyModelList": "Hãy bật ít nhất một mô hình. Nếu từ chối mọi mô hình, thành viên sẽ không còn gì để sử dụng.",
+    "catalogUnavailable": "Không tải được toàn bộ danh mục mô hình, nên chỉ hiển thị các danh sách bạn đã lưu. Hãy thử lại để tải mọi mô hình.",
     "region": {
       "global": "Toàn cầu",
       "us": "Hoa Kỳ",

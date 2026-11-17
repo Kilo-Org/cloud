@@ -4902,6 +4902,8 @@
     "inferenceRegion": "Regiune de inferență",
     "inferenceRegionDescription": "Fixează cererile Vercel AI Gateway la această regiune. Un model care nu este disponibil acolo eșuează.",
     "disableOpenrouterNote": "Dezactivarea OpenRouter blochează și cheile BYOK care direcționează cererile prin acesta.",
+    "emptyModelList": "Lăsați cel puțin un model activat. Dacă respingeți toate modelele, membrii nu vor avea nimic de folosit.",
+    "catalogUnavailable": "Catalogul complet de modele nu s-a încărcat, așa că sunt afișate doar listele salvate. Reîncercați pentru a încărca toate modelele.",
     "region": {
       "global": "Global",
       "us": "Statele Unite",

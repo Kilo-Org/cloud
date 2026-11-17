@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Wilayah inferens",
     "inferenceRegionDescription": "Menetapkan permintaan Vercel AI Gateway kepada wilayah ini. Model yang tidak tersedia di sana akan gagal.",
     "disableOpenrouterNote": "Mematikan OpenRouter juga menyekat kunci BYOK yang menghalakan permintaan melaluinya.",
+    "emptyModelList": "Biarkan sekurang-kurangnya satu model dihidupkan. Menolak semua model menyebabkan ahli tiada apa-apa untuk digunakan.",
+    "catalogUnavailable": "Katalog model penuh tidak dimuatkan, jadi hanya senarai yang anda simpan ditunjukkan. Cuba semula untuk memuatkan semua model.",
     "region": {
       "global": "Sejagat",
       "us": "Amerika Syarikat",

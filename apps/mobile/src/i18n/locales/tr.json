@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Çıkarım bölgesi",
     "inferenceRegionDescription": "Vercel AI Gateway isteklerini bu bölgeye sabitler. Orada kullanılamayan bir model başarısız olur.",
     "disableOpenrouterNote": "OpenRouter'ı devre dışı bırakmak, istekleri onun üzerinden yönlendiren BYOK anahtarlarını da engeller.",
+    "emptyModelList": "En az bir modeli açık bırakın. Tüm modelleri reddetmek, üyelere kullanacak hiçbir şey bırakmaz.",
+    "catalogUnavailable": "Tam model kataloğu yüklenemedi, bu yüzden yalnızca kayıtlı listeleriniz gösteriliyor. Tüm modelleri yüklemek için yeniden deneyin.",
     "region": {
       "global": "Küresel",
       "us": "Amerika Birleşik Devletleri",

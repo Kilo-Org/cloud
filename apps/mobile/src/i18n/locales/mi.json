@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Rohe whakatau",
     "inferenceRegionDescription": "Ka herea ngā tono Vercel AI Gateway ki tēnei rohe. Ka rahua tētahi tauira kāore e wātea ana ki reira.",
     "disableOpenrouterNote": "Mā te whakaweto i a OpenRouter e ārai hoki i ngā kī BYOK e tuku tono ana mā roto i a ia.",
+    "emptyModelList": "Waiho kia kotahi te tauira kia kā i te iti rawa. Ki te whakakāhoretia ngā tauira katoa, kāore he mea hei whakamahi mā ngā mema.",
+    "catalogUnavailable": "Kāore i utaina te putumōhio tauira katoa, nō reira ko ō rārangi kua tiakina anake e whakaaturia ana. Whakamātau anō kia utaina ngā tauira katoa.",
     "region": {
       "global": "Ao whānui",
       "us": "Te Hononga o Amerika",

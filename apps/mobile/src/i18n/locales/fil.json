@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Rehiyon ng inference",
     "inferenceRegionDescription": "Pini-pin ang mga request sa Vercel AI Gateway sa rehiyong ito. Papalya ang modelong hindi available doon.",
     "disableOpenrouterNote": "Kapag na-disable ang OpenRouter, haharangin din ang mga BYOK key na nagra-route ng mga request dito.",
+    "emptyModelList": "Mag-iwan ng kahit isang modelong naka-on. Kapag dinine-deny ang lahat ng modelo, wala nang magagamit ang mga miyembro.",
+    "catalogUnavailable": "Hindi na-load ang buong catalog ng modelo, kaya ang mga naka-save mong listahan lang ang ipinapakita. Subukang muli para i-load ang lahat ng modelo.",
     "region": {
       "global": "Global",
       "us": "Estados Unidos",

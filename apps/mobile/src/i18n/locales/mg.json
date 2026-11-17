@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Faritra fanodinana",
     "inferenceRegionDescription": "Mametraka ny fangatahana Vercel AI Gateway amin'ity faritra ity. Ny modely tsy misy eto dia tsy hahomby.",
     "disableOpenrouterNote": "Ny fanakanana OpenRouter dia manakana koa ny fanalahidy BYOK izay mandefa fangatahana amin'ny alalany.",
+    "emptyModelList": "Avelao ho velona farafahakeliny modely iray. Raha lavina ny modely rehetra dia tsy hanana na inona na inona hampiasaina ny mpikambana.",
+    "catalogUnavailable": "Tsy voaentana ny katalaogin'ny modely feno, ka ny lisitra voatahirinao ihany no aseho. Andramo indray mba hampidirana ny modely rehetra.",
     "region": {
       "global": "Maneran-tany",
       "us": "Etazonia",

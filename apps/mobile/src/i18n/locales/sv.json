@@ -4832,6 +4832,8 @@
     "inferenceRegion": "Inferensregion",
     "inferenceRegionDescription": "Låser Vercel AI Gateway-begäranden till den här regionen. En modell som inte är tillgänglig där misslyckas.",
     "disableOpenrouterNote": "Om OpenRouter inaktiveras blockeras även BYOK-nycklar som dirigerar begäranden genom det.",
+    "emptyModelList": "Låt minst en modell vara på. Om du nekar alla modeller har medlemmarna inget att använda.",
+    "catalogUnavailable": "Hela modellkatalogen kunde inte läsas in, så bara dina sparade listor visas. Försök igen för att läsa in alla modeller.",
     "region": {
       "global": "Globalt",
       "us": "USA",

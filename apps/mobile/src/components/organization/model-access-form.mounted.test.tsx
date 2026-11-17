@@ -15,6 +15,7 @@ import { ModelAccessForm } from './model-access-form';
 import {
   type CatalogModel,
   type ModelAccessDraft,
+  setModelsAllowed,
   setProvidersAllowed,
   toggleModel,
   toggleProvider,
@@ -59,7 +60,10 @@ const CATALOG = [model('anthropic/claude', ['anthropic']), model('openai/gpt', [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function render(providerAllowList: readonly string[] | undefined) {
+function render(
+  providerAllowList: readonly string[] | undefined,
+  overrides: { catalogUnavailable?: boolean; onRetryCatalog?: () => void } = {}
+) {
   saved.mutateAsync.mockResolvedValue(undefined);
   act(() => {
     renderer = TestRenderer.create(
@@ -67,7 +71,10 @@ function render(providerAllowList: readonly string[] | undefined) {
         organizationId: 'org-1',
         canEdit: true,
         models: [],
-        catalog: CATALOG,
+        catalog: overrides.catalogUnavailable === true ? [] : CATALOG,
+        catalogUnavailable: overrides.catalogUnavailable === true,
+        catalogIsFetching: false,
+        onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
         providerAllowList,
         modelDenyList: [],
         gateway: undefined,
@@ -103,11 +110,10 @@ function changeDraft(root: ReactTestInstance, next: ModelAccessDraft) {
 
 async function pressSave(root: ReactTestInstance) {
   const buttons = root.findAllByType('Button' as never);
-  const save = buttons[1];
+  const save = buttons.at(-1);
   if (!save) {
     throw new Error('save button not found');
   }
-  expect(buttons).toHaveLength(2);
   await act(async () => {
     (save.props.onPress as () => void)();
     await Promise.resolve();
@@ -190,5 +196,41 @@ describe('ModelAccessForm save', () => {
     expect(save.props.disabled).toBe(true);
     expect(saved.mutateAsync).not.toHaveBeenCalled();
     expect(String(statusMessage(root))).toContain('Allow at least one provider');
+  });
+
+  it('refuses two taps that would deny every model', async () => {
+    const root = render(undefined);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, setModelsAllowed(draft, ['anthropic/claude', 'openai/gpt'], false));
+
+    const save = await pressSave(root);
+
+    expect(save.props.disabled).toBe(true);
+    expect(saved.mutateAsync).not.toHaveBeenCalled();
+    expect(String(statusMessage(root))).toContain('Leave at least one model on');
+  });
+});
+
+describe('ModelAccessForm without the catalog', () => {
+  it('keeps the saved lists editable and offers a retry instead of a full-screen error', async () => {
+    const onRetryCatalog = vi.fn<() => void>();
+    const root = render(['anthropic'], { catalogUnavailable: true, onRetryCatalog });
+
+    const copy = root
+      .findAllByType('Text' as never)
+      .map(node => node.props.children)
+      .find(value => typeof value === 'string' && value.includes('full model catalog'));
+    expect(copy).toBeDefined();
+    expect(list(root, 'ModelDenyList').props.draft).toBeDefined();
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
+
+    const buttons = root.findAllByType('Button' as never);
+    await act(async () => {
+      (buttons[0]?.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onRetryCatalog).toHaveBeenCalledTimes(1);
   });
 });

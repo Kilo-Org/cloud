@@ -309,6 +309,23 @@ describe('browser runtime', () => {
     expect(leases.holder(TAB_ID)?.caller).toStrictEqual(run);
   });
 
+  it('ignores a handover from a caller that is not a panel', async () => {
+    vi.useFakeTimers();
+    const { leases, runtime } = createHarness();
+    const agentCaller = agent('session-1');
+
+    await leases.acquire(TAB_ID, agentCaller);
+
+    // Only a panel may hand a tab over; an agent's lease is never freed for someone else.
+    const claim = runtime.claimTab({ caller: workflow('run-1'), from: agentCaller, tabId: TAB_ID });
+
+    await vi.advanceTimersByTimeAsync(AGENT_TAB_WAIT_MS);
+    await expect(claim).resolves.toBe(false);
+    expect(leases.holder(TAB_ID)?.caller).toStrictEqual(agentCaller);
+
+    vi.useRealTimers();
+  });
+
   it('refuses a run claim on a tab another caller holds, after the wait window', async () => {
     vi.useFakeTimers();
     const { leases, runtime } = createHarness();

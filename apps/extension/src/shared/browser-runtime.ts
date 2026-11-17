@@ -170,9 +170,9 @@ export const createBrowserRuntime = ({
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
     // The handover runs before the acquire, in one message.
-    // The run's caller takes the panel lease its own turn holds.
-    // A caller already queued for the tab still gets it first (FIFO).
-    if (from !== undefined) {
+    // Only a panel may hand a lease over: its take-over asymmetry is the design's only one.
+    // An agent's tab is never freed for someone else without a confirmation.
+    if (from?.kind === 'panel') {
       leases.release(tabId, from);
     }
 

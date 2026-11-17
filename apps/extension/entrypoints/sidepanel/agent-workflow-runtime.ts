@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the panel's three tab transports (claim, eval, navigate) share one lease contract; splitting them would hide which call holds the tab. */
 import { browser } from '#imports';
 import type { Browser } from 'wxt/browser';
 import {
@@ -5,6 +6,7 @@ import {
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
+import { releaseBrowserCaller } from './browser-tool-runtime';
 import {
   CLAIM_TAB_MESSAGE,
   EVAL_TAB_MESSAGE,
@@ -38,27 +40,59 @@ const urlMatches = (left: string, right: string): boolean => {
  * rewrite the page and invalidate that holder's refs. The panel hands over its
  * own conversation's lease in the same message, so the run does not queue
  * behind the turn that is waiting for it.
+ *
+ * A stopped turn drops its claim at once instead of holding the queue for the
+ * whole wait window: the abort resolves this call false and releases the run
+ * caller, which drops the queued wait in the background. An `AbortSignal` does
+ * not cross `sendMessage`, so the cancellation travels as that release message.
  */
 export const claimTab = async (
   tabId: number,
   caller: BrowserCaller,
-  from?: BrowserCaller
+  { from, signal }: { readonly from?: BrowserCaller; readonly signal?: AbortSignal } = {}
 ): Promise<boolean> => {
-  try {
-    const response: unknown = await browser.runtime.sendMessage({
-      caller,
-      ...(from === undefined ? {} : { from }),
-      tabId,
-      type: CLAIM_TAB_MESSAGE,
-    });
+  const { promise: cancelled, resolve: markCancelled } = Promise.withResolvers<false>();
+  const onAbort = (): void => {
+    markCancelled(false);
+  };
+  // Read through a call: the signal can also fire while the claim is queued in the background.
+  const stopped = (): boolean => signal !== undefined && signal.aborted;
 
-    if (!isTabDebuggerResponse(response) || !response.ok) {
-      return false;
+  // A stopped turn claims nothing: it must not take a lease it will never release.
+  if (stopped()) {
+    return false;
+  }
+
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    const claim = (async (): Promise<boolean> => {
+      const response: unknown = await browser.runtime.sendMessage({
+        caller,
+        ...(from === undefined ? {} : { from }),
+        tabId,
+        type: CLAIM_TAB_MESSAGE,
+      });
+
+      if (!isTabDebuggerResponse(response) || !response.ok) {
+        return false;
+      }
+
+      return response.type === CLAIM_TAB_MESSAGE && response.granted;
+    })();
+
+    const granted = await Promise.race([claim, cancelled]);
+
+    if (stopped() && !granted) {
+      // The run is gone for good: drop the wait it may still hold in the background.
+      await releaseBrowserCaller(caller);
     }
 
-    return response.type === CLAIM_TAB_MESSAGE && response.granted;
+    return granted;
   } catch {
     return false;
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
   }
 };
 

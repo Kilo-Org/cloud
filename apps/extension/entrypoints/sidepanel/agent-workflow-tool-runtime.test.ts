@@ -895,6 +895,37 @@ describe('run_workflow', () => {
     );
   });
 
+  it('reports a stopped turn when the claim is cancelled', async () => {
+    const abort = new AbortController();
+
+    abort.abort();
+
+    const ctx = createBaseCtx({
+      claimTab: vi.fn().mockResolvedValue(false),
+      mode: 'dangerous',
+      signal: abort.signal,
+    });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        approvedScriptHash: 'hash',
+        createdAt: 100,
+        description: 'desc',
+        id: 'wf-1',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        updatedAt: 200,
+      },
+    ]);
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctx
+    );
+
+    expect(result).toStrictEqual({ error: 'Run stopped.', ok: false });
+  });
+
   it('runs in dangerous mode when workflow is found', async () => {
     const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
     mockedRunWorkflow.mockResolvedValue({ ok: true, pagesVisited: 1, result: 'success' });

@@ -4,7 +4,11 @@ import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
-import { CLAIM_TAB_MESSAGE, EVAL_TAB_MESSAGE } from '@/src/shared/tab-debugger';
+import {
+  CLAIM_TAB_MESSAGE,
+  EVAL_TAB_MESSAGE,
+  RELEASE_BROWSER_CALLER_MESSAGE,
+} from '@/src/shared/tab-debugger';
 
 type TabListener = (tabId: number, changeInfo: object, tabInfo: object) => void;
 
@@ -64,7 +68,7 @@ describe('workflow tab claim', () => {
       panelId: 'panel-1',
     } as const;
 
-    await expect(claimTab(7, runCaller, panelCaller)).resolves.toBe(true);
+    await expect(claimTab(7, runCaller, { from: panelCaller })).resolves.toBe(true);
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       caller: runCaller,
       from: panelCaller,
@@ -83,6 +87,41 @@ describe('workflow tab claim', () => {
       tabId: 7,
       type: CLAIM_TAB_MESSAGE,
     });
+  });
+
+  it('drops a queued claim as soon as the turn is stopped', async () => {
+    const { promise: neverSettles } = Promise.withResolvers<void>();
+
+    mocks.sendMessage.mockReset();
+    // The claim itself keeps waiting — the tab is held elsewhere — while the release resolves.
+    mocks.sendMessage.mockReturnValueOnce(neverSettles);
+    mocks.sendMessage.mockResolvedValue({
+      ok: true,
+      released: 1,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+    const abort = new AbortController();
+
+    const claim = claimTab(7, runCaller, { signal: abort.signal });
+
+    abort.abort();
+
+    await expect(claim).resolves.toBe(false);
+    // The cancellation travels as a release of the run caller, which drops the queued wait.
+    expect(mocks.sendMessage).toHaveBeenLastCalledWith({
+      caller: runCaller,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+  });
+
+  it('does not claim at all once the turn is stopped', async () => {
+    mocks.sendMessage.mockReset();
+    const abort = new AbortController();
+
+    abort.abort();
+
+    await expect(claimTab(7, runCaller, { signal: abort.signal })).resolves.toBe(false);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('reports a failed transport as a refused claim', async () => {

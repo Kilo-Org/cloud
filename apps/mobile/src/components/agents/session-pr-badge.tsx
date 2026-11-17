@@ -84,7 +84,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   const { t } = useTranslation();
 
   if (loading) {
-    return <Skeleton className="h-5 w-[52px] rounded-full" />;
+    return <Skeleton className="h-5 w-14 rounded-full" />;
   }
   if (!props.pr) {
     return null;

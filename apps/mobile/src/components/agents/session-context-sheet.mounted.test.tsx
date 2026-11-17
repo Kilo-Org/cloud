@@ -83,6 +83,7 @@ vi.mock('react-i18next', async importOriginal => {
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ width: 400, height: 700, fontScale: 1, scale: 1 }),
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -113,7 +114,14 @@ vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
+  Copy: 'Copy',
+  FileDiff: 'FileDiff',
+  History: 'History',
+}));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
@@ -393,7 +401,7 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 function textValues(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
     .findAll(node => node.type === Text)
-    .map(node => node.props.children)
+    .flatMap(node => (Array.isArray(node.props.children) ? node.props.children : [node.props.children]))
     .filter((value): value is string => typeof value === 'string');
 }
 
@@ -679,7 +687,11 @@ describe('SessionContextSheet copy row touch targets', () => {
         node => node.props.testID === testID
       );
       expect(target?.props.accessibilityRole).toBe('button');
-      expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+      const rowClasses =
+        target
+          ?.findAll(node => typeof node.props.className === 'string')
+          .map(node => node.props.className as string) ?? [];
+      expect(rowClasses.some(classes => classes.includes(ROW_TARGET_CLASS))).toBe(true);
       await unmount(renderer);
     }
   );
@@ -694,8 +706,12 @@ describe('SessionContextSheet view changes row touch target', () => {
       node => node.props.testID === 'session-context-sheet-view-changes'
     );
     expect(target?.props.accessibilityRole).toBe('button');
-    expect(target?.props.className).toContain(ROW_TARGET_CLASS);
-    expect(target?.props.className).not.toContain('min-h-[44px]');
+    const rowClasses =
+      target
+        ?.findAll(node => typeof node.props.className === 'string')
+        .map(node => node.props.className as string) ?? [];
+    expect(rowClasses.some(classes => classes.includes(ROW_TARGET_CLASS))).toBe(true);
+    expect(rowClasses.some(classes => classes.includes('min-h-[44px]'))).toBe(false);
     await unmount(renderer);
   });
 });

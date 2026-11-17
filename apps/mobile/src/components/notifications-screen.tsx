@@ -655,17 +655,17 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
-  let masterSubtitle: string | undefined;
-  if (masterLeading === 'on') {
-    masterSubtitle = t('notifications.onDescription');
-  } else if (masterLeading === 'off') {
-    masterSubtitle = t('notifications.offDescription');
-  }
+  const masterSubtitle =
+    masterLeading === 'on'
+      ? t('notifications.onDescription')
+      : masterLeading === 'off'
+        ? t('notifications.offDescription')
+        : undefined;
 
   // Master trailing slot — first match wins: a settling permission read or a
   // token query still in flight shows its skeleton, a permission read that
   // failed offers the retry, and only a settled gate draws the real switch.
-  let masterTrailing: ReactNode;
+  let masterTrailing: ReactNode = null;
   if (permissionLoading) {
     masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
   } else if (permissionError) {

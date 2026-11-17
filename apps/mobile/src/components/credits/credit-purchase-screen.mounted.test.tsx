@@ -1024,9 +1024,7 @@ describe('CreditPurchaseScreen', () => {
     for (let node = status?.parent ?? null; node !== null; node = node.parent) {
       ancestors.push(node);
     }
-    const gutter = ancestors.find(candidate =>
-      String(candidate.props.className).includes('px-4')
-    );
+    const gutter = ancestors.find(candidate => String(candidate.props.className).includes('px-4'));
     const outer = gutter?.parent;
     // The insets and the gutter sit on separate wrappers: an inline padding on
     // one node would replace its className padding.
@@ -1284,7 +1282,7 @@ describe('CreditPurchaseScreen', () => {
       return classes;
     };
 
-    for (const fontScale of [1, 1.8]) {
+    const expectOneGeometry = async (fontScale: number): Promise<void> => {
       dimensions.fontScale = fontScale;
       const loaded = await framesOfLoaded();
       vi.clearAllMocks();
@@ -1292,7 +1290,10 @@ describe('CreditPurchaseScreen', () => {
       expect(loaded, `font scale ${fontScale}`).toHaveLength(4);
       expect(placeholders, `font scale ${fontScale}`).toHaveLength(4);
       expect(new Set([...loaded, ...placeholders]).size, `font scale ${fontScale}`).toBe(1);
-    }
+    };
+
+    await expectOneGeometry(1);
+    await expectOneGeometry(1.8);
     dimensions.fontScale = 1;
   });
 

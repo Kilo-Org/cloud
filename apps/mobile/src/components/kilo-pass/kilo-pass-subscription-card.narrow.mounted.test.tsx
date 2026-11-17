@@ -119,8 +119,7 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     const bars = root
       .findAll(
         node =>
-          Object.is(node.type, 'Skeleton') &&
-          String(node.props.className).includes('max-w-full')
+          Object.is(node.type, 'Skeleton') && String(node.props.className).includes('max-w-full')
       )
       .map(node => String(node.props.className));
     // The skeleton row is the shared row primitive: its title and subtitle bars
@@ -139,8 +138,7 @@ describe('KiloPassSubscriptionCard loading layout', () => {
       const root = renderCard(true);
       const hidden = root.findAll(
         node =>
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('opacity-0')
+          typeof node.props.className === 'string' && node.props.className.includes('opacity-0')
       );
       expect(hidden).toHaveLength(1);
       expect(hidden[0]?.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThan(

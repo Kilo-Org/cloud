@@ -130,10 +130,10 @@ export function GgufDownloadControls({
     <>
       {record !== undefined && (
         <>
-          <Text className="text-sm">
+          <Text>
             {t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}
           </Text>
-          <Text className="text-sm text-muted-foreground">
+          <Text variant="muted">
             {t(modelCapabilityKey(record.tools, record.vision))}
           </Text>
           <Button
@@ -156,7 +156,7 @@ export function GgufDownloadControls({
       )}
       {download !== undefined && (
         <>
-          <Text className="text-sm" accessibilityLiveRegion="polite">
+          <Text accessibilityLiveRegion="polite">
             {t(progressKey(download), {
               written: size(download.written),
               total: size(download.total),
@@ -178,7 +178,7 @@ export function GgufDownloadControls({
         </Button>
       )}
       {failure !== undefined && (
-        <Text accessibilityRole="alert" className="text-sm text-destructive">
+        <Text accessibilityRole="alert" className="text-destructive">
           {t(FAILURE_KEYS[failure.problem])}
         </Text>
       )}
@@ -218,7 +218,7 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
         }}
         {...(error === null ? {} : { error: t(error) })}
       />
-      <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.urlHelp')}</Text>
+      <Text variant="muted">{t('modelChat.gguf.urlHelp')}</Text>
       <Button
         variant="outline"
         disabled={snapshot.download !== null || snapshot.loadFailed}
@@ -305,7 +305,7 @@ export function GgufModelSection({
       </Button>
       {advanced && <DirectLinkForm snapshot={snapshot} />}
       {otherFailure !== null && (
-        <Text accessibilityRole="alert" className="text-sm text-destructive">
+        <Text accessibilityRole="alert" className="text-destructive">
           {t(FAILURE_KEYS[otherFailure.problem])}
         </Text>
       )}

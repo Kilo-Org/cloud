@@ -210,10 +210,11 @@ async function readWithBoundedConcurrency<T>(
   let failure: unknown;
   const worker = async (): Promise<void> => {
     while (failure === undefined) {
+      const task = tasks[next];
+      if (task === undefined) return;
       const index = next++;
-      if (index >= tasks.length) return;
       try {
-        results[index] = await tasks[index]();
+        results[index] = await task();
       } catch (error) {
         // Keep the earliest started failure regardless of settlement order.
         if (failedIndex === -1 || index < failedIndex) {
@@ -515,12 +516,15 @@ async function readSnapshot(
  * Read one revision-consistent native snapshot, pinning even its first entity
  * page to the inspected state. Requests JSON-decode entity blobs and surface
  * service errors with a `code` property. Revision races and reclaimed blobs
- * restart from state, at most three complete attempts. Reads have a two-minute
- * total deadline, a 15-second request deadline, and non-cooperative cancellation.
- * The optional binary reader must use the same session/tenant authorization as
- * JSON reads and bound streamed bytes to the advertised blob size. Stored media
- * requires it; authorized bytes become content-bound data URLs without modifying
- * canonical messages or exposing credentials.
+ * restart from state, at most three complete attempts; content-addressed blob
+ * and attachment reads settled by an earlier attempt are reused, and the rest
+ * resolve with a small bounded pool rather than one request at a time. Reads
+ * have a two-minute total deadline, a 15-second request deadline, and
+ * non-cooperative cancellation. The optional binary reader must use the same
+ * session/tenant authorization as JSON reads and bound streamed bytes to the
+ * advertised blob size. Stored media requires it; authorized bytes become
+ * content-bound data URLs without modifying canonical messages or exposing
+ * credentials.
  */
 export async function fetchNativeSnapshot(
   request: Request,

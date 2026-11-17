@@ -1000,9 +1000,6 @@ function foldDestructiveLabel(value) {
  */
 function destructiveConfirmKeys(source, english) {
   const checks = new Map();
-  if (source === null) {
-    return checks;
-  }
   const englishCancel = foldDestructiveLabel(english.get('common.cancel') ?? '');
   for (const key of source.destructiveKeys) {
     const englishValue = english.get(key);

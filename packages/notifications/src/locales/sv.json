@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Din agentsession har en uppdatering",
-      "chatMessage": "Du har ett nytt meddelande",
-      "instanceLifecycle": "Din instans har en uppdatering",
-      "scheduledAction": "En schemalagd åtgärd har en uppdatering",
       "lowBalance": "Ditt saldo kräver uppmärksamhet",
       "spendAlert": "Dina utgifter kräver uppmärksamhet",
       "securityFinding": "En säkerhetsupptäckt kräver uppmärksamhet",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Utan titel",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "En säkerhetskontroll har en uppdatering"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} är redo",
-      "body": "Tryck för att börja chatta."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} misslyckades att starta",
-      "body": "Start misslyckades."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} startas om snart",
-      "body": "Schemalagd omstart klockan {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} omstart avbruten",
-      "body": "Den tidigare schemalagda omstarten har avbrutits."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} uppgraderas snart",
-      "bodyWithTag": "Uppgradera till {{targetImageTag}} klockan {{when}}.",
-      "bodyWithoutTag": "Schemalagd uppgradering klockan {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} uppgradering avbruten",
-      "body": "Den tidigare schemalagda uppgraderingen har avbrutits."
     }
   },
   "sessionReady": {

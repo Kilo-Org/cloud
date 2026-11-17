@@ -2,7 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import {
-  sendPushForConversationOutputSchema,
+  internalDispatchResponseSchema,
   type GlanceableScopeRefreshRequest,
   type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
@@ -103,7 +103,7 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
       }
 
       const payload: unknown = await response.json().catch(() => null);
-      const parsed = sendPushForConversationOutputSchema.safeParse(payload);
+      const parsed = internalDispatchResponseSchema.safeParse(payload);
       const failed = parsed.success
         ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed')
         : [];

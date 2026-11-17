@@ -1,6 +1,8 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
+import { sbomModulesPlugin } from './scripts/sbom-modules-plugin';
+
 const posthogApiKey = process.env['VITE_POSTHOG_API_KEY'];
 if (posthogApiKey === undefined || posthogApiKey.trim().length === 0) {
   console.warn(
@@ -39,7 +41,7 @@ export default defineConfig({
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), sbomModulesPlugin()],
   }),
   zip: {
     excludeSources: ['*', '**/*'],

@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -76,7 +77,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -169,7 +170,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     return (
       <PlatformErrorScreen
         title={t('common.repositories')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -191,7 +196,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     isError: repositories.isError,
     isFetching: repositories.isFetching,
     fetchStatus: repositories.fetchStatus,
-    connectivityKnown,
+    connectivityKnown: connectivity !== 'unknown',
   });
   const repositoriesFailed =
     repositoriesBody.status === 'error' ||

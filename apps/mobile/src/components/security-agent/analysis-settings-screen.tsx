@@ -22,10 +22,12 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -113,8 +115,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     models,
     isLoading: modelsLoading,
     isError: modelsError,
+    fetchStatus: modelsFetchStatus,
     refetch: refetchModels,
   } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [triageModelSlug, setTriageModelSlug] = useState('');
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
@@ -172,7 +176,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.analysisSettings.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.analysisSettings.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -196,6 +204,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // failure left nothing to show, so an offline visit with a warm catalogue keeps
   // the current slugs readable and pickable, as the new-session picker does.
   const modelsUnavailable = modelsError && models.length === 0;
+  const modelsFailureVariant = classifyReadFailureVariant({
+    errors: modelsError ? [modelsError] : [],
+    isPaused: modelsFetchStatus === 'paused',
+    connectivity,
+  });
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
@@ -289,7 +302,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         )}
         {modelsUnavailable && (
           <QueryError
-            variant="server"
+            variant={modelsFailureVariant}
             placement="top"
             title={t('common.couldNotLoadModels')}
             onRetry={() => void refetchModels()}

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
@@ -69,13 +68,6 @@ const reasoningEffortUpdateSchema = z.strictObject({
   id: z.string().optional(),
   reasoning: z.strictObject({ effort: ReasoningEffortSchema.or(z.literal('ultra')) }),
 });
-
-const TOOL_CALL_TYPES = new Set([
-  'function_call',
-  'function_call_output',
-  'custom_tool_call',
-  'custom_tool_call_output',
-]);
 
 /**
  * Adds the required traceability keys to the request metadata, keeping any
@@ -330,29 +322,12 @@ function normalizeInputItems(
   });
   body.input = normalizedInput;
 
-  const callIds = new Map<string, string>();
   for (const item of normalizedInput) {
     if (!isRecord(item)) continue;
 
     if (item.type === 'reasoning' && 'encrypted_content' in item && !('summary' in item)) {
       item.summary = [];
       normalizations.add('reasoning_summary_added');
-    }
-
-    if (
-      typeof item.type === 'string' &&
-      TOOL_CALL_TYPES.has(item.type) &&
-      typeof item.call_id === 'string' &&
-      item.call_id.length > 64
-    ) {
-      const originalId = item.call_id;
-      let callId = callIds.get(originalId);
-      if (!callId) {
-        callId = createHash('sha256').update(originalId).digest('hex');
-        callIds.set(originalId, callId);
-      }
-      item.call_id = callId;
-      normalizations.add('tool_call_id_hashed');
     }
 
     if (

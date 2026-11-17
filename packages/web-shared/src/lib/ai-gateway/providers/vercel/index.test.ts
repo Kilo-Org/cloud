@@ -525,6 +525,17 @@ describe('isValidVercelModelId', () => {
     }
   );
 
+  it('accepts a retained legacy alias that an override also targets', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['nvidia/nemotron-3.5-lightning-free'],
+      openRouterModelIds: ['nvidia/nemotron-3.5-lightning:free'],
+      overrides: [['nvidia/nemotron-3.5-lightning:free', 'nvidia/nemotron-3.5-lightning-free']],
+    });
+
+    await expect(isValidVercelModelId('nvidia/nemotron-3.5-lightning:free')).resolves.toBe(true);
+    await expect(isValidVercelModelId('nvidia/nemotron-3.5-lightning-free')).resolves.toBe(true);
+  });
+
   it('accepts a latest alias that resolves to a model Vercel serves', async () => {
     const isValidVercelModelId = await loadIsValidVercelModelId({
       vercelModelIds: ['zai/glm-5'],

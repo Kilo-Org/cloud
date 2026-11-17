@@ -7,6 +7,7 @@ import { wireEnvLocalFixture } from './stack-service-fixture';
 
 const SECTION_START = '# wired by dev/mock-snowflake/stack-service.ts';
 const SECTION_END = '# end of dev/mock-snowflake wiring';
+const CA_SOURCE_PREFIX = '# mock-snowflake CA: ';
 
 function countKeyLines(content: string, key: string): number {
   return content.split('\n').filter(line => line.startsWith(`${key}=`)).length;
@@ -14,6 +15,26 @@ function countKeyLines(content: string, key: string): number {
 
 function managedSection(content: string): string {
   return content.slice(content.indexOf(SECTION_START), content.indexOf(SECTION_END));
+}
+
+/**
+ * The value `scripts/dev.sh` hands Node: its `read_env_value` runs
+ * `awk -F= '$1 == key'` and takes the first line where the text before the
+ * first `=` is exactly the key, so `export KEY=...` and `KEY = ...` never match
+ * and only one line per file is read.
+ */
+function firstValueDevScriptReads(
+  content: string,
+  key = 'NODE_EXTRA_CA_CERTS'
+): string | undefined {
+  for (const line of content.split('\n')) {
+    if (line.split('=')[0] !== key) continue;
+    return line
+      .slice(key.length + 1)
+      .replace(/^["']|["']$/g, '')
+      .trim();
+  }
+  return undefined;
 }
 
 test('the first wire inserts one managed section holding the block and the CA bundle', async () => {
@@ -157,14 +178,102 @@ test('the bundle carries the mock certificate and a CA the file already trusted'
     assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nFOREIGN CA\n');
 
     const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
-    // The developer's own line stays where it was; the managed section adds its
-    // own single line, naming the bundle.
+    // The developer's own line keeps its position but names the bundle, because
+    // it is the first line `scripts/dev.sh` reads and the bundle holds its bytes.
+    assert.equal(firstValueDevScriptReads(content), fixture.caBundlePath);
+    assert.ok(content.includes(`${CA_SOURCE_PREFIX}${foreignCaPath}`));
     assert.equal(countKeyLines(content, 'NODE_EXTRA_CA_CERTS'), 2);
     assert.equal(countKeyLines(managedSection(content), 'NODE_EXTRA_CA_CERTS'), 1);
     assert.ok(managedSection(content).includes(`NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}`));
+
+    assert.deepEqual(await fixture.wire(), { status: 'unchanged' });
+    assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), content);
   } finally {
     if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
     else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a CA line the developer wrote above the section is rewritten to the bundle', async () => {
+  const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const corporateCaPath = path.join(fixture.root, 'corporate-ca.pem');
+    fs.writeFileSync(corporateCaPath, 'CORPORATE CA\n');
+    await fixture.wire();
+
+    // A hand-written corporate proxy CA above the managed section wins
+    // `dev.sh`'s first-match read unless it names the bundle.
+    const wired = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `# corporate proxy\nNODE_EXTRA_CA_CERTS=${corporateCaPath}\n${wired}`
+    );
+
+    assert.deepEqual(await fixture.wire(), {
+      status: 'rewritten',
+      previousAccountHost: '127.0.0.1:4792',
+      accountHost: '127.0.0.1:4792',
+    });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.equal(firstValueDevScriptReads(content), fixture.caBundlePath);
+    // The corporate CA stays trusted through the bundle, and the section keeps
+    // its path so a rotated certificate still lands in the bundle.
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nCORPORATE CA\n');
+    assert.ok(
+      content.startsWith(`# corporate proxy\nNODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`)
+    );
+    assert.ok(managedSection(content).includes(`${CA_SOURCE_PREFIX}${corporateCaPath}`));
+
+    const settled = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.deepEqual(await fixture.wire(), { status: 'unchanged' });
+    assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), settled);
+
+    // The recorded source is live, not a frozen copy: a rotated certificate
+    // reaches the bundle on the next wire without touching `.env.local`.
+    fs.writeFileSync(corporateCaPath, 'ROTATED CA\n');
+    assert.deepEqual(await fixture.wire(), { status: 'unchanged' });
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nROTATED CA\n');
+    assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), settled);
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('an empty CA placeholder above the section is filled with the bundle', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    fs.writeFileSync(fixture.envLocalPath, 'NODE_EXTRA_CA_CERTS=\nOTHER=1\n');
+
+    await fixture.wire();
+
+    // An empty value makes `dev.sh` fall through to the next file, so the
+    // section's own line in this one would never be read.
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.equal(firstValueDevScriptReads(content), fixture.caBundlePath);
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\n');
+    assert.equal(content.includes(CA_SOURCE_PREFIX), false);
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a real warehouse keeps its own CA line and the file byte-identical', async () => {
+  const envLocal = `NODE_EXTRA_CA_CERTS=/corporate/ca.pem\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n`;
+  const fixture = wireEnvLocalFixture(envLocal);
+  try {
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse' });
+    assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), envLocal);
+  } finally {
     fixture.restore();
   }
 });

@@ -1228,9 +1228,15 @@ export function getService(name: string): ServiceDef {
  * the fake Worker is in the same selection, and including the port
  * unconditionally would make a standalone tunnels start depend on a running
  * fake Worker. The web app is handed the Snowflake mock's CA bundle the same
- * way: `scripts/dev.sh` keeps an exported `NODE_EXTRA_CA_CERTS` ahead of the
- * first line in `.env.local`, so exporting it here is what makes the mock's
- * certificate trusted whatever the file already says.
+ * way: exporting it here is what makes the mock's certificate trusted.
+ *
+ * The export is also the only defence against a value the developer's own shell
+ * exits with: `scripts/dev.sh` resolves `NODE_EXTRA_CA_CERTS` as the shell's
+ * value first and only then reads `.env.local`, and Node keeps the exported
+ * value over anything Next.js loads later. Setting it on this command beats
+ * both, so every relaunch path must pass the session's selection — a restart or
+ * a recreate without one falls back to the bare command and silently un-trusts
+ * the mock.
  */
 export function serviceCommand(serviceName: string, serviceNames: readonly string[]): string[] {
   const command = getService(serviceName).command;

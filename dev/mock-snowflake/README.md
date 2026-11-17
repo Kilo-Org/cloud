@@ -34,14 +34,41 @@ Three guarantees about the file:
   `dev/mock-snowflake/fixtures/tls/ca-bundle.pem`, which holds the mock's
   self-signed certificate followed by the contents of every CA file that
   `NODE_EXTRA_CA_CERTS` already named in `.env.local` (outside the section) or in
-  the shell. Trust no longer depends on which line comes first, and the web app
-  still trusts a developer's other local certificates.
+  the shell.
 
-`dev/local/services.ts` adds the bundle to the web app's command as
-`NODE_EXTRA_CA_CERTS` whenever the mock is in the selection. That export is what
-makes the certificate trusted: Node reads `NODE_EXTRA_CA_CERTS` at startup,
-before Next.js loads `.env*` into its own process, and `scripts/dev.sh` keeps an
-exported value ahead of the first line it would otherwise read from the file.
+## Where trust comes from
+
+`scripts/dev.sh` resolves the variable as *exported value first, then the first
+matching line of `.env.development.local`, `.env.local` and the repo-root copies*,
+and it matches only a line whose text before the first `=` is exactly the key:
+`export KEY=value` and `KEY = value` never match, and an empty value makes it
+fall through to the next file. Node then reads the variable once at startup,
+before Next.js loads `.env*` for its own process.
+
+- **`pnpm dev:start` and `pnpm dev:restart`.** `dev/local/services.ts` prefixes
+  the web app's command with `NODE_EXTRA_CA_CERTS=<bundle>` whenever
+  `mock-snowflake` is in the selection, and every path that relaunches the web
+  app passes that selection — a start, a `dev:restart`, a dashboard start or
+  restart, the recreate of a pane that died with its process, and the
+  `dev:start-command` line printed for driving a pane by hand. The prefix wins
+  over whatever the shell exported and over every `.env*` line, so this is the
+  path that keeps the mock trusted.
+- **A shell that already exports `NODE_EXTRA_CA_CERTS`.** No file edit can win
+  there — an exported value beats every file, including the section's line — so
+  the command prefix above is what keeps the mock trusted; the stack entry
+  folds the shell's own CA into the bundle, so it stays trusted too.
+- **`pnpm dev` inside `apps/web`, with no stack export.** Trust then comes from
+  the file. A plain `NODE_EXTRA_CA_CERTS=...` line above the managed section is
+  the one `dev.sh` would read, so the stack entry points that line's value at the
+  bundle in place — same line, same position, only a trailing comment dropped,
+  because that comment would otherwise become part of the value — and records
+  the original path in the section as `# mock-snowflake CA: <path>`. The bundle
+  re-reads that file on every wire, so a rotated certificate keeps taking effect,
+  and the original value is never dropped: its bytes are in the bundle. A CA
+  line in an earlier file (`apps/web/.env.local`,
+  `.env.development.local`) or a shell export is not rewritten, because this
+  entry only owns the repo-root `.env.local`; the command prefix is what covers
+  those.
 
 ## Turning it off
 

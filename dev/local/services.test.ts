@@ -27,6 +27,8 @@ import {
   writePersistedPortOffset,
 } from './services';
 import { buildStartCommand } from './runner';
+import { manifestServiceNames, readManifest } from './manifest';
+import { caBundlePath } from '../mock-snowflake/tls-env';
 import { LOCAL_FAKE_LLM_ADMIN_TOKEN } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
 import { LOCAL_E2E_INTERNAL_API_SECRET } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
 
@@ -263,6 +265,43 @@ test('exports the mock CA bundle to the web app only when the mock is selected',
     false
   );
   assert.deepEqual(withoutMock, getService('nextjs').command);
+});
+
+test('a restart rebuilds the web app command from the selection the stack started with', () => {
+  // `dev:restart` and the dashboard read the manifest `dev:start` wrote and hand
+  // its services to `restartServiceInTmux`, which types the same
+  // `buildStartCommand` output into the pane — the relaunch and a recreate both
+  // use it. Without the selection the web app comes back without the mock's CA
+  // export: Node reads `NODE_EXTRA_CA_CERTS` at startup, `scripts/dev.sh` lets an
+  // exported value win over every `.env*` line, and a shell that exports its own
+  // CA leaves the mock's certificate untrusted.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-manifest-selection-'));
+  try {
+    fs.mkdirSync(path.join(root, 'dev', 'logs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'dev', 'logs', 'manifest.json'),
+      JSON.stringify({
+        session: 'kilo-dev-test',
+        portOffset,
+        wranglerRegistryPath: path.join(root, 'dev', 'logs', 'wrangler-registry.json'),
+        services: [
+          { name: 'mock-snowflake', port: 4792 + portOffset, group: 'core', type: 'process' },
+          { name: 'nextjs', port: 3000 + portOffset, group: 'core', type: 'nextjs' },
+        ],
+      })
+    );
+
+    const selection = manifestServiceNames(readManifest(root));
+    assert.deepEqual(selection, ['mock-snowflake', 'nextjs']);
+
+    const started = buildStartCommand('nextjs', ['mock-snowflake', 'nextjs']);
+    assert.ok(started.includes(`NODE_EXTRA_CA_CERTS=${caBundlePath()}`));
+    assert.equal(buildStartCommand('nextjs', selection), started);
+    // The omission this guards against: the command a restart used to build.
+    assert.equal(buildStartCommand('nextjs').includes('NODE_EXTRA_CA_CERTS='), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('starts the BYOK KMS service on its own port before the web app', () => {

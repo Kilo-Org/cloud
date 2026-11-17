@@ -2,17 +2,23 @@
 // `dev/local/services.ts` runs this with tsx). Beyond what the standalone
 // `server.ts` does, it keeps a managed section of the repo-root `.env.local`
 // current, so the web app the stack starts beside it picks the mock up without
-// manual steps. `dev/local/services.ts` also exports the CA bundle from that
-// section into the web app's command: `scripts/dev.sh` reads
-// `NODE_EXTRA_CA_CERTS` from `.env.local` only when the shell does not already
-// have one, so a line in the file alone loses to an earlier line or an exported
-// value.
+// manual steps.
+//
+// Trusting the mock's certificate needs two things, because `scripts/dev.sh`
+// resolves `NODE_EXTRA_CA_CERTS` as `shell value, else the first matching line
+// in .env.local`:
+//
+// - the file: the first line `dev.sh` would read must name the bundle (this
+//   module owns that, see `pointShadowingCaLineAtBundle`);
+// - the command: `dev/local/services.ts` exports the bundle into the web app's
+//   command, which is the only thing that wins over a value the developer's own
+//   shell exports.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { parseEnvEntries } from './env-file';
+import { parseEnvEntries, stripEnvValue } from './env-file';
 import { startMockSnowflake } from './server';
 import { MOCK_SNOWFLAKE_PORT, caBundlePath, caCertPath, loadTls, writeEnvSnippet } from './tls-env';
 
@@ -23,6 +29,14 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 // and nothing outside them is touched.
 const SECTION_START = '# wired by dev/mock-snowflake/stack-service.ts';
 const SECTION_END = '# end of dev/mock-snowflake wiring';
+
+const CA_KEY = 'NODE_EXTRA_CA_CERTS';
+
+// A CA line that had to be pointed at the bundle keeps its own path here, so
+// the bundle re-reads that file on every wire and a rotated certificate keeps
+// taking effect. A comment cannot shadow the section's line: `scripts/dev.sh`
+// only matches a line that starts with the key, and Next.js skips comments.
+const CA_SOURCE_PREFIX = '# mock-snowflake CA: ';
 
 export type WireResult =
   | { status: 'inserted' }
@@ -81,6 +95,66 @@ function writeCaBundle(existingCaPaths: readonly string[]): string {
 }
 
 /**
+ * The CA files earlier wires folded into the bundle, in the order the section
+ * recorded them.
+ */
+function readRecordedCaSources(lines: string[], section: LineRange | undefined): string[] {
+  if (!section) return [];
+  return lines
+    .slice(section.start, section.end)
+    .filter(line => line.startsWith(CA_SOURCE_PREFIX))
+    .map(line => line.slice(CA_SOURCE_PREFIX.length).trim())
+    .filter(source => source !== '');
+}
+
+/**
+ * Points the CA line that `scripts/dev.sh` would read first at the bundle.
+ *
+ * `dev.sh` takes the value of the first line in `.env.local` that starts with
+ * `NODE_EXTRA_CA_CERTS=` at column 0 — `export KEY=value` and `KEY = value`
+ * never match — so a plain line above the managed section (`/corporate/ca.pem`
+ * for a proxy, or an empty placeholder copied from an example) shadows the
+ * section's own. Rewriting that one line's value keeps the first match correct
+ * without moving anything, and drops nothing: `writeCaBundle` already carries
+ * that file's bytes, and the returned path is recorded in the section so the
+ * bundle keeps re-reading it.
+ */
+function pointShadowingCaLineAtBundle(
+  lines: string[],
+  section: LineRange | undefined,
+  bundlePath: string
+): { lines: string[]; folded: string | undefined } {
+  const limit = section?.start ?? lines.length;
+  const index = lines.findIndex((line, i) => i < limit && line.startsWith(`${CA_KEY}=`));
+  if (index === -1) return { lines, folded: undefined };
+
+  const original = stripEnvValue((lines[index] ?? '').slice(CA_KEY.length + 1));
+  const folded =
+    original === '' || path.resolve(original) === path.resolve(bundlePath) ? undefined : original;
+  const rewritten = [...lines];
+  rewritten[index] = `${CA_KEY}=${bundlePath}`;
+  return { lines: rewritten, folded };
+}
+
+/**
+ * The section's CA sources: what it recorded already, plus a path this wire
+ * folded in. A source that no longer exists is dropped, so the section does not
+ * keep claiming a CA the bundle cannot load.
+ */
+function mergeCaSources(recorded: readonly string[], folded: string | undefined): string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const source of folded === undefined ? recorded : [...recorded, folded]) {
+    if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile()) continue;
+    const resolved = path.resolve(source);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    merged.push(source);
+  }
+  return merged;
+}
+
+/**
  * Keeps one managed section of `.env.local` naming the mock's `SNOWFLAKE_*`
  * block, the CA bundle, and the port the server listens on. An existing
  * `SNOWFLAKE_ACCOUNT_HOST` outside that section is a real warehouse
@@ -96,13 +170,15 @@ export function wireEnvLocal(): WireResult {
 
   // Everything the developer wrote — the shell's own CA included — has to end
   // up in the bundle, but the section's own line names the bundle.
+  const recordedCaSources = readRecordedCaSources(lines, section);
   const outsideSection = [
     ...lines.slice(0, section?.start ?? lines.length),
     ...lines.slice(section?.end ?? lines.length),
   ];
   const bundlePath = writeCaBundle([
+    ...recordedCaSources,
     ...parseEnvEntries(outsideSection.join('\n'))
-      .filter(entry => entry.key === 'NODE_EXTRA_CA_CERTS')
+      .filter(entry => entry.key === CA_KEY)
       .map(entry => entry.value),
     process.env.NODE_EXTRA_CA_CERTS ?? '',
   ]);
@@ -116,31 +192,51 @@ export function wireEnvLocal(): WireResult {
   const accountHost = parseEnvEntries(envBlock).find(
     entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST'
   )?.value;
+
+  // A file with a real warehouse configuration is left alone entirely: the
+  // guard runs before the CA line below is rewritten, so nothing this module
+  // does to the file can reach it.
+  if (
+    !section &&
+    parseEnvEntries(lines.join('\n')).some(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST')
+  ) {
+    return { status: 'keptRealWarehouse' };
+  }
+
+  const rewritten = pointShadowingCaLineAtBundle(lines, section, bundlePath);
+  const caSources = mergeCaSources(recordedCaSources, rewritten.folded);
   const desired = [
     SECTION_START,
     ...envBlock.split('\n'),
-    `NODE_EXTRA_CA_CERTS=${bundlePath}`,
+    ...caSources.map(source => `${CA_SOURCE_PREFIX}${source}`),
+    `${CA_KEY}=${bundlePath}`,
     SECTION_END,
   ];
 
   if (!section) {
-    if (parseEnvEntries(lines.join('\n')).some(entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST')) {
-      return { status: 'keptRealWarehouse' };
-    }
-    const wired = lines.length === 0 ? desired : [...lines, '', ...desired];
+    const wired = rewritten.lines.length === 0 ? desired : [...rewritten.lines, '', ...desired];
     fs.writeFileSync(envLocalPath, `${wired.join('\n')}\n`);
     return { status: 'inserted' };
   }
 
+  const outsideUnchanged = rewritten.lines.every((line, i) => line === lines[i]);
   const existing = lines.slice(section.start, section.end);
-  if (existing.length === desired.length && existing.every((line, i) => line === desired[i])) {
+  if (
+    outsideUnchanged &&
+    existing.length === desired.length &&
+    existing.every((line, i) => line === desired[i])
+  ) {
     return { status: 'unchanged' };
   }
 
   const previousAccountHost = parseEnvEntries(existing.join('\n')).find(
     entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST'
   )?.value;
-  const wired = [...lines.slice(0, section.start), ...desired, ...lines.slice(section.end)];
+  const wired = [
+    ...rewritten.lines.slice(0, section.start),
+    ...desired,
+    ...rewritten.lines.slice(section.end),
+  ];
   fs.writeFileSync(envLocalPath, `${wired.join('\n')}${trailingNewline ? '\n' : ''}`);
   return { status: 'rewritten', previousAccountHost, accountHost };
 }

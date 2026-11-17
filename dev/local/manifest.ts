@@ -39,3 +39,14 @@ export function findManifestPort(manifest: Manifest | undefined, name: string): 
   const entry = manifest?.services.find(service => service?.name === name);
   return typeof entry?.port === 'number' && entry.port > 0 ? entry.port : undefined;
 }
+
+/**
+ * The selection a running stack was started with, in start order. A restart or
+ * a recreate rebuilds a service's command from it, so it has to match the one
+ * the start used: `serviceCommand` adds the Snowflake mock's CA bundle to the
+ * web app only when the mock is in the selection. Undefined when the session
+ * recorded no manifest, which keeps the plain service command.
+ */
+export function manifestServiceNames(manifest: Manifest | undefined): string[] | undefined {
+  return manifest?.services.map(service => service.name);
+}

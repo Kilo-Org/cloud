@@ -25,7 +25,13 @@ import {
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
-import { manifestPath, readManifest, type Manifest, type ManifestEntry } from './manifest';
+import {
+  manifestPath,
+  readManifest,
+  manifestServiceNames,
+  type Manifest,
+  type ManifestEntry,
+} from './manifest';
 import { currentComposeProject, syncInfraEnv } from './infra-env';
 import { syncEnvVars } from './env-sync';
 import { getWranglerRegistryPath } from './wrangler-registry';
@@ -589,7 +595,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       setSessionEnvironment(sessionName, mobileEnv);
       const nextjsPane = findServicePane(sessionName, 'nextjs');
       if (nextjsPane) {
-        const outcome = await restartServiceInTmux(sessionName, 'nextjs');
+        // The selection keeps the mock's CA export on the relaunched command.
+        const outcome = await restartServiceInTmux(sessionName, 'nextjs', undefined, serviceNames);
         if (outcome === 'gave-up')
           throw new Error('nextjs did not restart with refreshed mobile URLs');
       }
@@ -1249,7 +1256,10 @@ function cmdStartCommand(serviceName: string, repoRoot: string): void {
   // `pnpm --filter {./dir}` resolves the filter against the cwd, so the repo
   // root has to be explicit; commands that already cd into the service dir
   // must not be prefixed twice.
-  const command = buildStartCommand(serviceName);
+  // The selection the stack recorded carries the mock's CA export
+  // (`serviceCommand`), so a pane driven by this line behaves like the pane the
+  // stack started.
+  const command = buildStartCommand(serviceName, manifestServiceNames(manifest));
   console.log(command.startsWith('cd ') ? command : `cd ${shellQuote(repoRoot)} && ${command}`);
 }
 
@@ -1292,7 +1302,12 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
       : undefined;
 
   console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
-  const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv);
+  // The relaunch and any recreate rebuild the command from the selection, so it
+  // has to be the one the stack started with: without it the web app loses the
+  // Snowflake mock's `NODE_EXTRA_CA_CERTS` export and every usage read fails
+  // with a certificate error.
+  const selection = manifestServiceNames(readManifest(repoRoot));
+  const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv, selection);
   if (outcome === 'gave-up') {
     console.error(`${serviceName} did not shut down in time; not relaunched`);
     process.exit(1);

@@ -480,7 +480,8 @@
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
-    "changelog": "Noutăți"
+    "changelog": "Noutăți",
+    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
   },
   "preferences": {
     "general": "General",
@@ -3530,6 +3531,62 @@
       "orgLast30Days": "Toți membrii · Ultimele 30 de zile",
       "outputTokens": "Tokenuri de ieșire",
       "requests": "Cereri"
+    },
+    "modes": {
+      "create": "Mod nou",
+      "deleteAction": "Șterge modul",
+      "deleteMessage": "Modul este eliminat pentru toată lumea din această organizație. Un mod care înlocuiește unul predefinit revine la setările predefinite.",
+      "deleteTitle": "Ștergi acest mod?",
+      "descriptionLabel": "Descriere mod",
+      "emptyDescription": "Modurile adăugate aici sunt disponibile tuturor din această organizație.",
+      "emptyTitle": "Nu există încă moduri personalizate",
+      "identifierHint": "Litere mici, cifre și cratime.",
+      "identifierInvalid": "Folosește numai litere mici, cifre și cratime.",
+      "identifierLabel": "Identificator",
+      "identifierRequired": "Introdu un identificator.",
+      "identifierTaken": "Un alt mod folosește deja acest identificator.",
+      "nameLabel": "Nume mod",
+      "nameRequired": "Introdu un nume pentru mod.",
+      "notFound": "Acest mod nu mai există.",
+      "restrictionHint": "Pot fi editate numai fișierele care corespund acestui șablon. Lasă câmpul gol pentru a permite orice fișier.",
+      "restrictionInvalid": "Introdu un șablon valid.",
+      "restrictionLabel": "Etichetă restricție",
+      "restrictionPattern": "Șablon de fișier",
+      "roleLabel": "Definiție rol",
+      "roleRequired": "Descrie ce face acest mod.",
+      "tool": {
+        "browser": "Folosește browserul",
+        "command": "Rulează comenzi",
+        "edit": "Editează fișiere",
+        "mcp": "Folosește MCP",
+        "read": "Citește fișiere"
+      },
+      "whenToUseLabel": "Când se folosește acest mod"
+    },
+    "groups": {
+      "create": "Grup nou",
+      "deleteAction": "Șterge grupul",
+      "deleteMessage": "Grupul, politicile sale și atribuirile de membri sunt eliminate.",
+      "deleteTitle": "Ștergi acest grup?",
+      "descriptionLabel": "Descriere grup",
+      "emptyDescription": "Un grup reunește membri pentru ca o singură politică să se aplice tuturor.",
+      "emptyTitle": "Nu există încă grupuri",
+      "enterpriseOnly": "Grupurile sunt disponibile în planul Enterprise.",
+      "memberCount": "Membri: {{displayCount}}",
+      "memberCount_few": "{{displayCount}} membri",
+      "memberCount_one": "{{displayCount}} membru",
+      "memberCount_other": "{{displayCount}} de membri",
+      "memberViewEmpty": "Nu faci parte din niciun grup al acestei organizații.",
+      "memberViewTitle": "Grupurile tale",
+      "membersEmpty": "Niciun membru activ nu corespunde căutării.",
+      "membersLabel": "Membri ai grupului",
+      "nameLabel": "Nume grup",
+      "nameRequired": "Introdu un nume pentru grup.",
+      "nameTooLong": "Păstrează numele la cel mult 80 de caractere.",
+      "notFound": "Acest grup nu mai există.",
+      "permissionDenied": "Numai un proprietar sau administrator al organizației poate modifica grupurile acesteia.",
+      "searchMembers": "Caută membri",
+      "selectAllVisible": "Selectează toți membrii afișați"
     },
     "hub": {
       "renameTitle": "Redenumește organizația",

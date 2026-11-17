@@ -26,7 +26,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 /**
  * The organization destinations the hub lists, in the two shapes it opens
  * them: the web pages this app does not reimplement, and the areas the app
- * reads itself.
+ * reads and writes itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
  * role and plan gates, and its destinations follow
@@ -42,23 +42,22 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
- * - `providers-and-models`, `custom-modes`, `byok` and `integrations` render
- *   for every member;
+ * - `providers-and-models`, `byok` and `integrations` render for every member;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, and the
  *   dashboard links to the seats purchase, so the hub lists none of them.
  *
- * Usage, the audit log and BYOK are the areas the app reads itself, so their
- * rows open the app's own screens instead of a page. Usage is visible to every
- * member, as on the web sidebar; the audit log's gate is the one its procedure
- * applies (billing role and the enterprise plan); BYOK opens the app's own
- * provider-keys screen with the organization's scope, behind the web sidebar's
- * billing-role gate.
+ * Usage, the audit log, custom modes, groups and BYOK are the areas the app
+ * reads and writes itself, so their rows open the app's own screens instead of
+ * a page. Usage is visible to every member, as on the web sidebar; the audit
+ * log's gate is the one its procedure applies (billing role and the enterprise
+ * plan); groups the enterprise plan it is sold with; custom modes no gate,
+ * which is the gate its page has; and BYOK opens the app's own provider-keys
+ * screen with the organization's scope, behind the web sidebar's billing-role
+ * gate.
  */
 type OrgSettingsArea =
   | 'providersAndModels'
-  | 'customModes'
-  | 'groups'
   | 'guardrails'
   | 'requestLogs'
   | 'integrations'
@@ -86,7 +85,7 @@ export type OrgSettingsRow = Readonly<{
  * The areas the app reads and writes itself, each opening its own screen
  * instead of a web page.
  */
-type OrgInAppSettingsArea = 'usageDetails' | 'auditLogs' | 'byok';
+type OrgInAppSettingsArea = 'customModes' | 'groups' | 'usageDetails' | 'auditLogs' | 'byok';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -117,10 +116,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/providers-and-models',
     visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
   },
-  // "Custom Modes": no gate in the sidebar or on the page.
-  { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
-  // "Groups": enterprise only; the page redirects every other plan.
-  { area: 'groups', icon: Users, suffix: '/groups', visible: gate => gate.plan === 'enterprise' },
   // Guardrails page: owner/admin and Kilo Encrypt.
   {
     area: 'guardrails',
@@ -160,8 +155,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 
 const TITLE_KEYS = {
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
-  customModes: 'agentChat.modePicker.customModes',
-  groups: 'organization.settingsOnWeb.groups',
   guardrails: 'organization.settingsOnWeb.guardrails',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
@@ -192,6 +185,21 @@ type OrgInAppSettingsRowSpec = Readonly<{
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Custom modes": no gate in the sidebar or on the page, so every member
+  // reaches the native list and the server decides whether a write lands.
+  {
+    area: 'customModes',
+    icon: SlidersHorizontal,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/modes',
+    visible: () => true,
+  },
+  // "Groups": enterprise only, which is the plan its page redirects away from.
+  {
+    area: 'groups',
+    icon: Users,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/groups',
+    visible: gate => gate.plan === 'enterprise',
+  },
   // "Usage": the app's own usage screen reads the same summary, series and
   // breakdown the web page charts, so the row opens the screen. Every member
   // sees it, as on the web sidebar, and nothing in its gate needs a payload.
@@ -220,6 +228,8 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
 ];
 
 const IN_APP_TITLE_KEYS = {
+  customModes: 'agentChat.modePicker.customModes',
+  groups: 'organization.settingsOnWeb.groups',
   // The copy's own name keeps its group prefix: the web sidebar lists the same
   // area under Dashboard, and check:i18n refuses a second key with this copy.
   usageDetails: 'organization.settingsOnWeb.usageDetails',

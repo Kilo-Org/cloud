@@ -480,7 +480,8 @@
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },
-    "changelog": "Kas jauns"
+    "changelog": "Kas jauns",
+    "changelogVersionPending": "Šīs versijas piezīmes pienāks ar nākamo atjauninājumu."
   },
   "preferences": {
     "general": "Vispārīgi",
@@ -3530,6 +3531,62 @@
       "orgLast30Days": "Visi dalībnieki · Pēdējās 30 dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
+    },
+    "modes": {
+      "create": "Jauns režīms",
+      "deleteAction": "Dzēst režīmu",
+      "deleteMessage": "Režīms tiek noņemts visiem šajā organizācijā. Režīms, kas aizstāj iebūvēto, atgriežas pie iebūvētajiem iestatījumiem.",
+      "deleteTitle": "Dzēst šo režīmu?",
+      "descriptionLabel": "Režīma apraksts",
+      "emptyDescription": "Šeit pievienotie režīmi ir pieejami visiem šajā organizācijā.",
+      "emptyTitle": "Vēl nav pielāgotu režīmu",
+      "identifierHint": "Mazie burti, cipari un defises.",
+      "identifierInvalid": "Izmantojiet tikai mazos burtus, ciparus un defises.",
+      "identifierLabel": "Identifikators",
+      "identifierRequired": "Ievadiet identifikatoru.",
+      "identifierTaken": "Cits režīms jau izmanto šo identifikatoru.",
+      "nameLabel": "Režīma nosaukums",
+      "nameRequired": "Ievadiet režīma nosaukumu.",
+      "notFound": "Šis režīms vairs neeksistē.",
+      "restrictionHint": "Rediģēt var tikai failus, kas atbilst šim šablonam. Atstājiet tukšu, lai atļautu visus failus.",
+      "restrictionInvalid": "Ievadiet derīgu šablonu.",
+      "restrictionLabel": "Ierobežojuma apzīmējums",
+      "restrictionPattern": "Faila šablons",
+      "roleLabel": "Lomas definīcija",
+      "roleRequired": "Aprakstiet, ko šis režīms dara.",
+      "tool": {
+        "browser": "Izmantot pārlūku",
+        "command": "Palaist komandas",
+        "edit": "Rediģēt failus",
+        "mcp": "Izmantot MCP",
+        "read": "Lasīt failus"
+      },
+      "whenToUseLabel": "Kad izmantot šo režīmu"
+    },
+    "groups": {
+      "create": "Jauna grupa",
+      "deleteAction": "Dzēst grupu",
+      "deleteMessage": "Grupa, tās politikas un dalībnieku piešķīrumi tiek noņemti.",
+      "deleteTitle": "Dzēst šo grupu?",
+      "descriptionLabel": "Grupas apraksts",
+      "emptyDescription": "Grupa apvieno dalībniekus, lai viena politika attiektos uz visiem.",
+      "emptyTitle": "Vēl nav grupu",
+      "enterpriseOnly": "Grupas ir pieejamas Enterprise plānā.",
+      "memberCount": "Dalībnieki: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} dalībnieks",
+      "memberCount_other": "{{displayCount}} dalībnieki",
+      "memberCount_zero": "{{displayCount}} dalībnieku",
+      "memberViewEmpty": "Jūs neesat nevienā šīs organizācijas grupā.",
+      "memberViewTitle": "Jūsu grupas",
+      "membersEmpty": "Neviens aktīvs dalībnieks neatbilst jūsu meklējumam.",
+      "membersLabel": "Grupas dalībnieki",
+      "nameLabel": "Grupas nosaukums",
+      "nameRequired": "Ievadiet grupas nosaukumu.",
+      "nameTooLong": "Nosaukums nedrīkst būt garāks par 80 rakstzīmēm.",
+      "notFound": "Šī grupa vairs neeksistē.",
+      "permissionDenied": "Tikai organizācijas īpašnieks vai administrators var mainīt tās grupas.",
+      "searchMembers": "Meklēt dalībniekus",
+      "selectAllVisible": "Atlasīt visus redzamos"
     },
     "hub": {
       "renameTitle": "Pārdēvēt organizāciju",

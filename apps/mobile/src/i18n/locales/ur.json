@@ -480,7 +480,8 @@
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
     },
-    "changelog": "نیا کیا ہے"
+    "changelog": "نیا کیا ہے",
+    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
   },
   "preferences": {
     "general": "عمومی",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "تمام اراکین · پچھلے 30 دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
+    },
+    "modes": {
+      "create": "نیا موڈ",
+      "deleteAction": "موڈ حذف کریں",
+      "deleteMessage": "یہ موڈ اس تنظیم میں سب کے لیے حذف ہو جاتا ہے۔ جو موڈ کسی بلٹ اِن موڈ کی جگہ لیتا ہے وہ بلٹ اِن ترتیبات پر واپس چلا جاتا ہے۔",
+      "deleteTitle": "یہ موڈ حذف کریں؟",
+      "descriptionLabel": "موڈ کی تفصیل",
+      "emptyDescription": "یہاں شامل کیے گئے موڈز اس تنظیم میں سب کے لیے دستیاب ہوتے ہیں۔",
+      "emptyTitle": "ابھی کوئی حسب ضرورت موڈ نہیں",
+      "identifierHint": "چھوٹے حروف، اعداد اور ہائفن۔",
+      "identifierInvalid": "صرف چھوٹے حروف، اعداد اور ہائفن استعمال کریں۔",
+      "identifierLabel": "شناخت کنندہ",
+      "identifierRequired": "شناخت کنندہ درج کریں۔",
+      "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "nameLabel": "موڈ کا نام",
+      "nameRequired": "موڈ کا نام درج کریں۔",
+      "notFound": "یہ موڈ اب موجود نہیں ہے۔",
+      "restrictionHint": "صرف وہ فائلیں ترمیم کی جا سکتی ہیں جو اس پیٹرن سے مطابقت رکھتی ہوں۔ ہر فائل کی اجازت کے لیے اسے خالی چھوڑیں۔",
+      "restrictionInvalid": "درست پیٹرن درج کریں۔",
+      "restrictionLabel": "پابندی کا لیبل",
+      "restrictionPattern": "فائل پیٹرن",
+      "roleLabel": "کردار کی تعریف",
+      "roleRequired": "بیان کریں کہ یہ موڈ کیا کرتا ہے۔",
+      "tool": {
+        "browser": "براؤزر استعمال کریں",
+        "command": "کمانڈز چلائیں",
+        "edit": "فائلوں میں ترمیم کریں",
+        "mcp": "MCP استعمال کریں",
+        "read": "فائلیں پڑھیں"
+      },
+      "whenToUseLabel": "یہ موڈ کب استعمال کریں"
+    },
+    "groups": {
+      "create": "نیا گروپ",
+      "deleteAction": "گروپ حذف کریں",
+      "deleteMessage": "گروپ، اس کی پالیسیاں اور اس کے اراکین کی تفویضات حذف ہو جاتے ہیں۔",
+      "deleteTitle": "یہ گروپ حذف کریں؟",
+      "descriptionLabel": "گروپ کی تفصیل",
+      "emptyDescription": "گروپ اراکین کو جمع کرتا ہے تاکہ ایک پالیسی ان سب پر لاگو ہو سکے۔",
+      "emptyTitle": "ابھی کوئی گروپ نہیں",
+      "enterpriseOnly": "گروپس انٹرپرائز پلان میں دستیاب ہیں۔",
+      "memberCount": "{{displayCount}} اراکین",
+      "memberCount_one": "{{displayCount}} رکن",
+      "memberCount_other": "{{displayCount}} اراکین",
+      "memberViewEmpty": "آپ اس تنظیم کے کسی گروپ میں نہیں ہیں۔",
+      "memberViewTitle": "آپ کے گروپس",
+      "membersEmpty": "آپ کی تلاش سے کوئی فعال رکن نہیں ملا۔",
+      "membersLabel": "گروپ کے اراکین",
+      "nameLabel": "گروپ کا نام",
+      "nameRequired": "گروپ کا نام درج کریں۔",
+      "nameTooLong": "نام 80 حروف یا اس سے کم رکھیں۔",
+      "notFound": "یہ گروپ اب موجود نہیں ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک یا منتظم اس کے گروپس تبدیل کر سکتا ہے۔",
+      "searchMembers": "اراکین تلاش کریں",
+      "selectAllVisible": "دکھائے گئے سب کو منتخب کریں"
     },
     "hub": {
       "renameTitle": "تنظیم کا نام تبدیل کریں",

@@ -480,7 +480,8 @@
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
-    "changelog": "አዲስ ነገር"
+    "changelog": "አዲስ ነገር",
+    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "ሁሉም አባላት · ያለፉት 30 ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
+    },
+    "modes": {
+      "create": "አዲስ ሁነታ",
+      "deleteAction": "ሁነታን ሰርዝ",
+      "deleteMessage": "ሁነታው በዚህ ድርጅት ውስጥ ላለ ሁሉም ይወገዳል። አብሮ የተካተተን ሁነታ የሚተካ ሁነታ ወደ አብሮ የተካተቱት ቅንብሮች ይመለሳል።",
+      "deleteTitle": "ይህን ሁነታ ሰርዝ?",
+      "descriptionLabel": "የሁነታ መግለጫ",
+      "emptyDescription": "እዚህ የሚታከሉ ሁነታዎች በዚህ ድርጅት ውስጥ ላለ ሁሉም ይገኛሉ።",
+      "emptyTitle": "እስካሁን ብጁ ሁነታዎች የሉም",
+      "identifierHint": "ትናንሽ ፊደላት፣ ቁጥሮች እና ሰረዞች።",
+      "identifierInvalid": "ትናንሽ ፊደላት፣ ቁጥሮች እና ሰረዞችን ብቻ ተጠቀም።",
+      "identifierLabel": "መለያ",
+      "identifierRequired": "መለያ አስገባ።",
+      "identifierTaken": "ሌላ ሁነታ ይህን መለያ አስቀድሞ ይጠቀማል።",
+      "nameLabel": "የሁነታ ስም",
+      "nameRequired": "የሁነታ ስም አስገባ።",
+      "notFound": "ይህ ሁነታ ከእንግዲህ የለም።",
+      "restrictionHint": "ከዚህ ንድፍ ጋር የሚዛመዱ ፋይሎች ብቻ ሊታረሙ ይችላሉ። ሁሉንም ፋይሎች ለመፍቀድ ባዶ ተወው።",
+      "restrictionInvalid": "ትክክለኛ ንድፍ አስገባ።",
+      "restrictionLabel": "የገደብ መለያ",
+      "restrictionPattern": "የፋይል ንድፍ",
+      "roleLabel": "የሚና ፍቺ",
+      "roleRequired": "ይህ ሁነታ ምን እንደሚሰራ ግለጽ።",
+      "tool": {
+        "browser": "አሳሽ ተጠቀም",
+        "command": "ትዕዛዞችን አስፈጽም",
+        "edit": "ፋይሎችን አርትዕ",
+        "mcp": "MCP ተጠቀም",
+        "read": "ፋይሎችን አንብብ"
+      },
+      "whenToUseLabel": "ይህን ሁነታ መቼ መጠቀም እንዳለበት"
+    },
+    "groups": {
+      "create": "አዲስ ቡድን",
+      "deleteAction": "ቡድንን ሰርዝ",
+      "deleteMessage": "ቡድኑ፣ ፖሊሲዎቹ እና የአባል ምደባዎቹ ይወገዳሉ።",
+      "deleteTitle": "ይህን ቡድን ሰርዝ?",
+      "descriptionLabel": "የቡድን መግለጫ",
+      "emptyDescription": "ቡድን አባላትን ያሰባስባል፣ ስለዚህ አንድ ፖሊሲ ለሁሉም ሊተገበር ይችላል።",
+      "emptyTitle": "እስካሁን ቡድኖች የሉም",
+      "enterpriseOnly": "ቡድኖች በኢንተርፕራይዝ ፕላን ይገኛሉ።",
+      "memberCount": "{{displayCount}} አባል",
+      "memberCount_one": "{{displayCount}} አባል",
+      "memberCount_other": "{{displayCount}} አባላት",
+      "memberViewEmpty": "በዚህ ድርጅት ውስጥ በማንኛውም ቡድን ውስጥ አይደለህም።",
+      "memberViewTitle": "የአንተ ቡድኖች",
+      "membersEmpty": "ከፍለጋህ ጋር የሚዛመድ ንቁ አባል የለም።",
+      "membersLabel": "የቡድን አባላት",
+      "nameLabel": "የቡድን ስም",
+      "nameRequired": "የቡድን ስም አስገባ።",
+      "nameTooLong": "ስሙን ከ80 ቁምፊዎች በማይበልጥ አቆይ።",
+      "notFound": "ይህ ቡድን ከእንግዲህ የለም።",
+      "permissionDenied": "የድርጅቱ ባለቤት ወይም አስተዳዳሪ ብቻ ቡድኖቹን መቀየር ይችላል።",
+      "searchMembers": "አባላትን ፈልግ",
+      "selectAllVisible": "የሚታዩትን ሁሉ ምረጥ"
     },
     "hub": {
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",

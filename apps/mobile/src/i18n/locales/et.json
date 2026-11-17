@@ -480,7 +480,8 @@
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
     },
-    "changelog": "Mis on uut"
+    "changelog": "Mis on uut",
+    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
   },
   "preferences": {
     "general": "Üldine",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "Kõik liikmed · Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
+    },
+    "modes": {
+      "create": "Uus režiim",
+      "deleteAction": "Kustuta režiim",
+      "deleteMessage": "Režiim eemaldatakse kõigilt selle organisatsiooni liikmetelt. Sisseehitatud režiimi asendav režiim naaseb sisseehitatud seadete juurde.",
+      "deleteTitle": "Kas kustutada see režiim?",
+      "descriptionLabel": "Režiimi kirjeldus",
+      "emptyDescription": "Siia lisatud režiimid on saadaval kõigile selle organisatsiooni liikmetele.",
+      "emptyTitle": "Kohandatud režiime veel pole",
+      "identifierHint": "Väiketähed, numbrid ja sidekriipsud.",
+      "identifierInvalid": "Kasuta ainult väiketähti, numbreid ja sidekriipse.",
+      "identifierLabel": "Identifikaator",
+      "identifierRequired": "Sisesta identifikaator.",
+      "identifierTaken": "Seda identifikaatorit kasutab juba teine režiim.",
+      "nameLabel": "Režiimi nimi",
+      "nameRequired": "Sisesta režiimi nimi.",
+      "notFound": "Seda režiimi enam ei ole.",
+      "restrictionHint": "Muuta saab ainult faile, mis vastavad sellele mustrile. Jäta väli tühjaks, et lubada kõiki faile.",
+      "restrictionInvalid": "Sisesta kehtiv muster.",
+      "restrictionLabel": "Piirangu silt",
+      "restrictionPattern": "Faili muster",
+      "roleLabel": "Rolli määratlus",
+      "roleRequired": "Kirjelda, mida see režiim teeb.",
+      "tool": {
+        "browser": "Kasuta brauserit",
+        "command": "Käivita käsud",
+        "edit": "Muuda faile",
+        "mcp": "Kasuta MCP-d",
+        "read": "Loe faile"
+      },
+      "whenToUseLabel": "Millal seda režiimi kasutada"
+    },
+    "groups": {
+      "create": "Uus grupp",
+      "deleteAction": "Kustuta grupp",
+      "deleteMessage": "Grupp, selle poliitikad ja liikmete määramised eemaldatakse.",
+      "deleteTitle": "Kas kustutada see grupp?",
+      "descriptionLabel": "Grupi kirjeldus",
+      "emptyDescription": "Grupp koondab liikmed, et üks poliitika kehtiks neile kõigile.",
+      "emptyTitle": "Gruppe veel pole",
+      "enterpriseOnly": "Grupid on saadaval Enterprise'i paketis.",
+      "memberCount": "Liikmeid: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} liige",
+      "memberCount_other": "{{displayCount}} liiget",
+      "memberViewEmpty": "Sa ei kuulu selle organisatsiooni ühtegi gruppi.",
+      "memberViewTitle": "Sinu grupid",
+      "membersEmpty": "Ükski aktiivne liige ei vasta sinu otsingule.",
+      "membersLabel": "Grupi liikmed",
+      "nameLabel": "Grupi nimi",
+      "nameRequired": "Sisesta grupi nimi.",
+      "nameTooLong": "Hoia nimi 80 tähemärgi piires.",
+      "notFound": "Seda gruppi enam ei ole.",
+      "permissionDenied": "Ainult organisatsiooni omanik või administraator saab gruppe muuta.",
+      "searchMembers": "Otsi liikmeid",
+      "selectAllVisible": "Vali kõik kuvatud liikmed"
     },
     "hub": {
       "renameTitle": "Nimeta organisatsioon ümber",

@@ -480,7 +480,8 @@
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
-    "changelog": "Okusha"
+    "changelog": "Okusha",
+    "changelogVersionPending": "Amanothi ale nguqulo azofika nesibuyekezo esilandelayo."
   },
   "preferences": {
     "general": "Okujwayelekile",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "Amalungu onke · Izinsuku ezingama-30 ezedlule",
       "outputTokens": "Amathokheni okukhishiwe",
       "requests": "Izicelo"
+    },
+    "modes": {
+      "create": "Imodi entsha",
+      "deleteAction": "Susa imodi",
+      "deleteMessage": "Imodi isuswa kuwo wonke umuntu kule nhlangano. Imodi ethatha indawo yeyakhelwe ngaphakathi ibuyela ezilungiselelweni ezakhelwe ngaphakathi.",
+      "deleteTitle": "Susa le modi?",
+      "descriptionLabel": "Incazelo yemodi",
+      "emptyDescription": "Amamodi anezwe lapha ayatholakala kuwo wonke umuntu kule nhlangano.",
+      "emptyTitle": "Awekho amamodi enziwe ngokwezifiso okwamanje",
+      "identifierHint": "Izinhlamvu ezincane, izinombolo, namadashu.",
+      "identifierInvalid": "Sebenzisa izinhlamvu ezincane, izinombolo, namadashu kuphela.",
+      "identifierLabel": "Isihlonzi",
+      "identifierRequired": "Faka isihlonzi.",
+      "identifierTaken": "Enye imodi isivele isebenzisa lesi sihlonzi.",
+      "nameLabel": "Igama lemodi",
+      "nameRequired": "Faka igama lemodi.",
+      "notFound": "Le modi ayisekho.",
+      "restrictionHint": "Amafayela ahambisana naleli phethini kuphela angahlelwa. Shiya kungenalutho ukuze kuvunyelwe wonke amafayela.",
+      "restrictionInvalid": "Faka iphethini evumelekile.",
+      "restrictionLabel": "Ilebula yomkhawulo",
+      "restrictionPattern": "Iphethini yefayela",
+      "roleLabel": "Incazelo yendima",
+      "roleRequired": "Chaza okwenziwa yile modi.",
+      "tool": {
+        "browser": "Sebenzisa isiphequluli",
+        "command": "Gijimisa imiyalelo",
+        "edit": "Hlela amafayela",
+        "mcp": "Sebenzisa i-MCP",
+        "read": "Funda amafayela"
+      },
+      "whenToUseLabel": "Nini usebenzisa le modi"
+    },
+    "groups": {
+      "create": "Iqembu elisha",
+      "deleteAction": "Susa iqembu",
+      "deleteMessage": "Iqembu, izinqubomgomo zalo, kanye nezabelo zalo zamalungu kuyasuswa.",
+      "deleteTitle": "Susa leli qembu?",
+      "descriptionLabel": "Incazelo yeqembu",
+      "emptyDescription": "Iqembu lihlanganisa amalungu ukuze inqubomgomo eyodwa isebenze kuwo wonke.",
+      "emptyTitle": "Awekho amaqembu okwamanje",
+      "enterpriseOnly": "Amaqembu ayatholakala kuhlelo lwe-Enterprise.",
+      "memberCount": "Inani lamalungu: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} ilungu",
+      "memberCount_other": "{{displayCount}} amalungu",
+      "memberViewEmpty": "Awukho kunoma yiliphi iqembu lale nhlangano.",
+      "memberViewTitle": "Amaqembu akho",
+      "membersEmpty": "Akukho ilungu elisebenzayo elihambisana nokusesha kwakho.",
+      "membersLabel": "Amalungu eqembu",
+      "nameLabel": "Igama leqembu",
+      "nameRequired": "Faka igama leqembu.",
+      "nameTooLong": "Gcina igama linezinhlamvu ezingama-80 noma ngaphansi.",
+      "notFound": "Leli qembu alisekho.",
+      "permissionDenied": "Umnikazi wenhlangano noma umlawuli kuphela ongashintsha amaqembu ayo.",
+      "searchMembers": "Sesha amalungu",
+      "selectAllVisible": "Khetha wonke umuntu obonisiwe"
     },
     "hub": {
       "renameTitle": "Qamba kabusha inhlangano",

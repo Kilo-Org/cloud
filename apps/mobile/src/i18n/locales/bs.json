@@ -480,7 +480,8 @@
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
     },
-    "changelog": "Šta je novo"
+    "changelog": "Šta je novo",
+    "changelogVersionPending": "Bilješke za ovu verziju stižu uz sljedeće ažuriranje aplikacije."
   },
   "preferences": {
     "general": "Općenito",
@@ -3530,6 +3531,62 @@
       "orgLast30Days": "Svi članovi · Zadnjih 30 dana",
       "outputTokens": "Izlazni tokeni",
       "requests": "Zahtjevi"
+    },
+    "modes": {
+      "create": "Novi način rada",
+      "deleteAction": "Obriši način rada",
+      "deleteMessage": "Način rada se uklanja za sve u ovoj organizaciji. Način rada koji zamjenjuje ugrađeni vraća se na ugrađene postavke.",
+      "deleteTitle": "Obrisati ovaj način rada?",
+      "descriptionLabel": "Opis načina rada",
+      "emptyDescription": "Načini rada dodani ovdje dostupni su svima u ovoj organizaciji.",
+      "emptyTitle": "Još nema prilagođenih načina rada",
+      "identifierHint": "Mala slova, brojevi i crtice.",
+      "identifierInvalid": "Koristi samo mala slova, brojeve i crtice.",
+      "identifierLabel": "Identifikator",
+      "identifierRequired": "Unesi identifikator.",
+      "identifierTaken": "Drugi način rada već koristi ovaj identifikator.",
+      "nameLabel": "Naziv načina rada",
+      "nameRequired": "Unesi naziv načina rada.",
+      "notFound": "Ovaj način rada više ne postoji.",
+      "restrictionHint": "Mogu se uređivati samo datoteke koje odgovaraju ovom obrascu. Ostavi prazno da dozvoliš sve datoteke.",
+      "restrictionInvalid": "Unesi ispravan obrazac.",
+      "restrictionLabel": "Oznaka ograničenja",
+      "restrictionPattern": "Obrazac datoteke",
+      "roleLabel": "Definicija uloge",
+      "roleRequired": "Opiši šta ovaj način rada radi.",
+      "tool": {
+        "browser": "Koristi preglednik",
+        "command": "Pokreni komande",
+        "edit": "Uredi datoteke",
+        "mcp": "Koristi MCP",
+        "read": "Čitaj datoteke"
+      },
+      "whenToUseLabel": "Kada koristiti ovaj način rada"
+    },
+    "groups": {
+      "create": "Nova grupa",
+      "deleteAction": "Obriši grupu",
+      "deleteMessage": "Grupa, njene politike i dodjele članova se uklanjaju.",
+      "deleteTitle": "Obrisati ovu grupu?",
+      "descriptionLabel": "Opis grupe",
+      "emptyDescription": "Grupa okuplja članove kako bi se jedna politika primijenila na sve njih.",
+      "emptyTitle": "Još nema grupa",
+      "enterpriseOnly": "Grupe su dostupne na Enterprise planu.",
+      "memberCount": "Članova: {{displayCount}}",
+      "memberCount_few": "{{displayCount}} člana",
+      "memberCount_one": "{{displayCount}} član",
+      "memberCount_other": "{{displayCount}} članova",
+      "memberViewEmpty": "Nisi ni u jednoj grupi ove organizacije.",
+      "memberViewTitle": "Tvoje grupe",
+      "membersEmpty": "Nijedan aktivni član ne odgovara pretrazi.",
+      "membersLabel": "Članovi grupe",
+      "nameLabel": "Naziv grupe",
+      "nameRequired": "Unesi naziv grupe.",
+      "nameTooLong": "Naziv može imati najviše 80 znakova.",
+      "notFound": "Ova grupa više ne postoji.",
+      "permissionDenied": "Samo vlasnik ili administrator organizacije može mijenjati njene grupe.",
+      "searchMembers": "Pretraži članove",
+      "selectAllVisible": "Odaberi sve prikazane članove"
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",

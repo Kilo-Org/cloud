@@ -4,6 +4,7 @@ import {
   buildHomeWidgetDetails,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
+  EMPTY_HOME_WIDGET_DETAILS,
   glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
@@ -348,6 +349,14 @@ describe('Home-only widget policy', () => {
       primaryCount: 0,
       checkedAt: null,
     });
+  });
+
+  it('keeps each terminal payload empty lists its own, so one scope cannot fill another', () => {
+    const first = buildHomeWidgetData({ ...scope, sessions: [], status: 'privacy' });
+    const second = buildHomeWidgetData({ ...scope, sessions: [], status: 'privacy' });
+    first.details.waitingAgents.push({ title: 'Private', kind: 'permission' });
+    expect(second.details.waitingAgents).toEqual([]);
+    expect(EMPTY_HOME_WIDGET_DETAILS.waitingAgents).toEqual([]);
   });
 
   it('requests active/quiet cadence and an earlier future wake without tight overdue polling', () => {

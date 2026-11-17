@@ -480,7 +480,8 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
-    "changelog": "更新内容"
+    "changelog": "更新内容",
+    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
   },
   "preferences": {
     "general": "通用",
@@ -3478,6 +3479,61 @@
       "orgLast30Days": "全部成员 · 最近 30 天",
       "outputTokens": "输出词元",
       "requests": "请求"
+    },
+    "modes": {
+      "create": "新建模式",
+      "deleteAction": "删除模式",
+      "deleteMessage": "该模式将从此组织中的所有成员处移除。若该模式替代了某个内置模式，则会恢复为内置设置。",
+      "deleteTitle": "删除此模式？",
+      "descriptionLabel": "模式描述",
+      "emptyDescription": "在此添加的模式可供此组织中的所有成员使用。",
+      "emptyTitle": "还没有自定义模式",
+      "identifierHint": "小写字母、数字和连字符。",
+      "identifierInvalid": "请仅使用小写字母、数字和连字符。",
+      "identifierLabel": "标识符",
+      "identifierRequired": "请输入标识符。",
+      "identifierTaken": "另一个模式已使用此标识符。",
+      "nameLabel": "模式名称",
+      "nameRequired": "请输入模式名称。",
+      "notFound": "此模式已不存在。",
+      "restrictionHint": "只能编辑匹配此文件模式的文件。留空则允许所有文件。",
+      "restrictionInvalid": "请输入有效的文件模式。",
+      "restrictionLabel": "限制标签",
+      "restrictionPattern": "文件模式",
+      "roleLabel": "角色定义",
+      "roleRequired": "描述此模式的用途。",
+      "tool": {
+        "browser": "使用浏览器",
+        "command": "运行命令",
+        "edit": "编辑文件",
+        "mcp": "使用 MCP",
+        "read": "读取文件"
+      },
+      "whenToUseLabel": "何时使用此模式"
+    },
+    "groups": {
+      "create": "新建群组",
+      "deleteAction": "删除群组",
+      "deleteMessage": "该群组、其策略及其成员分配都会被移除。",
+      "deleteTitle": "删除此群组？",
+      "descriptionLabel": "群组描述",
+      "emptyDescription": "群组用于汇集成员，以便对全体成员应用同一策略。",
+      "emptyTitle": "还没有群组",
+      "enterpriseOnly": "群组仅在企业版套餐中可用。",
+      "memberCount": "{{displayCount}} 名成员",
+      "memberCount_one": "{{displayCount}} 名成员",
+      "memberCount_other": "{{displayCount}} 名成员",
+      "memberViewEmpty": "你不在该组织的任何群组中。",
+      "memberViewTitle": "你的群组",
+      "membersEmpty": "没有符合搜索条件的活跃成员。",
+      "membersLabel": "群组成员",
+      "nameLabel": "群组名称",
+      "nameRequired": "请输入群组名称。",
+      "nameTooLong": "名称不得超过 80 个字符。",
+      "notFound": "此群组已不存在。",
+      "permissionDenied": "只有组织所有者或管理员可以更改其群组。",
+      "searchMembers": "搜索成员",
+      "selectAllVisible": "选择所有已显示的成员"
     },
     "kiloPass": {
       "activating": "正在激活",

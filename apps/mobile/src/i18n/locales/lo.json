@@ -480,7 +480,8 @@
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
-    "changelog": "ມີຫຍັງໃໝ່"
+    "changelog": "ມີຫຍັງໃໝ່",
+    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນນີ້ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ"
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -3473,6 +3474,61 @@
       "orgLast30Days": "ສະມາຊິກທັງໝົດ · 30 ວັນທີ່ຜ່ານມາ",
       "outputTokens": "ໂທເຄັນຂາອອກ",
       "requests": "ຄຳຂໍ"
+    },
+    "modes": {
+      "create": "ໂໝດໃໝ່",
+      "deleteAction": "ລຶບໂໝດ",
+      "deleteMessage": "ໂໝດຈະຖືກລຶບສຳລັບທຸກຄົນໃນອົງກອນນີ້. ໂໝດທີ່ແທນໂໝດມາພ້ອມລະບົບຈະກັບໄປໃຊ້ການຕັ້ງຄ່າມາພ້ອມລະບົບ.",
+      "deleteTitle": "ລຶບໂໝດນີ້ບໍ?",
+      "descriptionLabel": "ຄຳອະທິບາຍໂໝດ",
+      "emptyDescription": "ໂໝດທີ່ເພີ່ມຢູ່ນີ້ມີໃຫ້ທຸກຄົນໃນອົງກອນນີ້ໃຊ້.",
+      "emptyTitle": "ຍັງບໍ່ມີໂໝດທີ່ກຳນົດເອງ",
+      "identifierHint": "ຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ, ແລະ ເຄື່ອງໝາຍຂີດ.",
+      "identifierInvalid": "ໃຊ້ພຽງຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ, ແລະ ເຄື່ອງໝາຍຂີດເທົ່ານັ້ນ.",
+      "identifierLabel": "ຕົວລະບຸ",
+      "identifierRequired": "ປ້ອນຕົວລະບຸ.",
+      "identifierTaken": "ໂໝດອື່ນໃຊ້ຕົວລະບຸນີ້ແລ້ວ.",
+      "nameLabel": "ຊື່ໂໝດ",
+      "nameRequired": "ປ້ອນຊື່ໂໝດ.",
+      "notFound": "ບໍ່ມີໂໝດນີ້ອີກແລ້ວ.",
+      "restrictionHint": "ແກ້ໄຂໄດ້ສະເພາະໄຟລ໌ທີ່ກົງກັບຮູບແບບນີ້. ປະໄວ້ຫວ່າງເພື່ອໃຫ້ແກ້ໄຂໄດ້ທຸກໄຟລ໌.",
+      "restrictionInvalid": "ປ້ອນຮູບແບບທີ່ຖືກຕ້ອງ.",
+      "restrictionLabel": "ປ້າຍການຈຳກັດ",
+      "restrictionPattern": "ຮູບແບບໄຟລ໌",
+      "roleLabel": "ຄຳນິຍາມບົດບາດ",
+      "roleRequired": "ອະທິບາຍວ່າໂໝດນີ້ເຮັດຫຍັງ.",
+      "tool": {
+        "browser": "ໃຊ້ບຣາວເຊີ",
+        "command": "ປະຕິບັດຄຳສັ່ງ",
+        "edit": "ແກ້ໄຂໄຟລ໌",
+        "mcp": "ໃຊ້ MCP",
+        "read": "ອ່ານໄຟລ໌"
+      },
+      "whenToUseLabel": "ເມື່ອໃດຄວນໃຊ້ໂໝດນີ້"
+    },
+    "groups": {
+      "create": "ກຸ່ມໃໝ່",
+      "deleteAction": "ລຶບກຸ່ມ",
+      "deleteMessage": "ກຸ່ມ, ນະໂຍບາຍຂອງກຸ່ມ, ແລະ ການມອບໝາຍສະມາຊິກຈະຖືກລຶບ.",
+      "deleteTitle": "ລຶບກຸ່ມນີ້ບໍ?",
+      "descriptionLabel": "ຄຳອະທິບາຍກຸ່ມ",
+      "emptyDescription": "ກຸ່ມລວບລວມສະມາຊິກເພື່ອໃຫ້ນະໂຍບາຍດຽວມີຜົນກັບທຸກຄົນ.",
+      "emptyTitle": "ຍັງບໍ່ມີກຸ່ມ",
+      "enterpriseOnly": "ກຸ່ມມີໃຫ້ໃຊ້ໃນແຜນ Enterprise.",
+      "memberCount": "{{displayCount}} ສະມາຊິກ",
+      "memberCount_one": "{{displayCount}} ສະມາຊິກ",
+      "memberCount_other": "{{displayCount}} ສະມາຊິກ",
+      "memberViewEmpty": "ທ່ານບໍ່ໄດ້ຢູ່ໃນກຸ່ມໃດຂອງອົງກອນນີ້.",
+      "memberViewTitle": "ກຸ່ມຂອງທ່ານ",
+      "membersEmpty": "ບໍ່ມີສະມາຊິກທີ່ໃຊ້ງານຢູ່ທີ່ກົງກັບການຄົ້ນຫາຂອງທ່ານ.",
+      "membersLabel": "ສະມາຊິກກຸ່ມ",
+      "nameLabel": "ຊື່ກຸ່ມ",
+      "nameRequired": "ປ້ອນຊື່ກຸ່ມ.",
+      "nameTooLong": "ໃຫ້ຊື່ມີບໍ່ເກີນ 80 ຕົວອັກສອນ.",
+      "notFound": "ບໍ່ມີກຸ່ມນີ້ອີກແລ້ວ.",
+      "permissionDenied": "ພຽງເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບເທົ່ານັ້ນທີ່ປ່ຽນກຸ່ມຂອງອົງກອນໄດ້.",
+      "searchMembers": "ຄົ້ນຫາສະມາຊິກ",
+      "selectAllVisible": "ເລືອກທຸກຄົນທີ່ສະແດງຢູ່"
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",

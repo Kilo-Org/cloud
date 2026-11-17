@@ -18,6 +18,7 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',

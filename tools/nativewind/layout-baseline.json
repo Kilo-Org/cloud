@@ -52,6 +52,7 @@
   "apps/mobile/src/components/agents/message-bubble.tsx": { "L1": 2 },
   "apps/mobile/src/components/agents/message-details-sheet.tsx": { "L2": 1 },
   "apps/mobile/src/components/agents/message-text-select-sheet.tsx": { "L2": 1 },
+  "apps/mobile/src/components/agents/model-selector.tsx": { "L8": 3 },
   "apps/mobile/src/components/agents/new-session-prompt-clone.tsx": { "L4": 2 },
   "apps/mobile/src/components/agents/new-session-prompt.tsx": { "L4": 1 },
   "apps/mobile/src/components/agents/permission-card.tsx": { "L4": 1 },

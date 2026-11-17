@@ -1315,8 +1315,8 @@ const needsInputPush = {
 };
 
 // Kinds this app retired. A server that has not stopped sending them still
-// delivers them, and the catalog still supplies their copy, so a foreground
-// delivery would draw a banner whose tap resolves no route.
+// delivers them, and their banner is drawn from the server-supplied title and
+// body, so a foreground delivery would draw one whose tap resolves no route.
 const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
   [
     'chat.message',

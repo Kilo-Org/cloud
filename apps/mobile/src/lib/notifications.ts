@@ -318,9 +318,10 @@ export function setupNotificationHandler() {
       const retiredType = rawPushType(notification.request.content.data);
       if (retiredType !== null && isRetiredPushType(retiredType)) {
         // A kind this app retired still arrives from a server that has not
-        // stopped sending it. It no longer parses, and the catalog still has
-        // its copy, so this check is the only thing standing between it and a
-        // foreground banner whose tap resolves no route.
+        // stopped sending it. It no longer parses and the catalog no longer has
+        // its copy, but its banner would still be drawn from the
+        // server-supplied title and body, so this check is the only thing
+        // between it and a foreground banner whose tap resolves no route.
         return suppressed;
       }
 

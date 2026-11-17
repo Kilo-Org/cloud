@@ -162,11 +162,18 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   );
 
   // isPending (no data AND no error) rather than isLoading: an offline paused
-  // fetch has isLoading false but no data — it must show the skeleton instead
-  // of the member-not-found state, while a real error still reaches QueryError.
-  // The organizationId guard keeps a disabled query (null org, pending
-  // forever) falling through to OrganizationBoundary below.
-  if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
+  // fetch has isLoading false but no data, so a settled-state branch built on
+  // isLoading would render without an answer. A pause is not progress — the
+  // read must name the offline state with a Retry instead of holding a silent
+  // skeleton — and a fetch in flight keeps the skeleton until it settles. A
+  // real error still reaches QueryError below. The organizationId guard keeps
+  // a disabled query (null org, pending forever) falling through to
+  // OrganizationBoundary below; a paused read passes the guard and reaches the
+  // offline state instead of this skeleton.
+  if (
+    isResolving ||
+    (organizationId != null && orgWithMembers.isPending && !orgWithMembers.isPaused)
+  ) {
     return (
       <SheetScrollView
         className="flex-1 bg-background"
@@ -195,7 +202,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   }
 
   const loadFailed = orgWithMembers.isError && !orgWithMembers.data;
-  if (loadFailed || !member) {
+  const loadPaused = organizationId != null && orgWithMembers.isPending;
+  if (loadFailed || loadPaused || !member) {
     return (
       <>
         <View collapsable={false} className="bg-background px-6 pt-4">
@@ -203,7 +211,14 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
             {t('organization.memberLimit.title')}
           </Text>
         </View>
-        {loadFailed ? (
+        {loadPaused ? (
+          <QueryError
+            className="bg-background"
+            variant="offline"
+            onRetry={() => void orgWithMembers.refetch()}
+            isRetrying={orgWithMembers.isFetching}
+          />
+        ) : loadFailed ? (
           <QueryError
             className="bg-background"
             onRetry={() => void orgWithMembers.refetch()}

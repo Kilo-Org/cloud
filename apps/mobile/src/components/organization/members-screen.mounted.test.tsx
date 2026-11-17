@@ -25,6 +25,7 @@ const withMembersQuery = vi.hoisted(() => ({
   data: undefined as unknown,
   isLoading: false,
   isPending: false,
+  isPaused: false,
   isFetching: false,
   isError: false,
   error: null as unknown,
@@ -232,6 +233,7 @@ beforeEach(() => {
   withMembersQuery.data = undefined;
   withMembersQuery.isLoading = false;
   withMembersQuery.isPending = false;
+  withMembersQuery.isPaused = false;
   withMembersQuery.isFetching = false;
   withMembersQuery.isError = false;
   withMembersQuery.error = null;
@@ -293,16 +295,26 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
   });
 
-  it('keeps the skeleton ahead of error and empty states while the read is pending and unfetched', async () => {
-    // A paused pending read with an in-flight error never produced data, so
-    // neither settled body may render; the mock also pins isLoading false,
-    // which is exactly the paused shape.
+  it('keeps a skeleton over an in-flight read with neither data nor answer yet', async () => {
+    // Pending, not fetching yet (isLoading false is the paused shape), no data,
+    // no error: neither settled body may render — the list skeleton holds.
     withMembersQuery.isPending = true;
     withMembersQuery.isLoading = false;
     withMembersQuery.data = undefined;
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
+  });
+
+  it('renders the offline state with a retry when the read is paused', async () => {
+    // A paused read cannot land an answer, so the screen names the state and
+    // hands the person the retry, matching the hub's row for the same query.
+    withMembersQuery.isPending = true;
+    withMembersQuery.isPaused = true;
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = undefined;
+    const texts = await renderScreen();
+    expect(texts).toContain('QUERY_ERROR');
   });
 });
 
@@ -561,12 +573,14 @@ describe('OrganizationMembersScreen self-row identity gate', () => {
     unmountAll();
   });
 
-  it('opens the caller row menu once the identity resolves to them', async () => {
+  it('resolves the gates after the identity matches the acting account', async () => {
     withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
     currentIdentity.userId = 'user-1';
 
     trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
 
+    // The caller's own row stays read-only on a resolved identity (the server
+    // owns self-management); the other member's row becomes manageable.
     expect(rowPropsFor('user-1').canManage).toBe(false);
     expect(rowPropsFor('user-1').canManageLimit).toBe(false);
     expect(rowPropsFor('member-9').canManage).toBe(true);

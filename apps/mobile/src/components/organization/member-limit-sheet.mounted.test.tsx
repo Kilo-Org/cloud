@@ -36,6 +36,7 @@ const query = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isPending: false,
+  isPaused: false,
   isError: false,
   isFetching: false,
   refetch: vi.fn(),
@@ -124,6 +125,7 @@ beforeEach(() => {
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;
+  query.isPaused = false;
   query.isError = false;
   query.refetch.mockClear();
   updateMember.mutate.mockClear();
@@ -310,8 +312,9 @@ describe('MemberLimitSheet error copy', () => {
 });
 
 describe('MemberLimitSheet pending membership read', () => {
-  // A paused (pending, not fetching) read with no cached data must reach the
-  // skeleton, not the member-not-found state: the sheet had no answer yet.
+  // A pending (not fetching yet, no data) read with no cached payload must
+  // reach the skeleton, not the member-not-found state: the sheet had no
+  // answer yet.
   it('shows the skeleton, not member-not-found, while the read is pending and unfetched', async () => {
     query.isPending = true;
     query.isLoading = false;
@@ -326,6 +329,23 @@ describe('MemberLimitSheet pending membership read', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+
+  // A paused read cannot land an answer, so the sheet names the offline state
+  // with a retry instead of holding a silent skeleton.
+  it('renders the offline state with a retry when the read is paused', async () => {
+    query.isPending = true;
+    query.isPaused = true;
+    query.isLoading = false;
+    query.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     unmount();
   });
 });

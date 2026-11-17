@@ -640,6 +640,8 @@ const maskAgentScreenshot = async (
   deps: BrowserReadActionDeps,
   input: {
     readonly clip?: ScreenshotClip | undefined;
+    /** The clip's render scale: 1 for a CSS-pixel capture, the device pixel ratio for a device one. */
+    readonly clipScale?: number | undefined;
     readonly dataUrl: string;
     readonly fullPage: boolean;
     readonly mediaType: string;
@@ -684,8 +686,8 @@ const maskAgentScreenshot = async (
     boxes,
     dataUrl: input.dataUrl,
     mediaType: input.mediaType,
-    // An element capture is clipped at scale 1; a viewport or full-page capture keeps the device pixel ratio the image carries.
-    scale: input.clip === undefined ? geometry.scale : 1,
+    // An element capture is clipped at its own scale; a viewport or full-page capture keeps the device pixel ratio the image carries.
+    scale: input.clip === undefined ? geometry.scale : (input.clipScale ?? 1),
   });
 
   return masked.ok ? { dataUrl: masked.dataUrl } : { error: masked.error };
@@ -820,7 +822,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     return invalidArguments('browser_take_screenshot', parsed.error);
   }
 
-  const { filename, fullPage, target } = parsed.data;
+  const { filename, fullPage, scale, target } = parsed.data;
   const type = inferScreenshotType(parsed.data.type, filename);
 
   if (fullPage === true && target !== undefined && target !== '') {
@@ -831,9 +833,18 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
 
   const clip =
     target === undefined || target === '' ? undefined : await readElementClip(deps.session, target);
+  // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
+  let clipScale = 1;
+
+  if (clip !== undefined && scale === 'device') {
+    const geometry = await readAgentScreenshotGeometry(deps.session, { fullPage: false });
+
+    clipScale = geometry.scale;
+  }
+
   const response = await deps.session.send('Page.captureScreenshot', {
     format: type,
-    ...(clip === undefined ? {} : { clip: { ...clip, scale: 1 } }),
+    ...(clip === undefined ? {} : { clip: { ...clip, scale: clipScale } }),
     ...(fullPage === true ? { captureBeyondViewport: true } : {}),
   });
   const shot = screenshotDataSchema.safeParse(response);
@@ -846,7 +857,10 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   const masked = await maskAgentScreenshot(deps, {
     ...(clip === undefined
       ? {}
-      : { clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width } }),
+      : {
+          clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width },
+          clipScale,
+        }),
     dataUrl: `data:${mediaType};base64,${shot.data.data}`,
     fullPage: fullPage === true,
     mediaType,

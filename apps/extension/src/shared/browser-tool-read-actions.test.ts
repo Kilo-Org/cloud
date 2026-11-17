@@ -41,6 +41,7 @@ const createSession = ({
   boxes = {},
   consoleMessages = [],
   frameTree,
+  layoutMetrics,
   requestsSinceLoad = [],
   pageText = () => '',
   responseBody,
@@ -53,6 +54,7 @@ const createSession = ({
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
   consoleMessages?: BrowserConsoleMessage[];
   frameTree?: Record<string, unknown>;
+  layoutMetrics?: Record<string, unknown>;
   requestsSinceLoad?: BrowserNetworkRequest[];
   pageText?: () => string;
   responseBody?: { base64Encoded?: boolean; body?: string };
@@ -99,6 +101,10 @@ const createSession = ({
 
       if (method === 'Page.getFrameTree') {
         return frameTree ?? {};
+      }
+
+      if (method === 'Page.getLayoutMetrics') {
+        return layoutMetrics ?? {};
       }
 
       if (method === 'DOM.getFrameOwner') {
@@ -310,6 +316,35 @@ describe('browser_take_screenshot', () => {
     expect(inputs).toHaveLength(1);
     expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
     expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('renders a device-scale element capture at the device pixel ratio', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { commands, session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'device', target: 'e12' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com'] },
+        maskScreenshot: mask,
+      }
+    );
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { clip: { height: 200, scale: 2, width: 400, x: 40, y: 120 }, format: 'png' },
+    });
+    expect(inputs[0]?.scale).toBe(2);
   });
 
   it('drops a withheld frame that the element clip does not overlap', async () => {

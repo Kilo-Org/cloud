@@ -226,7 +226,7 @@ test.describe('agent frame scoping', () => {
 
       const shot = screenshotValue(
         await callAgentTool(extensionPage, {
-          args: { type: 'png' },
+          args: { scale: 'css', type: 'png' },
           authorized: [{ class: 'read', origin: outerOrigin }],
           tabId,
           tool: 'browser_take_screenshot',

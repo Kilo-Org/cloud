@@ -324,59 +324,61 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         <Animated.View entering={FadeIn.duration(200)}>
           <RowGroup>
             {showMoney && (
+              <KvRow
+                label={t('organization.hub.balance')}
+                value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
+                valueFace="numeric"
+                // The amount's symbol and sign are neutral to the paragraph's
+                // direction, so the run carries its own left-to-right order.
+                valueDirection="ltr"
+                // An empty balance offers the top-up on the amount's own line: a
+                // row of its own would hold nothing but this control, and
+                // `lineAction` keeps that line one text line tall.
+                trailing={
+                  org.balance === 0 ? (
+                    <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
+                  ) : undefined
+                }
+                // Always pass the label: a node React Native stops handing a
+                // label keeps its previous native value on Android, so a
+                // masked row that reveals its amount would still announce
+                // "Balance hidden" (the credits card's own note).
+                valueAccessibilityLabel={
+                  hideOrgBalance ? t('profile.balanceHidden') : balanceAmount
+                }
+              />
+            )}
             <KvRow
-              label={t('organization.hub.balance')}
-              value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
-              valueFace="numeric"
-              // The amount's symbol and sign are neutral to the paragraph's
-              // direction, so the run carries its own left-to-right order.
-              valueDirection="ltr"
-              // An empty balance offers the top-up on the amount's own line: a
-              // row of its own would hold nothing but this control, and
-              // `lineAction` keeps that line one text line tall.
-              trailing={
-                org.balance === 0 ? (
-                  <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
-                ) : undefined
+              label={t('organization.hub.organizationSeats')}
+              // `requireSeats` is the enforcement switch; total is the raw
+              // purchased capacity and can legitimately be zero.
+              value={
+                org.requireSeats
+                  ? isolateLtrBidiText(
+                      `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
+                        org.seatCount.total,
+                        i18n.language
+                      )}`
+                    )
+                  : formatNumber(org.seatCount.used, i18n.language)
               }
-              // Always pass the label: a node React Native stops handing a
-              // label keeps its previous native value on Android, so a
-              // masked row that reveals its amount would still announce
-              // "Balance hidden" (the credits card's own note).
-              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : balanceAmount}
+              valueFace="numeric"
             />
-          )}
-          <KvRow
-            label={t('organization.hub.organizationSeats')}
-            // `requireSeats` is the enforcement switch; total is the raw
-            // purchased capacity and can legitimately be zero.
-            value={
-              org.requireSeats
-                ? isolateLtrBidiText(
-                    `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
-                      org.seatCount.total,
-                      i18n.language
-                    )}`
-                  )
-                : formatNumber(org.seatCount.used, i18n.language)
-            }
-            valueFace="numeric"
-          />
-          {/* The plan is the tier the seats belong to, so it closes the card
+            {/* The plan is the tier the seats belong to, so it closes the card
               the seats are counted in and paints in every state. A lapsed plan
               states that in this row: the tier alone beside the block above
               would read as an active plan, and the tier keeps the row's own ink
               so only the state carries the warning. */}
-          <KvRow
-            label={t('organization.hub.plan')}
-            value={planName}
-            valueStatus={
-              planEnded
-                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
-                : undefined
-            }
-            valueFace="text"
-          />
+            <KvRow
+              label={t('organization.hub.plan')}
+              value={planName}
+              valueStatus={
+                planEnded
+                  ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                  : undefined
+              }
+              valueFace="text"
+            />
           </RowGroup>
         </Animated.View>
 
@@ -575,10 +577,7 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
 
   const inner = (
     <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-      <IconTile
-        tint={tint}
-        content={<KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />}
-      />
+      <IconTile tint={tint} content={<KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />} />
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         {/* `h-4` is the `text-xs` line box (1 rem; native rem is 14), so the row

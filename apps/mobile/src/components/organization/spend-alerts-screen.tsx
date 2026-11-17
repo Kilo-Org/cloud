@@ -461,7 +461,9 @@ function SpendAlertsForm({
           switch's end inset lives in CardSwitch, so every switch on the screen
           ends level with the label's start. */}
       <RowGroup>
-        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
+        <View
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
+        >
           <Text className="text-sm font-medium text-foreground">{t('spendAlerts.sendAlerts')}</Text>
           <CardSwitch
             accessibilityLabel={t('spendAlerts.sendAlerts')}
@@ -668,7 +670,9 @@ function RuleCard({
       {children}
 
       <RowGroup>
-        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
+        <View
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
+        >
           <Text className="text-sm font-medium text-foreground">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
               into the switch label, so the two Email rows stay distinct. */}
@@ -696,7 +700,12 @@ function RuleCard({
             </View>
           </Pressable>
         ) : (
-          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
+          <View
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-3 px-4 py-3'
+            )}
+          >
             <Text className="text-sm font-medium text-foreground">{t('notifications.push')}</Text>
             <CardSwitch
               accessibilityLabel={pushLabel}

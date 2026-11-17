@@ -88,9 +88,7 @@ export function InputGuardrailsSection({
           }}
         />
       ) : null}
-      <Text variant="caption">
-        {t('organizationGuardrails.detectorsHint')}
-      </Text>
+      <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
       {INPUT_DETECTOR_IDS.map(id => {
         const copy = INPUT_DETECTOR_COPY[id];
         return (

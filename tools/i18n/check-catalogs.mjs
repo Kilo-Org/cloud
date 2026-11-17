@@ -19,7 +19,7 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1394,10 +1394,25 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
   return problems;
 }
 
-/** The `.json`-named entries of `dir` that are not regular files, sorted. */
+/**
+ * The `.json`-named entries of `dir` that are not regular files, sorted.
+ *
+ * The same stat-based definition `catalogTags` filters by, so an entry can
+ * never fall out of one set without a line in the other: a directory named
+ * like a catalog and a symlink the filesystem cannot follow are named here.
+ */
 function nonFileCatalogEntries(dir) {
   return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => !entry.isFile() && entry.name.endsWith('.json'))
+    .filter(entry => {
+      if (!entry.name.endsWith('.json')) {
+        return false;
+      }
+      try {
+        return !statSync(join(dir, entry.name)).isFile();
+      } catch {
+        return true;
+      }
+    })
     .map(entry => entry.name.replace(/\.json$/, ''))
     .sort();
 }

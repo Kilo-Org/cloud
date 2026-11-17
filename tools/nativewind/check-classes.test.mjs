@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
   copyFileSync,
   mkdirSync,
@@ -406,8 +407,9 @@ test('runs the whole audit over a clean tree through the CLI and ignores test sc
  * `makeFixture` links the app's node_modules to the repository's own, so the
  * stub cannot shadow one package in place. The require base walks app
  * package.json → its node_modules → root node_modules, so the fixture swaps
- * the app's link for a real directory that holds only the stub package, and
- * copies the real package.json so the exports map still resolves `./compiler`.
+ * the app's link for a real directory that holds only the stub package. The
+ * real package.json is resolved through Node, not a package-manager layout
+ * path, so the exports map still resolves `./compiler` under any linker.
  */
 function stubbedCompilerFixture(context, entrySource) {
   const root = makeFixture(context, {
@@ -417,7 +419,9 @@ function stubbedCompilerFixture(context, entrySource) {
   rmSync(join(root, 'apps/mobile/node_modules'), { recursive: true, force: true });
   mkdirSync(join(entry, 'dist/commonjs/compiler'), { recursive: true });
   copyFileSync(
-    join(REPO, 'node_modules/.pnpm/node_modules/react-native-css/package.json'),
+    // The checker resolves the compiler from the app's package.json base, so
+    // this resolution names the same installed tree under any package manager.
+    createRequire(join(MOBILE_ROOT, 'package.json')).resolve('react-native-css/package.json'),
     join(entry, 'package.json')
   );
   writeFileSync(join(entry, 'dist/commonjs/compiler/index.js'), entrySource);

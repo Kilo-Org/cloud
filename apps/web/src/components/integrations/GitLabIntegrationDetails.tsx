@@ -368,7 +368,8 @@ export function GitLabIntegrationDetails({
     }
 
     const queryString = params.toString();
-    window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
+    const separator = basePath.includes('?') ? '&' : '?';
+    window.location.href = queryString ? `${basePath}${separator}${queryString}` : basePath;
   };
 
   const handleDisconnect = async () => {

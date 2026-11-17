@@ -50,7 +50,9 @@ export function AppShellIntegrationDetails({
           organizationId={organizationId}
           success={success}
           error={error}
-          connectPath={buildAppShellConnectPath('gitlab', { organizationId })}
+          // GitLab builds its own query (organization and self-hosted instance)
+          // from these props, so the start route is handed over without one.
+          connectPath={buildAppShellConnectPath('gitlab')}
           shell
         />
       );

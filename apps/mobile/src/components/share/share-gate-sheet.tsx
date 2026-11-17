@@ -451,7 +451,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       <SheetHeader
         title={t('share.title')}
         onDone={dismiss}
-        doneLabel={t('common.close')}
+        // Nothing to commit here: the destinations commit themselves, so the
+        // header's one control closes the sheet.
+        variant="close"
         topInset="ios-page-sheet"
       />
       {previewPayload ? (

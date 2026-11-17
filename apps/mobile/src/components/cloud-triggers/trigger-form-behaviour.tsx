@@ -87,7 +87,7 @@ export function TriggerFormBehaviour({
         onBlur={() => {
           markTouched('prompt');
         }}
-        className="min-h-24 leading-[1.25rem]"
+        className="min-h-32"
         textAlignVertical="top"
       />
 
@@ -108,7 +108,7 @@ export function TriggerFormBehaviour({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-24 font-mono text-xs leading-[1.25rem]"
+            className="min-h-32 font-mono text-xs"
             textAlignVertical="top"
           />
           <Text variant="caption">{t('cloudAgent.triggers.bodySchemaHelp')}</Text>

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
@@ -242,7 +243,6 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const { t } = useTranslation();
   const contentContainerStyle = {
     ...sideInsetStyle,
-    paddingTop: 8,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
 
@@ -258,7 +258,7 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4">
+        <View className={SCREEN_BODY_CLASS}>
           <Section
             title={t('consent.aiProvidersTitle')}
             what={t('consent.aiProvidersWhat')}

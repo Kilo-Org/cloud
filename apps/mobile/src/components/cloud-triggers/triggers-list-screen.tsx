@@ -38,6 +38,13 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 
 const SKELETON_ROWS = [0, 1];
 
+/**
+ * The floor the pending band already occupies: two skeleton rows. Every state
+ * that is not the list keeps it, so the New trigger action below never moves
+ * when the two placeholders are replaced by the settled state.
+ */
+const BODY_BAND_CLASS = 'min-h-32';
+
 type TriggersListScreenProps = Readonly<{
   /** Organization scope from the route; absent is the caller's own triggers. */
   organizationId?: string;
@@ -204,7 +211,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
       >
         <Section>
           <Text variant="caption">{t('cloudAgent.triggers.subtitle')}</Text>
-          {body}
+          <View className={BODY_BAND_CLASS}>{body}</View>
           <Button
             variant="outline"
             className={STATE_ACTION_CLASS}

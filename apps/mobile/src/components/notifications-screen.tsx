@@ -28,6 +28,7 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Switch } from '@/components/ui/switch';
@@ -72,6 +73,13 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
+
+/**
+ * The master gate's bell, by its settled presentation. The neutral state reads
+ * nothing yet, so it keeps the tile's frame with a loading mark instead of one
+ * of these.
+ */
+const MASTER_GATE_ICON = { on: Bell, off: BellOff } as const;
 
 /**
  * The glanceable row's subtitle: what it promises while the OS allows it, and
@@ -647,44 +655,49 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
-  const masterSubtitle =
-    masterLeading === 'on'
-      ? t('notifications.onDescription')
-      : masterLeading === 'off'
-        ? t('notifications.offDescription')
-        : undefined;
+  let masterSubtitle: string | undefined;
+  if (masterLeading === 'on') {
+    masterSubtitle = t('notifications.onDescription');
+  } else if (masterLeading === 'off') {
+    masterSubtitle = t('notifications.offDescription');
+  }
 
   // Master trailing slot — first match wins: a settling permission read or a
   // token query still in flight shows its skeleton, a permission read that
   // failed offers the retry, and only a settled gate draws the real switch.
-  const masterTrailing: ReactNode = permissionLoading ? (
-    <Skeleton className="h-8 w-14 rounded-full" />
-  ) : permissionError ? (
-    <InlineRetry
-      label={t('notifications.retryPermission')}
-      color={colors.destructive}
-      onPress={() => void refetchPermission()}
-    />
-  ) : !gateSettled ? (
-    <Skeleton className="h-8 w-14 rounded-full" />
-  ) : (
-    <View className="flex-row items-center gap-2">
-      {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-      <Switch
-        value={notificationsEnabled}
-        disabled={isMasterBusy}
-        accessibilityLabel={t('notifications.deviceTitle')}
-        accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
-        onValueChange={value => {
-          if (value) {
-            void handleEnableNotifications();
-          } else {
-            handleDisableNotifications();
-          }
-        }}
+  let masterTrailing: ReactNode;
+  if (permissionLoading) {
+    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
+  } else if (permissionError) {
+    masterTrailing = (
+      <InlineRetry
+        label={t('notifications.retryPermission')}
+        color={colors.destructive}
+        onPress={() => void refetchPermission()}
       />
-    </View>
-  );
+    );
+  } else if (!gateSettled) {
+    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
+  } else {
+    masterTrailing = (
+      <View className="flex-row items-center gap-2">
+        {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+        <Switch
+          value={notificationsEnabled}
+          disabled={isMasterBusy}
+          accessibilityLabel={t('notifications.deviceTitle')}
+          accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
+          onValueChange={value => {
+            if (value) {
+              void handleEnableNotifications();
+            } else {
+              handleDisableNotifications();
+            }
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -728,18 +741,22 @@ export function NotificationsScreen() {
         {/* Master gate */}
         <Section label={t('notifications.push')}>
           <RowGroup>
-            <ConfigureRow
+            <RowFrame
               // The leading tile keeps its 30 dp frame in all three states, so
               // the title never moves when the permission settles into "on" or
-              // "off".
-              icon={masterLeading === 'on' ? Bell : BellOff}
+              // "off". While it is unsettled the tile holds a neutral mark
+              // instead of the off bell: painting "off" before the answer would
+              // assert a state nobody has read yet.
+              icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
+              iconContent={
+                masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
+              }
               title={t('notifications.deviceTitle')}
-              subtitle={masterSubtitle}
+              subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
               subtitlePlaceholder={
                 masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
               }
-              variant="action"
-              trailing={masterTrailing}
+              trailing={{ kind: 'node', node: masterTrailing }}
             />
           </RowGroup>
 

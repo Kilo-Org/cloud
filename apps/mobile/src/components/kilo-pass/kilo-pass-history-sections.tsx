@@ -41,8 +41,12 @@ function HistoryLine({
   return (
     <KvRow
       label={title}
+      // The description the server returns can be a sentence; the amount and
+      // the date are the column a reader scans, so the title yields its width
+      // to them instead of pushing them out of the row.
+      labelShrink
       value={amount}
-      valueFace="text"
+      valueFace="numeric"
       trailing={<Text variant="caption">{date}</Text>}
     />
   );

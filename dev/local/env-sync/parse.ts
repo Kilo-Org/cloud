@@ -59,7 +59,11 @@ function stripEnvQuotes(value: string): string {
   }
   // An unquoted value follows dotenv semantics, which nextjs applies when it
   // reads the same .env.local: a trailing ` # comment` is not part of the
-  // value (the e2e stub tags its env line with one).
+  // value (the e2e stub tags its env line with one). A value that starts with
+  // `#` is the comment itself, not content, so it strips to empty too.
+  if (value.startsWith('#') && !value.startsWith('"') && !value.startsWith("'")) {
+    return value.replace(/\s+#.*$/, '').trim();
+  }
   return value.replace(/\s+#.*$/, '').trim();
 }
 

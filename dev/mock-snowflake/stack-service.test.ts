@@ -234,20 +234,17 @@ test('the last host definition outside the section decides, both orders', async 
     assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:\d+$/m);
 
     // The reversed order: the placeholder comes first and the real host keeps
-    // it after — the last definition is the app's warehouse. The wire inserts
-    // its section below the last definition (dotenv keeps the last, so the
-    // section's entry must not shadow it), and the guard still sees the real
-    // host outside the section on later wires: the file keeps the real host
-    // and the section, because `wireEnvLocal` re-inserts under it every time.
+    // it after — the last definition is the app's warehouse. Wire a section
+    // first (a placeholder alone), then put the real host after it: the guard
+    // sees the real host outside the section and takes the section back out.
     fixture.restore();
     const second = wireEnvLocalFixture(undefined);
     try {
-      fs.writeFileSync(second.envLocalPath, 'SNOWFLAKE_ACCOUNT_HOST=real.example:443\n');
+      fs.writeFileSync(second.envLocalPath, 'SNOWFLAKE_ACCOUNT_HOST=\n');
       await second.wire();
-      const existing = fs.readFileSync(second.envLocalPath, 'utf8');
       fs.writeFileSync(
         second.envLocalPath,
-        `SNOWFLAKE_ACCOUNT_HOST=\n${existing}SNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
+        `${fs.readFileSync(second.envLocalPath, 'utf8')}SNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
       );
       assert.deepEqual(await second.wire(), {
         status: 'keptRealWarehouse',

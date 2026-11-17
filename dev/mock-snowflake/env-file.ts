@@ -13,6 +13,10 @@ export type EnvEntry = { key: string; value: string };
  */
 export function stripEnvValue(raw: string): string {
   let value = raw.trim();
+  // `KEY= # comment` is dotenv's empty value: a value that starts with `#` is
+  // the comment itself, not content (the blank-then-comment regex below needs
+  // whitespace before the `#`, which a trimmed start no longer has).
+  if (value.startsWith('#')) return '';
   if (!value.startsWith('"') && !value.startsWith("'")) {
     return value.replace(/\s+#.*$/, '').trim();
   }

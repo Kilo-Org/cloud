@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Jebinta SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Hubin ammin ayaa leh cusboonaysiin"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kalfadhigaaga Kilo waa diyaar in laga xakameeyo taleefankaaga"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

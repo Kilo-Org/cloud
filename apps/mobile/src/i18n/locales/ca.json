@@ -1377,7 +1377,8 @@
       "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
-      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball"
+      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
+      "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
     },
     "scopeList": {
       "personalStillAvailable": "Els repositoris personals encara estan disponibles a continuació.",
@@ -3520,7 +3521,6 @@
     },
     "settingsOnWeb": {
       "title": "Configuració de l'organització al web",
-      "integrations": "Integracions al web",
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
@@ -3529,9 +3529,19 @@
       "ssoAndDomain": "SSO i domini",
       "dataCollection": "Recollida de dades",
       "auditLogs": "Registres d'auditoria",
-      "requestLogs": "Registres de sol·licituds",
-      "subOrganizations": "Suborganitzacions",
-      "distributeFunds": "Distribueix fons"
+      "requestLogs": "Registres de sol·licituds"
+    },
+    "requestLogs": {
+      "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",
+      "older": "Hora anterior",
+      "newer": "Hora següent",
+      "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
+      "emptyTitle": "No hi ha sol·licituds",
+      "emptyDescription": "En aquesta hora no hi ha cap sol·licitud a la passarel·la.",
+      "loadError": "No s'han pogut carregar els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "tokens": "{{input}} d'entrada · {{output}} de sortida",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
@@ -4598,6 +4608,8 @@
     "topModels": "Models més usats",
     "topFeatures": "Funcions més usades",
     "emptyTitle": "Cap ús en aquest període",
+    "unavailableTitle": "Ús no disponible",
+    "unavailableDescription": "Aquest espai de treball no informa de l'ús. Tornar-ho a provar no ajudarà.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
     "viewDetails": "Mostra els detalls d'ús"
   },
@@ -4756,5 +4768,175 @@
     "unavailableDescription": "Aquest enllaç per compartir ha caducat o s'ha revocat.",
     "transcriptUnavailableTitle": "No s'ha pogut carregar aquesta transcripció",
     "transcriptUnavailableDescription": "L'enllaç encara funciona. Torna-ho a provar d'aquí a un moment."
+  },
+  "organizationGuardrails": {
+    "title": "Salvaguardes d'IA",
+    "permissionDenied": "Només els propietaris i els administradors de l'organització poden gestionar les salvaguardes d'IA.",
+    "unavailable": "Les salvaguardes d'IA no estan disponibles per a aquesta organització.",
+    "loadError": "No s'han pogut carregar les salvaguardes d'IA",
+    "statusSaving": "S'està desant…",
+    "statusSaved": "Desat",
+    "statusFailed": "No s'ha pogut desar.",
+    "inputTitle": "Salvaguardes d'entrada",
+    "inputDescription": "Analitza cada entrada amb Enkrypt AI, inclosos els resultats de les eines. Un detector de bloqueig rebutja una sol·licitud quan Enkrypt no està disponible.",
+    "outputTitle": "Salvaguardes de sortida",
+    "outputDescription": "Analitza les respostes amb Enkrypt AI abans que les rebin els membres. Està desactivat tret que l'activis.",
+    "detectorsHint": "«Bloqueig» rebutja una sol·licitud marcada. «Només registre» la registra sense endarrerir la sol·licitud.",
+    "detectorsHintOutput": "«Bloqueig» fa fallar una resposta marcada. «Només registre» la registra sense endarrerir la resposta.",
+    "choiceLog": "Només registre",
+    "applyTo": "Aplica a",
+    "applyToAllMembers": "Tots els membres",
+    "applyKiloDefault": "Aplica el valor per defecte de Kilo",
+    "invalidSavedTitle": "No es pot llegir la configuració desada dels detectors d'entrada",
+    "invalidSavedBody": "Les sol·licituds es bloquegen fins que es tornin a desar els detectors d'entrada. Els detectors següents parteixen del valor per defecte de Kilo.",
+    "invalidSavedOutputTitle": "No es pot llegir la configuració desada dels detectors de sortida",
+    "invalidSavedOutputBody": "Les respostes es retenen fins que es tornin a desar els detectors de sortida. Tria els detectors de sortida a continuació.",
+    "blockingOutputNote": "Un detector de sortida de bloqueig reté la resposta fins que Enkrypt l'ha comprovada sencera. Fes servir «Només registre» per evitar el retard.",
+    "inputDetectorRequired": "Activa almenys un detector d'entrada.",
+    "outputDetectorRequired": "Activa almenys un detector de sortida.",
+    "rulesTooMany": "Afegeix fins a {{max}} regles.",
+    "ruleIdRequired": "Introdueix un ID de regla.",
+    "ruleIdInvalid": "Un ID de regla només pot contenir lletres, números, punts, guions i guions baixos.",
+    "ruleTextRequired": "Descriu què prohibeix o exigeix la regla.",
+    "keywordTooLong": "Cada paraula clau pot tenir fins a {{max}} caràcters.",
+    "topicTooLong": "Cada tema pot tenir fins a {{max}} caràcters.",
+    "keywordsTooMany": "Afegeix fins a {{max}} paraules clau.",
+    "topicsTooMany": "Afegeix fins a {{max}} temes.",
+    "piiEntityRequired": "Selecciona com a mínim un tipus de dades que cal detectar.",
+    "keywordRequired": "Afegeix com a mínim una paraula clau.",
+    "topicRequired": "Afegeix com a mínim un tema.",
+    "policyTextRequired": "Introdueix el text de la política.",
+    "ruleRequired": "Afegeix com a mínim una regla.",
+    "ruleIdDuplicate": "Cada regla ha de tenir el seu propi ID de regla.",
+    "piiEntities": "Dades que cal detectar",
+    "keywordsLabel": "Paraules clau",
+    "keywordsHint": "Una paraula clau per línia.",
+    "topicsHint": "Un tema per línia.",
+    "policyFormat": "Format de la política",
+    "policyFormatRules": "Regles estructurades",
+    "policyFormatRulesDescription": "Una regla per requisit, amb una categoria i una gravetat. Recomanat.",
+    "policyFormatText": "Text de la política",
+    "policyFormatTextDescription": "Enganxa una política existent com a text sense format.",
+    "rulesEmpty": "Encara no hi ha regles. Cada regla descriu una cosa que les entrades no poden contenir ni demanar.",
+    "addRule": "Afegeix una regla",
+    "ruleNumber": "Regla {{number}}",
+    "ruleRemove": "Elimina la regla {{number}}",
+    "ruleIdLabel": "ID de la regla",
+    "ruleNameLabel": "Nom (opcional)",
+    "ruleTextLabel": "Regla",
+    "ruleRiskCategory": "Categoria de risc",
+    "ruleApplicability": "Abast",
+    "ruleFrameworks": "Marcs normatius",
+    "detector": {
+      "promptInjection": {
+        "label": "Injecció de prompts",
+        "description": "Detecta intents d'anul·lar les instruccions o de fer jailbreak al model."
+      },
+      "policyViolation": {
+        "label": "Infracció de la política",
+        "description": "Marca les entrades que incompleixen la política de la teva organització, escrita com a text o com a regles.",
+        "descriptionOutput": "Marca les respostes que incompleixen la política de la teva organització, escrita com a text o com a regles."
+      },
+      "pii": {
+        "label": "Dades personals i secrets",
+        "description": "Detecta dades personals, credencials, adreces IP i URL."
+      },
+      "keywords": {
+        "label": "Paraules clau prohibides",
+        "descriptionOutput": "Detecta les respostes que contenen qualsevol paraula clau de la teva llista."
+      },
+      "topics": {
+        "label": "Temes",
+        "descriptionOutput": "Marca les respostes sobre qualsevol tema de la teva llista."
+      },
+      "toxicity": {
+        "label": "Toxicitat",
+        "description": "Detecta llenguatge tòxic, insultant, amenaçador o d'odi."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detecta contingut sexual o no apte per a entorns de feina."
+      },
+      "bias": {
+        "label": "Biaix",
+        "description": "Detecta llenguatge esbiaixat o discriminatori."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dades personals",
+        "description": "Noms, adreces electròniques, números de telèfon."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "description": "Claus d'API, tokens, contrasenyes."
+      },
+      "ipAddress": {
+        "label": "Adreces IP",
+        "description": "Adreces IPv4 i IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adreces web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Seguretat i frau",
+      "safetyHarm": "Protecció i danys",
+      "privacyDataProtection": "Privadesa i protecció de dades",
+      "brandReputationTrust": "Marca i reputació",
+      "biasFairnessEthical": "Biaix i equitat",
+      "legalIpLiability": "Responsabilitat legal i de propietat intel·lectual",
+      "productMisuse": "Ús indegut del producte",
+      "performanceQuality": "Rendiment i qualitat"
+    },
+    "applicability": {
+      "user": "Entrada de l'usuari",
+      "userAssistant": "Entrada de l'usuari i respostes"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Llei d'IA de la UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funció per a empreses",
+    "enterpriseOnly": "Aquesta funció només està disponible per a empreses.",
+    "readOnly": "Només els propietaris i els administradors de l'organització poden canviar aquesta configuració.",
+    "loadError": "No s'han pogut carregar els proveïdors i els models",
+    "tabModels": "Models",
+    "tabProviders": "Proveïdors",
+    "tabGateways": "Passarel·les",
+    "modelsDescription": "Desactiva un model per bloquejar-lo per a tots els membres. Els models dels proveïdors permesos estan activats d'entrada.",
+    "modelsDeniedOnly": "Només denegats",
+    "modelsEmpty": "Cap model coincideix amb aquesta cerca.",
+    "providersDescription": "Desactiva un proveïdor perquè Kilo hi deixi d'encaminar sol·licituds en aquesta organització.",
+    "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
+    "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",
+    "allowAllShown": "Permet tots els mostrats",
+    "denyAllShown": "Denega tots els mostrats",
+    "gatewaysDescription": "Kilo encamina les sol·licituds de models a través de Vercel AI Gateway o OpenRouter. Si una passarel·la està desactivada, aquestes sol·licituds fallen.",
+    "emptyProviderList": "Permet com a mínim un proveïdor. Si la llista és buida, Kilo no pot encaminar cap sol·licitud de model.",
+    "gatewaysUnavailable": "La configuració de passarel·les no està disponible per a aquesta organització.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Les sol·licituds d'OpenRouter no estan fixades a cap regió.",
+    "inferenceRegion": "Regió d'inferència",
+    "inferenceRegionDescription": "Fixa les sol·licituds de Vercel AI Gateway a aquesta regió. Les sol·licituds a un model que no hi estigui disponible fallen.",
+    "disableOpenrouterNote": "Desactivar OpenRouter també bloqueja les claus BYOK que hi encaminen sol·licituds.",
+    "emptyModelList": "Deixa com a mínim un model activat. Si denegues tots els models, els membres no tindran res per utilitzar.",
+    "catalogUnavailable": "El catàleg complet de models no s'ha carregat, així que només es mostren les llistes desades. Torna-ho a provar per carregar tots els models.",
+    "region": {
+      "global": "Global",
+      "us": "Estats Units",
+      "eu": "Unió Europea",
+      "au": "Austràlia",
+      "jp": "Japó"
+    }
   }
 }

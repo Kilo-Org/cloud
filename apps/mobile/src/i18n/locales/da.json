@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Organisationens Bitbucket-forbindelse administreres på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet med de nødvendige tilladelser, og indsæt det nedenfor.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
-      "tokenPlaceholder": "Adgangstoken til arbejdsområdet"
+      "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
+      "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
     },
     "scopeList": {
       "personalStillAvailable": "Dine personlige kodelagre er stadig tilgængelige nedenfor.",
@@ -3463,7 +3464,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsindstillinger på nettet",
-      "integrations": "Integrationer på nettet",
       "usageDetails": "Forbrugsdetaljer",
       "providersAndModels": "Udbydere og modeller",
       "groups": "Grupper",
@@ -3472,9 +3472,19 @@
       "ssoAndDomain": "SSO og domæne",
       "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
-      "requestLogs": "Anmodningslogs",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Anmodningslogs"
+    },
+    "requestLogs": {
+      "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",
+      "older": "Forrige time",
+      "newer": "Næste time",
+      "truncated": "Denne time har flere anmodninger, end listen viser.",
+      "emptyTitle": "Ingen anmodninger",
+      "emptyDescription": "Der er ingen gateway-anmodninger i denne time.",
+      "loadError": "Anmodningslogs kunne ikke indlæses.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
+      "tokens": "{{input}} ind · {{output}} ud",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
@@ -4528,6 +4538,8 @@
     "topModels": "Mest brugte modeller",
     "topFeatures": "Mest brugte funktioner",
     "emptyTitle": "Intet forbrug i denne periode",
+    "unavailableTitle": "Forbrug er ikke tilgængeligt",
+    "unavailableDescription": "Dette arbejdsområde rapporterer ikke forbrug. Det hjælper ikke at prøve igen.",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer"
   },
@@ -4686,5 +4698,175 @@
     "unavailableDescription": "Dette delingslink er udløbet eller blevet tilbagekaldt.",
     "transcriptUnavailableTitle": "Udskriften kunne ikke indlæses",
     "transcriptUnavailableDescription": "Linket virker stadig. Prøv igen om lidt."
+  },
+  "organizationGuardrails": {
+    "title": "AI-sikkerhedsgrænser",
+    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser.",
+    "unavailable": "AI-sikkerhedsgrænser er ikke tilgængelige for denne organisation.",
+    "loadError": "AI-sikkerhedsgrænser kunne ikke indlæses",
+    "statusSaving": "Gemmer…",
+    "statusSaved": "Gemt",
+    "statusFailed": "Kunne ikke gemme.",
+    "inputTitle": "Sikkerhedsgrænser for input",
+    "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. En blokerende detektor afviser en anmodning, når Enkrypt ikke er tilgængelig.",
+    "outputTitle": "Sikkerhedsgrænser for output",
+    "outputDescription": "Scanner svar med Enkrypt AI, før medlemmerne modtager dem. Er slået fra, medmindre du slår det til.",
+    "detectorsHint": "Bloker afviser en markeret anmodning. Kun log registrerer den uden at forsinke anmodningen.",
+    "detectorsHintOutput": "Bloker får et markeret svar til at mislykkes. Kun log registrerer det uden at forsinke svaret.",
+    "choiceLog": "Kun log",
+    "applyTo": "Anvend på",
+    "applyToAllMembers": "Alle medlemmer",
+    "applyKiloDefault": "Anvend Kilo-standard",
+    "invalidSavedTitle": "Gemte indstillinger for inputdetektorer kan ikke læses",
+    "invalidSavedBody": "Anmodninger blokeres, indtil inputdetektorerne gemmes igen. Detektorerne nedenfor starter fra Kilo-standard.",
+    "invalidSavedOutputTitle": "Gemte indstillinger for outputdetektorer kan ikke læses",
+    "invalidSavedOutputBody": "Svar tilbageholdes, indtil outputdetektorerne gemmes igen. Vælg outputdetektorer nedenfor.",
+    "blockingOutputNote": "En blokerende outputdetektor holder et svar tilbage, indtil Enkrypt har kontrolleret det hele. Brug Kun log for at undgå forsinkelsen.",
+    "inputDetectorRequired": "Slå mindst én inputdetektor til.",
+    "outputDetectorRequired": "Slå mindst én outputdetektor til.",
+    "rulesTooMany": "Tilføj op til {{max}} regler.",
+    "ruleIdRequired": "Angiv et regel-id.",
+    "ruleIdInvalid": "Et regel-id må kun indeholde bogstaver, tal, punktummer, bindestreger og understregningstegn.",
+    "ruleTextRequired": "Beskriv, hvad reglen forbyder eller kræver.",
+    "keywordTooLong": "Hvert nøgleord må højst være {{max}} tegn.",
+    "topicTooLong": "Hvert emne må højst være {{max}} tegn.",
+    "keywordsTooMany": "Tilføj op til {{max}} nøgleord.",
+    "topicsTooMany": "Tilføj op til {{max}} emner.",
+    "piiEntityRequired": "Vælg mindst én type data, der skal registreres.",
+    "keywordRequired": "Tilføj mindst ét nøgleord.",
+    "topicRequired": "Tilføj mindst ét emne.",
+    "policyTextRequired": "Indtast politikteksten.",
+    "ruleRequired": "Tilføj mindst én regel.",
+    "ruleIdDuplicate": "Hver regel skal have sit eget regel-ID.",
+    "piiEntities": "Data, der skal registreres",
+    "keywordsLabel": "Nøgleord",
+    "keywordsHint": "Ét nøgleord pr. linje.",
+    "topicsHint": "Ét emne pr. linje.",
+    "policyFormat": "Politikformat",
+    "policyFormatRules": "Strukturerede regler",
+    "policyFormatRulesDescription": "Én regel pr. krav med en kategori og en alvorlighed. Anbefales.",
+    "policyFormatText": "Politiktekst",
+    "policyFormatTextDescription": "Indsæt en eksisterende politik som almindelig tekst.",
+    "rulesEmpty": "Ingen regler endnu. Hver regel beskriver én ting, som input ikke må indeholde eller bede om.",
+    "addRule": "Tilføj regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Fjern regel {{number}}",
+    "ruleIdLabel": "Regel-id",
+    "ruleNameLabel": "Navn (valgfrit)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risikokategori",
+    "ruleApplicability": "Omfang",
+    "ruleFrameworks": "Rammeværker",
+    "detector": {
+      "promptInjection": {
+        "label": "Promptinjektion",
+        "description": "Registrerer forsøg på at tilsidesætte instruktioner eller jailbreake modellen."
+      },
+      "policyViolation": {
+        "label": "Politikovertrædelse",
+        "description": "Markerer input, der overtræder din organisations politik, skrevet som tekst eller regler.",
+        "descriptionOutput": "Markerer svar, der overtræder din organisations politik, skrevet som tekst eller regler."
+      },
+      "pii": {
+        "label": "Personoplysninger og hemmeligheder",
+        "description": "Registrerer personoplysninger, loginoplysninger, IP-adresser og URL'er."
+      },
+      "keywords": {
+        "label": "Forbudte nøgleord",
+        "descriptionOutput": "Registrerer svar, der indeholder et af de nøgleord, du angiver."
+      },
+      "topics": {
+        "label": "Emner",
+        "descriptionOutput": "Markerer svar om et af de emner, du angiver."
+      },
+      "toxicity": {
+        "label": "Toksicitet",
+        "description": "Registrerer toksisk, fornærmende, truende eller hadefuldt sprog."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Registrerer seksuelt eller på anden måde upassende indhold."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Registrerer partisk eller diskriminerende sprog."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personoplysninger",
+        "description": "Navne, e-mailadresser, telefonnumre."
+      },
+      "secrets": {
+        "label": "Hemmeligheder",
+        "description": "API-nøgler, tokens, adgangskoder."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- og IPv6-adresser."
+      },
+      "url": {
+        "label": "URL'er",
+        "description": "Webadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "IT-sikkerhed og svindel",
+      "safetyHarm": "Sikkerhed og skade",
+      "privacyDataProtection": "Privatliv og databeskyttelse",
+      "brandReputationTrust": "Brand og omdømme",
+      "biasFairnessEthical": "Bias og retfærdighed",
+      "legalIpLiability": "Juridisk ansvar og immaterielle rettigheder",
+      "productMisuse": "Misbrug af produktet",
+      "performanceQuality": "Ydeevne og kvalitet"
+    },
+    "applicability": {
+      "user": "Brugerinput",
+      "userAssistant": "Brugerinput og svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU's AI-forordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise-funktion",
+    "enterpriseOnly": "Denne funktion er kun tilgængelig for Enterprise.",
+    "readOnly": "Kun organisationens ejere og administratorer kan ændre disse indstillinger.",
+    "loadError": "Udbydere og modeller kunne ikke indlæses",
+    "tabModels": "Modeller",
+    "tabProviders": "Udbydere",
+    "tabGateways": "Gateways",
+    "modelsDescription": "Slå en model fra for at blokere den for alle medlemmer. Modeller fra tilladte udbydere er slået til fra start.",
+    "modelsDeniedOnly": "Kun afviste",
+    "modelsEmpty": "Ingen modeller matcher denne søgning.",
+    "providersDescription": "Slå en udbyder fra for at forhindre, at Kilo dirigerer anmodninger til den for denne organisation.",
+    "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
+    "providersEmpty": "Ingen udbydere matcher denne søgning.",
+    "allowAllShown": "Tillad alle viste",
+    "denyAllShown": "Afvis alle viste",
+    "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",
+    "emptyProviderList": "Tillad mindst én udbyder. En tom liste blokerer alle Kilo-modelruter.",
+    "gatewaysUnavailable": "Gateway-indstillinger er ikke tilgængelige for denne organisation.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-anmodninger er ikke låst til en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-anmodninger til denne region. Anmodninger til en model, der ikke er tilgængelig der, mislykkes.",
+    "disableOpenrouterNote": "Hvis OpenRouter deaktiveres, blokeres også BYOK-nøgler, der dirigerer anmodninger gennem den.",
+    "emptyModelList": "Lad mindst én model være slået til. Hvis du afviser alle modeller, har medlemmerne intet at bruge.",
+    "catalogUnavailable": "Hele modelkataloget blev ikke indlæst, så kun dine gemte lister vises. Prøv igen for at indlæse alle modeller.",
+    "region": {
+      "global": "Global",
+      "us": "USA",
+      "eu": "Den Europæiske Union",
+      "au": "Australien",
+      "jp": "Japan"
+    }
   }
 }

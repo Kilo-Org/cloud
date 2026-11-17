@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Sárú SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Tá nuashonrú ar sheiceáil slándála"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Tá do sheisiún Kilo réidh le rialú ó do ghuthán"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

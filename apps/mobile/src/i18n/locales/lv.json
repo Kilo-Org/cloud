@@ -1377,7 +1377,8 @@
       "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
-      "tokenPlaceholder": "Darbvietas piekļuves pilnvara"
+      "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
+      "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
     },
     "scopeList": {
       "personalStillAvailable": "Personīgie repozitoriji joprojām ir pieejami zemāk.",
@@ -3520,7 +3521,6 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
-      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -3529,9 +3529,19 @@
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
-      "requestLogs": "Pieprasījumu žurnāli",
-      "subOrganizations": "Apakšorganizācijas",
-      "distributeFunds": "Sadalīt līdzekļus"
+      "requestLogs": "Pieprasījumu žurnāli"
+    },
+    "requestLogs": {
+      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
+      "older": "Iepriekšējā stunda",
+      "newer": "Nākamā stunda",
+      "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
+      "emptyTitle": "Nav pieprasījumu",
+      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
+      "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "tokens": "{{input}} ievade · {{output}} izvade",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
@@ -4598,6 +4608,8 @@
     "topModels": "Populārākie modeļi",
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
+    "unavailableTitle": "Lietojums nav pieejams",
+    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },
@@ -4756,5 +4768,175 @@
     "unavailableDescription": "Šīs kopīgošanas saites derīguma termiņš ir beidzies, vai tā ir atsaukta.",
     "transcriptUnavailableTitle": "Neizdevās ielādēt šo sarunas ierakstu",
     "transcriptUnavailableDescription": "Saite joprojām darbojas. Mēģiniet vēlreiz pēc brīža."
+  },
+  "organizationGuardrails": {
+    "title": "MI aizsargbarjeras",
+    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
+    "unavailable": "MI aizsargbarjeras šai organizācijai nav pieejamas.",
+    "loadError": "Neizdevās ielādēt MI aizsargbarjeras",
+    "statusSaving": "Saglabā…",
+    "statusSaved": "Saglabāts",
+    "statusFailed": "Neizdevās saglabāt.",
+    "inputTitle": "Ievades aizsargbarjeras",
+    "inputDescription": "Pārbauda katru ievadi ar Enkrypt AI, tostarp rīku rezultātus. Bloķējošs detektors noraida pieprasījumu, kad Enkrypt nav pieejams.",
+    "outputTitle": "Izvades aizsargbarjeras",
+    "outputDescription": "Pārbauda atbildes ar Enkrypt AI, pirms dalībnieki tās saņem. Izslēgts, ja vien to neieslēdzat.",
+    "detectorsHint": "Bloķēt noraida atzīmētu pieprasījumu. Tikai reģistrēt to ieraksta, neaizkavējot pieprasījumu.",
+    "detectorsHintOutput": "Bloķēt noraida atzīmētu atbildi. Tikai reģistrēt to ieraksta, neaizkavējot atbildi.",
+    "choiceLog": "Tikai reģistrēt",
+    "applyTo": "Attiecināt uz",
+    "applyToAllMembers": "Visiem dalībniekiem",
+    "applyKiloDefault": "Lietot Kilo noklusējumu",
+    "invalidSavedTitle": "Saglabātos ievades detektora iestatījumus nevar nolasīt",
+    "invalidSavedBody": "Pieprasījumi tiek bloķēti, līdz ievades detektori tiek saglabāti vēlreiz. Tālāk esošie detektori sāk no Kilo noklusējuma.",
+    "invalidSavedOutputTitle": "Saglabātos izvades detektora iestatījumus nevar nolasīt",
+    "invalidSavedOutputBody": "Atbildes tiek aizturētas, līdz izvades detektori tiek saglabāti vēlreiz. Tālāk izvēlieties izvades detektorus.",
+    "blockingOutputNote": "Bloķējošs izvades detektors aiztur atbildi, līdz Enkrypt to pilnībā pārbauda. Lai izvairītos no aizkaves, izmantojiet opciju Tikai reģistrēt.",
+    "inputDetectorRequired": "Ieslēdziet vismaz vienu ievades detektoru.",
+    "outputDetectorRequired": "Ieslēdziet vismaz vienu izvades detektoru.",
+    "rulesTooMany": "Pievienojiet līdz {{max}} noteikumiem.",
+    "ruleIdRequired": "Ievadiet noteikuma identifikatoru.",
+    "ruleIdInvalid": "Noteikuma identifikatorā var izmantot tikai burtus, ciparus, punktus, domuzīmes un pasvītrojumus.",
+    "ruleTextRequired": "Aprakstiet, ko noteikums aizliedz vai pieprasa.",
+    "keywordTooLong": "Katrs atslēgvārds var būt ne garāks par {{max}} rakstzīmēm.",
+    "topicTooLong": "Katra tēma var būt ne garāka par {{max}} rakstzīmēm.",
+    "keywordsTooMany": "Pievienojiet līdz {{max}} atslēgvārdiem.",
+    "topicsTooMany": "Pievienojiet līdz {{max}} tēmām.",
+    "piiEntityRequired": "Atlasiet vismaz vienu datu veidu, kas jāatklāj.",
+    "keywordRequired": "Pievienojiet vismaz vienu atslēgvārdu.",
+    "topicRequired": "Pievienojiet vismaz vienu tēmu.",
+    "policyTextRequired": "Ievadiet politikas tekstu.",
+    "ruleRequired": "Pievienojiet vismaz vienu noteikumu.",
+    "ruleIdDuplicate": "Katram noteikumam jābūt savam noteikuma ID.",
+    "piiEntities": "Atklājamie dati",
+    "keywordsLabel": "Atslēgvārdi",
+    "keywordsHint": "Viens atslēgvārds katrā rindā.",
+    "topicsHint": "Viena tēma katrā rindā.",
+    "policyFormat": "Politikas formāts",
+    "policyFormatRules": "Strukturēti noteikumi",
+    "policyFormatRulesDescription": "Viens noteikums uz katru prasību, ar kategoriju un smaguma pakāpi. Ieteicams.",
+    "policyFormatText": "Politikas teksts",
+    "policyFormatTextDescription": "Ielīmējiet esošo politiku kā vienkāršu tekstu.",
+    "rulesEmpty": "Vēl nav noteikumu. Katrs noteikums apraksta vienu lietu, ko ievade nedrīkst saturēt vai pieprasīt.",
+    "addRule": "Pievienot noteikumu",
+    "ruleNumber": "Noteikums {{number}}",
+    "ruleRemove": "Noņemt noteikumu {{number}}",
+    "ruleIdLabel": "Noteikuma identifikators",
+    "ruleNameLabel": "Nosaukums (neobligāts)",
+    "ruleTextLabel": "Noteikums",
+    "ruleRiskCategory": "Riska kategorija",
+    "ruleApplicability": "Darbības joma",
+    "ruleFrameworks": "Ietvari",
+    "detector": {
+      "promptInjection": {
+        "label": "Uzvednes injekcija",
+        "description": "Atklāj mēģinājumus ignorēt norādījumus vai apiet modeļa drošības ierobežojumus."
+      },
+      "policyViolation": {
+        "label": "Politikas pārkāpums",
+        "description": "Atzīmē ievades, kas pārkāpj jūsu organizācijas politiku, kas uzrakstīta kā teksts vai noteikumi.",
+        "descriptionOutput": "Atzīmē atbildes, kas pārkāpj jūsu organizācijas politiku, kas uzrakstīta kā teksts vai noteikumi."
+      },
+      "pii": {
+        "label": "PII un noslēpumi",
+        "description": "Atklāj personas datus, akreditācijas datus, IP adreses un URL."
+      },
+      "keywords": {
+        "label": "Aizliegtie atslēgvārdi",
+        "descriptionOutput": "Atklāj atbildes, kas satur jebkuru jūsu uzskaitīto atslēgvārdu."
+      },
+      "topics": {
+        "label": "Tēmas",
+        "descriptionOutput": "Atzīmē atbildes par jebkuru jūsu uzskaitīto tēmu."
+      },
+      "toxicity": {
+        "label": "Toksiskums",
+        "description": "Atklāj toksisku, aizvainojošu, draudīgu vai naidīgu valodu."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Atklāj seksuālu vai citādi darbam nepiemērotu saturu."
+      },
+      "bias": {
+        "label": "Aizspriedumi",
+        "description": "Atklāj aizspriedumainu vai diskriminējošu valodu."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personas dati",
+        "description": "Vārdi, e-pasta adreses, tālruņu numuri."
+      },
+      "secrets": {
+        "label": "Noslēpumi",
+        "description": "API atslēgas, marķieri, paroles."
+      },
+      "ipAddress": {
+        "label": "IP adreses",
+        "description": "IPv4 un IPv6 adreses."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Tīmekļa adreses."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Drošība un krāpšana",
+      "safetyHarm": "Drošība un kaitējums",
+      "privacyDataProtection": "Privātums un datu aizsardzība",
+      "brandReputationTrust": "Zīmols un reputācija",
+      "biasFairnessEthical": "Aizspriedumi un taisnīgums",
+      "legalIpLiability": "Juridiskā un intelektuālā īpašuma atbildība",
+      "productMisuse": "Produkta nepareiza lietošana",
+      "performanceQuality": "Veiktspēja un kvalitāte"
+    },
+    "applicability": {
+      "user": "Lietotāja ievade",
+      "userAssistant": "Lietotāja ievade un atbildes"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "VDAR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ES MI akts",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Uzņēmuma funkcija",
+    "enterpriseOnly": "Šī funkcija ir pieejama tikai uzņēmuma līmenī.",
+    "readOnly": "Šos iestatījumus var mainīt tikai organizācijas īpašnieki un administratori.",
+    "loadError": "Neizdevās ielādēt nodrošinātājus un modeļus",
+    "tabModels": "Modeļi",
+    "tabProviders": "Nodrošinātāji",
+    "tabGateways": "Vārtejas",
+    "modelsDescription": "Izslēdziet modeli, lai to bloķētu visiem dalībniekiem. Modeļi no atļautajiem nodrošinātājiem sākotnēji ir ieslēgti.",
+    "modelsDeniedOnly": "Tikai liegtie",
+    "modelsEmpty": "Neviens modelis neatbilst šim meklējumam.",
+    "providersDescription": "Izslēdziet nodrošinātāju, lai Kilo pārtrauktu maršrutēšanu uz to šai organizācijai.",
+    "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
+    "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
+    "allowAllShown": "Atļaut visus redzamos",
+    "denyAllShown": "Liegt visus redzamos",
+    "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",
+    "emptyProviderList": "Atļaujiet vismaz vienu nodrošinātāju. Ja saraksts ir tukšs, tiek bloķēti visi Kilo modeļu maršruti.",
+    "gatewaysUnavailable": "Vārteju iestatījumi šai organizācijai nav pieejami.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter pieprasījumi netiek piesaistīti reģionam.",
+    "inferenceRegion": "Secināšanas reģions",
+    "inferenceRegionDescription": "Piesaista Vercel AI Gateway pieprasījumus šim reģionam. Modelis, kas tur nav pieejams, izraisa pieprasījuma kļūdu.",
+    "disableOpenrouterNote": "OpenRouter atspējošana bloķē arī BYOK atslēgas, kas maršrutē pieprasījumus caur to.",
+    "emptyModelList": "Atstājiet ieslēgtu vismaz vienu modeli. Ja tiek liegti visi modeļi, dalībniekiem nav ko izmantot.",
+    "catalogUnavailable": "Pilnais modeļu katalogs netika ielādēts, tāpēc tiek rādīti tikai jūsu saglabātie saraksti. Mēģiniet vēlreiz, lai ielādētu visus modeļus.",
+    "region": {
+      "global": "Globāls",
+      "us": "Amerikas Savienotās Valstis",
+      "eu": "Eiropas Savienība",
+      "au": "Austrālija",
+      "jp": "Japāna"
+    }
   }
 }

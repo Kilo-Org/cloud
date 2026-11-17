@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Koneksyon Bitbucket òganizasyon sa a jere sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
-      "tokenPlaceholder": "Jeton aksè pou espas travay la"
+      "tokenPlaceholder": "Jeton aksè pou espas travay la",
+      "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."
     },
     "scopeList": {
       "personalStillAvailable": "Depo pèsonèl yo toujou disponib anba a.",
@@ -3463,7 +3464,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramèt òganizasyon an sou entènèt",
-      "integrations": "Entegrasyon sou entènèt",
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
@@ -3472,9 +3472,19 @@
       "ssoAndDomain": "SSO ak domèn",
       "dataCollection": "Koleksyon done",
       "auditLogs": "Jounal odit",
-      "requestLogs": "Jounal demann",
-      "subOrganizations": "Sou-òganizasyon",
-      "distributeFunds": "Distribye lajan"
+      "requestLogs": "Jounal demann"
+    },
+    "requestLogs": {
+      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
+      "older": "Èdtan anvan",
+      "newer": "Èdtan apre",
+      "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
+      "emptyTitle": "Pa gen demann",
+      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
+      "loadError": "Nou pa t ka chaje jounal demann yo.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
+      "tokens": "{{input}} antre · {{output}} soti",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
@@ -4528,6 +4538,8 @@
     "topModels": "Modèl ki pi itilize",
     "topFeatures": "Fonksyon ki pi itilize",
     "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "unavailableTitle": "Itilizasyon pa disponib",
+    "unavailableDescription": "Espas travay sa a pa rapòte itilizasyon. Repare pa pral ede.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
     "viewDetails": "Wè detay itilizasyon"
   },
@@ -4686,5 +4698,175 @@
     "unavailableDescription": "Lyen pataj sa a ekspire oswa yo anile l.",
     "transcriptUnavailableTitle": "Nou pa t ka chaje transkripsyon sa a",
     "transcriptUnavailableDescription": "Lyen an toujou mache. Eseye ankò nan yon ti moman."
+  },
+  "organizationGuardrails": {
+    "title": "Gadriy IA",
+    "permissionDenied": "Sèlman pwopriyetè ak administratè òganizasyon an ka jere Gadriy IA.",
+    "unavailable": "Gadriy IA pa disponib pou òganizasyon sa a.",
+    "loadError": "Gadriy IA pa t kapab chaje",
+    "statusSaving": "Ap anrejistre…",
+    "statusSaved": "Anrejistre",
+    "statusFailed": "Pa t kapab anrejistre.",
+    "inputTitle": "Gadriy antre",
+    "inputDescription": "Li eskane chak antre ak Enkrypt AI, ansanm ak rezilta zouti yo. Yon detektè blokaj rejte yon demann lè Enkrypt pa disponib.",
+    "outputTitle": "Gadriy sòti",
+    "outputDescription": "Li eskane repons yo ak Enkrypt AI anvan manm yo resevwa yo. Dezaktive sof si ou aktive l.",
+    "detectorsHint": "Blokaj rejte yon demann ki make. Anrejistre sèlman anrejistre l san retade demann lan.",
+    "detectorsHintOutput": "Blokaj fè yon repons ki make echwe. Anrejistre sèlman anrejistre l san retade repons lan.",
+    "choiceLog": "Anrejistre sèlman",
+    "applyTo": "Aplike pou",
+    "applyToAllMembers": "Tout manm",
+    "applyKiloDefault": "Aplike Defo Kilo",
+    "invalidSavedTitle": "Paramèt detektè antre ki anrejistre yo pa ka li",
+    "invalidSavedBody": "Demann yo bloke jiskaske detektè antre yo anrejistre ankò. Detektè ki anba yo kòmanse ak Defo Kilo.",
+    "invalidSavedOutputTitle": "Paramèt detektè sòti ki anrejistre yo pa ka li",
+    "invalidSavedOutputBody": "Repons yo kenbe jiskaske detektè sòti yo anrejistre ankò. Chwazi detektè sòti ki anba yo.",
+    "blockingOutputNote": "Yon detektè sòti blokaj kenbe yon repons jiskaske Enkrypt fin tcheke l nèt. Sèvi ak Anrejistre sèlman pou evite reta a.",
+    "inputDetectorRequired": "Aktive omwen yon detektè antre.",
+    "outputDetectorRequired": "Aktive omwen yon detektè sòti.",
+    "rulesTooMany": "Ajoute jiska {{max}} règ.",
+    "ruleIdRequired": "Antre yon idantifyan règ.",
+    "ruleIdInvalid": "Yon idantifyan règ ka sèvi sèlman ak lèt, chif, pwen, tirè, ak ba.",
+    "ruleTextRequired": "Dekri sa règ la entèdi oswa egzije.",
+    "keywordTooLong": "Chak mo kle ka gen jiska {{max}} karaktè.",
+    "topicTooLong": "Chak sijè ka gen jiska {{max}} karaktè.",
+    "keywordsTooMany": "Ajoute jiska {{max}} mo kle.",
+    "topicsTooMany": "Ajoute jiska {{max}} sijè.",
+    "piiEntityRequired": "Chwazi omwen yon kalite done pou detekte.",
+    "keywordRequired": "Ajoute omwen yon mo kle.",
+    "topicRequired": "Ajoute omwen yon sijè.",
+    "policyTextRequired": "Antre tèks politik la.",
+    "ruleRequired": "Ajoute omwen yon règ.",
+    "ruleIdDuplicate": "Chak règ bezwen pwòp ID règ li.",
+    "piiEntities": "Done pou detekte",
+    "keywordsLabel": "Mo kle",
+    "keywordsHint": "Yon mo kle pou chak liy.",
+    "topicsHint": "Yon sijè pou chak liy.",
+    "policyFormat": "Fòma politik",
+    "policyFormatRules": "Règ estriktire",
+    "policyFormatRulesDescription": "Yon règ pou chak egzijans, ak yon kategori ak yon gravite. Rekòmande.",
+    "policyFormatText": "Tèks politik",
+    "policyFormatTextDescription": "Kole yon politik ki egziste deja kòm tèks senp.",
+    "rulesEmpty": "Poko gen règ. Chak règ dekri yon bagay antre yo pa dwe genyen oswa mande.",
+    "addRule": "Ajoute règ",
+    "ruleNumber": "Règ {{number}}",
+    "ruleRemove": "Retire règ {{number}}",
+    "ruleIdLabel": "Idantifyan règ",
+    "ruleNameLabel": "Non (opsyonèl)",
+    "ruleTextLabel": "Règ",
+    "ruleRiskCategory": "Kategori risk",
+    "ruleApplicability": "Domèn",
+    "ruleFrameworks": "Kad",
+    "detector": {
+      "promptInjection": {
+        "label": "Enjeksyon pwompt",
+        "description": "Detekte tantativ pou chanje enstriksyon yo oswa pou fè modèl la soti nan kad li."
+      },
+      "policyViolation": {
+        "label": "Vyolasyon politik",
+        "description": "Make antre ki vyole politik òganizasyon w, ekri kòm tèks oswa règ.",
+        "descriptionOutput": "Make repons ki vyole politik òganizasyon w, ekri kòm tèks oswa règ."
+      },
+      "pii": {
+        "label": "PII ak sekrè",
+        "description": "Detekte done pèsonèl, idantifyan koneksyon, adrès IP, ak URL."
+      },
+      "keywords": {
+        "label": "Mo kle entèdi",
+        "descriptionOutput": "Detekte repons ki gen nenpòt mo kle ou lis."
+      },
+      "topics": {
+        "label": "Sijè",
+        "descriptionOutput": "Make repons sou nenpòt sijè ou lis."
+      },
+      "toxicity": {
+        "label": "Toksisite",
+        "description": "Detekte langaj toksik, ensilte, menasan, oswa rayisab."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detekte kontni seksyèl oswa ki pa an sekirite pou travay."
+      },
+      "bias": {
+        "label": "Patipri",
+        "description": "Detekte langaj ki gen patipri oswa diskriminasyon."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Done pèsonèl",
+        "description": "Non, adrès imèl, nimewo telefòn."
+      },
+      "secrets": {
+        "label": "Sekrè",
+        "description": "Kle API, jeton, modpas."
+      },
+      "ipAddress": {
+        "label": "Adrès IP",
+        "description": "Adrès IPv4 ak IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adrès wèb."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sekirite ak fwod",
+      "safetyHarm": "Sekirite ak domaj",
+      "privacyDataProtection": "Vi prive ak pwoteksyon done",
+      "brandReputationTrust": "Mak ak repitasyon",
+      "biasFairnessEthical": "Patipri ak jistis",
+      "legalIpLiability": "Responsablite jiridik ak IP",
+      "productMisuse": "Move itilizasyon pwodwi",
+      "performanceQuality": "Pèfòmans ak kalite"
+    },
+    "applicability": {
+      "user": "Antre itilizatè",
+      "userAssistant": "Antre itilizatè ak repons"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 pi gwo (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Lwa sou IA nan Inyon Ewopeyen",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Fonksyon antrepriz",
+    "enterpriseOnly": "Sa a se yon fonksyon pou antrepriz sèlman.",
+    "readOnly": "Sèlman pwopriyetè ak administratè òganizasyon an ka chanje paramèt sa yo.",
+    "loadError": "Founisè ak modèl pa t kapab chaje",
+    "tabModels": "Modèl",
+    "tabProviders": "Founisè",
+    "tabGateways": "Pòtay",
+    "modelsDescription": "Dezaktive yon modèl pou bloke l pou tout manm yo. Modèl ki soti nan founisè otorize yo aktive pa defo.",
+    "modelsDeniedOnly": "Refize sèlman",
+    "modelsEmpty": "Pa gen modèl ki koresponn ak rechèch sa a.",
+    "providersDescription": "Dezaktive yon founisè pou anpeche Kilo dirije demann yo vin jwenn li pou òganizasyon sa a.",
+    "providersNeedCatalog": "Entèriptè founisè yo rete an lekti sèlman jiskaske katalòg konplè modèl yo fin chaje. Eseye ankò anwo a pou w ka modifye yo.",
+    "providersEmpty": "Pa gen founisè ki koresponn ak rechèch sa a.",
+    "allowAllShown": "Pèmèt tout sa ki afiche",
+    "denyAllShown": "Refize tout sa ki afiche",
+    "gatewaysDescription": "Kilo dirije demann modèl yo atravè Vercel AI Gateway oswa OpenRouter. Yon pòtay ki dezaktive fè demann sa yo echwe.",
+    "emptyProviderList": "Pèmèt omwen yon founisè. Yon lis vid bloke tout wout modèl Kilo yo.",
+    "gatewaysUnavailable": "Paramèt pòtay yo pa disponib pou òganizasyon sa a.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Demann OpenRouter yo pa fikse sou yon rejyon.",
+    "inferenceRegion": "Rejyon enferans",
+    "inferenceRegionDescription": "Fikse demann Vercel AI Gateway yo sou rejyon sa a. Yon modèl ki pa disponib la echwe.",
+    "disableOpenrouterNote": "Dezaktive OpenRouter bloke tou kle BYOK ki dirije demann yo atravè li.",
+    "emptyModelList": "Kite omwen yon modèl aktive. Si ou refize tout modèl yo, manm yo p ap gen anyen pou yo itilize.",
+    "catalogUnavailable": "Katalòg konplè modèl yo pa chaje, kidonk se sèlman lis ou anrejistre yo ki parèt. Eseye ankò pou chaje tout modèl yo.",
+    "region": {
+      "global": "Mondyal",
+      "us": "Etazini",
+      "eu": "Inyon Ewopeyen",
+      "au": "Ostrali",
+      "jp": "Japon"
+    }
   }
 }

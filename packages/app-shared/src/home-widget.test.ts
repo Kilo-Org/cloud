@@ -8,9 +8,8 @@ import {
   glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
-  HOME_WIDGET_TITLE_LIMIT,
 } from './home-widget';
-import { GLANCEABLE_STALE_MS } from './glanceable-agents-snapshot';
+import { GLANCEABLE_STALE_MS, GLANCEABLE_TITLE_LIMIT } from './glanceable-agents-snapshot';
 
 const now = Date.parse('2026-10-09T10:00:00.000Z');
 const scope = { userId: 'oauth/private-user', organizationId: null, now };
@@ -66,14 +65,14 @@ describe('Home-only widget policy', () => {
   it('keeps missing titles empty for local fallback and never leaks extra row fields', () => {
     const row = {
       status: 'busy',
-      title: `\n${'x'.repeat(HOME_WIDGET_TITLE_LIMIT + 1)}`,
+      title: `\n${'x'.repeat(GLANCEABLE_TITLE_LIMIT + 1)}`,
       id: 'private-session',
       prompt: 'private-prompt',
       repository: 'private-repository',
     };
     const data = buildHomeWidgetData({ ...scope, sessions: [row] });
     expect(homeWidgetDataSchema.safeParse(data).success).toBe(true);
-    expect(data.details.primaryTitle).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+    expect(data.details.primaryTitle).toHaveLength(GLANCEABLE_TITLE_LIMIT);
     expect(JSON.stringify(data.snapshot)).not.toContain('xxx');
     for (const forbidden of [row.id, row.prompt, row.repository, scope.userId]) {
       expect(JSON.stringify(data)).not.toContain(forbidden);
@@ -87,8 +86,8 @@ describe('Home-only widget policy', () => {
     expect(glanceableSessionTitle(' \n ')).toBeNull();
     expect(glanceableSessionTitle('Named')).toBe('Named');
     expect(glanceableSessionTitle(`${placeholder} follow-up`)).toBe(`${placeholder} follow-up`);
-    expect(glanceableSessionTitle('a'.repeat(HOME_WIDGET_TITLE_LIMIT + 5))).toHaveLength(
-      HOME_WIDGET_TITLE_LIMIT
+    expect(glanceableSessionTitle('a'.repeat(GLANCEABLE_TITLE_LIMIT + 5))).toHaveLength(
+      GLANCEABLE_TITLE_LIMIT
     );
     // The stored details keep the plain cut, so every app build reads a payload.
     expect(
@@ -163,20 +162,20 @@ describe('Home-only widget policy', () => {
     const details = buildHomeWidgetDetails([
       {
         status: 'permission',
-        title: `${'\u200b'.repeat(400)}${'y'.repeat(HOME_WIDGET_TITLE_LIMIT + 10)}`,
+        title: `${'\u200b'.repeat(400)}${'y'.repeat(GLANCEABLE_TITLE_LIMIT + 10)}`,
       },
     ]);
-    expect(details.waitingAgents[0]?.title).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+    expect(details.waitingAgents[0]?.title).toHaveLength(GLANCEABLE_TITLE_LIMIT);
   });
 
   it('preserves complete emoji at the title limit', () => {
-    for (const padding of [HOME_WIDGET_TITLE_LIMIT - 2, HOME_WIDGET_TITLE_LIMIT - 1]) {
+    for (const padding of [GLANCEABLE_TITLE_LIMIT - 2, GLANCEABLE_TITLE_LIMIT - 1]) {
       const prefix = 'a'.repeat(padding);
       const details = buildHomeWidgetDetails([
         { status: 'permission', title: `\u200b${prefix}🚀next` },
       ]);
       expect(details.primaryTitle).toBe(
-        padding === HOME_WIDGET_TITLE_LIMIT - 2 ? `${prefix}🚀` : prefix
+        padding === GLANCEABLE_TITLE_LIMIT - 2 ? `${prefix}🚀` : prefix
       );
       expect(details.waitingAgents[0]?.title).toBe(details.primaryTitle);
     }
@@ -184,8 +183,8 @@ describe('Home-only widget policy', () => {
 
   it('preserves a joined emoji at the title limit', () => {
     const family = '👨‍👩‍👧';
-    const fits = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 8);
-    const overflows = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 7);
+    const fits = 'a'.repeat(GLANCEABLE_TITLE_LIMIT - 8);
+    const overflows = 'a'.repeat(GLANCEABLE_TITLE_LIMIT - 7);
     const fitting = buildHomeWidgetDetails([
       { status: 'permission', title: `${fits}${family}next` },
     ]);

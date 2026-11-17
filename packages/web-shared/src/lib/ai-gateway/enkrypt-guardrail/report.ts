@@ -58,7 +58,7 @@ export type EnkryptScanPart = z.infer<typeof EnkryptScanPartSchema>;
 
 const SegmentsPartSchema = EnkryptScanPartSchema.extract(['system', 'conversation']);
 
-/** A part whose segments are packed into chunks: the system prompt or the conversation. */
+/** A part scanned segment by segment: the system prompt or the conversation. */
 export type EnkryptSegmentsPart = z.infer<typeof SegmentsPartSchema>;
 
 const UnavailableReasonSchema = z.enum(['transient', 'timeout', 'failed']);
@@ -74,8 +74,8 @@ const scanOutcomeShape = {
   total_characters: z.number(),
   cached_characters: z.number(),
   /**
-   * Includes the separators between packed segments and the headers of split segments, so it can
-   * exceed `total_characters`.
+   * Includes the headers of split segments and the text their slices overlap by, so it can exceed
+   * `total_characters`.
    */
   scanned_characters: z.number(),
   decision: ScanDecisionSchema,
@@ -153,13 +153,13 @@ const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 /**
  * The scan of a request's system prompt or conversation by the blocking or the log-only detectors.
  * Each segment has its verdict cached on its own; `cached_segments` counts those the cache covered
- * whole. The uncached ones are packed into chunks of at most one Enkrypt call each. The decision is
- * that of the most severe chunk, and the error that of the most severe chunk that failed.
+ * whole. Each uncached one, or each slice of one, is a chunk scanned by its own Enkrypt call. The
+ * decision is that of the most severe chunk, and the error that of the most severe chunk that failed.
  * Characters, calls, and credits are summed; the latency runs until the last chunk's scan finished.
  */
 const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
   part: SegmentsPartSchema,
-  /** Chunks the uncached segments were packed into, so 0 when the cache covered all of them. */
+  /** Chunks the uncached segments were scanned in, so 0 when the cache covered all of them. */
   chunks: z.number(),
 });
 

@@ -1,7 +1,6 @@
 import { ENKRYPT_MAX_SCAN_CHARACTERS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   renderSegment,
-  SEGMENT_SEPARATOR,
   segmentHeaderLine,
   type RequestSegment,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
@@ -87,28 +86,4 @@ export function scanUnits(segments: RequestSegment[]): ScanUnit[] {
   return segments.flatMap((segment, index) =>
     segmentUnits(segment).map(text => ({ text, segment: index }))
   );
-}
-
-/**
- * Packs units, in order, into as few Enkrypt calls of at most `ENKRYPT_MAX_SCAN_CHARACTERS` as
- * fit, joined like segments, since each call pays Enkrypt's per-call minimum. An oversized unit is
- * a call of its own.
- */
-export function packUnits<T extends { text: string }>(units: T[]): T[][] {
-  const calls: T[][] = [];
-  let current: T[] = [];
-  let length = 0;
-  for (const unit of units) {
-    const joined = length + SEGMENT_SEPARATOR.length + unit.text.length;
-    if (current.length > 0 && joined <= ENKRYPT_MAX_SCAN_CHARACTERS) {
-      current.push(unit);
-      length = joined;
-      continue;
-    }
-    if (current.length > 0) calls.push(current);
-    current = [unit];
-    length = unit.text.length;
-  }
-  if (current.length > 0) calls.push(current);
-  return calls;
 }

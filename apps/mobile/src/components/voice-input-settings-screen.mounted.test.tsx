@@ -45,6 +45,7 @@ const selectionArgs = vi.hoisted(() => ({ organizationId: undefined as string | 
 const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',

@@ -49,6 +49,7 @@ const NORDLICHT = {
   role: 'member',
 };
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));

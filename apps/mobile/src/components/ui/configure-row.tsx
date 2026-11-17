@@ -1,11 +1,9 @@
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { type LucideIcon } from '@/components/ui/icons';
-import { IconTile } from '@/components/ui/icon-tile';
-import { type ReactNode } from 'react';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { type ComponentType, type ReactNode } from 'react';
+import { useWindowDimensions } from 'react-native';
 
-import { RowChevron } from '@/components/ui/row-chevron';
-import { Text } from '@/components/ui/text';
+import { type LucideProps } from '@/components/ui/icons';
+import { RowFrame } from '@/components/ui/row-frame';
+import { type RowTrailingSpec } from '@/components/ui/row-trailing';
 import {
   NEUTRAL_TINT,
   type RowHue,
@@ -14,8 +12,8 @@ import {
   toneColor,
   type ToneKey,
 } from '@/lib/agent-color';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { isNarrowLayout } from '@/lib/narrow-layout';
-import { cn } from '@/lib/utils';
 
 /**
  * At/above this Dynamic Type scale, ConfigureRow stacks the icon above the
@@ -27,7 +25,7 @@ import { cn } from '@/lib/utils';
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 type ConfigureRowProps = {
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
   title: string;
   subtitle?: string;
   /**
@@ -82,7 +80,7 @@ type ConfigureRowProps = {
 
 /** Tile + title + subtitle + trailing mark row. */
 export function ConfigureRow({
-  icon: Icon,
+  icon,
   title,
   subtitle,
   subtitleNumberOfLines,
@@ -122,7 +120,12 @@ export function ConfigureRow({
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
-  const trailingNode = trailing ?? (showChevron ? <RowChevron /> : null);
+  let rowTrailing: RowTrailingSpec | undefined = undefined;
+  if (trailing !== undefined) {
+    rowTrailing = { kind: 'node', node: trailing };
+  } else if (showChevron) {
+    rowTrailing = { kind: 'chevron' };
+  }
 
   // A disabled row dims by token, once, and never by row opacity: halving the
   // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
@@ -131,78 +134,36 @@ export function ConfigureRow({
   // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
   // and the chevron, the pressed feedback and the row Pressable's
-  // `accessibilityState` are what still say "unavailable". The inner layout
-  // View owns no role, so it declares no interactive state of its own: a
-  // state on it would announce disablement from a node a reader never reaches.
+  // `accessibilityState` are what still say "unavailable".
   const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
 
-  const iconTile = <IconTile icon={Icon} tint={iconTint} />;
-
-  let subtitleNode: ReactNode = subtitlePlaceholder ?? null;
-  if (subtitle) {
-    subtitleNode = (
-      <Text numberOfLines={subtitleNumberOfLines} className="mt-0.5 text-xs text-muted-foreground">
-        {subtitle}
-      </Text>
-    );
-  }
-
-  let titleTone = 'text-foreground';
+  let titleClassName = 'text-foreground';
   if (disabled) {
-    titleTone = 'text-muted-foreground';
+    titleClassName = 'text-muted-foreground';
   } else if (destructive) {
-    titleTone = 'text-destructive';
+    titleClassName = 'text-destructive';
   }
-  const textBlock = (
-    <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
-      <Text className={cn('text-sm font-medium', titleTone)} numberOfLines={1} ellipsizeMode="tail">
-        {title}
-      </Text>
-      {subtitleNode}
-    </View>
-  );
 
-  const inner = (
-    <View
-      testID={onPress ? undefined : testID}
-      className={cn(
-        'min-h-[48px] px-4 py-3',
-        stack ? 'gap-2' : 'flex-row items-center gap-3',
-        className
-      )}
-    >
-      {stack ? (
-        <>
-          <View className="w-full flex-row items-center justify-between gap-3">
-            {iconTile}
-            {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
-          </View>
-          {textBlock}
-        </>
-      ) : (
-        <>
-          {iconTile}
-          {textBlock}
-          {trailingNode}
-        </>
-      )}
-    </View>
+  return (
+    <RowFrame
+      icon={icon}
+      iconTint={iconTint}
+      title={title}
+      titleClassName={titleClassName}
+      subtitle={
+        subtitle === undefined
+          ? undefined
+          : { text: subtitle, numberOfLines: subtitleNumberOfLines }
+      }
+      subtitlePlaceholder={subtitlePlaceholder}
+      trailing={rowTrailing}
+      stack={stack}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      testID={testID}
+      className={className}
+    />
   );
-
-  if (onPress) {
-    return (
-      <Pressable
-        testID={testID}
-        onPress={onPress}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: Boolean(disabled) }}
-        className={cn(!disabled && 'active:opacity-70')}
-      >
-        {inner}
-      </Pressable>
-    );
-  }
-  return inner;
 }

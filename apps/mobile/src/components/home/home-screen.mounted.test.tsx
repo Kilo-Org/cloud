@@ -44,6 +44,7 @@ const state = vi.hoisted(() => ({
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const queryClient = new ReactQuery.QueryClient();
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,

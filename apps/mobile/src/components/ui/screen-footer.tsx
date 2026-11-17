@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,6 +36,11 @@ type ScreenFooterProps = {
   edge?: 'hairline' | 'background';
   /** Extra classes on the bar itself, outside the gutter and the reserved band. */
   className?: string;
+  /**
+   * Called with the bar's own layout, for a screen that measures the pinned
+   * footer to reserve exactly that height in its scroll body.
+   */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 /**
@@ -53,6 +58,7 @@ export function ScreenFooter({
   keyboard = 'footer',
   edge = 'hairline',
   className,
+  onLayout,
 }: Readonly<ScreenFooterProps>) {
   const { bottom } = useSafeAreaInsets();
   const tabBarBand = useTabBarBottomPadding();
@@ -69,6 +75,7 @@ export function ScreenFooter({
 
   return (
     <View
+      onLayout={onLayout}
       className={cn(
         'bg-background',
         edge === 'hairline' && 'border-t-[0.5px] border-hair-soft',

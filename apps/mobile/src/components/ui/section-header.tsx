@@ -16,10 +16,16 @@ import { cn } from '@/lib/utils';
  * action box, so every section header has one height and keeps one gap to the
  * block above it.
  */
-const LABEL_AIR_CLASS = 'min-h-[28px]';
+export const SECTION_LABEL_AIR_CLASS = 'min-h-[28px]';
 
 type SectionHeaderProps = {
   label: string;
+  /**
+   * Optional glyph before the label, on the label's own line — the Inbox and
+   * Recent marks a full-bleed list leads each of its eyebrows with. It carries
+   * no label of its own: the `label` names the section.
+   */
+  icon?: ReactNode;
   /**
    * Optional link at the row's outer edge (physical right in LTR, physical left
    * in RTL), e.g. "SEE ALL".
@@ -27,12 +33,25 @@ type SectionHeaderProps = {
   actionLabel?: string;
   onActionPress?: () => void;
   /**
+   * Test handle for the action control itself, for a native E2E script that
+   * taps the section's link.
+   */
+  actionTestID?: string;
+  /**
    * Keeps the action's box but makes it invisible, inert and hidden from
    * screen readers, so hiding it cannot change the header's size. Beside a
    * notice the hidden box is dropped instead: it would hold the notice off the
    * row edge, over empty space.
    */
   actionHidden?: boolean;
+  /**
+   * Keeps the action visible and its box unchanged, but makes it inert, dims
+   * its ink to the muted role and announces it disabled — the look a write in
+   * flight leaves on the control it will enable. Unlike `actionHidden` it stays
+   * in the accessibility tree, so the reader hears why the action does not
+   * respond.
+   */
+  actionDisabled?: boolean;
   /**
    * Optional status between the label and the action. It takes only the free
    * space on the label's line (zero basis), so it never pushes the action off
@@ -42,7 +61,7 @@ type SectionHeaderProps = {
    */
   notice?: ReactNode;
   /**
-   * Puts the label at the bottom of {@link LABEL_AIR_CLASS} and renders the
+   * Puts the label at the bottom of {@link SECTION_LABEL_AIR_CLASS} and renders the
    * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
    * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
    * slop. A row with an action and a row without one then have the same height,
@@ -59,9 +78,12 @@ type SectionHeaderProps = {
 
 export function SectionHeader({
   label,
+  icon,
   actionLabel,
   onActionPress,
+  actionTestID,
   actionHidden = false,
+  actionDisabled = false,
   notice,
   reserveLabelAir = false,
   inset = false,
@@ -70,9 +92,26 @@ export function SectionHeader({
   // With a notice the label keeps its own width, so the notice takes all the
   // free space on the line instead of an equal share of it.
   const labelText = (
-    <Text variant="eyebrow" className={cn('max-w-full', !reserveLabelAir && !notice && 'grow')}>
+    <Text
+      variant="eyebrow"
+      // A section label is a heading: a reader navigates a long settings screen
+      // by jumping between them, and the role is what makes them jump targets.
+      // With an icon the wrapper grows, so the label shrinks and truncates.
+      accessibilityRole="header"
+      className={cn('max-w-full', !reserveLabelAir && !notice && !icon && 'grow', icon && 'shrink')}
+    >
       {label}
     </Text>
+  );
+  const labelNode = icon ? (
+    <View
+      className={cn('min-w-0 flex-row items-center gap-2', !reserveLabelAir && !notice && 'grow')}
+    >
+      {icon}
+      {labelText}
+    </View>
+  ) : (
+    labelText
   );
   return (
     // The label sits on the row's content bottom edge (`items-end`), not on its
@@ -97,11 +136,11 @@ export function SectionHeader({
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       {reserveLabelAir ? (
-        <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
-          {labelText}
+        <View className={cn('flex-col justify-end', !notice && 'grow', SECTION_LABEL_AIR_CLASS)}>
+          {labelNode}
         </View>
       ) : (
-        labelText
+        labelNode
       )}
       {notice ? (
         <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
@@ -111,10 +150,12 @@ export function SectionHeader({
       {notice && hasAction ? <View className="h-3 w-px self-center bg-border" /> : null}
       {hasAction ? (
         <Pressable
+          testID={actionTestID}
           onPress={onActionPress}
-          disabled={actionHidden}
+          disabled={actionHidden || actionDisabled}
           accessibilityRole={actionHidden ? undefined : 'button'}
           accessibilityLabel={actionHidden ? undefined : actionLabel}
+          accessibilityState={actionDisabled ? { disabled: true } : undefined}
           accessibilityElementsHidden={actionHidden}
           importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
           // The row packs each flex line to its end (`justify-end`) and only the
@@ -151,7 +192,10 @@ export function SectionHeader({
         >
           <Text
             className={cn(
-              'shrink font-mono-medium text-[11px] text-primary',
+              'shrink font-mono-medium text-[11px]',
+              // The muted ink is the disabled read; the enabled action keeps the
+              // accent at full strength, so only it reads ready.
+              actionDisabled ? 'text-muted-foreground' : 'text-primary',
               // LTR-only: the letterspaced capitals break a cursive script's
               // joins, so an RTL action label drops them (home-ar-loading).
               // The class string is the eyebrow variant's, so the two labels

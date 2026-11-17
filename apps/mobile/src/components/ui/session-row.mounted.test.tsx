@@ -277,9 +277,7 @@ describe('SessionRow mounted layout', () => {
     { name: 'the last row', last: true, divider: 0 },
   ])('draws the gutter and hairline on $name', ({ last, divider }) => {
     const root = renderRow({ last });
-    const container = root.findAll(
-      node => typeof node.type === 'string' && node.type === 'View'
-    )[0];
+    const container = root.findAll(node => Object.is(node.type, 'View'))[0];
     const classes = String(container?.props.className).split(' ');
 
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'px-4', 'py-3']));

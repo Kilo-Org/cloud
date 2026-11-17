@@ -31,7 +31,7 @@ type RowProps = {
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
-  onPress?: () => void;
+  onPress?: (() => void) | (() => boolean);
   testID?: string;
   children?: ReactNode;
 };
@@ -155,6 +155,27 @@ describe('ChoiceRow selection haptic', () => {
 
     expect(onPress).toHaveBeenCalledOnce();
   });
+
+  // A press that the screen refuses — a save in flight, a locked scope — must
+  // not announce a choice that did not happen.
+  it('ticks only when the caller accepts the press', () => {
+    const accepted = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => true })
+    );
+    act(() => {
+      (accepted.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).toHaveBeenCalledOnce();
+
+    vi.mocked(Haptics.selectionAsync).mockReset();
+    const refused = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => false })
+    );
+    act(() => {
+      (refused.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('ChoiceRow disabled cue', () => {
@@ -207,8 +228,10 @@ describe('ChoiceRow touch target', () => {
 });
 
 describe('ChoiceRow test handle', () => {
-  it('puts the caller\'s testID on the row control', () => {
-    const control = rowControl(renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' }));
+  it("puts the caller's testID on the row control", () => {
+    const control = rowControl(
+      renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' })
+    );
 
     expect(control.props.testID).toBe('choice-1');
   });

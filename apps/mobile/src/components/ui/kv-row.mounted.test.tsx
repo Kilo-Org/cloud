@@ -10,6 +10,7 @@ import { KvRow } from './kv-row';
 // the RTL cases flip.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ I18nManager: i18nManager, Text: 'Text', View: 'View' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/icons', () => ({}));
@@ -262,7 +263,7 @@ describe('KvRow value status', () => {
 });
 
 describe('KvRow test handle', () => {
-  it('puts the caller\'s testID on the row container', () => {
+  it("puts the caller's testID on the row container", () => {
     const row = renderRow({ value: '1.2.3', testID: 'kv-1' }).find(
       node => typeof node.type === 'string' && node.props.testID === 'kv-1'
     );

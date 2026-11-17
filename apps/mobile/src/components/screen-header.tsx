@@ -1,10 +1,10 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { type Ref, useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, type TextInstance, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -123,6 +123,13 @@ type ScreenHeaderProps = {
    * an accessory never has to restate it through `titleContent`.
    */
   titleAccessory?: React.ReactNode;
+  /**
+   * The title Text itself, for a caller that drives TalkBack's reading order
+   * from it (a screen that moves focus to the heading once its body resolves).
+   * Only the plain title paints it; `titleContent` replaces that node and owns
+   * its own ref.
+   */
+  titleRef?: Ref<TextInstance>;
   /**
    * Line cap for the title, at most {@link MAX_TITLE_LINES}. The default is
    * one line: a header title that does not fit ellipsizes at its tail instead
@@ -322,6 +329,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleAccessory,
+  titleRef,
   titleNumberOfLines = 1,
   subtitle,
   reserveSubtitle = false,
@@ -441,6 +449,7 @@ export function ScreenHeader({
   if (title != null) {
     const titleLabel = (
       <Text
+        ref={titleRef}
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
         ellipsizeMode="tail"

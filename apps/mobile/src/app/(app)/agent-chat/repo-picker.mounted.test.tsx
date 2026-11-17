@@ -191,8 +191,14 @@ describe('repository picker row layout', () => {
     );
 
     await search(renderer, 'kubernetes');
+    // The row control is the host Pressable: `ChoiceRow` hands the name and the
+    // press to `RowFrame`, so a bare prop match would also count the frame
+    // component above the control.
     const results = renderer.root.findAll(
-      node => typeof node.props.accessibilityLabel === 'string' && node.props.onPress
+      node =>
+        String(node.type) === 'Pressable' &&
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.onPress
     );
     expect(results).toHaveLength(2);
     for (const result of results) {

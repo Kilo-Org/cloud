@@ -1,19 +1,20 @@
-import { type LucideIcon } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type ComponentType, type ReactNode } from 'react';
+import { type Insets, View } from 'react-native';
 
+import { type LucideProps } from '@/components/ui/icons';
+import { RowFrame } from '@/components/ui/row-frame';
+import { type RowEllipsizeMode, RowValue, type RowValueTone } from '@/components/ui/row-value';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
-type KvTone = 'good' | 'warn' | 'danger' | 'muted';
+type KvTone = Exclude<RowValueTone, 'default'>;
 
 type KvRowProps = {
-  icon?: LucideIcon;
+  icon?: ComponentType<LucideProps>;
   label: string;
   value: string;
-  valueTone?: 'default' | KvTone;
+  valueTone?: RowValueTone;
   /**
    * A state that trails the value on its own ink — the status of the thing the
    * value names. The value keeps the row's ordinary ink, so the state carries
@@ -55,20 +56,39 @@ type KvRowProps = {
    */
   valueDirection?: 'ltr';
   /**
+   * Where the value truncates. An identifier truncates in the middle so both
+   * ends stay legible; a status that ends with its state truncates at the tail.
+   */
+  valueEllipsizeMode?: RowEllipsizeMode;
+  /**
+   * A node in the value's place, for a value that is not one run of text — a
+   * badge, a glyph, a value with its own controls. The row keeps its height.
+   */
+  valueContent?: ReactNode;
+  /**
    * A control that belongs to this row, painted after the value at the row's
    * trailing edge — an action for the amount beside it. The row keeps its own
    * height, so the control shares the line instead of opening a block below.
    */
   trailing?: ReactNode;
+  /**
+   * The label gives up width to the value instead of holding its natural one,
+   * so a long label truncates rather than pushing the value out of the row.
+   */
+  labelShrink?: boolean;
+  /**
+   * Makes the row pressable — a value that opens what it names. Omit it and the
+   * row is a static label/value pair.
+   */
+  onPress?: () => void;
+  /** A row that names a control outside the app, e.g. an advisory page. */
+  accessibilityRole?: 'button' | 'link';
+  /** Full spoken name when the label and value do not say what the press does. */
+  accessibilityLabel?: string;
+  disabled?: boolean;
+  /** Lets a compact trailing control reach its own touch target inside the row. */
+  hitSlop?: Insets;
 };
-
-const VALUE_TONE = {
-  default: 'text-foreground',
-  good: 'text-good',
-  warn: 'text-warn',
-  danger: 'text-destructive',
-  muted: 'text-muted-foreground',
-} satisfies Record<NonNullable<KvRowProps['valueTone']>, string>;
 
 const DOT_TONE = {
   good: 'bg-good',
@@ -85,7 +105,7 @@ const DOT_TONE = {
  */
 type KvStatus = Readonly<{ label: string; tone: KvTone }>;
 
-/** Label-left / value-right row with hair-soft bottom divider. */
+/** Label-left / value-right row. */
 export function KvRow({
   icon: Icon,
   label,
@@ -100,66 +120,76 @@ export function KvRow({
   valueClassName,
   valueAccessibilityLabel,
   valueDirection,
+  valueEllipsizeMode,
+  valueContent,
   trailing,
+  labelShrink = false,
+  onPress,
+  accessibilityRole,
+  accessibilityLabel,
+  disabled,
+  hitSlop,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
-  // Android's `selectable` routes the value through ReactTextView, which
-  // re-applies selection when the view attaches and drops the `maxLines`
-  // clamp. A selectable value then wraps past the row's one-line height and
-  // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
-  // row). Clamp the values that can hold it; a selectable value wraps inside
-  // the row and the row grows to fit it, so no glyph is cut off.
-  const valueLineLimit = selectable ? undefined : 1;
-  const valueText = (
-    <Text
-      variant={valueFace === 'mono' ? 'mono' : 'default'}
-      selectable={selectable}
-      accessibilityLabel={valueAccessibilityLabel}
-      numberOfLines={valueLineLimit}
-      ellipsizeMode={valueLineLimit ? 'middle' : undefined}
-      style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
-      className={cn(
-        'min-w-0 shrink text-right text-[13px]',
-        valueFace === 'numeric' && 'tabular-nums',
-        VALUE_TONE[valueTone],
-        valueClassName
-      )}
-    >
-      {value}
-      {valueStatus === undefined ? null : (
-        // The status keeps its own ink inside the value paragraph, so the name
-        // before it stays in the row's ordinary colour. It restates the value's
-        // own size, because the shared Text carries the body size by default and
-        // a nested node would otherwise paint larger than the value it follows.
-        <Text className={cn('text-[13px]', VALUE_TONE[valueStatus.tone])}>{valueStatus.label}</Text>
-      )}
-    </Text>
-  );
-  return (
+  const labelNode = (
     <View
-      testID={testID}
-      className={cn(
-        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3',
-        className
-      )}
+      className={cn('flex-row items-center gap-2', labelShrink ? 'min-w-0 shrink' : 'shrink-0')}
     >
-      <View className="shrink-0 flex-row items-center gap-2">
-        {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
-        {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
-        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
-      {trailing === undefined ? (
-        valueText
-      ) : (
-        // The value keeps its right edge beside the control, so the pair reads
-        // as one trailing group on the row the control belongs to.
-        <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
-          {valueText}
-          {trailing}
-        </View>
-      )}
+      {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
+      {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
+      <Text
+        className={cn('text-sm text-muted-foreground', labelShrink && 'min-w-0 shrink')}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </View>
+  );
+
+  const valueNode = valueContent ?? (
+    // Android's `selectable` routes the value through ReactTextView, which
+    // re-applies selection when the view attaches and drops the `maxLines`
+    // clamp. A selectable value then wraps past the row's one-line height and
+    // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
+    // row). The value primitive clamps the values that can hold it.
+    <RowValue
+      text={value}
+      tone={valueTone}
+      face={valueFace}
+      selectable={selectable}
+      direction={valueDirection}
+      ellipsizeMode={valueEllipsizeMode ?? 'middle'}
+      accessibilityLabel={valueAccessibilityLabel}
+      className={valueClassName}
+      status={valueStatus}
+    />
+  );
+
+  return (
+    <RowFrame
+      leading={labelNode}
+      trailing={
+        trailing === undefined
+          ? { kind: 'node', node: valueNode }
+          : {
+              // The value keeps its right edge beside the control, so the pair
+              // reads as one trailing group on the row the control belongs to.
+              kind: 'node',
+              node: (
+                <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+                  {valueNode}
+                  {trailing}
+                </View>
+              ),
+            }
+      }
+      testID={testID}
+      className={className}
+      onPress={onPress}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      hitSlop={hitSlop}
+    />
   );
 }

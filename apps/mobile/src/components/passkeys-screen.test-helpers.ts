@@ -1,4 +1,4 @@
-import { createElement, type ReactNode, useSyncExternalStore } from 'react';
+import { createElement, type ElementType, type ReactNode, useSyncExternalStore } from 'react';
 import { vi } from 'vitest';
 
 import '@/i18n';
@@ -188,6 +188,53 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The layout primitives the screen composes. Each mock renders what the
+// assertions read: the row's icon, its title and secondary line, the control
+// the row carries, and one bar per skeleton line.
+vi.mock('@/components/ui/section', () => ({
+  Section: (props: { children?: ReactNode }) => props.children,
+}));
+vi.mock('@/components/ui/row-group', () => ({
+  RowGroup: (props: { children?: ReactNode }) => props.children,
+}));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/screen-footer', () => ({
+  ScreenFooter: (props: { children?: ReactNode }) => createElement('ScreenFooter', null, props.children),
+}));
+vi.mock('@/components/ui/row-skeleton', () => ({
+  RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
+    createElement(
+      'View',
+      null,
+      props.tile === true ? createElement('Skeleton') : null,
+      createElement('Skeleton'),
+      props.subtitle === true ? createElement('Skeleton') : null
+    ),
+}));
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: {
+    icon?: ElementType;
+    title: string;
+    subtitle?: string;
+    trailing?: ReactNode;
+  }) =>
+    createElement(
+      'View',
+      null,
+      props.icon === undefined ? null : createElement(props.icon),
+      createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle),
+      props.trailing ?? null
+    ),
+}));
+vi.mock('@/components/ui/icon-button', () => ({
+  IconButton: (props: { children?: ReactNode; accessibilityLabel?: string; onPress?: () => void }) =>
+    createElement(
+      'Pressable',
+      { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },
+      props.children
+    ),
+}));
 vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   Pencil: 'Pencil',

@@ -89,6 +89,57 @@ vi.mock('@/components/ui/icons', () => ({
   Wallet: 'Wallet',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The layout primitives the screen composes. Each mock renders the content the
+// assertions drive: the row text, the control a row carries in its trailing
+// slot, and a skeleton bar for the loading geometry.
+vi.mock('@/components/ui/section', () => ({
+  Section: (props: { children?: unknown }) => props.children,
+}));
+vi.mock('@/components/ui/row-group', () => ({
+  RowGroup: (props: { children?: unknown }) => props.children,
+}));
+vi.mock('@/components/ui/card', () => ({ Card: 'View' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: () => createElement('Skeleton') }));
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: {
+    title: string;
+    subtitle?: string;
+    subtitlePlaceholder?: unknown;
+    trailing?: unknown;
+  }) =>
+    createElement(
+      'View',
+      null,
+      createElement('Text', null, props.title),
+      props.subtitle === undefined
+        ? (props.subtitlePlaceholder ?? null)
+        : createElement('Text', null, props.subtitle),
+      props.trailing ?? null
+    ),
+}));
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
+    title: string;
+    subtitle: string;
+    value: boolean;
+    disabled: boolean;
+    onValueChange: (value: boolean) => void;
+  }) =>
+    createElement(
+      'View',
+      null,
+      createElement('Text', null, props.title),
+      createElement('Text', null, props.subtitle),
+      createElement('Switch', {
+        value: props.value,
+        disabled: props.disabled,
+        accessibilityLabel: props.title,
+        onValueChange: props.onValueChange,
+      })
+    ),
+}));
+
 // The briefing toggle reads the briefing preferences through the briefing API
 // and the native SQLCipher dismissal journal; the notification categories this
 // suite asserts are independent of it.

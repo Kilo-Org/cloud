@@ -66,10 +66,6 @@ export function AppUnlockFeedback({ outcome }: Readonly<{ outcome: UnlockOutcome
   return feedback;
 }
 
-function contentPadding({ left, right }: EdgeInsets) {
-  return { paddingLeft: left + 24, paddingRight: right + 24 };
-}
-
 function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
   const { status, busy, outcome, retry } = useAppUnlock();
   const { t } = useTranslation();

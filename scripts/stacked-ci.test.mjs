@@ -119,11 +119,7 @@ function validateMobileDetect(mobile) {
     );
   }
   for (const fragment of catalogPathFragments) {
-    assert.match(
-      detect.run ?? '',
-      fragment,
-      `catalog path detection must recognise ${fragment}`
-    );
+    assert.match(detect.run ?? '', fragment, `catalog path detection must recognise ${fragment}`);
   }
 }
 

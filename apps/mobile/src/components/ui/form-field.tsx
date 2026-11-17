@@ -19,7 +19,10 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * accessory, so the controls take no separate band under the input.
      */
     labelAccessory?: React.ReactNode;
-    /** Reserve the tallest localized message, including wrapping and font scaling. */
+    /** Reserve the tallest localized message, including wrapping and font scaling. The
+     * reservation exists only while the field is edited or showing an error: an idle
+     * form keeps the section rhythm of the screen it sits on, and the slot appears
+     * once on focus instead of growing the form on every keystroke. */
     reserveErrorMessages?: readonly string[];
     disabled?: boolean;
     /**
@@ -75,10 +78,12 @@ function FormField({
   defaultValue,
   style,
   onChangeText,
+  onFocus,
   onBlur,
   ...props
 }: Readonly<FormFieldProps>) {
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
   // `validate` owns what this field's own rule reports; `error` carries an
@@ -128,8 +133,13 @@ function FormField({
             setValidationError(validate(value));
           }
         }}
+        onFocus={event => {
+          onFocus?.(event);
+          setEditing(true);
+        }}
         onBlur={event => {
           onBlur?.(event);
+          setEditing(false);
           if (validate) {
             setValidationError(validate(valueRef.current));
           }
@@ -153,10 +163,13 @@ function FormField({
           className
         )}
       />
-      {reserveErrorMessages?.length ? (
+      {reserveErrorMessages?.length && (editing || displayedError) ? (
         <View>
           {/* Full-width overlapping copies reserve the maximum height in native layout,
-              before validation, without measuring or clipping larger text/RTL copy. */}
+              before validation, without measuring or clipping larger text/RTL copy. The
+              slot exists only while the field is edited or in error: an idle form keeps
+              the section rhythm a screen's own gap defines, and the slot appears once
+              on focus instead of growing the form on every keystroke. */}
           <View
             className="flex-row opacity-0"
             pointerEvents="none"

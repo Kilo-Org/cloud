@@ -57,6 +57,21 @@ function flattenStyle(style: unknown): Record<string, unknown> {
   return merged;
 }
 
+/** Focuses the field's input, the state that opens the reserved slot. */
+function focusInput(mounted: TestRenderer.ReactTestRenderer): void {
+  const inputProps = mounted.root.findByType('TextInput').props as {
+    onFocus: (event: unknown) => void;
+  };
+  act(() => {
+    inputProps.onFocus({});
+  });
+}
+
+/** The reserved-slot nodes, present only while the field is edited or in error. */
+function slot(mounted: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+  return mounted.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' });
+}
+
 describe('FormField reserved validation space', () => {
   it.each([
     ['English', en],
@@ -77,9 +92,11 @@ describe('FormField reserved validation space', () => {
         throw new Error('renderer was not created');
       }
       const mounted = renderer;
-      const reservation = () =>
-        mounted.root.findByProps({ importantForAccessibility: 'no-hide-descendants' });
-      const reserved = reservation();
+
+      // The slot exists only while the field is edited or in error, so the
+      // announce-through-recovery walk below runs with the field focused.
+      focusInput(mounted);
+      const reserved = slot(mounted)[0];
       expect(reserved.props.pointerEvents).toBe('none');
       expect(reserved.props.accessibilityElementsHidden).toBe(true);
       expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
@@ -112,11 +129,45 @@ describe('FormField reserved validation space', () => {
         })
       );
     });
-    expect(
-      renderer?.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
-    expect(renderer?.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(slot(renderer)).toHaveLength(0);
+    expect(renderer.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
       i18n.t('login.pleaseEnterEmail')
+    );
+  });
+
+  it('reserves the slot only while the field is edited or in error', () => {
+    const ownError = i18n.t('login.pleaseEnterEmail');
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('login.emailAddress'),
+          reserveErrorMessages: [ownError],
+          validate: (value: string) => (value === '' ? ownError : null),
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const input = renderer.root.findByType('TextInput').props as {
+      onBlur: (event: unknown) => void;
+    };
+
+    // An idle form keeps the section rhythm of the screen it sits on.
+    expect(slot(renderer)).toHaveLength(0);
+    // The slot opens on focus and stays while the field is edited.
+    focusInput(renderer);
+    expect(slot(renderer)).toHaveLength(1);
+    // After a blur that leaves an error showing, the slot stays with it.
+    act(() => {
+      input.onBlur({});
+    });
+    expect(slot(renderer)).toHaveLength(1);
+    expect(renderer.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
+      ownError
     );
   });
 });
@@ -148,40 +199,34 @@ describe('FormField errors known from elsewhere', () => {
   }
 
   function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
-    const props = mounted.root.findByType('TextInput').props as {
+    return mounted.root.findByType('TextInput').props as {
       onBlur: (event: unknown) => void;
       onChangeText: (value: string) => void;
     };
-    return props;
   }
 
   it('shows a rejected submit before the field has been blurred', () => {
     const mounted = mount({ error: submittedError });
-
     expect(shownError(mounted)).toEqual([submittedError]);
     expect(mounted.root.findByType('TextInput').props.className).toContain('border-destructive');
   });
 
   it("lets the field's own rule speak first once it has something to say", () => {
     const mounted = mount({ error: submittedError });
-
     act(() => {
       inputHandlers(mounted).onBlur({});
     });
-
     expect(shownError(mounted)).toEqual([ownError]);
   });
 
   it('returns to the externally known error once the value satisfies the rule', () => {
     const mounted = mount({ error: submittedError });
-
     act(() => {
       inputHandlers(mounted).onBlur({});
     });
     act(() => {
       inputHandlers(mounted).onChangeText('dev@example.com');
     });
-
     expect(shownError(mounted)).toEqual([submittedError]);
   });
 });
@@ -223,22 +268,18 @@ describe('FormField validation while typing', () => {
 
   it('shows the rule on a non-empty invalid value without a blur', () => {
     const mounted = mount({ validateWhileTyping: true });
-
     act(() => {
       inputHandlers(mounted).onChangeText('dev@example');
     });
-
     expect(shownError(mounted)).toEqual([ownError]);
   });
 
   it('waits for the first blur while the value is empty', () => {
     const mounted = mount({ validateWhileTyping: true });
-
     act(() => {
       inputHandlers(mounted).onChangeText('');
     });
     expect(shownError(mounted)).toEqual([]);
-
     act(() => {
       inputHandlers(mounted).onBlur({});
     });
@@ -247,24 +288,20 @@ describe('FormField validation while typing', () => {
 
   it('clears the message once the typed value becomes valid', () => {
     const mounted = mount({ validateWhileTyping: true });
-
     act(() => {
       inputHandlers(mounted).onChangeText('dev@example');
     });
     act(() => {
       inputHandlers(mounted).onChangeText(validEmail);
     });
-
     expect(shownError(mounted)).toEqual([]);
   });
 
   it('keeps blur-only validation for a field that does not opt in', () => {
     const mounted = mount();
-
     act(() => {
       inputHandlers(mounted).onChangeText('dev@example');
     });
-
     expect(shownError(mounted)).toEqual([]);
   });
 });
@@ -282,33 +319,32 @@ describe('FormField direction-aware content alignment', () => {
     return renderer.root.findByType('TextInput');
   }
 
+  function textAlign(input: TestRenderer.ReactTestInstance): unknown {
+    return flattenStyle(input.props.style).textAlign;
+  }
+
   it('right-aligns the field content in a right-to-left interface', () => {
     // The label mirrors to the right edge with the rest of the RTL layout, so
     // the value must sit on the same side even when it is Latin (an email
     // address, whose own strong direction would otherwise stay left).
     rtl.isRTL = true;
-
-    expect(flattenStyle(mountInput().props.style).textAlign).toBe('right');
+    expect(textAlign(mountInput())).toBe('right');
   });
 
   it('leaves the field alignment to the caller in a left-to-right interface', () => {
     rtl.isRTL = false;
-
-    expect(flattenStyle(mountInput().props.style).textAlign).toBeUndefined();
+    expect(textAlign(mountInput())).toBeUndefined();
   });
 
   it('keeps an explicit caller alignment after the RTL default', () => {
     rtl.isRTL = true;
-    const centered = { textAlign: 'center' } as const;
-
-    expect(flattenStyle(mountInput({ style: centered }).props.style).textAlign).toBe('center');
+    expect(textAlign(mountInput({ style: { textAlign: 'center' } }))).toBe('center');
   });
 
   it('keeps an explicit caller alignment passed as a prop after the RTL default', () => {
     // The shared field threads a `textAlign` prop straight to `Input`, so the
     // prop channel must survive the RTL default exactly like the style channel.
     rtl.isRTL = true;
-
-    expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
+    expect(textAlign(mountInput({ textAlign: 'center' }))).toBe('center');
   });
 });

@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
-      "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
+      "orgDescription": "Ibinabahagi ang mga key na ito sa lahat ng nasa organisasyon at sinisingil sa mga akawnt nito sa provider.",
+      "viewOnly": "Ang may-ari, admin, o billing manager lang ng organisasyon ang makakapagpalit ng mga key nito.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Hindi na gagamitin ng mga request na gumamit ng key na ito ang billing mo sa provider.",
       "add": "Magdagdag ng key",
       "added": "Naidagdag ang key",
+      "updated": "Na-update ang key",
       "emptyTitle": "Walang key ng provider",
       "emptyDescription": "Magdagdag ng key para magsimula.",
       "chooseProvider": "Pumili ng provider",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Walang provider na tumutugma sa paghahanap na iyon.",
       "newKeyTitle": "Bagong key",
       "newKeyDescription": "Naka-encrypt na nakaimbak ang key at hindi na ito maipapakita muli.",
+      "edit": "I-edit ang key",
+      "editKeyTitle": "Palitan ang key",
+      "editKeyDescription": "Hindi maipapakita ang nakaimbak na value. Maglagay ng bago para palitan ito.",
+      "editKeyMappingsWarning": "Ang pagpapalit ng key ay pinapalitan din ang mga nakaimbak na model mapping: ilagay muli ang bawat mapping na kailangan mo pa.",
+      "saveFailed": "Hindi ma-save ang key.",
+      "invalidCredentials": "Suriin ang mga credential at subukang muli.",
+      "fieldRequired": "Kailangan ang {{field}}.",
+      "incompleteMapping": "Kailangan ng Mapping {{number}} ang parehong gateway model slug at deployment name.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "I-paste ang key",
-      "apiKeyRequired": "Ilagay ang key."
+      "apiKeyRequired": "Ilagay ang key.",
+      "authMethod": "Paraan ng authentication",
+      "authMethodAccessKeys": "Mga access key",
+      "resourceName": "Pangalan ng Azure resource",
+      "region": "AWS region",
+      "accessKeyId": "Access key ID",
+      "secretAccessKey": "Secret access key",
+      "project": "Google Cloud project",
+      "location": "Lokasyon ng Vertex",
+      "clientEmail": "Email ng service account",
+      "privateKey": "Private key ng service account",
+      "modelMappings": "Mga model mapping",
+      "modelMappingsDescription": "Ipadala ang isang gateway model sa isang custom na deployment name.",
+      "mappingTitle": "Mapping {{number}}",
+      "mappingGatewayModel": "Gateway model slug",
+      "mappingCustomModel": "Deployment name",
+      "addMapping": "Magdagdag ng mapping",
+      "removeMapping": "Alisin ang mapping {{number}}"
     },
     "dataExport": {
       "title": "Ang iyong data",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },
-    "changelog": "Mga bago"
+    "changelog": "Mga bago",
+    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong ito."
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -1166,8 +1194,6 @@
       "clearMessage": "Sa pag-save ng walang laman na field, mabubura ang mga sariling tagubilin na naka-imbak para sa reviewer na ito."
     },
     "repos": {
-      "unavailable": "Hindi makuha ang mga repository. Tapusin ang setup ng Bitbucket sa kilo.ai.",
-      "finishSetup": "Tapusin ang setup",
       "manageAccess": "Pamahalaan ang access",
       "bitbucketNoRepositoriesDescription": "Walang magagamit na repository sa workspace na ito sa Bitbucket.",
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
@@ -1322,11 +1348,10 @@
     "followReviewMd": "Sundin ang REVIEW.md",
     "followReviewMdSubtitle": "Sundin ang mga tagubilin sa REVIEW.md file ng bawat repository",
     "bitbucket": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
-      "setupIncomplete": "Hindi pa tapos ang setup. Tapusin ang pagsasaayos sa kilo.ai.",
-      "setup": "Pag-setup ng Bitbucket"
+      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
       "tokenPlaceholder": "Token para sa access sa workspace"
@@ -1341,7 +1366,8 @@
       "noReviews": "Wala pang pagsusuri",
       "noReviewsDescription": "Lalabas dito ang mga pagsusuri kapag nagsuri na ng pull request ang Code Reviewer.",
       "startManualReview": "Magsimula ng manu-manong pagsusuri",
-      "configureProvider": "Isaayos ang provider"
+      "configureProvider": "Isaayos ang provider",
+      "connectOwnerOnly": "Hilingin sa isang may-ari ng organisasyon o admin na ikonekta ang isang provider."
     },
     "platformList": {
       "checking": "Sinusuri…",
@@ -1354,8 +1380,7 @@
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
       "gitlabAccount": "Account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
-      "bitbucketError": "Hindi mabuksan ang setup ng Bitbucket. Pakisubukang muli."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
     },
     "overview": {
       "allAreas": "Lahat ng aspeto",
@@ -2148,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
       "connectGithubDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa GitHub.",
       "connectGitlabDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa GitLab.",
-      "connectBitbucketDescription": "Mag-sign in mula sa iyong browser, saka bumalik dito para pumili ng imbakan ng code sa Bitbucket.",
       "openGithub": "Buksan ang GitHub",
       "openGitlab": "Buksan ang GitLab",
-      "openBitbucket": "Buksan ang Bitbucket",
       "refreshRepositories": "I-refresh ang mga imbakan ng code",
       "githubConnected": "Konektado ang GitHub",
       "gitlabConnected": "Konektado ang GitLab",
@@ -2951,6 +2974,7 @@
     "signOutThisDevice": "I-sign out ang device na ito",
     "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}, huling nakita: {{lastSeen}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
+    "sessionSignOutFailed": "Hindi ma-sign out ang sesyong ito. Subukan muli.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Huling nakita: {{lastSeen}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",
@@ -3074,12 +3098,14 @@
     "manage": {
       "billingHistory": "Kasaysayan ng billing",
       "billingHistoryEmpty": "Wala pang kasaysayan ng billing.",
+      "billingHistoryError": "Hindi ma-load ang kasaysayan ng billing",
       "cancel": "Kanselahin ang subscription",
       "cancelDescription": "Mananatiling aktibo ang iyong Kilo Pass hanggang sa katapusan ng billing period at hindi na ito magre-renew.",
       "cancelScheduled": "Makakansela sa {{date}}",
       "cancelScheduledChange": "Kanselahin ang nakaiskedyul na pagbabago",
       "cancelled": "Nakansela na ang subscription",
       "creditHistoryEmpty": "Wala pang Kilo Pass credit.",
+      "creditHistoryError": "Hindi ma-load ang kasaysayan ng credit",
       "resume": "Ituloy ang subscription",
       "resumeCancelledDescription": "Muling awtomatikong magre-renew ang iyong Kilo Pass.",
       "resumePausedDescription": "Itutuloy na ngayon ang iyong Kilo Pass, bago ang nakaiskedyul na petsa ng pagtuloy nito.",
@@ -3316,7 +3342,7 @@
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
       "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
-      "accessDeniedDescription": "Wala kang access sa organisasyong ito."
+      "accessDeniedDescription": "Hilingin sa isang may-ari o admin ng organisasyon na bigyan ka ng pag-access."
     },
     "create": {
       "title": "Gumawa ng organisasyon",
@@ -3442,6 +3468,8 @@
       "groups": "Mga grupo",
       "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
+      "ssoAndDomain": "SSO at domain",
+      "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
       "requestLogs": "Mga request log",
       "subOrganizations": "Mga sub-organisasyon",
@@ -3452,6 +3480,61 @@
       "orgLast30Days": "Lahat ng miyembro · Huling 30 araw",
       "outputTokens": "Mga palabas na token",
       "requests": "Mga kahilingan"
+    },
+    "modes": {
+      "create": "Bagong modo",
+      "deleteAction": "Burahin ang modo",
+      "deleteMessage": "Tinatanggal ang modo para sa lahat sa organisasyong ito. Ang modong pumapalit sa built-in ay babalik sa mga built-in na setting.",
+      "deleteTitle": "Burahin ang modong ito?",
+      "descriptionLabel": "Paglalarawan ng modo",
+      "emptyDescription": "Magagamit ng lahat sa organisasyong ito ang mga modong idinagdag dito.",
+      "emptyTitle": "Wala pang pasadyang modo",
+      "identifierHint": "Maliliit na titik, numero, at hyphen.",
+      "identifierInvalid": "Gumamit lamang ng maliliit na titik, numero, at hyphen.",
+      "identifierLabel": "Identifier",
+      "identifierRequired": "Maglagay ng identifier.",
+      "identifierTaken": "Ginagamit na ng ibang modo ang identifier na ito.",
+      "nameLabel": "Pangalan ng modo",
+      "nameRequired": "Maglagay ng pangalan ng modo.",
+      "notFound": "Wala na ang modong ito.",
+      "restrictionHint": "Mga file lamang na tumutugma sa pattern na ito ang maaaring i-edit. Iwanan itong walang laman para payagan ang lahat ng file.",
+      "restrictionInvalid": "Maglagay ng wastong pattern.",
+      "restrictionLabel": "Label ng paghihigpit",
+      "restrictionPattern": "Pattern ng file",
+      "roleLabel": "Depinisyon ng role",
+      "roleRequired": "Ilarawan ang ginagawa ng modong ito.",
+      "tool": {
+        "browser": "Gamitin ang browser",
+        "command": "Patakbuhin ang mga command",
+        "edit": "I-edit ang mga file",
+        "mcp": "Gamitin ang MCP",
+        "read": "Basahin ang mga file"
+      },
+      "whenToUseLabel": "Kailan gagamitin ang modong ito"
+    },
+    "groups": {
+      "create": "Bagong grupo",
+      "deleteAction": "Burahin ang grupo",
+      "deleteMessage": "Tinatanggal ang grupo, ang mga patakaran nito, at ang mga pagtatalaga ng miyembro nito.",
+      "deleteTitle": "Burahin ang grupong ito?",
+      "descriptionLabel": "Paglalarawan ng grupo",
+      "emptyDescription": "Pinagsasama ng grupo ang mga miyembro para mailapat ang isang patakaran sa kanilang lahat.",
+      "emptyTitle": "Wala pang grupo",
+      "enterpriseOnly": "Makukuha ang mga grupo sa Enterprise plan.",
+      "memberCount": "{{displayCount}} miyembro",
+      "memberCount_one": "{{displayCount}} miyembro",
+      "memberCount_other": "{{displayCount}} miyembro",
+      "memberViewEmpty": "Wala ka sa alinmang grupo ng organisasyong ito.",
+      "memberViewTitle": "Ang iyong mga grupo",
+      "membersEmpty": "Walang aktibong miyembro na tumutugma sa iyong paghahanap.",
+      "membersLabel": "Mga miyembro ng grupo",
+      "nameLabel": "Pangalan ng grupo",
+      "nameRequired": "Maglagay ng pangalan ng grupo.",
+      "nameTooLong": "Panatilihin ang pangalan sa 80 character o mas kaunti.",
+      "notFound": "Wala na ang grupong ito.",
+      "permissionDenied": "May-ari o admin lamang ng organisasyon ang makakabago ng mga grupo nito.",
+      "searchMembers": "Maghanap ng mga miyembro",
+      "selectAllVisible": "Piliin ang lahat ng nakikita"
     },
     "hub": {
       "renameTitle": "Palitan ang pangalan ng organisasyon",
@@ -4006,6 +4089,7 @@
     "commandAtLimit": "Ang utos ay limitado sa {{max}} na character",
     "commandsEmpty": "Wala pang utos sa pag-setup",
     "commandsSaveFailed": "Hindi ma-save ang mga utos sa pag-setup",
+    "commandLimitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} utos sa pag-setup. Mag-alis ng isa para makapagdagdag ng iba.",
     "moveCommandUp": "Ilipat ang utos {{position}} pataas",
     "moveCommandDown": "Ilipat ang utos {{position}} pababa",
     "skillsTitle": "Mga kasanayan",
@@ -4092,6 +4176,7 @@
       "deleteMessage": "Hindi na naaabot ng mga bagong session na gumagamit ng profile na ito ang mga tool ng server na ito. Hindi na ito maibabalik.",
       "deleteConfirm": "Burahin ang MCP server",
       "saveFailed": "Hindi ma-save ang MCP server",
+      "limitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} MCP server. Mag-alis ng isa para makapagdagdag ng iba.",
       "deleteFailed": "Hindi ma-delete ang MCP server",
       "updateFailed": "Hindi ma-update ang MCP server"
     },
@@ -4124,6 +4209,7 @@
       "modeSubagent": "Subagent lang",
       "modeAll": "Lahat",
       "saveFailed": "Hindi ma-save ang ahente",
+      "limitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} ahente. Mag-alis ng isa para makapagdagdag ng iba.",
       "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng slug ng ahente",
@@ -4154,6 +4240,7 @@
       "moveUp": "Ilipat ang slash command {{name}} pataas",
       "moveDown": "Ilipat ang slash command {{name}} pababa",
       "saveFailed": "Hindi ma-save ang command",
+      "limitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} slash command. Mag-alis ng isa para makapagdagdag ng iba.",
       "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
@@ -4234,7 +4321,7 @@
       },
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
-      "receiptA11y": "Buksan ang resibo para sa {{description}}",
+      "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
     },
     "title": "Bumili ng kredito",
@@ -4487,8 +4574,79 @@
       "portLabel": "localhost:{{port}}"
     },
     "triggers": {
-      "title": "Mga trigger at webhook",
-      "subtitle": "Pamahalaan ang mga webhook at naka-iskedyul na trigger sa web."
+      "title": "Mga pampapagana at webhook",
+      "subtitle": "Gawing awtomatiko ang mga pagtakbo ng Cloud Agent mula sa tawag na webhook o iskedyul.",
+      "new": "Bagong pampapagana",
+      "emptyTitle": "Wala pang pampapagana",
+      "emptyDescription": "Gumawa ng pampapagana para magsimula ng pagtakbo ng Cloud Agent mula sa tawag na webhook o sa isang iskedyul.",
+      "loadFailedTitle": "Hindi makuha ang mga pampapagana",
+      "loadFailedDescription": "Subukan ulit kapag may koneksyon ka.",
+      "detailLoadFailedTitle": "Hindi makuha ang pampapaganang ito",
+      "detailNotFoundTitle": "Hindi natagpuan ang pampapagana",
+      "cannotEditCreator": "Tumatakbo ang pampapaganang ito bilang tagalikha nito, kaya ang tagalikha lamang ang makakapagbago nito.",
+      "permissionDenied": "Hindi kayang pamahalaan ng iyong tungkulin ang mga pampapaganang ito.",
+      "webhookUrl": "URL ng webhook",
+      "urlCopied": "Nakopya ang URL ng webhook",
+      "deliveries": "Mga paghahatid",
+      "deliveriesEmptyTitle": "Wala pang paghahatid",
+      "deliveriesEmptyDescription": "Lalabas dito ang tawag na webhook o naka-iskedyul na pagtakbo kapag dumating na ito.",
+      "deliveriesLoadFailedTitle": "Hindi makuha ang mga paghahatid",
+      "openSession": "Tingnan ang sesyon",
+      "activationWebhook": "Tawag na webhook",
+      "fieldName": "Pangalan ng pampapagana",
+      "fieldActivation": "Tumatakbo sa",
+      "fieldCron": "Ekspresyong cron",
+      "fieldCronHelp": "Limang patlang: minuto, oras, araw, buwan at araw ng linggo. Ang pinakamaikling agwat ay isang minuto.",
+      "fieldTimezone": "Sona ng oras",
+      "nameLocked": "Hindi na mababago ang pangalan pagkatapos magawa ang pampapagana.",
+      "repositoryLocked": "Hindi na mababago ang imbakan pagkatapos magawa ang pampapagana.",
+      "environmentAutomatic": "Awtomatiko batay sa imbakan",
+      "notSelected": "Hindi napili",
+      "profileDefaults": "Gamitin ang mga paunang halaga",
+      "profileHelp": "Ang mga kaayusan ng propil ay nalalapat kapag tumakbo ang pampapagana. Malalaman ang mga sekreto nito sa oras na iyon.",
+      "customAgent": "Pasadyang ahente",
+      "agentHelp": "Isang ahente sa direktoryong .kilo/agent ng imbakan, o isa sa mga nakapaloob na paraan.",
+      "fieldBodySchema": "Iskema ng katawan",
+      "bodySchemaHelp": "Opsyonal na JSON Schema. Tatanggihan ang kahilingang hindi tumutugma ang katawan dito.",
+      "authTitle": "Sekretong header",
+      "authDescription": "Dapat ipadala ng mga kahilingan ang header na ito kasama ang pinagsasaluhang sekreto.",
+      "authHeaderLabel": "Pangalan ng header",
+      "authSecretLabel": "Pinagsasaluhang sekreto",
+      "authSecretKeep": "Iwanang blangko para mapanatili ang nakaimbak na sekreto.",
+      "authSecretSet": "Kinakailangan. Pumili ng malakas at random na string.",
+      "authSecretCreator": "Gumamit ng hindi bababa sa 16 na karakter kapag tumakbo ang pampapagana bilang tagalikha nito.",
+      "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
+      "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
+      "activeTitle": "Aktibo ang pampapagana",
+      "activeDescription": "Ang mga nakapahingang webhook ay tumutugon ng 404.",
+      "runAsCreator": "Patakbuhin bilang ako",
+      "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",
+      "saveFailedTitle": "Hindi maimbak ang pampapagana",
+      "deleteTitle": "Tanggalin ang pampapaganang ito?",
+      "deleteMessage": "Mabibigo ang mga tawag sa {{name}}. Hindi na ito maibabalik.",
+      "deleteMessageScheduled": "Titigil ang mga naka-iskedyul na pagtakbo ng {{name}}. Hindi na ito maibabalik.",
+      "runNow": "Patakbuhin ngayon",
+      "runStarted": "Nagsimula ang pagtakbo",
+      "created": "Nagawa ang pampapagana",
+      "saved": "Naimbak ang pampapagana",
+      "statusArrived": "Dumating",
+      "problems": {
+        "nameRequired": "Maglagay ng pangalan.",
+        "nameTooShort": "Gumamit ng hindi bababa sa 8 karakter.",
+        "nameTooLong": "Gumamit ng 64 na karakter o mas kaunti.",
+        "nameCharacters": "Gumamit ng maliliit na titik, mga numero at mga gitling.",
+        "nameReserved": "Nakalaan ang pangalang ito.",
+        "cronRequired": "Maglagay ng ekspresyong cron.",
+        "repositoryRequired": "Pumili ng repositoryo",
+        "agentRequired": "Pumili ng ahente.",
+        "agentInvalid": "Gumamit ng maliliit na titik, mga numero at mga gitling, na nagsisimula sa titik.",
+        "modelRequired": "Pumili ng modelo",
+        "promptRequired": "Maglagay ng prompt.",
+        "bodySchemaInvalid": "Maglagay ng JSON object, o iwanang blangko ito.",
+        "authHeaderRequired": "Ilagay ang pangalan ng header.",
+        "authSecretRequired": "Ilagay ang pinagsasaluhang sekreto.",
+        "authSecretTooShort": "Gumamit ng hindi bababa sa 16 na karakter."
+      }
     }
   },
   "sessionShare": {
@@ -4506,8 +4664,9 @@
     "create": "Gumawa ng link",
     "createFailed": "Hindi magawa ang link.",
     "existingTitle": "Umiiral na link",
-    "existingDescription": "May share link na ang session na ito. Kapag gumawa ka ng bago, papalitan nito ang luma at hindi na gagana ang lumang link.",
+    "existingDescription": "May share link na ang session na ito. Kapag gumawa ka ng bagong link gamit ang mga setting na ito, papalitan nito ang luma at hindi na gagana ang lumang link.",
     "rotate": "Gumawa ng bagong link",
+    "replacementSettings": "Ang mga setting na ito ay para sa bagong link.",
     "revoke": "Bawiin ang link",
     "revokeTitle": "Bawiin ang link?",
     "revokeMessage": "Agad na hindi na gagana ang kasalukuyang link.",
@@ -4526,5 +4685,175 @@
     "unavailableDescription": "Nag-expire na o binawi na ang share link na ito.",
     "transcriptUnavailableTitle": "Hindi ma-load ang transcript na ito",
     "transcriptUnavailableDescription": "Gumagana pa rin ang link. Subukang muli maya-maya."
+  },
+  "organizationGuardrails": {
+    "title": "Mga AI Guardrail",
+    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail.",
+    "unavailable": "Hindi available ang Mga AI Guardrail para sa organisasyong ito.",
+    "loadError": "Hindi ma-load ang Mga AI Guardrail",
+    "statusSaving": "Sine-save…",
+    "statusSaved": "Na-save",
+    "statusFailed": "Hindi ma-save.",
+    "inputTitle": "Mga input guardrail",
+    "inputDescription": "Ini-scan ang bawat input gamit ang Enkrypt AI, kasama ang mga resulta ng tool. Tinatanggihan ng blocking detector ang request kapag hindi available ang Enkrypt.",
+    "outputTitle": "Mga output guardrail",
+    "outputDescription": "Ini-scan ang mga sagot gamit ang Enkrypt AI bago ito matanggap ng mga miyembro. Naka-off maliban kung i-on mo.",
+    "detectorsHint": "Tinatanggihan ng Harangin ang na-flag na request. Itinatala lang ito ng Log lang nang hindi naaantala ang request.",
+    "detectorsHintOutput": "Pinapalya ng Harangin ang na-flag na sagot. Itinatala lang ito ng Log lang nang hindi naaantala ang sagot.",
+    "choiceLog": "Log lang",
+    "applyTo": "Ilapat sa",
+    "applyToAllMembers": "Lahat ng miyembro",
+    "applyKiloDefault": "Ilapat ang Kilo Default",
+    "invalidSavedTitle": "Hindi mabasa ang na-save na setting ng input detector",
+    "invalidSavedBody": "Haharangin ang mga request hanggang ma-save muli ang mga input detector. Nagsisimula sa Kilo Default ang mga detector sa ibaba.",
+    "invalidSavedOutputTitle": "Hindi mabasa ang na-save na setting ng output detector",
+    "invalidSavedOutputBody": "Pipigilan ang mga sagot hanggang ma-save muli ang mga output detector. Pumili ng mga output detector sa ibaba.",
+    "blockingOutputNote": "Pinipigil ng blocking output detector ang sagot hanggang masuri ito nang buo ng Enkrypt. Gamitin ang Log lang para maiwasan ang pagkaantala.",
+    "inputDetectorRequired": "Mag-on ng kahit isang input detector.",
+    "outputDetectorRequired": "Mag-on ng kahit isang output detector.",
+    "rulesTooMany": "Magdagdag ng hanggang {{max}} na panuntunan.",
+    "ruleIdRequired": "Maglagay ng rule ID.",
+    "ruleIdInvalid": "Mga titik, numero, tuldok, gitling, at underscore lang ang puwede sa rule ID.",
+    "ruleTextRequired": "Ilarawan kung ano ang ipinagbabawal o hinihingi ng panuntunan.",
+    "keywordTooLong": "Hanggang {{max}} na character ang bawat keyword.",
+    "topicTooLong": "Hanggang {{max}} na character ang bawat paksa.",
+    "keywordsTooMany": "Magdagdag ng hanggang {{max}} na keyword.",
+    "topicsTooMany": "Magdagdag ng hanggang {{max}} na paksa.",
+    "piiEntityRequired": "Pumili ng kahit isang uri ng datos na ide-detect.",
+    "keywordRequired": "Magdagdag ng kahit isang keyword.",
+    "topicRequired": "Magdagdag ng kahit isang paksa.",
+    "policyTextRequired": "Ilagay ang teksto ng patakaran.",
+    "ruleRequired": "Magdagdag ng kahit isang panuntunan.",
+    "ruleIdDuplicate": "Kailangan ng bawat panuntunan ng sarili nitong rule ID.",
+    "piiEntities": "Datos na ide-detect",
+    "keywordsLabel": "Mga keyword",
+    "keywordsHint": "Isang keyword bawat linya.",
+    "topicsHint": "Isang paksa bawat linya.",
+    "policyFormat": "Format ng patakaran",
+    "policyFormatRules": "Mga structured na panuntunan",
+    "policyFormatRulesDescription": "Isang panuntunan bawat requirement, may kategorya at kalubhaan. Inirerekomenda.",
+    "policyFormatText": "Teksto ng patakaran",
+    "policyFormatTextDescription": "I-paste ang kasalukuyang patakaran bilang plain text.",
+    "rulesEmpty": "Wala pang panuntunan. Inilalarawan ng bawat panuntunan ang isang bagay na hindi dapat laman o hingin ng mga input.",
+    "addRule": "Magdagdag ng panuntunan",
+    "ruleNumber": "Panuntunan {{number}}",
+    "ruleRemove": "Alisin ang panuntunan {{number}}",
+    "ruleIdLabel": "Rule ID",
+    "ruleNameLabel": "Pangalan (opsyonal)",
+    "ruleTextLabel": "Panuntunan",
+    "ruleRiskCategory": "Kategorya ng panganib",
+    "ruleApplicability": "Saklaw",
+    "ruleFrameworks": "Mga framework",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt injection",
+        "description": "Nade-detect ang mga pagtatangkang i-override ang mga tagubilin o i-jailbreak ang modelo."
+      },
+      "policyViolation": {
+        "label": "Paglabag sa patakaran",
+        "description": "Fina-flag ang mga input na lumalabag sa patakaran ng iyong organisasyon, nakasulat man bilang teksto o mga panuntunan.",
+        "descriptionOutput": "Fina-flag ang mga sagot na lumalabag sa patakaran ng iyong organisasyon, nakasulat man bilang teksto o mga panuntunan."
+      },
+      "pii": {
+        "label": "PII at mga secret",
+        "description": "Nade-detect ang personal na datos, mga credential, IP address, at URL."
+      },
+      "keywords": {
+        "label": "Mga ipinagbabawal na keyword",
+        "descriptionOutput": "Nade-detect ang mga sagot na naglalaman ng alinmang keyword na inilista mo."
+      },
+      "topics": {
+        "label": "Mga paksa",
+        "descriptionOutput": "Fina-flag ang mga sagot tungkol sa alinmang paksang inilista mo."
+      },
+      "toxicity": {
+        "label": "Toxicity",
+        "description": "Nade-detect ang toxic, mapang-insulto, nagbabanta, o mapoot na pananalita."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Nade-detect ang sekswal o iba pang content na hindi angkop sa trabaho."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Nade-detect ang may kinikilingan o mapandiskriminang pananalita."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personal na datos",
+        "description": "Mga pangalan, email address, numero ng telepono."
+      },
+      "secrets": {
+        "label": "Mga secret",
+        "description": "Mga API key, token, password."
+      },
+      "ipAddress": {
+        "label": "Mga IP address",
+        "description": "Mga IPv4 at IPv6 address."
+      },
+      "url": {
+        "label": "Mga URL",
+        "description": "Mga web address."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Seguridad at panloloko",
+      "safetyHarm": "Kaligtasan at pinsala",
+      "privacyDataProtection": "Privacy at proteksyon ng datos",
+      "brandReputationTrust": "Brand at reputasyon",
+      "biasFairnessEthical": "Bias at pagiging patas",
+      "legalIpLiability": "Legal at IP na pananagutan",
+      "productMisuse": "Maling paggamit ng produkto",
+      "performanceQuality": "Performance at kalidad"
+    },
+    "applicability": {
+      "user": "Input ng user",
+      "userAssistant": "Input ng user at mga sagot"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Feature ng Enterprise",
+    "enterpriseOnly": "Para sa enterprise lang ang feature na ito.",
+    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "loadError": "Hindi ma-load ang mga provider at modelo",
+    "tabModels": "Mga modelo",
+    "tabProviders": "Mga provider",
+    "tabGateways": "Mga gateway",
+    "modelsDescription": "I-off ang isang modelo para harangin ito para sa bawat miyembro. Naka-on sa simula ang mga modelo mula sa mga pinapayagang provider.",
+    "modelsDeniedOnly": "Mga tinanggihan lang",
+    "modelsEmpty": "Walang modelong tumutugma sa paghahanap na ito.",
+    "providersDescription": "I-off ang isang provider para itigil ng Kilo ang pag-route dito para sa organisasyong ito.",
+    "providersNeedCatalog": "Read-only ang mga switch ng provider hangga't hindi pa nalo-load ang buong catalog ng model. I-tap ang Subukan muli sa itaas para ma-edit ang mga ito.",
+    "providersEmpty": "Walang provider na tumutugma sa paghahanap na ito.",
+    "allowAllShown": "Payagan lahat ng nakikita",
+    "denyAllShown": "Tanggihan lahat ng nakikita",
+    "gatewaysDescription": "Ina-route ng Kilo ang mga request sa modelo sa pamamagitan ng Vercel AI Gateway o OpenRouter. Papalya ang mga request na iyon kapag naka-disable ang gateway.",
+    "emptyProviderList": "Mag-allow ng kahit isang provider. Kapag walang laman ang listahan, maba-block ang lahat ng route ng modelo ng Kilo.",
+    "gatewaysUnavailable": "Hindi available ang mga setting ng gateway para sa organisasyong ito.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Hindi naka-pin sa isang rehiyon ang mga request sa OpenRouter.",
+    "inferenceRegion": "Rehiyon ng inference",
+    "inferenceRegionDescription": "Pini-pin ang mga request sa Vercel AI Gateway sa rehiyong ito. Papalya ang modelong hindi available doon.",
+    "disableOpenrouterNote": "Kapag na-disable ang OpenRouter, haharangin din ang mga BYOK key na nagra-route ng mga request dito.",
+    "emptyModelList": "Mag-iwan ng kahit isang modelong naka-on. Kapag dinine-deny ang lahat ng modelo, wala nang magagamit ang mga miyembro.",
+    "catalogUnavailable": "Hindi na-load ang buong catalog ng modelo, kaya ang mga naka-save mong listahan lang ang ipinapakita. Subukang muli para i-load ang lahat ng modelo.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "European Union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

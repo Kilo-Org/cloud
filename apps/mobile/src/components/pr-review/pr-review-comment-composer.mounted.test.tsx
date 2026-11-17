@@ -71,7 +71,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'Success' },
 }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The Buy credits screen composes the store banner, loading, empty, error, and pack-row surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +20,6 @@ import {
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
   getStoreCreditExpiryMessageKey,
@@ -28,12 +28,11 @@ import {
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { getStoreLegalLinks } from '@/lib/iap/legal-links';
+import { type LegalDocument } from '@/lib/legal-document';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
@@ -200,7 +199,12 @@ export function CreditPurchaseScreen() {
   const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
   const hideBalanceAmount = hideBalance || !hideBalanceLoaded;
 
-  const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
+  const router = useRouter();
+  // The two legal documents open in their own native screens: a store purchase
+  // surface must not hand the reader a browser that can reach web pricing.
+  const openLegalDocument = (document: LegalDocument) => {
+    router.push({ pathname: '/(app)/legal/[document]', params: { document } });
+  };
 
   // A granted purchase bumps the owner's counter; a cancelled one releases the
   // request with no error key, so the counter is the only success signal.
@@ -684,19 +688,21 @@ export function CreditPurchaseScreen() {
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+                  openLegalDocument('terms');
                 }}
               >
-                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+                <Text className="text-xs text-primary underline">
+                  {t('kiloPass.legalTermsOfUse')}
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+                  openLegalDocument('privacy');
                 }}
               >
-                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+                <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
               </Pressable>
             </View>
           </View>

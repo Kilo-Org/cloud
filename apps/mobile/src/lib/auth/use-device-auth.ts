@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
+import { appShellSignInUrl } from '@/lib/app-shell-handoff';
+import { API_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
 import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
 import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
@@ -210,29 +211,29 @@ export function useDeviceAuth(): DeviceAuthResult {
 
         deviceCodeReference.current = deviceCode;
 
+        // Sign-in uses the server-provided verificationUrl, which points at the
+        // chrome-free `/device-auth` approval page (outside the full web's
+        // navigation, and it closes itself). SSO recovery routes through the app
+        // shell's sign-in page — the marketing sign-in page links to the pricing
+        // site — and hands it the approval page as its callback; the
+        // organization id is NOT put in the URL, it stays in client state and as
+        // a Sentry tag.
+        const verificationUrl = new URL(data.verificationUrl);
+        const callbackPath = `${verificationUrl.pathname}${verificationUrl.search}`;
+        let browserUrl = data.verificationUrl;
+        if (mode === 'sso') {
+          browserUrl = appShellSignInUrl({ email: ssoEmail, callbackPath });
+        }
+
         // Persist the pending transaction so a process death mid-sign-in can
         // resume it. The device code is a secret, so it lives in SecureStore
         // only (never React state, a URL, or the clipboard).
         void writePendingExternalAuth({
           deviceCode,
           userCode,
-          verificationUrl: data.verificationUrl,
+          verificationUrl: browserUrl,
           startedAt: Date.now(),
         });
-
-        // Sign-in uses the server-provided verificationUrl which points directly
-        // at /device-auth?code=... SSO recovery routes through the sign-in page
-        // with sso=true and the email so the web SSO page resolves the
-        // organization; the organization id is NOT put in the URL — it stays in
-        // client state and as a Sentry tag.
-        let browserUrl = data.verificationUrl;
-        if (mode === 'sso') {
-          browserUrl = `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-            sso: 'true',
-            email: ssoEmail ?? '',
-            callbackPath: `/device-auth?code=${userCode}&app=1`,
-          }).toString()}`;
-        }
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
 

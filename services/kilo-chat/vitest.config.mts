@@ -78,9 +78,6 @@ export default defineConfig({
                 async fetch(request) {
                   return new Response('ok');
                 }
-                async sendPushForConversation(input) {
-                  return { perRecipient: [] };
-                }
                 async clearBadgeBucketForUser(input) {
                   const key = bucketKey(input);
                   bucketsByUser.delete(key);

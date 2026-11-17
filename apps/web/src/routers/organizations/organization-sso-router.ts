@@ -136,7 +136,11 @@ export const organizationSsoRouter = createTRPCRouter({
       message: 'Created WorkOS SSO organization',
       metadata: { workosOrganizationId: createdOrg.id },
     });
-    return createdOrg;
+    // Only the identifier, never the WorkOS object. Its timestamps are `Date`
+    // instances, which plain tRPC JSON carries as ISO strings, so returning it
+    // would hand the client a type the wire does not match. The caller
+    // invalidates its config query and reads nothing else.
+    return { id: createdOrg.id };
   }),
   getConfig: organizationMemberProcedure.input(OrgIdSchema).query(async opts => {
     const { organizationId } = opts.input;

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -11,18 +12,18 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { openExternalUrl } from '@/lib/external-link';
-import { WEB_BASE_URL } from '@/lib/config';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
   useDisconnectIntegration,
   useGitHubConnections,
   useIntegrationConnect,
   useIntegrationStatuses,
 } from '@/lib/hooks/use-integrations';
+import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
   type IntegrationProvider,
@@ -46,6 +47,7 @@ type IntegrationsScreenProps = Readonly<{
  */
 export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const scope = integrationScope(organizationId);
   const boundary = useOrgBoundary(organizationId);
   // The link's organization becomes the selection once it resolves to a
@@ -63,10 +65,19 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // organization, so the header names it without a second lookup.
   const organizationName = scope === 'organization' ? boundary.org?.organizationName : undefined;
 
-  useRouteForegroundRefresh([[['platformIntegrations']], [['githubApps', 'listIntegrations']]]);
+  useRouteForegroundRefresh([
+    [['platformIntegrations']],
+    [['githubApps', 'listIntegrations']],
+    // The Bitbucket status read names the connection its row disconnects, so a
+    // read that failed here recovers when the route regains foreground.
+    [['organizations', 'bitbucket', 'getStatus']],
+  ]);
 
   const statuses = useIntegrationStatuses(organizationId, scopeResolved);
   const githubConnections = useGitHubConnections(organizationId, scopeResolved);
+  // The setup-status read reports whether a Bitbucket workspace is installed but
+  // never the integration row, which is the only id a native disconnect names.
+  const bitbucket = useBitbucketIntegrationStatus(organizationId, scopeResolved);
   const disconnect = useDisconnectIntegration(organizationId);
   const { confirm, dialog } = useConfirmDialog();
   const { pendingProvider, connect } = useIntegrationConnect({
@@ -119,6 +130,8 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     statuses: statuses.data,
     githubConnections: githubConnections.data ?? [],
     githubConnectionsPending: githubConnections.isPending,
+    bitbucketIntegrationId: bitbucket.data?.integrationId ?? null,
+    bitbucketIntegrationPending: bitbucket.isPending,
   });
   const role = boundary.role ?? undefined;
   // One row that offers the viewer no action is enough to need the sentence,
@@ -137,10 +150,31 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         })
     );
 
-  const openProviderPage = (provider: IntegrationProvider) => {
-    void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
-      label: t(providerLabelKey(provider)),
-    });
+  // A GitHub row whose installations the hub cannot name is the only row with a
+  // web management link, and it opens the app-shell integration page through a
+  // one-time hand-off. Bitbucket's controls run in the app's own connect sheet.
+  const manageRowOnWeb = (provider: IntegrationProvider) => {
+    if (provider === 'bitbucket') {
+      return;
+    }
+    void openAppShellHandoff(
+      {
+        page: 'integration',
+        platform: provider,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      { label: t(providerLabelKey(provider)) }
+    );
+  };
+
+  const connectProvider = (provider: IntegrationProvider) => {
+    if (provider === 'bitbucket') {
+      if (organizationId) {
+        router.push(bitbucketConnectHref(organizationId));
+      }
+      return;
+    }
+    void connect(provider);
   };
 
   const requestDisconnect = (row: IntegrationRow) => {
@@ -152,7 +186,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       onConfirm: () => {
         disconnect.mutate({
           provider: row.provider,
-          githubIntegrationId: row.githubIntegrationId,
+          integrationId: row.disconnectIntegrationId,
         });
       },
     });
@@ -190,14 +224,16 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                     disconnect.isPending && disconnect.variables.provider === row.provider
                   }
                   onConnect={() => {
-                    void connect(row.provider);
+                    connectProvider(row.provider);
                   }}
                   onDisconnect={() => {
                     requestDisconnect(row);
                   }}
                   onManageOnWeb={() => {
-                    openProviderPage(row.provider);
+                    manageRowOnWeb(row.provider);
                   }}
+                  onRetryConnection={() => void bitbucket.refetch()}
+                  retryingConnection={bitbucket.isFetching}
                   last={index === rows.length - 1}
                 />
               ))}

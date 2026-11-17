@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Provayder açarları",
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
-      "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
+      "orgDescription": "Bu açarlar təşkilatdakı hər kəslə paylaşılır və haqqı təşkilatın provayder hesablarından tutulur.",
+      "viewOnly": "Açarları yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri dəyişə bilər.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
       "managedByPlan": "Kodlaşdırma planın tərəfindən idarə olunur",
       "enableKey": "{{provider}} açarını aktivləşdir",
@@ -370,6 +371,7 @@
       "removeMessage": "Bu açardan istifadə edən sorğular artıq provayder ödənişindən istifadə etməyəcək.",
       "add": "Açar əlavə et",
       "added": "Açar əlavə edildi",
+      "updated": "Açar yeniləndi",
       "emptyTitle": "Provayder açarı yoxdur",
       "emptyDescription": "Başlamaq üçün açar əlavə et.",
       "chooseProvider": "Provayder seç",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Bu axtarışa uyğun provayder tapılmadı.",
       "newKeyTitle": "Yeni açar",
       "newKeyDescription": "Açar şifrələnmiş şəkildə saxlanılır və yenidən göstərilə bilməz.",
+      "edit": "Açarı redaktə et",
+      "editKeyTitle": "Açarı əvəz et",
+      "editKeyDescription": "Saxlanılan dəyər göstərilə bilməz. Onu əvəz etmək üçün yenisini daxil et.",
+      "editKeyMappingsWarning": "Açarın əvəz edilməsi saxlanılan model uyğunlaşdırmalarını da əvəz edir: hələ lazım olan hər bir uyğunlaşdırmanı yenidən daxil et.",
+      "saveFailed": "Açarı saxlamaq mümkün olmadı.",
+      "invalidCredentials": "Etimadnamələri yoxla və yenidən cəhd et.",
+      "fieldRequired": "{{field}} tələb olunur.",
+      "incompleteMapping": "Uyğunlaşdırma {{number}} üçün həm gateway modelinin slug-ı, həm də deployment adı tələb olunur.",
       "apiKeyLabel": "API açarı",
       "apiKeyPlaceholder": "Açarı yapışdır",
-      "apiKeyRequired": "Açarı daxil et."
+      "apiKeyRequired": "Açarı daxil et.",
+      "authMethod": "Autentifikasiya üsulu",
+      "authMethodAccessKeys": "Giriş açarları",
+      "resourceName": "Azure resurs adı",
+      "region": "AWS regionu",
+      "accessKeyId": "Giriş açarı ID-si",
+      "secretAccessKey": "Gizli giriş açarı",
+      "project": "Google Cloud layihəsi",
+      "location": "Vertex məkanı",
+      "clientEmail": "Xidmət hesabının e-poçtu",
+      "privateKey": "Xidmət hesabının şəxsi açarı",
+      "modelMappings": "Model uyğunlaşdırmaları",
+      "modelMappingsDescription": "Gateway modelini xüsusi deployment adına yönləndir.",
+      "mappingTitle": "Uyğunlaşdırma {{number}}",
+      "mappingGatewayModel": "Gateway modelinin slug-ı",
+      "mappingCustomModel": "Deployment adı",
+      "addMapping": "Uyğunlaşdırma əlavə et",
+      "removeMapping": "{{number}} saylı uyğunlaşdırmanı sil"
     },
     "dataExport": {
       "title": "Məlumatların",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
       "viewReceipt": "Qəbzə bax"
     },
-    "changelog": "Yeniliklər"
+    "changelog": "Yeniliklər",
+    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
   },
   "preferences": {
     "general": "Ümumi",
@@ -1166,8 +1194,6 @@
       "clearMessage": "Boş sahənin yadda saxlanması bu rəyçi üçün saxlanılmış xüsusi təlimatları siləcək."
     },
     "repos": {
-      "unavailable": "Repozitoriyalar əlçatan deyil. Bitbucket quraşdırmasını kilo.ai saytında tamamla.",
-      "finishSetup": "Quraşdırmanı tamamla",
       "manageAccess": "Girişi idarə et",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket iş sahəsində repozitoriya mövcud deyil.",
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
@@ -1322,11 +1348,10 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
-      "setupIncomplete": "Quraşdırma tamamlanmayıb. Tənzimləməni kilo.ai saytında tamamla.",
-      "setup": "Bitbucket quraşdırması"
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni"
@@ -1341,7 +1366,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",
@@ -1354,8 +1380,7 @@
       "githubError": "GitHub quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "gitlabAccount": "GitLab hesabı",
       "gitlabError": "GitLab quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
-      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur.",
-      "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
+      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur."
     },
     "overview": {
       "allAreas": "Bütün sahələr",
@@ -2148,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
       "connectGithubDescription": "Brauzerdə daxil ol, sonra GitHub repozitoriyası seçmək üçün buraya qayıt.",
       "connectGitlabDescription": "Brauzerdə daxil ol, sonra GitLab repozitoriyası seçmək üçün buraya qayıt.",
-      "connectBitbucketDescription": "Brauzerdə daxil ol, sonra Bitbucket repozitoriyası seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
       "openGitlab": "GitLab-ı aç",
-      "openBitbucket": "Bitbucket-ı aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
       "githubConnected": "GitHub qoşulub",
       "gitlabConnected": "GitLab qoşulub",
@@ -2952,6 +2975,7 @@
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
+    "sessionSignOutFailed": "Bu sessiyadan çıxış etmək mümkün olmadı. Yenidən cəhd edin.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
@@ -3074,12 +3098,14 @@
     "manage": {
       "billingHistory": "Ödəniş tarixçəsi",
       "billingHistoryEmpty": "Hələ ödəniş tarixçəsi yoxdur.",
+      "billingHistoryError": "Ödəniş tarixçəsi yüklənə bilmədi",
       "cancel": "Abunəliyi ləğv et",
       "cancelDescription": "Kilo Pass ödəniş dövrünün sonunadək aktiv qalacaq və yenilənməyəcək.",
       "cancelScheduled": "{{date}} tarixində ləğv olunur",
       "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
       "cancelled": "Abunəlik ləğv edildi",
       "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
+      "creditHistoryError": "Kredit tarixçəsi yüklənə bilmədi",
       "resume": "Abunəliyi bərpa et",
       "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
       "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
@@ -3316,7 +3342,7 @@
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
-      "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
+      "accessDeniedDescription": "Təşkilat sahibindən və ya inzibatçısından sənə giriş icazəsi verməsini xahiş et."
     },
     "create": {
       "title": "Təşkilat yarat",
@@ -3442,6 +3468,8 @@
       "groups": "Qruplar",
       "guardrails": "Qoruyucu qaydalar",
       "byok": "Öz açarınızdan istifadə edin",
+      "ssoAndDomain": "SSO və domen",
+      "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
       "requestLogs": "Sorğu jurnalları",
       "subOrganizations": "Alt təşkilatlar",
@@ -3452,6 +3480,61 @@
       "orgLast30Days": "Bütün üzvlər · Son 30 gün",
       "outputTokens": "Çıxış tokenləri",
       "requests": "Sorğular"
+    },
+    "modes": {
+      "create": "Yeni rejim",
+      "deleteAction": "Rejimi sil",
+      "deleteMessage": "Rejim bu təşkilatdakı hər kəs üçün silinir. Daxili rejimi əvəz edən rejim daxili parametrlərə qayıdır.",
+      "deleteTitle": "Bu rejim silinsin?",
+      "descriptionLabel": "Rejim təsviri",
+      "emptyDescription": "Burada əlavə edilən rejimlər bu təşkilatdakı hər kəs üçün əlçatandır.",
+      "emptyTitle": "Hələ fərdi rejim yoxdur",
+      "identifierHint": "Kiçik hərflər, rəqəmlər və defislər.",
+      "identifierInvalid": "Yalnız kiçik hərflər, rəqəmlər və defislərdən istifadə edin.",
+      "identifierLabel": "İdentifikator",
+      "identifierRequired": "İdentifikator daxil edin.",
+      "identifierTaken": "Bu identifikator artıq başqa rejim tərəfindən istifadə olunur.",
+      "nameLabel": "Rejim adı",
+      "nameRequired": "Rejim adı daxil edin.",
+      "notFound": "Bu rejim artıq mövcud deyil.",
+      "restrictionHint": "Yalnız bu şablona uyğun fayllar redaktə edilə bilər. Bütün fayllara icazə vermək üçün onu boş buraxın.",
+      "restrictionInvalid": "Düzgün şablon daxil edin.",
+      "restrictionLabel": "Məhdudiyyət etiketi",
+      "restrictionPattern": "Fayl şablonu",
+      "roleLabel": "Rol tərifi",
+      "roleRequired": "Bu rejimin nə etdiyini təsvir edin.",
+      "tool": {
+        "browser": "Brauzerdən istifadə et",
+        "command": "Əmrləri icra et",
+        "edit": "Faylları redaktə et",
+        "mcp": "MCP-dən istifadə et",
+        "read": "Faylları oxu"
+      },
+      "whenToUseLabel": "Bu rejim nə vaxt istifadə edilməlidir"
+    },
+    "groups": {
+      "create": "Yeni qrup",
+      "deleteAction": "Qrupu sil",
+      "deleteMessage": "Qrup, onun siyasətləri və üzv təyinatları silinir.",
+      "deleteTitle": "Bu qrup silinsin?",
+      "descriptionLabel": "Qrup təsviri",
+      "emptyDescription": "Qrup üzvləri bir araya gətirir ki, bir siyasət onların hamısına tətbiq edilsin.",
+      "emptyTitle": "Hələ qrup yoxdur",
+      "enterpriseOnly": "Qruplar Enterprise planında əlçatandır.",
+      "memberCount": "{{displayCount}} üzv",
+      "memberCount_one": "{{displayCount}} üzv",
+      "memberCount_other": "{{displayCount}} üzv",
+      "memberViewEmpty": "Siz bu təşkilatın heç bir qrupunda deyilsiniz.",
+      "memberViewTitle": "Qruplarınız",
+      "membersEmpty": "Axtarışınıza uyğun aktiv üzv yoxdur.",
+      "membersLabel": "Qrup üzvləri",
+      "nameLabel": "Qrup adı",
+      "nameRequired": "Qrup adı daxil edin.",
+      "nameTooLong": "Ad 80 simvoldan çox olmamalıdır.",
+      "notFound": "Bu qrup artıq mövcud deyil.",
+      "permissionDenied": "Təşkilatın qruplarını yalnız təşkilat sahibi və ya inzibatçı dəyişə bilər.",
+      "searchMembers": "Üzvləri axtar",
+      "selectAllVisible": "Göstərilən hər kəsi seç"
     },
     "hub": {
       "renameTitle": "Təşkilatın adını dəyiş",
@@ -4006,6 +4089,7 @@
     "commandAtLimit": "Əmr {{max}} simvolla məhduddur",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
+    "commandLimitReached": "Profil maksimum {{max}} quraşdırma əmri saxlaya bilər. Başqa bir quraşdırma əmri əlavə etmək üçün birini silin.",
     "moveCommandUp": "{{position}} nömrəli əmri yuxarı köçür",
     "moveCommandDown": "{{position}} nömrəli əmri aşağı köçür",
     "skillsTitle": "Bacarıqlar",
@@ -4092,6 +4176,7 @@
       "deleteMessage": "Bu profildən istifadə edən yeni sessiyalar artıq bu serverin alətlərinə çata bilmir. Bu geri qaytarıla bilməz.",
       "deleteConfirm": "MCP serverini sil",
       "saveFailed": "MCP serverini saxlamaq mümkün olmadı",
+      "limitReached": "Profil maksimum {{max}} MCP server saxlaya bilər. Başqa bir MCP server əlavə etmək üçün birini silin.",
       "deleteFailed": "MCP serverini silmək mümkün olmadı",
       "updateFailed": "MCP serverini yeniləmək mümkün olmadı"
     },
@@ -4124,6 +4209,7 @@
       "modeSubagent": "Yalnız subagent",
       "modeAll": "Hamısı",
       "saveFailed": "Agenti saxlamaq mümkün olmadı",
+      "limitReached": "Profil maksimum {{max}} agent saxlaya bilər. Başqa bir agent əlavə etmək üçün birini silin.",
       "deleteFailed": "Agenti silmək mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
@@ -4154,6 +4240,7 @@
       "moveUp": "{{name}} slash əmrini yuxarı köçür",
       "moveDown": "{{name}} slash əmrini aşağı köçür",
       "saveFailed": "Əmri saxlamaq mümkün olmadı",
+      "limitReached": "Profil maksimum {{max}} slash əmri saxlaya bilər. Başqa bir slash əmri əlavə etmək üçün birini silin.",
       "deleteFailed": "Əmri silmək mümkün olmadı",
       "nameRequired": "Əmr adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
@@ -4234,7 +4321,7 @@
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
-      "receiptA11y": "{{description}} üçün qəbzi açın",
+      "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
     },
     "title": "Kredit al",
@@ -4487,8 +4574,79 @@
       "portLabel": "localhost:{{port}}"
     },
     "triggers": {
-      "title": "Triggerlər və webhook-lar",
-      "subtitle": "Webhook və planlaşdırılmış triggerləri vebdə idarə et."
+      "title": "Tətikləyicilər və vebhuklar",
+      "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",
+      "new": "Yeni tətikləyici",
+      "emptyTitle": "Hələ tətikləyici yoxdur",
+      "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
+      "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",
+      "loadFailedDescription": "Bağlantı olduqda yenidən cəhd edin.",
+      "detailLoadFailedTitle": "Bu tətikləyici yüklənə bilmədi",
+      "detailNotFoundTitle": "Tətikləyici tapılmadı",
+      "cannotEditCreator": "Bu tətikləyici yaradıcısı kimi işləyir, ona görə də yalnız yaradıcısı onu dəyişə bilər.",
+      "permissionDenied": "Rolunuz bu tətikləyiciləri idarə edə bilməz.",
+      "webhookUrl": "Vebhuk URL-i",
+      "urlCopied": "Vebhuk URL-i kopyalandı",
+      "deliveries": "Çatdırılmalar",
+      "deliveriesEmptyTitle": "Hələ çatdırılma yoxdur",
+      "deliveriesEmptyDescription": "Vebhuk çağırışı və ya cədvəl üzrə icra gəldikdən sonra burada görünəcək.",
+      "deliveriesLoadFailedTitle": "Çatdırılmalar yüklənə bilmədi",
+      "openSession": "Sessiyaya bax",
+      "activationWebhook": "Vebhuk çağırışı",
+      "fieldName": "Tətikləyici adı",
+      "fieldActivation": "İşə düşmə",
+      "fieldCron": "Kron ifadəsi",
+      "fieldCronHelp": "Beş sahə: dəqiqə, saat, gün, ay və həftənin günü. Ən qısa interval bir dəqiqədir.",
+      "fieldTimezone": "Saat qurşağı",
+      "nameLocked": "Tətikləyici yaradıldıqdan sonra ad dəyişdirilə bilməz.",
+      "repositoryLocked": "Tətikləyici yaradıldıqdan sonra repozitoriya dəyişdirilə bilməz.",
+      "environmentAutomatic": "Repozitoriyaya görə avtomatik",
+      "notSelected": "Seçilməyib",
+      "profileDefaults": "Standart dəyərlərdən istifadə et",
+      "profileHelp": "Tətikləyici işləyərkən profilin parametrləri tətbiq olunur. Onun sirrləri də o zaman açılır.",
+      "customAgent": "Fərdi agent",
+      "agentHelp": "Repozitoriyanın .kilo/agent qovluğundakı agent və ya daxili rejimlərdən biri.",
+      "fieldBodySchema": "Gövdə sxemi",
+      "bodySchemaHelp": "İstəyə bağlı JSON Schema. Gövdəsi ona uyğun gəlməyən sorğu rədd edilir.",
+      "authTitle": "Məxfi başlıq",
+      "authDescription": "Sorğular bu başlığı ortaq sirrlə göndərməlidir.",
+      "authHeaderLabel": "Başlıq adı",
+      "authSecretLabel": "Ortaq sirr",
+      "authSecretKeep": "Yadda saxlanmış sirri saxlamaq üçün boş buraxın.",
+      "authSecretSet": "Məcburi. Güclü təsadüfi sətir seçin.",
+      "authSecretCreator": "Tətikləyici yaradıcısı kimi işləyərkən ən azı 16 simvol istifadə edin.",
+      "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
+      "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",
+      "activeTitle": "Tətikləyici aktivdir",
+      "activeDescription": "Dayandırılmış vebhuklar 404 ilə cavab verir.",
+      "runAsCreator": "Mənim hesabımla işlə",
+      "runAsCreatorDescription": "Hər icra hesabınızdan istifadə edir, buna görə məxfi başlıq tələb olunur.",
+      "saveFailedTitle": "Tətikləyici yadda saxlanıla bilmədi",
+      "deleteTitle": "Bu tətikləyici silinsin?",
+      "deleteMessage": "{{name}} ünvanına edilən çağırışlar uğursuz olacaq. Bu əməliyyat geri qaytarıla bilməz.",
+      "deleteMessageScheduled": "{{name}} tətikləyicisinin planlaşdırılıb icra olunan çağırışları dayanacaq. Bu əməliyyat geri qaytarıla bilməz.",
+      "runNow": "İndi işlət",
+      "runStarted": "İcra başladı",
+      "created": "Tətikləyici yaradıldı",
+      "saved": "Tətikləyici yadda saxlanıldı",
+      "statusArrived": "Gəldi",
+      "problems": {
+        "nameRequired": "Ad daxil edin.",
+        "nameTooShort": "Ən azı 8 simvol istifadə edin.",
+        "nameTooLong": "64 və ya daha az simvol istifadə edin.",
+        "nameCharacters": "Kiçik hərflər, rəqəmlər və defislərdən istifadə edin.",
+        "nameReserved": "Bu ad qorunur.",
+        "cronRequired": "Kron ifadəsi daxil edin.",
+        "repositoryRequired": "Repozitoriya seç",
+        "agentRequired": "Agent seçin.",
+        "agentInvalid": "Kiçik hərflər, rəqəmlər və defislərdən istifadə edin və hərflə başlayın.",
+        "modelRequired": "Model seçin",
+        "promptRequired": "Təlimat daxil edin.",
+        "bodySchemaInvalid": "JSON obyekti daxil edin və ya bu sahəni boş buraxın.",
+        "authHeaderRequired": "Başlıq adını daxil edin.",
+        "authSecretRequired": "Ortaq sirri daxil edin.",
+        "authSecretTooShort": "Ən azı 16 simvol istifadə edin."
+      }
     }
   },
   "sessionShare": {
@@ -4506,8 +4664,9 @@
     "create": "Link yarat",
     "createFailed": "Linki yaratmaq alınmadı.",
     "existingTitle": "Mövcud link",
-    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
+    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Bu parametrlərlə yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
     "rotate": "Yeni link yarat",
+    "replacementSettings": "Bu parametrlər yeni linkə aiddir.",
     "revoke": "Linki sil",
     "revokeTitle": "Link ləğv edilsin?",
     "revokeMessage": "Cari link dərhal işləməyi dayandırır.",
@@ -4526,5 +4685,175 @@
     "unavailableDescription": "Bu paylaşım linkinin müddəti bitib və ya o ləğv edilib.",
     "transcriptUnavailableTitle": "Bu transkripti yükləmək alınmadı",
     "transcriptUnavailableDescription": "Link hələ də işləyir. Bir az sonra yenidən cəhd edin."
+  },
+  "organizationGuardrails": {
+    "title": "Süni intellekt qoruyucu qaydaları",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "unavailable": "Süni intellekt qoruyucu qaydaları bu təşkilat üçün əlçatan deyil.",
+    "loadError": "Süni intellekt qoruyucu qaydaları yüklənmədi",
+    "statusSaving": "Yadda saxlanılır…",
+    "statusSaved": "Yadda saxlanıldı",
+    "statusFailed": "Yadda saxlamaq alınmadı.",
+    "inputTitle": "Giriş üçün qoruyucu qaydalar",
+    "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda bloklayan detektor sorğunu rədd edir.",
+    "outputTitle": "Çıxış üçün qoruyucu qaydalar",
+    "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
+    "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",
+    "detectorsHintOutput": "\"Blokla\" işarələnmiş cavabı uğursuz edir. \"Yalnız qeydə al\" cavabı ləngitmədən onu sadəcə qeydə alır.",
+    "choiceLog": "Yalnız qeydə al",
+    "applyTo": "Kimlərə tətbiq olunur",
+    "applyToAllMembers": "Bütün üzvlər",
+    "applyKiloDefault": "Kilo standartını tətbiq et",
+    "invalidSavedTitle": "Giriş detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedBody": "Giriş detektorları yenidən yadda saxlanılana qədər sorğular bloklanır. Aşağıdakı detektorlar Kilo standartı ilə başlayır.",
+    "invalidSavedOutputTitle": "Çıxış detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedOutputBody": "Çıxış detektorları yenidən yadda saxlanılana qədər cavablar verilmir. Aşağıda çıxış detektorlarını seçin.",
+    "blockingOutputNote": "Bloklayan çıxış detektoru Enkrypt cavabın hamısını yoxlayana qədər onu saxlayır. Gecikmənin qarşısını almaq üçün \"Yalnız qeydə al\" seçin.",
+    "inputDetectorRequired": "Ən azı bir giriş detektorunu aktivləşdirin.",
+    "outputDetectorRequired": "Ən azı bir çıxış detektorunu aktivləşdirin.",
+    "rulesTooMany": "Ən çoxu {{max}} qayda əlavə edin.",
+    "ruleIdRequired": "Qayda ID-sini daxil edin.",
+    "ruleIdInvalid": "Qayda ID-si yalnız hərflərdən, rəqəmlərdən, nöqtələrdən, defislərdən və alt xətlərdən ibarət ola bilər.",
+    "ruleTextRequired": "Qaydanın nəyi qadağan etdiyini və ya tələb etdiyini təsvir edin.",
+    "keywordTooLong": "Hər açar söz ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "topicTooLong": "Hər mövzu ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "keywordsTooMany": "Ən çoxu {{max}} açar söz əlavə edin.",
+    "topicsTooMany": "Ən çoxu {{max}} mövzu əlavə edin.",
+    "piiEntityRequired": "Aşkarlanacaq ən azı bir məlumat növü seçin.",
+    "keywordRequired": "Ən azı bir açar söz əlavə edin.",
+    "topicRequired": "Ən azı bir mövzu əlavə edin.",
+    "policyTextRequired": "Siyasət mətnini daxil edin.",
+    "ruleRequired": "Ən azı bir qayda əlavə edin.",
+    "ruleIdDuplicate": "Hər qaydanın öz qayda ID-si olmalıdır.",
+    "piiEntities": "Aşkarlanacaq məlumatlar",
+    "keywordsLabel": "Açar sözlər",
+    "keywordsHint": "Hər sətirdə bir açar söz.",
+    "topicsHint": "Hər sətirdə bir mövzu.",
+    "policyFormat": "Siyasət formatı",
+    "policyFormatRules": "Strukturlaşdırılmış qaydalar",
+    "policyFormatRulesDescription": "Hər tələb üçün kateqoriya və ciddilik dərəcəsi olan bir qayda. Tövsiyə olunur.",
+    "policyFormatText": "Siyasət mətni",
+    "policyFormatTextDescription": "Mövcud siyasəti sadə mətn kimi yapışdırın.",
+    "rulesEmpty": "Hələ qayda yoxdur. Hər qayda girişlərdə olmamalı və ya onların istəməməli olduğu bir şeyi təsvir edir.",
+    "addRule": "Qayda əlavə et",
+    "ruleNumber": "Qayda {{number}}",
+    "ruleRemove": "{{number}} nömrəli qaydanı sil",
+    "ruleIdLabel": "Qayda ID-si",
+    "ruleNameLabel": "Ad (istəyə bağlı)",
+    "ruleTextLabel": "Qayda",
+    "ruleRiskCategory": "Risk kateqoriyası",
+    "ruleApplicability": "Əhatə dairəsi",
+    "ruleFrameworks": "Çərçivələr",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt inyeksiyası",
+        "description": "Təlimatları ləğv etmək və ya modelin məhdudiyyətlərini aşmaq (jailbreak) cəhdlərini aşkarlayır."
+      },
+      "policyViolation": {
+        "label": "Siyasət pozuntusu",
+        "description": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan girişləri işarələyir.",
+        "descriptionOutput": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan cavabları işarələyir."
+      },
+      "pii": {
+        "label": "PII və məxfi məlumatlar",
+        "description": "Şəxsi məlumatları, giriş məlumatlarını, IP ünvanlarını və URL-ləri aşkarlayır."
+      },
+      "keywords": {
+        "label": "Qadağan olunmuş açar sözlər",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı açar sözü ehtiva edən cavabları aşkarlayır."
+      },
+      "topics": {
+        "label": "Mövzular",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı mövzuya aid cavabları işarələyir."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, təhqiramiz, təhdidedici və ya nifrət dolu dili aşkarlayır."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Cinsi və ya başqa səbəbdən iş mühiti üçün uyğun olmayan məzmunu aşkarlayır."
+      },
+      "bias": {
+        "label": "Qərəzlilik",
+        "description": "Qərəzli və ya ayrı-seçkilik edən dili aşkarlayır."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Şəxsi məlumatlar",
+        "description": "Adlar, e-poçt ünvanları, telefon nömrələri."
+      },
+      "secrets": {
+        "label": "Məxfi məlumatlar",
+        "description": "API açarları, tokenlər, parollar."
+      },
+      "ipAddress": {
+        "label": "IP ünvanları",
+        "description": "IPv4 və IPv6 ünvanları."
+      },
+      "url": {
+        "label": "URL-lər",
+        "description": "Veb ünvanlar."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Kibertəhlükəsizlik və fırıldaqçılıq",
+      "safetyHarm": "Təhlükəsizlik və zərər",
+      "privacyDataProtection": "Məxfilik və məlumatların qorunması",
+      "brandReputationTrust": "Brend və reputasiya",
+      "biasFairnessEthical": "Qərəzlilik və ədalətlilik",
+      "legalIpLiability": "Hüquqi və əqli mülkiyyət məsuliyyəti",
+      "productMisuse": "Məhsuldan sui-istifadə",
+      "performanceQuality": "Performans və keyfiyyət"
+    },
+    "applicability": {
+      "user": "İstifadəçi girişi",
+      "userAssistant": "İstifadəçi girişi və cavablar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Aİ Süni İntellekt Aktı",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise funksiyası",
+    "enterpriseOnly": "Bu funksiya yalnız Enterprise üçündür.",
+    "readOnly": "Bu ayarları yalnız təşkilat sahibləri və adminlər dəyişə bilər.",
+    "loadError": "Provayderlər və modellər yüklənmədi",
+    "tabModels": "Modellər",
+    "tabProviders": "Provayderlər",
+    "tabGateways": "Şlüzlər",
+    "modelsDescription": "Modeli bütün üzvlər üçün bloklamaq üçün onu söndürün. İcazə verilən provayderlərin modelləri standart olaraq aktivdir.",
+    "modelsDeniedOnly": "Yalnız qadağan olunanlar",
+    "modelsEmpty": "Bu axtarışa uyğun model yoxdur.",
+    "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
+    "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
+    "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "allowAllShown": "Göstərilənlərin hamısına icazə ver",
+    "denyAllShown": "Göstərilənlərin hamısını qadağan et",
+    "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",
+    "emptyProviderList": "Ən azı bir provayderə icazə verin. Boş siyahı bütün Kilo model yönləndirmələrini bloklayır.",
+    "gatewaysUnavailable": "Şlüz ayarları bu təşkilat üçün əlçatan deyil.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter sorğuları regiona bağlanmır.",
+    "inferenceRegion": "İnferens regionu",
+    "inferenceRegionDescription": "Vercel AI Gateway sorğularını bu regiona bağlayır. Orada əlçatan olmayan modelə sorğular uğursuz olur.",
+    "disableOpenrouterNote": "OpenRouter deaktiv edildikdə, sorğuları onun vasitəsilə yönləndirən BYOK açarları da bloklanır.",
+    "emptyModelList": "Ən azı bir modeli aktiv saxlayın. Bütün modelləri rədd etsəniz, üzvlərin istifadə edəcəyi heç nə qalmaz.",
+    "catalogUnavailable": "Tam model kataloqu yüklənmədi, buna görə yalnız yadda saxlanmış siyahılarınız göstərilir. Bütün modelləri yükləmək üçün yenidən cəhd edin.",
+    "region": {
+      "global": "Qlobal",
+      "us": "Amerika Birləşmiş Ştatları",
+      "eu": "Avropa İttifaqı",
+      "au": "Avstraliya",
+      "jp": "Yaponiya"
+    }
   }
 }

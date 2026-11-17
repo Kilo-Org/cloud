@@ -366,6 +366,8 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getLanguagePreference: () => 'device',
+  hasLanguagePreferenceWriteInFlight: () => false,
   getResolvedLanguage: () => 'en',
   useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
 }));

@@ -109,7 +109,12 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
 });
 // The apply path records the direction relaunch; the record itself is covered
 // by the apply-language suite, and its real store pulls in the native keychain.
-vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
+vi.mock('@/i18n/direction-attempt', () => ({
+  writeDirectionAttemptAsync,
+  // No running app path has an attempt record here: the sheet's apply always
+  // relaunches once for the language it names.
+  readDirectionAttemptAsync: vi.fn(() => Promise.resolve(null)),
+}));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
   // Mirrors the shell: `headerContent` is pinned chrome unless the caller put

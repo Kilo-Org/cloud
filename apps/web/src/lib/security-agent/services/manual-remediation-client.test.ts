@@ -204,6 +204,115 @@ describe('remediation Worker call sites', () => {
       json: () => Promise.resolve({ error: 'Invalid request' }),
     });
 
-    await expect(submit()).rejects.toThrow('Invalid request');
+    const error: TRPCError = await submit().then(
+      () => {
+        throw new Error('expected a rejection');
+      },
+      (e: unknown) => e as TRPCError
+    );
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error.code).toBe('PRECONDITION_FAILED');
+    // The stable rejection sentence is dropped verbatim: the Worker's raw
+    // error text never reaches the device.
+    expect(error.message).toBe('Security remediation service request was rejected');
+    expect(error.message).not.toContain('Invalid request');
+  });
+});
+
+describe('remediation Worker call sites env configuration', () => {
+  const capturedConfigError = async (
+    submit: () => Promise<unknown>
+  ): Promise<{ name?: string; code?: string; message: string }> => {
+    let captured: unknown;
+    try {
+      await submit();
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeDefined();
+    return captured as { name?: string; code?: string; message: string };
+  };
+
+  it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_AUTO_ANALYSIS_WORKER_URL is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'test-internal-secret',
+      SECURITY_AUTO_ANALYSIS_WORKER_URL: '',
+    }));
+    const mod = await import('./manual-remediation-client');
+    const captured = await capturedConfigError(() =>
+      mod.submitManualRemediationStart({
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(captured.name).toBe('TRPCError');
+    expect(captured.code).toBe('PRECONDITION_FAILED');
+    expect(captured.message).toBe('Security service is not configured');
+    expect(captured.message).not.toContain('test-internal-secret');
+
+    const applyCaptured = await capturedConfigError(() =>
+      mod.submitApplyAutoRemediation({
+        commandId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(applyCaptured.name).toBe('TRPCError');
+    expect(applyCaptured.code).toBe('PRECONDITION_FAILED');
+    expect(applyCaptured.message).toBe('Security service is not configured');
+
+    const cancelCaptured = await capturedConfigError(() =>
+      mod.submitRemediationCancellation({
+        attemptId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(cancelCaptured.name).toBe('TRPCError');
+    expect(cancelCaptured.code).toBe('PRECONDITION_FAILED');
+    expect(cancelCaptured.message).toBe('Security service is not configured');
+  });
+
+  it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: '',
+      SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
+    }));
+    const mod = await import('./manual-remediation-client');
+    const captured = await capturedConfigError(() =>
+      mod.submitManualRemediationStart({
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(captured.name).toBe('TRPCError');
+    expect(captured.code).toBe('PRECONDITION_FAILED');
+    expect(captured.message).toBe('Security service is not configured');
+
+    const applyCaptured = await capturedConfigError(() =>
+      mod.submitApplyAutoRemediation({
+        commandId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(applyCaptured.name).toBe('TRPCError');
+    expect(applyCaptured.code).toBe('PRECONDITION_FAILED');
+    expect(applyCaptured.message).toBe('Security service is not configured');
+
+    const cancelCaptured = await capturedConfigError(() =>
+      mod.submitRemediationCancellation({
+        attemptId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actorUserId: 'user-123',
+      })
+    );
+    expect(cancelCaptured.name).toBe('TRPCError');
+    expect(cancelCaptured.code).toBe('PRECONDITION_FAILED');
+    expect(cancelCaptured.message).toBe('Security service is not configured');
   });
 });

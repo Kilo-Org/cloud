@@ -18,6 +18,8 @@ import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -276,13 +278,28 @@ const MANAGED_GATEWAY_NAMES = {
   openrouter: 'OpenRouter',
 } as const satisfies Record<ManagedGatewayId, string>;
 
+const ADVANCED_POLICIES_HINT =
+  'Select a model the Vercel AI Gateway offers, add your own key (BYOK), or ask an organization admin to review the Advanced policies on the Providers & Models page.';
+
 export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
   const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
+      message: `${error} ${ADVANCED_POLICIES_HINT}`,
+    },
+    { status: 403 }
+  );
+}
+
+export function inferenceRegionRefusedResponse(region: OrganizationDataRegion) {
+  const error = `Your organization requires inference in the ${ORGANIZATION_DATA_REGION_NAMES[region]} region, which this request cannot use.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} In that region, requests paid with Kilo credits run only through the Vercel AI Gateway. ${ADVANCED_POLICIES_HINT}`,
     },
     { status: 403 }
   );

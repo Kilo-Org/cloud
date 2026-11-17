@@ -4,6 +4,7 @@ import { types } from 'node:util';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
@@ -39,6 +40,7 @@ export async function recordEnkryptUsageInPrimaryRegion(
 async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | null> {
   if (!INTERNAL_API_SECRET) return 'missing_internal_api_secret';
   if (!APP_URL) return 'missing_app_url';
+  if (!parseInternalServiceUrl(APP_URL)) return 'unsupported_app_url';
 
   let response: Response;
   try {

@@ -5,6 +5,18 @@ export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
 /**
+ * Precedence when a caller holds more than one role for the same organization,
+ * for example a direct `member` row and an `owner` row on the parent. The first
+ * matching role wins.
+ */
+export const ORGANIZATION_ROLE_PRIORITY = [
+  'owner',
+  'admin',
+  'billing_manager',
+  'member',
+] satisfies OrganizationRole[];
+
+/**
  * Roles with organization-management authority. `admin` matches `owner`
  * everywhere except owner management, which {@link canManageOrganizationOwners}
  * reserves for owners.

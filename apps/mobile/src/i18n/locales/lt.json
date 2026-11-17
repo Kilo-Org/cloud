@@ -4825,5 +4825,175 @@
     "unavailableDescription": "Šios bendrinimo nuorodos galiojimas baigėsi arba ji buvo atšaukta.",
     "transcriptUnavailableTitle": "Nepavyko įkelti šio pokalbio įrašo",
     "transcriptUnavailableDescription": "Nuoroda vis dar veikia. Bandykite dar kartą po akimirkos."
+  },
+  "organizationGuardrails": {
+    "title": "DI apsaugos priemonės",
+    "permissionDenied": "Tik organizacijos savininkai ir administratoriai gali valdyti DI apsaugos priemones.",
+    "unavailable": "DI apsaugos priemonės šiai organizacijai nepasiekiamos.",
+    "loadError": "Nepavyko įkelti DI apsaugos priemonių",
+    "statusSaving": "Išsaugoma…",
+    "statusSaved": "Išsaugota",
+    "statusFailed": "Nepavyko išsaugoti.",
+    "inputTitle": "Įvesties apsaugos priemonės",
+    "inputDescription": "Kiekviena įvestis nuskaitoma naudojant Enkrypt AI, įskaitant įrankių rezultatus. Blokuojantis detektorius atmeta užklausą, kai Enkrypt nepasiekiamas.",
+    "outputTitle": "Išvesties apsaugos priemonės",
+    "outputDescription": "Atsakymai nuskaitomi naudojant Enkrypt AI, kol nariai jų negauna. Išjungta, nebent įjungsite.",
+    "detectorsHint": "Parinktis „Blokuoti“ atmeta pažymėtą užklausą. Parinktis „Tik registruoti“ ją įrašo nevilkdama užklausos.",
+    "detectorsHintOutput": "Parinktis „Blokuoti“ blokuoja pažymėtą atsakymą. Parinktis „Tik registruoti“ jį įrašo nevilkdama atsakymo.",
+    "choiceLog": "Tik registruoti",
+    "applyTo": "Taikyti",
+    "applyToAllMembers": "Visiems nariams",
+    "applyKiloDefault": "Taikyti „Kilo“ numatytąjį",
+    "invalidSavedTitle": "Nepavyksta nuskaityti išsaugotų įvesties detektorių nustatymų",
+    "invalidSavedBody": "Užklausos blokuojamos, kol įvesties detektoriai vėl bus išsaugoti. Toliau nurodyti detektoriai pradedami nuo „Kilo“ numatytųjų nustatymų.",
+    "invalidSavedOutputTitle": "Nepavyksta nuskaityti išsaugotų išvesties detektorių nustatymų",
+    "invalidSavedOutputBody": "Atsakymai sulaikomi, kol išvesties detektoriai vėl bus išsaugoti. Toliau pasirinkite išvesties detektorius.",
+    "blockingOutputNote": "Blokuojantis išvesties detektorius sulaiko atsakymą, kol Enkrypt patikrins visą jo turinį. Naudokite „Tik registruoti“, kad išvengtumėte delsimo.",
+    "inputDetectorRequired": "Įjunkite bent vieną įvesties detektorių.",
+    "outputDetectorRequired": "Įjunkite bent vieną išvesties detektorių.",
+    "rulesTooMany": "Pridėkite iki {{max}} taisyklių.",
+    "ruleIdRequired": "Įveskite taisyklės identifikatorių.",
+    "ruleIdInvalid": "Taisyklės identifikatoriuje galima naudoti tik raides, skaičius, taškus, brūkšnelius ir pabraukimo ženklus.",
+    "ruleTextRequired": "Aprašykite, ką taisyklė draudžia arba ko reikalauja.",
+    "keywordTooLong": "Kiekvienas raktinis žodis gali būti iki {{max}} simbolių.",
+    "topicTooLong": "Kiekviena tema gali būti iki {{max}} simbolių.",
+    "keywordsTooMany": "Pridėkite iki {{max}} raktinių žodžių.",
+    "topicsTooMany": "Pridėkite iki {{max}} temų.",
+    "piiEntityRequired": "Pasirinkite bent vieną aptinkamą duomenų tipą.",
+    "keywordRequired": "Pridėkite bent vieną raktinį žodį.",
+    "topicRequired": "Pridėkite bent vieną temą.",
+    "policyTextRequired": "Įveskite politikos tekstą.",
+    "ruleRequired": "Pridėkite bent vieną taisyklę.",
+    "ruleIdDuplicate": "Kiekviena taisyklė turi turėti savo taisyklės ID.",
+    "piiEntities": "Aptinkami duomenys",
+    "keywordsLabel": "Raktiniai žodžiai",
+    "keywordsHint": "Vienas raktinis žodis eilutėje.",
+    "topicsHint": "Viena tema eilutėje.",
+    "policyFormat": "Politikos formatas",
+    "policyFormatRules": "Struktūrinės taisyklės",
+    "policyFormatRulesDescription": "Viena taisyklė vienam reikalavimui, su kategorija ir sunkumu. Rekomenduojama.",
+    "policyFormatText": "Politikos tekstas",
+    "policyFormatTextDescription": "Įklijuokite esamą politiką kaip paprastą tekstą.",
+    "rulesEmpty": "Taisyklių dar nėra. Kiekviena taisyklė aprašo vieną dalyką, kurio įvestyse neturi būti arba kurio neturi būti prašoma.",
+    "addRule": "Pridėti taisyklę",
+    "ruleNumber": "Taisyklė {{number}}",
+    "ruleRemove": "Pašalinti taisyklę {{number}}",
+    "ruleIdLabel": "Taisyklės identifikatorius",
+    "ruleNameLabel": "Pavadinimas (neprivalomas)",
+    "ruleTextLabel": "Taisyklė",
+    "ruleRiskCategory": "Rizikos kategorija",
+    "ruleApplicability": "Taikymo sritis",
+    "ruleFrameworks": "Reguliavimo sistemos",
+    "detector": {
+      "promptInjection": {
+        "label": "Užklausos įterpimas",
+        "description": "Aptinka bandymus nepaisyti instrukcijų arba apeiti modelio apsaugą."
+      },
+      "policyViolation": {
+        "label": "Politikos pažeidimas",
+        "description": "Pažymi įvestis, kurios pažeidžia jūsų organizacijos politiką, užrašytą tekstu arba taisyklėmis.",
+        "descriptionOutput": "Pažymi atsakymus, kurie pažeidžia jūsų organizacijos politiką, užrašytą tekstu arba taisyklėmis."
+      },
+      "pii": {
+        "label": "PII ir slaptieji duomenys",
+        "description": "Aptinka asmens duomenis, prisijungimo duomenis, IP adresus ir URL adresus."
+      },
+      "keywords": {
+        "label": "Draudžiami raktiniai žodžiai",
+        "descriptionOutput": "Aptinka atsakymus, kuriuose yra bet kuris jūsų išvardytas raktinis žodis."
+      },
+      "topics": {
+        "label": "Temos",
+        "descriptionOutput": "Pažymi atsakymus, susijusius su bet kuria jūsų išvardyta tema."
+      },
+      "toxicity": {
+        "label": "Toksiškumas",
+        "description": "Aptinka toksišką, įžeidžiančią, grėsmingą ar neapykantą kurstančią kalbą."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Aptinka seksualinį ar kitaip darbo aplinkai netinkamą turinį."
+      },
+      "bias": {
+        "label": "Šališkumas",
+        "description": "Aptinka šališką ar diskriminacinę kalbą."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Asmens duomenys",
+        "description": "Vardai, el. pašto adresai, telefono numeriai."
+      },
+      "secrets": {
+        "label": "Slaptieji duomenys",
+        "description": "API raktai, žetonai, slaptažodžiai."
+      },
+      "ipAddress": {
+        "label": "IP adresai",
+        "description": "IPv4 ir IPv6 adresai."
+      },
+      "url": {
+        "label": "URL adresai",
+        "description": "Interneto adresai."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Saugumas ir sukčiavimas",
+      "safetyHarm": "Sauga ir žala",
+      "privacyDataProtection": "Privatumas ir duomenų apsauga",
+      "brandReputationTrust": "Prekės ženklas ir reputacija",
+      "biasFairnessEthical": "Šališkumas ir sąžiningumas",
+      "legalIpLiability": "Teisinė ir intelektinės nuosavybės atsakomybė",
+      "productMisuse": "Netinkamas produkto naudojimas",
+      "performanceQuality": "Veikimas ir kokybė"
+    },
+    "applicability": {
+      "user": "Naudotojo įvestis",
+      "userAssistant": "Naudotojo įvestis ir atsakymai"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 svarbiausių (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ES dirbtinio intelekto aktas",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Įmonės funkcija",
+    "enterpriseOnly": "Tai funkcija, skirta tik įmonėms.",
+    "readOnly": "Tik organizacijos savininkai ir administratoriai gali keisti šiuos nustatymus.",
+    "loadError": "Nepavyko įkelti teikėjų ir modelių",
+    "tabModels": "Modeliai",
+    "tabProviders": "Teikėjai",
+    "tabGateways": "Vartai",
+    "modelsDescription": "Išjunkite modelį, kad jis būtų užblokuotas kiekvienam nariui. Leidžiamų teikėjų modeliai įjungiami pagal numatytuosius nustatymus.",
+    "modelsDeniedOnly": "Tik draudžiami",
+    "modelsEmpty": "Nė vienas modelis neatitinka šios paieškos.",
+    "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
+    "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
+    "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
+    "allowAllShown": "Leisti visus rodomus",
+    "denyAllShown": "Drausti visus rodomus",
+    "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",
+    "emptyProviderList": "Leiskite bent vieną teikėją. Tuščias sąrašas užblokuoja visus Kilo modelių maršrutus.",
+    "gatewaysUnavailable": "Šiai organizacijai vartų nustatymai nepasiekiami.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter užklausos nėra pririštos prie regiono.",
+    "inferenceRegion": "Inferencijos regionas",
+    "inferenceRegionDescription": "Pririša Vercel AI Gateway užklausas prie šio regiono. Jei modelis ten nepasiekiamas, užklausa nepavyksta.",
+    "disableOpenrouterNote": "Išjungus OpenRouter taip pat blokuojami BYOK raktai, kurie nukreipia užklausas per jį.",
+    "emptyModelList": "Palikite įjungtą bent vieną modelį. Uždraudus visus modelius, nariai neturės ką naudoti.",
+    "catalogUnavailable": "Nepavyko įkelti viso modelių katalogo, todėl rodomi tik jūsų išsaugoti sąrašai. Bandykite dar kartą, kad įkeltumėte visus modelius.",
+    "region": {
+      "global": "Pasaulinis",
+      "us": "Jungtinės Valstijos",
+      "eu": "Europos Sąjunga",
+      "au": "Australija",
+      "jp": "Japonija"
+    }
   }
 }

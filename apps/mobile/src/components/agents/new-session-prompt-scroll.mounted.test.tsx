@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The scroll gate and both clip-edge fade bands share one native-mock harness and the same mount helpers, so a second file would duplicate that harness. */
 import { createElement, useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +12,6 @@ import {
   resolveNewSessionPromptHeight,
 } from '@/components/agents/chat-composer-input-height';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
-import { resolveComposerTopFadeHeight } from '@/components/agents/new-session-prompt-fit';
 
 /**
  * The platform the component reads at render. The input's scroll gate is the
@@ -19,6 +19,18 @@ import { resolveComposerTopFadeHeight } from '@/components/agents/new-session-pr
  * picks the platform before it mounts.
  */
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'android' | 'ios' }));
+
+/**
+ * The keyboard's motion progress. The field grows from its keyboard-closed
+ * floor to its keyboard-open floor with it, so a case that needs the field
+ * closed sets it to zero. The setup's mock is a fixed zero; this suite reads
+ * and sets the value.
+ */
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
+
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionProgress: () => keyboardMotion,
+}));
 
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 
@@ -170,16 +182,45 @@ function findPromptInput(renderer: ReactTestRenderer) {
   );
 }
 
-async function mountPrompt(): Promise<ReactTestRenderer> {
+async function mountPrompt(overrides: Partial<PromptProps> = {}): Promise<ReactTestRenderer> {
   const holder: { current?: ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
-    holder.current = TestRenderer.create(createElement(NewSessionPrompt, makeProps()));
+    holder.current = TestRenderer.create(createElement(NewSessionPrompt, makeProps(overrides)));
   });
   if (!holder.current) {
     throw new Error('prompt did not mount');
   }
   return holder.current;
+}
+
+/**
+ * Mount the prompt again after the platform flips. The band offsets and the
+ * clip edges are module-level constants read at import, so the component must be
+ * re-imported for the new platform. The persistent `vi.mock` factory is cached,
+ * so `doMock` re-registers it for the fresh import and `resetModules` clears the
+ * module cache.
+ */
+async function mountPromptAfterPlatformChange(overrides: Partial<PromptProps> = {}) {
+  vi.doMock('react-native', reactNativeMock);
+  vi.resetModules();
+  const { NewSessionPrompt: PlatformPrompt } =
+    await import('@/components/agents/new-session-prompt');
+  const { createElement: createPlatformElement } = await import('react');
+  const { act: platformAct, TestRenderer: PlatformRenderer } = await import('@/test/renderer');
+
+  const holder: { current?: ReactTestRenderer } = {};
+  await platformAct(async () => {
+    await Promise.resolve();
+    holder.current = PlatformRenderer.create(
+      createPlatformElement(PlatformPrompt, makeProps(overrides))
+    );
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('prompt did not mount');
+  }
+  return { platformAct, renderer };
 }
 
 /** Report the draft's laid-out height the way the native field does. */
@@ -232,13 +273,34 @@ const PROMPT_INPUT_INSET = 7;
  */
 const SCROLLED_OFFSET = PROMPT_INPUT_INSET + 10;
 
-/** The fade band over the cut top line: where it starts and how tall it is. */
-function findTopFade(renderer: ReactTestRenderer) {
-  const node = renderer.root.find(
-    instance => typeof instance.type === 'string' && (instance.type as string) === 'Animated.View'
-  );
-  const [frame, size] = node.props.style as [{ top?: number }, { height?: number }];
-  return { height: size.height, top: frame.top };
+/** A fade band over a cut line: the edge it sits on and how tall it is. */
+function findFade(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
+  const node = findFadeBands(renderer, edge)[0];
+  if (!node) {
+    throw new Error(`no ${edge} fade band`);
+  }
+  const [frame, size] = node.props.style as [
+    { bottom?: number; top?: number },
+    { height?: number },
+  ];
+  return edge === 'top'
+    ? { height: size.height, top: frame.top }
+    : { bottom: frame.bottom, height: size.height };
+}
+
+/** Every fade band over a cut line, in render order. */
+function findFadeBands(renderer: ReactTestRenderer, edge: 'bottom' | 'top') {
+  return renderer.root.findAll(node => {
+    if (typeof node.type !== 'string' || (node.type as string) !== 'Animated.View') {
+      return false;
+    }
+    const style = node.props.style as unknown;
+    if (!Array.isArray(style)) {
+      return false;
+    }
+    const [frame] = style as [{ bottom?: number; top?: number }];
+    return frame[edge] !== undefined;
+  });
 }
 
 /** Report the field's scroll offset the way the native field does. */
@@ -267,14 +329,13 @@ describe('NewSessionPrompt top fade band', () => {
 
     // The text view draws scrolled text through its padding and cuts it at its
     // own bounds, so the band starts at the field's top edge, and the offset
-    // has to pass the padding before it reaches the cut line.
-    expect(findTopFade(renderer)).toEqual({
-      height: resolveComposerTopFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: SCROLLED_OFFSET - PROMPT_INPUT_INSET,
-      }),
-      top: 0,
-    });
+    // has to pass the padding before it reaches the cut line. That leaves 10
+    // points of the cut line above the edge and 14 below it. iOS adds its
+    // quarter-line ramp (6 points at the 24-point line), so the band would reach
+    // 16 points and the 14 points inside the field cap it: the whole cut line
+    // fades. The shipped `min(visible, hidden)` rule gave 10, which left the
+    // clipped ascenders at full contrast.
+    expect(findFade(renderer, 'top')).toEqual({ height: 14, top: 0 });
 
     renderer.unmount();
   });
@@ -282,38 +343,128 @@ describe('NewSessionPrompt top fade band', () => {
   it('fades from the text box on Android, where the edit text clips at its padding', async () => {
     platform.OS = 'android';
     // The band's top edge is a module-level constant, so the component must be
-    // re-imported after the platform flips. The persistent `vi.mock` factory is
-    // cached, so `doMock` re-registers it for the fresh import and
-    // `resetModules` clears the module cache.
-    vi.doMock('react-native', reactNativeMock);
-    vi.resetModules();
-    const { NewSessionPrompt: AndroidPrompt } =
-      await import('@/components/agents/new-session-prompt');
-    const { createElement: createAndroidElement } = await import('react');
-    const { act: androidAct, TestRenderer: AndroidRenderer } = await import('@/test/renderer');
+    // re-imported after the platform flips.
+    const { platformAct, renderer } = await mountPromptAfterPlatformChange();
 
-    const holder: { current?: ReactTestRenderer } = {};
-    await androidAct(async () => {
-      await Promise.resolve();
-      holder.current = AndroidRenderer.create(createAndroidElement(AndroidPrompt, makeProps()));
-    });
-    const renderer = holder.current;
-    if (!renderer) {
-      throw new Error('prompt did not mount');
-    }
-
-    reportScrollOffset(renderer, SCROLLED_OFFSET, androidAct);
+    reportScrollOffset(renderer, SCROLLED_OFFSET, platformAct);
 
     // The edit text cuts its text at the padding, so the band starts at the
-    // text box, where the offset already measures the cut.
-    expect(findTopFade(renderer)).toEqual({
-      height: resolveComposerTopFadeHeight({
-        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-        scrollOffset: SCROLLED_OFFSET,
-      }),
-      top: PROMPT_INPUT_INSET,
+    // text box, where the offset already measures the cut: 17 points past the
+    // top edge and 7 inside it. Android passes no ramp and keeps the shipped
+    // `min(visible, hidden)` rule, so the band stays at those 7 points: its
+    // rendering is not proven on a device and must not change.
+    expect(findFade(renderer, 'top')).toEqual({ height: 7, top: PROMPT_INPUT_INSET });
+
+    renderer.unmount();
+  });
+});
+
+/**
+ * A scroll offset where the iOS field's bottom edge lands inside its line: with
+ * the three-line field, the edge falls 19 points into the line.
+ */
+const BOTTOM_SCROLLED_OFFSET = 10;
+
+/**
+ * A scroll offset that leaves the bottom line 88% inside the field: the
+ * three-line field puts the cut edge at the offset plus 81 points, so 12.12
+ * lands it 21.12 points into the line and 2.88 points of the line's box are
+ * past the edge.
+ */
+const ALMOST_WHOLE_LINE_SCROLLED_OFFSET = 12.12;
+
+describe('NewSessionPrompt bottom fade band', () => {
+  beforeEach(() => {
+    platform.OS = 'ios';
+    keyboardMotion.value = 0;
+  });
+
+  it('fades the cut bottom line at the field bottom on iOS', async () => {
+    const renderer = await mountPrompt();
+
+    reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, act);
+
+    // The text view clips at its own bounds, so the band's bottom is the field's
+    // bottom, and the cut edge is the scroll offset plus the field's rendered
+    // height, one inset below the first line box's start: 19 points into the
+    // line, so 5 points of it are past the edge and 19 are inside. The 6-point
+    // iOS ramp doubles the hidden 5, and the band is 10 points. The shipped
+    // `min(visible, hidden)` rule gave 5.
+    expect(findFade(renderer, 'bottom')).toEqual({ bottom: 0, height: 10 });
+
+    renderer.unmount();
+  });
+
+  it('fades the descenders of a bottom line that is almost wholly visible', async () => {
+    const renderer = await mountPrompt();
+
+    // A slow scroll stops before the line leaves the field: at this offset the
+    // bottom edge sits 21.12 points into the line, so the line is 88% visible
+    // and 2.88 points of its box — the clipped descenders, the 'g' in 'eight' —
+    // are past the edge. The shipped rule gave those 2.88 points, a band too
+    // thin to fade a descender, which then ended flat at full contrast. The
+    // 6-point iOS ramp doubles the hidden part, and the band is 5.76 points.
+    reportScrollOffset(renderer, ALMOST_WHOLE_LINE_SCROLLED_OFFSET, act);
+
+    const band = findFade(renderer, 'bottom');
+    expect(band.bottom).toBe(0);
+    expect(band.height).toBeCloseTo(5.76, 5);
+
+    renderer.unmount();
+  });
+
+  it('draws no bottom band on Android', async () => {
+    platform.OS = 'android';
+    // The top band's clip edge is a module-level constant, so the component
+    // must be re-imported after the platform flips.
+    const { platformAct, renderer } = await mountPromptAfterPlatformChange();
+
+    reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, platformAct);
+
+    // The band ships on iOS only, where the bottom cut was measured. The
+    // Android field keeps its current bottom edge.
+    expect(findFadeBands(renderer, 'bottom')).toEqual([]);
+
+    renderer.unmount();
+  });
+
+  it('sizes the band to the field height while the keyboard motion is partway', async () => {
+    // The field renders between its keyboard-closed floor and its
+    // keyboard-open floor while the keyboard lands, so the band's cut edge
+    // moves with it. One closed line and three open lines put the rendered
+    // height at 52 points a quarter of the way through the motion, which places
+    // the cut edge 9 points into its line: the edge leaves 15 points of the line
+    // past it, so the band takes the 9 points inside the field. The closed
+    // height would place the edge 21 points in and make the band 6, the open
+    // height would place it 21 points in and make it 6 as well.
+    const closedHeight = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1);
+    const openHeight = resolveNewSessionPromptHeight(
+      NEW_SESSION_PROMPT_LINE_HEIGHT,
+      NEW_SESSION_PROMPT_DEFAULT_LINES
+    );
+    const progress = 0.25;
+    const renderedHeight = closedHeight + (openHeight - closedHeight) * progress;
+    const scrollY = 12;
+
+    // The precondition: the motion renders the field at 52 points.
+    expect(renderedHeight).toBe(52);
+
+    keyboardMotion.value = progress;
+    const renderer = await mountPrompt({
+      frameHeight: 2000,
+      keyboardClosedFrameHeight: 2000,
+      keyboardClosedLineCount: 1,
+      lineCount: NEW_SESSION_PROMPT_DEFAULT_LINES,
     });
 
+    reportScrollOffset(renderer, scrollY, act);
+
+    // The text view clips at its own bounds, so the band's bottom is the field's
+    // bottom at its rendered height, and the cut edge is the scroll offset plus
+    // that height, one inset below the first line box's start.
+    expect(findFade(renderer, 'bottom')).toEqual({ bottom: 0, height: 9 });
+
+    keyboardMotion.value = 0;
     renderer.unmount();
   });
 });

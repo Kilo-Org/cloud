@@ -3,7 +3,6 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import {
   CustomPricingConfigSchema,
-  CustomPricingConfigWriteSchema,
   type CustomPricing,
   type CustomPricingConfig,
 } from '@kilocode/db/schema-types';
@@ -106,8 +105,23 @@ describe('CustomPricingConfigSchema', () => {
       { models: [{ model: 'a/b', discountPercentage: 101, pricing: [tier(0)] }] },
     ],
     ['an uppercase model ID', { models: [{ model: 'A/B', pricing: [tier(0)] }] }],
+    ['a latest alias', { models: [{ model: '~a/b-latest', pricing: [tier(0)] }] }],
   ])('rejects %s', (_label, value) => {
     expect(CustomPricingConfigSchema.safeParse(value).success).toBe(false);
+  });
+
+  test('names a refused latest alias and its replacement', () => {
+    const result = CustomPricingConfigSchema.safeParse({
+      models: [{ model: '~a/b-latest', pricing: [tier(0)] }],
+    });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['models', 0, 'model'],
+        message: expect.stringContaining(
+          '"~a/b-latest" is a latest alias. Aliases are billed at their target model\'s custom pricing'
+        ),
+      }),
+    ]);
   });
 });
 
@@ -138,22 +152,11 @@ describe('resolveCustomPricingAliases', () => {
     });
   });
 
-  test("ignores an entry for the alias itself in favor of the target's", () => {
-    const aliasEntry: CustomPricing = {
-      model: alias,
-      pricing: [{ ...tier(0), pricing: { ...tier(0).pricing, prompt_per_million: 9 } }],
-    };
-    expect(
-      resolveCustomPricingAliases({ models: [aliasEntry, targetEntry] }, metadata(target))
-    ).toEqual({ models: [targetEntry, { ...targetEntry, model: alias }] });
-  });
-
   test.each([
     ['does not resolve', metadata()],
     ['is missing from the metadata', {}],
   ])('gives no custom pricing to an alias that %s', (_label, models) => {
-    const aliasEntry: CustomPricing = { model: alias, pricing: [tier(0)] };
-    expect(resolveCustomPricingAliases({ models: [aliasEntry, targetEntry] }, models)).toEqual({
+    expect(resolveCustomPricingAliases({ models: [targetEntry] }, models)).toEqual({
       models: [targetEntry],
     });
   });
@@ -202,32 +205,5 @@ describe('getCustomPricingConfig', () => {
     // refresh.
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(metadata());
     expect(await getCustomPricingConfig()).toEqual({ models: [targetEntry] });
-  });
-});
-
-describe('CustomPricingConfigWriteSchema', () => {
-  const aliasConfig: CustomPricingConfig = { models: [{ model: alias, pricing: [tier(0)] }] };
-
-  test('refuses an entry for a latest alias with an error naming it', () => {
-    const result = CustomPricingConfigWriteSchema.safeParse(aliasConfig);
-    expect(result.success).toBe(false);
-    expect(result.error?.issues).toEqual([
-      expect.objectContaining({
-        path: ['models', 0, 'model'],
-        message: expect.stringContaining(`"${alias}" is a latest alias`),
-      }),
-    ]);
-  });
-
-  test('accepts a config without aliases', () => {
-    expect(CustomPricingConfigWriteSchema.parse(TEST_CUSTOM_PRICING_CONFIG)).toEqual(
-      TEST_CUSTOM_PRICING_CONFIG
-    );
-  });
-
-  test('leaves a stored config with an alias entry readable', async () => {
-    await cleanupDbForTest();
-    await db.insert(ai_gateway_config).values({ custom_pricing: aliasConfig });
-    expect(await readCustomPricingConfig()).toEqual(aliasConfig);
   });
 });

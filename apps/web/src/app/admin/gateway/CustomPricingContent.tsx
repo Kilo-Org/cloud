@@ -7,11 +7,7 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  CustomPricingConfigSchema,
-  CustomPricingConfigWriteSchema,
-  type CustomPricingConfig,
-} from '@kilocode/db/schema-types';
+import { CustomPricingConfigSchema, type CustomPricingConfig } from '@kilocode/db/schema-types';
 import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
@@ -31,7 +27,7 @@ function parseConfig(json: string): { config: CustomPricingConfig } | { error: s
   }
   const strict = StrictCustomPricingConfigSchema.safeParse(raw);
   if (!strict.success) return { error: formatZodError(strict.error) };
-  const result = CustomPricingConfigWriteSchema.safeParse(raw);
+  const result = CustomPricingConfigSchema.safeParse(raw);
   if (!result.success) return { error: formatZodError(result.error) };
   return { config: result.data };
 }

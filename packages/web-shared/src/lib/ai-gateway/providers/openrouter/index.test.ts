@@ -674,19 +674,6 @@ describe('alias pricing', () => {
     });
   });
 
-  it("shows the target's price over a stored custom price for the alias itself", async () => {
-    mockStoredCustomPricing(
-      customPricing(target.id, 0.25),
-      customPricing(alias.id, 0.75, { discountPercentage: 10 })
-    );
-
-    const model = await getCatalog();
-
-    expect(model(alias.id)?.name).toBe(alias.name);
-    expect(model(alias.id)?.pricing).toEqual(model(target.id)?.pricing);
-    expect(model(target.id)?.pricing).toMatchObject({ prompt: '0.000000250000' });
-  });
-
   it("applies the target's custom price to an alias whose target is not listed", async () => {
     mockStoredCustomPricing(customPricing(target.id, 0.25, { discountPercentage: 50 }));
 

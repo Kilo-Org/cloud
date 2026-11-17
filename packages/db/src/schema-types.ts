@@ -3303,31 +3303,20 @@ export const CustomPricingConfigSchema = z.object({
             path: [index, 'model'],
           });
         }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
+            path: [index, 'model'],
+          });
+        }
         seen.add(model);
       }
     }),
 });
 
 export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
-
-/**
- * What the admin may save. A `~` latest alias is priced as the model it resolves to, so an entry
- * for one is refused. Stored configs are read with {@link CustomPricingConfigSchema}, which accepts
- * such entries, so a config stored before this rule still parses.
- */
-export const CustomPricingConfigWriteSchema = CustomPricingConfigSchema.superRefine(
-  (config, ctx) => {
-    for (const [index, { model }] of config.models.entries()) {
-      if (model.startsWith('~')) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
-          path: ['models', index, 'model'],
-        });
-      }
-    }
-  }
-);
 
 // --- Gateway models ---
 

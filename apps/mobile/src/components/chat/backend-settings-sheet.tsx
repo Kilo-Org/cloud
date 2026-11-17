@@ -193,13 +193,13 @@ function BackendSettingsContent({
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-2">
+        <View className="gap-3">
           <Text variant="heading">{t('modelChat.backends.cloud')}</Text>
           <CloudProviderChoice {...providerSelection} />
         </View>
-        <View className="gap-2">
+        <View className="gap-3">
           <Text variant="heading">{t('modelChat.localModels.title')}</Text>
-          <Text className="text-sm text-muted-foreground">{t('modelChat.localModels.help')}</Text>
+          <Text variant="muted">{t('modelChat.localModels.help')}</Text>
           <LocalModelSection {...providerSelection} />
           <GgufModelSection
             {...providerSelection}
@@ -210,7 +210,7 @@ function BackendSettingsContent({
             }}
           />
         </View>
-        <View className="gap-2">
+        <View className="gap-3">
           <Text variant="heading">{t('modelChat.backends.title')}</Text>
           {!loaded ? (
             <Text>{t('common.loading')}</Text>
@@ -218,9 +218,9 @@ function BackendSettingsContent({
             <>
               {backends.length === 0 && <Text>{t('modelChat.backends.empty')}</Text>}
               {backends.map(backend => (
-                <View key={backend.id} className="gap-2 rounded-xl border border-border p-4">
+                <Card key={backend.id}>
                   <Text variant="heading">{backend.name}</Text>
-                  <Text className="text-sm text-muted-foreground">{backend.baseUrl}</Text>
+                  <Text variant="muted">{backend.baseUrl}</Text>
                   {backend.models.map(model => (
                     <BackendProviderChoice
                       key={model.id}

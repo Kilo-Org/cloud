@@ -137,7 +137,18 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The row skeleton's text cell and the frame's lines render plain host nodes:
+// the real `Text` pulls the slot primitive and the RTL helpers, neither of
+// which this structural suite exercises.
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

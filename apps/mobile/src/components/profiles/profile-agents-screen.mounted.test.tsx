@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted harness pins the mode badge, draft restore, save ownership, row layout, manage slot, and delete confirmation */
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,9 @@ import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -243,7 +247,9 @@ function nodesOfType(renderer: MountedRenderer, type: string) {
 
 /** Mount the agents screen against this test's query and permission state. */
 function mountScreen() {
-  return renderWithProviders(createElement(ProfileAgentsScreen, { profileId: 'profile-1' }));
+  return renderWithProviders(
+    createElement(ProfileAgentsScreen, { profileId: 'profile-1', backFallback: PROFILES_LIST_HREF })
+  );
 }
 
 /** The open sheet, which the screen wires to its own save pipeline. */

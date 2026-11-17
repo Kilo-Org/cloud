@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -61,7 +62,13 @@ function initialVariableEdit(row: VariableRow | undefined): VariableEdit {
 export function ProfileVariablesScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
@@ -272,6 +279,7 @@ export function ProfileVariablesScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.variablesTitle')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

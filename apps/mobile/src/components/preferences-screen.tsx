@@ -21,6 +21,7 @@ import {
   type ThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * Preferences hub: each group s1 split into a subpage is one navigation row
@@ -34,7 +35,7 @@ export function PreferencesScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.preferences')} />
+      <ScreenHeader title={t('common.preferences')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 gap-3 pt-4"

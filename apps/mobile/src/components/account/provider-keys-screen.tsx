@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
@@ -247,7 +248,7 @@ export function ProviderKeysScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.title')} />
+      <ScreenHeader title={t('profile.providerKeys.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-4 pt-4"

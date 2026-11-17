@@ -313,6 +313,10 @@ function GuardrailsForm({
       <Card>
         <CardHeader>
           <CardTitle>Enkrypt AI guardrails</CardTitle>
+          <CardDescription>
+            Guardrails apply to Chat Completions, Anthropic Messages and Responses API requests.
+            Autocomplete, embedding and transcription requests are not checked.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
           <InputGuardrailSection

@@ -67,6 +67,7 @@ export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | Rej
  * Caps one account's inference request rate across every source address. Routes
  * call this before authentication: the key comes from the signed token, so a
  * flooded request costs no database query. See `isGatewayAccountRateLimited`.
+ * Autocomplete routes skip it; see `packages/web-shared/AGENTS.md`.
  */
 export async function gatewayAccountRateLimitRejection(
   request: NextRequest,

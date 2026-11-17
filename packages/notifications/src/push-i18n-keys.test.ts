@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { translatePush } from './i18n';
 import en from './locales/en.json';
-import { genericPushContentForPushData } from './push-copy';
+import { GENERIC_BODY_LEAF_BY_TYPE, genericPushContentForPushData } from './push-copy';
 import type { PushData } from './push-data';
 import {
   GENERIC_PUSH_TITLE_KEY,
@@ -87,7 +87,12 @@ describe('shared push copy', () => {
 
   it('points the security lifecycle push at the product name and the generic update', () => {
     expect(pushTitleCatalogKey(LIFECYCLE_KEY)).toBe(GENERIC_PUSH_TITLE_KEY);
-    expect(pushBodyCatalogKey(LIFECYCLE_KEY)).toBe('generic.body.securityUpdate');
+    // The lifecycle notice shows the content-free preview copy, so its body key
+    // must be the leaf the preview table renders for its type. Reading the leaf
+    // from that table keeps the fact in one place.
+    expect(pushBodyCatalogKey(LIFECYCLE_KEY)).toBe(
+      `generic.body.${GENERIC_BODY_LEAF_BY_TYPE.security_lifecycle}`
+    );
   });
 
   it('keeps an ordinary kind under its own title entry', () => {

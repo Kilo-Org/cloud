@@ -16,6 +16,7 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -421,26 +422,122 @@ describe('canRouteToVercel', () => {
 });
 
 describe('isValidVercelModelId', () => {
-  async function loadIsValidVercelModelId(vercelModelIds: string[]) {
+  async function loadIsValidVercelModelId({
+    vercelModelIds,
+    openRouterModelIds = [],
+    overrides = [],
+    aliases = {},
+  }: {
+    vercelModelIds: string[];
+    openRouterModelIds?: string[];
+    overrides?: [string, string][];
+    aliases?: Record<string, string>;
+  }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      isValidOpenRouterModelId: jest.fn(async (modelId: string) =>
+        openRouterModelIds.includes(modelId)
+      ),
     }));
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
+      const actual = jest.requireActual<typeof MapModelIdToVercelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+      );
+      const overrideMap = new Map(overrides);
+      return {
+        ...actual,
+        getVercelModelIdOverrides: jest.fn(async () => overrideMap),
+        mapModelIdToVercel: jest.fn(async (modelId: string) =>
+          actual.mapResolvedModelIdToVercel(aliases[modelId] ?? modelId, overrideMap)
+        ),
+      };
+    });
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .isValidVercelModelId;
   }
 
   it('accepts a model whose Vercel id is listed and rejects one that is not', async () => {
-    const isValidVercelModelId = await loadIsValidVercelModelId(['alibaba/qwen3.5-flash']);
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['alibaba/qwen3.5-flash'],
+    });
 
     await expect(isValidVercelModelId('qwen/qwen3.5-flash')).resolves.toBe(true);
     await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(false);
   });
 
+  it.each([
+    ['zai/glm-5', 'z-ai/glm-5'],
+    ['alibaba/qwen3-coder', 'qwen/qwen3-coder'],
+    ['mistral/mistral-small', 'mistralai/mistral-small'],
+    ['spacexai/grok-5', 'x-ai/grok-5'],
+    ['bytedance/seed-2.0', 'bytedance-seed/seed-2.0'],
+  ])('rejects the raw Vercel id %s but accepts %s', async (vercelId, kiloId) => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: [vercelId],
+      openRouterModelIds: [kiloId],
+    });
+
+    await expect(isValidVercelModelId(vercelId)).resolves.toBe(false);
+    await expect(isValidVercelModelId(kiloId)).resolves.toBe(true);
+  });
+
+  it('accepts a Vercel-only model under its OpenRouter-style id only', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-vercel-only', 'reflection/beta'],
+    });
+
+    await expect(isValidVercelModelId('z-ai/glm-vercel-only')).resolves.toBe(true);
+    await expect(isValidVercelModelId('zai/glm-vercel-only')).resolves.toBe(false);
+    await expect(isValidVercelModelId('reflection/beta')).resolves.toBe(true);
+  });
+
+  it('rejects the Vercel id an override maps to', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['meta/muse-wonder-1.0'],
+      openRouterModelIds: ['meta/muse-wonder'],
+      overrides: [['meta/muse-wonder', 'meta/muse-wonder-1.0']],
+    });
+
+    await expect(isValidVercelModelId('meta/muse-wonder')).resolves.toBe(true);
+    await expect(isValidVercelModelId('meta/muse-wonder-1.0')).resolves.toBe(false);
+  });
+
+  it('accepts every Kilo id that shares a Vercel model', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['anthropic/claude-haiku-4.5'],
+      openRouterModelIds: ['anthropic/claude-haiku-4.5'],
+      overrides: [['anthropic/claude-haiku-4-5', 'anthropic/claude-haiku-4.5']],
+    });
+
+    await expect(isValidVercelModelId('anthropic/claude-haiku-4-5')).resolves.toBe(true);
+    await expect(isValidVercelModelId('anthropic/claude-haiku-4.5')).resolves.toBe(true);
+  });
+
+  it('accepts a retained legacy alias that uses the Vercel spelling', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-5.3'],
+      openRouterModelIds: ['zai/glm-5.3'],
+    });
+
+    await expect(isValidVercelModelId('zai/glm-5.3')).resolves.toBe(true);
+  });
+
+  it('accepts a latest alias that resolves to a model Vercel serves', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-5'],
+      openRouterModelIds: ['~z-ai/glm-latest', 'z-ai/glm-5'],
+      aliases: { '~z-ai/glm-latest': 'z-ai/glm-5' },
+    });
+
+    await expect(isValidVercelModelId('~z-ai/glm-latest')).resolves.toBe(true);
+  });
+
   it("assumes a model is valid while Vercel's model list is unavailable", async () => {
-    const isValidVercelModelId = await loadIsValidVercelModelId([]);
+    const isValidVercelModelId = await loadIsValidVercelModelId({ vercelModelIds: [] });
 
     await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(true);
+    await expect(isValidVercelModelId('zai/glm-5')).resolves.toBe(true);
   });
 });
 

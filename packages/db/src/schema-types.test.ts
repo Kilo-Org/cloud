@@ -314,6 +314,17 @@ describe('ByokEndpointDefinitionSchema', () => {
     }
   );
 
+  it('rejects a URL template in the base URL', () => {
+    const result = ByokEndpointDefinitionSchema.safeParse(
+      definition({ base_url: 'https://llm.acme.example/models/{model}/v1' })
+    );
+
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ['base_url'],
+      message: 'must not contain { or }',
+    });
+  });
+
   it.each([
     'https://user:pass@llm.acme.example/v1',
     'https://user@llm.acme.example/v1',

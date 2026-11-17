@@ -3137,7 +3137,7 @@ function hasNoUserInfo(url: string): boolean {
 export const ByokEndpointDefinitionSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
-    /** The API root without a trailing slash, optionally with `{model}`. */
+    /** The API root without a trailing slash. */
     // Plain HTTP is accepted so local development can reach local servers. Deployed gateways
     // refuse non-HTTPS and non-public upstreams at request time (`isUpstreamUrlPolicyEnforced`),
     // as they do for every configurable upstream.
@@ -3145,7 +3145,9 @@ export const ByokEndpointDefinitionSchema = z
       .url({ protocol: /^https?$/ })
       .refine(url => !url.endsWith('/'), 'must not end with a slash')
       .refine(url => !url.includes('?') && !url.includes('#'), 'must not have a query or fragment')
-      .refine(hasNoUserInfo, 'must not contain a username or password'),
+      .refine(hasNoUserInfo, 'must not contain a username or password')
+      // Nothing substitutes URL templates such as `{model}`; the URL is used verbatim.
+      .refine(url => !/[{}]/.test(url), 'must not contain { or }'),
     /** Gateway APIs the upstream serves. */
     api_kinds: z.array(CustomLlmApiKindSchema).min(1),
     /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */

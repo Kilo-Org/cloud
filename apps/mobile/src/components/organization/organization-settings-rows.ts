@@ -67,11 +67,7 @@ import { WEB_BASE_URL } from '@/lib/config';
  * administration area this app does not reimplement, so the hub names neither
  * and links nowhere for them.
  */
-type OrgSettingsArea =
-  | 'providersAndModels'
-  | 'guardrails'
-  | 'ssoAndDomain'
-  | 'dataCollection';
+type OrgSettingsArea = 'providersAndModels' | 'guardrails' | 'ssoAndDomain' | 'dataCollection';
 
 export type OrgSettingsGate = Readonly<{
   role: OrganizationRole | undefined;

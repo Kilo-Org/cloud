@@ -80,16 +80,18 @@ describe('visibleOrgSettingsRows', () => {
   it('offers no row for the removed sub-organization and integration destinations', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        for (const row of visibleOrgSettingsRows(gate({ role, plan }), 'org_1')) {
-          if (row.target.kind !== 'web') continue;
+        const webUrls = visibleOrgSettingsRows(gate({ role, plan }), 'org_1').flatMap(row =>
+          row.target.kind === 'web' ? [row.target.url] : []
+        );
+        for (const url of webUrls) {
           // The hub names none of these areas and links nowhere for them:
           // sub-organizations and distribute funds are a parent-only area this
           // app does not reimplement, integrations open the app's own screen
           // from the members card, and request logs are a native screen.
-          expect(row.target.url).not.toContain('sub-organizations');
-          expect(row.target.url).not.toContain('distribute-funds');
-          expect(row.target.url).not.toContain('/request-logs');
-          expect(row.target.url).not.toContain('/integrations');
+          expect(url).not.toContain('sub-organizations');
+          expect(url).not.toContain('distribute-funds');
+          expect(url).not.toContain('/request-logs');
+          expect(url).not.toContain('/integrations');
         }
       }
     }
@@ -98,12 +100,14 @@ describe('visibleOrgSettingsRows', () => {
   it('opens a page of its own for every web row, never the dashboard', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        for (const row of visibleOrgSettingsRows(gate({ role, plan }), 'org_1')) {
-          if (row.target.kind !== 'web') continue;
+        const webUrls = visibleOrgSettingsRows(gate({ role, plan }), 'org_1').flatMap(row =>
+          row.target.kind === 'web' ? [row.target.url] : []
+        );
+        for (const url of webUrls) {
           // A suffix-less row lands on the organization dashboard, which links
           // to the seats purchase; the hub lists no such row.
-          expect(new URL(row.target.url).pathname).not.toBe('/organizations/org_1');
-          expect(new URL(row.target.url).pathname.startsWith('/organizations/org_1/')).toBe(true);
+          expect(new URL(url).pathname).not.toBe('/organizations/org_1');
+          expect(new URL(url).pathname.startsWith('/organizations/org_1/')).toBe(true);
         }
       }
     }

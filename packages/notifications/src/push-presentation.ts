@@ -261,6 +261,18 @@ export function iosMutableContentForPushData(data: PushData): boolean {
   return agentNotificationKindForPushData(data) === 'progress';
 }
 
+/**
+ * Relevance per spec "Presentation order": iOS shows the highest score in the
+ * Dynamic Island and orders the Lock Screen by it. Both producers use this.
+ */
+export const LIVE_ACTIVITY_RELEVANCE = {
+  sessionNeedsInput: 100,
+  aggregateNeedsInput: 80,
+  sessionActive: 60,
+  aggregate: 40,
+  sessionIdle: 20,
+} as const;
+
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {
   if (isAgentPushData(data)) {

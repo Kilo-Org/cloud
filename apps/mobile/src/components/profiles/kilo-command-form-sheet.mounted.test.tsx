@@ -8,6 +8,7 @@ import {
   type KiloCommandSaveFailure,
 } from '@/components/profiles/kilo-command-form-sheet';
 import { type KiloCommandSource } from '@/components/profiles/profile-kilo-commands-model';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -490,5 +491,46 @@ describe('KiloCommandFormSheet refetched command', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+describe('KiloCommandFormSheet cap refusal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('states the command cap as a warning when a create is refused at the limit', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'limit' } });
+
+    const message = i18n.t('profiles.slashCommands.limitReached', {
+      max: MAX_PROFILE_KILO_COMMANDS,
+    });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === message);
+
+    expect(status).toBeTruthy();
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('keeps the generic copy for a refusal that is not the cap', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'refused' } });
+
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+    );
+
+    expect(status).toBeTruthy();
+    expect(status?.props.className).toContain('text-destructive');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })
+    );
+
+    unmount();
   });
 });

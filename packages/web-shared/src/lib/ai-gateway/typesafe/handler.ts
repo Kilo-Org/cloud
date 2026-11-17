@@ -11,6 +11,7 @@ import {
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  dataCollectionPolicyRejection,
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
@@ -190,6 +191,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const requestPrivacy = getEffectiveProviderPrivacy(parsed.data.provider);
   const providerPolicy =
     preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
+
+  const dataCollectionRejected = await dataCollectionPolicyRejection(resolvedModel, providerPolicy);
+  if (dataCollectionRejected) return dataCollectionRejected;
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 

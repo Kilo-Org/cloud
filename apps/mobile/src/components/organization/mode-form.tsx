@@ -28,11 +28,15 @@ import { ModeOptionalFields } from '@/components/organization/mode-optional-fiel
 import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 const MODES_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/modes' as const;
+
+/** The form's fields in visual order, so a refused Save scrolls to the first one. */
+const FIELD_ORDER = ['name', 'slug', 'roleDefinition', 'editFileRegex'] as const;
 
 const ERROR_COPY_KEYS = {
   nameRequired: 'organization.modes.nameRequired',
@@ -93,6 +97,9 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   const [errors, setErrors] = useState<OrgModeFormErrors>({});
   const [derivedSlug, setDerivedSlug] = useState('');
   const [dirty, setDirty] = useState(false);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'name' | 'slug' | 'roleDefinition' | 'editFileRegex'
+  >();
   const guard = useMetadataLeaveGuard({ enabled: true });
   const { confirm, dialog } = useConfirmDialog();
 
@@ -125,11 +132,18 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   };
 
   const save = () => {
-    const next = orgModeFormSaveValues(currentValues(), mode === undefined ? 'create' : 'update');
+    // Slug strings, not the router output records: `orgModeFormSaveValues`
+    // takes just the slugs, so the form narrows before the call.
+    const next = orgModeFormSaveValues(
+      currentValues(),
+      mode === undefined ? 'create' : 'update',
+      existingModes.map(m => m.slug)
+    );
     const found = validateOrgModeForm(next, existingModes, mode?.id);
     setErrors(found);
-    const failed = Object.keys(found).length > 0;
-    if (failed) {
+    const firstInvalid = FIELD_ORDER.find(field => found[field] !== undefined);
+    if (firstInvalid !== undefined) {
+      scrollToField(firstInvalid);
       return;
     }
     const config = orgModeConfigInput(next, mode === undefined ? 'create' : 'update');
@@ -164,13 +178,14 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     <View className="flex-1 bg-background">
       <ScreenHeader title={mode === undefined ? t('organization.modes.create') : mode.name} />
       <TabScreenScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-5 px-6 pb-10 pt-4"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-1.5">
+        <View className="gap-1.5" onLayout={fieldLayout('name')}>
           <FormField
             label={t('organization.modes.nameLabel')}
             required
@@ -185,12 +200,17 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
                 setErrors(previous => ({ ...previous, name: undefined }));
               }
               if (mode === undefined && values.slug.length === 0) {
-                setDerivedSlug(modeSlugFromName(value));
+                setDerivedSlug(
+                  modeSlugFromName(
+                    value,
+                    existingModes.map(m => m.slug)
+                  )
+                );
               }
             }}
           />
         </View>
-        <View className="gap-1.5">
+        <View className="gap-1.5" onLayout={fieldLayout('slug')}>
           <FormField
             label={t('organization.modes.identifierLabel')}
             required
@@ -221,6 +241,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
           multiline
           textAlignVertical="top"
           className="min-h-28 leading-[1.25rem]"
+          containerOnLayout={fieldLayout('roleDefinition')}
           disabled={busy}
           error={errorFor('roleDefinition')}
           onChangeText={value => {
@@ -247,6 +268,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
           editFileRegex={values.editFileRegex}
           editRestrictionLabel={values.editRestrictionLabel}
           filePatternError={errorFor('editFileRegex')}
+          filePatternLayout={fieldLayout('editFileRegex')}
           disabled={busy}
           onToggleGroup={(group, checked) => {
             const next = checked

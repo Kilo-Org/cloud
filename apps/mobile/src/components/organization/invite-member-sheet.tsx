@@ -233,6 +233,7 @@ export function InviteMemberSheet() {
           textContentType="emailAddress"
           autoFocus
           validate={inviteEmailError}
+          alwaysReserve
           reserveErrorMessages={inviteEmailErrorMessages()}
           error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
           onChangeText={value => {

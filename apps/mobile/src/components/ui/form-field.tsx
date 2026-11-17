@@ -24,6 +24,14 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * form keeps the section rhythm of the screen it sits on, and the slot appears
      * once on focus instead of growing the form on every keystroke. */
     reserveErrorMessages?: readonly string[];
+    /**
+     * Keep `reserveErrorMessages` mounted from the first render instead of
+     * scoping it to the edited field. For a field whose error arrives without
+     * focus (an async verification result) or that opens focused inside a sheet
+     * (`autoFocus`), the late slot is the layout shift AGENTS.md forbids, so
+     * those callers reserve permanently and pay the idle line.
+     */
+    alwaysReserve?: boolean;
     disabled?: boolean;
     /**
      * Mark the field as required: the composed accessibility label appends
@@ -68,6 +76,7 @@ function FormField({
   labelAccessory,
   error,
   reserveErrorMessages,
+  alwaysReserve,
   disabled,
   required,
   containerOnLayout,
@@ -163,7 +172,7 @@ function FormField({
           className
         )}
       />
-      {reserveErrorMessages?.length && (editing || displayedError) ? (
+      {reserveErrorMessages?.length && (alwaysReserve || editing || displayedError) ? (
         <View>
           {/* Full-width overlapping copies reserve the maximum height in native layout,
               before validation, without measuring or clipping larger text/RTL copy. The

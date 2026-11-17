@@ -72,6 +72,17 @@ function slot(mounted: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestIn
   return mounted.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' });
 }
 
+/** Renders `FormField` with these props and asserts the mount took. */
+function mountField(props: React.ComponentProps<typeof FormField>): TestRenderer.ReactTestRenderer {
+  act(() => {
+    renderer = TestRenderer.create(createElement(FormField, props));
+  });
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
 describe('FormField reserved validation space', () => {
   it.each([
     ['English', en],
@@ -121,52 +132,49 @@ describe('FormField reserved validation space', () => {
   );
 
   it('preserves the unreserved behavior for other fields', () => {
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(FormField, {
-          label: i18n.t('login.emailAddress'),
-          error: i18n.t('login.pleaseEnterEmail'),
-        })
-      );
+    const mounted = mountField({
+      label: i18n.t('login.emailAddress'),
+      error: i18n.t('login.pleaseEnterEmail'),
     });
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
-    expect(slot(renderer)).toHaveLength(0);
-    expect(renderer.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
+    expect(slot(mounted)).toHaveLength(0);
+    expect(mounted.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
       i18n.t('login.pleaseEnterEmail')
     );
   });
 
+  it('reserves the slot from the first render when the caller opts out', () => {
+    const mounted = mountField({
+      label: i18n.t('login.emailAddress'),
+      reserveErrorMessages: [i18n.t('login.pleaseEnterEmail')],
+      alwaysReserve: true,
+    });
+    // The async-error and autoFocus flows shift layout when the slot mounts
+    // late, so those callers reserve permanently and pay the idle line.
+    expect(slot(mounted)).toHaveLength(1);
+  });
+
   it('reserves the slot only while the field is edited or in error', () => {
     const ownError = i18n.t('login.pleaseEnterEmail');
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(FormField, {
-          label: i18n.t('login.emailAddress'),
-          reserveErrorMessages: [ownError],
-          validate: (value: string) => (value === '' ? ownError : null),
-        })
-      );
+    const mounted = mountField({
+      label: i18n.t('login.emailAddress'),
+      reserveErrorMessages: [ownError],
+      validate: (value: string) => (value === '' ? ownError : null),
     });
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
-    const input = renderer.root.findByType('TextInput').props as {
+    const input = mounted.root.findByType('TextInput').props as {
       onBlur: (event: unknown) => void;
     };
 
     // An idle form keeps the section rhythm of the screen it sits on.
-    expect(slot(renderer)).toHaveLength(0);
+    expect(slot(mounted)).toHaveLength(0);
     // The slot opens on focus and stays while the field is edited.
-    focusInput(renderer);
-    expect(slot(renderer)).toHaveLength(1);
+    focusInput(mounted);
+    expect(slot(mounted)).toHaveLength(1);
     // After a blur that leaves an error showing, the slot stays with it.
     act(() => {
       input.onBlur({});
     });
-    expect(slot(renderer)).toHaveLength(1);
-    expect(renderer.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
+    expect(slot(mounted)).toHaveLength(1);
+    expect(mounted.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
       ownError
     );
   });

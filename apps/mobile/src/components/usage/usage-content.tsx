@@ -39,15 +39,17 @@ const METRIC_OPTIONS = [
 ] as const;
 
 /**
- * One tile of the totals grid: a value, its caption directly under it, and the
- * optional detail line. The caption comes before the detail so the two tiles
- * of a row keep one caption baseline when the detail wraps.
+ * One tile of the totals grid: a value, its caption directly under it, then the
+ * optional detail below the caption.
  *
- * The tile sizes to its own content: a wrapped detail grows only its own tile,
- * and the row partner stays centered inside the shared row height, so the
- * figures never ellipsize and no tile holds an empty reserved band. The
- * detail may be ellipsis-free over two lines in the long locales and one line
- * in the short ones. A larger font scale grows the tile with its text.
+ * The detail holds a two-line floor, never a cap, so a detail that needs more
+ * lines still grows the tile, and every locale whose detail fits two lines
+ * loads at one height that its loading skeleton matches.
+ *
+ * The tile sizes to its own content and its row partner stretches to the shared
+ * row height with `justify-center`, so the partner's value and caption are
+ * vertically centred, and the two captions of a row do not share one baseline
+ * once the detail wraps. A larger font scale grows the tile with its text.
  */
 function StatTile({
   label,
@@ -62,7 +64,11 @@ function StatTile({
     <View className="flex-1 justify-center gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
-      {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
+      {subtext !== undefined && (
+        <View className="min-h-[28px]">
+          <Text className="text-xs text-muted-foreground">{subtext}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -136,8 +142,8 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               <Skeleton className="h-[66px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[84px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[84px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />

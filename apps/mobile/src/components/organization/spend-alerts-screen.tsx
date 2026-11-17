@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { DENSE_ROW_H11_APPEND_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -668,7 +669,10 @@ function RuleCard({
 
       {children}
 
-      <View className="rounded-lg bg-secondary px-3 pb-[15px]">
+      {/* The pad matches the push row's bottom slop band exactly, so the
+          delivered reach stays inside the card (Android clips touches outside
+          a parent's bounds) without padding the row below the reach. */}
+      <View className="rounded-lg bg-secondary px-3 pb-[5.5px]">
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
@@ -686,11 +690,12 @@ function RuleCard({
             // The row keeps the group's density (`min-h-11`, 38.5 dp at the
             // native 14-point rem) and reaches the 44 dp design target through
             // the slop below it, not a taller row. The reach is asymmetric on
-            // purpose: the Email switch above fills its own row, so a top slop
-            // would shadow the bottom band of that 44 dp node, and the card's
-            // bottom padding (5.5 dp) keeps the reach inside the card, where
-            // Android delivers it.
-            hitSlop={{ top: 0, bottom: 5.5 }}
+            // purpose: the Email switch above fills its own row (44 dp, the
+            // shared Switch's own node), so a top slop would shadow the bottom
+            // band of that control, and the card's bottom padding — the same
+            // `DENSE_ROW_H11_TOUCH_SLOP_DP` the reach adds — keeps the whole
+            // band inside the card, where Android delivers it.
+            hitSlop={DENSE_ROW_H11_APPEND_HIT_SLOP}
             className="min-h-11 flex-row items-center justify-between active:opacity-70"
           >
             <Text className="text-sm text-muted-foreground">{t('notifications.push')}</Text>

@@ -13,6 +13,12 @@ import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import {
+  DENSE_ROW_H11_TOUCH_SLOP_DP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -200,6 +206,21 @@ function texts(renderer: ReactTestRenderer): string[] {
 
 function byType(renderer: ReactTestRenderer, nodeType: string): ReactTestInstance[] {
   return renderer.root.findAll(node => node.type === nodeType);
+}
+
+/** The nearest ancestor View node whose `className` passes `matches`. */
+function findAncestorViewNode(
+  node: ReactTestInstance,
+  matches: (view: ReactTestInstance) => boolean
+): ReactTestInstance | undefined {
+  let parent = node.parent;
+  while (parent) {
+    if (String(parent.type) === 'View' && matches(parent)) {
+      return parent;
+    }
+    parent = parent.parent;
+  }
+  return undefined;
 }
 
 function switchByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance | undefined {
@@ -737,5 +758,66 @@ describe('SpendAlertsScreen push agreement', () => {
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(byType(renderer, 'Pressable')).toHaveLength(2);
+  });
+
+  it('reaches the store touch target on the off-category push row without shadowing the email switch', async () => {
+    const { renderer } = await mountLoaded({ pushCategoryEnabled: false });
+
+    // With the category off, each rule card swaps its push switch for a
+    // Pressable aimed at Notifications — the only Pressables on the screen.
+    const rows = byType(renderer, 'Pressable');
+    expect(rows).toHaveLength(2);
+    const cards: ReactTestInstance[] = [];
+
+    for (const row of rows) {
+      // The reach joins the row on its bottom side only. A top slop would
+      // shadow the bottom band of the 44 dp Switch node in the row above, so
+      // that side stays at 0.
+      expect(row.props.hitSlop).toEqual({
+        top: 0,
+        bottom: DENSE_ROW_H11_TOUCH_SLOP_DP,
+        left: 0,
+        right: 0,
+      });
+
+      // Android clips touches outside a parent's bounds, so the card that
+      // wraps the row keeps the delivered reach inside itself: its compiled
+      // bottom padding must cover the row's bottom slop band.
+      const card = findAncestorViewNode(
+        row,
+        viewHolder =>
+          String(viewHolder.props.className).includes('rounded-lg bg-secondary') &&
+          String(viewHolder.props.className).includes('px-3')
+      );
+      if (!card) {
+        throw new Error('secondary card wrapping the push row not found');
+      }
+      cards.push(card);
+    }
+
+    // The audit reads the control's laid-out node and `hitSlop` never
+    // widens it, so assert the box the installed Tailwind and react-native-css
+    // compilers emit for the classes, not a hand-written utility map.
+    // The `toEqual` above already pins the slop shape, so the reach arithmetic
+    // reads its fields through this typed binding.
+    const compiled = await Promise.all(
+      rows.map(row =>
+        compiledLengthDp(row.props.className as string, 'minHeight').then(frame => ({
+          row,
+          frame,
+        }))
+      )
+    );
+    for (const { row, frame } of compiled) {
+      const slop = row.props.hitSlop as { top: number; bottom: number };
+      expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(frame + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
+
+    expect(
+      await Promise.all(
+        cards.map(card => compiledLengthDp(card.props.className as string, 'paddingBottom'))
+      )
+    ).toEqual(expect.arrayContaining([DENSE_ROW_H11_TOUCH_SLOP_DP, DENSE_ROW_H11_TOUCH_SLOP_DP]));
   });
 });

@@ -110,8 +110,11 @@ describe('TriggerDetailScreen target type', () => {
   it('sends the header Back control to the scoped triggers list', async () => {
     const root = await mount({ triggerId: 'x', organizationId: 'org-1' });
 
+    const header = root.findByProps({ title: 'x' }).props as {
+      onBack: () => void;
+    };
     act(() => {
-      root.findByProps({ title: 'x' }).props.onBack();
+      header.onBack();
     });
 
     expect(dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/triggers?org=org-1');

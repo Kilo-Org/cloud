@@ -9,7 +9,7 @@
 
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useRouter, type Href } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';

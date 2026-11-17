@@ -240,6 +240,10 @@ test('runMotion presses through the probe on iOS and reports the interaction shi
     result.findings.every(finding => finding.cell === 'motion' && finding.target === 'chat')
   );
   assert.equal(result.reliable, true);
+  // The fixture stamps its second state 360 ms after the first, and the first
+  // state covers three ticks, so the samples report a 120 ms spacing. The
+  // findings are timed with that measurement, never with the constant.
+  assert.equal(result.intervalMs, 120);
   assert.ok(fs.existsSync(path.join(ctx.out, 'motion.json')));
 });
 

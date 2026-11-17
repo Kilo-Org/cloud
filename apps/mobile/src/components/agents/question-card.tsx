@@ -1,6 +1,13 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, type TextInput, type TextInstance, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  type TextInput,
+  type TextInstance,
+  type TextStyle,
+  View,
+} from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { impactHaptic } from '@/lib/haptics';
@@ -36,6 +43,17 @@ import {
   typeMultiCustom,
   typeSingleCustom,
 } from './question-card-answer';
+
+/**
+ * Start alignment for an option's stacked label and description. `Button`
+ * publishes a centred label through its text class context, so a description
+ * that wraps would centre every line under a title that starts at the column
+ * edge. `auto` leaves the lines to the paragraph direction the shared Text
+ * already names, which is the start edge in either interface direction, and it
+ * has to be a style: the class from that context would otherwise win, and this
+ * build drops the logical `text-start` utility.
+ */
+const OPTION_TEXT_ALIGN = { textAlign: 'auto' } as const satisfies TextStyle;
 
 // Types matching the SDK's QuestionState structure
 type QuestionOption = {
@@ -323,6 +341,7 @@ export function QuestionCard({
                               'text-sm',
                               isSelected ? 'text-primary-foreground' : 'text-foreground'
                             )}
+                            style={OPTION_TEXT_ALIGN}
                           >
                             {option.label}
                           </Text>
@@ -334,6 +353,7 @@ export function QuestionCard({
                                   ? 'text-primary-foreground opacity-70'
                                   : 'text-muted-foreground'
                               )}
+                              style={OPTION_TEXT_ALIGN}
                             >
                               {option.description}
                             </Text>

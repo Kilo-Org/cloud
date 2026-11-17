@@ -17,6 +17,7 @@ import {
   TELEMETRY_DESCRIPTION_KEY,
   type TelemetryDescription,
 } from '@/lib/telemetry/error-sink';
+import { isTransportFailure } from '@/lib/telemetry/network-errors';
 import { fingerprintMessage } from '@/lib/telemetry/sentry-scrub';
 
 type AppErrorSource = 'query' | 'mutation';
@@ -77,19 +78,23 @@ function isNetworkLayerError(error: unknown): boolean {
   if (error instanceof CancelledError) {
     return true;
   }
+  if (isTransportFailure(error)) {
+    return true;
+  }
   return hasErrorName(error, REQUEST_DEADLINE_ERROR_NAME);
 }
 
 /**
  * True when the error is already reported by the network layer: a tRPC client
  * error (by name, or any error carrying a tRPC `code` envelope), a react-query
- * `CancelledError`, or a request-deadline timeout. The tRPC links or the fetch
- * wrapper own these (a timeout is a breadcrumb there, not an event), so
- * reporting them again would duplicate issues. A non-tRPC error that merely
- * carries a top-level `code` is not skipped — that would drop unrelated app
- * errors. An error whose `cause` is one of these is skipped too: a hook that
- * maps a server error onto user-facing copy keeps the server error as `cause`,
- * and the network layer owns it.
+ * `CancelledError`, a request-deadline timeout, or a rejection the fetch wrapper
+ * recorded as a transport failure and marked. The tRPC links or the fetch
+ * wrapper own these (a timeout and a transport failure are breadcrumbs there,
+ * not events), so reporting them again would duplicate issues. A non-tRPC error
+ * that merely carries a top-level `code` is not skipped — that would drop
+ * unrelated app errors. An error whose `cause` is one of these is skipped too: a
+ * hook that maps a server error onto user-facing copy keeps the server error as
+ * `cause`, and the network layer owns it.
  */
 export function isAlreadyReportedNetworkError(error: unknown): boolean {
   try {

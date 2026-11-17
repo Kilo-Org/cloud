@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   internalDispatchRequestSchema,
   internalDispatchSpendAlertRequestSchema,
+  perRecipientResultSchema,
   refreshGlanceableSessionsInputSchema,
   sendCloudAgentSessionNotificationInputSchema,
 } from './rpc-schemas';
@@ -187,5 +188,17 @@ describe('refreshGlanceableSessionsInputSchema', () => {
       refreshGlanceableSessionsInputSchema.parse({ userId: 'usr_1', cliSessionIds: ['ses_1'] })
         .approvalChangedSessionIds
     ).toBeUndefined();
+  });
+});
+
+describe('perRecipientResultSchema', () => {
+  const result = { userId: 'user-1', outcome: 'delivered' } as const;
+
+  it('accepts a result for a recipient id', () => {
+    expect(perRecipientResultSchema.parse(result)).toEqual(result);
+  });
+
+  it('rejects an empty recipient id two recipients would collapse onto', () => {
+    expect(perRecipientResultSchema.safeParse({ ...result, userId: '' }).success).toBe(false);
   });
 });

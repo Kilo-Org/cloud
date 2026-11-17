@@ -1,5 +1,6 @@
 import { FileText } from '@/components/ui/icons';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { type Href } from 'expo-router';
 import { type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -63,6 +64,8 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /** Where the header's Back lands when the list opens with no history to pop. */
+  backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
   query: InvoiceListQuery;
   entries: readonly Invoice[];
@@ -78,6 +81,7 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  backFallback,
   query,
   entries,
   hasMore,
@@ -214,7 +218,7 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} backFallback={backFallback} />
       {body}
     </View>
   );

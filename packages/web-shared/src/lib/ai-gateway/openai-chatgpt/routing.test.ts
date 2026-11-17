@@ -28,6 +28,10 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  logExceptInTest: jest.fn(),
+}));
 // `upstreamRequest` schedules its timeout-listener cleanup through `next/server`'s
 // `after()` post-response hook, which only works in a request context.
 jest.mock('next/server', () => ({
@@ -38,6 +42,7 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
@@ -116,8 +121,8 @@ function routingInput(
   };
 }
 
-async function buildProviderForTest() {
-  const result = await checkOpenAiChatGptByok(routingInput());
+async function buildProviderForTest(requestedModel = REQUESTED_MODEL) {
+  const result = await checkOpenAiChatGptByok(routingInput({ requestedModel }));
   if (result?.kind !== 'provider') {
     throw new Error('expected an openai-chatgpt provider');
   }
@@ -145,6 +150,7 @@ async function transformResponsesRequest(
 }
 
 beforeEach(() => {
+  jest.mocked(logExceptInTest).mockClear();
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest
     .mocked(getOpenAiChatGptStoredConnection)
@@ -526,6 +532,107 @@ describe('checkOpenAiChatGptByok', () => {
     expect('top_p' in body).toBe(false);
   });
 
+  it.each([
+    { label: 'omitted', strictField: {} },
+    { label: 'undefined', strictField: { strict: undefined } },
+  ])('defaults $label function-tool strict without rewriting schemas', async ({ strictField }) => {
+    const provider = await buildProviderForTest();
+    const parameters = {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'integer', default: 10 },
+        labels: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+      required: ['query'],
+    };
+    const text: GatewayResponsesRequest['text'] = {
+      format: { type: 'json_schema', name: 'result', schema: { type: 'object' } },
+    };
+    const originalParameters = structuredClone(parameters);
+    const originalText = structuredClone(text);
+    const tool = { type: 'function' as const, name: 'search', parameters, strict: false };
+    // Incoming JSON can omit strict even though the SDK's function-tool type requires it.
+    Reflect.deleteProperty(tool, 'strict');
+    Object.assign(tool, strictField);
+    const body: GatewayResponsesRequest = {
+      model: REQUESTED_MODEL,
+      input: 'hello',
+      tools: [tool],
+      parallel_tool_calls: true,
+      text,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual([
+      { type: 'function', name: 'search', parameters: originalParameters, strict: false },
+    ]);
+    expect(body.parallel_tool_calls).toBe(true);
+    expect(body.text).toEqual(originalText);
+  });
+
+  it.each([true, false, null])('preserves explicit function-tool strict %p', async strict => {
+    const provider = await buildProviderForTest();
+    const tools: GatewayResponsesRequest['tools'] = [
+      { type: 'function', name: 'search', parameters: { type: 'object' }, strict },
+    ];
+    const originalTools = structuredClone(tools);
+    const body: GatewayResponsesRequest = { model: REQUESTED_MODEL, input: 'hello', tools };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual(originalTools);
+  });
+
+  it('leaves hosted and custom tools untouched', async () => {
+    const provider = await buildProviderForTest();
+    const tools: GatewayResponsesRequest['tools'] = [
+      { type: 'web_search' },
+      { type: 'custom', name: 'emit_text', format: { type: 'text' } },
+    ];
+    const originalTools = structuredClone(tools);
+    const body: GatewayResponsesRequest = { model: REQUESTED_MODEL, input: 'hello', tools };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.tools).toEqual(originalTools);
+  });
+
+  it.each([null, {}, [null]])(
+    'leaves malformed tool definitions %p for upstream validation',
+    async tools => {
+      const provider = await buildProviderForTest();
+      const body = JSON.parse(
+        JSON.stringify({ model: REQUESTED_MODEL, input: 'hello', tools })
+      ) as GatewayResponsesRequest;
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.tools).toEqual(tools);
+    }
+  );
+
+  it.each([true, false, undefined])(
+    'leaves absent tools and parallel_tool_calls %p unchanged',
+    async parallelToolCalls => {
+      const provider = await buildProviderForTest();
+      const body: GatewayResponsesRequest = {
+        model: REQUESTED_MODEL,
+        input: 'hello',
+        ...(parallelToolCalls === undefined ? {} : { parallel_tool_calls: parallelToolCalls }),
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body).not.toHaveProperty('tools');
+      expect(body.parallel_tool_calls).toBe(parallelToolCalls);
+      if (parallelToolCalls === undefined) {
+        expect(body).not.toHaveProperty('parallel_tool_calls');
+      }
+    }
+  );
+
   it('keeps only the reasoning fields OpenAI accepts', async () => {
     const provider = await buildProviderForTest();
     const body: GatewayResponsesRequest = {
@@ -704,10 +811,18 @@ describe('checkOpenAiChatGptByok', () => {
 
   it('sends the partner key as Authorization and the delegated token upstream', async () => {
     const provider = await buildProviderForTest();
+    const tool = {
+      type: 'function' as const,
+      name: 'search',
+      parameters: { type: 'object' },
+      strict: false,
+    };
+    Reflect.deleteProperty(tool, 'strict');
     const body: GatewayResponsesRequest = {
       model: 'openai/gpt-5-nano',
       input: 'hello',
       provider: { only: ['openai'] },
+      tools: [tool],
     };
     const extraHeaders = await transformResponsesRequest(provider, body);
 
@@ -731,8 +846,12 @@ describe('checkOpenAiChatGptByok', () => {
     const headers = init.headers as Headers;
     expect(headers.get('Authorization')).toBe(`Bearer ${PARTNER_KEY}`);
     expect(headers.get(OPENAI_ON_BEHALF_OF_TOKEN_HEADER)).toBe(DELEGATED_TOKEN);
+    const outgoingBody = JSON.parse(init.body as string);
+    expect(outgoingBody.tools).toEqual([
+      { type: 'function', name: 'search', parameters: { type: 'object' }, strict: false },
+    ]);
     // api.openai.com rejects the gateway-only routing object.
-    expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
+    expect(outgoingBody).not.toHaveProperty('provider');
   });
 
   it('resolves the organization credential for an organization request', async () => {
@@ -785,6 +904,291 @@ describe('checkOpenAiChatGptByok', () => {
   it('returns no provider for an anonymous caller', async () => {
     await expect(checkOpenAiChatGptByok(routingInput({ userId: null }))).resolves.toBeNull();
     expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('delegated request normalization', () => {
+  async function normalize(fields: Record<string, unknown>) {
+    const provider = await buildProviderForTest(
+      typeof fields.model === 'string' ? fields.model : REQUESTED_MODEL
+    );
+    const body = { model: REQUESTED_MODEL, input: 'hello', ...fields } as GatewayResponsesRequest;
+    await transformResponsesRequest(provider, body);
+    return body;
+  }
+
+  it('does not transform another API kind', async () => {
+    const provider = await buildProviderForTest();
+    const request = chatCompletionsRequest(REQUESTED_MODEL);
+    const original = structuredClone(request);
+    const extraHeaders = {};
+
+    await provider.transformRequest({
+      provider,
+      model: REQUESTED_MODEL,
+      request,
+      extraHeaders,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userByok: null,
+      kilo_user_id: USER_ID,
+      organization_id: null,
+      session_id: null,
+    });
+
+    expect(request).toEqual(original);
+    expect(extraHeaders).toEqual({});
+    expect(logExceptInTest).not.toHaveBeenCalled();
+  });
+
+  it('removes only stream_options.include_usage', async () => {
+    const body = await normalize({
+      stream_options: { include_usage: true, include_obfuscation: false, future_option: true },
+    });
+
+    expect(body.stream_options).toEqual({ include_obfuscation: false, future_option: true });
+  });
+
+  it.each([true, false])(
+    'removes stream_options when include_usage=%s was its only key',
+    async includeUsage => {
+      const body = await normalize({ stream_options: { include_usage: includeUsage } });
+
+      expect(body).not.toHaveProperty('stream_options');
+    }
+  );
+
+  it.each([undefined, null, {}, { include_obfuscation: true }])(
+    'preserves stream_options without include_usage: %p',
+    async streamOptions => {
+      const body = await normalize({ stream_options: streamOptions });
+
+      expect(body.stream_options).toEqual(streamOptions);
+    }
+  );
+
+  it('maps ultra effort to the documented gpt-6.1-sol maximum and preserves other reasoning fields', async () => {
+    const body = await normalize({
+      model: 'openai/gpt-6.1-sol',
+      reasoning: { effort: 'ultra', summary: 'auto' },
+    });
+
+    expect(body.reasoning).toEqual({ effort: 'max', summary: 'auto' });
+  });
+
+  it.each(['openai/gpt-5-nano', 'openai/future-model'])(
+    'does not invent an ultra replacement for %s',
+    async model => {
+      const body = await normalize({ model, reasoning: { effort: 'ultra', summary: 'auto' } });
+
+      expect(body.reasoning).toEqual({ summary: 'auto' });
+    }
+  );
+
+  it('normalizes a promoted ultra update before sending it upstream', async () => {
+    const message = { role: 'user', content: 'Continue.' };
+    const body = await normalize({
+      model: 'openai/gpt-6.1-sol',
+      input: [{ type: 'configuration_update', reasoning: { effort: 'ultra' } }, message],
+      reasoning: { effort: 'medium', summary: 'auto' },
+    });
+
+    expect(body.reasoning).toEqual({ effort: 'max', summary: 'auto' });
+    expect(body.input).toEqual([message]);
+  });
+
+  it.each(['unknown', '', null, 42, {}, false])('drops unknown effort %p only', async effort => {
+    const body = await normalize({ reasoning: { effort, summary: 'auto' } });
+
+    expect(body.reasoning).toEqual({ summary: 'auto' });
+  });
+
+  it.each(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])(
+    'preserves valid effort %s',
+    async effort => {
+      const body = await normalize({ reasoning: { effort, summary: 'auto' } });
+
+      expect(body.reasoning).toEqual({ effort, summary: 'auto' });
+    }
+  );
+
+  it('does not add an absent effort', async () => {
+    const body = await normalize({ reasoning: { summary: 'auto' } });
+
+    expect(body.reasoning).toEqual({ summary: 'auto' });
+  });
+
+  it('preserves string input and string items without reordering or dropping items', async () => {
+    expect((await normalize({ input: 'unchanged' })).input).toBe('unchanged');
+    const input = ['unchanged', { type: 'future_item', content: 'private content' }, null, 42];
+
+    expect((await normalize({ input })).input).toEqual(input);
+  });
+
+  it.each([
+    { item: { type: 'reasoning', encrypted_content: 'opaque' }, added: true },
+    { item: { type: 'reasoning', encrypted_content: '' }, added: true },
+    { item: { type: 'reasoning' }, added: false },
+    { item: { type: 'reasoning', encrypted_content: 'opaque', summary: [] }, added: false },
+    { item: { type: 'reasoning', encrypted_content: 'opaque', summary: null }, added: false },
+    {
+      item: {
+        type: 'reasoning',
+        encrypted_content: 'opaque',
+        summary: [{ type: 'summary_text', text: 'private' }],
+      },
+      added: false,
+    },
+    { item: { type: 'message', encrypted_content: 'opaque' }, added: false },
+  ])('adds summary only for encrypted reasoning without summary: %j', async ({ item, added }) => {
+    const original = structuredClone(item);
+    const body = await normalize({ input: [item] });
+
+    expect(body.input).toEqual([added ? { ...original, summary: [] } : original]);
+  });
+
+  const namespace = (name: string, toolName = 'read', toolType = 'function') => ({
+    type: 'namespace',
+    name,
+    tools: [{ type: toolType, name: toolName, parameters: {}, strict: false }],
+  });
+
+  it.each([
+    ['function_call', 'function'],
+    ['custom_tool_call', 'custom'],
+  ])('adds the only matching namespace for %s', async (type, toolType) => {
+    const body = await normalize({
+      input: [{ type, name: 'read', call_id: 'short' }],
+      tools: [namespace('files', 'read', toolType), namespace('other', 'write', toolType)],
+    });
+
+    expect(body.input).toEqual([{ type, name: 'read', call_id: 'short', namespace: 'files' }]);
+  });
+
+  it.each([
+    ['function_call', 'custom'],
+    ['custom_tool_call', 'function'],
+  ])('does not match %s to a nested %s tool', async (type, toolType) => {
+    const input = [{ type, name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+
+    expect(
+      (await normalize({ input, tools: [namespace('files', 'read', toolType)] })).input
+    ).toEqual(original);
+  });
+
+  it.each([
+    ['function_call', 'function'],
+    ['custom_tool_call', 'custom'],
+  ])('does not namespace %s when a same-named top-level tool exists', async (type, toolType) => {
+    const input = [{ type, name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files', 'read', toolType), { type: toolType, name: 'read' }];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('ignores namespaces containing only a different tool type', async () => {
+    const body = await normalize({
+      input: [{ type: 'function_call', name: 'read', call_id: 'short' }],
+      tools: [namespace('files'), namespace('custom', 'read', 'custom')],
+    });
+
+    expect(body.input).toEqual([
+      { type: 'function_call', name: 'read', call_id: 'short', namespace: 'files' },
+    ]);
+  });
+
+  it.each([
+    undefined,
+    [],
+    [namespace('files', 'write')],
+    [namespace('files'), namespace('other')],
+    [{ type: 'function', name: 'read', parameters: {}, strict: false }],
+    [null, { type: 'namespace', name: 'files', tools: null }],
+  ])('does not guess a namespace from %j', async tools => {
+    const input = [{ type: 'function_call', name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('preserves explicit namespaces and does not namespace output items', async () => {
+    const input = [
+      { type: 'function_call', name: 'read', namespace: 'explicit' },
+      { type: 'custom_tool_call', name: 'read', namespace: 'explicit' },
+      { type: 'function_call_output', name: 'read' },
+      { type: 'custom_tool_call_output', name: 'read' },
+    ];
+    const original = structuredClone(input);
+
+    expect((await normalize({ input, tools: [namespace('files')] })).input).toEqual(original);
+  });
+
+  it('is deterministic and leaves a normalized body unchanged on its second pass', async () => {
+    const fields = {
+      model: 'openai/gpt-6.1-sol',
+      stream_options: { include_usage: true, include_obfuscation: false },
+      reasoning: { effort: 'ultra', summary: 'auto' },
+      input: [
+        'unchanged',
+        { type: 'reasoning', encrypted_content: 'opaque' },
+        { type: 'function_call', name: 'read', call_id: 'call_1', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'private output' },
+      ],
+      tools: [namespace('files')],
+    };
+    const body = await normalize(structuredClone(fields));
+    const firstPass = JSON.stringify(body);
+    expect(JSON.stringify(await normalize(structuredClone(fields)))).toBe(firstPass);
+    jest.mocked(logExceptInTest).mockClear();
+
+    await transformResponsesRequest(await buildProviderForTest('openai/gpt-6.1-sol'), body);
+
+    expect(JSON.stringify(body)).toBe(firstPass);
+    expect(logExceptInTest).not.toHaveBeenCalled();
+  });
+
+  it('logs one structured line with model and normalization names only', async () => {
+    await normalize({
+      model: 'openai/gpt-6.1-sol',
+      input: [
+        { type: 'reasoning', encrypted_content: 'private encrypted content' },
+        {
+          type: 'function_call',
+          name: 'read',
+          call_id: 'private-id',
+          arguments: 'private arguments',
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'private-id',
+          output: 'private output',
+        },
+      ],
+      tools: [namespace('files')],
+      reasoning: { effort: 'ultra' },
+      stream_options: { include_usage: true },
+    });
+
+    expect(logExceptInTest).toHaveBeenCalledTimes(1);
+    expect(logExceptInTest).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'openai_chatgpt_request_normalized',
+        model: 'gpt-6.1-sol',
+        normalizations: [
+          'model_prefix_removed',
+          'store_disabled',
+          'stream_options_include_usage_removed',
+          'reasoning_summary_added',
+          'tool_namespace_added',
+          'reasoning_effort_ultra_to_max',
+          'traceability_metadata_added',
+        ],
+      })
+    );
+    expect(JSON.stringify(jest.mocked(logExceptInTest).mock.calls)).not.toMatch(
+      /private|partner-project-key|delegated-access-token/
+    );
   });
 });
 

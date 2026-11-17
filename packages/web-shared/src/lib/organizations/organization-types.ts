@@ -6,7 +6,7 @@ import {
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
-import { CompanyDomainSchema, isValidDomain } from './company-domain';
+import { CompanyDomainSchema, normalizeSsoDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -428,8 +428,11 @@ export type OpenRouterProvidersResponse = z.infer<typeof OpenRouterProvidersResp
 export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
 export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSchema>;
 
-export const OrganizationSSODomainSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
+export const OrganizationSSODomainSchema = z.string().transform((input, ctx) => {
+  const normalized = normalizeSsoDomain(input);
+  if (normalized === null) {
+    ctx.addIssue({ code: 'custom', message: 'Please enter a valid domain (e.g. acme.com)' });
+    return z.NEVER;
+  }
+  return normalized;
+});

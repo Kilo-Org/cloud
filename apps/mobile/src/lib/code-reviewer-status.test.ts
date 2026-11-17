@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  canConnectAnyProvider,
   classifyConfigBody,
   classifyPermission,
   classifyProviderErrorCode,
@@ -138,6 +139,20 @@ describe('classifyProviderState', () => {
   });
 });
 
+describe('canConnectAnyProvider', () => {
+  it('is true for an owner/admin, who can connect GitHub', () => {
+    expect(canConnectAnyProvider({ canEdit: true, canManage: true })).toBe(true);
+  });
+
+  it('is true for a billing manager, who can connect GitLab', () => {
+    expect(canConnectAnyProvider({ canEdit: true, canManage: false })).toBe(true);
+  });
+
+  it('is false for a plain member, who can connect neither platform', () => {
+    expect(canConnectAnyProvider({ canEdit: false, canManage: false })).toBe(false);
+  });
+});
+
 describe('classifyConfigBody', () => {
   const base = {
     hasData: false,
@@ -215,6 +230,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: true,
         isFetching: true,
+        hasData: true,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -228,6 +244,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: false,
         isFetching: true,
+        hasData: true,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -241,6 +258,7 @@ describe('classifyPermission', () => {
       isLoading: false,
       isError: true,
       isFetching: false,
+      hasData: true,
       role: undefined,
       refetch,
     });
@@ -259,6 +277,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -274,6 +293,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -286,6 +306,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -293,25 +314,15 @@ describe('classifyPermission', () => {
     }
   });
 
-  it('denies edit for member role or an unresolved org', () => {
+  it('denies edit for a member role', () => {
     expect(
       classifyPermission({
         isPersonal: false,
         isLoading: false,
         isError: false,
         isFetching: false,
+        hasData: true,
         role: 'member',
-        refetch: vi.fn<() => void>(),
-      })
-    ).toEqual({ status: 'ready', canEdit: false, canManage: false });
-
-    expect(
-      classifyPermission({
-        isPersonal: false,
-        isLoading: false,
-        isError: false,
-        isFetching: false,
-        role: undefined,
         refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'ready', canEdit: false, canManage: false });

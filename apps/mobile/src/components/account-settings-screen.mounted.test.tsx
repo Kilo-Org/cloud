@@ -24,6 +24,11 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// The picker rows push through the guarded hook; the plain rows keep `useRouter`,
+// so both resolve to the same spy and the assertions observe one call each.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',

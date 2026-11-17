@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -47,6 +46,13 @@ export function createSecureStorePreference<T>(options: {
    * one frame would both start from the value before the first one.
    */
   let inFlight: T | undefined = undefined;
+  /**
+   * The target of the persist-then-apply write while it is on disk's way,
+   * visible only to `hasPendingWrite`: readers of `getRequested()` must keep
+   * seeing the last durable value, so a caller like the push-token locale
+   * registration is not told about a language the write may still reject.
+   */
+  let asyncWriteTarget: T | undefined = undefined;
   let writing = false;
   let hasLoaded = false;
   let loadSettled = false;
@@ -204,16 +210,12 @@ export function createSecureStorePreference<T>(options: {
         requested = value;
         void drainWrites();
       }
-    } catch (error) {
+    } catch {
       // Keep the default on read failure — this runs on mount, before the
       // user has done anything, so there's nothing actionable to tell them.
-      // Just log so we can see failure rates.
-      Sentry.captureException(error, {
-        tags: {
-          'error.subsystem': 'preferences',
-          'error.operation': 'load_secure_store',
-        },
-      });
+      // The SecureStore read path already reports the rejection once (a
+      // warning event for a real failure, a breadcrumb for a locked device's
+      // refusal), so a second record here would only duplicate it.
     } finally {
       loadSettled = true;
       hasLoaded = true;
@@ -274,6 +276,24 @@ export function createSecureStorePreference<T>(options: {
     /** Resolves once every requested value has been written or dropped. */
     whenPersisted,
     /**
+     * Whether a choice is queued or on its way to disk. The language follow
+     * reads this to admit a device change only when no manual pick is
+     * in flight: a pick applies in memory before its write lands, so
+     * `getRequested()` alone misses the window where a pick has changed
+     * the active language but the preference still reads the old one. The
+     * persist-then-apply write is surfaced through its own flag here, which
+     * leaves `getRequested()` semantics unchanged for every other reader.
+     */
+    hasPendingWrite: () =>
+      requested !== undefined || inFlight !== undefined || asyncWriteTarget !== undefined,
+    /**
+     * The choice whose persist-then-apply write is on disk's way, or undefined.
+     * The language follow's restore reads this: `getRequested()` deliberately
+     * keeps reporting the durable value while the write runs, so the only place
+     * the still-unpersisted pick lives is here.
+     */
+    getPendingWriteTarget: (): T | undefined => asyncWriteTarget,
+    /**
      * Persist-then-apply write for callers that must not change memory on a
      * failed disk write (e.g. language apply). Writes disk first; on success
      * updates memory and emits, returning true. On failure shows the existing
@@ -291,6 +311,12 @@ export function createSecureStorePreference<T>(options: {
       // choice belongs to the account that just left: it must not land on disk
       // (when it has not started yet) and must not repaint memory afterwards.
       const epoch = clearEpoch;
+      // The write is the pick's whole file: the target is visible to a racing
+      // reader (the device-language follow) from the moment the write is
+      // asked, not only once it reaches the disk helper. `drainWrites` sets
+      // the same in-flight field for a queued `set()` write. A failed write
+      // keeps the memory value — the caller rolls its own apply back.
+      asyncWriteTarget = next;
       await whenPersisted();
       if (epoch !== clearEpoch) {
         return false;
@@ -302,10 +328,16 @@ export function createSecureStorePreference<T>(options: {
         // reset already explains why the value is gone.
         if (epoch === clearEpoch) {
           toast.error(
-            i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined)
+            toastLng
+              ? i18n.t('common.couldNotSaveSetting', { lng: toastLng })
+              : i18n.t('common.couldNotSaveSetting')
           );
         }
         return false;
+      } finally {
+        if (asyncWriteTarget === next) {
+          asyncWriteTarget = undefined;
+        }
       }
       if (epoch !== clearEpoch) {
         return false;
@@ -324,6 +356,7 @@ export function createSecureStorePreference<T>(options: {
       clearEpoch += 1;
       requested = undefined;
       inFlight = undefined;
+      asyncWriteTarget = undefined;
       value = defaultValue;
       // Keep dirty set so an in-flight initial read does not restore the old
       // value after sign-out.

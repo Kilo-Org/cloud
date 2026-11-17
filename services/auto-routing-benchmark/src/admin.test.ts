@@ -29,20 +29,13 @@ import {
 const TEST_CONFIG: BenchmarkConfig = {
   router: 'efficient',
   accuracyNoiseBand: 0.05,
-  frontierMinAccuracyDelta: 0,
   classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
   deciderModels: [{ id: 'google/gemini-2.5-flash-lite' }, { id: 'anthropic/claude-sonnet-4.6' }],
   minAccuracy: 0.7,
-  switchCostFactor: 3,
-  bestAccuracySwitchThreshold: 0.05,
   productionTokenProfile: null,
   switchHorizonTurns: null,
-  lowConfidenceThreshold: null,
   benchmarkUserId: null,
   benchmarkOrgId: null,
-  classifierRepetitions: 1,
-  deciderRepetitions: 1,
-  classifierMaxP95LatencyMs: 1000,
   updatedAt: null,
   updatedBy: null,
 };
@@ -55,8 +48,8 @@ const TEST_CONFIG_ROWS = {
     accuracy_noise_band: 0.05,
     frontier_min_accuracy_delta: 0,
     min_accuracy: TEST_CONFIG.minAccuracy,
-    switch_cost_factor: TEST_CONFIG.switchCostFactor,
-    best_accuracy_switch_threshold: TEST_CONFIG.bestAccuracySwitchThreshold,
+    switch_cost_factor: 3,
+    best_accuracy_switch_threshold: 0.05,
     production_token_profile: null,
     switch_horizon_turns: null,
     low_confidence_threshold: null,
@@ -64,9 +57,9 @@ const TEST_CONFIG_ROWS = {
     user_max_concurrency: 40,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
-    classifier_repetitions: TEST_CONFIG.classifierRepetitions,
-    decider_repetitions: TEST_CONFIG.deciderRepetitions,
-    classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
+    classifier_repetitions: 1,
+    decider_repetitions: 1,
+    classifier_max_p95_latency_ms: 1000,
     policy_overrides: null,
     policy_computed: null,
     updated_at: '2026-06-01T00:00:00.000Z',
@@ -439,7 +432,7 @@ describe('GET /admin/config', () => {
         id: 1,
         router: 'efficient',
         accuracy_noise_band: TEST_CONFIG.accuracyNoiseBand,
-        frontier_min_accuracy_delta: TEST_CONFIG.frontierMinAccuracyDelta,
+        frontier_min_accuracy_delta: 0,
         min_accuracy: 0.9,
         switch_cost_factor: 3,
         best_accuracy_switch_threshold: 0.05,
@@ -483,6 +476,37 @@ describe('GET /admin/config', () => {
       kind: 'fixed',
       effective: 3,
       reason: expect.any(String),
+    });
+  });
+
+  it('keeps the previous release’s admin config fields on the resolved policy values', async () => {
+    // The stored legacy columns are stale; the previous web release still
+    // requires the fields, so they must carry the canonical policy value.
+    vi.mocked(getConfigRows).mockResolvedValueOnce({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        frontier_min_accuracy_delta: 0.4,
+        switch_cost_factor: 50,
+        best_accuracy_switch_threshold: 9,
+        low_confidence_threshold: 0.8,
+        classifier_repetitions: 3,
+        decider_repetitions: 5,
+        classifier_max_p95_latency_ms: 1000,
+      },
+    });
+
+    const res = await authedGet('/admin/config');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
     });
   });
 
@@ -571,7 +595,6 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
-      lowConfidenceThreshold: 0.8,
       deciderModels: [{ id: 'configured/model' }],
       updatedAt: null,
       updatedBy: null,
@@ -585,26 +608,111 @@ describe('PUT /admin/config', () => {
     const body = (await res.json()) as {
       config: {
         minAccuracy: number;
-        lowConfidenceThreshold: number | null;
         updatedBy: string | null;
         updatedAt: string | null;
       };
     };
     expect(body.config.minAccuracy).toBe(0.85);
-    expect(body.config.lowConfidenceThreshold).toBe(0.8);
     expect(body.config.updatedBy).toBe('igor@kilocode.ai');
     expect(typeof body.config.updatedAt).toBe('string');
 
     expect(replaceConfig).toHaveBeenCalledOnce();
     const [, configArg, , deciderModelRows, router] = vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
-    expect(configArg.low_confidence_threshold).toBe(0.8);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
     expect(deciderModelRows).toEqual([
       { model: 'configured/model', variant: null, reasoning_effort: null },
     ]);
     expect(router).toBe('efficient');
+  });
+
+  it('keeps the previous release’s admin config fields on the resolved policy values', async () => {
+    // The stored legacy columns are stale; the previous web release still
+    // requires the fields, so they must carry the canonical policy value.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        frontier_min_accuracy_delta: 0.4,
+        switch_cost_factor: 50,
+        best_accuracy_switch_threshold: 9,
+        low_confidence_threshold: 0.8,
+        classifier_repetitions: 3,
+        decider_repetitions: 5,
+        classifier_max_p95_latency_ms: 1000,
+      },
+    });
+
+    const res = await authedPut('/admin/config', {
+      ...TEST_CONFIG,
+      minAccuracy: 0.85,
+      frontierMinAccuracyDelta: 0.4,
+      switchCostFactor: 50,
+      deciderRepetitions: 2,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      minAccuracy: 0.85,
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    });
+  });
+
+  it('accepts the seven legacy policy keys and strips them before saving', async () => {
+    const legacyBody = {
+      ...TEST_CONFIG,
+      minAccuracy: 0.85,
+      deciderModels: [{ id: 'configured/model' }],
+      frontierMinAccuracyDelta: 0.4,
+      switchCostFactor: 50,
+      bestAccuracySwitchThreshold: 9,
+      lowConfidenceThreshold: 0.8,
+      classifierRepetitions: 3,
+      deciderRepetitions: 2,
+      classifierMaxP95LatencyMs: 1000,
+    };
+
+    const res = await authedPut('/admin/config', legacyBody, {
+      'x-updated-by': 'igor@kilocode.ai',
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    // The previous web release still parses these fields, so the response
+    // carries the canonical policy value rather than the payload's value.
+    expect(body.config).toMatchObject({
+      frontierMinAccuracyDelta: 0,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: null,
+    });
+    expect(body.config.minAccuracy).toBe(0.85);
+
+    // The legacy columns are not part of the payload: replaceConfig writes the
+    // canonical fixed policy value into them itself.
+    expect(replaceConfig).toHaveBeenCalledOnce();
+    const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
+    for (const column of [
+      'frontier_min_accuracy_delta',
+      'switch_cost_factor',
+      'best_accuracy_switch_threshold',
+      'low_confidence_threshold',
+      'classifier_repetitions',
+      'decider_repetitions',
+      'classifier_max_p95_latency_ms',
+    ]) {
+      expect(configArg).not.toHaveProperty(column);
+    }
   });
 });
 
@@ -774,27 +882,37 @@ describe('POST /admin/runs', () => {
   });
 
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
-    // No prior summaries → every configured model is enqueued.
-    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    // No prior summaries → every configured model is enqueued. The stored legacy
+    // columns hold stale values that the resolved policy must ignore.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        switch_cost_factor: 50,
+        best_accuracy_switch_threshold: 9,
+        classifier_max_p95_latency_ms: 1000,
+        classifier_repetitions: 3,
+      },
+    });
     const res = await authedPost('/admin/runs', { kind: 'classifier' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { runId: string; enqueuedModels: number };
     expect(body.runId).toMatch(/^classifier-/);
     expect(body.enqueuedModels).toBe(TEST_CONFIG.classifierModels.length);
     expect(insertRun).toHaveBeenCalledOnce();
-    // The run row snapshots the live config (mid-run edits must not skew results).
+    // The run row snapshots the resolved policy, not the legacy stored columns.
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
-    expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
-    expect(runArg.best_accuracy_switch_threshold).toBe(TEST_CONFIG.bestAccuracySwitchThreshold);
+    expect(runArg.switch_cost_factor).toBe(3);
+    expect(runArg.best_accuracy_switch_threshold).toBe(0.05);
+    expect(runArg.classifier_max_p95_latency_ms).toBeNull();
+    expect(runArg.repetitions).toBe(1);
     expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
     expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
     expect(queueSendBatch).toHaveBeenCalledTimes(2);
     expect(queuedMessages).toHaveLength(
-      TEST_CONFIG.classifierModels.length *
-        TEST_CONFIG.classifierRepetitions *
-        CLASSIFIER_CASES.length
+      TEST_CONFIG.classifierModels.length * CLASSIFIER_CASES.length
     );
     expect(queuedMessages[0].body).toMatchObject({
       kind: 'classifier',
@@ -840,7 +958,7 @@ describe('POST /admin/runs', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
       entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
-      repetitions: TEST_CONFIG.deciderRepetitions,
+      repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -903,12 +1021,12 @@ describe('POST /admin/runs', () => {
     expect(res.status).toBe(200);
     const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows).toHaveLength(100);
-    expect(run).toMatchObject({ repetitions: 5, max_concurrency: 0, router: 'efficient' });
+    expect(run).toMatchObject({ repetitions: 1, max_concurrency: 0, router: 'efficient' });
     expect(modelRows[0].model).toBe('m/0');
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: run.id,
       entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
-      repetitions: 5,
+      repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -991,7 +1109,7 @@ describe('GET /admin/registry', () => {
     expect(body).toEqual({
       router,
       engineIdentity: expect.any(String),
-      repetitions: TEST_CONFIG.deciderRepetitions,
+      repetitions: 1,
       platform: { pending: 0, running: 0, ready: 0, failed: 0 },
       user: { pending: 0, running: 0, ready: 0, failed: 0 },
       platformEntries: [],
@@ -1012,7 +1130,7 @@ describe('GET /admin/registry', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       router: 'efficient',
-      repetitions: TEST_CONFIG.deciderRepetitions,
+      repetitions: 1,
       platformEntries,
     });
   });
@@ -1454,7 +1572,10 @@ describe('POST /admin/profiles/register', () => {
     });
     expect(registerProfiles).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ deciderRepetitions: 1 }),
+      expect.objectContaining({
+        minAccuracy: TEST_CONFIG.minAccuracy,
+        accuracyNoiseBand: TEST_CONFIG.accuracyNoiseBand,
+      }),
       expect.objectContaining({
         ownerType: 'user',
         ownerId: 'u1',
@@ -2099,7 +2220,7 @@ describe('POST /admin/custom-routing-table', () => {
     await expect(res.json()).resolves.toEqual({ table: null });
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ repetitions: TEST_CONFIG.deciderRepetitions }),
+      expect.objectContaining({ repetitions: 1 }),
       [
         { model: 'a/b', variant: 'low' },
         { model: 'a/b', variant: 'high' },
@@ -2142,19 +2263,20 @@ describe('router selection', () => {
       frontierMinAccuracyDelta: 0.02,
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      config: { router: 'frontier', accuracyNoiseBand: 0.03, frontierMinAccuracyDelta: 0.02 },
-    });
+    const body = (await response.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({ router: 'frontier', accuracyNoiseBand: 0.03 });
+    // The payload's delta is not saved; the response carries the canonical
+    // fixed policy value the previous web release still parses.
+    expect(body.config).toMatchObject({ frontierMinAccuracyDelta: 0 });
     expect(replaceConfig).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({
-        accuracy_noise_band: 0.03,
-        frontier_min_accuracy_delta: 0.02,
-      }),
+      expect.objectContaining({ accuracy_noise_band: 0.03 }),
       expect.any(Array),
       expect.any(Array),
       'frontier'
     );
+    const [, saved] = vi.mocked(replaceConfig).mock.calls[0];
+    expect(saved).not.toHaveProperty('frontier_min_accuracy_delta');
   });
 
   it('keeps classifier starts on the shared efficient benchmark identity', async () => {
@@ -2190,7 +2312,7 @@ describe('router selection', () => {
     const response = await authedGet('/admin/config?router=frontier');
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      config: { router: 'frontier', accuracyNoiseBand: 0.05, frontierMinAccuracyDelta: 0 },
+      config: { router: 'frontier', accuracyNoiseBand: 0.05 },
     });
     await authedGet('/admin/runs?router=frontier');
     await authedGet('/admin/routing-table?router=frontier');

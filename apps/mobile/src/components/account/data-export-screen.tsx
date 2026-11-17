@@ -19,6 +19,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { codeFailureMessage, DOWNLOAD_CODE_PATTERN } from '@/lib/data-export-code';
 import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-download';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
@@ -127,7 +128,7 @@ export function DataExportScreen() {
   if (access.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('profile.dataExport.title')} />
+        <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <View className="gap-3 px-4 pt-4">
           <Skeleton className="h-[70px] rounded-lg" />
           <Skeleton className="h-11 rounded-lg" />
@@ -139,7 +140,7 @@ export function DataExportScreen() {
   if (access.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('profile.dataExport.title')} />
+        <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <QueryError onRetry={() => void access.refetch()} isRetrying={access.isFetching} />
       </View>
     );
@@ -148,7 +149,7 @@ export function DataExportScreen() {
   if (!access.data.enabled) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('profile.dataExport.title')} />
+        <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <EmptyState
           icon={Archive}
           title={t('profile.dataExport.unavailableTitle')}
@@ -206,7 +207,7 @@ export function DataExportScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.dataExport.title')} />
+      <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

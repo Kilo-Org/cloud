@@ -89,4 +89,84 @@ describe('design gate sampler', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps no sampling timer armed while a tick runs', () => {
+    vi.useFakeTimers();
+    try {
+      const armed: number[] = [];
+      const sampler = createSampler(() => {
+        armed.push(vi.getTimerCount());
+        return dump('/same', 10);
+      });
+      sampler.start(250, 60_000);
+      vi.advanceTimersByTime(250);
+      sampler.stop();
+      // The first tick runs before any timer is armed. A scheduled tick runs with
+      // only the maxMs deadline armed, because the next tick is scheduled after it
+      // returns; a periodic timer would still be armed there, which is what queues
+      // one tick behind an overrunning one.
+      expect(armed).toEqual([0, 1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the screen a slice between ticks when a tick costs more than the interval', async () => {
+    // Fake timers cannot make a synchronous tick consume fake time, and moving the
+    // fake system clock also shifts the armed timer, which would hide the queueing
+    // this asserts. The tick's cost is spent on the real clock instead.
+    const tickCostMs = 60;
+    const intervalMs = 10;
+    const windowMs = 300;
+    const starts: number[] = [];
+    const sampler = createSampler(() => {
+      starts.push(Date.now());
+      // One dump walks and serializes the whole document on this thread.
+      const until = Date.now() + tickCostMs;
+      while (Date.now() < until) {
+        // the app's own JS thread is busy here
+      }
+      return dump(`/route-${starts.length}`, 10);
+    });
+    sampler.start(intervalMs, 60_000);
+    const measured = Promise.withResolvers<undefined>();
+    setTimeout(() => {
+      measured.resolve(undefined);
+    }, windowMs);
+    await measured.promise;
+    const samples = sampler.stop();
+    expect(starts.length).toBeGreaterThan(1);
+    // Date.now() has millisecond resolution and a fired timer may land a moment
+    // early, so the asserted slice allows a few milliseconds of rounding.
+    const roundingMs = 5;
+    for (let index = 1; index < starts.length; index += 1) {
+      // The next tick starts after the previous one returned *and* after the
+      // interval: a fixed period queues the next tick the moment the previous one
+      // starts, so a dump that costs 60 ms leaves the app no slice at all.
+      expect((starts[index] ?? 0) - (starts[index - 1] ?? 0)).toBeGreaterThanOrEqual(
+        tickCostMs + intervalMs - roundingMs
+      );
+    }
+    // Ticks are bounded by the cost of a dump, not by window / interval.
+    expect(starts.length).toBeLessThanOrEqual(Math.ceil(windowMs / (tickCostMs + intervalMs)) + 1);
+    expect(samples.length).toBeGreaterThan(1);
+  });
+
+  it('clears the pending tick when the capture stops', () => {
+    vi.useFakeTimers();
+    try {
+      let snapshots = 0;
+      const sampler = createSampler(() => {
+        snapshots += 1;
+        return dump('/same', 10);
+      });
+      sampler.start(250, 60_000);
+      sampler.stop();
+      const afterStop = snapshots;
+      vi.advanceTimersByTime(10_000);
+      expect(snapshots).toBe(afterStop);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

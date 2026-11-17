@@ -26,8 +26,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
@@ -48,6 +50,7 @@ const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
  */
 export function AccountSettingsScreen() {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const trpc = useTRPC();
   const { confirm, dialog } = useConfirmDialog();
@@ -116,7 +119,7 @@ export function AccountSettingsScreen() {
                 }
               },
             });
-            router.push('/(app)/language-picker' as Href);
+            pushOnce('/(app)/language-picker' as Href);
           }}
         />
         <ConfigureRow
@@ -199,7 +202,7 @@ export function AccountSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.account')} />
+      <ScreenHeader title={t('preferences.account')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 gap-3 pt-4"

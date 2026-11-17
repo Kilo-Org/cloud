@@ -167,7 +167,9 @@ export function FixedPartRow({
             <ActivityIndicator size="small" color={colors.mutedForeground} />
           </View>
         ) : null}
-        {status === 'error' ? <XCircle size={STATUS_ICON_SIZE_DP} color={colors.destructive} /> : null}
+        {status === 'error' ? (
+          <XCircle size={STATUS_ICON_SIZE_DP} color={colors.destructive} />
+        ) : null}
         {status === 'completed' && Icon ? (
           <Icon size={STATUS_ICON_SIZE_DP} color={colors.mutedForeground} />
         ) : null}

@@ -588,7 +588,10 @@ const AttachmentChip = memo(function AttachmentChip({
             </CenteredState>
           ) : (
             <>
-              <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+              >
                 {renderPreviewBody(textPreview)}
               </ScrollView>
               <View style={{ height: insets.bottom }} className="bg-background" />

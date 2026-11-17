@@ -18,7 +18,11 @@ import { i18n } from '@/i18n';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { CHIP_HIT_SLOP, COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import {
+  CHIP_HIT_SLOP,
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -411,9 +415,7 @@ export function ModelPickerOptionRow({
                 ) : null}
                 {byok ? (
                   <View className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-700">
-                    <Text className="text-xs font-medium text-foreground">
-                      {BYOK_MODEL_LABEL}
-                    </Text>
+                    <Text className="text-xs font-medium text-foreground">{BYOK_MODEL_LABEL}</Text>
                   </View>
                 ) : null}
                 {collectsData ? (
@@ -429,10 +431,7 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        <View
-          className="items-center justify-center"
-          style={{ width: CHECK_COLUMN_DP }}
-        >
+        <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
           {selected ? (
             <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}

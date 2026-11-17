@@ -127,8 +127,8 @@ export function DeviceSessionsScreen() {
         toast.success(t('deviceSessions.sessionSignedOut'));
         void refetch();
       },
-      onError: error => {
-        toast.error(error.message);
+      onError: () => {
+        toast.error(t('deviceSessions.sessionSignOutFailed'));
       },
     })
   );

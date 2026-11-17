@@ -150,13 +150,18 @@ const transcriptionsEndpoint: UsageEndpoint<ParsedTranscriptionRequest> = {
     return parsed ?? { kind: 'rejected', response: invalidRequestResponse() };
   },
 
-  async resolveProvider({ requestedModelLowerCased }) {
-    const { provider, userByok } = await getTranscriptionProvider();
+  async resolveProvider({ requestedModelLowerCased, user, organizationId }) {
+    const { provider, userByok } = await getTranscriptionProvider({
+      requestedModel: requestedModelLowerCased,
+      user,
+      organizationId,
+    });
     return { provider, userByok, isFree: isFreeModel(requestedModelLowerCased) };
   },
 
-  // Transcriptions only route to OpenRouter, which no data region pins, so only a disabled
-  // gateway applies to them and the data region is not forwarded.
+  // Transcriptions only route to OpenRouter, through the owner's OpenRouter key or Kilo's account.
+  // OpenRouter cannot pin a region, so the gateway settings refuse Kilo's route when OpenRouter is
+  // disabled or an inference region is set, and the owner's key is exempt from both.
   async buildUpstreamBody({
     body: parsedRequest,
     requestedModel,

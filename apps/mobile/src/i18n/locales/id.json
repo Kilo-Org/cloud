@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Atur penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau admin untuk menghubungkan penyedia.",
       "couldNotLoad": "Tidak dapat memuat tinjauan.",
       "noReviews": "Belum ada tinjauan",
       "noReviewsDescription": "Tinjauan muncul di sini setelah Peninjau kode meninjau PR.",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "Keluar dari perangkat ini",
     "signOutSessionLabel": "Keluar dari {{device}}, masuk {{signedIn}}, terakhir aktif {{lastSeen}}",
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
+    "sessionSignOutFailed": "Tidak dapat keluar dari sesi ini. Coba lagi.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Terakhir aktif {{lastSeen}}. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
@@ -2553,12 +2555,14 @@
     "manage": {
       "billingHistory": "Riwayat penagihan",
       "billingHistoryEmpty": "Belum ada riwayat penagihan.",
+      "billingHistoryError": "Tidak dapat memuat riwayat penagihan",
       "cancel": "Batalkan langganan",
       "cancelDescription": "Kilo Pass Anda tetap aktif hingga akhir periode penagihan dan tidak akan diperpanjang.",
       "cancelScheduled": "Berakhir pada {{date}}",
       "cancelScheduledChange": "Batalkan perubahan terjadwal",
       "cancelled": "Langganan dibatalkan",
       "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
+      "creditHistoryError": "Tidak dapat memuat riwayat kredit",
       "resume": "Lanjutkan langganan",
       "resumeCancelledDescription": "Kilo Pass Anda akan kembali diperpanjang secara otomatis.",
       "resumePausedDescription": "Kilo Pass Anda dilanjutkan sekarang, sebelum tanggal lanjutan yang dijadwalkan.",
@@ -3330,7 +3334,7 @@
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
-      "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
+      "accessDeniedDescription": "Minta pemilik atau admin organisasi untuk memberimu akses."
     },
     "create": {
       "title": "Buat organisasi",
@@ -3463,16 +3467,27 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
       "guardrails": "Guardrail",
       "byok": "Gunakan kunci sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "subOrganizations": "Sub-organisasi",
-      "distributeFunds": "Distribusikan dana"
+      "requestLogs": "Log permintaan"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
+      "emptyTitle": "Tidak ada permintaan",
+      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
+      "loadError": "Tidak dapat memuat log permintaan.",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -4315,7 +4330,7 @@
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
-      "receiptA11y": "Buka tanda terima untuk {{description}}",
+      "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
     },
     "title": "Beli kredit",
@@ -4521,6 +4536,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Fitur teratas",
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Workspace ini tidak melaporkan penggunaan. Mencoba lagi tidak akan membantu.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
   },
@@ -4592,7 +4609,7 @@
       "fieldCron": "Ekspresi cron",
       "fieldCronHelp": "Lima kolom: menit, jam, hari, bulan, dan hari dalam seminggu. Interval terpendek adalah satu menit.",
       "fieldTimezone": "Zona waktu",
-      "nameLocked": "Nama adalah bagian dari URL webhook dan tidak dapat diubah.",
+      "nameLocked": "Nama tidak dapat diubah setelah pemicu dibuat.",
       "repositoryLocked": "Repositori tidak dapat diubah setelah pemicu dibuat.",
       "environmentAutomatic": "Otomatis berdasarkan repositori",
       "notSelected": "Belum dipilih",
@@ -4607,6 +4624,7 @@
       "authHeaderLabel": "Nama header",
       "authSecretLabel": "Rahasia bersama",
       "authSecretKeep": "Biarkan kosong untuk mempertahankan rahasia yang tersimpan.",
+      "authSecretSet": "Wajib diisi. Pilih string acak yang kuat.",
       "authSecretCreator": "Gunakan setidaknya 16 karakter saat pemicu berjalan sebagai pembuatnya.",
       "autoCommit": "Komit perubahan saat eksekusi selesai",
       "condenseOnComplete": "Ringkas konteks saat eksekusi selesai",
@@ -4617,6 +4635,7 @@
       "saveFailedTitle": "Tidak dapat menyimpan pemicu",
       "deleteTitle": "Hapus pemicu ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak dapat dibatalkan.",
+      "deleteMessageScheduled": "Eksekusi terjadwal pemicu {{name}} akan berhenti. Tindakan ini tidak dapat dibatalkan.",
       "runNow": "Jalankan sekarang",
       "runStarted": "Eksekusi dimulai",
       "created": "Pemicu dibuat",
@@ -4656,8 +4675,9 @@
     "create": "Buat tautan",
     "createFailed": "Tidak dapat membuat tautan.",
     "existingTitle": "Tautan yang sudah ada",
-    "existingDescription": "Sesi ini sudah memiliki tautan berbagi. Membuat tautan baru akan menggantikannya dan membuat tautan lama tidak berfungsi lagi.",
+    "existingDescription": "Sesi ini sudah memiliki tautan berbagi. Membuat tautan baru dengan setelan ini akan menggantikannya dan membuat tautan lama tidak berfungsi lagi.",
     "rotate": "Buat tautan baru",
+    "replacementSettings": "Setelan ini berlaku untuk tautan baru.",
     "revoke": "Cabut tautan",
     "revokeTitle": "Cabut tautan?",
     "revokeMessage": "Tautan saat ini akan langsung berhenti berfungsi.",
@@ -4676,5 +4696,175 @@
     "unavailableDescription": "Tautan berbagi ini sudah kedaluwarsa atau telah dicabut.",
     "transcriptUnavailableTitle": "Tidak dapat memuat transkrip ini",
     "transcriptUnavailableDescription": "Tautan masih berfungsi. Coba lagi sebentar lagi."
+  },
+  "organizationGuardrails": {
+    "title": "Pagar Pengaman Kecerdasan Artifisial",
+    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial.",
+    "unavailable": "Pagar Pengaman Kecerdasan Artifisial tidak tersedia untuk organisasi ini.",
+    "loadError": "Pagar Pengaman Kecerdasan Artifisial tidak dapat dimuat",
+    "statusSaving": "Menyimpan…",
+    "statusSaved": "Tersimpan",
+    "statusFailed": "Tidak dapat menyimpan.",
+    "inputTitle": "Pagar pengaman masukan",
+    "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Detektor pemblokir menolak permintaan saat Enkrypt tidak tersedia.",
+    "outputTitle": "Pagar pengaman keluaran",
+    "outputDescription": "Memindai respons dengan Enkrypt AI sebelum anggota menerimanya. Nonaktif kecuali Anda mengaktifkannya.",
+    "detectorsHint": "Blokir menolak permintaan yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda permintaan.",
+    "detectorsHintOutput": "Blokir menggagalkan respons yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda respons.",
+    "choiceLog": "Catat saja",
+    "applyTo": "Terapkan ke",
+    "applyToAllMembers": "Semua anggota",
+    "applyKiloDefault": "Terapkan Bawaan Kilo",
+    "invalidSavedTitle": "Pengaturan detektor masukan tersimpan tidak dapat dibaca",
+    "invalidSavedBody": "Permintaan diblokir hingga detektor masukan disimpan kembali. Detektor di bawah dimulai dari Bawaan Kilo.",
+    "invalidSavedOutputTitle": "Pengaturan detektor keluaran tersimpan tidak dapat dibaca",
+    "invalidSavedOutputBody": "Respons ditahan hingga detektor keluaran disimpan kembali. Pilih detektor keluaran di bawah.",
+    "blockingOutputNote": "Detektor keluaran pemblokir menahan respons hingga Enkrypt selesai memeriksa seluruhnya. Gunakan Catat saja untuk menghindari penundaan.",
+    "inputDetectorRequired": "Aktifkan setidaknya satu detektor masukan.",
+    "outputDetectorRequired": "Aktifkan setidaknya satu detektor keluaran.",
+    "rulesTooMany": "Tambahkan hingga {{max}} aturan.",
+    "ruleIdRequired": "Masukkan ID aturan.",
+    "ruleIdInvalid": "ID aturan hanya dapat menggunakan huruf, angka, titik, tanda hubung, dan garis bawah.",
+    "ruleTextRequired": "Jelaskan apa yang dilarang atau diwajibkan oleh aturan.",
+    "keywordTooLong": "Setiap kata kunci dapat berisi hingga {{max}} karakter.",
+    "topicTooLong": "Setiap topik dapat berisi hingga {{max}} karakter.",
+    "keywordsTooMany": "Tambahkan hingga {{max}} kata kunci.",
+    "topicsTooMany": "Tambahkan hingga {{max}} topik.",
+    "piiEntityRequired": "Pilih setidaknya satu jenis data untuk dideteksi.",
+    "keywordRequired": "Tambahkan setidaknya satu kata kunci.",
+    "topicRequired": "Tambahkan setidaknya satu topik.",
+    "policyTextRequired": "Masukkan teks kebijakan.",
+    "ruleRequired": "Tambahkan setidaknya satu aturan.",
+    "ruleIdDuplicate": "Setiap aturan memerlukan ID aturannya sendiri.",
+    "piiEntities": "Data yang dideteksi",
+    "keywordsLabel": "Kata kunci",
+    "keywordsHint": "Satu kata kunci per baris.",
+    "topicsHint": "Satu topik per baris.",
+    "policyFormat": "Format kebijakan",
+    "policyFormatRules": "Aturan terstruktur",
+    "policyFormatRulesDescription": "Satu aturan per persyaratan, dengan kategori dan tingkat keparahan. Direkomendasikan.",
+    "policyFormatText": "Teks kebijakan",
+    "policyFormatTextDescription": "Tempel kebijakan yang sudah ada sebagai teks biasa.",
+    "rulesEmpty": "Belum ada aturan. Setiap aturan menjelaskan satu hal yang tidak boleh ada dalam masukan atau diminta oleh masukan.",
+    "addRule": "Tambahkan aturan",
+    "ruleNumber": "Aturan {{number}}",
+    "ruleRemove": "Hapus aturan {{number}}",
+    "ruleIdLabel": "ID aturan",
+    "ruleNameLabel": "Nama (opsional)",
+    "ruleTextLabel": "Aturan",
+    "ruleRiskCategory": "Kategori risiko",
+    "ruleApplicability": "Cakupan",
+    "ruleFrameworks": "Kerangka kerja",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeksi perintah",
+        "description": "Mendeteksi upaya untuk mengesampingkan instruksi atau membobol model."
+      },
+      "policyViolation": {
+        "label": "Pelanggaran kebijakan",
+        "description": "Menandai masukan yang melanggar kebijakan organisasi Anda, yang ditulis sebagai teks atau aturan.",
+        "descriptionOutput": "Menandai respons yang melanggar kebijakan organisasi Anda, yang ditulis sebagai teks atau aturan."
+      },
+      "pii": {
+        "label": "PII dan rahasia",
+        "description": "Mendeteksi data pribadi, kredensial, alamat IP, dan URL."
+      },
+      "keywords": {
+        "label": "Kata kunci terlarang",
+        "descriptionOutput": "Mendeteksi respons yang berisi kata kunci apa pun yang Anda cantumkan."
+      },
+      "topics": {
+        "label": "Topik",
+        "descriptionOutput": "Menandai respons tentang topik apa pun yang Anda cantumkan."
+      },
+      "toxicity": {
+        "label": "Toksisitas",
+        "description": "Mendeteksi bahasa yang toksik, menghina, mengancam, atau penuh kebencian."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Mendeteksi konten seksual atau konten yang tidak layak untuk tempat kerja."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Mendeteksi bahasa yang bias atau diskriminatif."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Data pribadi",
+        "description": "Nama, alamat email, nomor telepon."
+      },
+      "secrets": {
+        "label": "Rahasia",
+        "description": "Kunci API, token, kata sandi."
+      },
+      "ipAddress": {
+        "label": "Alamat IP",
+        "description": "Alamat IPv4 dan IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Alamat web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Keamanan dan penipuan",
+      "safetyHarm": "Keselamatan dan bahaya",
+      "privacyDataProtection": "Privasi dan perlindungan data",
+      "brandReputationTrust": "Merek dan reputasi",
+      "biasFairnessEthical": "Bias dan keadilan",
+      "legalIpLiability": "Hukum dan tanggung jawab kekayaan intelektual",
+      "productMisuse": "Penyalahgunaan produk",
+      "performanceQuality": "Kinerja dan kualitas"
+    },
+    "applicability": {
+      "user": "Masukan pengguna",
+      "userAssistant": "Masukan pengguna dan respons"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 Teratas (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Undang-Undang Kecerdasan Artifisial Uni Eropa",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Fitur perusahaan",
+    "enterpriseOnly": "Ini adalah fitur khusus perusahaan.",
+    "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
+    "loadError": "Penyedia dan model tidak dapat dimuat",
+    "tabModels": "Model",
+    "tabProviders": "Penyedia",
+    "tabGateways": "Gerbang",
+    "modelsDescription": "Nonaktifkan model untuk memblokirnya bagi setiap anggota. Model dari penyedia yang diizinkan aktif secara bawaan.",
+    "modelsDeniedOnly": "Hanya yang ditolak",
+    "modelsEmpty": "Tidak ada model yang cocok dengan pencarian ini.",
+    "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
+    "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
+    "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "allowAllShown": "Izinkan semua yang ditampilkan",
+    "denyAllShown": "Tolak semua yang ditampilkan",
+    "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",
+    "emptyProviderList": "Izinkan setidaknya satu penyedia. Daftar kosong memblokir semua rute model Kilo.",
+    "gatewaysUnavailable": "Pengaturan gerbang tidak tersedia untuk organisasi ini.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Permintaan OpenRouter tidak dipatok ke suatu wilayah.",
+    "inferenceRegion": "Wilayah inferensi",
+    "inferenceRegionDescription": "Mematok permintaan Vercel AI Gateway ke wilayah ini. Model yang tidak tersedia di sana akan gagal.",
+    "disableOpenrouterNote": "Menonaktifkan OpenRouter juga memblokir kunci BYOK yang merutekan permintaan melaluinya.",
+    "emptyModelList": "Biarkan setidaknya satu model tetap aktif. Menolak semua model membuat anggota tidak punya apa pun untuk digunakan.",
+    "catalogUnavailable": "Katalog model lengkap tidak dapat dimuat, jadi hanya daftar tersimpan Anda yang ditampilkan. Coba lagi untuk memuat semua model.",
+    "region": {
+      "global": "Global",
+      "us": "Amerika Serikat",
+      "eu": "Uni Eropa",
+      "au": "Australia",
+      "jp": "Jepang"
+    }
   }
 }

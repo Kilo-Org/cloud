@@ -5,6 +5,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   formatModelIds,
+  getOpenRouterAliasTarget,
   joinGatewayModelEndpoints,
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
@@ -66,7 +67,7 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
   }
 
   const models = await getOpenRouterModelsMetadataFromDatabase();
-  return models[modelId]?.alias_target?.slug ?? modelId;
+  return getOpenRouterAliasTarget(models, modelId) ?? modelId;
 }
 
 /**

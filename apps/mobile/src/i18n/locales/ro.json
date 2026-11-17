@@ -1389,7 +1389,8 @@
       "noReviews": "Încă nu există revizuiri",
       "noReviewsDescription": "Revizuirile apar aici după ce agentul de revizuire a codului analizează un PR.",
       "startManualReview": "Începe o revizuire manuală",
-      "configureProvider": "Configurează furnizorul"
+      "configureProvider": "Configurează furnizorul",
+      "connectOwnerOnly": "Cere unui proprietar de organizație sau unui administrator să conecteze un furnizor."
     },
     "platformList": {
       "checking": "Se verifică…",
@@ -3028,6 +3029,7 @@
     "signOutThisDevice": "Deconectează acest dispozitiv",
     "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}, ultima activitate: {{lastSeen}}",
     "sessionSignedOut": "Sesiune deconectată.",
+    "sessionSignOutFailed": "Nu s-a putut deconecta această sesiune. Încearcă din nou.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
     "signOutThisSessionMessage": "{{device}} va fi deconectat. Ultima activitate: {{lastSeen}}. Accesul la API poate rămâne activ încă cel mult o oră.",
@@ -3153,12 +3155,14 @@
     "manage": {
       "billingHistory": "Istoric facturare",
       "billingHistoryEmpty": "Nu există încă un istoric de facturare.",
+      "billingHistoryError": "Nu s-a putut încărca istoricul de facturare",
       "cancel": "Anulează abonamentul",
       "cancelDescription": "Kilo Pass rămâne activ până la sfârșitul perioadei de facturare și nu se va reînnoi.",
       "cancelScheduled": "Se anulează pe {{date}}",
       "cancelScheduledChange": "Anulează modificarea programată",
       "cancelled": "Abonament anulat",
       "creditHistoryEmpty": "Nu există încă credite Kilo Pass.",
+      "creditHistoryError": "Nu s-a putut încărca istoricul de credite",
       "resume": "Reia abonamentul",
       "resumeCancelledDescription": "Kilo Pass va începe din nou să se reînnoiască automat.",
       "resumePausedDescription": "Kilo Pass se reia acum, înainte de data programată pentru reluare.",
@@ -3395,7 +3399,7 @@
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
-      "accessDeniedDescription": "Nu ai acces la această organizație."
+      "accessDeniedDescription": "Solicită unui proprietar sau administrator al organizației să îți acorde acces."
     },
     "create": {
       "title": "Creează o organizație",
@@ -3515,16 +3519,27 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
-      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
       "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
+      "ssoAndDomain": "SSO și domeniu",
+      "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
-      "requestLogs": "Jurnale de cereri",
-      "subOrganizations": "Suborganizații",
-      "distributeFunds": "Distribuie fonduri"
+      "requestLogs": "Jurnale de cereri"
+    },
+    "requestLogs": {
+      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
+      "older": "Ora anterioară",
+      "newer": "Ora următoare",
+      "truncated": "Această oră are mai multe cereri decât arată lista.",
+      "emptyTitle": "Nicio cerere",
+      "emptyDescription": "Nu există cereri către gateway în această oră.",
+      "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "tokens": "{{input}} intrare · {{output}} ieșire",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
@@ -4381,7 +4396,7 @@
       },
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
-      "receiptA11y": "Deschide chitanța pentru {{description}}",
+      "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
     },
     "title": "Cumpără credite",
@@ -4591,6 +4606,8 @@
     "topModels": "Modele principale",
     "topFeatures": "Funcții principale",
     "emptyTitle": "Nicio utilizare în această perioadă",
+    "unavailableTitle": "Utilizarea nu este disponibilă",
+    "unavailableDescription": "Acest spațiu de lucru nu raportează utilizare. Reîncercarea nu va ajuta.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
   },
@@ -4662,7 +4679,7 @@
       "fieldCron": "Expresie cron",
       "fieldCronHelp": "Cinci câmpuri: minut, oră, zi, lună și zi a săptămânii. Cel mai scurt interval este de un minut.",
       "fieldTimezone": "Fus orar",
-      "nameLocked": "Numele face parte din URL-ul webhook și nu poate fi modificat.",
+      "nameLocked": "Numele nu poate fi modificat după crearea declanșatorului.",
       "repositoryLocked": "Repository-ul nu poate fi modificat după crearea declanșatorului.",
       "environmentAutomatic": "Automat în funcție de repository",
       "notSelected": "Neselectat",
@@ -4677,6 +4694,7 @@
       "authHeaderLabel": "Nume antet",
       "authSecretLabel": "Secret partajat",
       "authSecretKeep": "Lasă necompletat pentru a păstra secretul salvat.",
+      "authSecretSet": "Obligatoriu. Alege un șir aleator puternic.",
       "authSecretCreator": "Folosește cel puțin 16 caractere când declanșatorul rulează ca creatorul său.",
       "autoCommit": "Comite modificările când rularea se încheie",
       "condenseOnComplete": "Condensează contextul când rularea se încheie",
@@ -4687,6 +4705,7 @@
       "saveFailedTitle": "Nu s-a putut salva declanșatorul",
       "deleteTitle": "Ștergi acest declanșator?",
       "deleteMessage": "Apelurile către {{name}} vor eșua. Această acțiune nu poate fi anulată.",
+      "deleteMessageScheduled": "Execuțiile programate ale {{name}} se opresc. Această acțiune nu poate fi anulată.",
       "runNow": "Rulează acum",
       "runStarted": "Rularea a început",
       "created": "Declanșator creat",
@@ -4726,8 +4745,9 @@
     "create": "Creează linkul",
     "createFailed": "Linkul nu a putut fi creat.",
     "existingTitle": "Link existent",
-    "existingDescription": "Această sesiune are deja un link de partajare. Crearea unui link nou îl înlocuiește pe cel vechi, care nu va mai funcționa.",
+    "existingDescription": "Această sesiune are deja un link de partajare. Crearea unui link nou cu aceste setări îl înlocuiește pe cel vechi, care nu va mai funcționa.",
     "rotate": "Creează un link nou",
+    "replacementSettings": "Aceste setări se aplică noului link.",
     "revoke": "Revocă linkul",
     "revokeTitle": "Revoci linkul?",
     "revokeMessage": "Linkul actual nu va mai funcționa imediat.",
@@ -4746,5 +4766,175 @@
     "unavailableDescription": "Acest link de partajare a expirat sau a fost revocat.",
     "transcriptUnavailableTitle": "Transcrierea nu a putut fi încărcată",
     "transcriptUnavailableDescription": "Linkul încă funcționează. Încearcă din nou în câteva momente."
+  },
+  "organizationGuardrails": {
+    "title": "Bariere de protecție AI",
+    "permissionDenied": "Doar proprietarii și administratorii organizației pot gestiona barierele de protecție AI.",
+    "unavailable": "Barierele de protecție AI nu sunt disponibile pentru această organizație.",
+    "loadError": "Barierele de protecție AI nu au putut fi încărcate",
+    "statusSaving": "Se salvează…",
+    "statusSaved": "Salvat",
+    "statusFailed": "Nu s-a putut salva.",
+    "inputTitle": "Bariere de protecție pentru intrare",
+    "inputDescription": "Scanează fiecare intrare cu Enkrypt AI, inclusiv rezultatele instrumentelor. Un detector care blochează respinge o cerere când Enkrypt nu este disponibil.",
+    "outputTitle": "Bariere de protecție pentru ieșire",
+    "outputDescription": "Scanează răspunsurile cu Enkrypt AI înainte ca membrii să le primească. Dezactivat dacă nu îl activați.",
+    "detectorsHint": "Blochează respinge o cerere semnalată. Doar jurnalizarea o consemnează fără a întârzia cererea.",
+    "detectorsHintOutput": "Blochează face ca un răspuns semnalat să eșueze. Doar jurnalizarea îl consemnează fără a întârzia răspunsul.",
+    "choiceLog": "Doar jurnalizare",
+    "applyTo": "Aplică la",
+    "applyToAllMembers": "Toți membrii",
+    "applyKiloDefault": "Aplică setările implicite Kilo",
+    "invalidSavedTitle": "Setările salvate pentru detectoarele de intrare nu pot fi citite",
+    "invalidSavedBody": "Cererile sunt blocate până când detectoarele de intrare sunt salvate din nou. Detectoarele de mai jos pornesc de la setările implicite Kilo.",
+    "invalidSavedOutputTitle": "Setările salvate pentru detectoarele de ieșire nu pot fi citite",
+    "invalidSavedOutputBody": "Răspunsurile sunt reținute până când detectoarele de ieșire sunt salvate din nou. Alegeți detectoarele de ieșire de mai jos.",
+    "blockingOutputNote": "Un detector de ieșire care blochează reține un răspuns până când Enkrypt l-a verificat în întregime. Folosiți Doar jurnalizare pentru a evita întârzierea.",
+    "inputDetectorRequired": "Activați cel puțin un detector de intrare.",
+    "outputDetectorRequired": "Activați cel puțin un detector de ieșire.",
+    "rulesTooMany": "Adăugați până la {{max}} reguli.",
+    "ruleIdRequired": "Introduceți un ID de regulă.",
+    "ruleIdInvalid": "Un ID de regulă poate conține doar litere, cifre, puncte, cratime și caractere de subliniere.",
+    "ruleTextRequired": "Descrieți ce interzice sau ce impune regula.",
+    "keywordTooLong": "Fiecare cuvânt-cheie poate avea până la {{max}} caractere.",
+    "topicTooLong": "Fiecare subiect poate avea până la {{max}} caractere.",
+    "keywordsTooMany": "Adăugați până la {{max}} cuvinte-cheie.",
+    "topicsTooMany": "Adăugați până la {{max}} subiecte.",
+    "piiEntityRequired": "Selectați cel puțin un tip de date de detectat.",
+    "keywordRequired": "Adăugați cel puțin un cuvânt-cheie.",
+    "topicRequired": "Adăugați cel puțin un subiect.",
+    "policyTextRequired": "Introduceți textul politicii.",
+    "ruleRequired": "Adăugați cel puțin o regulă.",
+    "ruleIdDuplicate": "Fiecare regulă trebuie să aibă propriul ID de regulă.",
+    "piiEntities": "Date de detectat",
+    "keywordsLabel": "Cuvinte-cheie",
+    "keywordsHint": "Un cuvânt-cheie pe linie.",
+    "topicsHint": "Un subiect pe linie.",
+    "policyFormat": "Formatul politicii",
+    "policyFormatRules": "Reguli structurate",
+    "policyFormatRulesDescription": "O regulă pentru fiecare cerință, cu o categorie și o severitate. Recomandat.",
+    "policyFormatText": "Textul politicii",
+    "policyFormatTextDescription": "Lipiți o politică existentă ca text simplu.",
+    "rulesEmpty": "Încă nu există reguli. Fiecare regulă descrie un lucru pe care intrările nu trebuie să îl conțină sau să îl solicite.",
+    "addRule": "Adaugă regulă",
+    "ruleNumber": "Regula {{number}}",
+    "ruleRemove": "Elimină regula {{number}}",
+    "ruleIdLabel": "ID regulă",
+    "ruleNameLabel": "Nume (opțional)",
+    "ruleTextLabel": "Regulă",
+    "ruleRiskCategory": "Categorie de risc",
+    "ruleApplicability": "Domeniu de aplicare",
+    "ruleFrameworks": "Cadre",
+    "detector": {
+      "promptInjection": {
+        "label": "Injecție de prompt",
+        "description": "Detectează încercări de a suprascrie instrucțiunile sau de a eluda restricțiile modelului."
+      },
+      "policyViolation": {
+        "label": "Încălcare a politicii",
+        "description": "Semnalizează intrările care încalcă politica organizației, scrisă ca text sau reguli.",
+        "descriptionOutput": "Semnalizează răspunsurile care încalcă politica organizației, scrisă ca text sau reguli."
+      },
+      "pii": {
+        "label": "PII și secrete",
+        "description": "Detectează date personale, acreditări, adrese IP și adrese URL."
+      },
+      "keywords": {
+        "label": "Cuvinte-cheie interzise",
+        "descriptionOutput": "Detectează răspunsurile care conțin oricare dintre cuvintele-cheie pe care le enumerați."
+      },
+      "topics": {
+        "label": "Subiecte",
+        "descriptionOutput": "Semnalizează răspunsurile despre oricare dintre subiectele pe care le enumerați."
+      },
+      "toxicity": {
+        "label": "Toxicitate",
+        "description": "Detectează limbaj toxic, insultător, amenințător sau plin de ură."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detectează conținut sexual sau care nu este adecvat la locul de muncă."
+      },
+      "bias": {
+        "label": "Părtinire",
+        "description": "Detectează limbaj părtinitor sau discriminatoriu."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Date personale",
+        "description": "Nume, adrese de e-mail, numere de telefon."
+      },
+      "secrets": {
+        "label": "Secrete",
+        "description": "Chei API, tokenuri, parole."
+      },
+      "ipAddress": {
+        "label": "Adrese IP",
+        "description": "Adrese IPv4 și IPv6."
+      },
+      "url": {
+        "label": "Adrese URL",
+        "description": "Adrese web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Securitate și fraudă",
+      "safetyHarm": "Siguranță și vătămări",
+      "privacyDataProtection": "Confidențialitate și protecția datelor",
+      "brandReputationTrust": "Marcă și reputație",
+      "biasFairnessEthical": "Părtinire și echitate",
+      "legalIpLiability": "Răspundere juridică și de proprietate intelectuală",
+      "productMisuse": "Utilizarea necorespunzătoare a produsului",
+      "performanceQuality": "Performanță și calitate"
+    },
+    "applicability": {
+      "user": "Intrare utilizator",
+      "userAssistant": "Intrare utilizator și răspunsuri"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RGPD",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Regulamentul UE privind IA",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funcție pentru întreprinderi",
+    "enterpriseOnly": "Aceasta este o funcție disponibilă doar pentru întreprinderi.",
+    "readOnly": "Doar proprietarii și administratorii organizației pot modifica aceste setări.",
+    "loadError": "Nu s-au putut încărca furnizorii și modelele.",
+    "tabModels": "Modele",
+    "tabProviders": "Furnizori",
+    "tabGateways": "Porți de acces",
+    "modelsDescription": "Dezactivați un model pentru a-l bloca pentru fiecare membru. Modelele de la furnizorii permiși pornesc activate.",
+    "modelsDeniedOnly": "Doar interzise",
+    "modelsEmpty": "Niciun model nu corespunde acestei căutări.",
+    "providersDescription": "Dezactivați un furnizor pentru a opri rutarea Kilo către acesta pentru această organizație.",
+    "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
+    "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",
+    "allowAllShown": "Permite toate cele afișate",
+    "denyAllShown": "Interzice toate cele afișate",
+    "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",
+    "emptyProviderList": "Permiteți cel puțin un furnizor. O listă goală blochează toate rutele Kilo către modele.",
+    "gatewaysUnavailable": "Setările porților de acces nu sunt disponibile pentru această organizație.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Cererile OpenRouter nu sunt fixate la o regiune.",
+    "inferenceRegion": "Regiune de inferență",
+    "inferenceRegionDescription": "Fixează cererile Vercel AI Gateway la această regiune. Un model care nu este disponibil acolo eșuează.",
+    "disableOpenrouterNote": "Dezactivarea OpenRouter blochează și cheile BYOK care direcționează cererile prin acesta.",
+    "emptyModelList": "Lăsați cel puțin un model activat. Dacă respingeți toate modelele, membrii nu vor avea nimic de folosit.",
+    "catalogUnavailable": "Catalogul complet de modele nu s-a încărcat, așa că sunt afișate doar listele salvate. Reîncercați pentru a încărca toate modelele.",
+    "region": {
+      "global": "Global",
+      "us": "Statele Unite",
+      "eu": "Uniunea Europeană",
+      "au": "Australia",
+      "jp": "Japonia"
+    }
   }
 }

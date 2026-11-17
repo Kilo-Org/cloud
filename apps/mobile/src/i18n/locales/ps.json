@@ -1366,7 +1366,8 @@
       "noReviews": "تر اوسه هېڅ بیاکتنه نشته",
       "noReviewsDescription": "کله چې د کوډ بیاکتونکی د یو پل ریکویسټ بیاکتنه وکړي، بیاکتنې به دلته ښکاره شي.",
       "startManualReview": "لاسي بیاکتنه پیل کړئ",
-      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ"
+      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ",
+      "connectOwnerOnly": "له یو سازمان مالک یا مدیر څخه وغواړئ چې یو خدمت چمتو کوونکی ونښلوي."
     },
     "platformList": {
       "checking": "کتل کېږي…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "له دې وسیلې ووځئ",
     "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}، وروستی لیدل شوی وخت: {{lastSeen}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
+    "sessionSignOutFailed": "له دې ناستې ووتل ونه شول، بیا هڅه وکړئ.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
     "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وروستی لیدل شوی وخت: {{lastSeen}}. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "د تادیاتو تاریخچه",
       "billingHistoryEmpty": "تر اوسه د تادیاتو تاریخچه نشته.",
+      "billingHistoryError": "د تادیاتو تاریخچه بارېدلای نشوه",
       "cancel": "ګډون لغوه کړئ",
       "cancelDescription": "ستاسو Kilo Pass د تادیې دورې تر پایه فعال پاتې کېږي او بیا به نه نوي کېږي.",
       "cancelScheduled": "په {{date}} لغوه کېږي",
       "cancelScheduledChange": "ټاکل شوی بدلون لغوه کړئ",
       "cancelled": "ګډون لغوه شو",
       "creditHistoryEmpty": "تر اوسه د Kilo Pass کریډیټونه نشته.",
+      "creditHistoryError": "د Kilo Pass کریډیټونو تاریخچه بارېدلای نشوه",
       "resume": "ګډون بیا پیل کړئ",
       "resumeCancelledDescription": "ستاسو Kilo Pass بیا په اتومات ډول نوي کېدل پیلوي.",
       "resumePausedDescription": "ستاسو Kilo Pass د بیا پیل له ټاکل شوې نېټې مخکې همدا اوس بیا پیلېږي.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
       "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان ناستې نشي لوډ کېدلی.",
-      "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
+      "accessDeniedDescription": "د یو سازمان له مالک یا مدیر څخه وغوښتئ چې تاسو ته لاسرسی درکړي."
     },
     "create": {
       "title": "سازمان جوړ کړئ",
@@ -3458,16 +3462,27 @@
     },
     "settingsOnWeb": {
       "title": "په ویب کې د سازمان ترتیبات",
-      "integrations": "په ویب کې ادغامونه",
       "usageDetails": "د کارونې جزئیات",
       "providersAndModels": "وړاندې کوونکي او ماډلونه",
       "groups": "ډلې",
       "guardrails": "خوندي حدونه",
       "byok": "خپله کیلي راوړئ",
+      "ssoAndDomain": "SSO او ډومېن",
+      "dataCollection": "د معلوماتو راټولول",
       "auditLogs": "د پلټنې لاګونه",
-      "requestLogs": "د غوښتنو لاګونه",
-      "subOrganizations": "فرعي سازمانونه",
-      "distributeFunds": "پیسې ووېشئ"
+      "requestLogs": "د غوښتنو لاګونه"
+    },
+    "requestLogs": {
+      "hint": "د کړکۍ تر پای وړاندې د یو ساعت غوښتنې، نوې یې لومړی.",
+      "older": "پخوانی ساعت",
+      "newer": "نوی ساعت",
+      "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
+      "emptyTitle": "غوښتنې نشته",
+      "emptyDescription": "په دې ساعت کې د ګېټوې غوښتنې نشته.",
+      "loadError": "د غوښتنو لاګونه بار نه شول.",
+      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
+      "tokens": "{{input}} ننوتي · {{output}} وتلي",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",
@@ -4315,7 +4330,7 @@
       },
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
-      "receiptA11y": "د {{description}} رسید پرانیزئ",
+      "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
       "receiptUnavailable": "د دې پېرود لپاره رسید نشته."
     },
     "title": "کریډیټ وپېرئ",
@@ -4521,6 +4536,8 @@
     "topModels": "مخکښ ماډلونه",
     "topFeatures": "مخکښې ځانګړنې",
     "emptyTitle": "په دې موده کې کارونه نشته",
+    "unavailableTitle": "کارونه د لاسرسي وړ نه ده",
+    "unavailableDescription": "دا کار ځای کارونه راپور نه کوي. بیا هڅه کول به مرسته ونه کړي.",
     "orgSelfNotice": "تاسو په دې سازمان کې خپله کارونه وینئ.",
     "viewDetails": "د کارونې جزئیات وګورئ"
   },
@@ -4592,7 +4609,7 @@
       "fieldCron": "کرون څرګندونه",
       "fieldCronHelp": "پنځه ساحې: دقیقه، ساعت، ورځ، میاشت او د اونۍ ورځ. ترټولو لنډه وقفه یوه دقیقه ده.",
       "fieldTimezone": "د وخت سیمه",
-      "nameLocked": "نوم د ویب‌هوک پتې برخه ده او نه‌شي بدلېدای.",
+      "nameLocked": "ټرېګر له جوړېدو وروسته نوم نه‌شي بدلېدای.",
       "repositoryLocked": "ټرېګر له جوړېدو وروسته مخزن نه‌شي بدلېدای.",
       "environmentAutomatic": "د مخزن له مخې اتومات",
       "notSelected": "نه دی ټاکل شوی",
@@ -4607,6 +4624,7 @@
       "authHeaderLabel": "د سرلیک نوم",
       "authSecretLabel": "ګډ راز",
       "authSecretKeep": "خالي یې پرېږدئ ترڅو خوندي شوی راز وساتل شي.",
+      "authSecretSet": "اړین. پیاوړی تصادفي تار وټاکئ.",
       "authSecretCreator": "کله چې ټرېګر د خپل جوړوونکي په توګه چلېږي، لږ تر لږه 16 توري وکاروئ.",
       "autoCommit": "کله چې چل پای ته ورسیږي، بدلونونه ثبت کړئ.",
       "condenseOnComplete": "کله چې چل پای ته ورسیږي، زمینه لنډه کړئ.",
@@ -4617,6 +4635,7 @@
       "saveFailedTitle": "ټرېګر خوندي نشو",
       "deleteTitle": "دا ټرېګر ړنګ کړو؟",
       "deleteMessage": "{{name}} ته غوښتنې به ناکامې شي. دا بېرته نه‌شی ګرځول کېدای.",
+      "deleteMessageScheduled": "د {{name}} مهال ویش شوې چلېدنې به ودرېږي. دا بېرته نه‌شی ګرځول کېدای.",
       "runNow": "اوس چل کړه",
       "runStarted": "چل پیل شو",
       "created": "ټرېګر جوړ شو",
@@ -4656,8 +4675,9 @@
     "create": "لینک جوړ کړئ",
     "createFailed": "لینک جوړ نه شو.",
     "existingTitle": "موجود لینک",
-    "existingDescription": "دا ناسته لا دمخه د شریکولو لینک لري. نوی لینک جوړول به یې ځای ونیسي او زوړ لینک به نور کار ونه کړي.",
+    "existingDescription": "دا ناسته لا دمخه د شریکولو لینک لري. نوی لینک د دغو تنظیماتو سره جوړول به یې ځای ونیسي او زوړ لینک به نور کار ونه کړي.",
     "rotate": "نوی لینک جوړ کړئ",
+    "replacementSettings": "دا تنظیمات پر نوي لینک پلي کېږي.",
     "revoke": "لینک لرې کړئ",
     "revokeTitle": "لینک لغوه کړئ؟",
     "revokeMessage": "اوسنی لینک سمدلاسه له کاره لوېږي.",
@@ -4676,5 +4696,175 @@
     "unavailableDescription": "د شریکولو دا لینک پای ته رسېدلی یا لغوه شوی دی.",
     "transcriptUnavailableTitle": "د خبرو دا لیکنه بار نه شوه",
     "transcriptUnavailableDescription": "لینک لا هم کار کوي. یوه شېبه وروسته بیا هڅه وکړئ."
+  },
+  "organizationGuardrails": {
+    "title": "د مصنوعي ځیرکتیا ساتونکي",
+    "permissionDenied": "یوازې د سازمان مالکین او مدیران کولی شي د مصنوعي ځیرکتیا ساتونکي مدیریت کړي.",
+    "unavailable": "د مصنوعي ځیرکتیا ساتونکي دې سازمان لپاره شته نه دي.",
+    "loadError": "د مصنوعي ځیرکتیا ساتونکي پورته نشول",
+    "statusSaving": "خوندي کېږي…",
+    "statusSaved": "خوندي شو",
+    "statusFailed": "خوندي نشو.",
+    "inputTitle": "د ننوتلو ساتونکي",
+    "inputDescription": "هر ننوتل د Enkrypt AI سره څېړي، چې د وسیلې پایلې هم شاملې دي. کله چې Enkrypt شته نه وي، یو بندوونکی کشف کوونکی غوښتنه ردوي.",
+    "outputTitle": "د وتلو ساتونکي",
+    "outputDescription": "د Enkrypt AI سره ځوابونه څېړي مخکې لدې چې غړي یې ترلاسه کړي. بند دي تر څو چې تاسو یې فعال نه کړئ.",
+    "detectorsHint": "بندول یوه نښه شوې غوښتنه ردوي. یوازې ثبت یې کوي پرته له دې چې غوښتنه وځنډوي.",
+    "detectorsHintOutput": "بندول یو نښه شوی ځواب ناکاموي. یوازې ثبت یې کوي پرته له دې چې ځواب وځنډوي.",
+    "choiceLog": "یوازې ثبت",
+    "applyTo": "پلي کول په",
+    "applyToAllMembers": "ټول غړي",
+    "applyKiloDefault": "د Kilo بنسټیز پلي کړه",
+    "invalidSavedTitle": "د خوندي شوو ننوتلو کشف کوونکو تنظیمات لوستل نشي",
+    "invalidSavedBody": "غوښتنې بندې دي تر څو چې د ننوتلو کشف کوونکي بیا خوندي شي. لاندې کشف کوونکي د Kilo بنسټیز څخه پیلېږي.",
+    "invalidSavedOutputTitle": "د خوندي شوو وتلو کشف کوونکو تنظیمات لوستل نشي",
+    "invalidSavedOutputBody": "ځوابونه بند ساتل کېږي تر څو چې د وتلو کشف کوونکي بیا خوندي شي. لاندې د وتلو کشف کوونکي وټاکئ.",
+    "blockingOutputNote": "یو بندوونکی د وتلو کشف کوونکی ځواب ساتي تر څو چې Enkrypt ټول کتنه وکړي. د ځنډ مخنیوي لپاره یوازې ثبت وکاروئ.",
+    "inputDetectorRequired": "لږ تر لږه یو د ننوتلو کشف کوونکی فعال کړئ.",
+    "outputDetectorRequired": "لږ تر لږه یو د وتلو کشف کوونکی فعال کړئ.",
+    "rulesTooMany": "تر {{max}} قاعدو پورې اضافه کړئ.",
+    "ruleIdRequired": "د قاعده پېژندونکی ولیکئ.",
+    "ruleIdInvalid": "د قاعده پېژندونکی یوازې توري، شمېرې، نقطې، لنډې کرښې او لاندې کرښې کارولی شي.",
+    "ruleTextRequired": "تشریح کړئ چې قاعده څه منع کوي یا څه غواړي.",
+    "keywordTooLong": "هره کلیدي کلمه تر {{max}} تورو پورې اوږده کېدای شي.",
+    "topicTooLong": "هره موضوع تر {{max}} تورو پورې اوږده کېدای شي.",
+    "keywordsTooMany": "تر {{max}} کلیدي کلمو پورې اضافه کړئ.",
+    "topicsTooMany": "تر {{max}} موضوعاتو پورې اضافه کړئ.",
+    "piiEntityRequired": "لږ تر لږه د کشفولو وړ معلوماتو یو ډول وټاکئ.",
+    "keywordRequired": "لږ تر لږه یوه کلیدي کلمه اضافه کړئ.",
+    "topicRequired": "لږ تر لږه یوه موضوع اضافه کړئ.",
+    "policyTextRequired": "د پالیسۍ متن ولیکئ.",
+    "ruleRequired": "لږ تر لږه یوه قاعده اضافه کړئ.",
+    "ruleIdDuplicate": "هره قاعده خپل د قاعدې ID ته اړتیا لري.",
+    "piiEntities": "د کشفولو وړ معلومات",
+    "keywordsLabel": "کلیدي کلمې",
+    "keywordsHint": "په هرې کرښې کې یوه کلیدي کلمه.",
+    "topicsHint": "په هرې کرښې کې یوه موضوع.",
+    "policyFormat": "د پالیسۍ بڼه",
+    "policyFormatRules": "جوړښت لرونکې قاعدې",
+    "policyFormatRulesDescription": "هرې اړتیا لپاره یوه قاعده، د یوې کټګورۍ او شدت سره. وړاندیز شوی.",
+    "policyFormatText": "د پالیسۍ متن",
+    "policyFormatTextDescription": "شته پالیسي د ساده متن په بڼه ولګوه.",
+    "rulesEmpty": "تر اوسه هېڅ قاعده نشته. هره قاعده یو شی بیانوي چې ننوتل باید هغه ونه لري یا یې غوښتنه ونه کړي.",
+    "addRule": "قاعده اضافه کړه",
+    "ruleNumber": "قاعده {{number}}",
+    "ruleRemove": "قاعده {{number}} لرې کړه",
+    "ruleIdLabel": "د قاعده پېژندونکی",
+    "ruleNameLabel": "نوم (اختیاري)",
+    "ruleTextLabel": "قاعده",
+    "ruleRiskCategory": "د خطر کټګوري",
+    "ruleApplicability": "حدوده",
+    "ruleFrameworks": "چوکاټونه",
+    "detector": {
+      "promptInjection": {
+        "label": "د لارښوونې داخلول",
+        "description": "د لارښوونو د لغوه کولو یا ماډل له محدودیتونو د وتلو هڅې کشفوي."
+      },
+      "policyViolation": {
+        "label": "د پالیسۍ سرغړونه",
+        "description": "هغه ننوتل په نښه کوي چې ستاسو د سازمان پالیسي ماتوي، که د متن یا قاعدو په بڼه لیکل شوې وي.",
+        "descriptionOutput": "هغه ځوابونه په نښه کوي چې ستاسو د سازمان پالیسي ماتوي، که د متن یا قاعدو په بڼه لیکل شوې وي."
+      },
+      "pii": {
+        "label": "PII او رازونه",
+        "description": "شخصي معلومات، د اعتبار اسناد، د انټرنېټ پروتوکول پتې او URLونه کشفوي."
+      },
+      "keywords": {
+        "label": "منع شوې کلیدي کلمې",
+        "descriptionOutput": "هغه ځوابونه کشفوي چې ستاسو د لېست شوو کلیدي کلمو څخه هر یوه ولري."
+      },
+      "topics": {
+        "label": "موضوعات",
+        "descriptionOutput": "هغه ځوابونه په نښه کوي چې ستاسو د لېست شوو موضوعاتو څخه هر یوې په اړه وي."
+      },
+      "toxicity": {
+        "label": "زهرجنتیا",
+        "description": "زهرجن، سپکاوی کوونکی، ګواښوونکی یا کرکه لرونکی ژبه کشفوي."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "جنسي یا په بل ډول د کار لپاره ناامن منځپانګې کشفوي."
+      },
+      "bias": {
+        "label": "تعصب",
+        "description": "تعصب لرونکې یا تبعیضي ژبه کشفوي."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "شخصي معلومات",
+        "description": "نومونه، برېښنالیک پتې، تلیفون شمېرې."
+      },
+      "secrets": {
+        "label": "رازونه",
+        "description": "د API کیلي، د لاسرسي نښې، پټنومونه."
+      },
+      "ipAddress": {
+        "label": "د انټرنېټ پروتوکول پتې",
+        "description": "IPv4 او IPv6 پتې."
+      },
+      "url": {
+        "label": "URLونه",
+        "description": "وېب پتې."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "امنیت او درغلي",
+      "safetyHarm": "خوندیتوب او زیان",
+      "privacyDataProtection": "محرمیت او د معلوماتو ساتنه",
+      "brandReputationTrust": "نښه او شهرت",
+      "biasFairnessEthical": "تعصب او انصاف",
+      "legalIpLiability": "قانوني او د معنوي مالکیت مسؤلیت",
+      "productMisuse": "د محصول ناوړه کارونه",
+      "performanceQuality": "کارکرد او کیفیت"
+    },
+    "applicability": {
+      "user": "د کارونکي ننوتل",
+      "userAssistant": "د کارونکي ننوتل او ځوابونه"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "د شرکت ځانګړتیا",
+    "enterpriseOnly": "دا یوازې د سوداګریزې موسسې ځانګړتیا ده.",
+    "readOnly": "یوازې د سازمان مالکین او مدیران کولی شي دا تنظیمات بدل کړي.",
+    "loadError": "عرضه کوونکي او ماډلونه پورته نشول",
+    "tabModels": "ماډلونه",
+    "tabProviders": "عرضه کوونکي",
+    "tabGateways": "دروازې",
+    "modelsDescription": "یو ماډل غیر فعال کړئ تر څو یې د هر غړي لپاره بند کړئ. د اجازه ورکړل شوو عرضه کوونکو ماډلونه په پیل کې فعال وي.",
+    "modelsDeniedOnly": "یوازې منع شوي",
+    "modelsEmpty": "هیڅ ماډل دې پلټنې سره سمون نه لري.",
+    "providersDescription": "یو عرضه کوونکی غیر فعال کړئ تر څو Kilo دې سازمان لپاره هغه ته د غوښتنو لېږل ودروي.",
+    "providersNeedCatalog": "تر هغه چې د ماډلونو بشپړ کتلاګ بار نه شي، د عرضه کوونکو سویچونه یوازې د لوستلو لپاره پاتې کېږي. د هغوی د سمولو لپاره پورته د بیا هڅه وکړئ تڼۍ کېکاږئ.",
+    "providersEmpty": "هیڅ عرضه کوونکی دې پلټنې سره سمون نه لري.",
+    "allowAllShown": "ټولو ښودل شوو ته اجازه ورکړه",
+    "denyAllShown": "ټول ښودل شوي منع کړه",
+    "gatewaysDescription": "Kilo د ماډل غوښتنې د Vercel AI Gateway یا OpenRouter له لارې لېږي. یوه غیر فعاله دروازه هغه غوښتنې ناکاموي.",
+    "emptyProviderList": "لږ تر لږه یو عرضه کوونکي ته اجازه ورکړئ. تش لېست د Kilo د ماډل ټولې لارې بندوي.",
+    "gatewaysUnavailable": "د دروازې تنظیمات د دې سازمان لپاره شتون نه لري.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "د OpenRouter غوښتنې یوې سیمې ته نه ټاکل کېږي.",
+    "inferenceRegion": "د استنباط سیمه",
+    "inferenceRegionDescription": "د Vercel AI Gateway غوښتنې دې سیمې ته ټاکي. هغه ماډل چې هلته شته نه وي ناکامېږي.",
+    "disableOpenrouterNote": "د OpenRouter غیر فعالول هغه BYOK کیلي هم بندوي چې غوښتنې د هغه له لارې لېږي.",
+    "emptyModelList": "لږ تر لږه یو ماډل فعال پرېږدئ. که ټول ماډلونه رد کړئ، غړو ته د کارولو لپاره هېڅ نه پاتې کېږي.",
+    "catalogUnavailable": "د ماډلونو بشپړ کتلاګ لوډ نه شو، نو یوازې ستاسو خوندي شوي لېستونه ښودل کېږي. د ټولو ماډلونو د لوډولو لپاره بیا هڅه وکړئ.",
+    "region": {
+      "global": "نړیوال",
+      "us": "د امریکا متحده ایالات",
+      "eu": "اروپایي اتحادیه",
+      "au": "آسټرالیا",
+      "jp": "جاپان"
+    }
   }
 }

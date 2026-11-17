@@ -104,6 +104,13 @@ export async function sendUpstreamAttempt({
   dataRegion,
   upstreamDurationBudgetMs,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
+  if (
+    !isAutoSmallFreeModel(requestedModel) &&
+    !(await gatewayServesModel(providerContext.provider, requestedModel))
+  ) {
+    return { type: 'unknown-gateway-model' };
+  }
+
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
     providerContext.provider,
@@ -137,13 +144,6 @@ export async function sendUpstreamAttempt({
         response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
       };
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
-  }
-
-  if (
-    !isAutoSmallFreeModel(requestedModel) &&
-    !(await gatewayServesModel(providerContext.provider, requestedModel))
-  ) {
-    return { type: 'unknown-gateway-model' };
   }
 
   const result = await upstreamRequest({

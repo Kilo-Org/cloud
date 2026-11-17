@@ -1366,7 +1366,8 @@
       "noReviews": "Ei vielä katselmointeja",
       "noReviewsDescription": "Katselmoinnit näkyvät tässä, kun koodikatselmoija on katselmoinut muutospyynnön.",
       "startManualReview": "Aloita manuaalinen katselmointi",
-      "configureProvider": "Määritä palveluntarjoaja"
+      "configureProvider": "Määritä palveluntarjoaja",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään palveluntarjoajan."
     },
     "platformList": {
       "checking": "Tarkistetaan…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Kirjaa tämä laite ulos",
     "signOutSessionLabel": "Kirjaa {{device}} ulos, kirjautunut {{signedIn}}, viimeksi käytössä {{lastSeen}}",
     "sessionSignedOut": "Istunto kirjattiin ulos.",
+    "sessionSignOutFailed": "Istuntoa ei voitu kirjata ulos. Yritä uudelleen.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
     "signOutThisSessionMessage": "{{device}} kirjataan ulos. Viimeksi käytössä {{lastSeen}}. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Laskutushistoria",
       "billingHistoryEmpty": "Ei vielä laskutushistoriaa.",
+      "billingHistoryError": "Laskutushistoriaa ei voitu ladata",
       "cancel": "Peru tilaus",
       "cancelDescription": "Kilo Pass pysyy voimassa laskutuskauden loppuun asti, eikä sitä uusita.",
       "cancelScheduled": "Päättyy {{date}}",
       "cancelScheduledChange": "Peru ajoitettu muutos",
       "cancelled": "Tilaus peruttu",
       "creditHistoryEmpty": "Ei vielä Kilo Pass -krediittejä.",
+      "creditHistoryError": "Krediittihistoriaa ei voitu ladata",
       "resume": "Jatka tilausta",
       "resumeCancelledDescription": "Kilo Pass alkaa taas uusiutua automaattisesti.",
       "resumePausedDescription": "Kilo Pass jatkuu nyt, ennen ajoitettua jatkamispäivää.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
-      "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
+      "accessDeniedDescription": "Pyydä organisaation omistajaa tai ylläpitäjää myöntämään sinulle pääsy."
     },
     "create": {
       "title": "Luo organisaatio",
@@ -3458,16 +3462,27 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
-      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
+      "ssoAndDomain": "SSO ja verkkotunnus",
+      "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
-      "requestLogs": "Pyyntölokit",
-      "subOrganizations": "Alaorganisaatiot",
-      "distributeFunds": "Jaa varoja"
+      "requestLogs": "Pyyntölokit"
+    },
+    "requestLogs": {
+      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
+      "older": "Edellinen tunti",
+      "newer": "Seuraava tunti",
+      "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
+      "emptyTitle": "Ei pyyntöjä",
+      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
+      "loadError": "Pyyntölokien lataaminen epäonnistui.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "tokens": "{{input}} sisään · {{output}} ulos",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -4315,7 +4330,7 @@
       },
       "purchaseFallback": "Krediittiosto",
       "receipt": "Kuitti",
-      "receiptA11y": "Avaa kuitti: {{description}}",
+      "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia."
     },
     "title": "Osta krediittejä",
@@ -4521,6 +4536,8 @@
     "topModels": "Käytetyimmät mallit",
     "topFeatures": "Käytetyimmät ominaisuudet",
     "emptyTitle": "Ei käyttöä tällä aikavälillä",
+    "unavailableTitle": "Käyttö ei ole saatavilla",
+    "unavailableDescription": "Tämä työtila ei raportoi käyttöä. Uudelleen yrittäminen ei auta.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
     "viewDetails": "Näytä käytön tiedot"
   },
@@ -4592,7 +4609,7 @@
       "fieldCron": "Cron-lauseke",
       "fieldCronHelp": "Viisi kenttää: minuutti, tunti, päivä, kuukausi ja viikonpäivä. Lyhin väli on yksi minuutti.",
       "fieldTimezone": "Aikavyöhyke",
-      "nameLocked": "Nimi on osa verkkokoukun URL-osoitetta, eikä sitä voi muuttaa.",
+      "nameLocked": "Nimeä ei voi muuttaa, kun liipaisin on luotu.",
       "repositoryLocked": "Tietovarastoa ei voi muuttaa, kun liipaisin on luotu.",
       "environmentAutomatic": "Automaattinen tietovaraston mukaan",
       "notSelected": "Ei valittu",
@@ -4607,6 +4624,7 @@
       "authHeaderLabel": "Otsakkeen nimi",
       "authSecretLabel": "Jaettu salaisuus",
       "authSecretKeep": "Jätä tyhjäksi, jos haluat säilyttää tallennetun salaisuuden.",
+      "authSecretSet": "Pakollinen. Valitse vahva satunnainen merkkijono.",
       "authSecretCreator": "Käytä vähintään 16 merkkiä, kun liipaisin ajetaan sen luojan oikeuksilla.",
       "autoCommit": "Vahvista muutokset, kun ajo päättyy",
       "condenseOnComplete": "Tiivistä konteksti, kun ajo päättyy",
@@ -4617,6 +4635,7 @@
       "saveFailedTitle": "Liipaisimen tallennus epäonnistui",
       "deleteTitle": "Poistetaanko tämä liipaisin?",
       "deleteMessage": "Kutsut kohteeseen {{name}} epäonnistuvat. Tätä ei voi kumota.",
+      "deleteMessageScheduled": "Liipaisimen {{name}} ajastetut suoritukset pysähtyvät. Tätä ei voi kumota.",
       "runNow": "Suorita nyt",
       "runStarted": "Ajo aloitettu",
       "created": "Liipaisin luotu",
@@ -4656,8 +4675,9 @@
     "create": "Luo linkki",
     "createFailed": "Linkin luominen epäonnistui.",
     "existingTitle": "Olemassa oleva linkki",
-    "existingDescription": "Tällä istunnolla on jo jakolinkki. Uuden luominen korvaa sen, ja vanha linkki lakkaa toimimasta.",
+    "existingDescription": "Tällä istunnolla on jo jakolinkki. Uuden linkin luominen näillä asetuksilla korvaa sen, ja vanha linkki lakkaa toimimasta.",
     "rotate": "Luo uusi linkki",
+    "replacementSettings": "Nämä asetukset koskevat uutta linkkiä.",
     "revoke": "Mitätöi linkki",
     "revokeTitle": "Mitätöidäänkö linkki?",
     "revokeMessage": "Nykyinen linkki lakkaa toimimasta välittömästi.",
@@ -4676,5 +4696,175 @@
     "unavailableDescription": "Tämä jakolinkki on vanhentunut tai mitätöity.",
     "transcriptUnavailableTitle": "Tätä transkriptiota ei voitu ladata",
     "transcriptUnavailableDescription": "Linkki toimii yhä. Yritä hetken kuluttua uudelleen."
+  },
+  "organizationGuardrails": {
+    "title": "AI-suojakaiteet",
+    "permissionDenied": "Vain organisaation omistajat ja ylläpitäjät voivat hallita AI-suojakaiteita.",
+    "unavailable": "AI-suojakaiteet eivät ole käytettävissä tässä organisaatiossa.",
+    "loadError": "AI-suojakaiteita ei voitu ladata",
+    "statusSaving": "Tallennetaan…",
+    "statusSaved": "Tallennettu",
+    "statusFailed": "Tallennus epäonnistui.",
+    "inputTitle": "Syötteen suojakaiteet",
+    "inputDescription": "Tarkistaa jokaisen syötteen Enkrypt AI:lla, myös työkalujen tulokset. Estävä tunnistin hylkää pyynnön, kun Enkrypt ei ole käytettävissä.",
+    "outputTitle": "Tulosteen suojakaiteet",
+    "outputDescription": "Tarkistaa vastaukset Enkrypt AI:lla ennen kuin jäsenet saavat ne. Ei käytössä, ellet ota sitä käyttöön.",
+    "detectorsHint": "Estä hylkää merkityn pyynnön. Vain kirjaus tallentaa sen viivästyttämättä pyyntöä.",
+    "detectorsHintOutput": "Estä hylkää merkityn vastauksen. Vain kirjaus tallentaa sen viivästyttämättä vastausta.",
+    "choiceLog": "Vain kirjaus",
+    "applyTo": "Koskee",
+    "applyToAllMembers": "Kaikki jäsenet",
+    "applyKiloDefault": "Käytä Kilo-oletusta",
+    "invalidSavedTitle": "Tallennettuja syötetunnistimien asetuksia ei voi lukea",
+    "invalidSavedBody": "Pyynnöt estetään, kunnes syötetunnistimet tallennetaan uudelleen. Alla olevat tunnistimet perustuvat Kilo-oletukseen.",
+    "invalidSavedOutputTitle": "Tallennettuja tulostetunnistimien asetuksia ei voi lukea",
+    "invalidSavedOutputBody": "Vastaukset pidätetään, kunnes tulostetunnistimet tallennetaan uudelleen. Valitse tulostetunnistimet alta.",
+    "blockingOutputNote": "Estävä tulostetunnistin pidättää vastauksen, kunnes Enkrypt on tarkistanut sen kokonaan. Vältä viive valitsemalla Vain kirjaus.",
+    "inputDetectorRequired": "Ota käyttöön vähintään yksi syötetunnistin.",
+    "outputDetectorRequired": "Ota käyttöön vähintään yksi tulostetunnistin.",
+    "rulesTooMany": "Lisää enintään {{max}} sääntöä.",
+    "ruleIdRequired": "Anna säännön tunnus.",
+    "ruleIdInvalid": "Säännön tunnuksessa voi käyttää vain kirjaimia, numeroita, pisteitä, yhdysmerkkejä ja alaviivoja.",
+    "ruleTextRequired": "Kuvaa, mitä sääntö kieltää tai edellyttää.",
+    "keywordTooLong": "Kunkin avainsanan enimmäispituus on {{max}} merkkiä.",
+    "topicTooLong": "Kunkin aiheen enimmäispituus on {{max}} merkkiä.",
+    "keywordsTooMany": "Lisää enintään {{max}} avainsanaa.",
+    "topicsTooMany": "Lisää enintään {{max}} aihetta.",
+    "piiEntityRequired": "Valitse vähintään yksi tunnistettava tietotyyppi.",
+    "keywordRequired": "Lisää vähintään yksi avainsana.",
+    "topicRequired": "Lisää vähintään yksi aihe.",
+    "policyTextRequired": "Syötä käytäntöteksti.",
+    "ruleRequired": "Lisää vähintään yksi sääntö.",
+    "ruleIdDuplicate": "Jokaisella säännöllä on oltava oma sääntö-ID.",
+    "piiEntities": "Tunnistettavat tiedot",
+    "keywordsLabel": "Avainsanat",
+    "keywordsHint": "Yksi avainsana riviä kohden.",
+    "topicsHint": "Yksi aihe riviä kohden.",
+    "policyFormat": "Käytännön muoto",
+    "policyFormatRules": "Jäsennellyt säännöt",
+    "policyFormatRulesDescription": "Yksi sääntö kutakin vaatimusta kohden, luokan ja vakavuuden kera. Suositeltu.",
+    "policyFormatText": "Käytäntöteksti",
+    "policyFormatTextDescription": "Liitä olemassa oleva käytäntö pelkkänä tekstinä.",
+    "rulesEmpty": "Ei vielä sääntöjä. Kukin sääntö kuvaa yhden asian, jota syötteet eivät saa sisältää tai pyytää.",
+    "addRule": "Lisää sääntö",
+    "ruleNumber": "Sääntö {{number}}",
+    "ruleRemove": "Poista sääntö {{number}}",
+    "ruleIdLabel": "Säännön tunnus",
+    "ruleNameLabel": "Nimi (valinnainen)",
+    "ruleTextLabel": "Sääntö",
+    "ruleRiskCategory": "Riskiluokka",
+    "ruleApplicability": "Soveltamisala",
+    "ruleFrameworks": "Viitekehykset",
+    "detector": {
+      "promptInjection": {
+        "label": "Kehoteinjektio",
+        "description": "Tunnistaa yritykset ohittaa ohjeet tai murtaa mallin rajoitukset (jailbreak)."
+      },
+      "policyViolation": {
+        "label": "Käytäntörikkomus",
+        "description": "Merkitsee syötteet, jotka rikkovat organisaatiosi tekstinä tai sääntöinä kirjoitettua käytäntöä.",
+        "descriptionOutput": "Merkitsee vastaukset, jotka rikkovat organisaatiosi tekstinä tai sääntöinä kirjoitettua käytäntöä."
+      },
+      "pii": {
+        "label": "Henkilötiedot ja salaisuudet",
+        "description": "Tunnistaa henkilötiedot, kirjautumistiedot, IP-osoitteet ja URL-osoitteet."
+      },
+      "keywords": {
+        "label": "Kielletyt avainsanat",
+        "descriptionOutput": "Tunnistaa vastaukset, jotka sisältävät jonkin luettelemistasi avainsanoista."
+      },
+      "topics": {
+        "label": "Aiheet",
+        "descriptionOutput": "Merkitsee vastaukset, jotka käsittelevät jotakin luettelemistasi aiheista."
+      },
+      "toxicity": {
+        "label": "Toksisuus",
+        "description": "Tunnistaa toksisen, loukkaavan, uhkaavan tai vihamielisen kielen."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Tunnistaa seksuaalisen tai muuten työympäristöön sopimattoman sisällön."
+      },
+      "bias": {
+        "label": "Puolueellisuus",
+        "description": "Tunnistaa puolueellisen tai syrjivän kielen."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Henkilötiedot",
+        "description": "Nimet, sähköpostiosoitteet, puhelinnumerot."
+      },
+      "secrets": {
+        "label": "Salaisuudet",
+        "description": "API-avaimet, tokenit, salasanat."
+      },
+      "ipAddress": {
+        "label": "IP-osoitteet",
+        "description": "IPv4- ja IPv6-osoitteet."
+      },
+      "url": {
+        "label": "URL-osoitteet",
+        "description": "Verkko-osoitteet."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Tietoturva ja petokset",
+      "safetyHarm": "Turvallisuus ja vahingot",
+      "privacyDataProtection": "Yksityisyys ja tietosuoja",
+      "brandReputationTrust": "Brändi ja maine",
+      "biasFairnessEthical": "Puolueellisuus ja reiluus",
+      "legalIpLiability": "Oikeudellinen vastuu ja immateriaalioikeudet",
+      "productMisuse": "Tuotteen väärinkäyttö",
+      "performanceQuality": "Suorituskyky ja laatu"
+    },
+    "applicability": {
+      "user": "Käyttäjän syöte",
+      "userAssistant": "Käyttäjän syöte ja vastaukset"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU:n tekoälysäädös",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise-ominaisuus",
+    "enterpriseOnly": "Tämä ominaisuus on saatavilla vain Enterprise-tilauksessa.",
+    "readOnly": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa näitä asetuksia.",
+    "loadError": "Palveluntarjoajia ja malleja ei voitu ladata",
+    "tabModels": "Mallit",
+    "tabProviders": "Palveluntarjoajat",
+    "tabGateways": "Yhdyskäytävät",
+    "modelsDescription": "Poista malli käytöstä estääksesi sen kaikilta jäseniltä. Sallittujen palveluntarjoajien mallit ovat oletuksena käytössä.",
+    "modelsDeniedOnly": "Vain estetyt",
+    "modelsEmpty": "Haulla ei löytynyt malleja.",
+    "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
+    "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
+    "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
+    "allowAllShown": "Salli kaikki näytetyt",
+    "denyAllShown": "Estä kaikki näytetyt",
+    "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",
+    "emptyProviderList": "Salli vähintään yksi palveluntarjoaja. Tyhjä luettelo estää kaikki Kilon mallireitit.",
+    "gatewaysUnavailable": "Yhdyskäytäväasetukset eivät ole käytettävissä tässä organisaatiossa.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-pyyntöjä ei ole sidottu tiettyyn alueeseen.",
+    "inferenceRegion": "Päättelyalue",
+    "inferenceRegionDescription": "Sitoo Vercel AI Gateway -pyynnöt tähän alueeseen. Pyynnöt malleille, jotka eivät ole saatavilla alueella, epäonnistuvat.",
+    "disableOpenrouterNote": "OpenRouterin poistaminen käytöstä estää myös BYOK-avaimet, jotka reitittävät pyyntöjä sen kautta.",
+    "emptyModelList": "Jätä vähintään yksi malli käyttöön. Jos estät kaikki mallit, jäsenillä ei ole mitään käytettävää.",
+    "catalogUnavailable": "Koko malliluettelo ei latautunut, joten vain tallennetut luettelosi näytetään. Yritä uudelleen ladataksesi kaikki mallit.",
+    "region": {
+      "global": "Maailmanlaajuinen",
+      "us": "Yhdysvallat",
+      "eu": "Euroopan unioni",
+      "au": "Australia",
+      "jp": "Japani"
+    }
   }
 }

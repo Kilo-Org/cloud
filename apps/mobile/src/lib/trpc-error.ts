@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
+import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
 
 import { isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 
@@ -83,6 +84,19 @@ const TERMINAL_TRPC_CODES = [
 /** True only for tRPC codes the user cannot recover from by retrying. */
 export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
+}
+
+/**
+ * True when the error's tRPC message names the unconfigured usage source
+ * (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`). The wire carries only the code and
+ * message, so the string is the one signal a client has; the constant is
+ * matched by identity with the one the server imported.
+ *
+ * The condition is terminal: with no usage source configured, no future read
+ * can succeed, so a screen that acts on it must show its no-retry state.
+ */
+export function isUsageSourceUnavailable(error: unknown): boolean {
+  return isUsageSourceNotConfigured(readTrpcErrorField(error, 'message'));
 }
 
 /** Whether asking the server again can plausibly succeed for this failure. */

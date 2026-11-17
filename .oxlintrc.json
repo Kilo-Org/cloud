@@ -138,6 +138,8 @@
       }
     },
     {
+      // The test override near the end of this file turns some of these rules off
+      // for test files: when adding a rule here, classify it there in the same change.
       "files": ["services/**/*.ts", "packages/**/*.ts"],
       "rules": {
         "@typescript-eslint/no-empty-object-type": "error",
@@ -167,7 +169,6 @@
       // result out of the override array order: those packages inherit the
       // rule from the shared override above, and every other service file
       // stays off.
-      // Those services are outside tooling reach, so the assertion-removal check stays off for them.
       "files": ["services/**/*.ts"],
       "excludeFiles": [
         "services/ai-attribution/**/*.ts",
@@ -211,7 +212,16 @@
     },
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
-      // Tests assert on untyped fixtures, so the strict type-safety checks stay off here.
+      // Tests assert on untyped fixtures, so this override turns off only the checks
+      // that fixture assertions trip: the `any`-flow rules, the two assertion rules,
+      // and `unbound-method` (jest mocks). Test files keep every other strict check,
+      // because those report defects in the test code itself, not in fixture typing:
+      // no-empty-object-type, await-thenable, no-base-to-string,
+      // no-duplicate-type-constituents, no-for-in-array, no-implied-eval,
+      // no-unsafe-enum-comparison, no-unsafe-unary-minus, restrict-plus-operands and
+      // restrict-template-expressions — except where a further tree-specific override
+      // turns one of them off again (cloud-agent-sdk and the three trees of the
+      // Interpolation-by-design override above).
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-non-null-assertion": "off",

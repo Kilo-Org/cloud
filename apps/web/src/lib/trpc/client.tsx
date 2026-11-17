@@ -16,16 +16,22 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createNoRetryEventSource } from '@/lib/trpc/noRetryEventSource';
 import { stepUpLink } from '@/lib/trpc/step-up-link';
 
-function getUrl() {
+function getUrl(endpoint: string) {
   const base = (() => {
     if (typeof window !== 'undefined') return '';
     if (buildInfo.vercelUrl) return `https://${buildInfo.vercelUrl}`;
     return APP_URL;
   })();
-  return `${base}/api/trpc`;
+  return `${base}${endpoint}`;
 }
 
-export function TRPCContext(props: { children: React.ReactNode }) {
+/**
+ * `endpoint` defaults to the main tRPC entry point. The app shell mounts this
+ * again with its own entry point, because its session cookie only covers
+ * `/app-shell` and the main entry point never reads it.
+ */
+export function TRPCContext(props: { children: React.ReactNode; endpoint?: string }) {
+  const endpoint = props.endpoint ?? '/api/trpc';
   // NOTE: Avoid useState when initializing the query client if you don't
   //       have a suspense boundary between this and the code that may
   //       suspend because React will throw away the client on the initial
@@ -36,7 +42,7 @@ export function TRPCContext(props: { children: React.ReactNode }) {
       typeof window === 'undefined'
         ? null
         : httpSubscriptionLink({
-            url: getUrl(),
+            url: getUrl(endpoint),
             EventSource: createNoRetryEventSource(EventSource),
             eventSourceOptions: () => ({}),
           });
@@ -49,10 +55,10 @@ export function TRPCContext(props: { children: React.ReactNode }) {
             false: splitLink({
               condition: op => op.context.skipBatch === true,
               true: httpLink({
-                url: getUrl(),
+                url: getUrl(endpoint),
               }),
               false: httpBatchLink({
-                url: getUrl(),
+                url: getUrl(endpoint),
               }),
             }),
           }),
@@ -61,10 +67,10 @@ export function TRPCContext(props: { children: React.ReactNode }) {
           splitLink({
             condition: op => op.context.skipBatch === true,
             true: httpLink({
-              url: getUrl(),
+              url: getUrl(endpoint),
             }),
             false: httpBatchLink({
-              url: getUrl(),
+              url: getUrl(endpoint),
             }),
           }),
         ];
@@ -74,7 +80,7 @@ export function TRPCContext(props: { children: React.ReactNode }) {
         stepUpLink(),
         splitLink({
           condition: op => op.path === 'admin.gatewayConfig.previewOrganizationFeatures',
-          true: httpLink({ url: getUrl(), methodOverride: 'POST' }),
+          true: httpLink({ url: getUrl(endpoint), methodOverride: 'POST' }),
           false: links,
         }),
       ],

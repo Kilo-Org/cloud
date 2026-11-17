@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 위반"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "보안 검사에 업데이트가 있습니다"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo 세션을 휴대폰에서 제어할 준비가 되었습니다"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

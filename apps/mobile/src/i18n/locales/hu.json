@@ -1366,7 +1366,8 @@
       "noReviews": "Még nincsenek kódellenőrzések",
       "noReviewsDescription": "A kódellenőrzések itt jelennek meg, miután a kódellenőrző lefut egy PR-en.",
       "startManualReview": "Kézi kódellenőrzés indítása",
-      "configureProvider": "Szolgáltató beállítása"
+      "configureProvider": "Szolgáltató beállítása",
+      "connectOwnerOnly": "Kérd meg a szervezet egy tulajdonosát vagy adminisztrátorát, hogy csatlakoztasson egy szolgáltatót."
     },
     "platformList": {
       "checking": "Ellenőrzés…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Kijelentkezés erről az eszközről",
     "signOutSessionLabel": "Kijelentkezés innen: {{device}}, bejelentkezés: {{signedIn}}, utolsó aktivitás: {{lastSeen}}",
     "sessionSignedOut": "Sikeres kijelentkezés a munkamenetből.",
+    "sessionSignOutFailed": "Nem sikerült kijelentkezni ebből a munkamenetből. Próbáld újra.",
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
     "signOutThisSessionMessage": "{{device}} ki lesz jelentkeztetve. Utolsó aktivitás: {{lastSeen}}. Az API-hozzáférése még legfeljebb egy óráig megmaradhat.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Számlázási előzmények",
       "billingHistoryEmpty": "Még nincsenek számlázási előzmények.",
+      "billingHistoryError": "Nem sikerült betölteni a számlázási előzményeket",
       "cancel": "Előfizetés lemondása",
       "cancelDescription": "A Kilo Pass a számlázási időszak végéig aktív marad, és nem újul meg.",
       "cancelScheduled": "Megszűnik: {{date}}",
       "cancelScheduledChange": "Ütemezett módosítás visszavonása",
       "cancelled": "Előfizetés lemondva",
       "creditHistoryEmpty": "Még nincsenek Kilo Pass-kreditek.",
+      "creditHistoryError": "Nem sikerült betölteni a kredit-előzményeket",
       "resume": "Előfizetés folytatása",
       "resumeCancelledDescription": "A Kilo Pass ismét automatikusan megújul.",
       "resumePausedDescription": "A Kilo Pass most folytatódik, még az ütemezett folytatási dátum előtt.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Szervezet kiválasztása",
       "unavailableDescription": "Ez a szervezet már nem érhető el. A folytatáshoz válassz egyet a profilodból.",
       "unavailableSessionsDescription": "Ez a szervezet már nem érhető el. A munkamenetei nem tölthetők be.",
-      "accessDeniedDescription": "Nincs hozzáférésed ehhez a szervezethez."
+      "accessDeniedDescription": "Kérj hozzáférést egy szervezet tulajdonosától vagy adminisztrátorától."
     },
     "create": {
       "title": "Szervezet létrehozása",
@@ -3458,16 +3462,27 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
-      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
       "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
+      "ssoAndDomain": "SSO és domain",
+      "dataCollection": "Adatgyűjtés",
       "auditLogs": "Auditnaplók",
-      "requestLogs": "Kérésnaplók",
-      "subOrganizations": "Alszervezetek",
-      "distributeFunds": "Pénzeszközök elosztása"
+      "requestLogs": "Kérésnaplók"
+    },
+    "requestLogs": {
+      "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",
+      "older": "Korábbi óra",
+      "newer": "Későbbi óra",
+      "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
+      "emptyTitle": "Nincsenek kérések",
+      "emptyDescription": "Ebben az órában nem volt gateway-kérés.",
+      "loadError": "Nem sikerült betölteni a kérésnaplókat.",
+      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "tokens": "{{input}} be · {{output}} ki",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",
@@ -4315,7 +4330,7 @@
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
-      "receiptA11y": "Nyugta megnyitása: {{description}}",
+      "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
     },
     "title": "Kreditek vásárlása",
@@ -4521,6 +4536,8 @@
     "topModels": "Leggyakoribb modellek",
     "topFeatures": "Leggyakoribb funkciók",
     "emptyTitle": "Nincs használat ebben az időszakban",
+    "unavailableTitle": "A használat nem érhető el",
+    "unavailableDescription": "Ez a munkaterület nem jelent használatot. Az újrapróbálkozás nem segít.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
     "viewDetails": "Használati részletek megtekintése"
   },
@@ -4592,7 +4609,7 @@
       "fieldCron": "Cron-kifejezés",
       "fieldCronHelp": "Öt mező: perc, óra, nap, hónap és hét napja. A legrövidebb időköz egy perc.",
       "fieldTimezone": "Időzóna",
-      "nameLocked": "A név a webhook URL része, és nem módosítható.",
+      "nameLocked": "A név nem módosítható a trigger létrehozása után.",
       "repositoryLocked": "A tároló nem módosítható a trigger létrehozása után.",
       "environmentAutomatic": "Automatikus a tároló alapján",
       "notSelected": "Nincs kiválasztva",
@@ -4607,6 +4624,7 @@
       "authHeaderLabel": "Fejléc neve",
       "authSecretLabel": "Megosztott titok",
       "authSecretKeep": "Hagyja üresen a mentett titok megtartásához.",
+      "authSecretSet": "Kötelező. Válasszon egy erős véletlen karakterláncot.",
       "authSecretCreator": "Használjon legalább 16 karaktert, ha a trigger a létrehozójaként fut.",
       "autoCommit": "A módosítások véglegesítése a futás befejezésekor",
       "condenseOnComplete": "A kontextus tömörítése a futás befejezésekor",
@@ -4617,6 +4635,7 @@
       "saveFailedTitle": "Nem sikerült menteni a triggert",
       "deleteTitle": "Törli ezt a triggert?",
       "deleteMessage": "A {{name}} hívásai sikertelenek lesznek. Ez nem vonható vissza.",
+      "deleteMessageScheduled": "A {{name}} ütemezett futtatásai leállnak. Ez nem vonható vissza.",
       "runNow": "Futtatás most",
       "runStarted": "A futás elindult",
       "created": "A trigger létrejött",
@@ -4656,8 +4675,9 @@
     "create": "Link létrehozása",
     "createFailed": "Nem sikerült létrehozni a linket.",
     "existingTitle": "Meglévő link",
-    "existingDescription": "Ehhez a munkamenethez már tartozik megosztási link. Egy új link létrehozása lecseréli a régit, és a régi link többé nem fog működni.",
+    "existingDescription": "Ehhez a munkamenethez már tartozik megosztási link. Egy új link létrehozása ezekkel a beállításokkal lecseréli a régit, és a régi link többé nem fog működni.",
     "rotate": "Új link létrehozása",
+    "replacementSettings": "Ezek a beállítások az új linkre vonatkoznak.",
     "revoke": "Link visszavonása",
     "revokeTitle": "Visszavonod a linket?",
     "revokeMessage": "A jelenlegi link azonnal megszűnik működni.",
@@ -4676,5 +4696,175 @@
     "unavailableDescription": "Ez a megosztási link lejárt, vagy visszavonták.",
     "transcriptUnavailableTitle": "Nem sikerült betölteni az átiratot",
     "transcriptUnavailableDescription": "A link továbbra is működik. Próbáld újra egy kicsit később."
+  },
+  "organizationGuardrails": {
+    "title": "AI-őrkorlátok",
+    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat.",
+    "unavailable": "Az AI-őrkorlátok nem érhetők el ennél a szervezetnél.",
+    "loadError": "Az AI-őrkorlátokat nem sikerült betölteni",
+    "statusSaving": "Mentés…",
+    "statusSaved": "Mentve",
+    "statusFailed": "Nem sikerült menteni.",
+    "inputTitle": "Bemeneti őrkorlátok",
+    "inputDescription": "Minden bemenetet átvizsgál az Enkrypt AI segítségével, beleértve az eszközök eredményeit is. A blokkoló detektor elutasítja a kérést, ha az Enkrypt nem érhető el.",
+    "outputTitle": "Kimeneti őrkorlátok",
+    "outputDescription": "Az Enkrypt AI segítségével átvizsgálja a válaszokat, mielőtt a tagok megkapnák azokat. Kikapcsolva marad, hacsak be nem kapcsolja.",
+    "detectorsHint": "A Blokkolás elutasítja a megjelölt kérést. A Csak naplózás rögzíti, anélkül hogy késleltetné a kérést.",
+    "detectorsHintOutput": "A Blokkolás meghiúsítja a megjelölt választ. A Csak naplózás rögzíti, anélkül hogy késleltetné a választ.",
+    "choiceLog": "Csak naplózás",
+    "applyTo": "Alkalmazás erre",
+    "applyToAllMembers": "Minden tag",
+    "applyKiloDefault": "A Kilo alapértelmezés alkalmazása",
+    "invalidSavedTitle": "A mentett bemeneti detektorbeállítások nem olvashatók",
+    "invalidSavedBody": "A kérések blokkolva vannak, amíg a bemeneti detektorokat újra nem menti. Az alábbi detektorok a Kilo alapértelmezésből indulnak.",
+    "invalidSavedOutputTitle": "A mentett kimeneti detektorbeállítások nem olvashatók",
+    "invalidSavedOutputBody": "A válaszok visszatartva maradnak, amíg a kimeneti detektorokat újra nem menti. Válassza ki az alábbi kimeneti detektorokat.",
+    "blockingOutputNote": "A blokkoló kimeneti detektor visszatartja a választ, amíg az Enkrypt a teljes választ át nem vizsgálta. A késleltetés elkerüléséhez használja a Csak naplózás lehetőséget.",
+    "inputDetectorRequired": "Kapcsoljon be legalább egy bemeneti detektort.",
+    "outputDetectorRequired": "Kapcsoljon be legalább egy kimeneti detektort.",
+    "rulesTooMany": "Legfeljebb {{max}} szabályt adhat hozzá.",
+    "ruleIdRequired": "Adjon meg egy szabályazonosítót.",
+    "ruleIdInvalid": "A szabályazonosító csak betűket, számokat, pontokat, kötőjeleket és aláhúzásjeleket tartalmazhat.",
+    "ruleTextRequired": "Írja le, mit tilt vagy ír elő a szabály.",
+    "keywordTooLong": "Minden kulcsszó legfeljebb {{max}} karakter hosszú lehet.",
+    "topicTooLong": "Minden témakör legfeljebb {{max}} karakter hosszú lehet.",
+    "keywordsTooMany": "Legfeljebb {{max}} kulcsszót adhat hozzá.",
+    "topicsTooMany": "Legfeljebb {{max}} témakört adhat hozzá.",
+    "piiEntityRequired": "Válasszon ki legalább egy észlelendő adattípust.",
+    "keywordRequired": "Adjon hozzá legalább egy kulcsszót.",
+    "topicRequired": "Adjon hozzá legalább egy témakört.",
+    "policyTextRequired": "Adja meg a szabályzat szövegét.",
+    "ruleRequired": "Adjon hozzá legalább egy szabályt.",
+    "ruleIdDuplicate": "Minden szabálynak külön szabály-ID-val kell rendelkeznie.",
+    "piiEntities": "Észlelendő adatok",
+    "keywordsLabel": "Kulcsszavak",
+    "keywordsHint": "Soronként egy kulcsszó.",
+    "topicsHint": "Soronként egy témakör.",
+    "policyFormat": "Szabályzat formátuma",
+    "policyFormatRules": "Strukturált szabályok",
+    "policyFormatRulesDescription": "Követelményenként egy szabály, kategóriával és súlyossággal. Ajánlott.",
+    "policyFormatText": "Szabályzat szövege",
+    "policyFormatTextDescription": "Illesszen be egy meglévő szabályzatot egyszerű szövegként.",
+    "rulesEmpty": "Még nincsenek szabályok. Minden szabály leír egy dolgot, amelyet a bemenetek nem tartalmazhatnak, és amelyre nem kérdezhetnek rá.",
+    "addRule": "Szabály hozzáadása",
+    "ruleNumber": "{{number}}. szabály",
+    "ruleRemove": "{{number}}. szabály eltávolítása",
+    "ruleIdLabel": "Szabályazonosító",
+    "ruleNameLabel": "Név (nem kötelező)",
+    "ruleTextLabel": "Szabály",
+    "ruleRiskCategory": "Kockázati kategória",
+    "ruleApplicability": "Hatókör",
+    "ruleFrameworks": "Keretrendszerek",
+    "detector": {
+      "promptInjection": {
+        "label": "Utasításbefecskendezés",
+        "description": "Észleli az utasítások felülírására vagy a modell korlátainak megkerülésére irányuló kísérleteket."
+      },
+      "policyViolation": {
+        "label": "Szabályzatsértés",
+        "description": "Megjelöli azokat a bemeneteket, amelyek megsértik a szervezet szabályzatát, függetlenül attól, hogy a szabályzat szövegként vagy szabályokként van megadva.",
+        "descriptionOutput": "Megjelöli azokat a válaszokat, amelyek megsértik a szervezet szabályzatát, függetlenül attól, hogy a szabályzat szövegként vagy szabályokként van megadva."
+      },
+      "pii": {
+        "label": "PII és titkok",
+        "description": "Észleli a személyes adatokat, hitelesítő adatokat, IP-címeket és URL-címeket."
+      },
+      "keywords": {
+        "label": "Tiltott kulcsszavak",
+        "descriptionOutput": "Észleli azokat a válaszokat, amelyek tartalmazzák a felsorolt kulcsszavak bármelyikét."
+      },
+      "topics": {
+        "label": "Témakörök",
+        "descriptionOutput": "Megjelöli azokat a válaszokat, amelyek bármely felsorolt témakörről szólnak."
+      },
+      "toxicity": {
+        "label": "Toxicitás",
+        "description": "Észleli a toxikus, sértő, fenyegető vagy gyűlöletkeltő nyelvhasználatot."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Észleli a szexuális vagy egyéb, munkahelyen nem biztonságos tartalmat."
+      },
+      "bias": {
+        "label": "Elfogultság",
+        "description": "Észleli az elfogult vagy diszkriminatív nyelvhasználatot."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Személyes adatok",
+        "description": "Nevek, e-mail-címek, telefonszámok."
+      },
+      "secrets": {
+        "label": "Titkok",
+        "description": "API-kulcsok, tokenek, jelszavak."
+      },
+      "ipAddress": {
+        "label": "IP-címek",
+        "description": "IPv4- és IPv6-címek."
+      },
+      "url": {
+        "label": "URL-címek",
+        "description": "Webcímek."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Biztonság és csalás",
+      "safetyHarm": "Biztonság és kár",
+      "privacyDataProtection": "Magánszféra és adatvédelem",
+      "brandReputationTrust": "Márka és hírnév",
+      "biasFairnessEthical": "Elfogultság és méltányosság",
+      "legalIpLiability": "Jogi és szellemitulajdon-felelősség",
+      "productMisuse": "Termék visszaélésszerű használata",
+      "performanceQuality": "Teljesítmény és minőség"
+    },
+    "applicability": {
+      "user": "Felhasználói bemenet",
+      "userAssistant": "Felhasználói bemenet és válaszok"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 legfontosabb kockázata (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI-rendelet",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Vállalati funkció",
+    "enterpriseOnly": "Ez egy csak vállalati csomagban elérhető funkció.",
+    "readOnly": "Csak a szervezet tulajdonosai és rendszergazdái módosíthatják ezeket a beállításokat.",
+    "loadError": "A szolgáltatókat és modelleket nem sikerült betölteni",
+    "tabModels": "Modellek",
+    "tabProviders": "Szolgáltatók",
+    "tabGateways": "Átjárók",
+    "modelsDescription": "Kapcsoljon ki egy modellt, hogy az minden tag számára le legyen tiltva. Az engedélyezett szolgáltatóktól származó modellek bekapcsolva indulnak.",
+    "modelsDeniedOnly": "Csak letiltottak",
+    "modelsEmpty": "Nincs a keresésnek megfelelő modell.",
+    "providersDescription": "Kapcsoljon ki egy szolgáltatót, hogy a Kilo ne irányítson hozzá kéréseket ennél a szervezetnél.",
+    "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
+    "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",
+    "allowAllShown": "Az összes megjelenített engedélyezése",
+    "denyAllShown": "Az összes megjelenített letiltása",
+    "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",
+    "emptyProviderList": "Engedélyezzen legalább egy szolgáltatót. Üres lista esetén a Kilo egyetlen modellútvonala sem működik.",
+    "gatewaysUnavailable": "Az átjárók beállításai ennél a szervezetnél nem érhetők el.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Az OpenRouter esetében a kérések nincsenek régióhoz rögzítve.",
+    "inferenceRegion": "Következtetési régió",
+    "inferenceRegionDescription": "A Vercel AI Gateway használatával érkező kéréseket ehhez a régióhoz rögzíti. Az ott nem elérhető modell sikertelen lesz.",
+    "disableOpenrouterNote": "Az OpenRouter letiltása azokat a BYOK kulcsokat is blokkolja, amelyek rajta keresztül irányítják a kéréseket.",
+    "emptyModelList": "Hagyjon legalább egy modellt bekapcsolva. Ha minden modellt letilt, a tagok semmit sem tudnak használni.",
+    "catalogUnavailable": "A teljes modellkatalógus nem töltődött be, ezért csak a mentett listái láthatók. Próbálja újra az összes modell betöltéséhez.",
+    "region": {
+      "global": "Globális",
+      "us": "Egyesült Államok",
+      "eu": "Európai Unió",
+      "au": "Ausztrália",
+      "jp": "Japán"
+    }
   }
 }

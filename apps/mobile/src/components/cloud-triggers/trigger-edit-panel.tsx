@@ -8,7 +8,6 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -33,6 +32,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 import { TriggerDeliveries } from './trigger-deliveries';
 import { TriggerForm, type TriggerFormFailure } from './trigger-form';
@@ -44,7 +44,11 @@ export function TriggerEditPanel({
 }: Readonly<{ detail: CloudTriggerDetail; organizationId?: string }>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const router = useRouter();
+  // The post-delete hand-off swaps the detail screen for the list screen in one
+  // commit; a literal `router.replace` crashes Android Fabric there (the
+  // session-route crash class, KILO-APP-25), so it goes through the
+  // push-then-retire hook instead.
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();
@@ -151,14 +155,19 @@ export function TriggerEditPanel({
               onPress={() => {
                 confirm({
                   title: t('cloudAgent.triggers.deleteTitle'),
-                  message: t('cloudAgent.triggers.deleteMessage', { name: detail.triggerId }),
+                  message: t(
+                    isScheduled
+                      ? 'cloudAgent.triggers.deleteMessageScheduled'
+                      : 'cloudAgent.triggers.deleteMessage',
+                    { name: detail.triggerId }
+                  ),
                   confirmLabel: t('common.delete'),
                   onConfirm: () => {
                     remove.mutate(
                       { triggerId: detail.triggerId, ...scope },
                       {
                         onSuccess: () => {
-                          router.replace(triggersListHref(organizationId) as Href);
+                          router.replace(triggersListHref(organizationId));
                         },
                       }
                     );

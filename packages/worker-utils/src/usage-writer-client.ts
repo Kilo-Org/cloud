@@ -152,11 +152,12 @@ async function sendUsageWrite<Result>(
     if (acknowledgement === 'not_recorded') return unavailable('not_recorded');
     if (acknowledgement === 'invalid') return unavailable('invalid_response');
 
-    console.info('usage writer acknowledged', {
-      usageId: request.usageId,
-      ...kindField,
-      outcome: acknowledgement.kind,
-    });
+    if (config.source !== 'queue')
+      console.info('usage writer acknowledged', {
+        usageId: request.usageId,
+        ...kindField,
+        outcome: acknowledgement.kind,
+      });
     return acknowledgement;
   } catch (error) {
     return unavailable(

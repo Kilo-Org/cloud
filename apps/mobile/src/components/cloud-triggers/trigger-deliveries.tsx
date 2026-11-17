@@ -18,10 +18,11 @@ import { Button } from '@/components/ui/button';
 import { Workflow } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { type CloudTriggerDelivery } from '@/lib/cloud-triggers/trigger-draft';
 import { useTriggerDeliveries } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { formatDate } from '@/lib/format';
-import { parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 const STATUS_KEYS = {
   captured: 'cloudAgent.triggers.statusArrived',
@@ -73,7 +74,7 @@ function DeliveryRow({
         <Button
           variant="ghost"
           size="sm"
-          className="self-start px-0"
+          className={cn('self-start px-0 justify-center', textActionTargetClass())}
           onPress={() => {
             // An organization trigger's run belongs to that organization: the
             // route carries the scope so the session opens in it instead of

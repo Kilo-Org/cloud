@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Torri SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Mae gan wiriad diogelwch ddiweddariad"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Mae eich sesiwn Kilo yn barod i'w rheoli o'ch ffôn"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

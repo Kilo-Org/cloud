@@ -8,7 +8,6 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type Href } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -51,7 +50,11 @@ function isDraftDirty(draft: TriggerDraft, initialDraft: TriggerDraft): boolean 
 export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const stackSafeReplace = useStackSafeReplace();
+  // The post-create hand-off swaps the create screen for the detail screen in
+  // one commit; a literal `router.replace` crashes Android Fabric there (the
+  // session-route crash class, KILO-APP-25), so it goes through the
+  // push-then-retire hook instead.
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   // The draft this screen started on, captured once: every field including the
   // time zone can be edited back to a different value, so the dirty test
@@ -87,15 +90,13 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
       announcingToast.success(t('cloudAgent.triggers.created'));
       // Landing on the detail replaces this create screen: Back must not return
       // to a form for a trigger that now exists. Leaving through the guard
-      // disarms it first, so the retire `navigation.reset` that
-      // `useStackSafeReplace` runs after the push is never intercepted as a
-      // Back on a draft that was just saved. The detail route's stack repair
-      // then puts the triggers list beneath it, so Back returns to the list on
-      // every entry path. Replacing (push, then retire) is the commit shape the
-      // Android native stack survives (KILO-APP-25); the same moves the
-      // organization group form makes after its create.
+      // disarms it first, so the retire `navigation.reset` that the push-then-
+      // retire hook runs after the push is never intercepted as a Back on a
+      // draft that was just saved. The detail route's stack repair then puts
+      // the triggers list beneath it, so Back returns to the list on every
+      // entry path.
       guard.leaveWithoutAsking(() => {
-        stackSafeReplace.replace(triggerDetailHref(created.triggerId, organizationId) as Href);
+        router.replace(triggerDetailHref(created.triggerId, organizationId));
       });
     } catch (error) {
       const message = readTrpcErrorField(error, 'message') ?? t('common.somethingWentWrong');

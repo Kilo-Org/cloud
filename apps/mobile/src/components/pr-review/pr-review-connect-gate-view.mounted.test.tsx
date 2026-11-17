@@ -85,6 +85,11 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
+// The gate mints its GitLab hand-off through this helper; a fixed URL keeps the
+// assertion on what the browser is asked to open.
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: () => Promise.resolve('https://web.example/app-shell/handoff?token=gate'),
+}));
 const router = vi.hoisted(() => ({ dismissTo: vi.fn(), push: vi.fn() }));
 vi.mock('expo-router', () => ({
   usePathname: () => '/pr-review/github/owner/repo/1',
@@ -475,7 +480,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     const renderer = mount('gitlab', null);
     await pressConnect(renderer);
     expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
-      'https://web.example/integrations/gitlab'
+      'https://web.example/app-shell/handoff?token=gate'
     );
     expect(queryResult.refetch).not.toHaveBeenCalled();
 
@@ -676,7 +681,7 @@ describe('PR-review connect gate — GitLab instance mismatch', () => {
     const renderer = mountInScope(SELF_MANAGED, 'org-1');
     await pressConnect(renderer);
     expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
-      'https://web.example/organizations/org-1/integrations/gitlab'
+      'https://web.example/app-shell/handoff?token=gate'
     );
     await settleLaunch(pending);
   });

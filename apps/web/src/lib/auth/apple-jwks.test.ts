@@ -190,10 +190,16 @@ describe('verifyAppleJwtWithJwks', () => {
     // After the cache TTL expires with refreshes still failing, the cached key
     // set keeps verifying the kid it holds while the retry stays bounded.
     now += 60 * 60 * 1000;
-    await verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp');
+    await verifyAppleJwtWithJwks(
+      signToken('current-key', { sub: 'user-1' }),
+      'com.kilocode.kiloapp'
+    );
     expect(fetchMock).toHaveBeenCalledTimes(3);
     now += 31_000;
-    await verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp');
+    await verifyAppleJwtWithJwks(
+      signToken('current-key', { sub: 'user-1' }),
+      'com.kilocode.kiloapp'
+    );
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });

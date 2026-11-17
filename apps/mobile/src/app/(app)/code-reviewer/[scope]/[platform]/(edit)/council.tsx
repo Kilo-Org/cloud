@@ -4,7 +4,7 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -64,7 +64,6 @@ function CouncilScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
-  const router = useRouter();
   const trpc = useTRPC();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
@@ -145,11 +144,6 @@ function CouncilScreen({
             platformSupportsCouncil={capabilities.council}
             refusalReason={refusalReason}
             membershipState={membershipState}
-            onScopePicked={organizationId => {
-              // Also switch the account to what the reader picked, so the
-              // destination screen shows the picked account everywhere.
-              router.replace(`/(app)/code-reviewer/${organizationId}/${platform}/council` as Href);
-            }}
           />
         ) : (
           <View className="gap-3 px-6 pt-4">

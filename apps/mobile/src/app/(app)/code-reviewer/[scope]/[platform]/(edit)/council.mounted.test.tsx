@@ -53,6 +53,7 @@ const state = vi.hoisted(() => {
     toggleProps: [] as ToggleProps[],
     patches: [] as SavedPatch[],
     routerPush: vi.fn(),
+    routerReplace: vi.fn(),
     setOrganizationId: vi.fn(),
     gateReason: null as string | null,
     orgs: undefined as { organizationId: string }[] | undefined,
@@ -88,7 +89,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
-  useRouter: () => ({ push: state.routerPush }),
+  useRouter: () => ({ push: state.routerPush, replace: state.routerReplace }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
@@ -110,15 +111,8 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/components/context-control', () => ({
-  useContextPicker: () => ({
-    openPicker: () => {
-      state.routerPush('/(app)/context-picker');
-    },
-  }),
-}));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ setOrganizationId: state.setOrganizationId }),
+  useOrganization: () => ({ setOrganizationId: vi.fn() }),
 }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<object>();
@@ -219,6 +213,7 @@ beforeEach(() => {
   state.patches.length = 0;
   state.save.isPending = false;
   state.routerPush.mockReset();
+  state.routerReplace.mockReset();
   state.setOrganizationId.mockReset();
   state.gateReason = null;
   state.orgs = [];
@@ -304,9 +299,10 @@ describe('council route gate', () => {
     await act(() => {
       onPress?.();
     });
-    // The press opens the shared account picker (the app's established
-    // equivalent), which the mocked single-push route records.
-    expect(state.routerPush).toHaveBeenCalledWith('/(app)/context-picker');
+    // The reviewer scope list replaces the refusal: it lists every
+    // membership on one screen, and a pick there reopens the picked
+    // account's council screen.
+    expect(state.routerReplace).toHaveBeenCalledWith('/(app)/code-reviewer');
 
     mounted.unmount();
   });

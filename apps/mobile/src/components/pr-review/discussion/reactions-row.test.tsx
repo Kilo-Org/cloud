@@ -12,6 +12,10 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  // The picker's sheet header measures its top clearance from the status bar.
+  StatusBar: { currentHeight: 24 },
+  I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

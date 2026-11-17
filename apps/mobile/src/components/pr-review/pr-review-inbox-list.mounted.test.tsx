@@ -116,8 +116,10 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
     organizationScopeAccess: 'granted' as const,
   }),
 }));
-// `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
+// `@/lib/utils` initializes real i18n; the row only needs timestamp shaping
+// and the class joiner the section header calls.
 vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.flat().filter(Boolean).join(' '),
   parseTimestamp: (value: string) => new Date(value),
   timeAgo: () => 'just now',
 }));

@@ -135,7 +135,7 @@ vi.mock('@/components/ui/preference-row', () => ({
     return createElement('PreferenceRow', props);
   },
 }));
-vi.mock('@/components/ui/icons', () => ({ Users: 'Users' }));
+vi.mock('@/components/ui/icons', () => ({ Users: 'Users', ShieldCheck: 'ShieldCheck' }));
 vi.mock('@/components/ui/choice-row', () => ({
   ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
     createElement('ChoiceRow', props),

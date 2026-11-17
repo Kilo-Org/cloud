@@ -70,7 +70,12 @@ vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` (the later-page retry CTA) wraps its label in this provider, so the
+// text mock must export the same context the real module does.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));

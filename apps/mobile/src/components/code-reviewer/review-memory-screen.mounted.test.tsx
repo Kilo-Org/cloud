@@ -145,6 +145,8 @@ vi.mock('react-native', () => ({
     views.rendered.push(props);
     return createElement('View', props);
   },
+  // The migrated list rows draw their chevron through the directional icon.
+  I18nManager: { isRTL: false },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',

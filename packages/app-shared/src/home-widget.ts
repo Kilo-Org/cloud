@@ -7,7 +7,9 @@ import { z } from 'zod';
 import { approvalKeySchema } from './approval-key';
 import {
   buildGlanceableSnapshot,
+  countGlanceableSessions,
   type GlanceableAgentsSnapshot,
+  type GlanceableCounts,
   glanceableAgentsSnapshotSchema,
   glanceableNeedsInputKind,
   GLANCEABLE_NEEDS_INPUT_STATUSES,
@@ -115,6 +117,17 @@ const KIND_RANK = {
 const KIND_ORDER: readonly GlanceableStatusKind[] = [...GLANCEABLE_STATUS_KINDS].sort(
   (a, b) => KIND_RANK[a] - KIND_RANK[b]
 );
+
+/**
+ * The one primary-kind ranking a snapshot or its rows read: the first kind in
+ * `KIND_ORDER` with a positive count, else null. Details and presentation both
+ * call it, so the title's kind and the count drawn beside it cannot rank
+ * differently.
+ */
+function primaryKindOf(counts: GlanceableCounts): GlanceableStatusKind | null {
+  return KIND_ORDER.find(kind => counts[kind] > 0) ?? null;
+}
+
 const ACTIVE_REFRESH_MS = 30 * 60 * 1000;
 const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
 
@@ -190,9 +203,7 @@ export function buildHomeWidgetDetails(
   const scheduled = sessions
     .filter(row => glanceableStatusKind(row.status) === 'scheduled')
     .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
-  const primaryKind = KIND_ORDER.find(kind =>
-    sessions.some(row => glanceableStatusKind(row.status) === kind)
-  );
+  const primaryKind = primaryKindOf(countGlanceableSessions(sessions));
   const primary =
     primaryKind === 'needsInput'
       ? waiting[0]
@@ -246,7 +257,7 @@ function staleness(data: HomeWidgetData): {
 } {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const primaryKind = terminal ? null : (KIND_ORDER.find(kind => snapshot[kind] > 0) ?? null);
+  const primaryKind = terminal ? null : primaryKindOf(snapshot);
   const checkedAt =
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
@@ -272,6 +283,23 @@ function scheduledWake(
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
 }
 
+/**
+ * The one status precedence: a terminal snapshot outranks content, content
+ * outranks a request for input, and an acknowledged snapshot that is neither is
+ * either empty or unavailable.
+ */
+function presentationStatus(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: boolean,
+  primaryKind: GlanceableStatusKind | null
+): HomeWidgetPresentation['status'] {
+  if (terminal) return snapshot.status === 'privacy' ? 'privacy' : 'signed_out';
+  if (primaryKind !== null) return 'content';
+  if (snapshot.status === 'waiting') return 'waiting';
+  if (snapshot.status === 'empty') return 'empty';
+  return 'unavailable';
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
@@ -285,17 +313,7 @@ export function buildHomeWidgetPresentation(
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   return {
-    status: terminal
-      ? snapshot.status === 'privacy'
-        ? 'privacy'
-        : 'signed_out'
-      : primaryKind !== null
-        ? 'content'
-        : snapshot.status === 'waiting'
-          ? 'waiting'
-          : snapshot.status === 'empty'
-            ? 'empty'
-            : 'unavailable',
+    status: presentationStatus(snapshot, terminal, primaryKind),
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
     secondaryCounts: terminal

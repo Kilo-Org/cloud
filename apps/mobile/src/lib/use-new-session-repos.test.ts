@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   pendingProviders: [] as string[],
   /** The browser launch every provider's connect flow waits on. */
   openAuthorization: vi.fn(async (_url: string): Promise<void> => undefined),
+  /** The route push that opens the app's own Bitbucket connect sheet. */
+  routerPush: vi.fn(),
 }));
 
 function emptyQueryResult(): Record<string, unknown> {
@@ -40,6 +42,12 @@ function emptyQueryResult(): Record<string, unknown> {
 }
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+// The hook reads `useRouter` to open the Bitbucket connect sheet; the real
+// module's expo-runtime import cannot load in the pure project.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
+}));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
@@ -492,6 +500,23 @@ describe('useNewSessionRepos connect busy state', () => {
       pending.resolve();
       await pending.promise;
     });
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the app connect sheet instead of the browser for Bitbucket', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    // The token is pasted in the app's own sheet, so the tap is synchronous:
+    // there is no browser wait to report as a running flow.
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+    expect(mocks.openAuthorization).not.toHaveBeenCalled();
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 

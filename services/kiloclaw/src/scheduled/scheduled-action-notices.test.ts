@@ -308,4 +308,36 @@ describe('dispatchOne orphan-user guard', () => {
     const result = await dispatchOne(fakeEnv, row);
     expect(result).toEqual({ ok: true });
   });
+
+  it('mobile_push channel drains without sending', async () => {
+    const row = {
+      notification_id: 'n-3',
+      notification_kind: 'notice' as const,
+      notification_channel: 'mobile_push' as const,
+      target_id: '00000000-0000-0000-0000-0000000000aa',
+      scheduled_action_id: '00000000-0000-0000-0000-0000000000bb',
+      action_type: 'scheduled_restart' as const,
+      user_id: 'user_present',
+      user_record_id: 'user_present',
+      user_email: null,
+      user_name: null,
+      instance_id: '00000000-0000-0000-0000-0000000000cc',
+      instance_sandbox_id: 'ki_abc',
+      instance_name: 'My Bot',
+      source_image_tag: null,
+      source_openclaw_version: null,
+      target_image_tag: null,
+      target_openclaw_version: null,
+      override_pins: false,
+      scheduled_at: '2026-05-04T18:55:00Z',
+      notice_lead_hours: 24,
+      notice_subject: 'Heads up',
+      notice_body: 'Body',
+      reason: null,
+    } satisfies DueRow;
+
+    // No notification binding is bound: a push attempt would throw.
+    const result = await dispatchOne(fakeEnv, row);
+    expect(result).toEqual({ ok: true });
+  });
 });

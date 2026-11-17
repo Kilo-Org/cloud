@@ -28,7 +28,7 @@ export const unstable_settings = {
  * The list is every tRPC root the stack's screens read: the tab itself (user,
  * organizations, the pass and agent-profile reads) plus the code-reviewer,
  * profile-management (including its GitHub and GitLab repository reads),
- * security-agent and spend-alert screens.
+ * security-agent, spend-alert and Cloud Agent trigger screens.
  */
 const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['user']],
@@ -41,6 +41,8 @@ const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['reviewMemory']],
   [['spendAlerts']],
   [['cloudAgentNext']],
+  [['cloudEnvironments']],
+  [['webhookTriggers']],
 ];
 
 export default function ProfileLayout() {

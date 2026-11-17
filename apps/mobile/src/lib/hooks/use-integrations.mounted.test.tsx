@@ -10,8 +10,6 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type IntegrationProvider } from '@/lib/integrations/provider-catalog';
-
 import { type IntegrationConnect, useIntegrationConnect } from './use-integrations';
 
 const mocks = vi.hoisted(() => ({
@@ -91,7 +89,10 @@ function requireHook(resultRef: { current: HookResult }): IntegrationConnect {
   return result;
 }
 
-async function connect(resultRef: { current: HookResult }, provider: IntegrationProvider) {
+async function connect(
+  resultRef: { current: HookResult },
+  provider: Parameters<IntegrationConnect['connect']>[0]
+) {
   await act(async () => {
     await requireHook(resultRef).connect(provider);
   });

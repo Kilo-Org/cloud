@@ -3,7 +3,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ESNext", "WebWorker"],
+    "lib": ["ESNext"],
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

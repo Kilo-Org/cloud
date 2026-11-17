@@ -26,6 +26,7 @@ import { pathToFileURL } from 'node:url';
 
 import { parseEnvEntries, stripEnvValue } from './env-file';
 import { startMockSnowflake } from './server';
+import { writeSecretsFile } from '../local/secrets-file';
 import {
   MOCK_SNOWFLAKE_PORT,
   SNIPPET_ENV_KEYS,
@@ -293,7 +294,7 @@ function mergeCaSources(recorded: readonly string[], folded: string | undefined)
  */
 function writeEnvLines(envLocalPath: string, lines: readonly string[], newline: boolean): void {
   const body = lines.join('\n');
-  fs.writeFileSync(envLocalPath, body === '' || !newline ? body : `${body}\n`);
+  writeSecretsFile(envLocalPath, body === '' || !newline ? body : `${body}\n`);
 }
 
 /**

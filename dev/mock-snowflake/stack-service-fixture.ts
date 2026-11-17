@@ -31,6 +31,7 @@ export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalF
   const caBundlePath = path.join(moduleDir, 'fixtures', 'tls', 'ca-bundle.pem');
 
   fs.mkdirSync(moduleDir, { recursive: true });
+  fs.mkdirSync(path.join(root, 'dev', 'local'), { recursive: true });
   for (const name of [
     'stack-service.ts',
     'env-file.ts',
@@ -40,6 +41,12 @@ export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalF
   ]) {
     fs.copyFileSync(path.join(sourceDir, name), path.join(moduleDir, name));
   }
+  // The copied stack-service imports `../local/secrets-file`, so the fixture
+  // has to reproduce that layout inside the temp root.
+  fs.copyFileSync(
+    path.join(sourceDir, '../local/secrets-file.ts'),
+    path.join(root, 'dev', 'local', 'secrets-file.ts')
+  );
   fs.mkdirSync(path.join(moduleDir, 'fixtures', 'tls'), { recursive: true });
   fs.writeFileSync(path.join(moduleDir, 'fixtures', 'tls', 'cert.pem'), 'CERT');
   fs.writeFileSync(path.join(moduleDir, 'fixtures', 'tls', 'key.pem'), 'KEY');

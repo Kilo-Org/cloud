@@ -81,6 +81,7 @@ async function main(): Promise<void> {
     dayjsModule,
     enums,
     issuance,
+    issueMonthModule,
     state,
     schema,
   ] = await Promise.all([
@@ -91,6 +92,7 @@ async function main(): Promise<void> {
     import('@kilocode/web-shared/lib/kilo-pass/dayjs'),
     import('@kilocode/web-shared/lib/kilo-pass/enums'),
     import('@kilocode/web-shared/lib/kilo-pass/issuance'),
+    import('@kilocode/web-shared/lib/kilo-pass/issue-month'),
     import('@kilocode/web-shared/lib/kilo-pass/state'),
     import('@kilocode/db/schema'),
   ]);
@@ -103,10 +105,10 @@ async function main(): Promise<void> {
   const { KiloPassCadence, KiloPassIssuanceSource } = enums;
   const {
     applyPendingKiloPassReferralBonusForIssuance,
-    computeIssueMonth,
     createOrGetIssuanceHeader,
     issueBaseCreditsForIssuance,
   } = issuance;
+  const { computeIssueMonth } = issueMonthModule;
   const { getKiloPassStateForUser } = state;
   const { kilo_pass_issuances, kilocode_users } = schema;
 

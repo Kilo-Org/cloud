@@ -41,6 +41,7 @@ describe('CurrentTaskList', () => {
 
     expect(html).toContain('aria-label="1 of 3 tasks completed"');
     expect(html).toContain('Active task');
+    expect(html).not.toContain('>Tasks<');
     expect(html).not.toContain('Pending task');
     expect(html).not.toContain('Finished task');
     expect(html).toContain('aria-expanded="false"');
@@ -74,6 +75,7 @@ describe('CurrentTaskList', () => {
 
     expect(html).toContain('aria-label="1 of 1 tasks completed"');
     expect(html).toContain('lucide-check');
+    expect(html).toContain('>Tasks<');
     expect(html).not.toContain('Finished task');
     expect(html).toContain('aria-expanded="false"');
   });

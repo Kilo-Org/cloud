@@ -179,6 +179,7 @@ export type ControlPlaneCommandFailure = z.infer<typeof controlPlaneCommandFailu
 
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
+  'preparation_cancelled',
   'workspace_setup_failed',
   'credential_upgrade_required',
   'repository_access_failed',
@@ -200,6 +201,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'agent_unresponsive',
   'no_progress',
   'no_outcome',
+  'completion_unconfirmed',
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
@@ -846,7 +848,18 @@ export const controlPlanePromptPayloadSchema = z.union([
   }),
 ]);
 
-const controlPlaneRouteUnknownSchema = z.object({ state: z.literal('unknown') }).strict();
+/**
+ * `stopEpoch` is present when the Sandbox refused a stale prepare because a
+ * workspace Stop happened after that work was created. The Session DO records
+ * it and settles the work instead of reviving the sandbox.
+ */
+const controlPlaneRouteUnknownSchema = z
+  .object({
+    state: z.literal('unknown'),
+    stopEpoch: z.number().int().positive().optional(),
+    stopAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 const controlPlaneRoutePreparingSchema = z
   .object({
     state: z.literal('preparing'),
@@ -960,6 +973,37 @@ export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
   .strict();
 
+/**
+ * Workspace Stop during environment preparation. One sandbox serves one
+ * workspace, so the Sandbox DO retires every route on it. `requestedAt` is when
+ * the Session DO accepted Stop; a preparation for work created before it is
+ * stale, while a message created after it is new intent.
+ */
+export const controlPlaneCancelWorkspacePayloadSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    requestedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
+/** Sandbox DO -> Session DO: the whole workspace stopped during preparation. */
+export const controlPlaneWorkspaceStoppedPayloadSchema = z
+  .object({
+    requestedAt: z.number().int().nonnegative(),
+    stopEpoch: z.number().int().positive(),
+    /** The route attempt this Stop retired; fence only that attempt. */
+    attemptId: z.string().min(1).max(128),
+  })
+  .strict();
+
+/** The durable workspace Stop, returned so a delayed retry stays idempotent. */
+export const controlPlaneCancelWorkspaceResultSchema = z
+  .object({
+    stopEpoch: z.number().int().positive(),
+    stopAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const controlPlaneAnswerReplySchema = z.discriminatedUnion('action', [
   z
     .object({
@@ -997,6 +1041,11 @@ export const controlPlaneStatusResultSchema = z
   .object({
     sessionId: z.string().min(1),
     view: controlPlaneRouteViewSchema,
+    /** Authoritative workspace phase: preparation is shared by every chat. */
+    workspacePreparing: z.boolean(),
+    /** Newest durable workspace Stop, so a dropped notification reconciles. */
+    workspaceStopEpoch: z.number().int().nonnegative(),
+    workspaceStopAt: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -1090,6 +1139,12 @@ const controlPlaneHelloFrameSchema = z
      */
     startCommands: z.literal(true).optional(),
     worktreeGit: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper renews short-lived sandbox transfer
+     * grants over this connection with `transfer.grant`. A wrapper that did not
+     * advertise it keeps the launch-time grant.
+     */
+    transferGrants: z.literal(true).optional(),
   })
   .strict();
 
@@ -1483,6 +1538,7 @@ export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
     .strict(),
   z.object({ name: z.literal('session.status') }).strict(),
   z.object({ name: z.literal('session.todo') }).strict(),
+  z.object({ name: z.literal('session.background') }).strict(),
   z
     .object({
       name: z.literal('session.diff'),
@@ -1540,6 +1596,33 @@ const controlPlanePreviewListFrameSchema = z
     requestId: z.string().min(1).max(128),
   })
   .strict();
+
+const controlPlaneTransferGrantFrameSchema = z
+  .object({
+    type: z.literal('transfer.grant'),
+    requestId: z.string().min(1).max(128),
+  })
+  .strict();
+
+const controlPlaneTransferGrantResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      grant: z.string().min(1).max(4096),
+      expiresAt: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
 
 const controlPlanePreviewResultFrameSchema = z.discriminatedUnion('ok', [
   z
@@ -1647,6 +1730,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneKiloResultFrameSchema,
   controlPlanePreviewListFrameSchema,
   controlPlanePreviewResultFrameSchema,
+  controlPlaneTransferGrantFrameSchema,
+  controlPlaneTransferGrantResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
@@ -1694,6 +1779,15 @@ export type ControlPlaneSessionCredentialsFrame = z.infer<
 >;
 export type ControlPlaneSessionPromptFrame = z.infer<typeof controlPlaneSessionPromptFrameSchema>;
 export type ControlPlaneSessionAbortFrame = z.infer<typeof controlPlaneSessionAbortFrameSchema>;
+export type ControlPlaneCancelWorkspacePayload = z.infer<
+  typeof controlPlaneCancelWorkspacePayloadSchema
+>;
+export type ControlPlaneWorkspaceStoppedPayload = z.infer<
+  typeof controlPlaneWorkspaceStoppedPayloadSchema
+>;
+export type ControlPlaneCancelWorkspaceResult = z.infer<
+  typeof controlPlaneCancelWorkspaceResultSchema
+>;
 export type ControlPlaneSessionAnswerFrame = z.infer<typeof controlPlaneSessionAnswerFrameSchema>;
 export type ControlPlaneSessionReleaseFrame = z.infer<typeof controlPlaneSessionReleaseFrameSchema>;
 export type ControlPlaneSessionEventsFrame = z.infer<typeof controlPlaneSessionEventsFrameSchema>;
@@ -1745,6 +1839,10 @@ export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloReques
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
+export type ControlPlaneTransferGrantFrame = z.infer<typeof controlPlaneTransferGrantFrameSchema>;
+export type ControlPlaneTransferGrantResultFrame = z.infer<
+  typeof controlPlaneTransferGrantResultFrameSchema
+>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
 export type ControlPlaneHistoryRecentFrame = z.infer<typeof controlPlaneHistoryRecentFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;

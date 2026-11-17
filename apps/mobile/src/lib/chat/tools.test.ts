@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type StoredRemoteMcpServer } from './remote-mcp-store';
+import { discoveryOf, type RemoteMcpDiscovery } from './remote-mcp-state';
+import { server, tool } from './remote-mcp.test-helpers';
 import { chatToolNames, chatToolNamesStarting, chatTools, chatToolsWithMcp } from './tools';
 
 // The base tool formats through the app's own `Intl` cache and the settings
@@ -25,7 +28,7 @@ const mcp = vi.hoisted(() => ({
 }));
 vi.mock('./kilo-mcp', () => ({
   kiloMcpTools: () => mcp.tools,
-  kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
+  kiloMcpToolNames: () => mcp.tools.map(entry => entry.definition.name),
   mcpEnabledFor: async (sessionId: string) => {
     await Promise.resolve();
     return mcp.enabled.get(sessionId) ?? true;
@@ -33,12 +36,21 @@ vi.mock('./kilo-mcp', () => ({
 }));
 
 const remote = vi.hoisted(() => ({
-  tools: [] as { readonly definition: { readonly name: string } }[],
+  servers: [] as StoredRemoteMcpServer[],
+  discovered: new Map<string, RemoteMcpDiscovery>(),
 }));
-vi.mock('./remote-mcp', () => ({
-  remoteServerTools: () => remote.tools,
-  remoteServerToolNames: () => remote.tools.map(tool => tool.definition.name),
-}));
+// What is faked here is the discovery; the join between a stored server and
+// what it answered is the real one, so the names a chat is opened with are
+// built the way they are on a device. The import is dynamic because a mock
+// factory is hoisted above this file's imports and cannot read them.
+vi.mock('./remote-mcp', async () => {
+  const { remoteServerToolsFor } = await import('./remote-mcp-state');
+  const tools = () => remoteServerToolsFor(remote.servers, remote.discovered);
+  return {
+    remoteServerTools: tools,
+    remoteServerToolNames: () => tools().map(entry => entry.definition.name),
+  };
+});
 
 // The chat's own web search choice; absent means on, as for a Kilo model.
 const webSearch = vi.hoisted(() => ({ enabled: new Map<string, boolean>() }));
@@ -54,16 +66,23 @@ vi.mock('./web-search-setting', () => ({
 }));
 
 const namesOf = (tools: readonly { readonly definition: { readonly name: string } }[]) =>
-  tools.map(tool => tool.definition.name);
+  tools.map(entry => entry.definition.name);
 
 const KILO = { definition: { name: 'mcp_kilo_read-file' } };
-const REMOTE = { definition: { name: 'mcp_notes_list' } };
+const NOTES = tool('mcp_notes_list');
+
+/** One enabled stored server whose discovery answered with these tools. */
+function remoteServerWith(id: string, tools: Parameters<typeof discoveryOf>[1]): void {
+  remote.servers.push(server({ id }));
+  remote.discovered.set(id, discoveryOf(id, tools));
+}
 
 beforeEach(() => {
   settings.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
-  remote.tools.length = 0;
+  remote.servers.length = 0;
+  remote.discovered.clear();
   webSearch.enabled.clear();
 });
 
@@ -91,16 +110,16 @@ describe('the tools a chat offers', () => {
   });
 
   it('answers with the tool itself, ready to run', () => {
-    const [tool] = chatTools();
-    expect(tool?.definition.name).toBe('time');
-    expect(tool?.run).toBeTypeOf('function');
+    const [clock] = chatTools();
+    expect(clock?.definition.name).toBe('time');
+    expect(clock?.run).toBeTypeOf('function');
   });
 });
 
 describe('the tools the registry holds', () => {
   it('is the base set, the Kilo server and every enabled remote server', () => {
     mcp.tools.push(KILO);
-    remote.tools.push(REMOTE);
+    remoteServerWith('notes', [NOTES]);
 
     expect(namesOf(chatToolsWithMcp())).toEqual([
       'time',
@@ -123,7 +142,7 @@ describe('the tools the registry holds', () => {
 describe('the names a chat is opened with', () => {
   it('is the gates as they stand, with the discovered names behind them', async () => {
     mcp.tools.push(KILO);
-    remote.tools.push(REMOTE);
+    remoteServerWith('notes', [NOTES]);
 
     expect(await chatToolNames(undefined, 's1', 'kilo/one')).toEqual([
       'time',
@@ -132,6 +151,22 @@ describe('the names a chat is opened with', () => {
       'settings_set',
       'mcp_kilo_read-file',
       'mcp_notes_list',
+    ]);
+  });
+
+  it('names a tool two servers offer once', async () => {
+    remoteServerWith('alpha', [tool('mcp_shared_read')]);
+    remoteServerWith('beta', [tool('mcp_shared_read')]);
+
+    const names = await chatToolNames(undefined, 's1', 'kilo/one');
+
+    expect(names.filter(name => name === 'mcp_shared_read')).toHaveLength(1);
+    expect(names).toEqual([
+      'time',
+      'web_search',
+      'settings_list',
+      'settings_set',
+      'mcp_shared_read',
     ]);
   });
 

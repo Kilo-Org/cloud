@@ -33,7 +33,7 @@ import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
@@ -63,6 +63,7 @@ export function FindingAnalysisPanel({
 }: Readonly<FindingAnalysisPanelProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const capacity = useSecurityAnalysisCapacity(scope);
@@ -203,9 +204,9 @@ export function FindingAnalysisPanel({
               onPress={handleStartAnalysis}
             >
               {startAnalysis.isPending ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
+                <ActivityIndicator size="small" color={mutedDisabledInk} />
               ) : null}
-              <Text className="text-primary-foreground">
+              <Text>
                 {analysisState === 'failed'
                   ? t('securityAgent.analysis.retryAnalysis')
                   : t('securityAgent.analysis.analyzeRepository')}

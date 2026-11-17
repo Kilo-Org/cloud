@@ -18,6 +18,7 @@
 import {
   failureReasonFromEvent,
   fakeDirective,
+  fetchFakeLastPrompt,
   fetchFakeRequests,
   getMessageResult,
   getSessionSnapshot,
@@ -851,8 +852,23 @@ export async function waitForPacedProgress(
   }
   throw new Error(
     `${label}: no correlated turn progress and new model request for ${parentMessageId} ` +
-      `within ${budget}ms (${diagnostics()}) eventTimings=${JSON.stringify(eventTimings())}`
+      `within ${budget}ms (${diagnostics()}) lastPromptHead=${await lastPromptHead(config)} ` +
+      `eventTimings=${JSON.stringify(eventTimings())}`
   );
+}
+
+/**
+ * The head of the last prompt the fake served. A request that the fake served
+ * but did not attribute to the scope shows here what preceded the scope marker.
+ * The fake's last prompt is global, so a parallel run can show another shard's.
+ */
+async function lastPromptHead(config: DriverConfig): Promise<string> {
+  try {
+    const text = await fetchFakeLastPrompt(config.fakeLlmUrl, AbortSignal.timeout(5_000));
+    return JSON.stringify(text.slice(0, 400));
+  } catch (error) {
+    return `unavailable(${error instanceof Error ? error.name : 'unknown'})`;
+  }
 }
 
 /**

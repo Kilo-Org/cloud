@@ -206,7 +206,10 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       installsSkillsSh: true,
       startCommands: true,
       worktreeGit: true,
+      transferGrants: true,
     });
+    socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    expect(connection.supportsTransferGrants()).toBe(true);
   });
 });
 
@@ -337,6 +340,7 @@ describe('acknowledged heartbeat', () => {
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
+      expect(connection.supportsTransferGrants()).toBe(false);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -1021,6 +1025,7 @@ describe('createControlPlaneConnection', () => {
     });
     try {
       await waitFor(() => connected === 1);
+      expect(connection.supportsTransferGrants()).toBe(true);
       await waitFor(() => sandbox.helloFrames.length === 1);
       expect(sandbox.helloFrames[0]).toEqual({
         type: 'hello',
@@ -1033,6 +1038,7 @@ describe('createControlPlaneConnection', () => {
         installsSkillsSh: true,
         startCommands: true,
         worktreeGit: true,
+        transferGrants: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
-import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
+import {
+  CirclePlus,
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  History,
+  LineChart,
+} from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -13,6 +20,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
   useBitbucketReadiness,
@@ -63,11 +71,18 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   });
   // This screen fetches the memberships itself — its access classification and
   // its Retry read that query — so it resolves the title from the same rule the
-  // screens without a list use, over the list it already has.
-  const scopeTitle = reviewerScopeTitle(scope, organizations.data, {
-    personal: t('common.personal'),
-    organization: t('common.organization'),
-  });
+  // screens without a list use, over the list it already has, and remembers the
+  // name that list delivers for a scope the reader may lose next.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -171,11 +186,23 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             <ConfigureRow
               icon={CirclePlus}
               title={t('codeReviewer.manualReview.title')}
-              last
+              last={isPersonal}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
+            {/* Review analytics is an organization surface (the dashboard query
+                needs an organization id), so a personal scope has no row. */}
+            {!isPersonal && (
+              <ConfigureRow
+                icon={LineChart}
+                title={t('codeReviewer.analytics.title')}
+                last
+                onPress={() => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
+                }}
+              />
+            )}
           </View>
         </View>
       </TabScreenScrollView>

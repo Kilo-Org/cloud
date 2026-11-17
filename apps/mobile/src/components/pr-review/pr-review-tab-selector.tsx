@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { formatNumber } from '@/lib/format';
+import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
 import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
@@ -62,6 +63,7 @@ export function PrReviewTabSelector({
           <Pressable
             key={tab.id}
             {...tabEntryA11y({ selected: active, disabled })}
+            hitSlop={PR_REVIEW_TAB_HIT_SLOP}
             disabled={disabled}
             onPress={() => {
               if (active) {

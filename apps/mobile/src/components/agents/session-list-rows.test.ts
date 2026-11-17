@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   flattenSessionSections,
   SESSION_LIST_SKELETON_COUNT,
+  SESSION_LIST_SKELETON_HEADER_KEY,
   type SessionListRow,
   skeletonSessionRows,
 } from './session-list-rows';
@@ -130,16 +131,24 @@ describe('flattenSessionSections', () => {
 });
 
 describe('skeletonSessionRows', () => {
-  it('defaults to the reserved cold-open row count', () => {
-    expect(skeletonSessionRows()).toHaveLength(SESSION_LIST_SKELETON_COUNT);
+  it('defaults to the reserved cold-open row count plus the header placeholder', () => {
+    const rows = skeletonSessionRows();
     expect(SESSION_LIST_SKELETON_COUNT).toBe(8);
+    expect(rows).toHaveLength(SESSION_LIST_SKELETON_COUNT + 1);
   });
 
-  it('marks every row as a skeleton kind with a unique key', () => {
+  it('starts with the date-header placeholder, then a skeleton kind per slot with a unique key', () => {
     const rows = skeletonSessionRows(8);
-    for (const row of rows) {
+    expect(rows[0]).toEqual({
+      kind: 'section-header-skeleton',
+      key: SESSION_LIST_SKELETON_HEADER_KEY,
+    });
+    for (const row of rows.slice(1)) {
       expect(row.kind).toBe('skeleton');
     }
+    expect(rows.map(row => row.key).slice(1)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `skeleton:${index}`)
+    );
     const keys = rows.map(row => row.key);
     expect(new Set(keys).size).toBe(keys.length);
   });
@@ -147,9 +156,20 @@ describe('skeletonSessionRows', () => {
   it('keeps keys stable across calls so the swap to real rows is a plain data update', () => {
     expect(skeletonSessionRows(3)).toEqual(skeletonSessionRows(3));
     expect(skeletonSessionRows(3).map(row => row.key)).toEqual([
+      'skeleton:header',
       'skeleton:0',
       'skeleton:1',
       'skeleton:2',
     ]);
+  });
+
+  it('matches the loaded row shapes item for item for a single-section history', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    // The placeholder must be one list item per real item, or a cell is
+    // measured at the placeholder's composite height and then corrected.
+    const loadedKinds = flattenSessionSections([section('Today', ids)]).map(row =>
+      row.kind === 'section-header' ? 'section-header-skeleton' : 'skeleton'
+    );
+    expect(skeletonSessionRows(ids.length).map(row => row.kind)).toEqual(loadedKinds);
   });
 });

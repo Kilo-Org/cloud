@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
-import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,
   sessionLiveActivityRelevance,
   sessionLiveActivityTitle,
 } from './session-live-activity';
+import { sessionLiveActivityContentStateSchema } from './session-live-content';
 
 const options = {
   approvalKey: 'a'.repeat(64),
@@ -203,6 +204,49 @@ describe('buildSessionLiveActivityContentState', () => {
       startedAt: '2026-10-12T09:00:00.000Z',
     });
     expect(local.permissionCommand).toBeNull();
+  });
+
+  it('replaces the remembered facts a row carries and keeps the ones it omits', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'busy',
+        currentStep: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 1, total: 4, current: 'Read the tests' },
+        changes: { files: 2, added: 10, removed: 1 },
+      },
+      options
+    );
+
+    // A carried fact replaces the remembered one outright; the two never merge.
+    const replaced = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'permission',
+        currentStep: { verb: 'running', target: 'schema.ts' },
+        plan: { done: 2, total: 4, current: 'Write the migration' },
+        changes: { files: 3, added: 40, removed: 4 },
+        permissionCommand: 'pnpm test',
+      },
+      { ...options, previous: pushed }
+    );
+    expect(replaced.currentStep).toEqual({
+      verb: 'running',
+      target: 'schema.ts',
+    });
+    expect(replaced.plan).toEqual({ done: 2, total: 4, current: 'Write the migration' });
+    expect(replaced.changes).toEqual({ files: 3, added: 40, removed: 4 });
+    expect(replaced.permissionCommand).toBe('pnpm test');
+
+    // A row that carries none of them keeps every fact the card already shows.
+    const kept = buildSessionLiveActivityContentState(
+      { id: 'ses_11', status: 'permission' },
+      { ...options, previous: replaced }
+    );
+    expect(kept.currentStep).toEqual(replaced.currentStep);
+    expect(kept.plan).toEqual(replaced.plan);
+    expect(kept.changes).toEqual(replaced.changes);
+    expect(kept.permissionCommand).toBe('pnpm test');
   });
 
   it('drops the permission command with the key it belongs to', () => {

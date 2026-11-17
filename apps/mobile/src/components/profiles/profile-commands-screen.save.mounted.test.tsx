@@ -39,7 +39,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileCommands: () => h.query,
@@ -59,6 +59,7 @@ vi.mock('expo-router', () => ({
       }
       h.back();
     },
+    canGoBack: () => true,
   }),
   usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
     h.guard.enabled = enabled;

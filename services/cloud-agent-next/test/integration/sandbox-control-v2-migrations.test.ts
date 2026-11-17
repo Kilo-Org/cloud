@@ -76,6 +76,7 @@ const ROUTE_ENVIRONMENT_MIGRATION_AT = 1792104724546;
 const WORKSPACE_DISK_MIGRATION_AT = 1793713237356;
 const CREATE_ATTEMPT_MIGRATION_AT = 1794145671968;
 const BILLING_FAILURE_MIGRATION_AT = 1794258032795;
+const WORKSPACE_ARTIFACTS_MIGRATION_AT = 1794406959569;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -126,6 +127,8 @@ function newSandboxStub(): DurableObjectStub<SandboxControlV2> {
 }
 
 function clearSchema(db: MigrationDb): void {
+  db.run(sql`DROP TABLE IF EXISTS workspace_artifact_orphans`);
+  db.run(sql`DROP TABLE IF EXISTS workspace_artifacts`);
   db.run(sql`DROP TABLE IF EXISTS workspace_disk_allocation`);
   db.run(sql`DROP TABLE IF EXISTS workspace_disk_snapshots`);
   db.run(sql`DROP TABLE IF EXISTS scope_grants`);
@@ -187,6 +190,8 @@ describe('sandbox control V2 consolidated migrations', () => {
         'allocation',
         'routes',
         'scope_grants',
+        'workspace_artifact_orphans',
+        'workspace_artifacts',
         'workspace_disk_allocation',
         'workspace_disk_snapshots',
       ]);
@@ -199,6 +204,18 @@ describe('sandbox control V2 consolidated migrations', () => {
       expect(columnSignatures(db, 'workspace_disk_snapshots')).toEqual([
         { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
         { name: 'workspace_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(columnSignatures(db, 'workspace_artifacts')).toEqual([
+        { name: 'content_hash', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'content_type', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'object_key', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'relative_path', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+        { name: 'size_bytes', type: 'integer', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'updated_at', type: 'integer', notnull: 1, dflt_value: null, pk: 0 },
+      ]);
+      expect(columnSignatures(db, 'workspace_artifact_orphans')).toEqual([
+        { name: 'object_key', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+        { name: 'queued_at', type: 'integer', notnull: 1, dflt_value: null, pk: 0 },
       ]);
       expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
       expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
@@ -215,6 +232,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
+        { hash: '', created_at: WORKSPACE_ARTIFACTS_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -229,7 +247,6 @@ describe('sandbox control V2 consolidated migrations', () => {
       clearSchema(db);
       await migrate(db, OLD_FOUR_MIGRATIONS);
 
-      const oldAllocationColumns = columnSignatures(db, 'allocation');
       const oldRoutesColumns = columnSignatures(db, 'routes');
       const oldApplied = appliedMigrations(db);
       expect(oldApplied.at(-1)?.created_at).toBe(1790511032804);
@@ -257,6 +274,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
+        { hash: '', created_at: WORKSPACE_ARTIFACTS_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);

@@ -13,6 +13,7 @@ import {
   shouldRenderReasoningPart,
 } from '@/components/cloud-agent-next/types';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 
 type SnapshotMessage = {
   info: { id: string; role?: unknown; time?: unknown };
@@ -135,7 +136,9 @@ function formatWorkedDuration(durationMs: number): string {
 }
 
 export function summarizeAgentWork(parts: Part[], working = false): string {
-  const tools = parts.filter(isToolPart);
+  const tools = parts.filter(
+    (part): part is ToolPart => isToolPart(part) && readBackgroundResult(part)?.kind !== 'notice'
+  );
   const reasoning = parts.filter(shouldRenderReasoningPart);
   const subtasks = parts.filter(isSubtaskPart);
 
@@ -191,10 +194,15 @@ export function groupAssistantParts(
       continue;
     }
 
+    const backgroundResult = isToolPart(part) ? readBackgroundResult(part) : undefined;
+    // Shell and subagent results need attention; passive notices stay in the work group.
     const standaloneTool =
       mode === 'live' &&
       isToolPart(part) &&
-      (part.tool === 'question' || part.tool === 'task' || part.tool === 'suggest');
+      (part.tool === 'question' ||
+        part.tool === 'task' ||
+        part.tool === 'suggest' ||
+        (backgroundResult !== undefined && backgroundResult.kind !== 'notice'));
     const toolId = producingToolPartId(part);
     // A tool's returned files stay beside that tool instead of ending its group.
     const type =

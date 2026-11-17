@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Vaše relace agenta má aktualizaci",
-      "chatMessage": "Máte novou zprávu",
-      "instanceLifecycle": "Vaše instance má aktualizaci",
-      "scheduledAction": "Naplánovaná akce má aktualizaci",
       "lowBalance": "Váš zůstatek vyžaduje pozornost",
       "spendAlert": "Vaše útrata vyžaduje pozornost",
       "securityFinding": "Nález zabezpečení vyžaduje pozornost",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Úkol dokončen"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Selhání: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Přerušeno: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Bez názvu",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Upozornění na útratu",
       "body": "Útrata {{scopeName}} překročila ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nový nález zabezpečení ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový nález zabezpečení ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Varování o SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Varování o SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Porušení SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Porušení SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Kontrola zabezpečení má aktualizaci"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} je připraven",
-      "body": "Klepnutím začnete chatovat."
-    },
-    "startFailed": {
-      "title": "Spuštění {{instanceName}} se nezdařilo",
-      "body": "Spuštění se nezdařilo."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} se brzy restartuje",
-      "body": "Naplánován restart v {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Restart {{instanceName}} zrušen",
-      "body": "Dříve naplánovaný restart byl zrušen."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} se brzy aktualizuje",
-      "bodyWithTag": "Aktualizace na {{targetImageTag}} v {{when}}.",
-      "bodyWithoutTag": "Naplánovaná aktualizace v {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Aktualizace {{instanceName}} zrušena",
-      "body": "Dříve naplánovaná aktualizace byla zrušena."
     }
   },
   "sessionReady": {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite per repository-state helper: provider status, grouping, and branch state share the same fixtures */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

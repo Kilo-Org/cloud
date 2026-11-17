@@ -15,12 +15,12 @@ import {
   getSessionFollowsRevision,
   isSessionFollowed,
   restoreFollowedSessionCards,
-  restoreFollowedSessionCardsFromStorage,
   SESSION_FINISHED_DISMISS_MS,
   subscribeSessionFollows,
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
+import { restoreFollowedSessionCardsFromStorage } from './session-follow-storage';
 import { _setStoredContextReaderForTests } from './session-stored-context';
 
 const mocks = vi.hoisted(() => ({
@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   }),
   setAndroidSessionScope: vi.fn(),
   runGlanceableApprove: vi.fn(),
+  ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
 }));
 
 // The card builder reads the app's locale and number formatting through the
@@ -65,9 +66,7 @@ vi.mock('./session-notification', () => ({
 }));
 
 vi.mock('./ensure-notification-channels', () => ({
-  ensureAndroidNotificationChannels: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+  ensureAndroidNotificationChannels: mocks.ensureAndroidNotificationChannels,
 }));
 
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
@@ -104,6 +103,7 @@ beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   setLiveActivityEnabledValue(true);
   setNotificationPermissionGrantedValue(true);
+  mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
 });
 
 describe('followSession', () => {
@@ -285,5 +285,53 @@ describe('restoreFollowedSessionCards', () => {
       userId: 'user-1',
       organizationId: 'org-1',
     });
+  });
+
+  it('cancels a foreign-scope card before the channel pass, even when it fails', async () => {
+    _setStoredContextReaderForTests(() => CTX);
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-7', userId: 'user-1', organizationId: null, approvalKey: null },
+    ]);
+
+    // The channel pass failed, so the follow set is still unknown.
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(false);
+
+    // The card another scope left behind is pruned even though the channels could
+    // not be created: reconciliation owns the cards, the channel pass only the post.
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-7');
+    expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(1);
+    expect(mocks.dismissSessionCard.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.ensureAndroidNotificationChannels.mock.invocationCallOrder[0] ??
+        Number.POSITIVE_INFINITY
+    );
+  });
+
+  it('restores a same-scope card only once the channel pass succeeded', async () => {
+    _setStoredContextReaderForTests(() => CTX);
+    const own = [
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
+    ];
+    mocks.getStoredSessionCards.mockReturnValue(own);
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
+
+    // The follow set is still empty, so the result must not claim it is known: a
+    // headless push would release a token for a session this device does follow.
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(false);
+
+    // A card restored before its channel existed would be posted into nothing and
+    // never reposted once creation succeeded.
+    expect(mocks.restoreSessionCard).not.toHaveBeenCalled();
+    expect(mocks.dismissSessionCard).not.toHaveBeenCalledWith('session-1');
+
+    // The next launch reconciles again, and now the card is restored.
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+
+    expect(mocks.restoreSessionCard).toHaveBeenCalledWith('session-1');
+    expect(mocks.ensureAndroidNotificationChannels.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.restoreSessionCard.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
   });
 });

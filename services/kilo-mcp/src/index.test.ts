@@ -78,6 +78,21 @@ const testCatalog: Catalog = {
     searchBlob: 'debug.echoText Echoes a short string back from the debug router. debug echotext',
     debug: true,
   },
+  'debug.setFlag': {
+    path: 'debug.setFlag',
+    kind: 'query',
+    summary: 'Read a debug flag through the debug router.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: { verbose: { type: 'boolean' } },
+      required: ['verbose'],
+      additionalProperties: false,
+    },
+    tags: ['debug'],
+    searchBlob: 'debug.setFlag Read a debug flag through the debug router. debug setflag verbose',
+    debug: true,
+  },
   'cliSessions.revokeAll': {
     path: 'cliSessions.revokeAll',
     kind: 'mutation',
@@ -555,6 +570,54 @@ describe('tools/call params and arguments validation (zod)', () => {
     expect(url).toBe('https://app.kilo.ai/api/trpc/reports.echo?input=%22hello%22');
   });
 
+  it('call decodes a JSON-encoded object input before forwarding it', async () => {
+    // The published `input` property carries a description and no JSON Schema
+    // `type`, so a client may serialize the object argument as a JSON string.
+    // The schema for the catalog row still decides what is forwarded.
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: { data: { sessions: [] } } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const response = await rpc(
+      protectedHandler({ fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 28,
+        method: 'tools/call',
+        params: {
+          name: 'call',
+          arguments: { path: 'cliSessions.search', input: '{"query":"deploy"}' },
+        },
+      },
+      AUTH
+    );
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(json.result.content[0]!.text).toBe('{"sessions":[]}');
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe('{"query":"deploy"}');
+  });
+
+  it('call still refuses a JSON string that does not satisfy the row schema', async () => {
+    const fetchImpl = vi.fn();
+    const { json } = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 29,
+        method: 'tools/call',
+        params: {
+          name: 'call',
+          arguments: { path: 'cliSessions.search', input: '{"query":""}' },
+        },
+      },
+      fetchImpl
+    );
+    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('call_protected accepts the scalar input a published schema describes and records exactly it', async () => {
     const fetchImpl = vi.fn();
     const requests = fakeRequestsStore({ id: 'req-scalar' });
@@ -577,6 +640,35 @@ describe('tools/call params and arguments validation (zod)', () => {
       path: 'debug.echoText',
       kind: 'debug',
       inputJson: '"hello"',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('call_protected records the decoded object for a JSON-string input, not the encoding', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({ id: 'req-json' });
+    const response = await rpc(
+      protectedHandler({ requests, fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 30,
+        method: 'tools/call',
+        params: {
+          name: 'call_protected',
+          arguments: { path: 'debug.setFlag', input: '{"verbose":true}' },
+        },
+      },
+      AUTH_ADMIN
+    );
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(JSON.parse(json.result.content[0]!.text)).toMatchObject({
+      status: 'otp_required',
+      request_id: 'req-json',
+    });
+    expect(requests.created[0]).toMatchObject({
+      path: 'debug.setFlag',
+      kind: 'debug',
+      inputJson: '{"verbose":true}',
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });

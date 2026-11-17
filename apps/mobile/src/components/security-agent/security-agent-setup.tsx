@@ -8,7 +8,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { CenteredState } from '@/components/centered-state';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -28,10 +28,10 @@ type SecurityAgentSetupProps<T> = {
    */
   readOnlyNotice?: string;
   /**
-   * The URL to open. Undefined while the install-state token is still being
-   * minted or after a failed mint: pressing the button then mints again and
-   * only opens once a URL exists, so a transient mint failure never replaces
-   * this screen with an error-only page.
+   * The URL to open. Undefined while the hand-off token is still being minted
+   * or after a failed mint: pressing the button then mints again and only opens
+   * once a URL exists, so a transient mint failure never replaces this screen
+   * with an error-only page.
    */
   url?: string;
   /** Resolves the current URL (mints when the screen has none) before opening. */
@@ -50,6 +50,7 @@ export function SecurityAgentSetup<T>({
   onConnected,
 }: Readonly<SecurityAgentSetupProps<T>>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const [connecting, setConnecting] = useState(false);
   /**
    * Why the last press could not continue. Rendered in this body and kept
@@ -125,9 +126,7 @@ export function SecurityAgentSetup<T>({
               void connect();
             }}
           >
-            {connecting ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : null}
+            {connecting ? <ActivityIndicator size="small" color={mutedDisabledInk} /> : null}
             <Text>{buttonLabel}</Text>
           </Button>
         )}

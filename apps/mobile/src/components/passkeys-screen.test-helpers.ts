@@ -1,10 +1,14 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useSyncExternalStore } from 'react';
 import { vi } from 'vitest';
 
 import '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { PasskeysScreen } from './passkeys-screen';
-import { renderWithProviders } from '@/test/render-with-providers';
+import {
+  renderWithProviders,
+  type RenderWithProvidersResult,
+  waitFor,
+} from '@/test/render-with-providers';
 
 /** One `user.getPasskeys` row; a test overrides only the fields it cares about. */
 type PasskeyFixture = {
@@ -37,7 +41,8 @@ export const USED = passkey({
   last_used_at: '2026-03-04T05:06:07Z',
 });
 
-type PasskeysView = Awaited<ReturnType<typeof renderWithProviders>>;
+/** What mounting the screen returns: the renderer and its query client. */
+export type PasskeysView = RenderWithProvidersResult;
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 // The harness lives here so the scenario file stays under the repository's
@@ -50,7 +55,36 @@ const list = vi.hoisted(() => ({
   renameFn: vi.fn(),
   register: vi.fn(),
   supported: vi.fn(() => true),
+  requestCode: vi.fn(),
+  authorizeCode: vi.fn(),
+  authorizeTicket: vi.fn(),
+  mintTicket: vi.fn(),
+  startSso: vi.fn(),
+  collectSso: vi.fn(),
 }));
+/** The account the screen is signed in as; a test may switch it mid-flight. */
+type Identity = { userId: string | undefined; email: string | undefined };
+const identity = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  let value: Identity = { userId: 'user-1', email: 'person@example.com' };
+  return {
+    get: () => value,
+    set: (next: Identity) => {
+      value = next;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+});
+/** The OS browser the SSO handoff opens; a test makes it refuse or resolve. */
+const browser = vi.hoisted(() => ({ open: vi.fn(), dismiss: vi.fn() }));
 const store = vi.hoisted(() => ({ rows: [] as unknown[] }));
 /** The window the screen lays out in; a test sets a landscape size to read the
  *  short-window presentation and restores it afterwards. */
@@ -60,7 +94,7 @@ const toastError = vi.hoisted(() => vi.fn());
 const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { confirmSpy, list, store, toastError, toastSuccess, windowSize };
+export { browser, confirmSpy, list, store, toastError, toastSuccess, windowSize };
 
 /**
  * The confirmation the stubbed `useConfirmDialog` captured; mirrors the
@@ -92,9 +126,29 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
+// The screen reads the account on every render, so a test can sign it in as
+// someone else mid-flight and watch a late answer lose its owner.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => useSyncExternalStore(identity.subscribe, identity.get, identity.get),
+}));
 vi.mock('@/lib/auth/passkey-client', () => ({
   registerPasskey: list.register,
   passkeysSupported: list.supported,
+  mintPasskeyTicket: list.mintTicket,
+}));
+vi.mock('@/lib/auth/passkey-management', () => ({
+  requestManagementCode: list.requestCode,
+  authorizePasskeyManagementWithCode: list.authorizeCode,
+  authorizePasskeyManagementWithTicket: list.authorizeTicket,
+  startPasskeyManagementSso: list.startSso,
+  collectPasskeyManagementSso: list.collectSso,
+}));
+vi.mock('@/lib/auth/auth-browser', () => ({
+  openAuthBrowser: browser.open,
+  dismissAuthBrowser: browser.dismiss,
+  // The real classifier reads the URL's host and the platform; these suites
+  // only need one stable kind to pair with the close.
+  resolveAuthBrowserKind: () => 'auth-session',
 }));
 vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock('react-native', () => ({
@@ -124,6 +178,7 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // The removal confirmation is the app's in-app dialog. The screen's own
 // behaviour is the subject here, so the hook is stubbed: `confirm` captures the
@@ -156,6 +211,16 @@ export async function press(control: ReactTestInstance): Promise<void> {
   });
 }
 
+/**
+ * Sign the screen in as another account, the way a sign-out followed by a
+ * sign-in would: the panels and mutations on screen belonged to the old one.
+ */
+export async function switchAccount(next: Identity): Promise<void> {
+  await act(() => {
+    identity.set(next);
+  });
+}
+
 export async function retry(control: ReactTestInstance): Promise<void> {
   await act(() => {
     (control.props.onRetry as () => void)();
@@ -172,6 +237,26 @@ export async function confirmRemoval(): Promise<void> {
   await act(() => {
     request?.onConfirm();
   });
+}
+
+/** The catalog copy the verification panel shows on its opening step. */
+export const VERIFY_TITLE = "Verify it's you";
+export const VERIFY_EMAIL = 'Email me a code';
+export const VERIFY_PASSKEY = 'Verify with a passkey';
+
+/**
+ * Give the screen the emailed-code proof: choose it, type the code, submit.
+ * The code request and the authorization are the suite's to mock; this helper
+ * only drives the panel the way a person would.
+ */
+export async function verifyWithCode(view: PasskeysView, code = '123456'): Promise<void> {
+  await press(buttonByLabel(view, VERIFY_EMAIL));
+  await waitFor(() => nodes(view, 'FormField').length === 1);
+  const field = first(view, 'FormField');
+  await act(() => {
+    (field.props.onChangeText as (value: string) => void)(code);
+  });
+  await press(buttonByLabel(view, 'Verify code'));
 }
 
 function flatten(value: unknown): string[] {

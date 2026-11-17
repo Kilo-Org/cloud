@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Jou agentsessie het 'n opdatering",
-      "chatMessage": "Jy het 'n nuwe boodskap",
-      "instanceLifecycle": "Jou instansie het 'n opdatering",
-      "scheduledAction": "'n Geskeduleerde aksie het 'n opdatering",
       "lowBalance": "Jou saldo benodig aandag",
       "spendAlert": "Jou besteding benodig aandag",
       "securityFinding": "'n Sekuriteitsbevinding benodig aandag",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Aktiewe agente het 'n opdatering"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Taak voltooi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Misluk: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Onderbreek: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Sonder titel",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Bestedingswaarskuwing",
       "body": "{{scopeName}} besteding het ${{amountUsd}} oorskry"
     },
-    "securityFindingNew": {
-      "title": "Nuwe sekuriteitsbevinding ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nuwe sekuriteitsbevinding ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-waarskuwing",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-waarskuwing"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-oortreding",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-oortreding"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "'n Sekuriteitskontrole het 'n opdatering"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} is gereed",
-      "body": "Tik om te begin klets."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} kon nie begin nie",
-      "body": "Begin het misluk."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} sal binnekort herbegin",
-      "body": "Geskeduleer om te herbegin by {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} herbegin gekanselleer",
-      "body": "Die voorheen geskeduleerde herbegin is gekanselleer."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} sal binnekort opgradeer",
-      "bodyWithTag": "Opgradeer na {{targetImageTag}} by {{when}}.",
-      "bodyWithoutTag": "Geskeduleerde opgradering by {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} opgradering gekanselleer",
-      "body": "Die voorheen geskeduleerde opgradering is gekanselleer."
     }
   },
   "sessionReady": {

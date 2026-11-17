@@ -2,6 +2,7 @@ import type * as watchwoodModule from '@/lib/auth/watchwood';
 import type * as linkingModule from '@/lib/account-linking-session';
 import type * as userModule from '@/lib/user';
 import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
+import type * as domainGatesModule from '@kilocode/web-shared/lib/user/domain-gates';
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
 jest.mock('@/lib/auth/watchwood', () => ({
@@ -18,6 +19,9 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
   getUserFromSession: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  ...jest.requireActual<typeof domainGatesModule>('@kilocode/web-shared/lib/user/domain-gates'),
   isBlockedTLD: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
@@ -31,6 +35,7 @@ import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import * as userServer from '@kilocode/web-shared/lib/user/server';
+import * as domainGates from '@kilocode/web-shared/lib/user/domain-gates';
 import * as userLib from '@/lib/user';
 import { sessionAuthOptions } from '@kilocode/web-shared/lib/user/server';
 import {
@@ -703,7 +708,7 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
-    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+    jest.mocked(domainGates.isBlockedTLD).mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -805,7 +810,7 @@ describe('Sign-in verification address', () => {
       .mockImplementation(
         jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
       );
-    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+    jest.mocked(domainGates.isBlockedTLD).mockResolvedValue(false);
 
     const profile = {
       sub: `subject-${user.id}`,

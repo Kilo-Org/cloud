@@ -19,6 +19,7 @@ import { createHostedWorkspaceProfileHandlers } from './router/handlers/hosted-w
 import { createHostedWorkspaceContinuationHandlers } from './router/handlers/hosted-workspace-continuation.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
+import { createSessionWorkspaceArtifactsHandlers } from './router/handlers/session-workspace-artifacts.js';
 import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
 import { listChildSessions } from './router/handlers/list-child-sessions.js';
 import { createSessionWorktreeGitHandlers } from './router/handlers/session-worktree-git.js';
@@ -31,6 +32,16 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
+import {
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+} from './router/handlers/hosted-workspace-changes.js';
+import {
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
+} from './router/handlers/hosted-workspace-pull-request.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -55,6 +66,12 @@ export const appRouter = router({
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
+  refreshHostedWorkspacePullRequest,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,
@@ -73,6 +90,7 @@ export const appRouter = router({
   ...createHostedWorkspaceProfileHandlers(),
   ...createHostedWorkspaceContinuationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
+  ...createSessionWorkspaceArtifactsHandlers(),
   ...createSessionEgressAuditHandlers(),
   ...createSessionWorktreeGitHandlers(),
 });

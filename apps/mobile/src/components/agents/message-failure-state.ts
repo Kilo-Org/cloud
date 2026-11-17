@@ -40,8 +40,8 @@ type DeliveryReason = SdkDeliveryReason | typeof CREDITS_DELIVERY_REASON;
  * its second line names the run as the thing that failed.
  *
  * `error` marks a row that reports an error, so the row carries the destructive
- * marker beside its title. A message the person stopped reports a neutral
- * status rather than an error, so it carries none.
+ * marker beside its title and the destructive ink. A message the person stopped
+ * reports a neutral status rather than an error, so it carries neither.
  */
 const DELIVERY_FAILURE_ROW = {
   interrupted: {
@@ -97,6 +97,13 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
   'MessageAbortedError',
   'ContextOverflowError',
 ];
+
+/**
+ * The assistant error the person's own Stop writes. The runtime reports the
+ * generation as `aborted`, and `kilo2-source-messages.ts` names it with this
+ * error, so the row can tell a stop from a failure.
+ */
+const STOPPED_ASSISTANT_ERROR = 'MessageAbortedError';
 
 /**
  * Whether the gateway itself marked the failure terminal. An `APIError` carries
@@ -176,9 +183,6 @@ function assistantDetailKey(errorName: string, nonRetryableByProvider: boolean):
     case 'ProviderAuthError': {
       return 'agentChat.messageFailure.assistantProviderRejected';
     }
-    case 'MessageAbortedError': {
-      return 'agentChat.messageFailure.assistantStopped';
-    }
     case 'ContextOverflowError': {
       return 'agentChat.messageFailure.assistantContextOverflow';
     }
@@ -218,10 +222,11 @@ export type MessageFailure = {
   side: 'user' | 'assistant';
   /**
    * Whether the row reports an error, so it carries the destructive marker
-   * beside its title. Every failure does except a message the person stopped:
-   * stopping is a neutral status, not an error. The message bubble itself keeps
-   * the same fill and ink in every state, so the marker does not touch the ink
-   * its 15px copy reads at.
+   * beside its title and the destructive ink. Every failure does except a stop:
+   * a message the person stopped and a response the person stopped report a
+   * neutral status, so they carry neither. The message bubble itself keeps the
+   * same fill and ink in every state, so the marker does not touch the ink its
+   * 15px copy reads at.
    */
   error: boolean;
   /**
@@ -309,6 +314,11 @@ export function composeFailureLabel(title: string, template: string): string {
  * The failed row's accessibility label: the failure title, then the retry line
  * when the row offers one.
  *
+ * A neutral row draws one line and speaks one line: the failure templates open
+ * with an error word in several catalogs ("خطأ:", "Error:", "오류:") and the
+ * retry line repeats an action whose button is announced on its own, so a stop
+ * speaks its own title and never reads as a failure.
+ *
  * The catalog value is read before interpolation (`getResource`), so the
  * decision to drop the title's terminator is made against the template as
  * translated rather than against a copy of the rule.
@@ -317,12 +327,15 @@ export function composeFailureLabel(title: string, template: string): string {
  * language switch even when a caller holds a failure selected earlier.
  */
 export function messageFailureLabel(
-  failure: Pick<MessageFailure, 'titleKey' | 'canRetry'>
+  failure: Pick<MessageFailure, 'titleKey' | 'canRetry' | 'error'>
 ): string {
+  const title = i18n.t(failure.titleKey);
+  if (!failure.error) {
+    return title;
+  }
   const key = failure.canRetry
     ? 'agentChat.messageBubble.failureRetryAvailable'
     : 'agentChat.messageBubble.failure';
-  const title = i18n.t(failure.titleKey);
   // The catalogs hold a string at every key they define; an absent one falls
   // back to i18next's own interpolation, which then keeps the title unchanged.
   const template =
@@ -334,8 +347,8 @@ export function messageFailureLabel(
  * The detail keys of the statement that says only that the response failed: an
  * unclassified assistant error carries none, and a question whose run failed
  * carries `deliveryExecution`. Every classified cause — a provider refusal, a
- * spent balance, an aborted or overflowing turn — names something the reader
- * cannot get anywhere else, so it is not generic.
+ * spent balance, an overflowing turn — names something the reader cannot get
+ * anywhere else, so it is not generic.
  */
 const GENERIC_RESPONSE_FAILURE_DETAIL_KEYS: ReadonlySet<string | null> = new Set([
   null,
@@ -422,6 +435,25 @@ export function selectMessageFailure(input: {
   if (info.role === 'assistant' && info.error) {
     const { error } = info;
     const errorName = error.name;
+    // The person stopped the generation: the row states that as a neutral
+    // status, with no error title, no marker and no second line, exactly as a
+    // message the person stopped does (`DELIVERY_FAILURE_ROW.interrupted`). The
+    // stop is the recovery that was already taken, so the row offers none.
+    if (errorName === STOPPED_ASSISTANT_ERROR) {
+      return {
+        kind: 'assistant',
+        side: 'assistant',
+        error: false,
+        titleKey: 'agentChat.messageFailure.assistantStopped',
+        title: i18n.t('agentChat.messageFailure.assistantStopped'),
+        detailKey: null,
+        detail: null,
+        copyDetail: '',
+        canRetry: false,
+        canAddCredits: false,
+        canCopy: false,
+      };
+    }
     // A terminal gateway verdict drops the Retry and changes the detail line;
     // the name set still covers the errors whose class is terminal on every
     // transport.

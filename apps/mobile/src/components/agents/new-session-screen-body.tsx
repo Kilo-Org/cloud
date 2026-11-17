@@ -8,11 +8,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
+import { EnvironmentSheet } from '@/components/agents/environment-sheet';
+import { NewSessionCloudEnvironmentRow } from '@/components/agents/new-session-cloud-environment-row';
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import {
   isStoredRepoSelectionGone,
   resetSelectedBranchOverrides,
 } from '@/components/agents/new-session-repository-state';
+import { isRepositoryRegionSettled } from '@/components/agents/new-session-repository-settle';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,
@@ -52,6 +55,12 @@ import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import {
+  environmentBlocksStart,
+  requestedEnvironmentForSelection,
+  requiresEnvironmentChoice,
+} from '@/lib/cloud-environments/environment-selection';
+import { useSessionEnvironment } from '@/lib/cloud-environments/use-session-environment';
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
@@ -68,6 +77,7 @@ import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-and
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
+import { useCollapsedConnectCtas } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
@@ -77,6 +87,7 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   FORK_CUT_NOT_SYNCED_KEY,
   resolveCloneCapabilityRefusal,
@@ -146,6 +157,7 @@ export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
@@ -448,6 +460,7 @@ export function NewSessionScreenBody() {
     groups,
     isRetrying,
     reposSettled,
+    providerQueriesResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,
@@ -465,9 +478,14 @@ export function NewSessionScreenBody() {
     entityKey: repositoryDraftKey,
   });
 
-  const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
+  // The seed gate reads the region's own bounded signal, so a list that never
+  // answers cannot withhold the form's rows on a prefilled entry either; the
+  // hook gives the request up at the bound so a late answer cannot mount a
+  // repository the region was declared final without.
+  const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
+    providerQueriesResolved,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
     storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,
@@ -497,6 +515,46 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
+
+  // The cloud environment of this repository: the environments that contain
+  // it, the remembered pick among several, and each one's snapshot build. A
+  // clone entry picks none (the web's Continue route picks none either), and a
+  // remote target never creates a cloud session, so neither blocks on one.
+  const sessionEnvironment = useSessionEnvironment({
+    organizationId,
+    repository: isCloneEntry ? null : selectedRepository,
+  });
+  const [environmentSheetOpen, setEnvironmentSheetOpen] = useState(false);
+  const isCloudTarget = runOnInstance === null && !computerTargetSelected;
+  const environmentSelection = sessionEnvironment.selection;
+  const selectedEnvironmentId = sessionEnvironment.environment?.id ?? null;
+  const environmentBlocked =
+    !isCloneEntry && isCloudTarget && environmentBlocksStart(environmentSelection);
+  // `idle` is a form with no repository yet: the row would have nothing to say
+  // and no picker to open, so it appears with the repository it describes.
+  const environmentSection =
+    isCloneEntry || environmentSelection.status === 'idle' ? undefined : (
+      <NewSessionCloudEnvironmentRow
+        selection={environmentSelection}
+        isError={sessionEnvironment.isError}
+        buildStatusFailed={
+          selectedEnvironmentId !== null &&
+          sessionEnvironment.buildStatusFailedFor(selectedEnvironmentId)
+        }
+        buildStatus={
+          selectedEnvironmentId === null
+            ? undefined
+            : sessionEnvironment.buildStatusFor(selectedEnvironmentId)
+        }
+        disabled={isCreating || isSubmitting}
+        onRetry={() => {
+          sessionEnvironment.retryEnvironmentList();
+        }}
+        onOpen={() => {
+          setEnvironmentSheetOpen(true);
+        }}
+      />
+    );
 
   // A repository is one discrete choice, not a keystroke burst, so it is
   // written through the debounce immediately: a restart in the next half second
@@ -531,6 +589,18 @@ export function NewSessionScreenBody() {
     }
   }, [dropUnresolvedRepo, repositoryDraftKey, setSelectedRepo, userId]);
 
+  // The repository section's own height is data-dependent (connect cards, the
+  // branch row), so the form paints the cards and the rows below the section on
+  // this one signal instead of letting a late card push those rows down.
+  const { hasLoaded: connectCtasLoaded } = useCollapsedConnectCtas();
+  const repositoryRegionSettled = isRepositoryRegionSettled({
+    providerQueriesResolved,
+    connectCtasLoaded,
+    draftSettled: repositoryDraft.settled,
+    seedPending: repoSeedPending,
+    storedSelectionGone: dropUnresolvedRepo,
+  });
+
   const {
     profile,
     profileId,
@@ -553,8 +623,8 @@ export function NewSessionScreenBody() {
         setOverrideProfileId(id);
       },
     });
-    router.push('/(app)/agent-chat/profile-picker' as Href);
-  }, [organizationId, overrideProfileId, router]);
+    pushOnce('/(app)/agent-chat/profile-picker' as Href);
+  }, [organizationId, overrideProfileId, pushOnce]);
 
   const handleOpenRepoDefaults = useCallback(() => {
     // The composer's own Stack, so Back returns here with the draft instead of
@@ -757,6 +827,10 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
+    requestedEnvironment: requestedEnvironmentForSelection(sessionEnvironment.selection),
+    requireEnvironmentChoice: requiresEnvironmentChoice(sessionEnvironment.selection)
+      ? true
+      : undefined,
     manualEnvVars,
     setupCommands,
     todoId,
@@ -1141,16 +1215,14 @@ export function NewSessionScreenBody() {
   // A lapsed organization plan blocks Start exactly like a missing
   // precondition does: the explanation is already on screen, so the button
   // must not keep the primary fill over it.
-  const isStartDisabled = resolveStartDisabled() || planRefusal !== null;
+  const isStartDisabled = resolveStartDisabled() || planRefusal !== null || environmentBlocked;
 
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
   const hasRepositories = repositories.length > 0;
-  // One source of truth for "a provider can still be connected" and which one
-  // the footer's connect action opens: the first group in the `connect` state,
-  // in the section's fixed github/gitlab/bitbucket order.
-  const connectProviderPlatform = resolveNewSessionConnectProvider(groups);
-  const hasConnectableProvider = connectProviderPlatform !== null;
+  // True while at least one provider can still be connected: the repository
+  // section's connect card carries that step.
+  const hasConnectableProvider = resolveNewSessionConnectProvider(groups) !== null;
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
@@ -1200,27 +1272,18 @@ export function NewSessionScreenBody() {
 
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
-  if (runOnInstance === null && computerTargetSelected) {
+  // `connect-provider` is not mapped here: the repository section's connect card
+  // already names that step and carries its own button, so the footer leaves
+  // the reason empty instead of repeating the prompt.
+  if (environmentBlocked) {
+    // The environment picker is part of the form, so an unchosen repository
+    // environment blocks the start the same way the web's picker does. Its own
+    // row states it too; the footer names the action the person must take.
+    startBlockedReason = t('agentChat.environment.selectEnvironmentToStart');
+  } else if (runOnInstance === null && computerTargetSelected) {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
-  } else if (startBlockedReasonKey === 'connect-provider') {
-    startBlockedReason = t('agentChat.newSession.connectProviderToStart');
-    // `connect-provider` requires at least one connectable group, so a target
-    // exists exactly when this branch runs; fall back to no action if it ever
-    // does not, rather than opening a broken connect flow.
-    if (connectProviderPlatform !== null) {
-      startBlockedAction = {
-        label: t('common.connectProvider'),
-        onPress: () => {
-          openIntegration(connectProviderPlatform);
-        },
-        // The flow's first step is a network round trip (GitHub mints an install
-        // state), so the action keeps a spinner and stays disabled until the
-        // flow ends instead of looking inert for the whole mint.
-        isBusy: connectingProvider !== null,
-      };
-    }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {
@@ -1234,6 +1297,25 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.enterPromptToStart');
   } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
+  } else if (startBlockedReasonKey === 'attachment-failed') {
+    // The composer's own file-fix copy, reused here: the footer names the same
+    // failed chip the composer refuses to send, and offers no second action.
+    startBlockedReason = t('agentChat.composer.removeFailedAttachments');
+  } else if (startBlockedReasonKey === 'attachment-uploading') {
+    // An upload has no timeout and a chip mid-flight offers only Remove, so the
+    // line names that escape instead of asking the person to wait for an end
+    // that may never come.
+    startBlockedReason = t('agentChat.newSession.attachmentUploadingToStart');
+  } else if (startBlockedReasonKey === 'profile-loading') {
+    // The Environment row already shows its busy state; the footer says why
+    // Start waits on it, so a disabled control is never unexplained.
+    startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'model-missing') {
+    startBlockedReason = t('agentChat.newSession.modelMissingToStart');
+  } else if (startBlockedReasonKey === 'stale-selection') {
+    // The repository section already asked for a new pick; the footer says why
+    // Start stayed disabled after a refresh dropped the selected row.
+    startBlockedReason = t('agentChat.newSession.staleRepositoryToStart');
   }
 
   // The plan explanation already says why Start cannot run, and nothing the
@@ -1383,6 +1465,7 @@ export function NewSessionScreenBody() {
         autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
+        repositoryRegionSettled={repositoryRegionSettled}
         onChangeRepo={handleRepoChange}
         onConnectProvider={openIntegration}
         connectingProvider={connectingProvider}
@@ -1405,6 +1488,7 @@ export function NewSessionScreenBody() {
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
         accountSection={accountSection}
+        environmentSection={environmentSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
@@ -1421,6 +1505,24 @@ export function NewSessionScreenBody() {
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}
       {discardConfirm}
+      <EnvironmentSheet
+        visible={environmentSheetOpen}
+        onClose={() => {
+          setEnvironmentSheetOpen(false);
+        }}
+        environments={sessionEnvironment.matches ?? []}
+        selectedEnvironmentId={sessionEnvironment.environment?.id ?? null}
+        repositoryLabel={selectedRepository?.fullName ?? ''}
+        organizationId={organizationId}
+        buildStatusFor={sessionEnvironment.buildStatusFor}
+        buildStatusFailedFor={sessionEnvironment.buildStatusFailedFor}
+        onRetryBuildStatus={() => {
+          sessionEnvironment.retryBuildStatus();
+        }}
+        onChoose={environmentId => {
+          sessionEnvironment.chooseEnvironment(environmentId);
+        }}
+      />
       <SaveDraftAsTodoSheet
         visible={saveAsTodoLeave !== null}
         organizationId={organizationId ?? null}

@@ -19,6 +19,9 @@ export const billingSubjectSchema = z
   .strict();
 export type BillingSubject = z.infer<typeof billingSubjectSchema>;
 
+export const billingModeSchema = z.enum(['shadow', 'paid']);
+export type BillingMode = z.infer<typeof billingModeSchema>;
+
 export const billingActorSchema = z
   .object({
     type: z.enum(['user', 'bot']),
@@ -203,7 +206,7 @@ export type BudgetVerdict = z.infer<typeof budgetVerdictSchema>;
 
 export const heartbeatAckSchema = recordAckSchema
   .extend({
-    billingMode: z.enum(['shadow', 'paid']).optional(),
+    billingMode: billingModeSchema.optional(),
     budget: budgetVerdictSchema,
   })
   .strict();

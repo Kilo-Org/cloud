@@ -93,8 +93,12 @@ const getCloudSessionQuery = vi.fn();
 const getCloudSessionMessagesPageQuery = vi.fn();
 const getOrganizationCloudSessionQuery = vi.fn();
 const getOrganizationCloudSessionMessagesPageQuery = vi.fn();
+const activeSessionsListQuery = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
+    activeSessions: {
+      list: { query: activeSessionsListQuery },
+    },
     cliSessionsV2: {
       get: { query: getSessionQuery },
       getWithRuntimeState: { query: getWithRuntimeStateQuery },
@@ -139,6 +143,10 @@ const {
 } = await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
+// Organization ids are UUIDs: the org procedures validate them, so a fixture
+// with any other shape reads as "no organization scope".
+const ORGANIZATION_ID = '5b0f5a0e-8a1f-4a54-9d0d-2a1c1b3d4e5f';
+const OTHER_ORGANIZATION_ID = '0c8b1e45-6d2a-4f83-9a71-7c5e2d4b1a09';
 
 function notFoundError(): Error {
   const error = new Error('Session not found') as Error & { data: { code: string } };
@@ -488,14 +496,15 @@ describe('StreamTicketResponseSchema', () => {
 
 describe('mobile workspace DO callbacks', () => {
   const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc' as CloudAgentSessionId;
+  const organizationId = ORGANIZATION_ID;
 
   beforeEach(() => {
     configHolder.current = null;
     vi.clearAllMocks();
   });
 
-  function setup(organizationId?: string): SessionManagerConfig {
-    const options = { store: {}, userWebConnection: {}, organizationId };
+  function setup(scope?: string): SessionManagerConfig {
+    const options = { store: {}, userWebConnection: {}, organizationId: scope };
     createMobileAgentSessionManager(options as never);
     const config = configHolder.current;
     if (!config) {
@@ -504,10 +513,10 @@ describe('mobile workspace DO callbacks', () => {
     return config;
   }
 
-  it.each([undefined, 'org-1'])(
+  it.each([undefined, organizationId])(
     'routes metadata and initial/older pages through DO APIs for scope %s',
-    async organizationId => {
-      const config = setup(organizationId);
+    async scope => {
+      const config = setup(scope);
       await config.fetchCloudSession?.(sessionId);
       await config.fetchCloudSnapshotPage?.(sessionId, {});
       await config.fetchCloudSnapshotPage?.(sessionId, { cursor: 'older', limit: 20 });
@@ -518,10 +527,10 @@ describe('mobile workspace DO callbacks', () => {
       };
       await config.fetchCloudSnapshotPage?.(sessionId, childPageOptions);
 
-      if (organizationId) {
+      if (scope) {
         expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
           cloudAgentSessionId: sessionId,
-          organizationId,
+          organizationId: scope,
         });
         expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(1, {
           sessionId,
@@ -562,7 +571,7 @@ describe('mobile workspace DO callbacks', () => {
     getSessionQuery.mockResolvedValueOnce({
       session_id: SESSION_ID,
       cloud_agent_session_id: sessionId,
-      organization_id: 'discovered-org',
+      organization_id: organizationId,
     });
     const config = setup();
     await config.resolveSession(SESSION_ID);
@@ -570,14 +579,59 @@ describe('mobile workspace DO callbacks', () => {
     await config.fetchCloudSnapshotPage?.(sessionId, {});
     expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
       cloudAgentSessionId: sessionId,
-      organizationId: 'discovered-org',
+      organizationId,
     });
     expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenCalledWith({
       sessionId,
-      organizationId: 'discovered-org',
+      organizationId,
     });
     expect(getWithRuntimeStateQuery).not.toHaveBeenCalled();
     expect(getSessionMessagesPageQuery).not.toHaveBeenCalled();
+  });
+
+  it('keeps an invalid organization scope off the org procedures', async () => {
+    // A hand-built link (or a navigation that lost its param) can carry a value
+    // the org procedures reject as a non-UUID: every request would answer a
+    // permanent BAD_REQUEST, so the scope must read as "personal" instead.
+    getSessionQuery.mockResolvedValueOnce({
+      session_id: SESSION_ID,
+      cloud_agent_session_id: sessionId,
+      organization_id: 'undefined',
+    });
+    const config = setup('personal');
+    await config.resolveSession(SESSION_ID);
+    await config.fetchCloudSession?.(sessionId);
+
+    expect(getOrganizationCloudSessionQuery).not.toHaveBeenCalled();
+    expect(getCloudSessionQuery).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+  });
+
+  it('treats a blank cloud agent id as not a cloud session', async () => {
+    getSessionQuery.mockResolvedValueOnce({
+      session_id: SESSION_ID,
+      cloud_agent_session_id: '  ',
+    });
+    activeSessionsListQuery.mockResolvedValueOnce({ sessions: [] });
+    const config = setup();
+
+    await expect(config.resolveSession(SESSION_ID)).resolves.toEqual({
+      type: 'read-only',
+      kiloSessionId: SESSION_ID,
+    });
+  });
+
+  it('refuses cloud metadata for a blank session id without a request', async () => {
+    const config = setup();
+    const fetchCloudSession = config.fetchCloudSession;
+    if (!fetchCloudSession) {
+      throw new Error('expected fetchCloudSession');
+    }
+
+    await expect(fetchCloudSession('' as CloudAgentSessionId)).rejects.toThrow(
+      'Cloud Agent session metadata requires a session id'
+    );
+    expect(getCloudSessionQuery).not.toHaveBeenCalled();
+    expect(getOrganizationCloudSessionQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -755,7 +809,7 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
   it('adds organizationId to the org mutation payload', async () => {
     cancelQueuedMessageMutate.mockReset();
     cancelQueuedMessageMutate.mockResolvedValue({ dropped: false });
-    const config = setup('org-1');
+    const config = setup(ORGANIZATION_ID);
     const cancel = config.api.cancelQueuedMessage;
     if (!cancel) {
       throw new Error('expected cancelQueuedMessage api');
@@ -765,7 +819,7 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
 
     expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
     expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
-      { sessionId: 'c-1', messageId: 'm-1', organizationId: 'org-1' },
+      { sessionId: 'c-1', messageId: 'm-1', organizationId: ORGANIZATION_ID },
       { context: { skipBatch: true } }
     );
   });
@@ -815,21 +869,27 @@ describe('createMobileAgentSessionManager organization adoption', () => {
     // The route mounted before its metadata read settled (offline or stalled)
     // and handed in no scope. The manager's own read resolves it a beat later;
     // org-scoped requests must carry it without recreating the manager.
-    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-1', runtimeState: null });
+    getWithRuntimeStateQuery.mockResolvedValue({
+      organization_id: ORGANIZATION_ID,
+      runtimeState: null,
+    });
     const config = setup();
 
     await config.fetchSession(SESSION_ID);
 
-    await expectCancelOrganization(config, 'org-1');
+    await expectCancelOrganization(config, ORGANIZATION_ID);
   });
 
   it('keeps the explicit route organization over the one its read names', async () => {
-    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-2', runtimeState: null });
-    const config = setup('org-1');
+    getWithRuntimeStateQuery.mockResolvedValue({
+      organization_id: OTHER_ORGANIZATION_ID,
+      runtimeState: null,
+    });
+    const config = setup(ORGANIZATION_ID);
 
     await config.fetchSession(SESSION_ID);
 
-    await expectCancelOrganization(config, 'org-1');
+    await expectCancelOrganization(config, ORGANIZATION_ID);
   });
 });
 
@@ -869,7 +929,7 @@ describe('createMobileAgentSessionManager api.respondToPermission', () => {
   });
 
   it('passes the manager organization through to the shared body', async () => {
-    const config = setup('org-1');
+    const config = setup(ORGANIZATION_ID);
     const input = { sessionId: 'c-1', requestId: 'p-1', response: 'always' };
     await config.api.respondToPermission(input as never);
 
@@ -877,7 +937,7 @@ describe('createMobileAgentSessionManager api.respondToPermission', () => {
       cloudAgentSessionId: 'c-1',
       requestId: 'p-1',
       response: 'always',
-      organizationId: 'org-1',
+      organizationId: ORGANIZATION_ID,
     });
   });
 });
@@ -963,16 +1023,6 @@ describe('createMobileAgentSessionManager cold open', () => {
     getWithRuntimeStateQuery.mockReset();
     getSessionQuery.mockReset();
     getSessionMessagesPageQuery.mockReset();
-  });
-
-  it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {
-    const options = { store: {}, userWebConnection: {} };
-    createMobileAgentSessionManager(options as never);
-    const config = configHolder.current;
-    if (config === null) {
-      throw new Error('createSessionManager did not capture a config');
-    }
-    expect(config.readCachedSnapshotPage).toBeUndefined();
   });
 
   it('leaves the transcript empty while the live page has not landed', async () => {

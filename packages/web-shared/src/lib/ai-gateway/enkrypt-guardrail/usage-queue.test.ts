@@ -1,9 +1,7 @@
 const mockConfig: {
-  ENKRYPT_USAGE_QUEUE_ENABLED: boolean;
   USAGE_INGEST_URL: string | undefined;
   USAGE_INGEST_PUBLISH_SECRET: string | undefined;
 } = {
-  ENKRYPT_USAGE_QUEUE_ENABLED: false,
   USAGE_INGEST_URL: undefined,
   USAGE_INGEST_PUBLISH_SECRET: undefined,
 };
@@ -18,9 +16,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'test-internal-secret',
-  get ENKRYPT_USAGE_QUEUE_ENABLED() {
-    return mockConfig.ENKRYPT_USAGE_QUEUE_ENABLED;
-  },
   get USAGE_INGEST_URL() {
     return mockConfig.USAGE_INGEST_URL;
   },
@@ -42,6 +37,7 @@ import {
   enkryptUsageRecordForNewOrganization,
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { recordEnkryptUsage } from './usage';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const INGEST_URL = 'https://ingest.example.test/enkrypt-usage';
 const HANDOFF_URL = 'https://app.example.com/api/internal/enkrypt-usage/record';
@@ -54,7 +50,6 @@ const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 function enableQueue(overrides: Partial<typeof mockConfig> = {}) {
   Object.assign(mockConfig, {
-    ENKRYPT_USAGE_QUEUE_ENABLED: true,
     USAGE_INGEST_URL: 'https://ingest.example.test/usage',
     USAGE_INGEST_PUBLISH_SECRET: PUBLISH_SECRET,
     ...overrides,
@@ -62,11 +57,11 @@ function enableQueue(overrides: Partial<typeof mockConfig> = {}) {
 }
 
 function callsTo(url: string) {
-  return mockFetch.mock.calls.filter(([target]) => String(target) === url);
+  return mockFetch.mock.calls.filter(([target]) => requestUrlOf(target) === url);
 }
 
 function publishedBodies() {
-  return callsTo(INGEST_URL).map(([, init]) => JSON.parse(String(init?.body)) as unknown);
+  return callsTo(INGEST_URL).map(([, init]) => readJsonBody(init?.body));
 }
 
 function droppedLogs() {
@@ -80,7 +75,6 @@ const regions = [
 
 beforeEach(() => {
   Object.assign(mockConfig, {
-    ENKRYPT_USAGE_QUEUE_ENABLED: false,
     USAGE_INGEST_URL: 'https://ingest.example.test/usage',
     USAGE_INGEST_PUBLISH_SECRET: PUBLISH_SECRET,
   });
@@ -97,18 +91,19 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('recordEnkryptUsage with the usage queue flag off', () => {
+describe('recordEnkryptUsage when the publisher is not configured', () => {
   it('writes locally in Frankfurt and publishes nothing', async () => {
+    enableQueue({ USAGE_INGEST_URL: undefined });
     const usageRecord = await enkryptUsageRecordForNewOrganization();
 
     await recordEnkryptUsage(usageRecord);
 
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockedAfter).not.toHaveBeenCalled();
     expect(await enkryptLedgerRows(usageRecord.organizationId)).toHaveLength(1);
   });
 
   it('hands off from SFO and publishes nothing', async () => {
+    enableQueue({ USAGE_INGEST_URL: undefined });
     mockedIsUSRegion.mockReturnValue(true);
     mockFetch.mockResolvedValue(Response.json({ status: 'recorded' }));
 
@@ -116,11 +111,10 @@ describe('recordEnkryptUsage with the usage queue flag off', () => {
 
     expect(callsTo(HANDOFF_URL)).toHaveLength(1);
     expect(callsTo(INGEST_URL)).toEqual([]);
-    expect(mockedAfter).not.toHaveBeenCalled();
   });
 });
 
-describe('recordEnkryptUsage with the usage queue flag on', () => {
+describe('recordEnkryptUsage through the usage queue', () => {
   it.each(regions)(
     'publishes the bare write once from %s and neither hands off nor writes locally',
     async (_region, us) => {

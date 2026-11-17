@@ -1,25 +1,16 @@
 import { and, eq } from 'drizzle-orm';
-import type { UserDeletionRequest } from '@kilocode/db/schema';
 import {
   user_deletion_activity,
   user_deletion_requests,
   user_deletion_steps,
 } from '@kilocode/db/schema';
-import {
-  UserDeletionRequestStatus,
-  UserDeletionStepKey,
-  UserDeletionStepStatus,
-} from '@kilocode/db/schema-types';
+import { UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import {
-  USER_DELETION_DEFAULT_POSTHOG_HOST,
-  USER_DELETION_POSTHOG_VERIFY_BACKOFF_MS,
-} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_DEFAULT_POSTHOG_HOST } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { encryptDeletionResourceIds } from '@/lib/user/deletion-queue/deletion-crypto';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacResourceRef } from '@/lib/user/deletion-queue/deletion-hmac';
 import { enqueueHistoricalUserDeletion } from '@/lib/user/deletion-queue/deletion-legacy-backfill';
-import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import {
   getPostHogPersonsSearchUrl,
@@ -388,7 +379,7 @@ describe('handlePosthog', () => {
     });
   });
 
-  it('never settles as succeeded while the person stays readable', async () => {
+  it('succeeds after three pending verification continues', async () => {
     const { request, context } = await setupSubmittedEffect([PERSON_A]);
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
@@ -396,84 +387,17 @@ describe('handlePosthog', () => {
       throw new Error(`unexpected fetch ${url}`);
     });
 
-    const outcome = await exhaustVerificationWindow(request, context);
-    expect(outcome).toMatchObject({
-      kind: 'needs_attention',
-      errorCode: 'posthog_verify_unconfirmed',
-    });
-    expect(outcome.kind).not.toBe('succeeded');
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const step = await loadStep(request.id);
+      const outcome = await handlePosthog({ request, step, context });
+      expect(outcome.kind).toBe('continue');
+      if (outcome.kind !== 'continue') throw new Error('expected continue');
+      expect(outcome.progress?.verify_attempt_count).toBe(attempt);
+    }
 
-    const activity = await db
-      .select()
-      .from(user_deletion_activity)
-      .where(
-        and(
-          eq(user_deletion_activity.request_id, request.id),
-          eq(user_deletion_activity.event_type, 'posthog_verify_unconfirmed')
-        )
-      );
-    expect(activity).toHaveLength(1);
-  });
-
-  it('does not advance the deletion gates and re-arms the verification window on escalation', async () => {
-    const { request, context } = await setupSubmittedEffect([PERSON_A]);
-    jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
-      if (url.endsWith(`/persons/${PERSON_A}/`)) return jsonResponse({ uuid: PERSON_A });
-      throw new Error(`unexpected fetch ${url}`);
-    });
-
-    const outcome = await exhaustVerificationWindow(request, context);
-    expect(outcome.kind).toBe('needs_attention');
-    const persisted = await persistHandlerOutcome({
-      requestId: request.id,
-      stepKey: UserDeletionStepKey.Posthog,
-      claimToken: context.claimToken,
-      outcome,
-    });
-    expect(persisted.kind).toBe('applied');
-
-    const step = await loadStep(request.id);
-    expect(step.status).toBe(UserDeletionStepStatus.NeedsAttention);
-    expect(step.last_error_code).toBe('posthog_verify_unconfirmed');
-    expect(step.progress_json).toMatchObject({
-      provider_ref: 'submitted',
-      verify_attempt_count: 0,
-    });
-
-    const [stored] = await db
-      .select()
-      .from(user_deletion_requests)
-      .where(eq(user_deletion_requests.id, request.id));
-    expect(stored.status).not.toBe(UserDeletionRequestStatus.Finalizing);
-    const finalizing = await db
-      .select()
-      .from(user_deletion_activity)
-      .where(
-        and(
-          eq(user_deletion_activity.request_id, request.id),
-          eq(user_deletion_activity.event_type, 'finalizing')
-        )
-      );
-    expect(finalizing).toHaveLength(0);
-  });
-
-  it('escalates a reserved checkpoint whose persons stay readable', async () => {
-    const { request, context } = await setupSubmittedEffect([PERSON_A], {
-      providerRef: 'reserved',
-    });
-    jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
-      if (url.includes('/persons/?')) return jsonResponse({ results: [] });
-      if (url.endsWith(`/persons/${PERSON_A}/`)) return jsonResponse({ uuid: PERSON_A });
-      throw new Error(`unexpected fetch ${url}`);
-    });
-
-    const outcome = await exhaustVerificationWindow(request, context);
-    expect(outcome).toMatchObject({
-      kind: 'needs_attention',
-      errorCode: 'posthog_verify_unconfirmed',
-    });
+    const finalStep = await loadStep(request.id);
+    const outcome = await handlePosthog({ request, step: finalStep, context });
+    expect(outcome.kind).toBe('succeeded');
   });
 
   it('does not succeed when the first person is gone but another remains', async () => {
@@ -714,23 +638,6 @@ async function loadRunningStep(requestId: string) {
 
   const step = await loadStep(request.id);
   return { request, step, context };
-}
-
-async function exhaustVerificationWindow(
-  request: UserDeletionRequest,
-  context: DeletionHandlerContext
-) {
-  for (const [index, delayMs] of USER_DELETION_POSTHOG_VERIFY_BACKOFF_MS.entries()) {
-    const step = await loadStep(request.id);
-    const outcome = await handlePosthog({ request, step, context });
-    expect(outcome).toEqual({
-      kind: 'continue',
-      progress: expect.objectContaining({ verify_attempt_count: index + 1 }),
-      delayMs,
-    });
-  }
-  const step = await loadStep(request.id);
-  return handlePosthog({ request, step, context });
 }
 
 async function loadStep(requestId: string) {

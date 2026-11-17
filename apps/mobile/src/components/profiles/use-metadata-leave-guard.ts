@@ -10,10 +10,11 @@ export type MetadataLeaveGuard = Readonly<{
   /** Wire this to the metadata form's `onDirtyChange`. */
   handleDirtyChange: (dirty: boolean) => void;
   /**
-   * Drop the unsaved-edit state without asking. The caller is leaving for a
-   * reason the guard does not speak for, as after a delete.
+   * Leave for a reason the guard does not speak for — the save made the draft
+   * the saved record, or the record the form edits no longer exists — so it
+   * drops the unsaved-edit state without asking and then runs `leave`.
    */
-  markClean: () => void;
+  leaveWithoutAsking: (leave: () => void) => void;
   /** The discard confirmation; render it inside the screen. */
   dialog: ReactNode;
 }>;
@@ -51,9 +52,29 @@ export function useMetadataLeaveGuard({
     setDirty(next);
   }, []);
 
-  const markClean = useCallback(() => {
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(leaveTimerRef.current);
+    },
+    []
+  );
+  const leaveWithoutAsking = useCallback((leave: () => void) => {
     dirtyRef.current = false;
     setDirty(false);
+    // The leave waits one task for the render that disarms the guard. Clearing
+    // the edit flag and leaving in one turn asks the native stack to change this
+    // route's `preventRemove` option and start its pop transition together: the
+    // option change lands after the transition began, react-native-screens
+    // re-mounts the screen header, and Fabric throws `addViewAt … The specified
+    // child already has a parent` (Sentry KILO-APP-25). Nothing else on the
+    // screen moves between the two, so one task is enough for the disarm to
+    // reach the native side first — and the pop is then a plain pop.
+    clearTimeout(leaveTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => {
+      leaveTimerRef.current = undefined;
+      leave();
+    }, 0);
   }, []);
 
   usePreventRemove(enabled && dirty && !leaveAllowed, ({ data, repeat }) => {
@@ -100,5 +121,5 @@ export function useMetadataLeaveGuard({
     replay?.();
   }, [leaveCount]);
 
-  return { handleDirtyChange, markClean, dialog };
+  return { handleDirtyChange, leaveWithoutAsking, dialog };
 }

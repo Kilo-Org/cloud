@@ -94,6 +94,8 @@ type CloudComposerProps = {
   toolbarDisabled?: boolean;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
+  /** Environment preparation runs without an agent turn; Stop still applies. */
+  isPreparing?: boolean;
   placeholder?: string;
   /** Why sending waits while typing is open, such as a chat that still loads; shown on the send button. */
   sendUnavailableReason?: string;
@@ -152,6 +154,8 @@ type CloudComposerProps = {
    * selected chat, so completion is scoped to this key.
    */
   conversationKey?: string;
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function CloudComposer({
@@ -165,6 +169,7 @@ export function CloudComposer({
   toolbarDisabled = disabled,
   inputRef,
   isStreaming = false,
+  isPreparing = false,
   placeholder = 'Type your message...',
   sendUnavailableReason,
   slashCommands = [],
@@ -190,6 +195,7 @@ export function CloudComposer({
   variantPickerDisabled,
   variantPickerTooltip,
   conversationKey,
+  favorites,
 }: CloudComposerProps) {
   const aui = useAui();
   const value = useAuiState(state => state.composer.text);
@@ -865,6 +871,7 @@ export function CloudComposer({
                 variantPickerTooltip={variantPickerTooltip}
                 className="md:hidden"
                 customModeOptions={customModeOptions}
+                favorites={favorites}
               />
               {/* Desktop: individual pickers */}
               <div className="hidden md:contents">
@@ -908,6 +915,7 @@ export function CloudComposer({
                     isLoading={isLoadingModels}
                     disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
+                    favorites={favorites}
                   />
                 )}
                 {variantPickerDisabled
@@ -963,7 +971,7 @@ export function CloudComposer({
               <Paperclip className="h-4 w-4" />
             </UIButton>
           )}
-          {isStreaming && (
+          {(isStreaming || isPreparing) && (
             <UIButton
               type="button"
               variant="destructive"
@@ -971,7 +979,16 @@ export function CloudComposer({
               onClick={handleStop}
               disabled={!canInterrupt || !onStop}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-              aria-label="Stop response"
+              aria-label={
+                isPreparing
+                  ? 'Stop workspace preparation'
+                  : 'Stop response or workspace preparation'
+              }
+              title={
+                isPreparing
+                  ? 'Stop preparation and all chats in this workspace'
+                  : 'Stop this response. If any chat is preparing, stop all chats in this workspace.'
+              }
             >
               <Square className="h-4 w-4" />
             </UIButton>

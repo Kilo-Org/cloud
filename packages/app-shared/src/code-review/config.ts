@@ -52,6 +52,8 @@ export type CodeReviewCouncilConfigInput = {
     model_slug?: string;
     thinking_effort?: string | null;
   }>;
+  /** Label gate for automated reviews; absent/empty means every eligible PR runs council. */
+  required_labels?: string[];
 };
 
 // Mobile/personal-org save patch. All keys are optional; omission preserves the
@@ -70,6 +72,9 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  reviewGuidelineSourceRepositories: string[];
+  /** GitHub only: skip automated reviews of PRs opened by bot accounts. */
+  skipBotPullRequests: boolean;
 }>;
 
 // Field-merge PATCH surface. Extends the save patch with the org-only fields
@@ -86,23 +91,17 @@ export type CodeReviewFieldMergePatch = CodeReviewConfigPatch &
 // `stored` argument to `applyCodeReviewConfigPatch`. Every field is optional
 // because callers may have a subset (e.g. personal configs never carry
 // `council`); the helper preserves whatever is supplied.
-export type CodeReviewStoredConfig = {
-  reviewStyle?: ReviewStyle;
-  focusAreas?: string[];
+export type CodeReviewStoredConfig = Omit<CodeReviewFieldMergePatch, 'customInstructions'> & {
   customInstructions?: string | null;
-  modelSlug?: string;
-  thinkingEffort?: string | null;
-  gateThreshold?: GateThreshold;
-  repositorySelectionMode?: 'all' | 'selected';
-  selectedRepositoryIds?: (number | string)[];
-  repositoryModelOverrides?: RepositoryModelOverrideInput[];
-  disableReviewMd?: boolean;
-  // Org-only fields. Personal configs never have these in storage, so the
-  // stored snapshot can omit them and the helper still works.
-  manuallyAddedRepositories?: ManuallyAddedRepositoryInput[];
-  council?: CodeReviewCouncilConfigInput | null;
-  councilEnabledRepositoryIds?: (number | string)[];
 };
+
+function assignStoredField<K extends keyof CodeReviewStoredConfig>(
+  target: CodeReviewStoredConfig,
+  key: K,
+  value: CodeReviewStoredConfig[K]
+): void {
+  target[key] = value;
+}
 
 // Field-merge helper for the PATCH endpoints (`personalReviewAgent.patchReviewConfig`
 // and `organizations.reviewAgent.patchReviewConfig`). Returns a new object
@@ -122,12 +121,11 @@ export function applyCodeReviewConfigPatch(
   patch: CodeReviewFieldMergePatch
 ): CodeReviewStoredConfig {
   const merged: CodeReviewStoredConfig = { ...stored };
-  for (const key of Object.keys(patch) as Array<keyof CodeReviewFieldMergePatch>) {
+  for (const key of Object.keys(patch) as Array<keyof CodeReviewStoredConfig>) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {
-      const value = patch[key];
+      const value: CodeReviewStoredConfig[typeof key] = patch[key];
       if (value !== undefined) {
-        // Safe: every key in the patch is also a key on CodeReviewStoredConfig.
-        (merged as Record<string, unknown>)[key] = value;
+        assignStoredField(merged, key, value);
       }
     }
   }

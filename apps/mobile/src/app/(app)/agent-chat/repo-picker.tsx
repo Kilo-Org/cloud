@@ -10,15 +10,23 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
   | { key: string; kind: 'repo'; repo: RepoOption; showPlatform: boolean };
+
+/**
+ * Satisfies the adapter's failure parameter; this surface has no failure arm —
+ * a refused tap is the same as the first tap, so it never publishes one.
+ */
+type PickerSelectionFailure = { readonly kind: 'select-failed' };
 
 export default function RepoPickerScreen() {
   const router = useRouter();
@@ -93,8 +101,17 @@ export default function RepoPickerScreen() {
     return items;
   }, [bridge, filtered, deferredSearch]);
 
+  const selection = useSurfaceFeedback<PickerSelectionFailure>();
+
   const handleSelect = useCallback(
     (repo: string) => {
+      if (selection.begin() === null) {
+        // A second tap in the dismissal burst must not select and pop again.
+        // The attempt stays pending until this route unmounts, which is the
+        // adapter's invalidation; a picker that fails to pop therefore keeps
+        // refusing rather than popping the screen beneath it.
+        return;
+      }
       selectionHaptic();
       dismissSearchPickerKeyboard();
       bridgeRef.current?.onSelect(repo);
@@ -102,7 +119,7 @@ export default function RepoPickerScreen() {
       bridgeRef.current = undefined;
       closePicker();
     },
-    [closePicker]
+    [closePicker, selection]
   );
 
   if (!bridge) {
@@ -110,6 +127,7 @@ export default function RepoPickerScreen() {
       <PickerSheet
         title={t('agentChat.repoPicker.title')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
         expired
       />
@@ -120,6 +138,7 @@ export default function RepoPickerScreen() {
     <PickerSheet
       title={t('agentChat.repoPicker.title')}
       onDone={closePicker}
+      onCancel={closePicker}
       scrollable={false}
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
@@ -244,7 +263,7 @@ export default function RepoPickerScreen() {
                     {repo.fullName}
                   </Text>
                 </View>
-                {isSelected ? <Check size={18} color={colors.primary} /> : null}
+                {isSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
               </Pressable>
             );
           })}

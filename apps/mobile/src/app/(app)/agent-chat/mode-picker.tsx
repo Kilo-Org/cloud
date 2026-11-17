@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 
 // FlashList takes `style`/`contentContainerStyle` (never `className`), so the
 // list's `flex-1 bg-background` classes become the list style plus the themed
@@ -42,6 +43,10 @@ export default function ModePickerScreen() {
   // "No options available" flash before a later effect populates state.
   const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
+  function close() {
+    router.back();
+  }
+
   function handleSelect(mode: AgentMode) {
     selectionHaptic();
     bridge?.onSelect(mode);
@@ -53,9 +58,8 @@ export default function ModePickerScreen() {
     return (
       <PickerSheet
         title={t('agentChat.modePicker.title')}
-        onDone={() => {
-          router.back();
-        }}
+        onDone={close}
+        onCancel={close}
         scrollable={false}
         topInset="never"
         expired
@@ -96,7 +100,7 @@ export default function ModePickerScreen() {
           <Text className="text-base font-medium text-foreground">{label}</Text>
           <Text className="text-sm text-muted-foreground">{description}</Text>
         </View>
-        {selected && <Check size={18} color={colors.primary} />}
+        {selected && <Check size={18} color={selectionCheckColor(colors)} />}
       </Pressable>
     );
   }
@@ -106,9 +110,8 @@ export default function ModePickerScreen() {
   return (
     <PickerSheet
       title={t('agentChat.modePicker.title')}
-      onDone={() => {
-        router.back();
-      }}
+      onDone={close}
+      onCancel={close}
       scrollable={false}
       topInset="never"
     >

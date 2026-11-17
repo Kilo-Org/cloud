@@ -26,8 +26,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 // The manager reaches the list's own key and type reads. Its module graph also
 // loads a React Native measurement helper, which this node project cannot parse;
-// only `PixelRatio` is read from that import, and no test here measures a view.
-vi.mock('react-native', () => ({ PixelRatio: { roundToNearestPixel: (value: number) => value } }));
+// only `PixelRatio` is read from that import, to compare measured dimensions, and
+// no test here measures a view.
+vi.mock('react-native', () => ({
+  PixelRatio: {
+    roundToNearestPixel: (value: number) => value,
+    getPixelSizeForLayoutSize: (value: number) => value,
+  },
+}));
 
 type Row = { key: string; kind: string };
 
@@ -186,5 +192,28 @@ describe('FlashList RecyclerViewManager reads past the data length', () => {
     expect(read.getItemType(9)).toBe('default');
     expect(calls.types).toEqual([]);
     expect(read.getItemType(2)).toBe('session');
+  });
+});
+
+describe('FlashList RecyclerViewManager layout reads past the layout table', () => {
+  it('answers nothing for a layout the table no longer holds, where the list used to throw', () => {
+    // A ViewHolder reports its size after it lays out, and a render stack entry
+    // keeps its index between syncs. Both can outlive the layout table row they
+    // were created for, so both reads go through the bounds-safe accessor now.
+    const calls: CallLog = { keys: [], types: [] };
+    const manager = managerFor(rows(6), calls);
+    manager.updateLayoutParams({ width: 320, height: 600 }, 0);
+    manager.modifyChildrenLayout(
+      rows(6).map((_, index) => ({ index, dimensions: { width: 320, height: 50 } })),
+      rows(6).length
+    );
+
+    expect(manager.tryGetLayout(5)).toBeDefined();
+
+    // The rows shrink to two.
+    manager.modifyChildrenLayout([], 2);
+
+    expect(manager.tryGetLayout(5)).toBeUndefined();
+    expect(() => manager.getLayout(5)).toThrow('index out of bounds, not enough layouts');
   });
 });

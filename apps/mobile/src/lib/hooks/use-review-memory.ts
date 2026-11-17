@@ -43,6 +43,46 @@ export function useSetReviewMemoryEnabled(scope: string) {
   });
 }
 
+/**
+ * "Analyze now": asks the server to look for one repeated guidance pattern in a
+ * repository's recent maintainer replies. Mirroring the web panel, the caller
+ * disables the action while a run is pending, and the summary's repository list
+ * is what says whether there is anything to analyze at all.
+ */
+export function useTriggerReviewMemoryAnalysis(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (repoFullName: string) =>
+      trpcClient.reviewMemory.triggerAnalysis.mutate({ ...ownerInput, repoFullName }),
+    onSuccess: data => {
+      // All three outcomes are successes; each names what happened, so a run
+      // that found nothing repeated does not read as a failure.
+      let outcomeKey = 'codeReviewer.reviewMemory.analyze.noPattern';
+      if (data.status === 'proposed') {
+        outcomeKey = 'codeReviewer.reviewMemory.analyze.proposed';
+      } else if (data.status === 'no_feedback') {
+        outcomeKey = 'codeReviewer.reviewMemory.analyze.noFeedback';
+      }
+      announcingToast.success(i18n.t(outcomeKey));
+    },
+    onError: error => {
+      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({ queryKey: trpc.reviewMemory.listProposalsPage.pathKey() }),
+      ]);
+    },
+  });
+}
+
 export function useReviewMemoryProposalActions(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

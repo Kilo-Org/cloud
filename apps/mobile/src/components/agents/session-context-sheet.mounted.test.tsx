@@ -8,6 +8,7 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SessionComputeCharges } from '@/lib/session-compute-total';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -32,16 +33,24 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
   useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    activeSessions: { listInstances: { queryOptions: () => ({}) } },
-    cliSessionsV2: {
-      get: { queryOptions: () => ({}), queryKey: () => ['get'] },
-      share: { mutationOptions: () => ({}) },
-      unshare: { mutationOptions: () => ({}) },
-    },
-  }),
-}));
+vi.mock('@/lib/trpc', () => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  return {
+    trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
+    useTRPC: () => ({
+      activeSessions: { listInstances: { queryOptions: () => ({}) } },
+      cliSessionsV2: {
+        get: { queryOptions: () => ({}), queryKey: () => ['get'] },
+        share: { mutationOptions: () => ({}) },
+        unshare: { mutationOptions: () => ({}) },
+      },
+      cloudAgentNext: namespace,
+      organizations: { cloudAgentNext: namespace },
+    }),
+  };
+});
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The sheet's compute block and its total read one query; the harness pins it
 // to "nothing recorded" unless a test supplies charges.
 vi.mock('@/lib/hooks/use-session-compute', () => ({
@@ -93,6 +102,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The sandbox section's own button and dialog edges reach react-native through
+// modules the mounted transform cannot parse (activity-indicator -> motion ->
+// expo-battery), so both are mocked at their adapter.
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
@@ -144,6 +156,9 @@ function renderSheet(
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
+        cloudAgentSessionId: null,
+        cloudStatusType: null,
+        organizationId: undefined,
         modelDisplay: 'Model X',
         providerDisplay: 'Kilo',
         totalCostMicrodollars: null,
@@ -214,6 +229,13 @@ describe('SessionContextSheet auto-approve row', () => {
       expect(switchBefore.props.disabled).toBe(state === 'unavailable');
       expect(renderedTexts(renderer.root)).toContain('-');
       expect(renderedTexts(renderer.root)).not.toContain('1,000');
+      // A lone placeholder, not a broken "- tokens" row: the USED row paints no
+      // unit copy until a usage report arrives. The harness's `t` replaces the
+      // key without interpolating, so the copy is compared by key.
+      expect(renderedTexts(renderer.root)).not.toContain(i18n.t('agentChat.contextUsage.tokens'));
+      expect(renderedTexts(renderer.root)).not.toContain(
+        i18n.t('agentChat.contextUsage.ofWindowTokens')
+      );
       const labels = [
         i18n.t('common.model'),
         i18n.t('agentChat.contextUsage.provider'),
@@ -236,6 +258,10 @@ describe('SessionContextSheet auto-approve row', () => {
       });
       expect(switchNode(renderer.root)).toBe(switchBefore);
       expect(renderedTexts(renderer.root)).toContain('1,000');
+      // The unit comes back with the value once usage reports a window.
+      expect(renderedTexts(renderer.root)).toContain(
+        i18n.t('agentChat.contextUsage.ofWindowTokens')
+      );
       for (const label of labels) {
         expect(renderedTexts(renderer.root)).toContain(label);
       }
@@ -324,11 +350,12 @@ function sheetElement(
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
+    cloudAgentSessionId: null,
+    cloudStatusType: null,
+    organizationId: undefined,
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
-    cloudAgentSessionId: null,
-    organizationId: undefined,
     breakdownCostUsd: 0,
     messages: [],
     modelOptions: [],
@@ -637,6 +664,38 @@ describe('SessionContextSheet copy link row', () => {
     const values = textValues(renderer);
     expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
     expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
+    await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet copy row touch targets', () => {
+  it.each(['session-context-sheet-copy-id', 'session-context-sheet-copy-link'])(
+    'renders the %s row on the shared full target',
+    async testID => {
+      // Two stacked lines of small type measured 32 dp together, so each copy
+      // row has to carry the shared target on its own pressable node.
+      const renderer = await mountSheet();
+      const target = findByType(renderer.root, 'Pressable').find(
+        node => node.props.testID === testID
+      );
+      expect(target?.props.accessibilityRole).toBe('button');
+      expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+      await unmount(renderer);
+    }
+  );
+});
+
+describe('SessionContextSheet view changes row touch target', () => {
+  it('renders the view changes row on the shared full target', async () => {
+    // It kept a 44 dp frame between two 48 dp copy rows, so one action list
+    // used two row heights — visible the moment a row gets a pressed fill.
+    const renderer = await mountSheet();
+    const target = findByType(renderer.root, 'Pressable').find(
+      node => node.props.testID === 'session-context-sheet-view-changes'
+    );
+    expect(target?.props.accessibilityRole).toBe('button');
+    expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+    expect(target?.props.className).not.toContain('min-h-[44px]');
     await unmount(renderer);
   });
 });

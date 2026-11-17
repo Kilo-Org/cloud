@@ -53,6 +53,12 @@ export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];
   readonly download: GgufDownload | null;
   readonly failure: { readonly fileId: string; readonly problem: GgufDownloadProblem } | null;
+  /**
+   * The saved model list could not be read. Not an empty list: the picker must say
+   * so and offer the retry, because nothing else tells the person why the models
+   * they downloaded are missing.
+   */
+  readonly loadFailed: boolean;
 };
 
 /** The file a finished download wrote. Nothing here reads it; it only has to exist. */

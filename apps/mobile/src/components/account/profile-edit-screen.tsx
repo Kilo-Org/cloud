@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { usePopOnce } from '@/lib/navigation/pop-once';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 type ProfileUrlError = (value: string) => string | null;
@@ -50,6 +52,8 @@ function submittedUrl(value: string, initial: string | null): string | null | un
 type FieldsProps = {
   readonly linkedinUrl: string | null;
   readonly githubUrl: string | null;
+  /** The screen's one exit: the save completing, or a Save that changed nothing. */
+  readonly onDone: () => void;
 };
 
 /**
@@ -57,9 +61,8 @@ type FieldsProps = {
  * uncontrolled (a ref per field, `defaultValue` for the initial text), so they
  * cannot be filled in by a query that settles after their first render.
  */
-function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
+function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const { t } = useTranslation();
-  const router = useRouter();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
@@ -75,7 +78,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
         // would show the links as they were before this save.
         void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
         announcingToast.success(t('profile.editProfile.saved'));
-        router.back();
+        // Same rule as the header's Back: if the reader already left during the
+        // save, this completion is dropped instead of popping the screen beneath.
+        onDone();
       },
       // The server's message is the account of what it refused, so it is shown
       // as written rather than replaced with a generic failure.
@@ -94,7 +99,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
       return;
     }
     if (linkedin === undefined && github === undefined) {
-      router.back();
+      onDone();
       return;
     }
     update.mutate({
@@ -158,6 +163,24 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
  */
 export function ProfileEditScreen() {
   const { t } = useTranslation();
+  // This route has one exit, whoever asks for it: the header's Back, the save's
+  // completion, and a Save that changed nothing all leave through `popOnce`. The
+  // route leaves once, and a press or completion that arrives while it is
+  // already leaving is dropped — the reader's Back can still land on this
+  // screen's header during the pop the completion started, and a second pop
+  // would close Account settings beneath it.
+  const popOnce = usePopOnce();
+  const router = useRouter();
+  // A relaunch, or a cold link, can render this route with nothing beneath it;
+  // the header's Back then has no history to pop and lands on the Profile tab
+  // root instead of unwinding the stack.
+  const leaveScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      popOnce();
+      return;
+    }
+    router.dismissTo(PROFILE_TAB_HREF);
+  }, [popOnce, router]);
   const trpc = useTRPC();
   const links = useQuery(trpc.user.getProfileLinks.queryOptions());
 
@@ -174,13 +197,21 @@ export function ProfileEditScreen() {
     body = <QueryError onRetry={() => void links.refetch()} isRetrying={links.isFetching} />;
   } else {
     body = (
-      <ProfileLinkForm linkedinUrl={links.data.linkedinUrl} githubUrl={links.data.githubUrl} />
+      <ProfileLinkForm
+        linkedinUrl={links.data.linkedinUrl}
+        githubUrl={links.data.githubUrl}
+        onDone={popOnce}
+      />
     );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.editProfile.title')} />
+      <ScreenHeader
+        title={t('profile.editProfile.title')}
+        onBack={leaveScreen}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

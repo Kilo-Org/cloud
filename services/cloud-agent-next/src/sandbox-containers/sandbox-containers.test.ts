@@ -2800,6 +2800,136 @@ function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}
 }
 
 describe('SandboxContainers environment snapshot starts', () => {
+  it.each(['image', 'repository'] as const)(
+    'interrupts a pending %s startup probe before destroying, without a late launch write',
+    async source => {
+      const { instance, container, readRecord } = setup();
+      const probe = Promise.withResolvers<ExecProcess>();
+      const exec = container.exec.bind(container);
+      vi.spyOn(container, 'exec').mockImplementationOnce(() => probe.promise);
+      const starting = (
+        source === 'repository' ? launchFromSnapshot(instance, REF_A) : launch(instance, REF_A)
+      ).catch((error: unknown) => error);
+      await vi.waitFor(() => expect(container.exec).toHaveBeenCalled());
+
+      const stopping = instance.stop(REF_A);
+      try {
+        await vi.waitFor(() => expect(container.destroyCalls).toBe(1), { timeout: 250 });
+        await expect(stopping).resolves.toBe('terminal');
+        expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+        expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+
+        vi.mocked(container.exec).mockImplementation(exec);
+        await expect(launch(instance, REF_B)).resolves.toMatchObject({ started: true });
+        probe.resolve(makeExecProcess({ stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}` }));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+        expect(container.startCalls).toHaveLength(2);
+        expect(container.destroyCalls).toBe(1);
+      } finally {
+        probe.resolve(makeExecProcess({ stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}` }));
+        await Promise.allSettled([starting, stopping]);
+      }
+    }
+  );
+
+  it('retains the allocation until a slow destroy confirms the interrupted start stopped', async () => {
+    const { instance, container, readRecord } = setup();
+    const probe = Promise.withResolvers<ExecProcess>();
+    vi.spyOn(container, 'exec').mockImplementationOnce(() => probe.promise);
+    container.destroyBehavior = 'deferred';
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(container.exec).toHaveBeenCalled());
+    let stopped = false;
+    const stopping = instance.stop(REF_A).then(result => {
+      stopped = true;
+      return result;
+    });
+    try {
+      await vi.waitFor(() => expect(container.destroyCalls).toBe(1));
+      expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+      expect(stopped).toBe(false);
+      expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+    } finally {
+      container.deferredDestroy?.resolve();
+      probe.resolve(makeExecProcess());
+      await Promise.allSettled([starting, stopping]);
+    }
+    expect(await stopping).toBe('terminal');
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('cancels before starting when Stop arrives during the ownership write', async () => {
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup();
+    const writing = Promise.withResolvers<void>();
+    setPutGate(value => {
+      if ((value as StoredRecord).state !== 'launching') return 'pass';
+      writing.resolve();
+      return 'hold';
+    });
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await writing.promise;
+    const stopping = instance.stop(REF_A);
+    releaseHeldPut();
+
+    expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('cancels before starting when Stop arrives during the instance write', async () => {
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup();
+    const writing = Promise.withResolvers<void>();
+    setPutGate(() => {
+      writing.resolve();
+      return 'hold';
+    });
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await writing.promise;
+    const stopping = instance.stop(REF_A);
+    releaseHeldPut();
+
+    expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('cancels queued launches while a superseded allocation is being destroyed', async () => {
+    const { instance, container, readRecord } = setup({
+      running: true,
+      record: { ...idleRecord, state: 'running', allocationRef: REF_B },
+    });
+    container.destroyBehavior = 'deferred';
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(container.destroyCalls).toBe(1));
+    const queued = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    const stopping = instance.stop(REF_A);
+    container.deferredDestroy?.resolve();
+
+    expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    expect(await queued).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('does not cancel startup for a different allocation stop', async () => {
+    const { instance, container, readRecord } = setup();
+    const probe = Promise.withResolvers<ExecProcess>();
+    vi.spyOn(container, 'exec').mockImplementationOnce(() => probe.promise);
+    const starting = launchFromSnapshot(instance, REF_A);
+    await vi.waitFor(() => expect(container.exec).toHaveBeenCalled());
+    const stopping = instance.stop(REF_B);
+    probe.resolve(makeExecProcess({ stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}` }));
+
+    await expect(starting).resolves.toMatchObject({ started: true });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.destroyCalls).toBe(0);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
   it('reports the same snapshot artifact after repeated failures without an image fallback', async () => {
     const { instance, container } = setup();
     for (let attempt = 0; attempt < 3; attempt += 1) {

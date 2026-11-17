@@ -33,11 +33,11 @@ import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/
 
 import {
   applyPendingKiloPassReferralBonusForIssuance,
-  computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
   issueBonusCreditsForIssuance,
 } from './issuance';
+import { computeIssueMonth } from './issue-month';
 import { KILO_PASS_TIER_CONFIG } from './constants';
 
 async function createTestSubscription(params: {

@@ -1262,57 +1262,66 @@ describe('stream handler handleStreamRequest', () => {
     ]);
   });
 
-  it('corrects accepted delivery immediately after reconnect user-message materialization', async () => {
-    const serverWs = makeFakeWebSocket();
-    mockWebSocketPair(serverWs);
+  it.each([undefined, 'command'] as const)(
+    'corrects accepted %s delivery after reconnect user-message materialization',
+    async turnType => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
 
-    const messageId = 'msg_accepted';
-    const timestamp = 1_700_000_000_000;
-    const persistedSentEvent: StoredEvent = {
-      ...makeEvent(7, JSON.stringify({ messageId, delivery: 'sent' })),
-      execution_id: '',
-      stream_event_type: 'cloud.message.sent',
-      timestamp,
-    };
-    const handler = createStreamHandler(
-      makeFakeState(),
-      makeFakeEventQueries([persistedSentEvent]),
-      SESSION_ID,
-      {
-        deriveQueuedMessages: async () => [
-          { messageId, content: 'already running', timestamp, delivery: 'sent' },
-        ],
-      }
-    );
+      const messageId = 'msg_accepted';
+      const timestamp = 1_700_000_000_000;
+      const persistedSentEvent: StoredEvent = {
+        ...makeEvent(7, JSON.stringify({ messageId, delivery: 'sent' })),
+        execution_id: '',
+        stream_event_type: 'cloud.message.sent',
+        timestamp,
+      };
+      const handler = createStreamHandler(
+        makeFakeState(),
+        makeFakeEventQueries([persistedSentEvent]),
+        SESSION_ID,
+        {
+          deriveQueuedMessages: async () => [
+            {
+              messageId,
+              content: 'already running',
+              timestamp,
+              delivery: 'sent',
+              ...(turnType ? { turnType } : {}),
+            },
+          ],
+        }
+      );
 
-    await handler.handleStreamRequest(
-      new Request('https://example.com/stream', {
-        headers: { Upgrade: 'websocket' },
-      })
-    );
+      await handler.handleStreamRequest(
+        new Request('https://example.com/stream', {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
 
-    const events = parseSentMessages(serverWs);
-    expect(events.map(event => [event.eventId, event.streamEventType])).toEqual([
-      [7, 'cloud.message.sent'],
-      [0, 'connected'],
-      [0, 'cloud.message.queued'],
-      [0, 'cloud.message.sent'],
-    ]);
-    expect(events[2]).toEqual({
-      eventId: 0,
-      sessionId: SESSION_ID,
-      streamEventType: 'cloud.message.queued',
-      timestamp: new Date(timestamp).toISOString(),
-      data: { messageId, content: 'already running', delivery: 'queued' },
-    });
-    expect(events[3]).toEqual({
-      eventId: 0,
-      sessionId: SESSION_ID,
-      streamEventType: 'cloud.message.sent',
-      timestamp: new Date(timestamp).toISOString(),
-      data: { messageId, delivery: 'sent' },
-    });
-  });
+      const events = parseSentMessages(serverWs);
+      expect(events.map(event => [event.eventId, event.streamEventType])).toEqual([
+        [7, 'cloud.message.sent'],
+        [0, 'connected'],
+        [0, 'cloud.message.queued'],
+        [0, 'cloud.message.sent'],
+      ]);
+      expect(events[2]).toEqual({
+        eventId: 0,
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.queued',
+        timestamp: new Date(timestamp).toISOString(),
+        data: { messageId, content: 'already running', delivery: 'queued' },
+      });
+      expect(events[3]).toEqual({
+        eventId: 0,
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.sent',
+        timestamp: new Date(timestamp).toISOString(),
+        data: { messageId, delivery: 'sent', ...(turnType ? { turnType } : {}) },
+      });
+    }
+  );
 
   it('leaves genuinely queued and legacy snapshots queued without a sent correction', async () => {
     const serverWs = makeFakeWebSocket();
@@ -1398,6 +1407,59 @@ describe('stream handler handleStreamRequest', () => {
       reason: 'wrapper_failed',
     });
   });
+
+  it.each([
+    {
+      query: '',
+      expected: [
+        'cloud.message.completed',
+        'connected',
+        'cloud.message.queued',
+        'cloud.message.sent',
+      ],
+    },
+    {
+      query: '&eventTypes=cloud.message.completed',
+      expected: ['cloud.message.completed', 'connected'],
+    },
+    { query: '&eventTypes=cloud.message.sent', expected: ['connected', 'cloud.message.sent'] },
+  ])(
+    'restores completed command receipts without making them active for $query',
+    async ({ query, expected }) => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'command',
+            content: '',
+            timestamp: 1000,
+            completedAt: 1005,
+            turnType: 'command',
+          },
+          { messageId: 'active', content: 'Still running', timestamp: 1010, delivery: 'sent' },
+        ],
+      });
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?replay=false${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+      const events = parseSentMessages(serverWs);
+      expect(events.map(event => event.streamEventType)).toEqual(expected);
+      expect(
+        events.find(event => event.streamEventType === 'connected')?.data.activeMessageId
+      ).toBe('active');
+      const completion = events.find(event => event.streamEventType === 'cloud.message.completed');
+      if (completion)
+        expect(completion).toMatchObject({
+          eventId: 0,
+          timestamp: new Date(1005).toISOString(),
+          data: { messageId: 'command' },
+        });
+    }
+  );
 
   it.each([
     {

@@ -171,6 +171,60 @@ describe('POST /api/exa/[...path]', () => {
     });
   });
 
+  describe('request body validation', () => {
+    it('keeps a function duration that covers the direct write and the queue fallback', async () => {
+      const { maxDuration } = await import('./route');
+      expect(maxDuration).toBe(300);
+    });
+
+    it.each([
+      ['null', null],
+      ['an array', []],
+      ['a string', 'query=test'],
+      ['a number', 1],
+      ['a boolean', true],
+    ])('rejects %s with 400 before calling Exa', async (_label, body) => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search', body) as never);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid request body' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('rejects malformed JSON with 400 before calling Exa', async () => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const request = new Request('http://localhost:3000/api/exa/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      });
+      const response = await POST(request as never);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('propagates a body read failure that is not a JSON parse error', async () => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const request = makeRequest('/search', { query: 'test' });
+      request.text = () => Promise.reject(new TypeError('body stream failed'));
+
+      await expect(POST(request as never)).rejects.toThrow('body stream failed');
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+  });
+
   describe('request signal propagation', () => {
     it('passes request.signal to upstream fetch', async () => {
       setUserAuth();
@@ -361,6 +415,7 @@ describe('POST /api/exa/[...path]', () => {
             chargedToBalance: false,
             freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
           },
+          { deadlineMs: expect.any(Number) },
         ],
       ]);
     });
@@ -384,7 +439,8 @@ describe('POST /api/exa/[...path]', () => {
           expect.objectContaining({
             id: usageId,
             occurredAt: occurredAt.toISOString(),
-          })
+          }),
+          expect.anything()
         );
       } finally {
         randomUUIDSpy.mockRestore();
@@ -416,6 +472,7 @@ describe('POST /api/exa/[...path]', () => {
             chargedToBalance: true,
             freeAllowanceMicrodollars: 10_000_000,
           },
+          { deadlineMs: expect.any(Number) },
         ],
       ]);
     });
@@ -432,7 +489,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: orgId })
+        expect.objectContaining({ organizationId: orgId }),
+        expect.anything()
       );
     });
 
@@ -532,7 +590,8 @@ describe('POST /api/exa/[...path]', () => {
         expect.objectContaining({
           featureId: 'kiloclaw',
           type: 'deep',
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -553,7 +612,10 @@ describe('POST /api/exa/[...path]', () => {
       );
       await flushAfterCallbacks();
 
-      expect(mockedRecordExaUsage).toHaveBeenCalledWith(expect.objectContaining({ type: 'deep' }));
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'deep' }),
+        expect.anything()
+      );
       expect(mockedRecordExaUsage.mock.calls[0][0]).not.toHaveProperty('featureId');
     });
 
@@ -861,6 +923,86 @@ describe('POST /api/exa/[...path]', () => {
       });
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
       expect(mockedCaptureException).toHaveBeenCalledWith(writeError, expect.any(Object));
+    });
+
+    it('skips the direct write and publishes when only the publication reserve remains', async () => {
+      let elapsed = 0;
+      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      const { POST } = await import('./route');
+
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      elapsed = 290_000;
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+      expect(failureLine()).toStrictEqual({
+        exa_path: '/search',
+        payer_kind: 'personal',
+        charged_to_balance: false,
+        cost_microdollars: 7000,
+        stage: 'write_skipped',
+        error: { type: 'unknown' },
+        fallback: 'queued',
+      });
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('attempts the direct write when the fallback is disabled and only the reserve remains', async () => {
+      config.EXA_USAGE_QUEUE_FALLBACK_ENABLED = false;
+      let elapsed = 0;
+      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      mockedRecordExaUsage.mockResolvedValue('recorded');
+      const { POST } = await import('./route');
+
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      elapsed = 290_000;
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('attempts the direct write when the publisher is unconfigured and only the reserve remains', async () => {
+      config.USAGE_INGEST_URL = undefined;
+      let elapsed = 0;
+      jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      mockedRecordExaUsage.mockResolvedValue('recorded');
+      const { POST } = await import('./route');
+
+      await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+      elapsed = 290_000;
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(0);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('publishes when the direct write outlives its deadline', async () => {
+      jest.useFakeTimers();
+      try {
+        let elapsed = 0;
+        jest.spyOn(performance, 'now').mockImplementation(() => elapsed);
+        mockedRecordExaUsage.mockReturnValue(new Promise<'recorded'>(() => {}));
+        const { POST } = await import('./route');
+
+        await POST(makeRequest('/search', { query: 'secret-query-text' }) as never);
+        elapsed = 200_000;
+        const flushed = flushAfterCallbacks();
+        await jest.advanceTimersByTimeAsync(55_000);
+        await flushed;
+
+        expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+        expect(mockedRecordExaUsage).toHaveBeenCalledWith(expect.anything(), {
+          deadlineMs: 55_000,
+        });
+        expect(fetchCallsTo(INGEST_EXA_USAGE_URL)).toHaveLength(1);
+        expect(failureLine()).toMatchObject({ stage: 'record_write', fallback: 'queued' });
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it.each([

@@ -87,11 +87,13 @@ describe('bouncer credit-event outbox (integration)', () => {
   it('keeps a normal-length source id unchanged as the wire identity and dedupe key', async () => {
     const user = await insertTestUser();
 
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: 'evt-short-identity',
-      userId: user.id,
-    });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: 'evt-short-identity',
+        userId: user.id,
+      })
+    );
 
     const [row] = await db
       .select()
@@ -105,7 +107,9 @@ describe('bouncer credit-event outbox (integration)', () => {
     const user = await insertTestUser();
     const longId = 'e'.repeat(200);
 
-    await enqueueCreditEvent(db, { type: 'charge.failed', eventId: longId, userId: user.id });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, { type: 'charge.failed', eventId: longId, userId: user.id })
+    );
 
     const [row] = await db
       .select()
@@ -119,16 +123,20 @@ describe('bouncer credit-event outbox (integration)', () => {
     const user = await insertTestUser();
     const prefix = 'p'.repeat(128);
 
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: `${prefix}A`,
-      userId: user.id,
-    });
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: `${prefix}B`,
-      userId: user.id,
-    });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: `${prefix}A`,
+        userId: user.id,
+      })
+    );
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: `${prefix}B`,
+        userId: user.id,
+      })
+    );
 
     const rows = await db
       .select()
@@ -145,11 +153,13 @@ describe('bouncer credit-event outbox (integration)', () => {
       blocked_reason: createSoftDeletedBlockedReason(),
     });
 
-    const result = await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: 'evt-for-deleted-user',
-      userId,
-    });
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: 'evt-for-deleted-user',
+        userId,
+      })
+    );
 
     expect(result.enqueued).toBe(false);
     const rows = await db
@@ -181,17 +191,19 @@ describe('bouncer credit-event outbox (integration)', () => {
       })
       .returning();
 
-    await enqueueCreditEvent(db, {
-      type: 'charge.attempted',
-      eventId: 'evt-child-org-charge',
-      occurredAt: new Date('2026-01-01T00:00:00.000Z'),
-      userId: user.id,
-      orgId: child.id,
-      flow: 'topup',
-      amountCents: 2_000,
-      accountCreatedAt: child.created_at,
-      accountUsedMicrodollars: child.microdollars_used,
-    });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-child-org-charge',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId: user.id,
+        orgId: child.id,
+        flow: 'topup',
+        amountCents: 2_000,
+        accountCreatedAt: child.created_at,
+        accountUsedMicrodollars: child.microdollars_used,
+      })
+    );
 
     const [row] = await db
       .select()

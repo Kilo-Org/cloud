@@ -30,9 +30,12 @@ import {
   type StoredMessage,
   type SuggestionState,
   type UnreadablePermissionState,
+  type WorkspaceArtifactsRefresh,
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
+import { type BackgroundActivityState } from '@kilocode/cloud-agent-sdk/background-activity';
+import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
@@ -222,6 +225,7 @@ export function createAgentChatFixtureManager(
     switchSession: async () => undefined,
     hydrateChildSession: async () => undefined,
     loadOlderChildMessages: async () => undefined,
+    noteSpawnedSession: () => undefined,
     loadOlderMessages: async () => undefined,
     trimRetainedHistory: () => undefined,
     updateFetchedAssociatedPr: () => undefined,
@@ -230,6 +234,7 @@ export function createAgentChatFixtureManager(
     setCloudAgentModelOverride: () => undefined,
     retryRemoteModels: () => undefined,
     retryRemoteCommands: () => undefined,
+    retryBackgroundActivity: () => undefined,
     createRemoteSession: async () => AGENT_CHAT_FIXTURE_SESSION_ID,
     exitRemoteSession: async () => undefined,
     interrupt: async () => undefined,
@@ -290,6 +295,7 @@ export function createAgentChatFixtureManager(
         waitingForPermission ? PENDING_BASH_ASK : null
       ),
       pendingQuestions: fixed<readonly StandaloneQuestion[]>([]),
+      backgroundActivity: fixed<BackgroundActivityState>({ status: 'inactive' }),
       pendingPermissions: fixed<readonly StandalonePermission[]>(
         waitingForPermission ? [PENDING_BASH_ASK] : []
       ),
@@ -305,12 +311,16 @@ export function createAgentChatFixtureManager(
       availableCommands: fixed<SlashCommandInfo[]>([]),
       availableCommandsCatalogStatus: fixed<SlashCommandCatalogStatus | null>(null),
       worktreeChangesRefresh: fixed(noWorktreeRefresh),
+      workspaceArtifactsRefresh: fixed<WorkspaceArtifactsRefresh | null>(null),
       messagesList: atom(messages),
       staticMessages: atom(messages),
       dynamicMessages: atom<StoredMessage[]>([]),
       totalCost: atom(0.0012),
       contextUsage: atom<ContextUsage | undefined>(undefined),
       childMessages: fixed<(childSessionId: string) => StoredMessage[]>(() => []),
+      childSessionStatus: fixed<(childSessionId: string) => SessionStatus | undefined>(
+        () => undefined
+      ),
       childSessionHydrationState: fixed<(childSessionId: string) => ChildSessionHydrationState>(
         () => ({ status: 'idle' })
       ),

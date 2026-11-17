@@ -768,3 +768,61 @@ describe('SessionMessageList anchor reporting', () => {
     expect(onAnchorChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SessionMessageList chrome ride-up', () => {
+  function holderStyle(renderer: TestRenderer.ReactTestRenderer) {
+    const node = renderer.root
+      .findAll(candidate => Object.is(candidate.type, 'View'))
+      .find(
+        candidate =>
+          (candidate.props.style as { overflow?: string } | undefined)?.overflow === 'hidden'
+      );
+    return node?.props.style as { overflow?: string; marginBottom?: number } | undefined;
+  }
+
+  function shiftStyle(renderer: TestRenderer.ReactTestRenderer): number | null {
+    for (const node of renderer.root.findAll(candidate => Object.is(candidate.type, 'View'))) {
+      const value = (
+        node.props.style as { transform?: readonly { translateY?: number }[] } | undefined
+      )?.transform?.[0]?.translateY;
+      if (typeof value === 'number') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  it('shifts the list by the chrome growth while the transcript is anchored', () => {
+    const renderer = mountList({ chromeGrowthDp: 64 });
+    settleAtBottom();
+    expect(shiftStyle(renderer)).toBe(-64);
+    expect(holderStyle(renderer)?.marginBottom).toBe(-64);
+    expect(holderStyle(renderer)?.overflow).toBe('hidden');
+  });
+
+  it('applies the shift in the render that publishes the growth', () => {
+    const renderer = mountList({ chromeGrowthDp: 0 });
+    settleAtBottom();
+    expect(shiftStyle(renderer)).toBeNull();
+    rerenderList(renderer, { chromeGrowthDp: 64 });
+    expect(shiftStyle(renderer)).toBe(-64);
+  });
+
+  it('keeps the shift when the content is shorter than the list', () => {
+    // The reservation keeps the list's height, so a scrollability verdict read
+    // from that height would release the reservation that produced it: the
+    // transcript would alternate between the two frames on every layout it
+    // caused. A transcript whose content fits keeps its last row on the
+    // chrome's top edge instead.
+    const renderer = mountList({ chromeGrowthDp: 64 });
+    fire('onScrollEndDrag', {
+      nativeEvent: {
+        contentOffset: { y: 0 },
+        contentSize: { height: 400, width: 0 },
+        layoutMeasurement: { height: 500, width: 0 },
+      },
+    });
+    expect(shiftStyle(renderer)).toBe(-64);
+    expect(holderStyle(renderer)?.marginBottom).toBe(-64);
+  });
+});

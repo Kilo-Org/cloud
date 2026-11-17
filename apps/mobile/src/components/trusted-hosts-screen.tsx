@@ -14,6 +14,7 @@ import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { revokeImageHost, useTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { revokeHost, useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { cn } from '@/lib/utils';
 
 function TrustedHostRow({
@@ -110,7 +111,7 @@ export function TrustedHostsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('trustedHosts.title')} />
+      <ScreenHeader title={t('trustedHosts.title')} backFallback={PROFILE_TAB_HREF} />
       {hasLoaded && imageHostsLoaded && hasNoTrustedHosts ? (
         <EmptyState
           icon={Shield}

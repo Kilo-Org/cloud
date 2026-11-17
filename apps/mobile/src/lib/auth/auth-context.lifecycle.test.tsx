@@ -337,6 +337,10 @@ vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
   clearRunOnDestinationPreference: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/environment-choice', () => ({
+  clearEnvironmentChoices: vi.fn(),
+}));
+
 const {
   clearHideThinkingPreference,
   clearKeepScreenOnPreference,
@@ -464,6 +468,13 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
 
+// The account boundary also drops the retained merge intent keys, and their
+// store mints through expo-crypto, whose expo root needs `__DEV__`. This suite
+// asserts the teardown ordering, and the store's own suite covers the clear.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
+
 vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
@@ -476,6 +487,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LAST_ROUTE_KEY: 'last-route',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   LOGIN_EMAIL_DRAFT_KEY: 'login-email-draft',
+  LOGIN_DRAFT_RECORD_KEY: 'login-draft-record',
   LOGIN_SSO_RECOVERY_DRAFT_KEY: 'login-sso-recovery-draft',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
@@ -833,8 +845,8 @@ describe('sign-out teardown ordering', () => {
     // The mount loads auth-context from a fresh module registry, so the drafts
     // module the provider closes over is the one imported after it.
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
 
     await act(async () => {
       await ctx.signIn('signed-in-token');
@@ -851,8 +863,8 @@ describe('sign-out teardown ordering', () => {
   it('keeps the sign-in form drafts when the credential write fails', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
     hoisted.secureStore.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
 
     await act(async () => {
@@ -864,6 +876,87 @@ describe('sign-out teardown ordering', () => {
       email: 'typed@example.com',
       ssoRecovery: { email: 'typed@example.com', ssoOrganizationId: 'org-1' },
     });
+
+    unmount();
+  });
+
+  it('completes the sign-in when the draft retirement cannot be written, and retires it on sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesRetirement = true;
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      if (key === recordKey && refusesRetirement) {
+        return Promise.reject(new Error('keychain unavailable'));
+      }
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    refusesRetirement = false;
+    await drafts.persistLoginDrafts();
+    // (a) The keychain refuses the tombstone, and the person is signed in anyway.
+    refusesRetirement = true;
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+
+    // (b) Sign-out retries the obligation, still before the login screen draws,
+    // and its success retires the record the previous attempt wrote.
+    refusesRetirement = false;
+    await act(async () => {
+      await ctx.signOut();
+    });
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({ version: 2, state: 'retired' });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    unmount();
+  });
+
+  it('still signs in when the retirement fails both at sign-in and at sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesWrites = false;
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      if (key === recordKey && refusesWrites) {
+        return Promise.reject(new Error('keychain unavailable'));
+      }
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    await drafts.persistLoginDrafts();
+    refusesWrites = true;
+
+    // (c) Both retirements fail. This process still shows the signed-out screen
+    // with nothing restored, because its own memory is retired; the held record
+    // survives on disk, which is the window the report states.
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+    await act(async () => {
+      await ctx.signOut();
+    });
+    // The keychain kept refusing, so the record is still the held copy.
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({
+      version: 2,
+      state: 'held',
+      email: 'typed@example.com',
+    });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
 
     unmount();
   });
@@ -1883,8 +1976,10 @@ describe('bootstrap and foreground race fencing', () => {
     // Hold the terminal clear open so the epoch can move inside it: this is the
     // window where the refresh still returns refused for the session that
     // owned it.
+    const clearStarted = Promise.withResolvers<undefined>();
     const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
     hoisted.secureStore.deleteItemAsync.mockImplementationOnce(async () => {
+      clearStarted.resolve(undefined);
       await clearGate;
     });
 
@@ -1896,16 +1991,9 @@ describe('bootstrap and foreground race fencing', () => {
     // Wait until the clear is in flight, then move the epoch: a newer session
     // now owns the tree while the old refresh is still inside its clear.
     const authEpoch = await import('@/lib/auth/auth-epoch');
-    let flushes = 0;
-    while (hoisted.secureStore.deleteItemAsync.mock.calls.length === 0 && flushes < 50) {
-      flushes += 1;
-      // eslint-disable-next-line no-await-in-loop -- sequential flush until the clear is in flight
-      await act(async () => {
-        await new Promise<void>(resolve => {
-          void setTimeout(resolve, 0);
-        });
-      });
-    }
+    await act(async () => {
+      await clearStarted.promise;
+    });
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalled();
 
@@ -2018,7 +2106,7 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   }, 60_000);
 
-  it('repro: an unreadable refresh-token read shows the restore error instead of signing out', async () => {
+  it('ends a token-only session once when its token is refused instead of retrying forever', async () => {
     useFakeBackoffClock();
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // Bootstrap consumes: preloadedToken, preloadedRefreshToken, the expiry
@@ -2033,9 +2121,14 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBe(storedToken);
     expect(getCtx().sessionEnded).toBe(false);
 
-    // Every refresh-token read — including `readStoredValueRetryingNull`'s
-    // retries — answers null while the stored token stays present.
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    // A sign-in that carried no pair (the legacy long-lived credential) leaves
+    // a token-only set: the stored access token is still there, and every read
+    // of the refresh token — including `readStoredValueRetryingNull`'s
+    // retries — answers null.
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return key === 'auth-token' ? storedToken : null;
+    });
 
     const handler = unauthorizedMock.getHandler();
     if (!handler) {
@@ -2045,20 +2138,68 @@ describe('bootstrap and foreground race fencing', () => {
       await awaitOnFakeClock(handler);
     });
 
-    // The credential set is one unit: an unreadable refresh token is not a
-    // signed-out session, so the session stands and the retryable restore error
-    // takes over instead of the login screen. No teardown ran.
-    expect(getCtx().token).toBe(storedToken);
-    expect(getCtx().sessionEnded).toBe(false);
-    expect(getCtx().restoreFailed).toBe(true);
-    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
-    expect(hoisted.posthog.captureEvent).not.toHaveBeenCalledWith('logout');
+    // Nothing can rotate this set, so the refused token ends the session: the
+    // person lands on sign-in with the session-ended notice, and the repeated
+    // restore error plus its repeated events stop.
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
+    expect(hoisted.posthog.captureEvent).toHaveBeenCalledWith('logout');
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
-      cause: 'credentials_unreadable',
-      branch: 'refresh_token_unreadable',
-      keyNames: ['auth-token'],
+      cause: 'session_unrenewable',
     });
+
+    // A later 401 belongs to the session the sign-out already ended: it ends
+    // nothing a second time and files nothing.
+    await act(async () => {
+      await awaitOnFakeClock(handler);
+    });
+    expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  }, 30_000);
+
+  it('keeps a token-only session when the refused request carried no bearer', async () => {
+    useFakeBackoffClock();
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // No owner can serve a bearer, so the request that produced this 401 went
+    // out unauthenticated and the refusal proves nothing about the stored
+    // token. The set is token-only, which is what the refresh finds.
+    // `afterEach` resets the module registry, so the owner is loaded from the
+    // same graph as the provider rather than through a static import.
+    const { clearActiveToken } = await import('@/lib/auth/token-owner');
+    clearActiveToken();
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return key === 'auth-token' ? storedToken : null;
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await awaitOnFakeClock(handler);
+    });
+
+    // A session that may still be perfectly healthy is never ended on the
+    // strength of a request that carried no credential.
+    expect(getCtx().token).toBe(storedToken);
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+    expect(signOutTelemetryMock.reportAuthBranch).not.toHaveBeenCalled();
 
     unmount();
   }, 30_000);
@@ -2129,14 +2270,13 @@ describe('bootstrap and foreground race fencing', () => {
     });
 
     // A real 401 still signs out, is announced as a session end, and records
-    // the refresh_401 branch.
+    // the ended-session cause.
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().restoreFailed).toBe(false);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
       cause: 'session_ended',
-      branch: 'refresh_401',
     });
 
     unmount();
@@ -2504,7 +2644,7 @@ describe('reactive auth epoch', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome.ok).toBe(true);
+    expect(outcome.kind).toBe('ok');
     expect(tokens.getActiveToken()?.token).toBe('refreshed-token');
     expect(scope.getAuthenticatedOwner()).toBe(owner);
     expect(scope.isAuthenticatedOwner(owner)).toBe(true);

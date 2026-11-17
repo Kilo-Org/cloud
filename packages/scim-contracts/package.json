@@ -14,6 +14,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/scim-contracts/src"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

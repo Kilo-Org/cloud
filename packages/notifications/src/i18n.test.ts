@@ -4,25 +4,25 @@ import { resolvePushLocale, translatePush } from './i18n';
 
 describe('translatePush', () => {
   it('translates a key into Spanish for the es locale', () => {
-    expect(translatePush('es', 'generic.body.chatMessage')).toBe('Tienes un mensaje nuevo');
+    expect(translatePush('es', 'generic.body.lowBalance')).toBe('Tu saldo necesita atención');
   });
 
   it('returns English for the en locale', () => {
-    expect(translatePush('en', 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(translatePush('en', 'generic.body.lowBalance')).toBe('Your balance needs attention');
   });
 
   it('interpolates params into the translated string', () => {
-    expect(translatePush('es', 'instanceLifecycle.ready.title', { instanceName: 'Mi Bot' })).toBe(
-      'Mi Bot está listo'
+    expect(translatePush('en', 'internal.securityFindingNew.title', { severity: 'high' })).toBe(
+      'New security finding (high)'
     );
   });
 
   it('falls back to English for an unknown locale', () => {
-    expect(translatePush('xx', 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(translatePush('xx', 'generic.body.lowBalance')).toBe('Your balance needs attention');
   });
 
   it('falls back to English for a null locale', () => {
-    expect(translatePush(null, 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(translatePush(null, 'generic.body.lowBalance')).toBe('Your balance needs attention');
   });
 
   it('returns the key itself when the key is unknown and no fallback is given', () => {

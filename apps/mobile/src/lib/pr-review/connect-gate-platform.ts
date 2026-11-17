@@ -41,24 +41,43 @@ async function delayEdge<Edge extends string>(
  * Only a transition back from a non-active state counts: a stray `active`
  * delivery while the app never left (the first Android state echo) is not a
  * return to the app.
+ *
+ * `departed` is the other half of that pair: the first non-active state, which
+ * is what a browser taking the screen looks like. It resolves at once when the
+ * app is already away, because the transition it waits for has happened: a
+ * later `active` is a return, and the launch has nothing left to prove.
  */
 function waitForForeground() {
-  let resolveReturn: (() => void) | undefined = undefined;
-  const returned = new Promise<void>(resolve => {
-    resolveReturn = resolve;
-  });
+  const returnSignal = Promise.withResolvers<undefined>();
+  const departureSignal = Promise.withResolvers<undefined>();
   let away = AppState.currentState !== 'active';
+  if (away) {
+    departureSignal.resolve(undefined);
+  }
   const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
     if (state !== 'active') {
       away = true;
+      departureSignal.resolve(undefined);
       return;
     }
     if (away) {
-      resolveReturn?.();
+      returnSignal.resolve(undefined);
     }
   });
-  return { returned, subscription };
+  return { returned: returnSignal.promise, departed: departureSignal.promise, subscription };
 }
+
+/**
+ * How long a launched browser has to take the app out of the foreground.
+ *
+ * Android's plain browser reports `opened` as soon as it hands the URL over, so
+ * the departure is the only evidence the browser actually reached the screen,
+ * and it follows within a moment. Without a deadline, a launch that
+ * reports `opened` and never leaves the app — a browser that refused to start,
+ * a hand-off the system dropped — waits on a return that can never arrive, and
+ * the row spins with no error and no retry.
+ */
+export const FOREGROUND_DEPARTURE_DEADLINE_MS = 10_000;
 
 export type AuthorizationWait = {
   /**
@@ -134,6 +153,26 @@ export async function openAuthorizationAndWaitForReturn(
       throw first.error;
     }
     if (first.result.type === WebBrowser.WebBrowserResultType.OPENED) {
+      // `opened` only says the URL was handed over, so the departure is the
+      // evidence that the browser took the screen. A hand-off that never
+      // happens — the browser refused the URL, the system dropped it — leaves
+      // the return edge with nothing to end it, so it fails here instead.
+      const deadline = Promise.withResolvers<undefined>();
+      const timer = setTimeout(() => {
+        deadline.resolve(undefined);
+      }, FOREGROUND_DEPARTURE_DEADLINE_MS);
+      try {
+        const departure = await Promise.race([
+          delayEdge(foreground.departed, 'departed'),
+          delayEdge(cancelled, 'aborted'),
+          delayEdge(deadline.promise, 'deadline'),
+        ]);
+        if (departure.edge === 'deadline') {
+          throw new Error('The browser did not take the screen after the hand-off');
+        }
+      } finally {
+        clearTimeout(timer);
+      }
       await Promise.race([foreground.returned, cancelled]);
     }
     return { reported, settledByLaunch: true };

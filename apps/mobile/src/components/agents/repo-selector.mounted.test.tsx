@@ -97,7 +97,7 @@ describe('Repository picker admission', () => {
     const { renderer, unmount } = mountSelector({ isLoading: true });
 
     expect(renderer.root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
-    expect(renderer.root.findAll(node => node.type === 'Pressable')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Pressable')).toHaveLength(0);
 
     unmount();
   });

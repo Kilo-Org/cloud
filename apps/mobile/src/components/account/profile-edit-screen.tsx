@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -14,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 type ProfileUrlError = (value: string) => string | null;
@@ -168,6 +170,17 @@ export function ProfileEditScreen() {
   // screen's header during the pop the completion started, and a second pop
   // would close Account settings beneath it.
   const popOnce = usePopOnce();
+  const router = useRouter();
+  // A relaunch, or a cold link, can render this route with nothing beneath it;
+  // the header's Back then has no history to pop and lands on the Profile tab
+  // root instead of unwinding the stack.
+  const leaveScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      popOnce();
+      return;
+    }
+    router.dismissTo(PROFILE_TAB_HREF);
+  }, [popOnce, router]);
   const trpc = useTRPC();
   const links = useQuery(trpc.user.getProfileLinks.queryOptions());
 
@@ -194,7 +207,11 @@ export function ProfileEditScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.editProfile.title')} onBack={popOnce} />
+      <ScreenHeader
+        title={t('profile.editProfile.title')}
+        onBack={leaveScreen}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

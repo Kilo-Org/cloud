@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted case per slash-command screen state: list, add, duplicate, conflict, failure, and save */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,9 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -203,7 +207,12 @@ function pressSheetDone(root: ReactTestInstance): void {
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountScreen() {
-  return renderWithProviders(createElement(ProfileKiloCommandsScreen, { profileId: 'profile-1' }));
+  return renderWithProviders(
+    createElement(ProfileKiloCommandsScreen, {
+      profileId: 'profile-1',
+      backFallback: PROFILES_LIST_HREF,
+    })
+  );
 }
 
 /**

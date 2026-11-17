@@ -7427,8 +7427,8 @@
                     },
                     "variant": {
                       "type": "string",
-                      "maxLength": 50,
-                      "pattern": "^[a-zA-Z]+$"
+                      "minLength": 1,
+                      "maxLength": 50
                     }
                   },
                   "required": [
@@ -7466,8 +7466,8 @@
                     },
                     "variant": {
                       "type": "string",
-                      "maxLength": 50,
-                      "pattern": "^[a-zA-Z]+$"
+                      "minLength": 1,
+                      "maxLength": 50
                     }
                   },
                   "required": [
@@ -7579,8 +7579,8 @@
             },
             "variant": {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             "requestedEnvironment": {
               "type": "object",
@@ -8242,8 +8242,8 @@
             },
             "variant": {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             "requestedEnvironment": {
               "type": "object",
@@ -8948,8 +8948,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -8987,8 +8987,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -19590,8 +19590,8 @@
                         },
                         "variant": {
                           "type": "string",
-                          "maxLength": 50,
-                          "pattern": "^[a-zA-Z]+$"
+                          "minLength": 1,
+                          "maxLength": 50
                         }
                       },
                       "required": [
@@ -19629,8 +19629,8 @@
                         },
                         "variant": {
                           "type": "string",
-                          "maxLength": 50,
-                          "pattern": "^[a-zA-Z]+$"
+                          "minLength": 1,
+                          "maxLength": 50
                         }
                       },
                       "required": [
@@ -19742,8 +19742,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 },
                 "requestedEnvironment": {
                   "type": "object",
@@ -20411,8 +20411,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 },
                 "requestedEnvironment": {
                   "type": "object",
@@ -21209,8 +21209,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -21248,8 +21248,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -26698,8 +26698,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -26788,8 +26788,8 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 50,
-                        "pattern": "^[a-zA-Z]+$"
+                        "minLength": 1,
+                        "maxLength": 50
                       },
                       {
                         "type": "null"
@@ -27093,8 +27093,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -27196,8 +27196,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -27214,6 +27214,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -27302,8 +27311,8 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 50,
-                            "pattern": "^[a-zA-Z]+$"
+                            "minLength": 1,
+                            "maxLength": 50
                           },
                           {
                             "type": "null"
@@ -27374,13 +27383,14 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.rotateGitLabWebhookSecret": {
     "path": "organizations.reviewAgent.rotateGitLabWebhookSecret",
@@ -27455,8 +27465,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -27529,8 +27539,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -27547,6 +27557,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -27635,8 +27654,8 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 50,
-                            "pattern": "^[a-zA-Z]+$"
+                            "minLength": 1,
+                            "maxLength": 50
                           },
                           {
                             "type": "null"
@@ -27710,13 +27729,14 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.toggleReviewAgent": {
     "path": "organizations.reviewAgent.toggleReviewAgent",
@@ -30839,8 +30859,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -30929,8 +30949,8 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 50,
-                        "pattern": "^[a-zA-Z]+$"
+                        "minLength": 1,
+                        "maxLength": 50
                       },
                       {
                         "type": "null"
@@ -31112,8 +31132,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -31203,8 +31223,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -31221,6 +31241,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -31254,11 +31283,12 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.saveReviewConfig": {
     "path": "personalReviewAgent.saveReviewConfig",
@@ -31301,8 +31331,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -31369,8 +31399,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -31387,6 +31417,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -31425,11 +31464,12 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.toggleReviewAgent": {
     "path": "personalReviewAgent.toggleReviewAgent",
@@ -38300,8 +38340,8 @@
         },
         "variant": {
           "type": "string",
-          "maxLength": 50,
-          "pattern": "^[a-zA-Z]+$"
+          "minLength": 1,
+          "maxLength": 50
         },
         "sandboxAllocation": {
           "type": "string",
@@ -38587,6 +38627,9 @@
             "webhook",
             "scheduled"
           ]
+        },
+        "withEditability": {
+          "type": "boolean"
         }
       }
     },
@@ -38595,9 +38638,10 @@
       "list",
       "organizationid",
       "targettype",
-      "activationmode"
+      "activationmode",
+      "witheditability"
     ],
-    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode organizationId targetType activationMode"
+    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode witheditability organizationId targetType activationMode withEditability"
   },
   "webhookTriggers.listRequests": {
     "path": "webhookTriggers.listRequests",
@@ -38671,8 +38715,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"

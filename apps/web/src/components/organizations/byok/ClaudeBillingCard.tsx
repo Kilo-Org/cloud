@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -17,13 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
 import type { ClaudeBillingOwnerInput } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
 import { claudeBillingOutcomeParam } from '@/lib/claude-billing/constants';
 
-const subscribeHydration = () => () => {};
 const LINKED_PLATFORMS_URL = 'https://platform.claude.com/linked-platforms';
 
 /**
@@ -98,8 +95,8 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
       return 'This Claude organization already has a link. Use an existing link below if you control it, or ask its owner to share it. If neither applies, unlink Kilo under Linked platforms in Claude Console, then link again.';
     case 'forbidden':
       return scope === 'organization'
-        ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
-        : 'Claude linked billing is not available for your account yet.';
+        ? 'Only a Kilo organization owner or admin can link it.'
+        : 'Claude linked billing is not available for this account.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }
@@ -357,7 +354,6 @@ function ClaudeBillingCardContent({
   const [lastShareSource, setLastShareSource] = useState<ClaudeBillingOwnerInput | null>(null);
   const input = { organizationId };
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions(input));
-  const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
   const invalidateBillingQueries = () =>
     Promise.all([
       queryClient.invalidateQueries(trpc.claudeBilling.status.pathFilter()),
@@ -387,17 +383,6 @@ function ClaudeBillingCardContent({
   const needsAdmin = failureCode === 'FORBIDDEN';
   const nonRetryableShareError =
     shareFailureCode === 'CONFLICT' || shareFailureCode === 'PRECONDITION_FAILED';
-  // Before launch the card appears only for an owner who already has a
-  // connection, so they can still see its state and remove it.
-  const hydrated = useSyncExternalStore(
-    subscribeHydration,
-    () => true,
-    () => false
-  );
-  const launched = hydrated && flagEnabled === true;
-  const hasConnection =
-    statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
-  if (!launched && !hasConnection) return null;
   return (
     <ClaudeBillingCardView
       status={statusQuery.data}
@@ -412,7 +397,7 @@ function ClaudeBillingCardContent({
           : needsAdmin
             ? scope === 'organization'
               ? 'An organization owner or admin must manage Claude billing for this organization.'
-              : 'Linked billing with Claude Platform is not available for your account yet.'
+              : 'Linked billing with Claude Platform is not available for this account.'
             : shareFailureCode === 'CONFLICT'
               ? 'This scope already has a Claude link. Remove it from Kilo first to use another link.'
               : shareFailureCode === 'PRECONDITION_FAILED'
@@ -442,20 +427,16 @@ function ClaudeBillingCardContent({
               }
             }
       }
-      onConnect={
-        launched
-          ? () => {
-              setConnecting(true);
-              const query = new URLSearchParams({
-                owner: scope === 'personal' ? 'personal' : (organizationId ?? 'personal'),
-                return: window.location.pathname,
-              });
-              window.location.assign(`/claude/billing/connect?${query}`);
-            }
-          : undefined
-      }
+      onConnect={() => {
+        setConnecting(true);
+        const query = new URLSearchParams({
+          owner: scope === 'personal' ? 'personal' : (organizationId ?? 'personal'),
+          return: window.location.pathname,
+        });
+        window.location.assign(`/claude/billing/connect?${query}`);
+      }}
       onShare={
-        launched && (statusQuery.data?.shareableLinks.length ?? 0) > 0
+        (statusQuery.data?.shareableLinks.length ?? 0) > 0
           ? source => {
               removeMutation.reset();
               setLastShareSource(source);

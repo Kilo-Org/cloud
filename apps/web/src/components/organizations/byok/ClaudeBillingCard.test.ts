@@ -3,10 +3,6 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-jest.mock('posthog-js/react', () => ({
-  useFeatureFlagEnabled: () => false,
-}));
-
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
@@ -225,9 +221,13 @@ describe('ClaudeBillingCardView', () => {
         ],
       },
       scope: 'personal',
+      onConnect: () => undefined,
       onShare: () => undefined,
     });
-    expect(rendered.map(button => button.textContent)).toEqual(['Use Claude link from Acme']);
+    expect(rendered.map(button => button.textContent)).toEqual([
+      'Link your Claude organization',
+      'Use Claude link from Acme',
+    ]);
   });
 
   it('renders a link selector when multiple Claude accounts are available', () => {
@@ -269,6 +269,7 @@ describe('ClaudeBillingCardView', () => {
           sharedWith: ['Personal account', 'Acme'],
         },
         scope: 'organization',
+        onConnect: () => undefined,
       })
     );
     expect(html).toContain('Shared with Personal account, Acme.');

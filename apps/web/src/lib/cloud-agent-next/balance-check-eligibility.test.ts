@@ -294,10 +294,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
         owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
       );
-      mockResolveClaudeBillingConnector.mockResolvedValue({
-        kind: 'present',
-        email: 'connector@example.test',
-      });
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'present' });
 
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,

@@ -15,7 +15,6 @@ import {
   type ClaudeBillingOwner,
   type ClaudeBillingScopeSharing,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -139,8 +138,8 @@ async function buildScopeStatus(
 
 function forbiddenManageMessage(owner: ClaudeBillingOwner): string {
   return owner.kind === 'organization'
-    ? 'Only an organization owner or admin with access to this feature can link it.'
-    : 'Linked billing with Claude Platform is not available for your account yet.';
+    ? 'Only an organization owner or admin can link it.'
+    : 'Linked billing with Claude Platform is not available for this account.';
 }
 
 async function executeShare(
@@ -162,11 +161,7 @@ async function executeShare(
       message: 'Select another scope to share its Claude link.',
     });
   }
-  if (
-    !sourceResolved.canManage ||
-    !targetResolved.canManage ||
-    !(await isClaudePlatformOAuthEnabled(targetResolved.userEmail))
-  ) {
+  if (!sourceResolved.canManage || !targetResolved.canManage) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: forbiddenManageMessage(

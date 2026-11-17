@@ -1,6 +1,3 @@
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
   getClaudeOperatorToken: jest.fn(async () => 'router-operator-token'),
   isClaudeOperatorConfigured: jest.fn(() => false),
@@ -18,7 +15,6 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   isClaudeOperatorConfigured,
   unlinkClaudeUserProfile,
@@ -77,7 +73,6 @@ async function seedConnectedOrganization(organizationId: string, createdBy: stri
 }
 
 beforeEach(() => {
-  jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(false);
   jest
     .mocked(unlinkClaudeUserProfile)
@@ -117,18 +112,6 @@ describe('claudeBillingRouter.sharePersonal', () => {
     });
     await seedConnectedPersonal(member.id);
     const caller = await callerFor(member.id);
-
-    await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-    });
-  });
-
-  it('forbids sharing when the release flag is off', async () => {
-    const user = await insertTestUser();
-    const org = await createTestOrganization('Claude router flag', user.id, 0);
-    await seedConnectedPersonal(user.id);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    const caller = await callerFor(user.id);
 
     await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
       code: 'FORBIDDEN',

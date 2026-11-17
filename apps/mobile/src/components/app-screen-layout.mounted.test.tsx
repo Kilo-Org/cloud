@@ -6,7 +6,13 @@ import { expect, it, vi } from 'vitest';
 
 import { appScreenLayout } from '@/components/app-screen-layout';
 import { type ScreenLayoutProps } from '@/components/centered-state-surface';
-import { armLeaveSettle, insideLeaveSettle, resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import {
+  armLeaveSettle,
+  endLeaveSettle,
+  insideLeaveSettle,
+  resetLeaveSettle,
+  spendsLeaveBackPress,
+} from '@/lib/navigation/leave-settle';
 
 // The gate reads nothing else from React Native, and the mounted project cannot
 // parse the library's Flow-typed source: the wrapper is a plain host element.
@@ -26,7 +32,7 @@ vi.mock('@/components/centered-state-surface', () => ({
 type SceneListener = (event?: { data?: { closing: boolean } }) => void;
 
 /** The scene's own navigation object, as the native Stack hands it to a layout. */
-function fakeSceneNavigation(initiallyFocused = true) {
+function fakeSceneNavigation(initiallyFocused = true, sceneKey = 'scene-this') {
   const listeners = new Map<string, Set<SceneListener>>();
   let focused = initiallyFocused;
   return {
@@ -40,6 +46,9 @@ function fakeSceneNavigation(initiallyFocused = true) {
           set.delete(listener);
         };
       },
+      // This scene is the only route of its own stack, under the key the test
+      // gives it, so the layout can name the scene its transition end belongs to.
+      getState: () => ({ index: 0, routes: [{ key: sceneKey }] }),
     },
     // Drives the event the native Stack sends: a push blurs the covered scene,
     // a pop focuses it again.
@@ -60,10 +69,10 @@ function fakeSceneNavigation(initiallyFocused = true) {
   };
 }
 
-async function mountScene(initiallyFocused: boolean) {
-  const scene = fakeSceneNavigation(initiallyFocused);
-  // The fake supplies the two fields the gate reads; the Stack's route, options
-  // and theme are not part of this contract.
+async function mountScene(initiallyFocused: boolean, sceneKey = 'scene-this') {
+  const scene = fakeSceneNavigation(initiallyFocused, sceneKey);
+  // The fake supplies the fields the gate and the settle listener read; the
+  // Stack's route, options and theme are not part of this contract.
   const props = { navigation: scene.navigation, children: createElement('Draft') };
   const view = await renderWithProviders(
     createElement(appScreenLayout, props as unknown as ScreenLayoutProps)
@@ -157,7 +166,7 @@ it('follows the scene navigation it is replaced with instead of the old one', as
   expect(second.listenerCount()).toBe(0);
 });
 
-it('ends a dismissal’s settle window when this scene finishes appearing', async () => {
+it('ends a dismissal’s settle window and opens its grace when this scene finishes appearing', async () => {
   const { scene, view } = await mountScene(true);
   armLeaveSettle();
   expect(insideLeaveSettle()).toBe(true);
@@ -168,6 +177,8 @@ it('ends a dismissal’s settle window when this scene finishes appearing', asyn
     scene.finishTransition(false);
   });
   expect(insideLeaveSettle()).toBe(false);
+  // The grace that follows that end still belongs to the leave.
+  expect(spendsLeaveBackPress()).toBe(true);
 
   armLeaveSettle();
   // A scene that leaves is not the one a dismissal revealed.
@@ -175,6 +186,32 @@ it('ends a dismissal’s settle window when this scene finishes appearing', asyn
     scene.finishTransition(true);
   });
   expect(insideLeaveSettle()).toBe(true);
+
+  // The layout names this scene, so a leave that named the same scene ends here.
+  endLeaveSettle();
+  armLeaveSettle('scene-this');
+  act(() => {
+    scene.finishTransition(false);
+  });
+  expect(insideLeaveSettle()).toBe(false);
+
+  view.unmount();
+  resetLeaveSettle();
+});
+
+it('does not end a leave armed for another scene when this scene appears', async () => {
+  const { scene, view } = await mountScene(true);
+  // The dismissal revealed a different scene, and this one reported its own
+  // appearance first: a tab switch, or a push that completed while the leave
+  // was pending. That end is not this leave's end.
+  armLeaveSettle('scene-other');
+  expect(insideLeaveSettle()).toBe(true);
+
+  act(() => {
+    scene.finishTransition(false);
+  });
+  expect(insideLeaveSettle()).toBe(true);
+  expect(spendsLeaveBackPress()).toBe(true);
 
   view.unmount();
   resetLeaveSettle();

@@ -51,12 +51,14 @@ import {
   type CloudAgentWorktreeId,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
+  type SessionCloneRejectionCode,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 
@@ -117,6 +119,7 @@ import {
 import { createMessageId } from './message-id.js';
 import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
 import type {
@@ -525,23 +528,93 @@ function sessionCreateSettledOutboxEvent(params: {
   };
 }
 
-async function createIngestOwnershipRow(
+/**
+ * Clone rejections that report an interrupted copy rather than a create the
+ * caller got wrong, so the same create may run again. `source_digest_changed`
+ * is the source transcript changing while the copy read it, which a session
+ * that is still being written to does. `clone_setup_failed` is the copy's own
+ * staging failing, including the destination stage being reset underneath it;
+ * a source row too large to stage is the one permanent reason it carries, and
+ * a second attempt reports that just as clearly. Every other code is a
+ * permanent answer about the caller's input, the source, or the destination.
+ */
+const RETRYABLE_CLONE_REJECTION_CODES: Partial<Record<SessionCloneRejectionCode, true>> = {
+  source_digest_changed: true,
+  clone_setup_failed: true,
+};
+
+/** True when a clone rejection may succeed if the same create runs again. */
+export function isRetryableCloneRejection(code: SessionCloneRejectionCode): boolean {
+  return RETRYABLE_CLONE_REJECTION_CODES[code] === true;
+}
+
+/**
+ * Create the Session Ingest ownership row, copying the source transcript when
+ * the request is a clone.
+ *
+ * A copy that only failed because the source changed under it is retried once
+ * here, against the source as it stands at the second attempt. The rejection
+ * resets the destination stage and writes no PostgreSQL row, so the retry
+ * copies from scratch instead of resuming work built on the old digest. One
+ * attempt is the whole budget: a source that keeps changing still reports the
+ * rejection, and every other outcome reaches the caller unchanged.
+ */
+export async function createIngestOwnershipRow(
   env: Env,
   params: CreateSessionForCloudAgentParams
 ): Promise<CreateSessionForCloudAgentResult | undefined> {
-  try {
-    return await env.SESSION_INGEST.createSessionForCloudAgent(params);
-  } catch (error) {
+  const attempts = params.cloneFromKiloSessionId === undefined ? 1 : 2;
+  for (let attempt = 1; ; attempt += 1) {
+    let result: CreateSessionForCloudAgentResult | undefined;
+    try {
+      result = await env.SESSION_INGEST.createSessionForCloudAgent(params);
+    } catch (error) {
+      logger
+        .withFields({
+          kiloSessionId: params.sessionId,
+          cloudAgentSessionId: params.cloudAgentSessionId,
+          kiloUserId: params.kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('session-ingest RPC createSessionForCloudAgent failed');
+      throw error;
+    }
+    if (
+      attempt >= attempts ||
+      result?.status !== 'rejected' ||
+      result.code !== 'source_digest_changed'
+    ) {
+      return result;
+    }
     logger
       .withFields({
         kiloSessionId: params.sessionId,
         cloudAgentSessionId: params.cloudAgentSessionId,
-        kiloUserId: params.kiloUserId,
-        error: error instanceof Error ? error.message : String(error),
+        sourceSessionId: params.cloneFromKiloSessionId,
+        attempt,
       })
-      .error('session-ingest RPC createSessionForCloudAgent failed');
-    throw error;
+      .warn('Session clone source changed during the copy; copying the source again');
   }
+}
+
+/**
+ * Turn an ingest rejection into the error the caller's surface shows. A refused
+ * organization is a permanent authorization answer, so it keeps the same
+ * forbidden message as the preflight membership check. An interrupted copy is
+ * a conflict the caller can retry, not a request to correct; every other
+ * rejection carries its stable code on the request error.
+ */
+export function ingestRejectionError(code: SessionCloneRejectionCode): TRPCError {
+  if (code === 'organization_access_denied') {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+  }
+  if (isRetryableCloneRejection(code)) {
+    return new TRPCError({ code: 'CONFLICT', message: code });
+  }
+  return new TRPCError({ code: 'BAD_REQUEST', message: code });
 }
 
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
@@ -863,6 +936,13 @@ async function issueSessionRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
       ...(orgId ? { organizationId: orgId } : {}),
+      onBindingRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'binding_check', reason),
+    }).catch((error: unknown) => {
+      if (error instanceof RuntimeAuthorizationRevokedError) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+      }
+      throw error;
     });
     runtimeAuthorization = {
       token: created.token,
@@ -979,7 +1059,7 @@ async function allocateNewSession(
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
   if (requestedAllocation !== undefined) {
-    assertSandboxAllocationAvailable(
+    await assertSandboxAllocationAvailable(
       ctx.env,
       { userId: ctx.userId, orgId },
       requestedAllocation,
@@ -1228,7 +1308,7 @@ async function allocateNewSession(
         await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
         await ledger.onFailure('ownership_row', 'session_clone_failed');
       }
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult.status === 'in_progress') {
       if (ledger) {
@@ -1246,7 +1326,7 @@ async function allocateNewSession(
       await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
       await ledger.onFailure('ownership_row', ingestResult.code);
     }
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
 
   return {
@@ -1823,7 +1903,7 @@ async function registerAllocatedSession(
     throw error;
   }
 
-  if (!registerResult.success && registerResult.error !== 'Session already registered') {
+  if (!registerResult.success) {
     const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1848,19 +1928,8 @@ async function registerAllocatedSession(
     });
   }
 
-  // `Session already registered` means the registration already committed on a
-  // prior attempt whose response was lost. The DO method is not idempotent, so
-  // the retry returns this rejection; treat it as idempotent success instead of
-  // rolling back a live clone, tombstoning its IDs, or settling the row failed.
-  //
-  // The rejection can only come from this caller's own retry, because the DO name
-  // `${userId}:${cloudAgentSessionId}` is request-identity bound on both entries:
-  // a first attempt allocates a fresh random `cloudAgentSessionId`
-  // (`generateSessionId`), so only `withDORetry` can reach that DO again; a
-  // same-operationKey replay rebuilds the ID from `row.canonical_result` in
-  // `rebuildRecordedSessionAllocation`, so the DO belongs to the same ledger row. Keep that
-  // property if either entry changes; otherwise an unrelated conflict would be
-  // swallowed as success here.
+  // The registration RPC replays a repeated call with the stored intent, so a
+  // retry whose first response was lost recovers here as a success.
   await recordParentChildSession(input, ctx, {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     ...(allocation.initialTurn === undefined
@@ -1942,7 +2011,15 @@ async function withLedgerSavedAllocation(
   }
   // Admission always writes a canonical result, so its presence no longer means
   // progress was recorded; only a fresh admission may still read owner settings.
-  if (freshAdmission) return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+  if (freshAdmission) {
+    try {
+      return await withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+    } catch (error) {
+      const hooks = await buildLedgerHooks(input, ctx, options, getPgDb(ctx.env), row, 'new');
+      await hooks.onFailure('sandbox', 'sandbox');
+      throw error;
+    }
+  }
   return { ...input, savedSandboxAllocation: null };
 }
 
@@ -2242,7 +2319,7 @@ export async function createSessionWithLedger(
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
     const capability = allocationCapabilityFor(input, options.billingOrigin);
     const available = isSandboxAllocationAvailable(
-      getSandboxSelectionCapabilities(ctx.env, owner, {
+      await getSandboxSelectionCapabilities(ctx.env, owner, {
         repositoryType: input.repository.type,
         ...(capability ? { capability } : {}),
       }),
@@ -2261,7 +2338,7 @@ export async function createSessionWithLedger(
         )
         .limit(1);
       if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
-        assertSandboxAllocationAvailable(
+        await assertSandboxAllocationAvailable(
           ctx.env,
           owner,
           allocation,
@@ -2660,7 +2737,7 @@ async function resumeCloneCreate(
   if (ingestResult.status === 'rejected') {
     await recordCloneTombstone(hooks, ids);
     await hooks.onFailure('ownership_row', 'session_clone_failed');
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
   if (ingestResult.status === 'in_progress') {
     await hooks.onTransportFailure();
@@ -2715,7 +2792,7 @@ async function resumeFirstWorktreeCreate(
         });
       }
       await hooks.onFailure('ownership_row', ingestResult.code);
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult?.status === 'in_progress') {
       await hooks.onTransportFailure();

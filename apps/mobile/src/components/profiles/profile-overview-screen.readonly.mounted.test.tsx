@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   guard: { enabled: false as boolean },
   connectivity: 'online' as string,
+  permission: 'read-only' as 'resolving' | 'allowed' | 'read-only',
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -34,7 +35,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => false,
+  useOrganizationProfilePermission: () => h.permission,
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -70,6 +71,8 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileSlashCommandsPath: (id: string, org?: string) =>
     `/profiles/${id}/slash-commands${org ? `?org=${org}` : ''}`,
   getProfileMcpPath: (id: string, org?: string) => `/profiles/${id}/mcp${org ? `?org=${org}` : ''}`,
+  getProfileInstructionsPath: (id: string, org?: string) =>
+    `/profiles/${id}/instructions${org ? `?org=${org}` : ''}`,
   getProfileSkillsPath: (id: string, org?: string) =>
     `/profiles/${id}/skills${org ? `?org=${org}` : ''}`,
   getProfileAgentsPath: (id: string, org?: string) =>
@@ -107,6 +110,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
+  Download: 'Download',
+  FileText: 'FileText',
   KeyRound: 'KeyRound',
   Server: 'Server',
   Sparkles: 'Sparkles',
@@ -128,6 +133,12 @@ describe('ProfileOverviewScreen without the manage role', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen('org-1');
+
+    // The statement that names who may change an organization profile sits in
+    // the slot the manager's delete action would occupy, above the inert form.
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Only organization owners and admins can change organization profiles.'
+    );
 
     // No destructive delete action for a non-manager.
     expect(findAll(renderer.root, 'Button')).toHaveLength(1);
@@ -151,6 +162,25 @@ describe('ProfileOverviewScreen without the manage role', () => {
     changeText(renderer.root, 'Profile description', 'Typed into a disabled field');
 
     expect(h.guard.enabled).toBe(false);
+
+    unmount();
+  });
+
+  it('claims neither of the two roles while the role is unresolved', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.permission = 'resolving';
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    // The membership list has not answered, so the screen says neither that
+    // the reader may change the profile nor that someone else must.
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      'Only organization owners and admins can change organization profiles.'
+    );
+    // The metadata form's own Save button is the only one left: no Import and
+    // no Delete, the same as a member.
+    expect(findAll(renderer.root, 'Button')).toHaveLength(1);
 
     unmount();
   });

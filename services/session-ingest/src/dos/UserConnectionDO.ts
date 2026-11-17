@@ -1,15 +1,21 @@
 import { DurableObject } from 'cloudflare:workers';
+import { getWorkerDb } from '@kilocode/db/client';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
 import { isNeedsInputStatus } from './session-ingest-attention';
-import { resolveAccessibleKiloSession } from '../services/session-access';
+import {
+  resolveAccessibleKiloSession,
+  type AccessibleKiloSession,
+} from '../services/session-access';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
   CLIOutboundMessageSchema,
+  heartbeatSessionCount,
   type CLIInboundMessage,
   type Instance,
   type SessionEventPayload,
@@ -258,6 +264,12 @@ const SESSION_ACCESS_DENIED_ERROR = {
   message: 'You no longer have access to this session',
 };
 
+const ORGANIZATION_ACCESS_DENIED_ERROR = {
+  source: 'relay',
+  code: 'ORGANIZATION_ACCESS_DENIED',
+  message: 'You do not have access to this organization',
+};
+
 const CATALOG_TOO_LARGE_ERROR = {
   source: 'relay',
   code: 'CATALOG_TOO_LARGE',
@@ -323,6 +335,32 @@ const MUTATION_ID_TOO_LONG_ERROR = {
   code: 'MUTATION_ID_TOO_LONG',
   message: 'Mutation ID is too long',
 };
+
+/** UUID v1–v5 shape used to gate the `create_session` organization claim. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The organization a `create_session` command claims the new session belongs
+ * to. `none` is a personal create; `invalid` is a claim that cannot be read, so
+ * the command is refused instead of forwarded with an unreadable claim.
+ */
+type CreateSessionOrgClaim =
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'organization'; organizationId: string };
+
+function readCreateSessionOrgClaim(msg: {
+  command: string;
+  data?: unknown;
+}): CreateSessionOrgClaim {
+  if (msg.command !== 'create_session') return { kind: 'none' };
+  const data = msg.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return { kind: 'none' };
+  if (!Object.hasOwn(data, 'orgId')) return { kind: 'none' };
+  const orgId: unknown = Reflect.get(data, 'orgId');
+  if (typeof orgId !== 'string') return { kind: 'invalid' };
+  return { kind: 'organization', organizationId: orgId };
+}
 
 type ReadyPushEntry = {
   kiloUserId: string;
@@ -710,10 +748,14 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
+      // Report the frame's size beside the byte count so a frame outside the
+      // contract is diagnosable from its shape, never from its contents.
+      const sessionCount = heartbeatSessionCount(parsed);
       console.warn('CLI message parse failed', {
         role: 'cli',
         connectionId: attachment.connectionId,
         byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+        ...(sessionCount === undefined ? {} : { sessionCount }),
         issues: result.error.issues.map(issue => ({
           path: issue.path,
           code: issue.code,
@@ -866,10 +908,10 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
       // `needsApproval` gates the Approve control on the locked surfaces, so a
-      // move into or out of `permission` must bypass the delivery window. Only
-      // the sessions that moved are named: this batch aggregates every
-      // connection, so it can span the personal scope and several orgs, and the
-      // exemption must not reach a scope that had no approval change.
+      // move into or out of `permission` is delivered on the shorter approval
+      // interval. Only the sessions that moved are named: this batch aggregates
+      // every connection, so it can span the personal scope and several orgs,
+      // and the shorter interval belongs only to the scope with the move.
       const approvalChangedSessionIds = new Set<string>();
       for (const session of this.aggregateSessions()) {
         const previous = previousStatuses.get(session.id);
@@ -1625,9 +1667,29 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    // A create may name an organization, and that claim reaches the CLI. Accept
+    // it only when the acting user can act for that organization: for a
+    // session-scoped create that is the resolved session's own organization,
+    // and for a connection-scoped create it is any organization the read paths
+    // grant, which includes a child organization reached through a parent role.
+    //
+    // This decides whether the create runs, not what the session records. The
+    // recorded organization is set by the ingest metadata write, which keeps its
+    // own rule, so accepting a scope here never widens the attribution.
+    const orgClaim = readCreateSessionOrgClaim(msg);
+    if (orgClaim.kind === 'invalid') {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: INVALID_COMMAND_ERROR,
+      });
+      return;
+    }
+
     // Command-time access recheck: a removed member must not forward a command
     // to a session they no longer have access to. Catalog commands without a
     // sessionId skip this check.
+    let accessibleSession: AccessibleKiloSession | null = null;
     if (msg.sessionId) {
       const kiloUserId = attachment.kiloUserId;
       if (!kiloUserId) {
@@ -1638,15 +1700,40 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
         return;
       }
-      const accessible = await resolveAccessibleKiloSession(this.env, {
+      accessibleSession = await resolveAccessibleKiloSession(this.env, {
         kiloUserId,
         kiloSessionId: msg.sessionId,
       });
-      if (!accessible) {
+      if (!accessibleSession) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
           error: SESSION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
+    }
+
+    if (orgClaim.kind === 'organization') {
+      const kiloUserId = attachment.kiloUserId;
+      const organizationId = orgClaim.organizationId;
+      const allowed =
+        kiloUserId !== undefined &&
+        UUID_RE.test(organizationId) &&
+        (accessibleSession !== null
+          ? accessibleSession.organizationId === organizationId
+          : await hasEffectiveOrganizationAccess(
+              getWorkerDb(this.env.HYPERDRIVE.connectionString),
+              {
+                kiloUserId,
+                organizationId,
+              }
+            ));
+      if (!allowed) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: ORGANIZATION_ACCESS_DENIED_ERROR,
         });
         return;
       }
@@ -2078,15 +2165,14 @@ export class UserConnectionDO extends DurableObject<Env> {
           cliSessionIds: rootSessionIds,
           // A disconnecting CLI leaves the live aggregate, so the snapshot the
           // locked surfaces build no longer carries its permission: the Approve
-          // control clears now rather than behind the delivery window. The
-          // attention reset above does not write the stored status — it holds
-          // the clear for the CLI absence window — so this exemption covers the
-          // aggregate drop, and the deferred write fires its own exemption in
-          // `resetAttentionStatusOnCliDisconnect` for a session that stays
-          // snapshot-visible (a cloud agent merged from Postgres, not the live
-          // list). Only the scopes whose roots moved are named: this batch
-          // aggregates every connection, so a request-level flag would exempt
-          // scopes that had no approval change.
+          // control clears on the shorter approval interval. The attention reset
+          // above does not write the stored status — it holds the clear for the
+          // CLI absence window — so this hint covers the aggregate drop, and
+          // `resetAttentionStatusOnCliDisconnect` names the session on the same
+          // path for a session that stays snapshot-visible (a cloud agent merged
+          // from Postgres, not the live list). Only the scopes whose roots moved
+          // are named: this batch aggregates every connection, so a
+          // request-level flag would name scopes with no approval move.
           approvalChangedSessionIds: rootSessionIds.filter(id => permissionRootIds.has(id)),
         })
       );

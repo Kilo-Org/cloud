@@ -85,7 +85,9 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
    within the transport bound and settles a known failed old attempt's existing work. It then stores
    the new message as `queued`; unavailable confirmation retains the existing queued intent.
 3. If the route is `ready`, go to step 7. Otherwise the Session DO calls `prepare` on the Sandbox DO.
-   `prepare` is idempotent and returns at once.
+   `prepare` is idempotent and returns at once. It carries this chat's newest workspace stop epoch
+   and the oldest queued message's creation time; after a workspace Stop, the Sandbox DO refuses a
+   prepare for work created before that Stop and returns `unknown` with the current epoch.
 4. The Sandbox DO makes sure an allocation is `connected`: create the sandbox, launch the
    supervisor and wrapper, wait for the wrapper to connect.
 5. The Sandbox DO sends `session.prepare` to the wrapper. The wrapper runs the workspace steps and
@@ -123,13 +125,36 @@ terminal. Nothing else.
 | Route lost (reason) | All `accepted` → `failed` with the reason. `queued` stay; if any, call `prepare`. |
 | Owner view names a replacement attempt | Before storing the new view, all old `accepted` → `failed` (`agent_restarted`). Never replay them; keep `queued` for the new owner. |
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
-| Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
+| Stop | If any route in the workspace is `preparing`, confirm a workspace Stop with the Sandbox DO before cancelling local work: every chat in the workspace is cancelled and the sandbox stops. Otherwise cancel this chat's `queued` and `accepted` messages and send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
 | Backstop alarm | `queued` older than its queued backstop → `failed` (`preparation_timeout`). `accepted` older than its accepted backstop → `failed` (`no_outcome`). |
 
-Stop still forwards a best-effort abort to an existing ready Kilo route when no
-message is queued or accepted and the wrapper has no active turn. It does not
-rewrite terminal message outcomes or prepare/wake a stopped sandbox.
+Environment preparation is workspace work, not chat work: one sandbox serves one
+workspace, and its preparation, runtime and physical allocation are shared by every
+chat and worktree in it. A new session's sandbox id is derived from its own root
+session, and worktree siblings inherit that id, so independent workspaces never
+share a Sandbox DO. (Retired shared sandbox keys still decode for stored metadata;
+whatever routes they host are treated as one workspace.) Stop during preparation
+therefore stops the whole workspace: a fresh Stop retires every route that exists
+when it runs (including work prepared after the caller captured `requestedAt`),
+records a durable stop epoch, notifies every Session DO so each settles its own
+queued and accepted work as cancelled, and stops the physical allocation. Sibling
+chats are cancelled, not preserved. A different workspace is a different Sandbox
+DO and is untouched. A preparation for work created before the Stop is refused by
+the recorded epoch, so a stale queued message cannot revive the workspace; a
+message created afterwards is new intent and may prepare again. A repeated Stop
+with the same `requestedAt` is idempotent and preserves routes that started after
+the accepted Stop. Before a route is deleted, its `workspace_stopped` payload is
+persisted per session; the Sandbox alarm replays it until that Session DO
+acknowledges the exact epoch/attempt, so a dropped dispatcher send or eviction does
+not leave a sibling running. `status` also carries the authoritative
+`workspacePreparing` and stop epoch/at, and the Session alarm checks it before
+applying a backstop failure. Stop on a workspace with no preparation keeps
+per-chat behaviour: it aborts the Kilo turn and does not stop the workspace. Stop
+does not rewrite terminal message outcomes. If the workspace Stop RPC fails within
+its transport bound, return an error without settling local work or reporting a
+completed Stop. The user can retry; an RPC that completed remotely still notifies
+each Session DO through the durable stop notification.
 
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
@@ -309,6 +334,12 @@ so a later report changes nothing.
   billing/provider work or physical start/stop.
 - A `prepare` during `stopping` stores the route as `preparing` and returns its view at once. The
   Sandbox DO starts `creating` after `stopped`.
+- Native provider stop interrupts a pending main-process readiness probe for the same allocation.
+  This releases the provider queue for destruction. Physical start, billing and destruction stay
+  serialized. A late probe cannot mark the old allocation running or change its replacement.
+  Stop also cancels queued launches and launches awaiting pre-start work before physical start.
+  The Sandbox DO treats this cancellation as `launch_interrupted`, without a snapshot retry or
+  create-failure diagnostic. The caller that requested the stop owns its completion.
 - On `stopping` or `stopped`, every `ready` route is removed and its session gets `route lost`. A
   session with queued messages calls `prepare` again, which creates a new allocation.
 - A `preparing` route stays across a failed allocation (create error, connect timeout, sandbox gone)
@@ -341,9 +372,10 @@ so a later report changes nothing.
 
 `preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
 own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
-the clone fallback, Kilo runtime start, session import), including one create retry and one
-retry each of the last two steps. Environment snapshot builds run separately. An attempt
-starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
+the clone fallback, Kilo runtime start, session import), including one create retry, one
+snapshot launch retry (a stop confirmed within 4 minutes, then its own launch bound) and one retry each of the last
+two steps. Environment snapshot builds run separately. An attempt starts when a route enters
+`preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
 attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is
 configuration, so the attempt deadline is their aggregate stop: a preparation whose setup work
@@ -369,6 +401,7 @@ notification, so a lost notification never leaves it waiting.
 | `hello`, same `wrapperId` | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes. |
 | `hello`, new `wrapperId` | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
 | `release` (session deleted) | Remove the route; send `session.release`. |
+| `cancelWorkspace(sessionId, requestedAt)` | Workspace Stop during preparation. A fresh call retires every route that exists now, persists each retired session's `workspace_stopped` payload before deleting the route, notifies the Session DO, and stops the allocation when no newer route remains. The Sandbox alarm replays unacknowledged payloads. The same `requestedAt` is idempotent and preserves routes that started afterwards. |
 
 ### Forwarding
 
@@ -616,9 +649,18 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   `launch` returns `startSource` (`repository` or `image`). The progress detail names the snapshot
   capture date and time in UTC, the changed environment settings, an earlier base image and the
   real admission outcome.
-- **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
-  within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
-  provider that started the image instead) fails at once and asks to rebuild the environment.
+- **No fallback.** Each snapshot launch attempt has its own 5-minute bound
+  (`DEADLINE_MS.repositoryStartup`): the first ends at the create deadline, which starts at create.
+  A failed or timed-out snapshot start stops that container and, after a confirmed stop, retries the
+  same snapshot once. The retry moves the allocation's create deadline to a new 5-minute bound,
+  renders a new startup command and artifact grant for that bound, and reports "Retrying the
+  snapshot start" on the snapshot step. A slow first attempt therefore never uses up the retry. A
+  container wedged in a snapshot start can take minutes to destroy, so the stop repeats with the
+  stop ladder's pauses for up to 4 minutes (`snapshotRetryStopMs`). After the first unconfirmed
+  stop, the snapshot step reports "Waiting for the failed sandbox to stop". A stop that is not
+  confirmed in that bound fails the start. A permanent reason (expired, missing, image mismatch,
+  provenance, or a provider that started the image instead) fails at once and asks to rebuild the
+  environment.
   A repeated transient failure asks to send the message again, and to rebuild only if the failure
   repeats. Neither failure allows the session to continue from the base image.
   A wrapper that connected during the launch receives no
@@ -752,6 +794,62 @@ keep environment snapshots and existing history/worktree recovery.
   it does not delete the provider artifact. Cloudflare retains snapshots for 30 days after creation
   or their last restore, and each restore resets this TTL. Disk snapshots do not preserve running
   processes, terminals or memory. Ship compatible wrapper and Worker before enrollment.
+
+### Workspace artifacts
+
+Each workspace's Sandbox DO owns the artifact index. The stable sandbox ID is the address and the
+workspace identity, so sibling sessions share one index and one `/artifacts` folder. The index
+lives in the Sandbox DO SQLite database. `workspace_artifacts_revision` in `storage.kv` holds the
+monotonic revision.
+
+| Table | Columns | Notes |
+|---|---|---|
+| `workspace_artifacts` | `relative_path` (PK), `object_key`, `content_hash`, `size_bytes`, `content_type`, `updated_at` | Normalized `/`-separated path; hash is hex SHA-256 |
+| `workspace_artifact_orphans` | `object_key` (PK), `queued_at` | Objects to delete from R2 |
+
+`object_key` is `<sandboxId>/<uuid>` in the private `WORKSPACE_ARTIFACTS_BUCKET`. Each upload
+uses a new key. An object carries `contentType` and `customMetadata: { sandboxId, sha256 }`.
+A replaced, deleted or expired object becomes an orphan row in the same transaction as the index
+change; a rejected upload leaves its reservation's orphan row for the alarm. A KV record
+`workspace_artifact_reservation:<objectKey>` holds `{ sandboxId, expiresAt, sizeBytes }`.
+
+**Reservation lifecycle.** `reserveWorkspaceArtifactUpload` validates the path and size, prunes
+expired entries, checks file and byte quotas and bounds queued orphan records, then returns a new object
+key. It inserts the orphan row and writes a reservation with a 10-minute TTL
+(`WORKSPACE_ARTIFACT_RESERVATION_TTL_MS`). Expired reservations still count until the sweep removes
+their orphan rows. An unexpired reservation is an upload in flight that already holds bucket
+storage: at most `WORKSPACE_ARTIFACT_MAX_ACTIVE_RESERVATIONS` (8) may exist, and their declared
+bytes count against the byte quota. Exceeding either returns `busy` (route `429`), which the
+wrapper treats as a backoff. The Worker streams the request body to R2 with the declared SHA-256 and
+`onlyIf: { etagDoesNotMatch: '*' }`, verifies the stored size equals `Content-Length`, then calls
+`commitWorkspaceArtifact`. A failed stream calls `releaseWorkspaceArtifactReservation`, which frees
+the in-flight slot and leaves the orphan row for the sweep.
+
+- A commit needs the unexpired reservation and its orphan row. It reports an unchanged hash,
+  queues the previous object of a replacement, removes the reservation and orphan row, upserts
+  the index row and increments the revision.
+- A missing or expired reservation returns `reservation_missing` or `reservation_expired`; the
+  route maps both to `503`. The alarm claims leftovers after a 60 s minimum and the 10-minute
+  reservation grace, and deletes them in batches of 100.
+- `deleteWorkspaceArtifact` and `deleteWorkspaceArtifactForUser` require `expectedHash` and return
+  `deleted`, `absent` or `hash_mismatch`. Only a match queues the object and increments the
+  revision. The user path has no wrapper-liveness check and works offline.
+- Workspace deletion and exclusive handoff call `clear()`, which queues every entry, removes the
+  index rows and lets the same alarm sweep the objects.
+
+**Storage and expiry.** Entries expire `WORKSPACE_ARTIFACT_RETENTION_MS` (14 days) after
+`updated_at`. Every index access (`list`, `get`, `reserve`, `commit`, `delete`) prunes expired
+rows inside its transaction, queues their objects and increments the revision when it removes
+one. Listing, download URLs and quota counting therefore ignore expired entries. An operator
+lifecycle rule deletes the bytes 15 days after upload; a new key on every update keeps the two
+ages aligned. Limits are 50 MiB per file, 500 MiB and 1,000 files per workspace, 1,024 path bytes
+and 16 segments. Dot segments, `node_modules`, `__pycache__` and `venv` are excluded.
+
+**Change notification.** After a real revision change, the Sandbox DO dispatcher enqueues
+`{ kind: 'workspace_artifacts', payload: { revision } }` for every route in the workspace. The
+Session DO `onWorkspaceArtifactsChanged` persists `cloud.workspace.artifacts.changed` with
+`entityId: workspace-artifacts/<revision>` and broadcasts it. Duplicate revisions are ignored.
+Delivery is best effort; clients also refetch on view open, focus and reconnect.
 
 ## 7. Wrapper
 
@@ -978,11 +1076,22 @@ the legacy profile restrictions.
   a live user-blocked tree retains its normal idle policy.
   When neither half has arrived and no publication cleanup transport budget applies, the quiet drain
   is bounded by the wrapper's `noProgressMs` (20 minutes). Foreground work clears that timer;
-  a later quiet phase starts a new timer. Expiry fails the turn as `no_outcome`.
+  a later quiet phase starts a new timer. Expiry fails with the completion-unconfirmed message below.
   The first half never extends an armed deadline. Feed gaps preserve that deadline and the
   publication cleanup transport bound.
-  Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
-  with an unconfirmed-completion warning. Native work retains the supervisor's execution bounds.
+  Drain disables Bun's socket idle timeout for this request only; a quiet HTTP connection does not
+  prove native work stopped. Three transient attempts, with 1-second and 2-second backoff, exhaust
+  with an unconfirmed-completion warning. Each retry only waits for native work again; it does not
+  submit another prompt. Fresh tokens fence late responses and markers from earlier attempts.
+  Native work retains the supervisor's execution bounds. Each failed attempt logs its number,
+  elapsed milliseconds, classification, and a bounded, redacted error/cause chain. HTTP/marker pair
+  timeouts also name the missing half and native feed gap. The sandbox-local HTTP transport is
+  separate from the wrapper-to-Worker socket.
+  Unconfirmed completion reports `completion_unconfirmed`, which maps to this user message:
+  "The assistant finished its reply, but session completion could not be confirmed. Send a new
+  message to continue." It retains the `wrapper_no_output` report and callback classification.
+  It never reports `no_outcome`, and does not claim full-tree success.
+  The Worker backstop still uses `no_outcome` for runs that send no outcome.
 - The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
   successful outcomes from idle snapshots. Compact's own close reconciliation only releases its
   delivery barrier; an ineligible close cannot later become completion for a queued follower.
@@ -1031,9 +1140,10 @@ the legacy profile restrictions.
   in the existing submission chain before aborting the captured client. New intake remains accepted,
   but dispatch waits until cleanup confirms abort and a fresh HTTP/marker pair. Abort gets 10 seconds;
   three post-cancel confirmations get 10 seconds each, with 1-second and 2-second backoff (43 seconds
-  maximum). Unconfirmed cleanup warns and fails `no_outcome`; it never releases dispatch through an
-  uncertain abort. Only known cleanup interruption signals are suppressed. Successful cleanup releases
-  the barrier and re-arms confirmation from the original eligible close when no newer intake exists.
+  maximum). Unconfirmed cleanup warns and fails with the completion-unconfirmed message; it never
+  releases dispatch through an uncertain abort. Only known cleanup interruption signals are suppressed.
+  Successful cleanup releases the barrier and re-arms confirmation from the original eligible close
+  when no newer intake exists.
 - Native deadline failures are reported immediately. When the interrupted batch opted into
   auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
   and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
@@ -1063,8 +1173,9 @@ it as dispatched work. The first reconcile of the same process after the loss de
   `completed` root close, and if any dispatch that no observation or close showed is still running
   at the root. An idle root with observed work and no seen close lost that close.
 - Otherwise, or if observation was already lost when the gap began, dispatched work that no native
-  proof covers fails as `no_outcome`, with a history-incomplete warning. Snapshots and new tokens
-  cannot recover missed final errors.
+  proof covers fails with a history-incomplete warning. If a seen completed root close covers the
+  latest prompt, it uses the completion-unconfirmed message, not `no_outcome`. Without that close,
+  it retains `no_outcome`. Snapshots and new tokens cannot recover missed final errors.
 
 A snapshot that began before the loss does not decide the gap. A restart decides instead of the
 gap, so a crash that ends the feed first still gets restart resubmission and its specific reason.
@@ -1073,7 +1184,7 @@ already-confirmed work during optional finalization are not failed. A newer disp
 an accepted proof is unconfirmed work again. Three edges remain. A missed root error followed by a
 queued follow-up under the same execution id completes the turn. A `completed` close that arrives
 after a later prompt was dispatched also covers that prompt. A root or child execution that ends on
-the new feed before its first reconcile finishes fails the turn as `no_outcome`.
+the new feed before its first reconcile finishes fails the turn under the same gap decision.
 
 The global feed is subscribed before a bounded initial snapshot. Reconciliation repeats
 on reconnect and every 30 seconds, single-flight with a 10-second request budget. It
@@ -1218,6 +1329,7 @@ them through one development-only override.
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
+| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (repeated 30-s stops, up to 4 min) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | Adopt an environment snapshot | 2 min | Preserve the workspace and fail preparation |
 | Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |
@@ -1263,15 +1375,16 @@ them through one development-only override.
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
 | Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
-| User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
+| User Stop while preparing | Session DO + Sandbox DO | Cancel every chat in the workspace and stop the allocation; a ready route aborts the Kilo session only | Queued and accepted `cancelled`; preparation closes as `preparation_cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
 
 ## 10. Interfaces
 
 Session DO → Sandbox DO (RPC, returns at once): `prepare(route spec)` → route view,
-`deliver(sessionId, messages)` → `sent` | `not_ready`, `abort(sessionId)`, `answer(sessionId,
-reply)`, terminal create/resize/close/connect requests, worktree-change requests,
+`deliver(sessionId, messages)` → `sent` | `not_ready`, `abort(sessionId)`,
+`cancelWorkspace(sessionId, requestedAt)` → stop epoch, `answer(sessionId, reply)`, terminal
+create/resize/close/connect requests, worktree-change requests,
 `release(sessionId)`, `status(sessionId)` (passive read). Preview resolves off the operation queue:
 the Session DO `resolvePreviewTarget()` does a passive read of the Sandbox DO `previewTarget` and
 returns provider coordinates; it enqueues nothing (see Preview).
@@ -1312,9 +1425,107 @@ identity failures remain hard failures and are never downgraded to pending clean
 workspace from one IDE's Agent Manager is a client-local action: it performs no Cloud mutation, and
 only `deleteWorktree` destroys Cloud state.
 
+### Hosted workspace changes and linked pull request
+
+Workspace-keyed `getHostedWorkspaceChanges`, `refreshHostedWorkspaceChanges`,
+`getHostedWorkspaceChangeFile`, `getHostedWorkspacePullRequest` and
+`getHostedWorkspacePullRequestFile` serve the Cloud change and published-PR
+diffs an IDE renders without opening a local checkout. They authorize through
+the owner-scoped workspace catalog plus the ordinary organization
+membership/scope checks; a guessed or another owner's workspace identity is
+`NOT_FOUND`, and a workspace whose organization the caller has left is
+`FORBIDDEN`.
+
+A hosted workspace's committed/uncommitted snapshot is stored once per
+`worktreeId` under the Sandbox DO and read through any root session, so the
+response is independent of the session the caller happens to name and sibling
+sessions share exactly one snapshot. The reads are passive: they only touch DO
+storage, never call `prepare`, `deliver`, a sandbox wake or billing. A
+multi-repository workspace returns one comparison per repository — attributed by
+the longest repository `path` prefix — and never a union of files from different
+repositories; an unattributable saved file fails closed as `inconsistent`. Every
+listed file reports diff/content availability with the saved omission reason, so
+an omitted payload never renders as an empty successful diff. The per-file read
+is revision-fenced and keeps the session contract's `available`, `omitted`,
+`stale`, `no_longer_listed` and `not_captured` outcomes. Refresh preserves the
+existing `refreshed` / `offline` / `failed` semantics and the previous durable
+snapshot; an offline refresh does not discard saved changes.
+
+The linked-PR leg is addressed only by workspace identity. Cloud resolves the
+workspace's cached branch PR from `github_branch_pull_requests` and re-verifies
+the live PR with the workspace owner's GitHub App installation credential: the
+base and head repositories must be the workspace repository and the head ref
+must be the workspace branch. A missing or never-cached PR is `not_linked`; a
+repo or head-ref mismatch is `unverified` and exposes no PR data. When the
+installation cannot read the PR but a connected-user credential would, the
+result is the distinct `credential_required`; the connected-user credential is
+never spent on these reads. A live head that moved relative to the webhook
+cache is normal publication progress and is served with `cacheStale`; a head
+that moves between live verification and the files fetch returns `stale` with
+no mixed-revision file data. GitHub authorization, rate-limit, not-found and availability
+failures stay distinct (`github_access_denied`, `github_rate_limited`,
+`pull_request_not_found`, `github_unavailable`) and never look like an empty
+PR. The PR file list discards patch text while accumulating its bounded summary,
+bounds every GitHub request with a timeout, and keeps a short-lived per-isolate
+index keyed by the verified head so repeated file reads fetch only the page
+that holds the path. The per-file patch is fenced by `expectedHeadSha`,
+returning `stale`, `not_listed` or `provider_omitted` rather than synthesizing
+a patch.
+
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
+
+### Workspace artifact access
+
+**Transfer grants.** The wrapper sends artifact bytes to
+`/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/artifacts/objects`. Each route
+calls `authorizeTransfer(c, 'workspace_artifacts')`, which verifies the bearer grant, the path
+identity and the scope. A grant is HS256 with `type: 'sandbox_transfer'`, audience
+`cloud-agent-sandbox-transfer`, scopes `logs | workspace_artifacts`, and a four-hour lifetime.
+Legacy `control_log_upload` grants are accepted only on log routes, never on artifact routes.
+Authorization failures are `400` invalid identity, `401` unauthorized, and `403` identity or
+scope mismatch.
+
+The wrapper generates a fresh random `wrapperId` for each process. It sends that ID in `hello`
+and uses it in the transfer URL, so the transfer identity and the control-socket identity match.
+The launch environment also carries `SANDBOX_TRANSFER_URL` and `SANDBOX_TRANSFER_GRANT`; the
+legacy `CONTROL_LOG_*` values stay for old wrappers.
+
+A wrapper that advertises `transferGrants` in `hello` may send
+`{ type: 'transfer.grant', requestId }` on the current control socket. The Sandbox DO answers
+`transfer.grant.result` with `grant` and `expiresAt`, or with an error. It mints only for a
+current bound socket and uses `sandboxId`, the durable `allocationId` and
+`AllocationState.wrapperId`; the frame cannot choose the identity or scopes. Errors are
+`not_ready` and `unavailable`, both retryable. The wrapper renews at half the lifetime and once
+on `401`, only while connected. Without renewal it keeps using the launch grant for logs until
+that grant expires.
+
+**HTTP contract.**
+
+| Route | Success | Errors |
+|---|---|---|
+| `PUT .../artifacts/objects?path=<p>` with `Content-Length` and `X-Content-SHA256` (content type comes from the path) | `200` `{ status: 'committed' \| 'unchanged', revision }` | `400` path, hash or length, `401`/`403` authorization, `409` stale, `411` missing length, `413` file or quota, `415` content encoding, `422` hash mismatch, `429` too many uploads in flight, `503` storage or missing/expired reservation |
+| `DELETE .../artifacts/objects?path=<p>&hash=<h>` | `200` `{ status: 'deleted' \| 'absent' \| 'hash_mismatch', revision }` | `400` path or hash, `401`/`403` authorization, `409` stale, `503` not connected |
+
+`PUT` validates the path and length, reserves a key, streams to R2, then commits. A rejected
+commit leaves the object queued as an orphan. The Sandbox DO checks the current allocation and
+wrapper at reserve and commit; a replaced wrapper gets `409 stale`.
+
+**tRPC.** `listWorkspaceArtifacts`, `getWorkspaceArtifactDownloadUrl` and
+`deleteWorkspaceArtifact` are `protectedProcedure` queries or mutations. They call
+`requireCurrentSessionAccess`, resolve the session's `sandboxId` and read the Sandbox DO. They
+never prepare, start or wake a sandbox. Access failures are `FORBIDDEN`, or
+`SERVICE_UNAVAILABLE` when the access lookup fails. Missing session metadata or a missing
+artifact is `NOT_FOUND`; a missing download configuration is `PRECONDITION_FAILED`.
+
+- `listWorkspaceArtifacts` returns `{ revision, entries }`; entries carry `contentHash`,
+  `updatedAt` and `expiresAt`.
+- `getWorkspaceArtifactDownloadUrl` signs a presigned R2 GET for 300 s with an attachment
+  disposition, using the read-only key scoped to the artifacts bucket. HTML, XML and SVG are
+  forced to `application/octet-stream`.
+- `deleteWorkspaceArtifact` passes `expectedHash` to `deleteWorkspaceArtifactForUser` and returns
+  its status and revision.
 
 ### Startup mode rollout
 
@@ -1935,6 +2146,23 @@ deleted sessions are never recreated. Notifications remain best effort, with the
 existing list reconciliation and reconnect fetch repairing missed notifications.
 Deploy session-ingest before cloud-agent-next; no database migration is needed.
 
+The session list also records the session's Kilo runtime in `cli_sessions_v2.version`
+(`CLI_SESSION_VERSION_BY_RUNTIME_HARNESS`: `1` Kilo v1, `2` Kilo v2, `0` unknown).
+After a delivery to a `ready` route, the Session DO sends that route container's
+`runtimeHarness`, which the connected wrapper reported, through
+`SESSION_INGEST.recordCloudAgentSessionHarness`. Ingest writes only the row that
+matches the user and Cloud Agent session, and keeps `updated_at`. Ingest returns
+`true` for a matching row, including an idempotent repeat, or `false` for no match.
+The Session DO persists one pending record before publication. Publication runs
+in the background with a five-second timeout and never waits for another delivery.
+Failures and unmatched rows retry through the shared alarm every 30 seconds, even
+after completion or eviction. After ten attempts, the alarm discards the pending
+record and logs the retry limit; a later delivery can start another attempt batch,
+including during the final retry window. Invalid record identities are logged and
+skipped without failing an already accepted turn.
+Acknowledged records survive eviction and suppress repeated writes for the same
+runtime. Rows created before this record stay `0` until a new delivery records it.
+
 | Reason | Stage / code |
 |---|---|
 | `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |
@@ -1946,9 +2174,9 @@ Deploy session-ingest before cloud-agent-next; no database migration is needed.
 | `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `no_progress`, `no_outcome`, `completion_unconfirmed` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
-| `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
+| `sandbox_stopped` (idle while waiting on the user), `execution_limit`, `preparation_cancelled` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |
 | `runtime_artifact_unauthorized`, `runtime_artifact_invalid`, `runtime_cli_probe_failed`, `runtime_supervisor_missing` | `pre_dispatch` / `wrapper_start_failed` |
@@ -1966,14 +2194,15 @@ counts.
    from one outcome; one callback. This does not require bypassing a pending command/summary response.
 4. **Kilo final error with A and B accepted.** Both fail with Kilo's reason; the next message
    works.
-5. **Two chats in one worktree, two worktrees in one sandbox.** Turns stream at the same time; Stop
-   in one chat does not affect the others. Deleting the chat that issued the scope handle leaves
-   surviving chats usable: their in-flight model calls keep working through a surviving member, whose
-   attestation `resourceId` is that member, while the deleted root's ingestion/export and title writes
-   are denied. Revoking the deleted member's handle does not stop a surviving chat's in-flight model
-   calls while another member can serve, but a revoked member's new sends are denied. The usage
-   `session_id` stays the forwarded `X-KILOCODE-TASKID`; this repository does not verify that Kilo
-   sets it per chat. Last-member release retires the scope.
+5. **Two chats in one worktree, two worktrees in one workspace, one workspace per sandbox.** Turns
+   stream at the same time; Stop in one chat does not affect the others. Deleting the chat that
+   issued the scope handle leaves surviving chats usable: their in-flight model calls keep working
+   through a surviving member, whose attestation `resourceId` is that member, while the deleted
+   root's ingestion/export and title writes are denied. Revoking the deleted member's handle does
+   not stop a surviving chat's in-flight model calls while another member can serve, but a revoked
+   member's new sends are denied. The usage `session_id` stays the forwarded `X-KILOCODE-TASKID`;
+   this repository does not verify that Kilo sets it per chat. Last-member release retires the
+   scope.
 6. **Slash commands and attachment.** `/compact` summarizes the session; another known command runs
    as a command; an attachment reaches the model.
    A follow-up may wait for the command/summary response, then reaches Kilo in arrival order;

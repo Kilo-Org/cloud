@@ -4,11 +4,21 @@ import type * as SharedUtils from '@kilocode/app-shared/utils';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
-import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
+import {
+  BALANCE_RETRY_FRAME_DP,
+  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_HIT_SLOP_DP,
+  LEGAL_LINK_BOX_CLASS,
+  LEGAL_LINK_ROW_CLASS,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 
@@ -29,21 +39,49 @@ const owner = vi.hoisted(() => ({
   reconnectStore: vi.fn(),
   purchase: vi.fn(),
   completingProductId: null as string | null,
+  purchaseWait: null as { productId: string; kind: 'store' | 'pending' } | null,
   errorMessageKey: null as string | null,
   completedPurchaseCount: 0,
   clearError: vi.fn(),
+  buyAgainProductId: null as string | null,
+  hasUnresolvedPurchase: false,
+  purchaseResolution: 'unknown' as
+    | 'unknown'
+    | 'found'
+    | 'not-found'
+    | 'terminal-refusal'
+    | 'credited',
+  reconcilePurchase: vi.fn(),
+  buyAgain: vi.fn(),
 }));
 
-const balance = vi.hoisted(() => ({ balance: 1234 }));
+const balance = vi.hoisted(() => ({
+  balance: 1234,
+  state: 'ok' as 'ok' | 'pending' | 'error',
+}));
 const creditBlocks = vi.hoisted(() => ({
   entries: [] as { balance_mUsd: number; expiry_date: string | null }[],
+  state: 'ok' as 'ok' | 'pending' | 'error',
 }));
 
-const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
+/**
+ * What one of the card's two reads answers in the current state. A function
+ * declaration, not a `vi.hoisted` const: the query factories hoist above the
+ * module body, and a function declaration is initialized with it.
+ */
+function answerRead(state: 'ok' | 'pending' | 'error', answer: unknown): Promise<unknown> {
+  if (state === 'error') {
+    return Promise.reject(new Error('read failed'));
+  }
+  if (state === 'pending') {
+    // A read that never answers is the card's loading state; the test only
+    // inspects the painted frame, so the promise stays open.
+    return new Promise(() => undefined);
+  }
+  return Promise.resolve(answer);
+}
 
-// The legal links are the only caller of this module on the screen, so the mock
-// is the destination each link opened.
-const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
+const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
@@ -52,13 +90,32 @@ const statusAnnouncement = vi.hoisted(() => ({ useStatusAnnouncement: vi.fn() })
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
+// The screen sizes its pack-area reservation from the live font scale, so the
+// dimensions read is mutable: the scale test drives it.
+const dimensions = vi.hoisted(() => ({ fontScale: 1 }));
+
 vi.mock('react-native', () => ({
   Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({
+    width: 411,
+    height: 914,
+    scale: 1,
+    fontScale: dimensions.fontScale,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+
+// The footer pads itself with the bottom inset, so the read is mutable: the
+// footer case drives a device with a home indicator. The library loads a native
+// module, so the mounted project stubs the read like the other screen tests do.
+const safeAreaInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => safeAreaInsets,
+}));
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
@@ -73,19 +130,29 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));
 
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => externalLink);
-vi.mock('@/lib/iap/legal-links', () => ({
-  getStoreLegalLinks: () => [
-    { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
-    { url: 'https://example.com/terms-app', label: 'Terms of Use (EULA)' },
-  ],
-}));
+const legalNavigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: legalNavigation.push }) }));
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   useInlinePurchaseErrorOwnership: vi.fn(),
 }));
+// The screen's catalog reads are gated on the identity read, and a failed
+// read is one of its states, so the test drives it like the IAP owner.
+const identity = vi.hoisted(() => ({
+  userId: 'user-1' as string | undefined,
+  isError: false,
+  isUnreachable: false,
+  refetchAsync: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false, isError: false }),
+  useCurrentUserId: () => ({
+    userId: identity.userId,
+    isLoading: false,
+    isError: identity.isError,
+    isUnreachable: identity.isUnreachable,
+    refetchAsync: identity.refetchAsync,
+  }),
 }));
 
 // The screen obeys the Profile tab's hide-balance preference, the same store
@@ -115,13 +182,13 @@ vi.mock('@/lib/trpc', () => ({
       getContextBalance: {
         queryOptions: () => ({
           queryKey: ['user', 'getContextBalance', {}],
-          queryFn: () => ({ balance: balance.balance, isDepleted: false }),
+          queryFn: () => answerRead(balance.state, { balance: balance.balance, isDepleted: false }),
         }),
       },
       getCreditBlocks: {
         queryOptions: () => ({
           queryKey: ['user', 'getCreditBlocks', {}],
-          queryFn: () => ({ creditBlocks: creditBlocks.entries }),
+          queryFn: () => answerRead(creditBlocks.state, { creditBlocks: creditBlocks.entries }),
         }),
       },
     },
@@ -154,20 +221,31 @@ const STORE_LISTINGS = [
   { id: 'credits.usd500.v1', displayPrice: '$549.99' },
 ];
 
-const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card p-5';
+// The row and the placeholder share one height and one surface; their classes
+// differ only in the padding axis, so the tests match them by the testIDs the
+// screen sets rather than by a class string.
+const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card';
 
 function placeholderShells(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
-    node =>
-      String(node.type) === 'View' &&
-      (node.props as { className?: string }).className === PACK_ROW_SHELL
+    node => (node.props as { testID?: string }).testID === 'credit-pack-placeholder'
   );
 }
 
 function classNamesOf(instances: TestRenderer.ReactTestInstance[]): string[] {
   return instances.map(instance => String((instance.props as { className?: string }).className));
+}
+
+function classNameOf(instance: TestRenderer.ReactTestInstance): string {
+  const value: unknown = instance.props.className;
+  return typeof value === 'string' ? value : '';
+}
+
+function labelOf(instance: TestRenderer.ReactTestInstance | undefined): string {
+  const value: unknown = instance?.props.accessibilityLabel;
+  return typeof value === 'string' ? value : '';
 }
 
 function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
@@ -176,6 +254,14 @@ function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactT
       String(node.type) === 'Pressable' &&
       typeof (node.props as { accessibilityLabel?: unknown }).accessibilityLabel === 'string' &&
       (node.props as { accessibilityLabel: string }).accessibilityLabel.includes('of credits')
+  );
+}
+
+function legalLinkNodes(scope: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return scope.findAll(
+    node =>
+      String(node.type) === 'Pressable' &&
+      (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
   );
 }
 
@@ -237,6 +323,13 @@ const packAmount = (amount: string): string => `\u2066${amount}\u2069`;
 describe('CreditPurchaseScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A one-shot implementation a test queued and did not consume would
+    // otherwise answer the next test's first call. Reset the queue, then set
+    // this test's defaults below.
+    owner.fetchStoreProducts.mockReset();
+    owner.reconnectStore.mockReset();
+    owner.purchase.mockReset();
+    identity.refetchAsync.mockReset();
     mockedPlatform.OS = 'ios';
     backend.response = {
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
@@ -250,9 +343,18 @@ describe('CreditPurchaseScreen', () => {
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
     balance.balance = 1234;
+    balance.state = 'ok';
     creditBlocks.entries = [];
+    creditBlocks.state = 'ok';
     hideBalancePref.hideBalance = false;
     hideBalancePref.hasLoaded = true;
+    identity.userId = 'user-1';
+    identity.isError = false;
+    identity.isUnreachable = false;
+    safeAreaInsets.top = 0;
+    safeAreaInsets.bottom = 0;
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
   });
 
   it('happy: renders one row per pack with its amount and store price, purchase enabled', async () => {
@@ -428,7 +530,16 @@ describe('CreditPurchaseScreen', () => {
     // A store failure is not a catalog claim: the no-match body belongs to a
     // store that answered and priced no pack.
     expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
-    expect(allText(renderer)).toContain('Price unavailable');
+    // The card above is the only visible statement of the failure: a disabled
+    // row does not repeat it. A screen reader still hears the state per row.
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    expect(
+      packRows(renderer).every(row =>
+        (row.props as { accessibilityLabel: string }).accessibilityLabel.includes(
+          'Price unavailable'
+        )
+      )
+    ).toBe(true);
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
 
@@ -443,7 +554,7 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => owner.fetchStoreProducts.mock.calls.length >= 2);
 
     expect(packRows(renderer)).toHaveLength(4);
-    expect(allText(renderer)).toContain('Price unavailable');
+    expect(allText(renderer)).not.toContain('Price unavailable');
     unmount();
   });
 
@@ -490,9 +601,10 @@ describe('CreditPurchaseScreen', () => {
       expect(allText(renderer)).not.toContain(
         'Could not connect to Google Play. Check your connection and try again.'
       );
-      // The backend amounts stay on screen, unpriced, with a retry to offer.
+      // The backend amounts stay on screen, unpriced, with a retry to offer,
+      // and the timeout card above is the only visible statement of why.
       expect(packRows(renderer)).toHaveLength(4);
-      expect(allText(renderer)).toContain('Price unavailable');
+      expect(allText(renderer)).not.toContain('Price unavailable');
       unmount();
     } finally {
       vi.useRealTimers();
@@ -585,12 +697,15 @@ describe('CreditPurchaseScreen', () => {
     });
 
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
+    // The notice keeps the pack area while the retry runs, above the settled
+    // rows; no placeholder replaces them.
     expect(packRows(renderer)).toHaveLength(4);
+    expect(placeholderShells(renderer)).toHaveLength(0);
     expect(allText(renderer)).toContain('App Store products unavailable');
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
-    expect(allText(renderer)).toContain('Price unavailable');
+    expect(allText(renderer)).not.toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.
     const pendingRetry = tryAgainButton(renderer);
@@ -642,7 +757,8 @@ describe('CreditPurchaseScreen', () => {
       await settleTimers(() => allText(renderer).includes('$10.99'));
 
       // The store drops while the prices are cached, so the bounded wait fires
-      // and every row reads Price unavailable.
+      // and the card above is the only visible statement: no row repeats it,
+      // and each row keeps the reason in its accessibilityLabel.
       owner.connected = false;
       await act(async () => {
         update();
@@ -652,7 +768,7 @@ describe('CreditPurchaseScreen', () => {
         await vi.advanceTimersByTimeAsync(8000);
       });
       expect(allText(renderer)).toContain('App Store products unavailable');
-      expect(allText(renderer)).toContain('Price unavailable');
+      expect(allText(renderer)).not.toContain('Price unavailable');
 
       // The store reconnects with the cached prices still fresh, so React Query
       // keeps `status: success` and never refetches: only the connection itself
@@ -692,6 +808,123 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('store unavailable: the card states the failure once and every row keeps its title, note and inactive reason', async () => {
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+
+    const rows = packRows(renderer);
+    expect(rows).toHaveLength(4);
+    // The card above is the one visible statement; no row repeats the status.
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    // The rows keep their disabled style, their pack title and their expiry
+    // note, and a screen reader still hears why each one is inactive.
+    const labels = rows.map(
+      row => (row.props as { accessibilityLabel: string }).accessibilityLabel
+    );
+    expect(labels).toContain(
+      `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
+    );
+    expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    expect(
+      classNamesOf(rows).every(
+        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+      )
+    ).toBe(true);
+    // No row keeps an empty band for a status it does not state: the title row
+    // and the row's one note line are its only children. The note line keeps a
+    // fixed height for the note or the in-flight label it may hold.
+    expect(
+      rows.every(row => {
+        const children = row.children;
+        const line = children[1];
+        if (children.length !== 2 || line === undefined || typeof line === 'string') {
+          return false;
+        }
+        const texts = line.findAll(node => String(node.type) === 'Text');
+        return (
+          String(line.type) === 'View' &&
+          classNameOf(line).includes('min-h-5') &&
+          classNameOf(line).includes('mt-2') &&
+          texts.length === 1 &&
+          texts[0]?.props.children === 'Credits purchased through the App Store do not expire.'
+        );
+      })
+    ).toBe(true);
+    unmount();
+  });
+
+  it('place: a status phrase takes the row state line, and only a real price takes the trailing slot', async () => {
+    owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS.slice(0, 3));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const rows = packRows(renderer);
+    const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, then the store price: the price is the only trailing child, and
+    // the expiry note takes the row's one state line.
+    expect(priced).toHaveLength(3);
+    expect(priced[1]?.props.children).toBe('$10.99');
+    expect(String(priced[1]?.props.className)).toContain('shrink-0');
+    const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, then the status in the same state line its neighbours fill with
+    // the expiry note: the row keeps their height, and the note it no longer
+    // prints stays in its accessibility label.
+    expect(unpriced.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$500.00')} of credits`,
+      'Price unavailable',
+    ]);
+    expect(labelOf(rows[3])).toContain('Credits purchased through the App Store do not expire.');
+    // One fixed-height state line, one gap, on every row: the store answering
+    // or dropping changes the copy in place, never a row's height.
+    const stateLines = rows.map(row =>
+      row.findAll(
+        node =>
+          String(node.type) === 'View' &&
+          String((node.props as { className?: string }).className).includes('min-h-5')
+      )
+    );
+    expect(stateLines.every(lines => lines.length === 1)).toBe(true);
+    expect(
+      stateLines.every(([line]) => {
+        if (line === undefined) {
+          return false;
+        }
+        const className = classNameOf(line);
+        return className.includes('min-h-5') && className.includes('mt-2');
+      })
+    ).toBe(true);
+    expect(
+      (stateLines[3]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Price unavailable']);
+    expect(
+      (stateLines[0]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Credits purchased through the App Store do not expire.']);
+    unmount();
+  });
+
+  it('place: every row title is bounded to one line', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const titles = renderer.root.findAll(node => {
+      if (String(node.type) !== 'Text') {
+        return false;
+      }
+      const { children } = node.props;
+      return typeof children === 'string' && children.includes('of credits');
+    });
+    expect(titles).toHaveLength(4);
+    expect(titles.every(title => title.props.numberOfLines === 1)).toBe(true);
+    unmount();
+  });
+
   it('non-retryable: an account-mismatch error shows the mismatch copy, no retry, rows enabled', async () => {
     owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
 
@@ -721,13 +954,113 @@ describe('CreditPurchaseScreen', () => {
     mockedPlatform.OS = 'android';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => packRows(renderer).length === 4);
+    await waitFor(() => renderer.root.findAllByType(AccessibleStatus).length > 0);
 
-    const status = renderer.root.findByType(AccessibleStatus);
-    expect(status.props.message).toBe(
+    const [status] = renderer.root.findAllByType(AccessibleStatus);
+    expect(status?.props.message).toBe(
       'The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.'
     );
-    expect(status.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
+    expect(status?.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
+    unmount();
+  });
+
+  it('grows the error clearance with the text it clears', async () => {
+    // The card is text, so the room reserved beneath it must grow with the same
+    // scale; a fixed clearance would let a raised scale cover the content.
+    const contentHeights = async (): Promise<number[]> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const scroller = renderer.root.findByType(DetailScreenScrollView);
+      const heights = scroller
+        .findAll(node => typeof node.props.style === 'object' && node.props.style !== null)
+        .map(node => {
+          const style: unknown = node.props.style;
+          if (typeof style !== 'object' || style === null || !('height' in style)) {
+            return 0;
+          }
+          const value = style.height;
+          return typeof value === 'number' ? value : 0;
+        })
+        .filter(height => height > 0);
+      unmount();
+      return heights;
+    };
+
+    dimensions.fontScale = 1;
+    const single = await contentHeights();
+    // The room clears the card up to the pinned footer: three `text-sm` lines,
+    // the card's chrome, and the 8 dp gap its wrapper keeps above the footer.
+    // The home-indicator band belongs to the footer, so the room does not grow
+    // with the bottom inset.
+    safeAreaInsets.bottom = 34;
+    const withHomeIndicator = await contentHeights();
+    dimensions.fontScale = 1.5;
+    const raised = await contentHeights();
+    dimensions.fontScale = 1;
+    safeAreaInsets.bottom = 0;
+
+    const textHeight = 63;
+    const fixed = 26 + 8;
+    expect(single.some(height => Math.abs(height - (textHeight + fixed)) <= 0.5)).toBe(true);
+    expect(withHomeIndicator).toEqual(single);
+    expect(raised.some(height => Math.abs(height - (textHeight * 1.5 + fixed)) <= 0.5)).toBe(true);
+  });
+
+  it('floats the purchase error above the pinned footer without taking layout height', async () => {
+    // The error is not one of the four pack states, so it must not take layout
+    // height. It floats at the bottom of the scroll area, directly above the
+    // footer that holds the copy, and the content ends with a spacer sized to
+    // the card, so the content can scroll clear of it.
+    owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => renderer.root.findAllByType(AccessibleStatus).length > 0);
+
+    const scroller = renderer.root.findByType(DetailScreenScrollView);
+    expect(scroller.findAllByType(AccessibleStatus)).toHaveLength(0);
+    // The copy is not part of the scroll content any more: the floating card is
+    // the only thing outside the footer that can cover it.
+    expect(legalLinkNodes(scroller)).toHaveLength(0);
+
+    // The clearance is a child of the content, never a container style: that
+    // style prop makes NativeWind drop the caller's contentContainerClassName,
+    // which would take the content gap and gutter with it.
+    expect(scroller.props.contentContainerStyle).toBeUndefined();
+    const contentStyle: unknown = scroller.props.contentContainerClassName;
+    expect(String(contentStyle)).toContain('gap-3');
+
+    const spacers = renderer.root.findAll(node => {
+      const style: unknown = node.props.style;
+      return (
+        typeof style === 'object' &&
+        style !== null &&
+        'height' in style &&
+        typeof style.height === 'number' &&
+        style.height > 0
+      );
+    });
+    // The spacer is the content's last child, sized to the card it clears: its
+    // three capped `text-sm` lines, read from the compiled theme.
+    const spacerHeight = spacers
+      .map(node => (node.props.style as { height: number }).height)
+      .at(-1);
+    const cardText =
+      3 *
+      (await compiledLengthDp('text-sm', 'fontSize')) *
+      (await compiledLengthDp('text-sm', 'lineHeight'));
+    expect(spacerHeight).toBeGreaterThanOrEqual(cardText);
+
+    const [status] = renderer.root.findAllByType(AccessibleStatus);
+    const inner = status?.parent;
+    const outer = inner?.parent;
+    // The insets and the gutter sit on separate wrappers: an inline padding on
+    // one node would replace its className padding.
+    expect(String(inner?.props.className)).toContain('px-5');
+    expect(String(outer?.props.className)).toContain('bottom-0');
+    // The card keeps only its 8 dp gap to the footer, which owns the
+    // home-indicator band, so the gap is a theme length rather than the inset.
+    const cardBottomGap = await compiledLengthDp(String(inner?.props.className), 'paddingBottom');
+    expect(cardBottomGap).toBe(8);
     unmount();
   });
 
@@ -742,6 +1075,542 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('pins the copy in the footer and lays the pack states out in flow', async () => {
+    // The four pack states render in flow directly under the balance card, so a
+    // shorter state ends sooner instead of leaving a reserved blank band under
+    // it. The description and the legal links are no longer scroll content:
+    // they sit in the footer below the scroll area, the last child of the screen
+    // root, so no store answer and no locale can move them off the bottom edge.
+    const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
+    const surfaceKinds = ['row', 'placeholder', 'empty', 'notice', 'account'] as const;
+    type SurfaceKind = (typeof surfaceKinds)[number];
+
+    const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && !Array.isArray(style)
+        ? { ...style }
+        : {};
+    };
+    const minHeightOf = (node: TestRenderer.ReactTestInstance): number => {
+      const value = styleOf(node).minHeight;
+      return typeof value === 'number' ? value : 0;
+    };
+    const testIDOf = (node: TestRenderer.ReactTestInstance): string => {
+      const value: unknown = node.props.testID;
+      return typeof value === 'string' ? value : '';
+    };
+    const surfaceOf = (node: TestRenderer.ReactTestInstance): SurfaceKind | undefined => {
+      if (testIDOf(node) === 'credit-pack-row') {
+        return 'row';
+      }
+      if (testIDOf(node) === 'credit-pack-placeholder') {
+        return 'placeholder';
+      }
+      if (node.children.some(child => child === 'Credit packs are unavailable right now.')) {
+        return 'empty';
+      }
+      if (node.children.some(child => child === 'App Store products unavailable')) {
+        return 'notice';
+      }
+      if (node.children.some(child => child === 'Could not load')) {
+        return 'account';
+      }
+      return undefined;
+    };
+    /** The description paragraphs in `scope`: the footer's copy, not a label. */
+    const descriptionsIn = (scope: TestRenderer.ReactTestInstance): number =>
+      scope.findAll(
+        node =>
+          String(node.type) === 'Text' &&
+          node.children.some(
+            part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
+          )
+      ).length;
+
+    const cases: { state: string; expected: SurfaceKind; prepare: () => void }[] = [
+      {
+        state: 'loading',
+        expected: 'placeholder',
+        prepare: () => {
+          owner.connected = false;
+        },
+      },
+      { state: 'happy', expected: 'row', prepare: () => undefined },
+      {
+        state: 'empty',
+        expected: 'empty',
+        prepare: () => {
+          backend.response = {
+            appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+            products: [],
+          };
+        },
+      },
+      {
+        state: 'store unavailable',
+        expected: 'notice',
+        prepare: () => {
+          owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+        },
+      },
+    ];
+
+    const measured: {
+      state: string;
+      surfaces: SurfaceKind[];
+      packAreaFound: boolean;
+      packAreaMinHeight: unknown;
+      reservesInScroller: number;
+      copyInScroller: boolean;
+      legalInScroller: number;
+      descriptionInFooter: number;
+      legalInFooter: number;
+      footerIsScreenRootLastChild: boolean;
+      footerUnderScrollArea: boolean;
+      rowHeight: number;
+    }[] = [];
+    // Sequential, not parallel: every scenario mutates the same owner mock and
+    // the same backend fixture, so two mounted screens would race.
+    /* eslint-disable no-await-in-loop -- each scenario mutates the shared mocks */
+    for (const scenario of cases) {
+      owner.connected = true;
+      owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS);
+      backend.response = {
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+        products: BACKEND_PRODUCTS,
+      };
+      scenario.prepare();
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(
+        () =>
+          allText(renderer).includes(DESCRIPTION_PREFIX) &&
+          renderer.root.findAll(() => true).some(node => surfaceOf(node) === scenario.expected)
+      );
+      const scroller = renderer.root.findByType(DetailScreenScrollView);
+      const screenRoot = renderer.root.findByProps({ testID: 'credit-purchase-screen' });
+      const screenChildren = screenRoot.children.filter(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
+      );
+      const footer = screenChildren.at(-1);
+      // The pack area is the scroller's own child holding this state's surface.
+      // The balance card carries two reservations of its own, so they are told
+      // apart by their testIDs.
+      const packArea = scroller.children.find(
+        (child): child is TestRenderer.ReactTestInstance =>
+          typeof child !== 'string' &&
+          child.findAll(node => surfaceOf(node) !== undefined).length > 0
+      );
+      const reservesInScroller = scroller
+        .findAll(node => minHeightOf(node) > 0)
+        .filter(node => !/^credit-(balance|expiry)-slot$/.test(testIDOf(node))).length;
+      const surfaces = scroller
+        .findAll(node => surfaceOf(node) !== undefined)
+        .map(node => surfaceOf(node))
+        .filter((kind): kind is SurfaceKind => kind !== undefined);
+      const [firstRow] = renderer.root.findAll(
+        node => testIDOf(node) === 'credit-pack-row' || testIDOf(node) === 'credit-pack-placeholder'
+      );
+      const rowStyle: unknown = firstRow?.props.style;
+      const rowHeight =
+        typeof rowStyle === 'object' && rowStyle !== null && 'height' in rowStyle
+          ? Number(rowStyle.height)
+          : 0;
+      measured.push({
+        state: scenario.state,
+        surfaces,
+        packAreaFound: packArea !== undefined,
+        packAreaMinHeight: packArea ? styleOf(packArea).minHeight : undefined,
+        reservesInScroller,
+        copyInScroller: descriptionsIn(scroller) > 0,
+        legalInScroller: legalLinkNodes(scroller).length,
+        descriptionInFooter: footer ? descriptionsIn(footer) : 0,
+        legalInFooter: footer ? legalLinkNodes(footer).length : 0,
+        footerIsScreenRootLastChild:
+          footer !== undefined && String(footer.props.className).includes('border-t'),
+        footerUnderScrollArea:
+          screenChildren.at(-2)?.findAllByType(DetailScreenScrollView).length === 1,
+        rowHeight,
+      });
+      unmount();
+      vi.clearAllMocks();
+    }
+    /* eslint-enable no-await-in-loop */
+
+    for (const result of measured) {
+      const scenario = cases.find(candidate => candidate.state === result.state);
+      // One card at a time: the account failure, the store notice or the empty
+      // catalogue. The priced rows render under the card whenever the catalogue
+      // answered, so a store failure keeps its rows below the notice instead of
+      // replacing them.
+      const expectedSurfaces: SurfaceKind[] = [];
+      if (scenario?.expected === 'notice') {
+        expectedSurfaces.push('notice', 'row');
+      } else if (scenario !== undefined) {
+        expectedSurfaces.push(scenario.expected);
+      }
+      expect(
+        [...new Set(result.surfaces)].sort((a, b) => a.localeCompare(b)),
+        result.state
+      ).toEqual([...expectedSurfaces].sort((a, b) => a.localeCompare(b)));
+      expect(result.surfaces.length, result.state).toBeGreaterThan(0);
+      // The pack area sits in flow and reserves nothing: only the balance
+      // card's two data slots keep a height in the scroller, so a shorter pack
+      // state leaves no blank band under it.
+      expect(result.packAreaFound, result.state).toBe(true);
+      expect(result.packAreaMinHeight, result.state).toBeUndefined();
+      expect(result.reservesInScroller, result.state).toBe(0);
+      // The copy is outside the scroll content, in the footer that closes the
+      // screen: the description plus exactly the two store legal links.
+      expect(result.copyInScroller, result.state).toBe(false);
+      expect(result.legalInScroller, result.state).toBe(0);
+      expect(result.descriptionInFooter, result.state).toBe(1);
+      expect(result.legalInFooter, result.state).toBe(2);
+      expect(result.footerIsScreenRootLastChild, result.state).toBe(true);
+      expect(result.footerUnderScrollArea, result.state).toBe(true);
+    }
+    // The placeholder rows take exactly the priced row's height, so the list
+    // never jumps when the store answers.
+    const rowHeights = measured
+      .filter(result => result.rowHeight > 0)
+      .map(result => result.rowHeight);
+    expect(new Set(rowHeights).size, 'rows and placeholders share one height').toBe(1);
+    expect(rowHeights[0]).toBeGreaterThan(0);
+  });
+
+  it('pads the footer with the bottom inset so the copy holds the safe-area edge', async () => {
+    // The footer, not the floating card, clears the home-indicator band. With
+    // no home indicator the app's 16 dp floor keeps the links off the edge.
+    const footerPadding = async (): Promise<number | undefined> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const screenRoot = renderer.root.findByProps({ testID: 'credit-purchase-screen' });
+      const footer = screenRoot.children.findLast(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
+      );
+      const style: unknown = footer?.props.style;
+      const padding =
+        typeof style === 'object' && style !== null && 'paddingBottom' in style
+          ? style.paddingBottom
+          : undefined;
+      unmount();
+      return typeof padding === 'number' ? padding : undefined;
+    };
+
+    safeAreaInsets.bottom = 0;
+    expect(await footerPadding()).toBe(16);
+    safeAreaInsets.bottom = 34;
+    expect(await footerPadding()).toBe(34);
+    safeAreaInsets.bottom = 0;
+  });
+
+  it('sizes a pack row and its placeholder to the same height', async () => {
+    const heightOf = (node: TestRenderer.ReactTestInstance): number => {
+      const style: unknown = node.props.style;
+      if (typeof style !== 'object' || style === null || !('height' in style)) {
+        return 0;
+      }
+      const value = style.height;
+      return typeof value === 'number' ? value : 0;
+    };
+
+    const priced = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(priced.renderer).length === 4);
+    const rowHeights = priced.renderer.root
+      .findAll(node => (node.props as { testID?: string }).testID === 'credit-pack-row')
+      .map(node => heightOf(node));
+    priced.unmount();
+    vi.clearAllMocks();
+
+    owner.connected = false;
+    const loading = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => placeholderShells(loading.renderer).length === 4);
+    const placeholderHeights = placeholderShells(loading.renderer).map(node => heightOf(node));
+    loading.unmount();
+
+    expect(rowHeights).toHaveLength(4);
+    expect(placeholderHeights).toHaveLength(4);
+    expect(new Set([...rowHeights, ...placeholderHeights]).size).toBe(1);
+    expect(rowHeights[0]).toBeGreaterThan(0);
+  });
+
+  it('caps every text block a pack row sizes', async () => {
+    // The row's height is its capped text plus its spacing, so an uncapped line
+    // would grow the row past the height it reserves.
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    const caps = renderer.root
+      .findAll(node => typeof node.props.numberOfLines === 'number')
+      .map(node => Number(node.props.numberOfLines));
+    // Every row caps its title to one line; the store price holds its own
+    // `shrink-0` line and the state line holds one short phrase instead of a
+    // separate capped line.
+    expect(caps.filter(cap => cap === 1)).toHaveLength(4);
+    unmount();
+  });
+
+  it('scales the row height with the system font scale', async () => {
+    // Only the row's text scales; its paddings and the content gaps keep their
+    // size. A static height would clip the text at a raised scale.
+    const rowHeight = async (): Promise<number> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const [row] = renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'credit-pack-row'
+      );
+      const style: unknown = row?.props.style;
+      const value =
+        typeof style === 'object' && style !== null && 'height' in style ? style.height : 0;
+      unmount();
+      return typeof value === 'number' ? value : 0;
+    };
+
+    dimensions.fontScale = 1;
+    const single = await rowHeight();
+    dimensions.fontScale = 1.5;
+    const raised = await rowHeight();
+    dimensions.fontScale = 0.85;
+    const reduced = await rowHeight();
+    dimensions.fontScale = 1;
+
+    expect(single).toBeGreaterThan(0);
+    expect(raised).toBeGreaterThan(single);
+    // The spacing does not scale, so a reduced scale shrinks the row by less
+    // than the scale itself.
+    expect(reduced).toBeLessThan(single);
+    expect(reduced).toBeGreaterThan(single * 0.85);
+  });
+
+  it('names an expiring balance and states plainly when none expires', async () => {
+    // The card paints a caption in both states, so the space it reserves is
+    // never a band: the quiet state says the same thing the Profile credits
+    // card says instead of leaving the second line blank.
+    const quiet = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(quiet.renderer).length === 4);
+    expect(allText(quiet.renderer)).toContain('No expiring credits.');
+    quiet.unmount();
+
+    creditBlocks.entries = [{ balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' }];
+    const expiring = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(expiring.renderer).includes('in credits expires'));
+    expect(allText(expiring.renderer)).not.toContain('No expiring credits.');
+    expiring.unmount();
+  });
+
+  it('holds the balance card height in every state of its two reads', async () => {
+    // The card is the only block above the pack area whose content arrives
+    // late, so it paints one height in every state: a skeleton, the value, the
+    // failed read's retry target, and a caption in all three cases. Otherwise a
+    // settling read would move the packs below it.
+    /** The card's data-slot Views, found by the testID the screen sets. */
+    const slotOf = (scope: TestRenderer.ReactTestInstance, testID: string) => {
+      const [slot] = scope.findAll(node => (node.props as { testID?: string }).testID === testID);
+      return slot;
+    };
+    const heightOf = (slot: TestRenderer.ReactTestInstance | undefined): number => {
+      const minHeight: unknown = slot?.props.style;
+      const value =
+        typeof minHeight === 'object' && minHeight !== null && 'minHeight' in minHeight
+          ? (minHeight as { minHeight: unknown }).minHeight
+          : 0;
+      return typeof value === 'number' ? value : 0;
+    };
+    const textOf = (slot: TestRenderer.ReactTestInstance | undefined): string => {
+      if (!slot) {
+        return '';
+      }
+      const texts: string[] = [];
+      const walk = (instance: TestRenderer.ReactTestInstance): void => {
+        for (const child of instance.children) {
+          if (typeof child === 'string') {
+            texts.push(child);
+          } else if (typeof child === 'number') {
+            texts.push(String(child));
+          } else {
+            walk(child);
+          }
+        }
+      };
+      walk(slot);
+      return texts.join(' ');
+    };
+    const cases: { state: string; expected: string; prepare: () => void }[] = [
+      {
+        state: 'reads pending',
+        expected: 'Credits are a one-time purchase',
+        prepare: () => undefined,
+      },
+      {
+        state: 'nothing expires',
+        expected: 'No expiring credits.',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'ok';
+        },
+      },
+      {
+        state: 'expiring balance',
+        expected: 'in credits expires',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'ok';
+          creditBlocks.entries = [
+            { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+          ];
+        },
+      },
+      {
+        state: 'credit blocks failed',
+        expected: 'Credit expiry unavailable.',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'error';
+        },
+      },
+      {
+        state: 'balance failed',
+        expected: 'Failed to load balance. Tap to retry.',
+        prepare: () => {
+          balance.state = 'error';
+          creditBlocks.state = 'ok';
+        },
+      },
+    ];
+
+    const measured: { state: string; amount: number; caption: number; captionSlotText: string }[] =
+      [];
+    /* eslint-disable no-await-in-loop -- each scenario mutates the shared read state */
+    for (const scenario of cases) {
+      balance.state = 'pending';
+      creditBlocks.state = 'pending';
+      creditBlocks.entries = [];
+      scenario.prepare();
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => allText(renderer).includes(scenario.expected));
+      const card = renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'credit-purchase-screen'
+      )[0];
+      if (!card) {
+        throw new Error(`expected the screen in ${scenario.state}`);
+      }
+      measured.push({
+        state: scenario.state,
+        amount: heightOf(slotOf(card, 'credit-balance-slot')),
+        caption: heightOf(slotOf(card, 'credit-expiry-slot')),
+        captionSlotText: textOf(slotOf(card, 'credit-expiry-slot')),
+      });
+      unmount();
+      vi.clearAllMocks();
+    }
+    /* eslint-enable no-await-in-loop */
+
+    const amountHeight = measured[0]?.amount ?? 0;
+    const captionHeight = measured[0]?.caption ?? 0;
+    // Each floor is the text's own line box at the default scale, so the
+    // reservation matches the painted lines: one `text-2xl` line for the
+    // amount, and the sentence's two `text-xs` lines for the caption. The
+    // compiled `lineHeight` is a multiplier, so the box is the font size times
+    // that leading.
+    const amountLine =
+      (await compiledLengthDp('text-2xl', 'fontSize')) *
+      (await compiledLengthDp('text-2xl', 'lineHeight'));
+    const captionLine =
+      (await compiledLengthDp('text-xs', 'fontSize')) *
+      (await compiledLengthDp('text-xs', 'lineHeight'));
+    expect(amountHeight).toBeCloseTo(amountLine, 0);
+    expect(captionHeight).toBeGreaterThanOrEqual(2 * captionLine);
+    for (const result of measured) {
+      expect(result.amount, result.state).toBe(amountHeight);
+      expect(result.caption, result.state).toBe(captionHeight);
+    }
+    // A raised scale fits fewer characters per line, so the caption needs more
+    // lines than it does at the default scale. The floor must count those
+    // lines, not just scale the two lines' height, or the caption outgrows it
+    // and the packs below move.
+    dimensions.fontScale = 1.5;
+    const raised = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(raised.renderer).includes('No expiring credits.'));
+    const raisedCard = raised.renderer.root.findAll(
+      node => (node.props as { testID?: string }).testID === 'credit-purchase-screen'
+    )[0];
+    if (!raisedCard) {
+      throw new Error('expected the screen at the raised scale');
+    }
+    expect(heightOf(slotOf(raisedCard, 'credit-expiry-slot'))).toBeGreaterThanOrEqual(
+      3 * captionLine * 1.5
+    );
+    expect(heightOf(slotOf(raisedCard, 'credit-balance-slot'))).toBeCloseTo(amountLine * 1.5, 0);
+    raised.unmount();
+    dimensions.fontScale = 1;
+    // The caption slot paints one caption in every state; the slot's own
+    // subtree carries the copy, so the assertion cannot pass through the rest
+    // of the screen. The failed balance line sits in the amount slot, above
+    // this one, so it is not part of the caption's states.
+    const captions = measured.map(result => result.captionSlotText);
+    expect(captions.some(text => text.includes('No expiring credits.'))).toBe(true);
+    expect(captions.some(text => text.includes('in credits expires'))).toBe(true);
+    expect(captions.some(text => text.includes('Credit expiry unavailable.'))).toBe(true);
+    // The skeleton paints no text, so the pending state's slot reads as empty.
+    expect(captions[0]).toBe('');
+    // Every state paints the caption line inside the same two-line floor, and
+    // the amount keeps one line: both are the text's own box, so the card's
+    // padding stays balanced.
+    expect(captions.filter(text => text.length > 0)).toHaveLength(cases.length - 1);
+
+    // The failed read's retry keeps the amount's own line box and reaches the
+    // 44 dp touch minimum from its hit slop, so it adds no height to the card.
+    balance.state = 'error';
+    creditBlocks.state = 'ok';
+    creditBlocks.entries = [];
+    const failed = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(failed.renderer).includes('Failed to load balance. Tap to retry.'));
+    const [retry] = failed.renderer.root.findAll(
+      node => (node.props as { accessibilityRole?: string }).accessibilityRole === 'button'
+    );
+    if (!retry) {
+      throw new Error('expected the balance retry target');
+    }
+    const slop = (retry.props as { hitSlop?: Record<string, number> }).hitSlop;
+    const reach = tapTargetReachDp(BALANCE_RETRY_FRAME_DP, BALANCE_RETRY_HIT_SLOP_DP);
+    expect(slop).toEqual(BALANCE_RETRY_HIT_SLOP);
+    expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    failed.unmount();
+  });
+
+  it('identity failure: shows its own retryable card instead of an empty pack area', async () => {
+    // Without a user id neither catalog read can run, so nothing settles. The
+    // screen must not present that as "nothing for sale" with no way back, and
+    // it must not keep a store spinner running either: an offline cold start is
+    // exactly the case where the store has not connected.
+    identity.userId = undefined;
+    identity.isError = true;
+    owner.connected = false;
+    // The store read must not start for a retry that answers no identity: a
+    // manual refetch bypasses the query's own gate.
+    identity.refetchAsync.mockResolvedValue(undefined);
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Check your connection and try again.'));
+
+    expect(allText(renderer)).toContain('Could not load');
+    expect(packRows(renderer)).toHaveLength(0);
+    expect(placeholderShells(renderer)).toHaveLength(0);
+    expect(allText(renderer)).not.toContain('Credit packs are unavailable right now.');
+    // Never a blank pack area and never a spinner: the card offers the retry.
+    const retry = tryAgainButton(renderer);
+    expect(retry).toBeDefined();
+    if (!retry) {
+      throw new Error('expected a Try again button');
+    }
+    await act(async () => {
+      (retry.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+    expect(identity.refetchAsync).toHaveBeenCalledTimes(1);
+    // A repeat failure leaves the store read alone.
+    expect(owner.fetchStoreProducts).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('shows the completing copy and disables every row while a purchase is in flight', async () => {
     owner.completingProductId = 'credits.usd10.v1';
 
@@ -750,15 +1619,32 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('Completing purchase');
     const rows = packRows(renderer);
-    // The in-flight row announces its state in the label too.
+    // The in-flight row keeps its store price and its state, and the state takes
+    // the note line, so the row keeps its height and the price stays announced.
     const busyRow = rows.find(
       row =>
         (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
     );
+    const busyTexts = busyRow?.findAll(node => String(node.type) === 'Text') ?? [];
+    expect(busyTexts.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$10.00')} of credits`,
+      '$10.99',
+      'Completing purchase',
+    ]);
+    // The label takes the row's last line in place of the expiry note, and that
+    // line keeps one height for both, so the row does not change height.
+    const busyLine = busyRow?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    expect(busyLine).toHaveLength(1);
+    expect(busyLine?.[0]?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
+    expect(busyTexts).toHaveLength(3);
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(
-      `Add ${packAmount('$10.00')} of credits, Completing purchase, Credits purchased through the App Store do not expire.`
+      `Add ${packAmount('$10.00')} of credits, $10.99, Completing purchase, Credits purchased through the App Store do not expire.`
     );
     expect(
       rows.every(
@@ -834,15 +1720,11 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('gives each store legal link a full legal-link target and its own destination', async () => {
+  it('gives each store legal link a full legal-link target and opens it natively', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
-    const legalLinks = renderer.root.findAll(
-      node =>
-        String(node.type) === 'Pressable' &&
-        (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
-    );
+    const legalLinks = legalLinkNodes(renderer.root);
     expect(legalLinks).toHaveLength(2);
     const [termsLink, privacyLink] = legalLinks;
     if (!termsLink || !privacyLink) {
@@ -867,19 +1749,248 @@ describe('CreditPurchaseScreen', () => {
       (privacyLink.props as { onPress: () => void }).onPress();
     });
 
-    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      1,
-      'https://example.com/terms-app',
-      {
-        label: 'Terms of Use (EULA)',
-      }
-    );
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      2,
-      'https://example.com/privacy-app',
-      { label: 'Privacy Policy' }
-    );
+    expect(legalNavigation.push).toHaveBeenCalledTimes(2);
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
     unmount();
   });
 });
+
+describe('CreditPurchaseScreen unresolved purchase card', () => {
+  const cardId = 'credit-unresolved-purchase';
+  const waitCardId = 'credit-purchase-wait-card';
+
+  function byTestId(
+    renderer: TestRenderer.ReactTestRenderer,
+    testID: string
+  ): TestRenderer.ReactTestInstance | undefined {
+    return renderer.root.findAll(
+      candidate => (candidate.props as { testID?: string }).testID === testID
+    )[0];
+  }
+
+  function cards(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+    return renderer.root.findAll(node => {
+      const testID = (node.props as { testID?: string }).testID;
+      return testID === cardId || testID === waitCardId || testID === 'credit-pack-placeholder';
+    });
+  }
+
+  /** Each pack row's index among its parent's children, in render order. */
+  function rowPlacement(renderer: TestRenderer.ReactTestRenderer): number[] {
+    return packRows(renderer).map(rowInstance => {
+      const parent = rowInstance.parent;
+      if (parent === null) {
+        throw new Error('expected a mounted pack row');
+      }
+      return parent.children.indexOf(rowInstance);
+    });
+  }
+
+  async function press(instance: TestRenderer.ReactTestInstance | undefined): Promise<void> {
+    if (!instance) {
+      throw new Error('expected a control to press');
+    }
+    const control = instance.props as { onPress?: () => void };
+    await act(async () => {
+      control.onPress?.();
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseResolution = 'unknown';
+    owner.buyAgainProductId = null;
+    owner.purchaseWait = null;
+    owner.reconcilePurchase.mockReset();
+    owner.buyAgain.mockReset();
+  });
+
+  it('shows the unresolved notice as the one card, with both actions working', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(cards(renderer)).toHaveLength(1);
+    expect(textWithinCard(card)).toContain(i18n.t('credits.unresolvedPurchaseFound'));
+
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    await press(actions.find(node => labelOf(node).startsWith('Try again')));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    await press(actions.find(node => labelOf(node).startsWith('Buy again')));
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('tells the person to pick a pack and leaves the rows enabled without a target', async () => {
+    owner.hasUnresolvedPurchase = true;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(textWithinCard(card)).toContain(i18n.t('credits.pickPackToBuyAgain'));
+    expect(card.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
+    ).toBe(true);
+    unmount();
+  });
+
+  it('says the store has not answered on the waiting row and in the card', async () => {
+    owner.completingProductId = null;
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const waiting = i18n.t('credits.waitingForStore');
+    const waitingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(waiting)
+    );
+    expect(waitingRowNode).toBeDefined();
+    expect(allText(renderer)).not.toContain(i18n.t('credits.storeTimedOut'));
+    const card = byTestId(renderer, waitCardId);
+    if (!card) {
+      throw new Error('expected the waiting card');
+    }
+    expect(textWithinCard(card)).toContain(waiting);
+    expect(cards(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('says the payment is pending on the row and in the card', async () => {
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'pending' };
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const pending = i18n.t('credits.purchasePending');
+    const pendingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(pending)
+    );
+    expect(pendingRowNode).toBeDefined();
+    // The card in the slot carries the pending copy, and its actions stay
+    // enabled because no purchase is in flight.
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved card');
+    }
+    expect(textWithinCard(card)).toContain(pending);
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    expect(
+      actions.every(
+        node =>
+          (node.props as { disabled?: boolean }).disabled !== true &&
+          (node.props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+            ?.disabled !== true
+      )
+    ).toBe(true);
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
+    ).toBe(true);
+    unmount();
+  });
+
+  it('shows one card at most, with and without an error set', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    expect(cards(renderer)).toHaveLength(1);
+
+    // The purchase error is the floating region, not a card in the slot.
+    owner.errorMessageKey = 'credits.storeTimedOut';
+    const { unmount: unmountSecond, renderer: withError } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(withError).length === 4);
+    expect(cards(withError)).toHaveLength(1);
+    expect(allText(withError)).toContain(i18n.t('credits.storeTimedOut'));
+    unmount();
+    unmountSecond();
+  });
+
+  it('leaves every pack row where it is when the purchase card appears, changes and goes', async () => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseWait = null;
+    const absent = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(absent.renderer).length === 4);
+    const placement = rowPlacement(absent.renderer);
+
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+    const waiting = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(waiting.renderer).length === 4);
+    expect(byTestId(waiting.renderer, waitCardId)).toBeDefined();
+
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.purchaseWait = null;
+    const notice = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(notice.renderer).length === 4);
+    const card = byTestId(notice.renderer, cardId);
+    if (!card) {
+      throw new Error('expected the purchase card');
+    }
+    const packArea = packRows(notice.renderer)[0]?.parent?.parent;
+    const parent = card.parent;
+    if (!packArea || !parent) {
+      throw new Error('expected a mounted pack area and card');
+    }
+    expect(parent.children.indexOf(card)).toBeGreaterThan(parent.children.indexOf(packArea));
+
+    owner.hasUnresolvedPurchase = false;
+    const gone = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(gone.renderer).length === 4);
+
+    for (const step of [waiting.renderer, notice.renderer, gone.renderer]) {
+      expect(rowPlacement(step)).toEqual(placement);
+    }
+    expect(byTestId(gone.renderer, cardId)).toBeUndefined();
+    expect(byTestId(gone.renderer, waitCardId)).toBeUndefined();
+    absent.unmount();
+    waiting.unmount();
+    notice.unmount();
+    gone.unmount();
+  });
+});
+
+function textWithinCard(card: TestRenderer.ReactTestInstance): string {
+  const texts: string[] = [];
+  const walk = (instance: TestRenderer.ReactTestInstance): void => {
+    for (const child of instance.children) {
+      if (typeof child === 'string') {
+        texts.push(child);
+      } else if (typeof child === 'number') {
+        texts.push(String(child));
+      } else {
+        walk(child);
+      }
+    }
+  };
+  walk(card);
+  return texts.join(' ');
+}

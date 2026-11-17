@@ -7,6 +7,7 @@ import {
   formatToolCount,
   getConnectButtonLabel,
   isSecretSaved,
+  needsCredentials,
   removeServer,
   toolsToJsonString,
 } from './remote-mcp-settings-logic';
@@ -42,6 +43,22 @@ describe('remote-mcp-settings pure logic', () => {
 
     it('returns Refresh for unavailable', () => {
       expect(getConnectButtonLabel('unavailable')).toBe('Refresh');
+    });
+  });
+
+  describe('credential requirement', () => {
+    it('routes a 401 server without OAuth to adding credentials', () => {
+      expect(needsCredentials(makeServer({ status: 'needs_auth' }))).toBe(true);
+    });
+
+    it('keeps Connect for a 401 server whose OAuth flow can be started', () => {
+      expect(needsCredentials(makeServer({ auth: { type: 'oauth' }, status: 'needs_auth' }))).toBe(
+        false
+      );
+    });
+
+    it('is false for a connected server', () => {
+      expect(needsCredentials(makeServer({ status: 'connected' }))).toBe(false);
     });
   });
 

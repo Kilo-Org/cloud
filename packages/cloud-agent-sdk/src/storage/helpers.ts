@@ -1,195 +1,33 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
-import type { MessageInfo } from '../types';
+import type { SessionSubscriptionKey } from './types';
 
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  return left > right ? 1 : 0;
+/** Sort key of a message id: the id is its own key. */
+function messageIdKey(value: string): string {
+  return value;
 }
+
+const partIdKey = (part: Part): string => part.id;
 
 /**
- * Rows ordered by their own creation time, id as the tiebreak, so the store's
- * id order never stands in for the transcript's order.
- *
- * The store keeps `messageIds` sorted by id because that order is the only one
- * it can maintain incrementally. A CLI mints ids that rise with the clock, so
- * that order used to agree with `time.created`; a session written by another
- * client, an import, or an older id scheme holds ids in any order, and the
- * worker's history read orders every page by `time.created`
- * (`compareKiloSdkMessageInfo`). Reading the id order as the transcript order
- * showed such a session out of sequence, with a newer turn above older rows.
- *
- * An optimistic or queued row is stamped with the device clock, and every
- * stored row carries the writer's clock, so the two cannot be ranked against
- * each other while a phone's clock disagrees with the writer's. Both are marked
- * `synthetic` until the server echoes the row, and an unconfirmed row closes the
- * transcript for the turn it belongs to, so they rank after every timed row.
- *
- * Returns `ids` itself while the array already follows that order, so an
- * unchanged transcript keeps its reference. A row whose time is unreadable
- * keeps the array as it is: the wire boundary rejects such a row, and a guess
- * here would reorder a transcript on data the store cannot place.
+ * Insert `item` before the first element whose sort key is not less than the
+ * item's key, so equal keys keep their arriving order. Returns a new array and
+ * leaves `arr` untouched.
  */
-function orderMessageIdsByCreated(
-  ids: readonly string[],
-  messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const rows: Array<{ id: string; created: number; unconfirmed: boolean }> = [];
-  for (const id of ids) {
-    const info = messages.get(id);
-    const unconfirmed = info?.role === 'user' && info.synthetic === true;
-    const created: unknown = info?.time?.created;
-    if (!unconfirmed && (typeof created !== 'number' || !Number.isFinite(created))) return ids;
-    rows.push({
-      id,
-      created: typeof created === 'number' && Number.isFinite(created) ? created : 0,
-      unconfirmed,
-    });
-  }
-  let ordered = true;
-  for (let index = 1; index < rows.length; index += 1) {
-    const previous = rows[index - 1];
-    const current = rows[index];
-    if (previous === undefined || current === undefined) return ids;
-    if (compareCreatedRows(previous, current) > 0) {
-      ordered = false;
-      break;
-    }
-  }
-  if (ordered) return ids;
-  rows.sort(compareCreatedRows);
-  return rows.map(row => row.id);
-}
-
-function compareCreatedRows(
-  left: { id: string; created: number; unconfirmed: boolean },
-  right: { id: string; created: number; unconfirmed: boolean }
-): number {
-  if (left.unconfirmed !== right.unconfirmed) return left.unconfirmed ? 1 : -1;
-  if (left.created !== right.created) return left.created < right.created ? -1 : 1;
-  return compareIds(left.id, right.id);
-}
-
-/**
- * The transcript's row order: creation time first, then the causality repair
- * that keeps an assistant reply behind the prompt it answers.
- */
-function orderMessageIds(
-  ids: readonly string[],
-  messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const ordered = orderMessageIdsByCreated(ids, messages);
-  const causal = orderCausalMessageIds(ordered, messages);
-  if (causal === ids) return ids;
-  if (causal.length === ids.length && causal.every((id, index) => id === ids[index])) return ids;
-  return causal;
-}
-
-function orderCausalMessageIds(
-  ids: readonly string[],
-  messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const positions = new Map(ids.map((id, index) => [id, index]));
-  const parents = new Map<number, number>();
-  let needsOrdering = false;
-  for (let index = 0; index < ids.length; index += 1) {
-    const info = messages.get(ids[index] ?? '');
-    if (info?.role !== 'assistant') continue;
-    const parentIndex = positions.get(info.parentID);
-    const parent = messages.get(info.parentID);
-    if (
-      parentIndex === undefined ||
-      parentIndex === index ||
-      parent?.sessionID !== info.sessionID
-    ) {
-      continue;
-    }
-    parents.set(index, parentIndex);
-    if (parentIndex > index) needsOrdering = true;
-  }
-  if (!needsOrdering) return ids;
-
-  const children = new Map<number, number[]>();
-  const ready: number[] = [];
-  function enqueue(index: number): void {
-    let position = ready.length;
-    ready.push(index);
-    while (position > 0) {
-      const parentPosition = (position - 1) >>> 1;
-      const parentIndex = ready[parentPosition];
-      if (parentIndex === undefined || parentIndex <= index) break;
-      ready[position] = parentIndex;
-      position = parentPosition;
-    }
-    ready[position] = index;
-  }
-  for (let index = 0; index < ids.length; index += 1) {
-    const parent = parents.get(index);
-    if (parent === undefined) {
-      enqueue(index);
-    } else {
-      const siblings = children.get(parent);
-      if (siblings) siblings.push(index);
-      else children.set(parent, [index]);
-    }
-  }
-
-  const result: string[] = [];
-  const emitted = new Set<number>();
-  while (ready.length > 0) {
-    const index = ready[0];
-    const last = ready.pop();
-    if (index === undefined || last === undefined) break;
-    if (ready.length > 0) {
-      let position = 0;
-      while (position * 2 + 1 < ready.length) {
-        let childPosition = position * 2 + 1;
-        if ((ready[childPosition + 1] ?? Infinity) < (ready[childPosition] ?? Infinity)) {
-          childPosition += 1;
-        }
-        const child = ready[childPosition];
-        if (child === undefined || child >= last) break;
-        ready[position] = child;
-        position = childPosition;
-      }
-      ready[position] = last;
-    }
-    result.push(ids[index] ?? '');
-    emitted.add(index);
-    for (const child of children.get(index) ?? []) enqueue(child);
-  }
-  // Invalid parent cycles cannot satisfy every edge, but must never hide a row.
-  for (let index = 0; index < ids.length; index += 1) {
-    if (!emitted.has(index)) result.push(ids[index] ?? '');
-  }
-  return result;
-}
-
-function insertSorted(arr: string[], id: string): string[] {
+function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string): T[] {
   const result = [...arr];
-  let low = 0,
-    high = result.length;
+  let low = 0;
+  let high = result.length;
+  const itemKey = key(item);
   while (low < high) {
     const mid = (low + high) >>> 1;
-    if ((result[mid] ?? '') < id) low = mid + 1;
+    const midValue = result[mid];
+    if (midValue !== undefined && key(midValue) < itemKey) low = mid + 1;
     else high = mid;
   }
-  result.splice(low, 0, id);
-  return result;
-}
-
-function insertPartSorted(arr: Part[], part: Part): Part[] {
-  const result = [...arr];
-  let low = 0,
-    high = result.length;
-  while (low < high) {
-    const mid = (low + high) >>> 1;
-    const midPart = result[mid];
-    if (midPart !== undefined && midPart.id < part.id) low = mid + 1;
-    else high = mid;
-  }
-  result.splice(low, 0, part);
+  result.splice(low, 0, item);
   return result;
 }
 
@@ -206,6 +44,9 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
  * not stable across a clone either.
  */
 type PartOrderingEvidence = Map<string, number>;
+
+/** Per-message cached part views: the views, an invalidation marker, or nothing. */
+type PartsSnapshot = Map<string, readonly ReadonlyPart[] | null>;
 
 function partOrderingKey(messageID: string, partId: string): string {
   return `${messageID}\u0000${partId}`;
@@ -269,23 +110,73 @@ function toolRunningStartedAt(part: Part): number | undefined {
 /**
  * A tool part advances pending → running → terminal and never moves backwards.
  * A snapshot, history or DO replay can re-deliver an older part version over
- * newer live state, so a lower-ranked update is dropped, and a terminal update
- * is applied only when it carries ordering evidence that it postdates the
- * stored update (the event's own time, or the tool state's `time.end` when a
- * replay carries no event time). Over a running part, that evidence must also
- * postdate the stored running update's ordering evidence — the later of its
- * recorded event time (when the update came from the wire) and the run's
- * `time.start` (the only evidence a replayed running part carries, and the bound
- * that keeps an inherited older event time from dropping the guard below the
- * live run): a terminal whose settle time predates the live run is an
- * out-of-order replay, not a completion. A terminal with no evidence at all
- * never replaces a live running task.
- *
- * The same ordering evidence settles the mirror case: a run whose `time.start`
- * postdates a stored terminal's settle time is a newer observation of that part
- * (a reopen replay of the live run over a stale cached terminal), so it
- * replaces it instead of being dropped as a backwards lifecycle step.
+ * newer live state, so a lower-ranked update is dropped (unless it reopens a
+ * settled run — see `runningReopensTerminal`), and a terminal update is applied
+ * only when it carries ordering evidence that it postdates the stored update
+ * (the event's own time, or the tool state's `time.end` when a replay carries
+ * no event time). A terminal with no evidence at all never replaces a live
+ * running task.
  */
+
+/** Ordering evidence of a terminal update: its event time, else its settle time. */
+function terminalOrder(part: Part, eventTime: number | undefined): number | undefined {
+  return eventTime ?? partSettledAt(part);
+}
+
+/**
+ * Ordering evidence of a stored running part: the later of the event time the
+ * update that applied it carried and the run's `time.start`.
+ */
+function runningOrder(stored: Part, storedEventTime: number | undefined): number | undefined {
+  const startedAt = toolRunningStartedAt(stored);
+  if (storedEventTime === undefined || startedAt === undefined) {
+    return storedEventTime ?? startedAt;
+  }
+  return Math.max(storedEventTime, startedAt);
+}
+
+/** A terminal update over a stored terminal applies only when it postdates it. */
+function terminalBeatsTerminal(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  const storedOrder = terminalOrder(stored, storedEventTime);
+  if (incomingOrder === undefined || storedOrder === undefined) return false;
+  return incomingOrder > storedOrder;
+}
+
+/** A terminal update over a stored running part applies only when it postdates both evidence pieces. */
+function terminalBeatsRunning(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  if (incomingOrder === undefined) return false;
+  // The stored running part carries two pieces of evidence: the event time of
+  // the update that last applied it (which can be inherited from an older part
+  // replaced on the same id) and the run's own `time.start`. A terminal must
+  // postdate both, so bound the guard by the later one — inherited older
+  // evidence must not drop it below the live run.
+  const storedOrder = runningOrder(stored, storedEventTime);
+  return storedOrder === undefined || incomingOrder > storedOrder;
+}
+
+/** A running update over a stored terminal applies only when the run started after its settle time. */
+function runningReopensTerminal(stored: Part, incoming: Part): boolean {
+  const runningStartedAt = toolRunningStartedAt(incoming);
+  const storedSettledAt = partSettledAt(stored);
+  return (
+    runningStartedAt !== undefined &&
+    storedSettledAt !== undefined &&
+    runningStartedAt > storedSettledAt
+  );
+}
+
 function isStaleToolLifecycleUpdate(
   stored: Part,
   incoming: Part,
@@ -301,41 +192,21 @@ function isStaleToolLifecycleUpdate(
   }
 
   if (incomingRank < storedRank) {
+    // Running (1) over terminal (2): the run reopens the settled run only when
+    // its start postdates the settle time. Every other lower-ranked update is
+    // stale.
     if (incomingRank === 1 && storedRank === 2) {
-      const runningStartedAt = toolRunningStartedAt(incoming);
-      const storedSettledAt = partSettledAt(stored);
-      if (
-        runningStartedAt !== undefined &&
-        storedSettledAt !== undefined &&
-        runningStartedAt > storedSettledAt
-      ) {
-        return false;
-      }
+      return !runningReopensTerminal(stored, incoming);
     }
     return true;
   }
 
   if (incomingRank === 2 && storedRank === 2) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    const storedOrder = storedEventTime ?? partSettledAt(stored);
-    if (incomingOrder === undefined || storedOrder === undefined) return true;
-    return incomingOrder <= storedOrder;
+    return !terminalBeatsTerminal(stored, incoming, storedEventTime, eventTime);
   }
 
   if (incomingRank === 2 && storedRank === 1) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    if (incomingOrder === undefined) return true;
-    // The stored running part carries two pieces of evidence: the event time of
-    // the update that last applied it (which can be inherited from an older part
-    // replaced on the same id) and the run's own `time.start`. A terminal must
-    // postdate both, so bound the guard by the later one — inherited older
-    // evidence must not drop it below the live run.
-    const runningStartedAt = toolRunningStartedAt(stored);
-    const storedOrder =
-      storedEventTime === undefined || runningStartedAt === undefined
-        ? (storedEventTime ?? runningStartedAt)
-        : Math.max(storedEventTime, runningStartedAt);
-    if (storedOrder !== undefined && incomingOrder <= storedOrder) return true;
+    return !terminalBeatsRunning(stored, incoming, storedEventTime, eventTime);
   }
 
   return false;
@@ -395,21 +266,20 @@ function upsertPartDroppingStaleSyntheticParts(
   }
 
   rememberPartUpdateTime(evidence, nextPart, eventTime);
-  return insertPartSorted(filtered, nextPart);
+  return insertSortedBy(filtered, nextPart, partIdKey);
 }
 
-const STRUCTURAL_PART_FIELDS = new Set(['id', 'messageID', 'sessionID', 'type']);
 const SUPPORTED_DELTA_FIELDS = new Set(['text']);
 
 function isSupportedDeltaField(field: string): boolean {
-  return SUPPORTED_DELTA_FIELDS.has(field) && !STRUCTURAL_PART_FIELDS.has(field);
+  return SUPPORTED_DELTA_FIELDS.has(field);
 }
 
 function clonePart(part: Part): Part {
   return structuredClone(part);
 }
 
-function createReadonlyPartView(part: Part): Part {
+function createReadonlyPartView(part: Part): ReadonlyPart {
   return new Proxy(part, {
     set() {
       return true;
@@ -463,7 +333,7 @@ function appendPartTextChunks(
   const existing = idx >= 0 ? arr[idx] : undefined;
   if (!existing) {
     // Part not yet known for this message — create it with the chunks as seed.
-    return insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')));
+    return insertSortedBy(arr, createSeedTextPart(messageId, partId, chunks.join('')), partIdKey);
   }
   const updatedPart = applyTextDeltas(existing, chunks);
   if (updatedPart === existing) {
@@ -480,12 +350,12 @@ function appendPartTextChunks(
  * snapshot.
  */
 function publishPartsChanged(
-  snapshot: Map<string, Part[] | null>,
-  subscribers: Map<string, Set<() => void>>,
+  snapshot: PartsSnapshot,
+  subscribers: SubscriberRegistry,
   messageId: string
 ): void {
   snapshot.set(messageId, null);
-  notify(subscribers, `parts:${messageId}`);
+  subscribers.notifyParts(messageId);
 }
 
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
@@ -498,11 +368,58 @@ function createSeedTextPart(messageId: string, partId: string, text: string): Te
   };
 }
 
-function notify(subscribers: Map<string, Set<() => void>>, key: string): void {
-  const subs = subscribers.get(key);
-  if (subs) {
-    for (const cb of subs) cb();
-  }
+const messageIdsKey: SessionSubscriptionKey = 'messageIds';
+
+/** Subscription key of one message row's channel. */
+function messageKey(messageId: string): SessionSubscriptionKey {
+  return `message:${messageId}`;
+}
+
+/** Subscription key of one message's parts channel. */
+function partsKey(messageId: string): SessionSubscriptionKey {
+  return `parts:${messageId}`;
+}
+
+type SubscriberRegistry = {
+  subscribe(key: SessionSubscriptionKey, callback: () => void): () => void;
+  notify(key: SessionSubscriptionKey): void;
+  notifyMessageIds(): void;
+  notifyMessage(messageId: string): void;
+  notifyParts(messageId: string): void;
+};
+
+function createSubscriberRegistry(): SubscriberRegistry {
+  const subscribers = new Map<string, Set<() => void>>();
+  const notify = (key: SessionSubscriptionKey): void => {
+    const subs = subscribers.get(key);
+    if (subs) {
+      for (const cb of subs) cb();
+    }
+  };
+  return {
+    subscribe(key, callback) {
+      let set = subscribers.get(key);
+      if (!set) {
+        set = new Set();
+        subscribers.set(key, set);
+      }
+      set.add(callback);
+      return () => {
+        set.delete(callback);
+        if (set.size === 0) subscribers.delete(key);
+      };
+    },
+    notify,
+    notifyMessageIds() {
+      notify(messageIdsKey);
+    },
+    notifyMessage(messageId) {
+      notify(messageKey(messageId));
+    },
+    notifyParts(messageId) {
+      notify(partsKey(messageId));
+    },
+  };
 }
 
 const EMPTY_PARTS: readonly Part[] = Object.freeze([]);
@@ -514,13 +431,16 @@ export {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
-  orderMessageIds,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdsKey,
+  messageKey,
+  messageIdKey,
+  partsKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 };
-export type { PartOrderingEvidence };
+export { orderMessageIds } from './message-order';
+export type { PartOrderingEvidence, PartsSnapshot, SessionSubscriptionKey, SubscriberRegistry };

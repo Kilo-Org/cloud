@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
@@ -28,10 +28,12 @@ import {
   notificationHistoryTarget,
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
@@ -107,8 +109,41 @@ export function NotificationHistoryScreen() {
   // `reconcileFirstPage` keeps the retained pages until page one arrives, so
   // the rows a refresh started from stay on screen (and scroll survives) even
   // when the refetch is paused by lost connectivity or fails.
-  const items = flatItems;
-  const hasListContent = items.length > 0 || query.isFetchNextPageError;
+  // A stored page can still hold a row of a kind this build retired; the list
+  // never draws one.
+  const items = useMemo(
+    () => flatItems.filter(row => !isRetiredPushType(row.pushType)),
+    [flatItems]
+  );
+  // A page can be nothing but retired rows. Rather than report an account with
+  // no notifications, the list reads on until it has a row to show or the
+  // retention window ends.
+  const { fetchNextPage, hasNextPage, isFetchNextPageError, isFetchingNextPage } = query;
+  const readingOn = items.length === 0 && (hasNextPage || isFetchingNextPage);
+  const hasListContent = items.length > 0 || readingOn || isFetchNextPageError;
+  useEffect(() => {
+    // A failed next page keeps the cursor and clears the fetching flag, so an
+    // unguarded read-on would re-request the same page for as long as the list
+    // stays empty; the footer's Retry is the single recovery, as `onEndReached`
+    // already assumes.
+    if (
+      authToken == null ||
+      items.length > 0 ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    ) {
+      return;
+    }
+    void fetchNextPage();
+  }, [
+    authToken,
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    items.length,
+  ]);
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   // The push banner and the filter chips both sit above the list, so the list
   // waits for the same reads they do: a row that settles first is pushed down
@@ -201,7 +236,11 @@ export function NotificationHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.history.title')} showBackButton />
+      <ScreenHeader
+        title={t('notifications.history.title')}
+        showBackButton
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-1">
         {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">

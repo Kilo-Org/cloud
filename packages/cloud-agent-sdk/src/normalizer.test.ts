@@ -2061,6 +2061,43 @@ describe('normalize', () => {
     );
   });
 
+  describe('cloud.workspace.artifacts.changed', () => {
+    it('normalizes an execution-independent service event with the Cloud envelope identity', () => {
+      const result = normalize({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'cloud.workspace.artifacts.changed',
+        timestamp: '2026-09-02T00:00:00.000Z',
+        data: { revision: 4 },
+      });
+      expect(result).toEqual({
+        type: 'workspace.artifacts.changed',
+        cloudSessionId: 'agent-1',
+        revision: 4,
+      });
+      if (!result) throw new Error('Expected workspace artifacts event');
+      expect(isChatEvent(result)).toBe(false);
+    });
+
+    it.each([
+      {},
+      { revision: 0 },
+      { revision: '1' },
+      { revision: NaN },
+      { revision: 1, extra: true },
+    ])('rejects invalid data %p', data =>
+      expect(normalize(createRaw('cloud.workspace.artifacts.changed', data))).toBeNull()
+    );
+
+    it.each(['cloud.workspace.artifacts.changed', 'workspace.artifacts.changed'])(
+      'does not accept %s as a Kilo event',
+      type => {
+        expect(normalize(createKilocode(type, { revision: 1 }))).toBeNull();
+        expect(normalizeCliEvent(type, { revision: 1 })).toBeNull();
+      }
+    );
+  });
+
   describe('connected', () => {
     it('preserves bounded ancillary bootstrap omissions beside the authoritative retry snapshot', () => {
       const sessionStatus = { type: 'retry', attempt: 2, message: 'Retrying', next: 42 };
@@ -2358,30 +2395,50 @@ describe('normalize', () => {
 
   describe('cloud.message.queued', () => {
     it('normalizes with messageId, executionId, delivery', () => {
-      const result = normalize(
-        createRaw('cloud.message.queued', {
-          messageId: 'msg_1',
-          executionId: 'exe_1',
-          content: 'hi',
-          delivery: 'queued',
-        })
-      );
+      const raw = createRaw('cloud.message.queued', {
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+        content: 'hi',
+        delivery: 'queued',
+      });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_1',
         executionId: 'exe_1',
         content: 'hi',
+        createdAt: Date.parse(raw.timestamp),
       });
     });
 
     it('normalizes with only messageId', () => {
-      const result = normalize(createRaw('cloud.message.queued', { messageId: 'msg_2' }));
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_2' });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_2',
         executionId: undefined,
         content: undefined,
+        createdAt: Date.parse(raw.timestamp),
       });
+    });
+
+    it('uses the persisted envelope time, not a timestamp supplied in content', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', createdAt: 999 });
+      expect(normalize({ ...raw, timestamp: '2026-09-01T00:00:00.000Z' })).toMatchObject({
+        createdAt: Date.parse('2026-09-01T00:00:00.000Z'),
+      });
+    });
+
+    it('keeps an unreadable timestamp unconfirmed without dropping the queued event', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', content: 'hi' });
+      const event = normalize({ ...raw, timestamp: 'unreadable' });
+      expect(event).toMatchObject({
+        type: 'cloud.message.queued',
+        messageId: 'msg_1',
+        content: 'hi',
+      });
+      expect(event).not.toHaveProperty('createdAt');
     });
 
     it('returns null when messageId is missing', () => {

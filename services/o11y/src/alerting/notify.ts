@@ -1,5 +1,5 @@
 /**
- * Slack notification delivery for SLO and container capacity alerts.
+ * Slack notification delivery for SLO, container capacity and queue alerts.
  */
 
 import type { AlertSeverity } from './slo-config';
@@ -67,16 +67,39 @@ export type QueueBacklogAlertPayload = {
   oldestMessageTimestamp?: Date;
 };
 
+export type DeadLetterQueueAlertPayload = {
+  alertType: 'dead_letter_queue';
+  severity: AlertSeverity;
+  provider: string;
+  model: string;
+  clientName: string;
+  queueId: string;
+  backlogCount: number;
+  newMessages: number;
+  backlogBytes: number;
+  oldestMessageTimestamp?: Date;
+};
+
 export type AlertPayload =
   | SloAlertPayload
   | ContainerCapacityAlertPayload
   | ContainerAllocationAlertPayload
-  | QueueBacklogAlertPayload;
+  | QueueBacklogAlertPayload
+  | DeadLetterQueueAlertPayload;
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+/**
+ * A Slack block field for a value that comes from telemetry or configuration
+ * rather than this Worker's source. Plain text renders the value exactly as it
+ * is given.
+ */
+function plainTextField(label: string, value: string): object {
+  return { type: 'plain_text', text: `${label}:\n${value}` };
 }
 
 function formatSeverityLabel(severity: AlertSeverity): string {
@@ -100,6 +123,8 @@ function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
       return 'Container Capacity';
     case 'queue_backlog':
       return 'Queue Backlog';
+    case 'dead_letter_queue':
+      return 'Dead-Letter Queue';
   }
 }
 
@@ -127,8 +152,8 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Provider:*\n${alert.provider}` },
-        { type: 'mrkdwn', text: `*Model:*\n${alert.model}` },
+        plainTextField('Provider', alert.provider),
+        plainTextField('Model', alert.model),
         {
           type: 'mrkdwn',
           text: `*Burn rate:*\n${alert.burnRate.toFixed(1)}x (threshold: ${alert.burnRateThreshold}x)`,
@@ -159,7 +184,7 @@ function buildCapacitySlackBlocks(
       {
         type: 'section',
         fields: [
-          { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+          plainTextField('Application', alert.model),
           { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
           { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
           { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
@@ -193,7 +218,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+        plainTextField('Application', alert.model),
         {
           type: 'mrkdwn',
           text: `*Instances:*\n${alert.usedInstances} / ${alert.maxInstances}`,
@@ -205,7 +230,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       text: {
-        type: 'mrkdwn',
+        type: 'plain_text',
         text: `Container: ${alert.clientName}${healthText}`,
       },
     },
@@ -227,7 +252,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.model}` },
+        plainTextField('Queue ID', alert.model),
         {
           type: 'mrkdwn',
           text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages`,
@@ -249,6 +274,37 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
   ];
 }
 
+function buildDeadLetterQueueSlackBlocks(alert: DeadLetterQueueAlertPayload): object[] {
+  const severityLabel = formatSeverityLabel(alert.severity);
+  const oldestMessageTimestamp = alert.oldestMessageTimestamp?.toISOString() ?? 'Unknown';
+
+  return [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `${severityLabel} — Dead-Letter Queue Alert` },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Queue:*\n${alert.model}` },
+        {
+          type: 'mrkdwn',
+          text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages (${alert.newMessages.toLocaleString('en-US')} since last alert)`,
+        },
+        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.queueId}` },
+        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString('en-US')}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Each message is usage that was not recorded after every retry. Oldest message: ${oldestMessageTimestamp}\nRunbook: services/usage-ingest/README.md#dead-letter-alert`,
+      },
+    },
+  ];
+}
+
 /**
  * Builds a Slack Block Kit message body for the given alert.
  * Exported for testing.
@@ -259,6 +315,8 @@ export function buildSlackMessage(alert: AlertPayload): object {
       return { blocks: buildCapacitySlackBlocks(alert) };
     case 'queue_backlog':
       return { blocks: buildQueueBacklogSlackBlocks(alert) };
+    case 'dead_letter_queue':
+      return { blocks: buildDeadLetterQueueSlackBlocks(alert) };
     default:
       return { blocks: buildSloSlackBlocks(alert) };
   }

@@ -282,6 +282,7 @@ function createHarness(
     clientThrowsWhileRestarting?: boolean;
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    flushArtifacts?: () => void;
     materializeAttachments?: (
       message: { prompt?: string; parts?: unknown[] },
       deps?: { signal?: AbortSignal }
@@ -324,6 +325,7 @@ function createHarness(
     log: message => logs.push(message),
     onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    ...(options.flushArtifacts === undefined ? {} : { flushArtifacts: options.flushArtifacts }),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (
@@ -646,6 +648,24 @@ describe('turn manager submission', () => {
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
     expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+  });
+
+  it('flushes artifacts when a turn reaches an outcome', async () => {
+    let flushes = 0;
+    const h = createHarness({
+      flushArtifacts: () => {
+        flushes += 1;
+      },
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(flushes).toBe(0);
+
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+    expect(flushes).toBe(1);
   });
 
   it('routes /compact without auto and fails when summarize returns false', async () => {
@@ -2270,7 +2290,7 @@ describe('native completion replaces snapshot completion', () => {
     http.resolve(false);
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([
-      { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+      { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' },
     ]);
     expect(h.client(routeSpec()).drains).toHaveLength(1);
   });
@@ -3229,7 +3249,7 @@ describe('turn drain completion', () => {
         type: 'session.outcome',
         sessionId: SESSION_ID,
         status: 'failed',
-        reason: 'no_outcome',
+        reason: 'completion_unconfirmed',
         lastMessageId: 'm1',
       },
     ]);
@@ -3757,7 +3777,7 @@ describe('GitHub review publication recovery', () => {
       expect(outcomeFrames(h.frames)).toMatchObject([
         failure === 'restart'
           ? { status: 'completed' }
-          : { status: 'failed', reason: 'no_outcome' },
+          : { status: 'failed', reason: 'completion_unconfirmed' },
       ]);
       expect(h.timeouts.every(timer => timer.cancelled)).toBe(true);
       expect(h.manager.hasPendingWork()).toBe(false);
@@ -4720,7 +4740,9 @@ describe('completion ownership and transport bounds', () => {
       }
       expect(new Set(tokens).size).toBe(3);
       expect(client.drains).toHaveLength(3);
-      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_outcome' }]);
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'completion_unconfirmed' },
+      ]);
       expect(h.manager.hasPendingWork()).toBe(false);
     }
   );
@@ -4782,7 +4804,9 @@ describe('completion ownership and transport bounds', () => {
     h.fireTimeout(SESSION_TIMERS.noProgressMs);
     await settle();
     expect(client.drains).toHaveLength(1);
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_outcome' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'completion_unconfirmed' },
+    ]);
     expect(h.manager.hasPendingWork()).toBe(false);
   });
 
@@ -5194,7 +5218,7 @@ describe('native feed gaps', () => {
 
   it.each([
     ['still live', [5], { status: 'completed', lastMessageId: 'm1' }],
-    ['ended', [], { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' }],
+    ['ended', [], { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' }],
   ] as const)(
     'holds proof until the reconcile and decides an idle root whose background child is %s',
     async (_, after, outcome) => {

@@ -22,6 +22,7 @@ import {
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from '@/lib/integrations/db/predicates';
+import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
@@ -387,11 +388,8 @@ export async function connectVerifiedGitHubInstallation(
   try {
     return await (transaction ? execute(transaction) : db.transaction(execute));
   } catch (error) {
-    const code =
-      error && typeof error === 'object' && 'cause' in error
-        ? (error.cause as { code?: string } | undefined)?.code
-        : (error as { code?: string } | undefined)?.code;
-    if (code === '55P03' || code === '40P01' || code === '57014') {
+    const code = getPostgresErrorCode(error);
+    if (code !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(code)) {
       return { ok: false, reason: 'retryable_conflict' };
     }
     throw error;

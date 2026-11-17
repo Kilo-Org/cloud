@@ -26,11 +26,6 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
-  /** Forwarded to the inner `CenteredState`: the frame the state centers in.
-   *  `viewport` is for a state whose scroller sits between chrome the surface
-   *  does not describe, where centering on the surface moves the state when a
-   *  measurement arrives (the chat transcript states). */
-  band?: 'surface' | 'viewport';
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
   /** Overrides the glyph color. Defaults to the muted token, which reads a step
@@ -58,15 +53,12 @@ export function EmptyState({
   placement = 'center',
   refreshControl,
   compact,
-  band,
   title,
   ...props
 }: Readonly<EmptyStateProps>) {
   const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl} band={band}>
-      {body}
-    </CenteredState>
+    <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
   ) : (
     body
   );

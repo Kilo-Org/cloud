@@ -8,13 +8,14 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -25,10 +26,7 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { trpcClient } from '@/lib/trpc';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -76,7 +74,8 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
@@ -108,10 +107,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
   const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    setBaseline(previous => ({ ...previous, ...patch }));
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
@@ -179,10 +179,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     return <RepositorySettingsSkeleton />;
   }
 
-  const setModeOption = (option: RepositorySelectionMode) => {
-    setMode(option);
-  };
-
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
@@ -211,45 +207,19 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
   // The GitHub settings page is where installation access is widened on the
-  // web, and `openExternalUrl` resolves when that page closes — on both
-  // platforms it awaits the browser's own dismissal (a launch it could not open
-  // is toasted by that helper and still resolves). Reading the repository list
-  // again on that return edge is what makes a grant show up here: without it the
-  // cached empty answer stays fresh for the whole stale window, and the disabled
-  // agent's enable rule counts exactly these repositories.
-  //
-  // The mint is only the hand-off token. An organization's mint needs
-  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
-  // screen's `canManage` (`canManageOrganizationBilling` admits
-  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
-  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
-  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
-  // exactly the empty-grant case this screen exists for. The web page mints
-  // its own state for the signed-in user, so any organization refusal falls
-  // back to the plain settings URL instead of leaving the control inert — the
-  // same rule the Code Reviewer's GitHub recovery control applies. A personal
-  // mint failure has no such page-level fallback to reach, so it keeps the
-  // toast.
+  // web, and `openAppShellHandoff` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch or mint it could
+  // not complete is toasted by that helper and still resolves). Reading the
+  // repository list again on that return edge is what makes a grant show up
+  // here: without it the cached empty answer stays fresh for the whole stale
+  // window, and the disabled agent's enable rule counts exactly these
+  // repositories.
   const manageAccess = async () => {
     const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-    const open = async (url: string) => {
-      await openExternalUrl(url, {
-        label: t('securityAgent.repositories.githubAppSettings'),
-      });
-    };
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
-    } catch {
-      if (!orgId) {
-        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-        return;
-      }
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
-    }
+    await openAppShellHandoff(
+      { page: 'github-app', ...(orgId ? { organizationId: orgId } : {}) },
+      { label: t('securityAgent.repositories.githubAppSettings') }
+    );
     await repositories.refetch();
   };
 
@@ -263,6 +233,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
+      <OrphanedFindingsCard scope={scope} canManage={canManage} />
       <RadioGroup label={t('common.repositories')}>
         {(['all', 'selected'] as const).map(option => (
           <ChoiceRow
@@ -274,7 +245,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             disabled={!canManage}
             className="border-b-[0.5px] border-hair-soft"
             onPress={() => {
-              setModeOption(option);
+              setMode(option);
             }}
           />
         ))}
@@ -376,6 +347,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
+      {feedback.node}
       <FlashList
         style={listStyle}
         data={listData}

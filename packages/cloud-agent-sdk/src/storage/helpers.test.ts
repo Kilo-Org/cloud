@@ -1,5 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { MessageInfo } from '../types';
+import type { MessageInfo, ReadonlyPart } from '../types';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
@@ -7,12 +7,15 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdsKey,
+  messageKey,
+  messageIdKey,
   orderMessageIds,
+  partsKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
@@ -134,13 +137,98 @@ describe('orderMessageIds', () => {
   });
 
   test('never drops rows from invalid parent cycles', () => {
-    const ids = ['a', 'b', 'c'];
+    const ids = ['c', 'a', 'b'];
     const messages = new Map([
       ['a', message('a', 'b')],
       ['b', message('b', 'a')],
       ['c', message('c')],
     ]);
-    expect(orderMessageIds(ids, messages)).toEqual(['c', 'a', 'b']);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  describe('turns', () => {
+    function unconfirmed(id: string, created: number, queuedAt?: number): MessageInfo {
+      return {
+        ...timed(id, created),
+        synthetic: true,
+        ...(queuedAt === undefined ? {} : { queuedAt }),
+      } as MessageInfo;
+    }
+
+    function order(ids: string[], infos: MessageInfo[]): readonly string[] {
+      return orderMessageIds(ids, new Map(infos.map(info => [info.id, info])));
+    }
+
+    test('keeps a prompt queued mid-turn below later steps of the running turn', () => {
+      const infos = [
+        timed('prompt', 900),
+        timed('step-1', 1000, 'prompt'),
+        unconfirmed('queued', 1500, 1500),
+        timed('step-2', 2000, 'prompt'),
+      ];
+      expect(order(['prompt', 'queued', 'step-1', 'step-2'], infos)).toEqual([
+        'prompt',
+        'step-1',
+        'step-2',
+        'queued',
+      ]);
+    });
+
+    test('places a queued row by its server queue time, not its device time', () => {
+      const infos = [
+        unconfirmed('failed', 60_000, 100),
+        timed('retry', 200),
+        timed('answer', 300, 'retry'),
+      ];
+      expect(order(['answer', 'failed', 'retry'], infos)).toEqual(['failed', 'retry', 'answer']);
+    });
+
+    test('keeps a row without a server time after every placed turn', () => {
+      const infos = [
+        unconfirmed('sending', 5),
+        unconfirmed('queued', 9_000, 400),
+        timed('prompt', 100),
+        timed('step', 500, 'prompt'),
+      ];
+      expect(order(['sending', 'queued', 'prompt', 'step'], infos)).toEqual([
+        'prompt',
+        'step',
+        'queued',
+        'sending',
+      ]);
+    });
+
+    test('keeps a reply under its unconfirmed prompt', () => {
+      const infos = [unconfirmed('sending', 5), timed('reply', 1, 'sending'), timed('older', 2)];
+      expect(order(['older', 'reply', 'sending'], infos)).toEqual(['older', 'sending', 'reply']);
+    });
+
+    test('orders a later prompt after a turn whose steps it answers', () => {
+      // A prompt delivered between steps: the native runtime parents the later
+      // steps to it, so they belong to its turn.
+      const infos = [
+        timed('a', 100),
+        timed('a-1', 200, 'a'),
+        timed('b', 300),
+        timed('b-1', 400, 'b'),
+      ];
+      expect(order(['b-1', 'a', 'b', 'a-1'], infos)).toEqual(['a', 'a-1', 'b', 'b-1']);
+    });
+
+    test('orders the rows of a turn by time after the prompt', () => {
+      const infos = [
+        timed('p', 100),
+        timed('s-2', 300, 'p'),
+        timed('s-1', 200, 'p'),
+        timed('q', 250),
+      ];
+      expect(order(['p', 'q', 's-1', 's-2'], infos)).toEqual(['p', 's-1', 's-2', 'q']);
+    });
+
+    test('opens a turn for a reply whose prompt is on an older page', () => {
+      const infos = [timed('reply', 100, 'missing'), timed('next', 200), timed('late', 50)];
+      expect(order(['next', 'reply', 'late'], infos)).toEqual(['late', 'reply', 'next']);
+    });
   });
 });
 
@@ -222,42 +310,44 @@ function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
   return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
 }
 
-describe('insertSorted', () => {
-  test('inserts into empty array', () => {
-    expect(insertSorted([], 'b')).toEqual(['b']);
+describe('insertSortedBy', () => {
+  const partKey = (part: Part): string => part.id;
+
+  test('inserts a message id into an empty array', () => {
+    expect(insertSortedBy([], 'b', messageIdKey)).toEqual(['b']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = ['b', 'd'];
-    expect(insertSorted(arr, 'a')).toEqual(['a', 'b', 'd']);
-    expect(insertSorted(arr, 'c')).toEqual(['b', 'c', 'd']);
-    expect(insertSorted(arr, 'e')).toEqual(['b', 'd', 'e']);
+  test('inserts a part into an empty array', () => {
+    const part = makePart('b');
+    expect(insertSortedBy<Part>([], part, partKey)).toEqual([part]);
   });
 
-  test('does not mutate input', () => {
-    const arr = ['a', 'c'];
-    insertSorted(arr, 'b');
-    expect(arr).toEqual(['a', 'c']);
-  });
-});
-
-describe('insertPartSorted', () => {
-  test('inserts into empty array', () => {
-    const p = makePart('b');
-    expect(insertPartSorted([], p)).toEqual([p]);
+  test('inserts a message id at beginning, middle, and end', () => {
+    const ids = ['b', 'd'];
+    expect(insertSortedBy(ids, 'a', messageIdKey)).toEqual(['a', 'b', 'd']);
+    expect(insertSortedBy(ids, 'c', messageIdKey)).toEqual(['b', 'c', 'd']);
+    expect(insertSortedBy(ids, 'e', messageIdKey)).toEqual(['b', 'd', 'e']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = [makePart('b'), makePart('d')];
-    expect(insertPartSorted(arr, makePart('a')).map(p => p.id)).toEqual(['a', 'b', 'd']);
-    expect(insertPartSorted(arr, makePart('c')).map(p => p.id)).toEqual(['b', 'c', 'd']);
-    expect(insertPartSorted(arr, makePart('e')).map(p => p.id)).toEqual(['b', 'd', 'e']);
+  test('inserts a part at beginning, middle, and end', () => {
+    const parts = [makePart('b'), makePart('d')];
+    const inserted = (id: string) =>
+      insertSortedBy(parts, makePart(id), partKey).map(part => part.id);
+    expect(inserted('a')).toEqual(['a', 'b', 'd']);
+    expect(inserted('c')).toEqual(['b', 'c', 'd']);
+    expect(inserted('e')).toEqual(['b', 'd', 'e']);
   });
 
-  test('does not mutate input', () => {
-    const arr = [makePart('a'), makePart('c')];
-    insertPartSorted(arr, makePart('b'));
-    expect(arr).toHaveLength(2);
+  test('does not mutate the message id array', () => {
+    const ids = ['a', 'c'];
+    insertSortedBy(ids, 'b', messageIdKey);
+    expect(ids).toEqual(['a', 'c']);
+  });
+
+  test('does not mutate the part array', () => {
+    const parts = [makePart('a'), makePart('c')];
+    insertSortedBy(parts, makePart('b'), partKey);
+    expect(parts).toHaveLength(2);
   });
 });
 
@@ -610,6 +700,17 @@ describe('createReadonlyPartView', () => {
     delete (view as Record<string, unknown>)['text'];
     expect((view as Part & { text: string }).text).toBe('hello');
   });
+
+  test('mutations through the view do not reach the stored part', () => {
+    const stored = makePart('p1', 'hello');
+    const view = createReadonlyPartView(stored);
+    (view as { text: string }).text = 'changed';
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (view as Record<string, unknown>)['id'];
+    expect((stored as Part & { text: string }).text).toBe('hello');
+    expect(stored.id).toBe('p1');
+    expect((view as { text: string }).text).toBe('hello');
+  });
 });
 
 describe('applyTextDeltas', () => {
@@ -674,13 +775,12 @@ describe('appendPartTextChunks', () => {
 
 describe('publishPartsChanged', () => {
   test('invalidates the message snapshot and notifies only its channel', () => {
-    const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
+    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
-    const subscribers = new Map<string, Set<() => void>>([
-      ['parts:msg-1', new Set([partsCallback])],
-      ['message:msg-1', new Set([messageCallback])],
-    ]);
+    const subscribers = createSubscriberRegistry();
+    subscribers.subscribe('parts:msg-1', partsCallback);
+    subscribers.subscribe('message:msg-1', messageCallback);
 
     publishPartsChanged(snapshot, subscribers, 'msg-1');
 
@@ -703,25 +803,48 @@ describe('createSeedTextPart', () => {
   });
 });
 
-describe('notify', () => {
+describe('createSubscriberRegistry', () => {
   test('calls all registered callbacks for matching key', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const subs = new Map([['k', new Set([cb1, cb2])]]);
-    notify(subs, 'k');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(messageKey('msg-1'), cb1);
+    registry.subscribe(messageKey('msg-1'), cb2);
+    registry.notify(messageKey('msg-1'));
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
 
   test('no-op for missing key', () => {
     const cb = jest.fn();
-    const subs = new Map([['k', new Set([cb])]]);
-    notify(subs, 'other');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(partsKey('msg-1'), cb);
+    registry.notify(messageKey('msg-2'));
     expect(cb).not.toHaveBeenCalled();
   });
 
-  test('no-op for empty subscriber map', () => {
-    expect(() => notify(new Map(), 'k')).not.toThrow();
+  test('no-op for empty registry', () => {
+    expect(() => createSubscriberRegistry().notify(messageIdsKey)).not.toThrow();
+  });
+
+  test('built keys address the channels the registry notifies', () => {
+    const registry = createSubscriberRegistry();
+    const idsCb = jest.fn();
+    const messageCb = jest.fn();
+    const partsCb = jest.fn();
+    registry.subscribe(messageIdsKey, idsCb);
+    registry.subscribe(messageKey('msg-1'), messageCb);
+    registry.subscribe(partsKey('msg-1'), partsCb);
+
+    registry.notifyMessageIds();
+    registry.notifyMessage('msg-1');
+    registry.notifyParts('msg-1');
+
+    expect(idsCb).toHaveBeenCalledTimes(1);
+    expect(messageCb).toHaveBeenCalledTimes(1);
+    expect(partsCb).toHaveBeenCalledTimes(1);
+    registry.notifyMessage('msg-2');
+    expect(messageCb).toHaveBeenCalledTimes(1);
   });
 });
 

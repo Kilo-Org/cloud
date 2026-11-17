@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Az ügynök munkameneted frissítést kapott",
-      "chatMessage": "Új üzeneted van",
-      "instanceLifecycle": "A példányod frissítést kapott",
-      "scheduledAction": "Egy ütemezett művelet frissítést kapott",
       "lowBalance": "Az egyenleged figyelmet igényel",
       "spendAlert": "A költésed figyelmet igényel",
       "securityFinding": "Egy biztonsági találat figyelmet igényel",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Feladat befejezve"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nem sikerült: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Megszakítva: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Cím nélkül",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Költésfigyelmeztetés",
       "body": "{{scopeName}} költése meghaladta a(z) ${{amountUsd}} összeget"
     },
-    "securityFindingNew": {
-      "title": "Új biztonsági találat ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Új biztonsági találat ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA figyelmeztetés",
-      "body": "{{findingTitle}} itt: {{repoFullName}}"
+      "title": "SLA figyelmeztetés"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA megsértése",
-      "body": "{{findingTitle}} itt: {{repoFullName}}"
+      "title": "SLA megsértése"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Egy biztonsági ellenőrzés frissítést kapott"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} kész",
-      "body": "Koppints a csevegés indításához."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} nem tudott elindulni",
-      "body": "Az indítás nem sikerült."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} hamarosan újraindul",
-      "body": "Újraindítás ütemezve erre: {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} újraindítása törölve",
-      "body": "A korábban ütemezett újraindítás törlésre került."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} hamarosan frissül",
-      "bodyWithTag": "Frissítés erre: {{targetImageTag}}, ekkor: {{when}}.",
-      "bodyWithoutTag": "Ütemezett frissítés ekkor: {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} frissítése törölve",
-      "body": "A korábban ütemezett frissítés törlésre került."
     }
   },
   "sessionReady": {

@@ -1,118 +1,23 @@
-// The picker's Manage access control is the only way to widen what the
-// repository list may show, so a tap that produces nothing is the whole defect:
-// it has to draw a busy state while the install state is minted, never start a
-// second launch from a repeated tap, and report a launch that failed — including
-// one that failed after the app's own return edge ended the wait.
+// The Manage-access control's busy state, its mint failures, and the return edge
+// its caller resyncs from. Mocks and mounting live in the helpers module, whose
+// import MUST stay first: it registers the module mocks while it is evaluated.
 
-import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
 import {
-  type ManageRepositoryAccess,
-  useManageRepositoryAccess,
-} from './use-manage-repository-access';
+  accessMocks,
+  HANDOFF_URL,
+  mountHook,
+  requireHook,
+  resetAccessMocks,
+} from './use-manage-repository-access.test-helpers';
 
-const mocks = vi.hoisted(() => ({
-  toastError: vi.fn(),
-  mintInstallState: vi.fn((_input: unknown): Promise<{ token: string }> =>
-    Promise.resolve({ token: 'install-token' })
-  ),
-  launch: vi.fn<(url: string) => Promise<unknown>>(),
-}));
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
-
-vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-
-vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  isPersonal: (scope: string) => scope === 'personal',
-}));
-
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
-
-vi.mock('@/lib/agent-github-integration', () => ({
-  getGitHubIntegrationUrl: (base: string, orgId: string | undefined, token?: string) =>
-    `${base}/${orgId ?? 'personal'}${token ? `?state=${token}` : ''}`,
-}));
-
-vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: (base: string, orgId: string | undefined) =>
-    `${base}/${orgId ?? 'personal'}/gitlab`,
-}));
-
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mocks.mintInstallState } } },
-}));
-
-vi.mock('react-native', () => ({
-  Platform: { OS: 'android' },
-  AppState: {
-    addEventListener: () => ({ remove: () => undefined }),
-    currentState: 'active',
-  },
-}));
-
-vi.mock('expo-web-browser', () => ({
-  openAuthSessionAsync: vi.fn(),
-  openBrowserAsync: vi.fn(),
-  WebBrowserResultType: { OPENED: 'opened', CANCEL: 'cancel', DISMISS: 'dismiss' },
-}));
-
-// Only the launch is faked: the late-failure report under test is the real one.
-vi.mock('@/lib/pr-review/connect-gate-platform', async importOriginal => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  openAuthorizationAndWaitForReturn: mocks.launch,
-}));
-
-type HookResult = ManageRepositoryAccess | undefined;
-
-type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
-
-function Harness({
-  scope,
-  platform,
-  handlers,
-  resultRef,
-}: {
-  scope: string;
-  platform: 'github' | 'gitlab' | 'bitbucket';
-  handlers: Handlers;
-  resultRef: { current: HookResult };
-}) {
-  resultRef.current = useManageRepositoryAccess(scope, platform, handlers);
-  return null;
-}
-
-function mountHook(
-  scope: string,
-  platform: 'github' | 'gitlab' | 'bitbucket',
-  handlers: Handlers = {}
-): { current: HookResult } {
-  const resultRef: { current: HookResult } = { current: undefined };
-  act(() => {
-    TestRenderer.create(React.createElement(Harness, { scope, platform, handlers, resultRef }));
-  });
-  return resultRef;
-}
-
-function requireHook(resultRef: { current: HookResult }): ManageRepositoryAccess {
-  const result = resultRef.current;
-  if (!result) {
-    throw new Error('useManageRepositoryAccess returned no action');
-  }
-  return result;
-}
+const mocks = accessMocks();
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.mintInstallState.mockImplementation(() => Promise.resolve({ token: 'install-token' }));
-  mocks.launch.mockImplementation(() =>
-    Promise.resolve({ reported: Promise.resolve({ type: 'dismiss' }), settledByLaunch: true })
-  );
+  resetAccessMocks();
 });
 
 describe('useManageRepositoryAccess', () => {
@@ -137,10 +42,9 @@ describe('useManageRepositoryAccess', () => {
     // so the tap is never inert.
     expect(onOpen).toHaveBeenCalledOnce();
     expect(onReturn).not.toHaveBeenCalled();
-    expect(mocks.mintInstallState).toHaveBeenCalledTimes(1);
-    expect(mocks.launch).toHaveBeenCalledWith(
-      'https://app.example.com/personal?state=install-token'
-    );
+    expect(mocks.handoffUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
 
     await act(async () => {
       pendingLaunch.resolve({
@@ -205,7 +109,7 @@ describe('useManageRepositoryAccess', () => {
         requireHook(resultRef).handlePress();
         await Promise.resolve();
       });
-      expect(mocks.mintInstallState).toHaveBeenCalledTimes(2);
+      expect(mocks.handoffUrl).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
@@ -264,7 +168,7 @@ describe('useManageRepositoryAccess', () => {
       await Promise.resolve();
     });
 
-    expect(mocks.mintInstallState).toHaveBeenCalledTimes(1);
+    expect(mocks.handoffUrl).toHaveBeenCalledTimes(1);
     expect(mocks.launch).toHaveBeenCalledTimes(1);
   });
 
@@ -304,7 +208,7 @@ describe('useManageRepositoryAccess', () => {
   });
 
   it('reports a failed mint instead of leaving the tap unanswered', async () => {
-    mocks.mintInstallState.mockRejectedValue(new Error('mint failed'));
+    mocks.handoffUrl.mockRejectedValue(new Error('mint failed'));
     const resultRef = mountHook('personal', 'github');
 
     await act(() => {
@@ -318,43 +222,53 @@ describe('useManageRepositoryAccess', () => {
     expect(requireHook(resultRef).pending).toBe(false);
   });
 
-  // The organization's mint is narrower than the screens that offer this
-  // control: a member is refused with UNAUTHORIZED, and an installation that
-  // cannot take another one with FORBIDDEN. Neither can mint a token, and the
-  // page works without one — so the tap opens it rather than answering nothing
-  // in the one state that needs a route to it.
-  for (const code of ['UNAUTHORIZED', 'FORBIDDEN']) {
-    it(`opens the settings page without a token when the organization's mint is refused with ${code}`, async () => {
-      mocks.mintInstallState.mockRejectedValue({ data: { code } });
-      const onReturn = vi.fn<(opened: boolean) => void>();
-      const resultRef = mountHook('org_123', 'github', { onReturn });
-
-      await act(() => {
-        requireHook(resultRef).handlePress();
-      });
-
-      await vi.waitFor(() => {
-        expect(onReturn).toHaveBeenCalledWith(true);
-      });
-      expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
-      expect(mocks.toastError).not.toHaveBeenCalled();
-    });
-  }
-
-  // A personal scope has no page-level fallback to reach: the page mints its
-  // own state for a signed-in user, and a personal mint failure still has to be
-  // reported.
-  it('still reports a refused personal mint', async () => {
-    mocks.mintInstallState.mockRejectedValue({ data: { code: 'UNAUTHORIZED' } });
-    const resultRef = mountHook('personal', 'github');
+  it('names the organization on the GitHub hand-off target', async () => {
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('org_123', 'github', { onReturn });
 
     await act(() => {
       requireHook(resultRef).handlePress();
     });
 
     await vi.waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith('prReview.couldNotOpenGitHubAppSettings');
+      expect(onReturn).toHaveBeenCalledWith(true);
     });
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({
+      page: 'github-app',
+      organizationId: 'org_123',
+    });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
+  });
+
+  it('hands off to the GitLab integration shell page for a personal scope', async () => {
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('personal', 'gitlab', { onReturn });
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(onReturn).toHaveBeenCalledWith(true);
+    });
+    expect(mocks.handoffUrl).toHaveBeenCalledWith({ page: 'integration', platform: 'gitlab' });
+    expect(mocks.launch).toHaveBeenCalledWith(HANDOFF_URL);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed GitLab mint instead of leaving the tap unanswered', async () => {
+    mocks.handoffUrl.mockRejectedValue(new Error('mint failed'));
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('personal', 'gitlab', { onReturn });
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('common.couldNotOpen');
+    });
+    expect(onReturn).toHaveBeenCalledWith(false);
     expect(mocks.launch).not.toHaveBeenCalled();
   });
 });

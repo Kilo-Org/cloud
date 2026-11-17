@@ -8,6 +8,10 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  toSharedTranscriptMessages,
+  type SharedTranscriptMessage,
+} from '@/lib/shared-session-transcript';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
@@ -22,10 +26,6 @@ import {
   type KiloSdkMessageHistory,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
-
-// ---------------------------------------------------------------------------
-// Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)
-// ---------------------------------------------------------------------------
 
 // Mirrors SharedSessionSnapshotSchema from cloudflare-session-ingest/src/util/share-output.ts.
 // Kept in sync manually (same pattern as cloud-agent-client.ts).
@@ -57,10 +57,6 @@ const SessionSnapshotSchema = z.object({
   ),
 });
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /**
  * Snapshot returned by the session-ingest export endpoint.
  * Contains the final compacted state of all messages — NOT streaming deltas.
@@ -68,10 +64,6 @@ const SessionSnapshotSchema = z.object({
 export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export type SessionMessage = SessionSnapshot['messages'][number];
-
-// ---------------------------------------------------------------------------
-// Bounded fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Redact a request URL to an allow-listed route label for logging: the
@@ -146,10 +138,6 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
   }
 }
 
-// ---------------------------------------------------------------------------
-// Failure mapping
-// ---------------------------------------------------------------------------
-
 /**
  * The tRPC error one session-ingest call failure becomes.
  *
@@ -167,10 +155,6 @@ export function sessionIngestTrpcError(message: string, cause: unknown): TRPCErr
     cause,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Fetch the session snapshot from the session-ingest service.
@@ -227,10 +211,6 @@ export async function fetchSessionMessages(
   const snapshot = await fetchSessionSnapshot(sessionId, user.id);
   return snapshot?.messages ?? null;
 }
-
-// ---------------------------------------------------------------------------
-// Paginated authorized session-message history
-// ---------------------------------------------------------------------------
 
 const SessionMessagesPageResponseSchema = z.object({
   success: z.literal(true),
@@ -334,10 +314,6 @@ export async function fetchSessionMessagesPage(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Session diff
-// ---------------------------------------------------------------------------
-
 const SessionDiffResponseSchema = z.object({
   success: z.literal(true),
   diff: sessionDiffReadSchema,
@@ -396,14 +372,14 @@ export async function fetchSessionDiff(
   return parsed.data.diff;
 }
 
-// ---------------------------------------------------------------------------
-// Share
-// ---------------------------------------------------------------------------
-
 const ShareResponseSchema = z
   .object({
     success: z.literal(true),
     share_token: z.string().min(1),
+    /* The capability the worker wrote. Optional because a worker older than this
+       client answers with the token alone; the caller then keeps today's
+       behaviour, which is showing the link without rotation detection. */
+    public_id: z.string().min(1).optional(),
   })
   .strict();
 
@@ -431,13 +407,16 @@ export class SessionShareTooLargeError extends Error {
  * Calls POST /session/:sessionId/share, which rotates the public capability.
  * Each call issues a fresh share generation and invalidates the previous link.
  *
- * @returns The opaque JWT used to construct the /s/{share_token} share URL.
+ * @returns The opaque JWT used to construct the /s/{share_token} share URL, and
+ *   the capability the worker created, which is what tells this link from a
+ *   later one. `public_id` is null only while a worker older than this client
+ *   answers.
  */
 export async function shareSession(
   sessionId: string,
   userId: string,
   options: Partial<SessionShareOptions> = {}
-): Promise<{ share_token: string }> {
+): Promise<{ share_token: string; public_id: string | null }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
@@ -475,7 +454,7 @@ export async function shareSession(
   }
 
   const body = ShareResponseSchema.parse(await response.json());
-  return { share_token: body.share_token };
+  return { share_token: body.share_token, public_id: body.public_id ?? null };
 }
 
 /**
@@ -618,9 +597,59 @@ export async function fetchSharedSessionSnapshot(
   return parsed.data;
 }
 
-// ---------------------------------------------------------------------------
-// Authorization cache invalidation
-// ---------------------------------------------------------------------------
+/** A public share as the read-only viewer needs it: who shared it, and what it says. */
+export type SharedSessionRead = {
+  metadata: SharedSessionMetadata;
+  messages: SharedTranscriptMessage[];
+  /**
+   * The link is valid but the snapshot behind it could not be read. The viewer
+   * still shows the session's identity and says the transcript is unavailable,
+   * exactly like the public web page does.
+   */
+  transcriptUnavailable: boolean;
+};
+
+/**
+ * Read a publicly shared session by its share token.
+ *
+ * Returns null when the token names no live share — expired, revoked, rotated
+ * out by a newer link, or never valid. That is the one answer the viewer treats
+ * as terminal, because retrying it cannot succeed.
+ *
+ * The snapshot is validated into renderable messages here, so every client of
+ * this capability receives the same transcript the public web page shows. The
+ * token is intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSession(shareToken: string): Promise<SharedSessionRead | null> {
+  // Both reads are capped by the same upstream budget, and the control-plane
+  // procedure budget is only slightly larger, so issuing them in sequence can
+  // fail a link that is valid. The public page reads them together too. A
+  // snapshot rejection is folded into a settled result so a dead link still
+  // answers null below rather than surfacing the snapshot's error.
+  const [metadata, snapshotRead] = await Promise.all([
+    fetchSharedSessionMetadata(shareToken),
+    fetchSharedSessionSnapshot(shareToken).then(
+      snapshot => ({ ok: true as const, snapshot }),
+      () => ({ ok: false as const, snapshot: null })
+    ),
+  ]);
+  if (!metadata) {
+    return null;
+  }
+
+  if (!snapshotRead.ok || snapshotRead.snapshot === null) {
+    // A valid capability whose snapshot read failed is not a dead link: the
+    // metadata above resolved, so the viewer keeps the session and reports the
+    // transcript as unavailable rather than claiming the link expired.
+    return { metadata, messages: [], transcriptUnavailable: true };
+  }
+
+  return {
+    metadata,
+    messages: toSharedTranscriptMessages(snapshotRead.snapshot.messages),
+    transcriptUnavailable: false,
+  };
+}
 
 export async function invalidateOrganizationSessionAccess(
   kiloUserId: string,
@@ -661,10 +690,6 @@ export async function invalidateOrganizationSessionAccess(
     throw error;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Delete
-// ---------------------------------------------------------------------------
 
 /**
  * Delete a session via the session-ingest worker.

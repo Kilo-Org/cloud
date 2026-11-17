@@ -136,8 +136,16 @@ export class EventServiceClient {
   }
 
   private async handleAuthFailure(err: unknown): Promise<boolean> {
-    if (!(err instanceof WebSocketAuthError) || !this.onUnauthorized) {
+    if (!(err instanceof WebSocketAuthError)) {
       return false;
+    }
+
+    // Without a handler no consumer can refresh the credential, so a refused
+    // ticket is terminal for this client.
+    if (!this.onUnauthorized) {
+      console.warn('[event-service] connection ticket refused; no onUnauthorized handler');
+      this.stopAfterUnauthorized();
+      return true;
     }
 
     if (this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS) {

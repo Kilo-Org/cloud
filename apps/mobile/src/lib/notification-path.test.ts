@@ -62,19 +62,6 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/agent-briefing?via=push');
   });
 
-  it.each([
-    {
-      type: 'chat.message',
-      sandboxId: 'sandbox-1',
-      conversationId: 'conversation-1',
-      messageId: 'm1',
-    },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
-  ] as const)('ignores retired notification destination $type', data => {
-    expect(notificationPathForData(data)).toBeNull();
-  });
-
   it('routes cloud agent notifications to the matching agent session', () => {
     expect(
       notificationPathForData({

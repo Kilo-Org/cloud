@@ -477,10 +477,28 @@ export const organizationsRouter = createTRPCRouter({
   update: organizationBillingMutationProcedure
     .input(OrganizationUpdateSchema)
     .mutation(async opts => {
-      await db
-        .update(organizations)
-        .set({ name: opts.input.name })
-        .where(eq(organizations.id, opts.input.organizationId));
+      await db.transaction(async tx => {
+        const [current] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, opts.input.organizationId));
+        const oldName = current?.name;
+        await tx
+          .update(organizations)
+          .set({ name: opts.input.name })
+          .where(eq(organizations.id, opts.input.organizationId));
+        if (oldName !== undefined && oldName !== opts.input.name) {
+          await createAuditLog({
+            organization_id: opts.input.organizationId,
+            action: 'organization.settings.change',
+            actor_email: opts.ctx.user.google_user_email,
+            actor_id: opts.ctx.user.id,
+            actor_name: opts.ctx.user.google_user_name,
+            message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
+            tx,
+          });
+        }
+      });
       return {
         organization: {
           id: opts.input.organizationId,

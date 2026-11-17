@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { CHATGPT_ACCESS_FLAG } from '@kilocode/app-shared/feature-flags';
 import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
 
 /**
@@ -79,7 +79,12 @@ export function BYOKContent({
             ) : chatGptEnabled === undefined ? (
               <OpenAiChatGptCardView status={undefined} isOrganization />
             ) : null}
-            <ClaudeBillingCard organizationId={organizationId} />
+          </ConnectionSection>
+          <ConnectionSection
+            title="Claude billing"
+            description="Members’ requests and Kilo services such as code review bill through one Claude organization. Only owners and admins can link or remove it."
+          >
+            <ClaudeBillingCard organizationId={organizationId} scope="organization" />
           </ConnectionSection>
           {hasPermission ? (
             <>
@@ -92,7 +97,6 @@ export function BYOKContent({
                 ) : chatGptEnabled === undefined ? (
                   <ChatGptSharedServicesCardView status={undefined} />
                 ) : null}
-                <ClaudeBillingCard organizationId={organizationId} scope="shared_services" />
               </ConnectionSection>
               <BYOKKeysManager organizationId={organizationId} />
             </>

@@ -13,8 +13,10 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearScopeNames } from '@/lib/code-reviewer-scope-name';
 import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
+import { clearCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
@@ -23,6 +25,7 @@ import { noteLauncherSurfacesCleared } from '@/lib/launcher-surfaces-publish';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
+import { clearMergeOperationKeys } from '@/lib/pr-review/merge/pr-merge-operation-key';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearAccountStagedShareNavigation } from '@/lib/share-navigation';
 import { clearAccountStagedSharePayloads } from '@/lib/share-payload';
@@ -51,25 +54,14 @@ function clearSearchIndexBestEffort(): void {
 }
 
 /**
- * Re-run the OS search clear on an app launch that restored no session.
- *
- * The sign-out teardown fires the clear once and cannot await it, and the
- * process can be killed before it lands, so a failure there would leave the
- * previous account's session, pull-request and security titles searchable for
- * the whole signed-out window with nothing to retry it — the index sync is
- * gated off while signed out. This is that retry: on a signed-out launch the
- * sync never runs, so a wiped ledger cannot re-index anything, and the next
- * sign-in re-indexes its own account from its own cache.
+ * Re-runs the clears for a launch with no stored session, so the surfaces that
+ * outlive a session start empty.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
-  // The intent catalog is the same titles in another place, and its clear has
-  // the same one-shot problem: the teardown fired it without awaiting, so a
-  // process killed before it landed would leave the previous account's sessions
-  // named by Siri for the whole signed-out window. The signed-out launch is that
-  // retry, and running it while signed out cannot re-publish anything because
-  // the sync is gated off.
   clearSessionCatalogBestEffort();
+  runClear(clearArtifactMirror);
+  runClear(notifyArtifactsChanged);
 }
 
 /**
@@ -107,13 +99,15 @@ function clearRecentPrsBestEffort(): void {
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
  * PR discussion conversation, the staged share deliveries, the phone's own
- * search index, the OS launcher shortcuts and tile, and the durable
- * last-opened-session and last-route records. Every member is
+ * search index, the OS launcher shortcuts and tile, the per-organization code
+ * reviewer analytics platform and period selection, the durable
+ * last-opened-session and last-route records, and the remembered Code Reviewer
+ * scope names. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
  * a rejection is reported through telemetry, and the signed-out-launch re-clear
- * retries the index clear.
+ * retries the device-wide members.
  *
  * Both boundaries call this: the sign-out body and the account switch. A clear
  * that only the sign-out path ran would let a direct switch hand the next
@@ -134,6 +128,11 @@ export function clearSessionScopedState(): void {
   // stores: a form left open under the previous account must not reopen under
   // the next one.
   runClear(clearFormDrafts);
+  // A retained merge intent is an operation key the server's ledger still holds
+  // for 30 days, and it names this account's pull request. Replaying it under
+  // the next account must be impossible, so the boundary drops the merge
+  // domain's retained keys with the other account-scoped members.
+  runClear(clearMergeOperationKeys);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);
@@ -145,6 +144,11 @@ export function clearSessionScopedState(): void {
   runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
+  // The analytics platform and period are a per-organization choice held in
+  // memory, so the account boundary drops it with the other session-scoped
+  // members: the next account must not open an organization on the previous
+  // account's analytics choice.
+  runClear(clearCodeReviewerAnalyticsFilters);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
   // dropping the engine memo keeps a completed run from repopulating it. The
   // wipe alone is invisible to an open Files app, which keeps the listing it
@@ -207,6 +211,11 @@ export function clearSessionScopedState(): void {
   // to the account that is signed in.
   runClear(clearLastOpenedSession);
   runClear(clearLastRoute);
+  // The remembered scope names title a header by organization id, and an
+  // organization the next account does not belong to must never keep painting
+  // the previous account's name, so they go with the other account-bound
+  // records.
+  runClear(clearScopeNames);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

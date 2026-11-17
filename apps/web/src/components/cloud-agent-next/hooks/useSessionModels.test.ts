@@ -39,8 +39,8 @@ describe('useSessionModels', () => {
       jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
         modelOptions: [],
         isLoadingModels: requested,
+        hasLoadedModels: false,
         contextLengthByModelId: new Map(),
-        defaultModel: undefined,
       });
       function Picker() {
         const models = useSessionModels({
@@ -65,8 +65,8 @@ describe('useSessionModels', () => {
     jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
       modelOptions: [],
       isLoadingModels: true,
+      hasLoadedModels: false,
       contextLengthByModelId: new Map(),
-      defaultModel: undefined,
     });
     function Picker() {
       useSessionModels({
@@ -89,8 +89,8 @@ describe('useSessionModels', () => {
     jest.mocked(useOrganizationModels).mockReturnValue({
       modelOptions: isLoadingModels ? [] : gatewayModels,
       isLoadingModels,
+      hasLoadedModels: !isLoadingModels,
       contextLengthByModelId: new Map(),
-      defaultModel: undefined,
     });
     function Picker() {
       const models = useSessionModels({
@@ -119,6 +119,100 @@ describe('useSessionModels', () => {
     expect(renderToStaticMarkup(createElement(Picker))).toBe(
       '<output data-loading="false">Claude Sonnet 4:high</output>'
     );
+  });
+  it('uses the cached organization catalog before the model picker opens', () => {
+    jest
+      .mocked(useOrganizationModels)
+      .mockClear()
+      .mockReturnValue({
+        modelOptions: gatewayModels,
+        isLoadingModels: false,
+        hasLoadedModels: true,
+        contextLengthByModelId: new Map([[gatewayModels[0].id, 200_000]]),
+      });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: gatewayModels[0].id,
+        fetchedSessionData: { organizationId: 'org-owning' },
+        sessionIdFromParams: 'session-2',
+        knownModels: [
+          { ...gatewayModels[0], name: 'Old name', variants: [], mayTrainOnYourPrompts: false },
+        ],
+        loadGatewayCatalog: false,
+      });
+      return createElement(
+        'output',
+        null,
+        models.modelOptions[0]?.name,
+        ':',
+        models.availableVariants.join(','),
+        ':',
+        models.gatewayContextLengthByModelId.get(gatewayModels[0].id)
+      );
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe(
+      '<output>Claude Sonnet 4:none,high:200000</output>'
+    );
+    expect(useOrganizationModels).toHaveBeenCalledWith('org-owning', false);
+  });
+
+  it('honors a cached empty catalog instead of restoring a model removed by policy', () => {
+    jest.mocked(useOrganizationModels).mockReturnValue({
+      modelOptions: [],
+      isLoadingModels: false,
+      hasLoadedModels: true,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: gatewayModels[0].id,
+        fetchedSessionData: { organizationId: 'org-owning' },
+        sessionIdFromParams: 'session-2',
+        knownModels: [{ ...gatewayModels[0], mayTrainOnYourPrompts: false }],
+        loadGatewayCatalog: false,
+      });
+      return createElement(
+        'output',
+        { 'data-loading': models.isLoadingModels },
+        models.modelOptions.length
+      );
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe(
+      '<output data-loading="false">0</output>'
+    );
+  });
+
+  it('does not expose a cached catalog before an existing chat owner is resolved', () => {
+    jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+      modelOptions: gatewayModels,
+      isLoadingModels: false,
+      hasLoadedModels: true,
+      contextLengthByModelId: new Map(),
+    });
+    function Picker() {
+      const models = useSessionModels({
+        activeSessionType: null,
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        fetchedSessionData: null,
+        routeOrganizationId: 'org-other',
+        sessionIdFromParams: 'session-unresolved',
+        knownModels: [],
+        loadGatewayCatalog: false,
+      });
+      return createElement('output', null, models.modelOptions.length);
+    }
+    expect(renderToStaticMarkup(createElement(Picker))).toBe('<output>0</output>');
+    expect(useOrganizationModels).toHaveBeenCalledWith(undefined, false);
   });
 });
 

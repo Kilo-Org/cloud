@@ -1,4 +1,3 @@
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -8,11 +7,8 @@ import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { parseTimestamp } from '@/lib/utils';
-
-/** The passkey list as `user.getPasskeys` returns it; the types are derived, never copied. */
-export type PasskeysResult = inferRouterOutputs<MobileRouter>['user']['getPasskeys'];
-export type PasskeyRow = PasskeysResult['passkeys'][number];
 
 /** One passkey: its name (or the default when the server stored none), the date
  * it was added, the date it was last used when the server recorded one, and the

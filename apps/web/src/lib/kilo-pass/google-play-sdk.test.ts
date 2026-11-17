@@ -134,7 +134,7 @@ describe('google-play-sdk', () => {
     const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
 
     expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
-      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is not set'
+      'Missing required environment variable GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON'
     );
   });
 
@@ -148,6 +148,50 @@ describe('google-play-sdk', () => {
     expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
       'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
     );
+  });
+
+  it('throws when the service account JSON is not an object', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = '[]';
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('throws when a service account field is not a non-empty string', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = JSON.stringify({
+      client_email: 'publisher@example.com',
+      private_key: 12345,
+    });
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('passes unknown service account fields through to the auth client', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = JSON.stringify({
+      client_email: 'publisher@example.com',
+      private_key: 'private-key',
+      project_id: 'kilo-play-project',
+    });
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    createGooglePlayAndroidPublisherClient();
+
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials: expect.objectContaining({
+        client_email: 'publisher@example.com',
+        private_key: 'private-key',
+        project_id: 'kilo-play-project',
+      }),
+      scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    });
   });
 
   it('throws when the service account value is not JSON', () => {

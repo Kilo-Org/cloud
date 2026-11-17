@@ -162,7 +162,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         instance_name: 'Research Claw',
         scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
         admin_message_section: new RawHtml(
-          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+          '<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
         ),
       };
     case 'clawScheduledVersionChangeNotice':
@@ -172,7 +172,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         instance_name: 'Research Claw',
         scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
         admin_message_section: new RawHtml(
-          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+          '<p class="kc-box" style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
         ),
         version_change_section:
           'Upgrading from v1.2.3 (OpenClaw 0.9.0) to v1.2.4 (OpenClaw 0.9.1).',
@@ -319,10 +319,10 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       });
     case 'recommendationsDigest': {
       const recRow = (title: string, description: string, label: string, url: string) =>
-        `<tr><td style="padding: 14px 0; border-top: 1px solid #ebebea">` +
-        `<p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${title}</p>` +
-        `<p style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${description}</p>` +
-        `<a href="${url}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${label}</a>` +
+        `<tr><td class="kc-divider" style="padding: 14px 0; border-top: 1px solid #ebebea">` +
+        `<p class="kc-strong" style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${title}</p>` +
+        `<p class="kc-muted" style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${description}</p>` +
+        `<a class="kc-strong" href="${url}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${label}</a>` +
         `</td></tr>`;
       return {
         organization_name: 'Acme Corp',

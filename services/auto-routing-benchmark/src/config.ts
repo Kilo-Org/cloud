@@ -7,6 +7,7 @@ import type {
 import {
   parseStoredPolicyComputed,
   parseStoredPolicyOverrides,
+  POLICY_SETTING_VALUE_DEFAULTS,
 } from '@kilocode/auto-routing-contracts';
 import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
@@ -23,21 +24,16 @@ export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeci
 // Null when no admin has saved a config yet — the worker never fabricates
 // one, and runs cannot start until a config exists.
 export function mapConfigRows(
+  // The seven fixed policy columns are legacy: they are not read here, and the
+  // effective value comes from the policy setting's fixed constant.
   configRow: {
     router?: AutoRouter;
     accuracy_noise_band?: number;
-    frontier_min_accuracy_delta?: number;
     min_accuracy: number;
-    switch_cost_factor: number;
-    best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
-    low_confidence_threshold?: number | null;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
-    classifier_repetitions: number;
-    decider_repetitions: number;
-    classifier_max_p95_latency_ms: number | null;
     // Stored JSON; entries that fail their key's schema are ignored on read.
     policy_overrides?: unknown;
     policy_computed?: unknown;
@@ -55,21 +51,15 @@ export function mapConfigRows(
 
   return {
     router: configRow.router ?? 'efficient',
-    accuracyNoiseBand: configRow.accuracy_noise_band ?? 0.05,
-    frontierMinAccuracyDelta: configRow.frontier_min_accuracy_delta ?? 0,
+    accuracyNoiseBand:
+      configRow.accuracy_noise_band ?? POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand,
     classifierModels,
     deciderModels,
     minAccuracy: configRow.min_accuracy,
-    switchCostFactor: configRow.switch_cost_factor,
-    bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
     productionTokenProfile: configRow.production_token_profile ?? null,
     switchHorizonTurns: configRow.switch_horizon_turns ?? null,
-    lowConfidenceThreshold: configRow.low_confidence_threshold ?? null,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
-    classifierRepetitions: configRow.classifier_repetitions,
-    deciderRepetitions: configRow.decider_repetitions,
-    classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
     policyOverrides: parseStoredPolicyOverrides(configRow.policy_overrides),
     policyComputed: parseStoredPolicyComputed(configRow.policy_computed),
     updatedAt: configRow.updated_at,
@@ -101,17 +91,10 @@ export async function saveBenchmarkConfig(
     {
       min_accuracy: config.minAccuracy,
       accuracy_noise_band: config.accuracyNoiseBand,
-      frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
-      switch_cost_factor: config.switchCostFactor,
-      best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       production_token_profile: config.productionTokenProfile,
       switch_horizon_turns: config.switchHorizonTurns,
-      low_confidence_threshold: config.lowConfidenceThreshold,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,
-      classifier_repetitions: config.classifierRepetitions,
-      decider_repetitions: config.deciderRepetitions,
-      classifier_max_p95_latency_ms: config.classifierMaxP95LatencyMs,
       policy_overrides: config.policyOverrides ?? null,
       updated_at: updatedAt,
       updated_by: updatedBy,

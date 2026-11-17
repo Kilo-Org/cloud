@@ -61,6 +61,9 @@ export function fakeBridge(
 export const request: ModelRequest = {
   model: 'system',
   maxTokens: 4096,
+  // One chat: every request of this exchange carries it, the way the harness
+  // passes the session id.
+  cacheKey: 'chat-a',
   tools: [
     {
       name: 'time',

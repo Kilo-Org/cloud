@@ -1038,3 +1038,17 @@ describe('deep-link-launch', () => {
     });
   });
 });
+
+// Cold-launch half of the same Android limitation: the org-root filter also
+// delivers the web create pages, and both map to the app's own create screen,
+// so capture stashes that route like any other universal link.
+describe('organization create pages from the org-root Android filter', () => {
+  it.each(['new', 'create'])('captures /organizations/%s as the native screen', page => {
+    _resetDeepLinkLaunchForTests();
+    _setGetLinkingURLForTests(() => `https://app.kilo.ai/organizations/${page}`);
+
+    captureLaunchDeepLink();
+
+    expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/create');
+  });
+});

@@ -42,8 +42,8 @@ import { notificationPathForData, prPathForData } from './notification-path';
 import {
   clearPostedNeedsInputNotification,
   notificationIdentifierForSession,
-  type NotificationPreviews,
-} from './needs-input-notification';
+} from './needs-input-presentation';
+import { type NotificationPreviews } from './needs-input-notification';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
 export async function registerNeedsInputCategories(): Promise<void> {
@@ -113,6 +113,7 @@ function needsInputActionFor(actionId: NeedsInputActionId): Notifications.Notifi
 type NeedsInputInteractionRunner = (input: {
   kiloSessionId: string;
   action: NeedsInputAction;
+  raiseId?: string;
   text?: string;
 }) => Promise<NeedsInputActionOutcome>;
 
@@ -186,49 +187,45 @@ const headlessStringDataSchema = z.string();
  * With the app alive in the background, Expo hands the same response to both
  * the JS response listener and the registered background task
  * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
- * twice. Concurrent dispatches of one response share the first interaction;
- * once it settles, a later tap — on the replaced result notification — is
- * answered again.
+ * twice. Concurrent dispatches of one response share the first one — an action
+ * answers once, and a body tap stashes its destination once; once it settles, a
+ * later tap — on the replaced result notification — is answered again.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
   response: Notifications.NotificationResponse,
   deps: NeedsInputActionDeps = {}
 ): Promise<boolean> {
-  const key = actionDispatchKey(response);
-  if (key === null) {
-    return dispatchNeedsInputResponse(response, deps);
-  }
-  const inFlight = inFlightActionDispatches.get(key);
+  const key = responseDispatchKey(response);
+  const inFlight = inFlightDispatches.get(key);
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackActionDispatch(key, dispatchNeedsInputResponse(response, deps));
-  inFlightActionDispatches.set(key, dispatch);
+  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
 
-// One interaction per tap: the in-flight dispatch for each OS response, keyed
-// by its notification identifier and action. Entries are removed on settle so
-// a retry tap on the replaced notification runs again.
-const inFlightActionDispatches = new Map<string, Promise<boolean>>();
+// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
+// its notification identifier and action. A body tap is deduped like an action
+// button, because Expo delivers a warm-background tap to both the JS listener
+// and the registered background task. Entries are removed on settle so a retry
+// tap on the replaced notification runs again.
+const inFlightDispatches = new Map<string, Promise<boolean>>();
 
-/** The OS identity of a response, or null for identifiers outside our four actions. */
-function actionDispatchKey(response: Notifications.NotificationResponse): string | null {
-  if (!isNeedsInputActionIdentifier(response.actionIdentifier)) {
-    return null;
-  }
+/** The OS identity of a response: its notification identifier and action id. */
+function responseDispatchKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
 /** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackActionDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
   try {
     const result = await dispatch;
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     return result;
   } catch (error) {
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     throw error;
   }
 }
@@ -296,8 +293,8 @@ async function dispatchNeedsInputResponse(
   if (data === null) {
     return false;
   }
-  const path = notificationPathForData(data);
-  if (path === null) {
+  const href = notificationPathForData(data);
+  if (href === null) {
     return false;
   }
   Notifications.clearLastNotificationResponse();
@@ -305,7 +302,7 @@ async function dispatchNeedsInputResponse(
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
+  setPendingDeepLink(href, 'notification', pendingDeepLinkOptionsForData(data));
   return false;
 }
 
@@ -474,6 +471,10 @@ async function runAnswerAction(args: {
     outcome = await (deps.runInteraction ?? defaultRunInteraction)({
       kiloSessionId: data.cliSessionId,
       action,
+      // The raise this notification presented. The interaction answers only
+      // that raise; a payload posted before the field existed omits it and
+      // keeps the earlier behaviour.
+      ...(data.raiseId === undefined ? {} : { raiseId: data.raiseId }),
       ...(action === 'reply' ? { text: response.userText } : {}),
     });
   } catch (error) {

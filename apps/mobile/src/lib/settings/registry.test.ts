@@ -43,7 +43,6 @@ const notificationMutation = vi.hoisted(() => ({
     agentAttention: false,
     agentUpdates: true,
     sessionStatus: true,
-    kiloclawActivity: true,
     balanceAlerts: true,
     securityFindings: true,
     agentPushEnabled: true,

@@ -151,6 +151,28 @@ describe('agent memory search', () => {
     expect(searchAgentMemories(memories, '')).toStrictEqual([]);
     expect(searchAgentMemories(memories, '   ')).toStrictEqual([]);
   });
+
+  it('matches tokens case-insensitively and by shared prefix', () => {
+    const reply = memory({
+      id: 'reply',
+      note: 'Reply style',
+      text: 'User prefers concise replies and metric units.',
+    });
+    const unrelated = memory({ id: 'unrelated', text: 'Deployment checklist for friday' });
+
+    expect(
+      searchAgentMemories([reply, unrelated], 'reply preferences').map(item => item.id)
+    ).toStrictEqual(['reply']);
+    expect(searchAgentMemories([reply, unrelated], 'REPLIES').map(item => item.id)).toStrictEqual([
+      'reply',
+    ]);
+    expect(
+      searchAgentMemories([reply, unrelated], 'concise metric').map(item => item.id)
+    ).toStrictEqual(['reply']);
+    expect(searchAgentMemories([reply, unrelated], 'deploy').map(item => item.id)).toStrictEqual([
+      'unrelated',
+    ]);
+  });
 });
 
 describe('agent memory index formatting', () => {

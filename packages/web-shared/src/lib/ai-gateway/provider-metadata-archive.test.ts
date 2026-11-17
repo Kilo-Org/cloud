@@ -79,7 +79,6 @@ function createRequest(
         outcome: 'selected',
         gateway: provider,
         bounded_spending: true,
-        organization_disabled_vercel_ai_gateway: false,
         kilo_ignored_providers: ['synthetic-ignored'],
       },
     ],

@@ -2734,7 +2734,7 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
-    it("removes the deleted user's own Claude billing connections and keeps the organization's shared one", async () => {
+    it("removes the deleted user's own Claude billing connections and keeps the organization's one", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
       });
@@ -2775,7 +2775,7 @@ describe('User', () => {
       expect(organizationRows[0]?.kilo_user_id).toBeNull();
     });
 
-    it("promotes a deleted user's personal payer when shared services still use it", async () => {
+    it("promotes a deleted user's personal payer when the organization still uses it", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-shared-cleanup-${randomUUID()}@example.com`,
       });
@@ -2798,7 +2798,7 @@ describe('User', () => {
       if (!payer) throw new Error('Missing payer fixture');
       await shareClaudeBillingConnection(
         { kind: 'personal', kiloUserId: user.id },
-        { kind: 'shared_services', organizationId: organization.id },
+        { kind: 'organization', organizationId: organization.id },
         user.id
       );
 
@@ -5474,7 +5474,7 @@ describe('User', () => {
             kind: 'package',
             ecosystem: 'npm',
             identifier: 'example-server',
-            min_version: null,
+            version_spec: null,
           },
           source: { registry: 'custom', id: null },
           created_by_kilo_user_id: actor.id,

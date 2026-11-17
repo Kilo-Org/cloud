@@ -323,7 +323,6 @@ vi.mock('@/components/agents/session-list-search-header', async () => {
     },
   };
 });
-vi.mock('@/components/context-picker-sheet', () => ({ ContextPickerSheet: 'ContextPickerSheet' }));
 vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
   ...(await importOriginal<typeof PlatformFilterModule>()),
   SessionFilterModal: 'SessionFilterModal',
@@ -735,25 +734,32 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
-  it('names the accepted-empty history route by its destination instead of a bare See-all', async () => {
+  it('names the accepted-empty body history link and the header control after the same destination', async () => {
     await renderScreen();
-    const history = action('Session history');
-    expect(history.props.testID).toBe('agents-view-history-empty');
-    expect(history.findByType(Text).children).toEqual(['Session history']);
-    // The body action is the second route into stored history: pressing it must
+    const historyLabel = i18n.t('agents.sessionList.pastSessions');
+    const bodyLink = nodes('Pressable').find(
+      node => node.props.testID === 'agents-view-history-empty'
+    );
+    if (!bodyLink) {
+      throw new Error('Missing body history link');
+    }
+    expect(bodyLink.props.accessibilityLabel).toBe(historyLabel);
+    expect(bodyLink.findByType(Text).children).toEqual([historyLabel]);
+    // One destination carries one name, so the header control and the body link
+    // both read it; only their test ids tell the two controls apart.
+    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
+    // The body link is the second route into stored history: pressing it must
     // reach the same destination the header control does.
-    press('Session history');
+    pressControl('agents-view-history-empty');
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
-    // The non-empty live list keeps the history route in the header, under its
-    // own destination copy instead of this body label.
+    // The non-empty live list keeps the history route in the header alone: the
+    // body link is gone, and the header keeps the same name.
     state.live.activeSessions = [row];
     await renderScreen();
-    expect(action(i18n.t('agents.sessionList.pastSessions')).props.testID).toBe(
-      'agents-view-history'
+    expect(nodes('Pressable').some(node => node.props.testID === 'agents-view-history-empty')).toBe(
+      false
     );
-    expect(
-      nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
-    ).toHaveLength(0);
+    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {

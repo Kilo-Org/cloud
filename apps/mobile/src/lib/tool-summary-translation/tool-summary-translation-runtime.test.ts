@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- one cohesive suite: batching, hydration, expiry, persistence and the generation-staleness cases share one mocked store and client */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type ToolSummaryTranslationScope } from './tool-summary-translation-client';
+import { BATCH_WINDOW_MS } from './tool-summary-translation-runtime';
 import type * as runtimeModule from './tool-summary-translation-runtime';
 
 const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
@@ -20,7 +22,12 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
 const OTHER_MODEL = { id: 'kilo-auto/frontier', name: 'Auto Frontier' };
 
-type BatchRequest = { texts: readonly string[]; targetLanguage: string; model: string };
+type BatchRequest = {
+  texts: readonly string[];
+  targetLanguage: string;
+  model: string;
+  scope: ToolSummaryTranslationScope;
+};
 type StoreEntry = {
   itemId: string;
   language: string;
@@ -78,11 +85,10 @@ function pendingBatches(): ((results: (string | null)[]) => void)[] {
   return resolvers;
 }
 
-/** Longer than the 40 ms batch window plus the lazy client import. */
+/** Advances the runtime's batch window and settles the lazy client import. */
 async function flushBatch(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 150);
-  });
+  await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 /** Wait until every item of the batch is cached under its own id. */
@@ -102,11 +108,16 @@ function waitForTranslations(
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   requestMock.mockReset();
   readMock.mockReset();
   writeMock.mockReset();
   readMock.mockResolvedValue([]);
   writeMock.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('tool summary translation runtime', () => {
@@ -131,7 +142,7 @@ describe('tool summary translation runtime', () => {
     await waitForTranslations(mod, items);
 
     expect(requestMock).toHaveBeenCalledTimes(1);
-    expect(requestCalls()[0]).toEqual({
+    expect(requestCalls()[0]).toMatchObject({
       texts,
       targetLanguage: 'de',
       model: MODEL.id,
@@ -174,7 +185,7 @@ describe('tool summary translation runtime', () => {
     await waitForTranslations(mod, [{ itemId: 'part-2', text: 'second' }]);
 
     expect(requestMock).toHaveBeenCalledTimes(2);
-    expect(requestCalls()[1]).toEqual({
+    expect(requestCalls()[1]).toMatchObject({
       texts: ['second'],
       targetLanguage: 'de',
       model: MODEL.id,
@@ -316,7 +327,7 @@ describe('tool summary translation runtime', () => {
     await waitForTranslations(mod, [{ itemId: 'part-20', text: 'summary 20' }]);
 
     expect(requestMock).toHaveBeenCalledTimes(2);
-    expect(requestCalls()[1]).toEqual({
+    expect(requestCalls()[1]).toMatchObject({
       texts: ['summary 20'],
       targetLanguage: 'de',
       model: MODEL.id,
@@ -617,17 +628,12 @@ describe('tool summary translation hydration', () => {
     );
     const mod = await loadRuntime();
     echoBatch();
-    vi.useFakeTimers();
-    try {
-      mod.ensureTranslation({ itemId: 'part-1', text: 'Hello', language: 'de', model: MODEL });
-      await vi.advanceTimersByTimeAsync(10_000);
-      await vi.advanceTimersByTimeAsync(0);
+    mod.ensureTranslation({ itemId: 'part-1', text: 'Hello', language: 'de', model: MODEL });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(0);
 
-      expect(requestMock).toHaveBeenCalledTimes(1);
-      expect(requestCalls()[0]?.texts).toEqual(['Hello']);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['Hello']);
   });
 
   it('still translates when the store read fails', async () => {
@@ -1126,6 +1132,46 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     gate.resolve(null);
     await signOut;
     expect(settled).toBe(true);
+  });
+
+  it('fences the dispatched batch when the account resets mid-flight', async () => {
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+    const scope = requestCalls()[0]?.scope;
+    expect(scope?.isCurrent()).toBe(true);
+
+    mod.clearToolSummaryTranslationMemory();
+
+    // The reset cancels the request instead of letting it finish under the
+    // next account, and the same fence the client re-reads has moved.
+    expect(scope?.signal.aborted).toBe(true);
+    expect(scope?.isCurrent()).toBe(false);
+
+    resolvers[0]?.(['Hallo']);
+    await flushBatch();
+    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
+  });
+
+  it('fences the dispatched batch when the configuration changes mid-flight', async () => {
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+    const scope = requestCalls()[0]?.scope;
+
+    mod.setConfig({ enabled: true, model: OTHER_MODEL });
+
+    expect(scope?.signal.aborted).toBe(true);
+    expect(scope?.isCurrent()).toBe(false);
+    resolvers[0]?.(['Hallo']);
+    await flushBatch();
+    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
   });
 
   it('caps the retry memory, evicting the oldest unresolved summaries', async () => {

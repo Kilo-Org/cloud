@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseTimestamp, timestampMs, timestampToIso } from './utils';
+import { epochMsToIso, parseTimestamp, timestampMs, timestampToIso } from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -110,5 +110,15 @@ describe('timestampToIso', () => {
     expect(timestampToIso('')).toBeNull();
     expect(timestampToIso('2026-02-30')).toBeNull();
     expect(timestampToIso('not-a-timestamp')).toBeNull();
+  });
+});
+
+describe('epochMsToIso', () => {
+  it('renders an epoch instant as the ISO string with millisecond precision', () => {
+    expect(epochMsToIso(Date.UTC(2026, 2, 16, 15, 21, 40, 957))).toBe('2026-03-16T15:21:40.957Z');
+  });
+
+  it('drops the sub-millisecond part', () => {
+    expect(epochMsToIso(1_772_000_000_123.9)).toBe('2026-02-25T06:13:20.123Z');
   });
 });

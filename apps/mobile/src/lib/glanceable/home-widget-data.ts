@@ -12,11 +12,12 @@ import {
 
 import {
   type GatedSecureStore,
-  readGatedValue,
+  readGatedValueForUpdate,
+  widgetSecureStore,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
 
-const HOME_WIDGET_DATA_KEY = 'home-widget-data';
+import { HOME_WIDGET_DATA_KEY } from './widget-store';
 
 let storeForTests: GatedSecureStore | null = null;
 let lastData: HomeWidgetData | null = null;
@@ -27,11 +28,7 @@ let writes: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function store(): GatedSecureStore {
-  if (storeForTests !== null) {
-    return storeForTests;
-  }
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load
-  return require('expo-secure-store') as GatedSecureStore;
+  return storeForTests ?? widgetSecureStore();
 }
 
 function changed(): void {
@@ -42,8 +39,9 @@ function changed(): void {
 
 /**
  * Each write waits for the previous one so the mirror never lands out of order.
- * A locked device skips the write (see `secure-store-gated`): the in-memory
- * record stays authoritative and the next publish mirrors it again.
+ * A write the keychain refuses — only before the device's first unlock since
+ * boot, for an item written `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` — leaves the
+ * in-memory record authoritative, and the next publish mirrors it again.
  */
 async function writeAfter(previous: Promise<void> | null, raw: string): Promise<void> {
   await previous;
@@ -174,13 +172,14 @@ export async function restoreHomeWidgetData(scopeKey: string | null): Promise<vo
     return;
   }
   const startedAtEpoch = epoch;
-  // A locked device and a failed read both read as no record: the Home surface
-  // draws from memory until a confirmed fetch mirrors a new one.
-  const raw = await readGatedValue(store, HOME_WIDGET_DATA_KEY);
-  if (raw === null || epoch !== startedAtEpoch) {
+  // A device that has not been unlocked since boot, and a read that failed, both
+  // read as unreadable rather than as no record: the Home surface draws from
+  // memory until a confirmed fetch mirrors a new one.
+  const read = await readGatedValueForUpdate(store, HOME_WIDGET_DATA_KEY);
+  if (read.status === 'unreadable' || read.value === null || epoch !== startedAtEpoch) {
     return;
   }
-  const stored = parseStoredHomeWidgetData(raw);
+  const stored = parseStoredHomeWidgetData(read.value);
   if (
     stored === null ||
     stored.snapshot.scopeKey !== scopeKey ||

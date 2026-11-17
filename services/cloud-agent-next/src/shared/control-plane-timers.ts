@@ -47,6 +47,8 @@ export type ControlPlaneTimers = {
     organizationMembershipReadRetryMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
+    /** Total bound on confirming the stop of a failed snapshot launch before its retry. */
+    snapshotRetryStopMs: number;
   };
   wrapper: {
     heartbeatIntervalMs: number;
@@ -86,8 +88,13 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
-// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
-// also ships in the wrapper without the worker sources.
+const PROVIDER_STOP_ATTEMPT_MS = 30_000;
+// A container wedged in a snapshot start can take minutes to destroy. In
+// production, the stop after a timed-out restore was confirmed 38 s, 2 min 13 s
+// and 3 min 14 s after the first stop began; one 30-s stop never confirmed it.
+const SNAPSHOT_RETRY_STOP_MS = 4 * MINUTE_MS;
+// Snapshot starts use `DEADLINE_MS.repositoryStartup` for each launch attempt;
+// this module also ships in the wrapper without the worker sources.
 const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
@@ -97,12 +104,15 @@ const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
 const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
 const KILO_SESSION_MS = 2 * MINUTE_MS;
 
-// Fixed preparation work includes one create retry and one retry each for
-// runtime start and session import. Setup retains its per-command bounds;
-// the attempt deadline is its aggregate stop.
+// Fixed preparation work includes one create retry, one snapshot launch retry
+// (a stop confirmed within its own bound, then its own launch bound) and one
+// retry each for runtime start and session import. Setup retains its
+// per-command bounds; the attempt deadline is its aggregate stop.
 const ROUTE_PREPARATION_MS =
   PREPARATION_CREATE_MS +
   PROVIDER_CREATE_RETRY_MS +
+  PREPARATION_CREATE_MS +
+  SNAPSHOT_RETRY_STOP_MS +
   PREPARATION_CREATE_MS +
   WRAPPER_FIRST_CONNECT_MS +
   WRAPPER_HELLO_MS +
@@ -151,8 +161,9 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     organizationMembershipReadMs: 3_000,
     organizationMembershipReadAttempts: 3,
     organizationMembershipReadRetryMs: 1_000,
-    providerStopAttemptMs: 30_000,
+    providerStopAttemptMs: PROVIDER_STOP_ATTEMPT_MS,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
+    snapshotRetryStopMs: SNAPSHOT_RETRY_STOP_MS,
   };
   const wrapper = {
     heartbeatIntervalMs: ms(5_000),

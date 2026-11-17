@@ -110,11 +110,12 @@ function isFormatControl(code: number): boolean {
 }
 
 /**
- * Display text as one line of what it draws: control characters and line breaks
- * become spaces, layout format controls are left out, and the joiners that
- * shape adjacent characters are kept. Every display surface that shows stored
- * text reads it through this, so one string cannot read two ways. White space
- * is left as it is; `sessionLiveText` collapses and bounds it.
+ * Display text as one line of what it draws: control characters (the C0 range,
+ * delete, the C1 range) and line breaks become spaces, layout format controls
+ * are left out, and the joiners that shape adjacent characters are kept. Every
+ * display surface that shows stored text reads it through this, so one string
+ * cannot read two ways. White space is left as it is; `sessionLiveText`
+ * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
   // Iterating code points keeps a surrogate pair whole while the control set is
@@ -124,7 +125,9 @@ export function sessionDisplayLine(raw: string): string {
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
       if (isFormatControl(code)) return '';
-      return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029
+        ? ' '
+        : char;
     })
     .join('');
 }
@@ -151,21 +154,25 @@ function characterSegmenter(): Intl.Segmenter | null {
 }
 
 /**
+ * The shared character reader for every cut in the workspace: display surfaces
+ * read it through `sessionLiveCut`, and byte-capped report fields read it
+ * directly after their own byte count.
+ *
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
  * a surrogate pair whole.
  */
-function characterCut(line: string, maxIndex: number): number {
+export function characterCut(line: string, maxIndex: number): number {
   const segmenter = characterSegmenter();
   if (segmenter === null) {
     const last = line.charCodeAt(maxIndex - 1);
     return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
   }
   let end = 0;
-  for (const { index } of segmenter.segment(line)) {
-    if (index > maxIndex) break;
-    end = index;
+  for (const { index, segment } of segmenter.segment(line)) {
+    if (index + segment.length > maxIndex) break;
+    end = index + segment.length;
   }
   return end;
 }

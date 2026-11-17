@@ -1487,6 +1487,39 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The four cloud-agent-next parts run one service suite, and the suite reaches
+// workspaces outside this service by relative path:
+// src/telemetry/report-consumer.glanceable.test.ts reads services/notifications
+// and apps/web, and test/integration/scm-broker-parity.test.ts reads
+// services/git-token-service. A project outside the install scope gets no
+// node_modules to resolve its own imports from, so the install names those
+// closures beside the service and wrapper closures the deploy job already
+// installs. The suites that read packages/cloud-agent-sdk resolve their own
+// imports without that package's node_modules, so it needs no filter. A part
+// that starts reading another workspace widens the filter; it does not restore
+// the recursive workspace install.
+const cloudAgentNextInstall = [
+  'pnpm install --frozen-lockfile',
+  "--filter 'cloud-agent-next...'",
+  "--filter '@kilocode/cloud-agent-wrapper...'",
+  "--filter 'notifications...'",
+  "--filter 'cloudflare-git-token-service...'",
+  "--filter 'web...'",
+  '--filter kilocode-monorepo',
+].join(' ');
+
+test('the cloud-agent-next parts install the closures their suites read', () => {
+  const job = ciJobs['cloud-agent-next'];
+  const install = job.steps.find(step => step.name === 'Install dependencies');
+  assert.equal(install.run, cloudAgentNextInstall, 'the parts install the suite closures');
+  assert.equal(install.if, undefined, 'every part installs the same set');
+  assert.deepEqual(
+    job.strategy.matrix.part,
+    '${{ fromJSON(needs.changes.outputs.cloud_agent_next_parts) }}',
+    'the four parts still fan out'
+  );
+});
+
 // The build job runs one Next production build, and that build's type check
 // reads the app's tsconfig include: the app sources and tests, the web-shared
 // sources, the ai-gateway sources one web test imports, and the sources of a
@@ -1536,6 +1569,7 @@ const scriptSuiteInputs = [
   'services/session-ingest/wrangler.jsonc',
   'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
   '.github/workflows/mobile-native-build.yml',
+  '.github/workflows/kilo-mcp-release.yml',
   'packages/session-ingest-contracts/src/index.ts',
   'pnpm-lock.yaml',
 ];
@@ -1646,6 +1680,14 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
       `${name}: gated on the data filter and the detector answer`
     );
   }
+  // The suite copies shared tables and reads the worktree rows, so it needs the
+  // migrated schema. This step also runs when the detector alone selects the
+  // service, a run in which the meter step above never applies the migrations.
+  assert.equal(
+    step('Run Session Ingest Postgres tests').run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres',
+    'the session ingest suite migrates its own schema'
+  );
   // The workspace matrix runs one of these suites under its own condition, and
   // it must not repeat a run this job already covers, whichever of the two
   // conditions started it.

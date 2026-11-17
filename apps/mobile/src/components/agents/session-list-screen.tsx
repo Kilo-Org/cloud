@@ -231,34 +231,32 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     router.setParams({ status: undefined });
   }, [router]);
 
-  // The header link opens the stored-session list, so it names that surface: a
-  // bare `home.seeAll` here claimed a longer live list that is not on screen
-  // (finding live-now-all).
+  // Both routes into the stored-session list — the header control and the
+  // accepted-empty body link — name that surface: a bare `home.seeAll` here
+  // claimed a longer live list that is not on screen (finding live-now-all),
+  // and two names for one destination read as two different surfaces.
   const historyLabel = t('agents.sessionList.pastSessions');
-  const viewHistoryLabel = t('agents.sessionList.viewHistory');
-  const historyControl = (label: string) => (
+  const openHistory = () => {
+    router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+  };
+  const emptyStateHistoryAction = (
     <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
+      onPress={openHistory}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={historyLabel}
       testID="agents-view-history-empty"
       className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
     >
       <Text className="text-sm text-primary" numberOfLines={1}>
-        {label}
+        {historyLabel}
       </Text>
     </Pressable>
   );
-  const viewHistoryAction = historyControl(viewHistoryLabel);
   const historyAction = (
     <IconButton
       accessibilityLabel={historyLabel}
       testID="agents-view-history"
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
+      onPress={openHistory}
     >
       <History size={20} color={colors.mutedForeground} />
     </IconButton>
@@ -430,7 +428,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         organizationId={organizationId}
         refreshControl={refreshControl}
         compact={compactLiveEmptyState}
-        historyAction={viewHistoryAction}
+        historyAction={emptyStateHistoryAction}
       />
     );
   } else if (hasLiveRows) {

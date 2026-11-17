@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
 import { DrainSessionError } from '../kilo-api.js';
+import { createServer } from 'node:http';
+import { createDrainWaiter, type DrainFailureDiagnostic } from '../drain-wait.js';
 
 type RecordedRequest = {
   method: string;
@@ -48,9 +50,12 @@ function createHarness(serverUrl: string) {
 }
 
 function statusResponse(status: string, error?: string) {
-  return Response.json([
-    { name: 'kilo-cloud-agent', status: { status, ...(error === undefined ? {} : { error }) } },
-  ]);
+  return Response.json({
+    location: { directory },
+    data: [
+      { name: 'kilo-cloud-agent', status: { status, ...(error === undefined ? {} : { error }) } },
+    ],
+  });
 }
 
 const credential = {
@@ -58,6 +63,53 @@ const credential = {
   token: 'renewed-session-mcp-token',
   expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
 };
+
+describe('Kilo v2 harness commit messages', () => {
+  it('uses the native commit-message RPC in the target repository with server authorization', async () => {
+    const message = 'fix: preserve descriptive commit messages';
+    const { url, requests } = startStub(() => Response.json({ output: { message } }));
+    const repository = '/workspace/another repository';
+
+    expect(await createHarness(url).generateCommitMessage({ path: repository })).toEqual({
+      message,
+    });
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/api/rpc/kilocode.commit-message/generate',
+        directory: repository,
+        authorization: 'Basic harness-test',
+        body: { input: { path: repository } },
+      },
+    ]);
+  });
+
+  it.each([
+    { status: 503, body: { message: 'Generation unavailable' } },
+    { status: 200, body: { output: { message: null } } },
+    { status: 200, body: { data: { text: 'Wrong API envelope' } } },
+    { status: 200, body: { error: { code: 'failed', message: 'Generation failed' } } },
+  ])('rejects failed or invalid native generation responses: %j', async ({ status, body }) => {
+    const { url, requests } = startStub(() => Response.json(body, { status }));
+    const error: unknown = await createHarness(url)
+      .generateCommitMessage({ path: directory })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('honors cancellation before requesting a commit message', async () => {
+    const { url, requests } = startStub(() => Response.json({ output: { message: 'unused' } }));
+    const error: unknown = await createHarness(url)
+      .generateCommitMessage({
+        path: directory,
+        signal: AbortSignal.abort(),
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(requests).toHaveLength(0);
+  });
+});
 
 describe('Kilo v2 harness compaction', () => {
   const sessionId = 'ses_compaction';
@@ -563,6 +615,74 @@ describe('Kilo v2 harness release', () => {
 });
 
 describe('Kilo v2 full-tree drain', () => {
+  it('recovers a real local socket reset and records its underlying cause', async () => {
+    let attempts = 0;
+    const server = createServer((request, response) => {
+      if (++attempts === 1) request.socket.destroy();
+      else {
+        response.setHeader('content-type', 'application/json');
+        response.end(JSON.stringify({ output: true }));
+      }
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a local TCP server');
+    const diagnostics: DrainFailureDiagnostic[] = [];
+    const harness = createHarness(`http://127.0.0.1:${address.port}`);
+    const drain = harness.drainSession;
+    if (!drain) throw new Error('Expected native drain');
+    try {
+      const result = await createDrainWaiter(
+        signal => drain({ sessionId: 'ses_root', directory, signal }),
+        { onFailure: diagnostic => diagnostics.push(diagnostic) }
+      ).start();
+      expect(result).toEqual({ state: 'drained' });
+      expect(attempts).toBe(2);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]).toMatchObject({ attempt: 1, kind: 'transient' });
+      expect(diagnostics[0]?.errors.some(error => error.name !== 'DrainSessionError')).toBe(true);
+      expect(JSON.stringify(diagnostics)).toMatch(/socket|connection/i);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
+  it('keeps native drain pending beyond Bun socket idle timeout without changing other requests', async () => {
+    const script = `
+      import { createKilo2Harness } from ${JSON.stringify(new URL('./kilo2-harness.ts', import.meta.url).href)};
+      import { createKilo2Lifecycle } from ${JSON.stringify(new URL('./kilo2-lifecycle.ts', import.meta.url).href)};
+      const server = Bun.serve({ port: 0, idleTimeout: 0, async fetch() {
+        await Bun.sleep(12000);
+        return Response.json({ output: true });
+      }});
+      const harness = createKilo2Harness({
+        server: { url: server.url.origin }, directory: '/workspace/test',
+        lifecycle: createKilo2Lifecycle(),
+      });
+      try {
+        const control = fetch(server.url).then(() => 'unexpected success', e => e.name);
+        const drained = harness.drainSession({sessionId:'ses_test', directory:'/workspace/test'});
+        console.log(JSON.stringify({control: await control, drained: await drained}));
+      } finally { await server.stop(true); }
+    `;
+    const child = Bun.spawn([process.execPath, '--eval', script], {
+      env: { ...process.env, BUN_CONFIG_HTTP_IDLE_TIMEOUT: '1' },
+      timeout: 20_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: '' });
+    expect(JSON.parse(stdout)).toEqual({ control: 'TimeoutError', drained: true });
+  }, 25_000);
+
   it('calls the native plugin RPC with location, token, and server authorization', async () => {
     const stub = startStub(() => Response.json({ output: true }));
     const harness = createHarness(stub.url);

@@ -1000,6 +1000,7 @@ describe('production session host composition', () => {
       expect(f.host.getHeartbeat().active).toBe(true);
       f.event(feed, 'session.status', { sessionID: 'ses_other', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_other', reason: 'completed' });
+      await settle();
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       stop.resolve(true);
@@ -1402,7 +1403,7 @@ describe('completion feed continuity and idle allocation', () => {
         }
       }
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
-        { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+        { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' },
       ]);
       expect(f.host.getHeartbeat().active).toBe(true);
     } finally {

@@ -20,7 +20,7 @@ import { roleLabel } from './member-row';
 
 type InvitedMemberRowProps = {
   invite: InvitedOrgMember;
-  /** Caller is owner. */
+  /** Caller may revoke or resend: management role, and owner only for an owner invite. */
   canManage: boolean;
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */

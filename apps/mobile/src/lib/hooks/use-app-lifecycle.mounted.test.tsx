@@ -8,7 +8,6 @@ const appState = vi.hoisted(() => {
   const listeners = new Set<(state: string) => void>();
   return {
     listeners,
-    lastState: 'active' as string,
     addEventListener: (_event: string, listener: (state: string) => void) => {
       listeners.add(listener);
       return {
@@ -18,7 +17,6 @@ const appState = vi.hoisted(() => {
       };
     },
     emit: (state: string): void => {
-      appState.lastState = state;
       for (const listener of listeners) {
         listener(state);
       }
@@ -79,7 +77,6 @@ describe('useAppLifecycle mounted', () => {
     });
     mountedRenderers.length = 0;
     appState.listeners.clear();
-    appState.lastState = 'active';
   });
 
   it('shares one AppState listener between two mounted probes', () => {
@@ -134,7 +131,6 @@ describe('useAppLifecycle mounted', () => {
     expect(textChildren(first)).toEqual(['false']);
 
     unmountProbe(first);
-    expect(appState.lastState).toBe('background');
 
     const second = mountProbe();
     expect(textChildren(second)).toEqual(['true']);

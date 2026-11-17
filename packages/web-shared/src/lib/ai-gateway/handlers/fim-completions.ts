@@ -13,6 +13,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreFimUsage,
   extractFimPromptInfo,
+  extractHeaderAndLimitLength,
   invalidRequestResponse,
   malformedJsonResponse,
   temporarilyUnavailableResponse,
@@ -43,6 +44,10 @@ import {
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
+import {
+  fetchUpstream,
+  UPSTREAM_DURATION_BUDGET_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -165,9 +170,9 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
     : await getBYOKforUser(readDb, user.id, byokProviderKeys);
-  const userByokEntry = byokProviderKeys
-    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
-    .find(entry => entry !== undefined);
+  // Keys arrive in `BYOK_KEY_ORDER`, so the key the owner ranked first serves the model; its
+  // provider also selects the upstream host.
+  const userByokEntry = userByok?.find(entry => byokProviderKeys.includes(entry.providerId));
 
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
@@ -192,6 +197,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   setTag('ui.ai_model', requestBody.model);
+  // This one call is the route's whole access decision. It answers the paid-usage gate, then
+  // the caller's organization model-access policy: the member grant, the enterprise
+  // organization's model deny list, and its provider allow-list, matched against the provider
+  // this route selected for the model. A denial returns `modelNotAllowedResponse` before any
+  // upstream request. Do not resolve that policy again here; `direct-provider-access.ts` is the
+  // single source, so a second resolution can only disagree with it.
   const accessResult = await checkDirectProviderAccess({
     user,
     organizationId,
@@ -254,16 +265,17 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   // Make upstream request to the resolved provider
-  const proxyRes = await fetch(upstreamUrl, {
+  const upstream = await fetchUpstream({
+    provider: { type: fimProvider, apiUrl: upstreamUrl, apiKey, apiKeyHeader: null },
+    path: '',
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(bodyForUpstream),
+    body: bodyForUpstream,
+    signal: request.signal,
+    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.status_code = proxyRes.status;
+  usageContext.status_code = upstream.response.status;
 
   const metricsParams = {
     kiloUserId: user.id,
@@ -277,8 +289,16 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     toolsAvailable: [],
     toolsUsed: [],
     ttfbMs,
-    statusCode: proxyRes.status,
+    statusCode: upstream.response.status,
+    mode: usageContext.mode || undefined,
   };
+
+  if (upstream.type === 'error') {
+    fimRequestSpan.end();
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstream.response;
+  }
+  const proxyRes = upstream.response;
 
   if (!proxyRes.body) {
     emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });

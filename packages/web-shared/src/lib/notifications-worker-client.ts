@@ -2,7 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import {
-  sendPushForConversationOutputSchema,
+  internalDispatchResponseSchema,
   type GlanceableScopeRefreshRequest,
   type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
@@ -14,6 +14,7 @@ import {
   INTERNAL_API_SECRET,
   NOTIFICATIONS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
 type DispatchBody =
   | InternalDispatchAgentBriefingRequest
@@ -55,6 +56,16 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
     );
     return false;
   }
+  const dispatchUrl = parseInternalServiceEndpoint(
+    NOTIFICATIONS_WORKER_URL,
+    '/internal/v1/dispatch'
+  );
+  if (!dispatchUrl) {
+    console.error(
+      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping push dispatch'
+    );
+    return false;
+  }
   if (!INTERNAL_API_SECRET) {
     console.error(
       '[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping push dispatch'
@@ -77,7 +88,7 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   const tags = { source: 'notifications-worker-client', endpoint: 'dispatch', kind: body.kind };
   try {
     for (let attempt = 0; ; attempt++) {
-      const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/dispatch`, {
+      const response = await fetch(dispatchUrl.toString(), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -103,7 +114,7 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
       }
 
       const payload: unknown = await response.json().catch(() => null);
-      const parsed = sendPushForConversationOutputSchema.safeParse(payload);
+      const parsed = internalDispatchResponseSchema.safeParse(payload);
       const failed = parsed.success
         ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed')
         : [];
@@ -251,6 +262,16 @@ export async function refreshGlanceableScope(input: GlanceableScopeRefreshReques
     );
     return;
   }
+  const refreshUrl = parseInternalServiceEndpoint(
+    NOTIFICATIONS_WORKER_URL,
+    '/internal/v1/glanceable-refresh'
+  );
+  if (!refreshUrl) {
+    console.error(
+      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping glanceable refresh'
+    );
+    return;
+  }
   if (!INTERNAL_API_SECRET) {
     console.error(
       '[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping glanceable refresh'
@@ -259,7 +280,7 @@ export async function refreshGlanceableScope(input: GlanceableScopeRefreshReques
   }
 
   try {
-    const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/glanceable-refresh`, {
+    const response = await fetch(refreshUrl.toString(), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

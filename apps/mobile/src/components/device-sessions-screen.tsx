@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
-import { LogOut, Smartphone } from '@/components/ui/icons';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
+import { Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -27,6 +28,7 @@ import {
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -39,8 +41,9 @@ type SessionRowProps = {
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
-  const device = deviceSessionLabel(session.user_agent);
+  const device = deviceSessionLabel(session);
   const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
+  const lastSeen = formatDate(parseTimestamp(session.last_seen_at), i18n.language);
 
   return (
     <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3">
@@ -51,18 +54,19 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
             {device}
           </Text>
           {session.isCurrent && (
-            <View className="rounded-full bg-primary px-2 py-0.5">
-              <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground">
+            /* The badge keeps the light olive in dark mode: the dark accent
+                (#ffdd00) as a full pill glares and pulls focus, so dark swaps
+                in `--selection`, the same hue lifted to stand off the page,
+                with its own label tone. */
+            <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
+              <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground dark:text-selection-foreground">
                 {t('deviceSessions.thisDevice')}
               </Text>
             </View>
           )}
         </View>
         <Text variant="muted" className="mt-0.5 text-xs">
-          {t('deviceSessions.signedIn', {
-            signedIn,
-            lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
-          })}
+          {t('deviceSessions.signedIn', { signedIn, lastSeen })}
         </Text>
       </View>
       {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
@@ -84,11 +88,12 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
             : t('deviceSessions.signOutSessionLabel', {
                 device: isolateBidiText(device),
                 signedIn,
+                lastSeen,
               })
         }
         className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"
       >
-        <LogOut size={16} color={colors.destructive} />
+        <DirectionalLogOut size={16} color={colors.destructive} />
       </Pressable>
     </View>
   );
@@ -98,7 +103,7 @@ export function DeviceSessionsScreen() {
   const router = useRouter();
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
 
   const { data, isPending, isError, isFetching, refetch } = useQuery({
@@ -122,8 +127,8 @@ export function DeviceSessionsScreen() {
         toast.success(t('deviceSessions.sessionSignedOut'));
         void refetch();
       },
-      onError: error => {
-        toast.error(error.message);
+      onError: () => {
+        toast.error(t('deviceSessions.sessionSignOutFailed'));
       },
     })
   );
@@ -145,7 +150,8 @@ export function DeviceSessionsScreen() {
     confirm({
       title: t('deviceSessions.signOutThisSessionTitle'),
       message: t('deviceSessions.signOutThisSessionMessage', {
-        device: isolateBidiText(deviceSessionLabel(session.user_agent)),
+        device: isolateBidiText(deviceSessionLabel(session)),
+        lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
       }),
       confirmLabel: t('common.signOut'),
       onConfirm: () => {
@@ -186,7 +192,7 @@ export function DeviceSessionsScreen() {
     );
   } else {
     body = (
-      <DetailScreenScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"
         showsVerticalScrollIndicator={false}
@@ -231,17 +237,17 @@ export function DeviceSessionsScreen() {
               </Text>
             )}
             <Text variant="muted" className="text-xs">
-              {t('deviceSessions.onlyKiloAppSignIns')}
+              {t('deviceSessions.signInScopeNote')}
             </Text>
           </View>
         )}
-      </DetailScreenScrollView>
+      </TabScreenScrollView>
     );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.deviceSessions')} />
+      <ScreenHeader title={t('common.deviceSessions')} backFallback={PROFILE_TAB_HREF} />
       {body}
       {dialog}
     </View>

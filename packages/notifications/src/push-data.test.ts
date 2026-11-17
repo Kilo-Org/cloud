@@ -295,6 +295,35 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('parses the raiseId an attention push presents, and keeps it absent when the producer has none', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      raiseId: '2026-09-18T21:00:00.000Z',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+
+    const withoutRaise = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+    };
+    expect('raiseId' in pushDataSchema.parse(withoutRaise)).toBe(false);
+  });
+
+  it('rejects an empty raiseId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      raiseId: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {

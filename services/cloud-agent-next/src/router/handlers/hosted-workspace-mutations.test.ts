@@ -149,6 +149,26 @@ describe('hosted workspace mutation inputs', () => {
     expect(hostedWorkspaceCreateRequest(input).options?.kiloSessionId).toBe(kiloSessionId);
   });
 
+  it('accepts a model-specific variant key on both create mutations', () => {
+    for (const variant of ['high-2', 'thinking-v2', 'xhigh_1']) {
+      const workspace = CreateHostedWorkspaceInput.parse({
+        ...validCreate,
+        agent: { ...validCreate.agent, variant },
+      });
+      expect(hostedWorkspaceCreateRequest(workspace).agent.variant).toBe(variant);
+
+      expect(
+        CreateHostedWorkspaceSessionInput.parse({
+          workspaceId,
+          operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          clientProvenance: 'agent-manager',
+          message: { prompt: 'Second chat' },
+          agent: { mode: 'code', model: 'anthropic/claude-sonnet-4', variant },
+        }).agent.variant
+      ).toBe(variant);
+    }
+  });
+
   it('does not accept workspace-wide overrides when adding a sibling', () => {
     const valid = {
       workspaceId,

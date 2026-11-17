@@ -129,3 +129,23 @@ describe('FileHeaderRow status label in French', () => {
     expect(hostTexts().some(node => node.props.children === changed)).toBe(true);
   });
 });
+
+describe('FileHeaderRow status label in Lithuanian', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('paints the changed and the modified status with different labels', async () => {
+    await i18n.changeLanguage('lt');
+
+    mountRow('modified');
+    const modified = i18n.t('prReview.fileStatus.modified');
+    expect(hostTexts().some(node => node.props.children === modified)).toBe(true);
+    act(() => renderer?.unmount());
+
+    mountRow('changed');
+    const changed = i18n.t('prReview.fileStatus.changed');
+    expect(changed).not.toBe(modified);
+    expect(hostTexts().some(node => node.props.children === changed)).toBe(true);
+  });
+});

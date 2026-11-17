@@ -25,10 +25,11 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
-import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
-import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+import { walk } from '../lib/ast.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
+import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
@@ -405,10 +406,39 @@ export function checkCompilerStillDropsThese() {
     );
     return problems;
   }
-  const firstValue = (css, options) => {
+
+  /**
+   * The value the compiled stylesheet emits for `property` in the fixture rule.
+   *
+   * Selecting by the property name the runtime receives keeps the pin on the
+   * declaration the Metro transformer ships, not on one position in the
+   * compiler's private stylesheet tree.
+   */
+  function emittedValue(css, options, property) {
     const sheet = compile(css, options).stylesheet();
-    return JSON.stringify(sheet?.s?.[0]?.[1]?.[0]?.d?.[0] ?? null);
-  };
+    for (const entry of sheet?.s ?? []) {
+      for (const rule of entry?.[1] ?? []) {
+        for (const declaration of rule?.d ?? []) {
+          if (declaration?.[1] === property) {
+            return declaration[0];
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * True while the value still defers to a CSS function call `name`, which is how
+   * the compiler keeps a value for the runtime instead of resolving it at build
+   * time.
+   */
+  function defersTo(value, name) {
+    return (
+      Array.isArray(value) &&
+      value.some(item => (Array.isArray(item) ? defersTo(item, name) : item === name))
+    );
+  }
 
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {
@@ -421,14 +451,16 @@ export function checkCompilerStillDropsThese() {
   // deferred colorMix over the variable; the runtime cannot decompose it and
   // drops the declaration. When the compiler resolves it instead, this stops
   // matching and the rule above can go.
-  const themeOpacity = firstValue(
+  const themeOpacity = emittedValue(
     '@theme inline { --color-destructive: var(--destructive); }\n' +
       ':root { --destructive: #b0483a; }\n' +
-      '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }'
+      '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
+    undefined,
+    'backgroundColor'
   );
-  if (!themeOpacity.includes('colorMix')) {
+  if (!defersTo(themeOpacity, 'colorMix')) {
     problems.push(
-      `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
+      `check-classes: color-mix over an @theme inline variable now compiles to ${JSON.stringify(themeOpacity ?? null)} instead of a deferred colorMix — drop the theme-token opacity rule`
     );
   }
 
@@ -436,38 +468,38 @@ export function checkCompilerStillDropsThese() {
   // scale reaches the runtime as a deferred calc inside the line-height
   // function, which multiplies the result by the font size. When the compiler
   // folds it to a length instead, this stops matching and the rule can go.
-  const spacingLeading = firstValue(
+  const spacingLeading = emittedValue(
     ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-    { inlineVariables: false }
+    { inlineVariables: false },
+    'lineHeight'
   );
-  if (!spacingLeading.includes('"lineHeight",[{},"calc"')) {
+  if (!defersTo(spacingLeading, 'calc')) {
     problems.push(
-      `check-classes: a spacing-scale line height now compiles to ${spacingLeading} instead of a deferred calc — drop the numeric leading rule`
+      `check-classes: a spacing-scale line height now compiles to ${JSON.stringify(spacingLeading ?? null)} instead of a deferred calc — drop the numeric leading rule`
     );
   }
   return problems;
 }
 
 /**
- * Every problem one source file has, from every rule this checker owns. The
- * problems are returned, not kept in module state, so one file's findings
+ * Every problem one parsed source file has, from every rule this checker owns.
+ * The problems are returned, not kept in module state, so one file's findings
  * cannot leak into the next call.
  *
- * `relative` is the path from the repository root without a leading separator;
- * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
- * prefix test and diagnostic below reads the same spelling of the path. The
- * file is parsed here too, and a file the parser refuses is a problem of its
- * own: its tree is empty, so leaving it out would report the file as clean.
+ * The entry is one `parseSourceTree` step (tools/lib/source-files.mjs): the
+ * normalised `path` every exemption lookup, prefix test and diagnostic reads,
+ * the absolute `file` the Intl rule scopes itself by, the `text`, the syntax
+ * tree `program`, the `problems` the parser reported, and the `lineOf` lookup
+ * those problems were built with, which the rules reuse so the text is scanned
+ * for lines once. A file the parser refused is reported here, once: its tree is
+ * empty, so leaving it out would report the file as clean.
  */
-export function checkSourceFile(relative, absolute, text) {
-  const path = relative.replace(/^(?:\.?\/)+/, '');
-  const lineOf = lineIndex(text);
-  const { program, errors } = parseSourceFile(path, text);
+export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
   return [
-    ...parseProblems(path, errors, lineOf),
+    ...problems,
     ...checkScrollPadding(path, program, text, lineOf),
     ...checkRawText(path, program, lineOf),
-    ...checkDirectIntl(path, absolute, program, lineOf),
+    ...checkDirectIntl(path, file, program, lineOf),
     ...checkRules(path, program, text, lineOf),
   ];
 }
@@ -476,8 +508,8 @@ export function checkSourceFile(relative, absolute, text) {
 function run() {
   const problems = [];
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir, isTestArtifact)) {
-      problems.push(...checkSourceFile(file.slice(ROOT.length), file, readFileSync(file, 'utf8')));
+    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact)) {
+      problems.push(...checkParsedFile(entry));
     }
   }
   problems.push(...checkCompilerStillDropsThese());
@@ -493,8 +525,4 @@ function run() {
   console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

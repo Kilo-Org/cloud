@@ -206,7 +206,7 @@ export function SessionInfoDialog({
                 {computeBillingEnabled && (
                   <div className="flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
                     <dt className="text-muted-foreground">
-                      Compute
+                      Compute cost
                       {computeData?.scope === 'workspace' && (
                         <span className="mt-0.5 block text-xs">
                           Shared by all chats in this workspace

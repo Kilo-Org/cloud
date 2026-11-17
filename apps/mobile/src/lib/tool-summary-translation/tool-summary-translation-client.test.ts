@@ -18,7 +18,17 @@ vi.mock('expo-secure-store', () => ({ getItemAsync }));
 
 const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>();
 
-const INPUT = { texts: ['Hello world'], targetLanguage: 'de', model: 'kilo-auto/small' };
+/** A live dispatch fence: the account and configuration have not changed. */
+function liveScope(): { signal: AbortSignal; isCurrent: () => boolean } {
+  return { signal: new AbortController().signal, isCurrent: () => true };
+}
+
+const INPUT = {
+  texts: ['Hello world'],
+  targetLanguage: 'de',
+  model: 'kilo-auto/small',
+  scope: liveScope(),
+};
 
 /** The last fetch call, for request-shape assertions. */
 function lastFetchCall(): { url: string; init: RequestInit } {
@@ -273,5 +283,74 @@ describe('requestToolSummaryTranslations', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     expect(await pending).toEqual(texts.map(() => null));
+  });
+});
+
+describe('requestToolSummaryTranslations batch fence', () => {
+  it('sends nothing when the batch was fenced before it dispatched', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await requestToolSummaryTranslations({
+      ...INPUT,
+      texts: ['a', 'b'],
+      scope: { signal: controller.signal, isCurrent: () => false },
+    });
+
+    expect(result).toEqual([null, null]);
+    expect(getAuthTokenForRequest).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the account changed while the token was read', async () => {
+    const gate = Promise.withResolvers<string | null>();
+    getAuthTokenForRequest.mockReturnValue(gate.promise);
+    let current = true;
+    const scope = { signal: new AbortController().signal, isCurrent: () => current };
+
+    const pending = requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'], scope });
+    // A sign-out or profile switch lands while the store read is pending.
+    current = false;
+    gate.resolve('token-of-the-next-account');
+
+    expect(await pending).toEqual([null, null]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the account changed while the organization was read', async () => {
+    const gate = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(gate.promise);
+    let current = true;
+    const scope = { signal: new AbortController().signal, isCurrent: () => current };
+
+    const pending = requestToolSummaryTranslations({ ...INPUT, scope });
+    current = false;
+    gate.resolve('org-of-the-next-account');
+
+    expect(await pending).toEqual([null]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('cancels a request in flight when the batch is fenced', async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementation(async (_url, init) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+      return promise;
+    });
+
+    const pending = requestToolSummaryTranslations({
+      ...INPUT,
+      texts: ['a', 'b'],
+      scope: { signal: controller.signal, isCurrent: () => !controller.signal.aborted },
+    });
+    // The token and organization reads settle first; then the request is out.
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    controller.abort();
+    expect(await pending).toEqual([null, null]);
   });
 });

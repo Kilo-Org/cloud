@@ -12,6 +12,7 @@ import {
   prepareProof,
   ProofManifestSchema,
   readPreparation,
+  readProofManifest,
   sourceMarker,
   targetReadiness,
   validatePreparedSource,
@@ -20,7 +21,7 @@ import {
   type Preparation,
   type Revision,
 } from './baseline';
-import type { RunOutcome } from './capture';
+import type { RunOutcome, SkippedTarget } from './capture';
 import type { Finding } from './findings';
 import type { ProbeDump } from './tree';
 
@@ -36,7 +37,7 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-function syntheticRepo(t: TestContext) {
+function syntheticRepo(t: TestContext, proofManifest = manifest) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -70,7 +71,7 @@ function syntheticRepo(t: TestContext) {
   git('commit', '-m', 'head product');
   const head = git('rev-parse', 'HEAD');
   const targets = path.join(root, 'targets.json');
-  fs.writeFileSync(targets, JSON.stringify(manifest));
+  fs.writeFileSync(targets, JSON.stringify(proofManifest));
   const out = path.join(root, 'prepared');
   return { root, repo, git, base, head, targets, out };
 }
@@ -124,6 +125,10 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
   for (const component of [
     '../card.tsx',
     'apps/mobile/src/app/_layout.tsx',
+    'apps/mobile/src/app/(app)/_layout.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/+not-found.tsx',
+    'apps/mobile/src/app/../components/card.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.ts',
     'apps/mobile/src/components/../auth.tsx',
   ]) {
     assert.equal(
@@ -132,6 +137,21 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
         targets: [{ ...TARGET, diagnostic: { component } }],
       }).success,
       false
+    );
+  }
+  // A screen file is a valid diagnostic source: a change that only alters the
+  // props a route passes to a shared component is invisible to a component
+  // target, because that component renders the same on both revisions.
+  for (const component of [
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.tsx',
+    'apps/mobile/src/app/(app)/(tabs)/(3_profile)/profiles/[profileId]/index.tsx',
+  ]) {
+    assert.equal(
+      ProofManifestSchema.safeParse({
+        version: 1,
+        targets: [{ ...TARGET, diagnostic: { component } }],
+      }).success,
+      true
     );
   }
   assert.equal(
@@ -154,6 +174,77 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
       .success,
     false
   );
+  // A presentation the app does not have must be refused, not silently ignored:
+  // the capture would then measure a sheet header at the window origin.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...TARGET, diagnostic: { component: PRODUCT, presentation: 'dialog' } }],
+    }).success,
+    false
+  );
+});
+
+test('preparation refuses a tracked product file at a generated picker-sheet route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const tracked = path.join(fixture.repo, 'apps/mobile/src/app/(app)/design-proof-card.tsx');
+  fs.mkdirSync(path.dirname(tracked), { recursive: true });
+  fs.writeFileSync(tracked, 'export default function Real() { return "product"; }\n');
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'tracked product file at the generated route');
+  await assert.rejects(
+    () =>
+      prepareProof({
+        ...fixture,
+        head: fixture.git('rev-parse', 'HEAD'),
+      }),
+    /would overwrite existing product source/
+  );
+  assert.equal(fs.existsSync(path.join(fixture.out, 'preparation.json')), false);
+});
+
+test('a picker-sheet diagnostic presents the screen the way the app presents that route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const preparation = await prepareProof(fixture);
+  // The route lives in the signed-in shell, where the picker routes live and
+  // where the sheet is pushed over the tabs.
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(app)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The screen registers its own sheet options and only opens warm.
+  assert.match(route, /import \{ useFormSheetScreenOptions \} from '@\/lib\/form-sheet'/);
+  assert.match(route, /React\.createElement\(Stack\.Screen, \{ options \}\)/);
+  assert.match(route, /sheetAllowedDetents: \[0\.5\]/);
+  const intent = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/+native-intent.tsx'),
+    'utf8'
+  );
+  assert.match(intent, /!initial &&/);
 });
 
 test('diagnostic prerequisite must exist on base, never copied from head', async t => {
@@ -210,21 +301,16 @@ test('prepared run rejects changed product, changed fixtures and unrelated files
   );
 });
 
-function capture(
-  preparation: Preparation,
-  revision: Revision,
-  dir: string,
+function probeDump(
   options: {
     route?: string;
     screen?: string;
     ready?: boolean;
-    findings?: (Finding & { count?: number })[];
     width?: number;
     nodes?: ProbeDump['nodes'];
   } = {}
-) {
-  fs.mkdirSync(dir);
-  const dump: ProbeDump = {
+): ProbeDump {
+  return {
     version: 1,
     env: {
       platform: 'android',
@@ -250,37 +336,65 @@ function capture(
       },
     ],
   };
+}
+
+function capture(
+  preparation: Preparation,
+  revision: Revision,
+  dir: string,
+  options: {
+    target?: { id: string; link: string };
+    route?: string;
+    screen?: string;
+    ready?: boolean;
+    findings?: (Finding & { count?: number })[];
+    width?: number;
+    nodes?: ProbeDump['nodes'];
+    skipped?: SkippedTarget[];
+    /** Model a cell the runner applied but never started: no CellRun at all. */
+    omitCell?: boolean;
+  } = {}
+) {
+  fs.mkdirSync(dir);
+  const dump = probeDump(options);
   fs.writeFileSync(path.join(dir, 'screen.json'), JSON.stringify(dump));
   // Deliberately synthetic bytes: these tests exercise receipt binding, not visual claims.
   fs.writeFileSync(path.join(dir, 'screen.png'), 'synthetic-image');
   const outcome: RunOutcome = {
-    cells: [
-      {
-        id: 'base',
-        config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
-        screens: [
-          {
-            target: TARGET.id,
-            link: TARGET.link,
-            dump: 'screen.json',
-            screenshot: 'screen.png',
-            annotated: 'annotated.png',
-            env: dump.env,
-          },
-        ],
-      },
-    ],
+    cells:
+      options.omitCell === true
+        ? []
+        : [
+            {
+              id: 'base',
+              config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
+              screens: [
+                {
+                  target: (options.target ?? TARGET).id,
+                  link: (options.target ?? TARGET).link,
+                  dump: 'screen.json',
+                  screenshot: 'screen.png',
+                  annotated: 'annotated.png',
+                  env: dump.env,
+                },
+              ],
+            },
+          ],
     findings: options.findings ?? [],
+    skipped: options.skipped ?? [],
   };
-  // Same omission of per-screen env as writeArtifacts.
+  // The artifact shape `writeArtifacts` writes: skips under `run`, and the same
+  // omission of per-screen env.
   fs.writeFileSync(
     path.join(dir, 'findings.json'),
     JSON.stringify({
-      ...outcome,
+      version: 1,
+      run: { skipped: outcome.skipped },
       cells: outcome.cells.map(cell => ({
         ...cell,
         screens: cell.screens.map(({ env: _env, ...screen }) => screen),
       })),
+      findings: outcome.findings,
     })
   );
   writeCaptureReceipt(preparation, revision, outcome, dir);
@@ -317,6 +431,33 @@ test('actual compare operation attributes only ready same-screen exact-source ca
   assert.deepEqual(result.reasons, []);
 });
 
+test('a comparison whose base run never started a cell names that cell as inconclusive', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  // The runner applied the cell and could not switch the app's language, so the
+  // artifact has no CellRun for it and names the target under `run.skipped`.
+  capture(preparation, 'base', baseRun, {
+    omitCell: true,
+    skipped: [{ cell: 'base', target: TARGET.id, reason: 'InfraError: no debugger page' }],
+  });
+  capture(preparation, 'head', headRun);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'inconclusive');
+  assert.match(
+    result.reasons.join(' '),
+    new RegExp(
+      `base: base/${TARGET.id}: target could not be read \\(InfraError: no debugger page\\)`
+    )
+  );
+});
+
 test('pre-existing findings are not attributed to head', async t => {
   const fixture = syntheticRepo(t);
   const preparation = await prepareProof(fixture);
@@ -329,6 +470,43 @@ test('pre-existing findings are not attributed to head', async t => {
       .introduced.length,
     0
   );
+});
+
+test('a landing notice persisted in both findings artifacts still compares', async t => {
+  // The shape `warningFinding` in capture.ts writes for a tab route whose link
+  // leaves the route unchanged: a ratio warning on the root node.
+  const landing: Finding = {
+    rule: 'link-unopened',
+    severity: 'warning',
+    cell: 'base',
+    target: UNMARKED.id,
+    element: { index: 0, path: 'View', tag: 'View', rect: [0, 0, 400, 800] },
+    measured: 1,
+    expected: 'the deep link changes the screen',
+    unit: 'ratio',
+    message: 'deep link did not open',
+  };
+  const run = {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+    findings: [landing],
+  };
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  capture(preparation, 'base', baseRun, run);
+  capture(preparation, 'head', headRun, run);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
 });
 
 for (const state of [
@@ -423,6 +601,25 @@ test('empty/missing screen coverage and escaped dump paths fail closed', async t
   assert.throws(() => targetReadiness(outcome, manifest, baseRun), /escapes/);
 });
 
+test('a target the probe could not read makes readiness inconclusive and names the cause', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-skip-'));
+  const readiness = targetReadiness(
+    {
+      cells: [{ id: 'base', screens: [] }],
+      findings: [],
+      skipped: [{ cell: 'base', target: TARGET.id, reason: 'InfraError: no debugger page' }],
+    },
+    manifest,
+    dir
+  );
+  // The skip replaces the anonymous "missing screen" reason: a comparison that
+  // sees it must say which target was never read and why.
+  assert.deepEqual(readiness, [
+    'base: target coverage differs from manifest',
+    `base/${TARGET.id}: target could not be read (InfraError: no debugger page)`,
+  ]);
+});
+
 test('manifest screen identity uses the raw segments.join producer key, not a route path', () => {
   const screen = ['(app)', '(tabs)', 'profile'].join('/');
   const parsed = ProofManifestSchema.parse({
@@ -445,6 +642,228 @@ test('manifest screen identity uses the raw segments.join producer key, not a ro
       targets: [{ ...TARGET, screen: '/design-proof-card' }],
     }).success,
     false
+  );
+});
+
+/** A readiness run for one captured dump, without a full preparation. */
+function readinessRun(t: TestContext, target: { id: string; link: string }, dump: ProbeDump) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-ready-'));
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(out, 'screen.json'), JSON.stringify(dump));
+  return {
+    out,
+    outcome: {
+      cells: [
+        {
+          id: 'base',
+          screens: [{ target: target.id, link: target.link, dump: 'screen.json' }],
+        },
+      ],
+      findings: [],
+    },
+  };
+}
+
+const UNMARKED = {
+  id: 'profile',
+  link: 'kiloapp:///profile',
+  route: '/profile',
+  screen: '(app)/(tabs)/profile',
+};
+const unmarkedManifest = ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] });
+
+test('manifest accepts a target without readyTestID and rejects an empty marker', () => {
+  assert.equal(
+    ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] }).targets[0].readyTestID,
+    undefined
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({ version: 1, targets: [{ ...UNMARKED, readyTestID: '' }] })
+      .success,
+    false
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...UNMARKED, readyTestID: 'r'.repeat(129) }],
+    }).success,
+    false
+  );
+});
+
+test('a target without readyTestID is ready by its declared route, screen and a visible node', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target without readyTestID is not ready on another screen or with no visible node', t => {
+  const otherScreen = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({ route: UNMARKED.route, screen: '(app)/(tabs)/chats' })
+  );
+  assert.deepEqual(targetReadiness(otherScreen.outcome, unmarkedManifest, otherScreen.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, (app)/(tabs)/chats)`,
+  ]);
+  const hidden = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800], style: { display: 'none' } }],
+    })
+  );
+  assert.deepEqual(targetReadiness(hidden.outcome, unmarkedManifest, hidden.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a target with readyTestID is not ready when that node is absent', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: false }));
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
+});
+
+test('a tab route keeps a marker-less target ready when the link leaves the route unchanged', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'link-unopened',
+    severity: 'warning',
+    expected: 'the deep link changes the screen',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target that declares a marker keeps failing on the landing notice', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: true }));
+  run.outcome.findings.push({
+    cell: 'base',
+    target: TARGET.id,
+    rule: 'link-unopened',
+    severity: 'warning',
+    expected: 'the deep link changes the screen',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when its cell config did not apply', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'error',
+    expected: 'probe env matches the cell config',
+    message: 'Cell config did not apply (isRTL false, expected true)',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when another target landed on its screen', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'warning',
+    expected: 'a distinct screen per target',
+    message: 'showed the same screen as profile',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when the capture itself is unusable', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'unsettled',
+    severity: 'warning',
+    message: 'layout kept changing',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a target ready by its route keeps the comparison inconclusive when it never reached that screen', async t => {
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'unmarked-base');
+  const headRun = path.join(fixture.root, 'unmarked-head');
+  capture(preparation, 'base', baseRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: '(app)/(tabs)/chats',
+  });
+  capture(preparation, 'head', headRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+  });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'unmarked-comparison')
+  );
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.match(
+    result.reasons.join(' '),
+    /base: base\/profile: target not ready or screen identity differs/
   );
 });
 
@@ -722,11 +1141,14 @@ test('prepared source validation rejects symlink ancestors even when the externa
   const fixture = syntheticRepo(t);
   const preparation = await prepareProof(fixture);
   const base = preparation.base.directory;
-  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
+  const generated = path.join(base, 'apps/mobile/src/app/(auth)/design-proof-card.tsx');
   const outside = path.join(fixture.root, 'external-matching-fixture');
   fs.mkdirSync(outside);
-  const text = fs.readFileSync(path.join(auth, 'design-proof-card.tsx'), 'utf8');
+  const text = fs.readFileSync(generated, 'utf8');
   fs.writeFileSync(path.join(outside, 'design-proof-card.tsx'), text);
+  // A symlinked ancestor hides where the generated leaf really lives; the leaf
+  // alone would match, so the ancestor is what the containment check must catch.
+  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
   fs.renameSync(auth, `${auth}-original`);
   fs.symlinkSync(outside, auth);
   assert.throws(
@@ -1036,3 +1458,51 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     );
   }
 }
+
+// Two thousand nodes of real text are what a busy screen serializes to; the
+// document bound exists for the manifest and the receipt, not for a measurement.
+const BIG_TEXT = 'x'.repeat(1_200_000);
+
+function bigDump(): ProbeDump {
+  return probeDump({
+    nodes: [
+      { parent: -1, tag: 'View', rect: [0, 0, 400, 800], testID: TARGET.readyTestID },
+      { parent: 0, tag: 'Text', rect: [0, 0, 400, 20], text: BIG_TEXT },
+    ],
+  });
+}
+
+test('readiness accepts a capture dump above the document bound', t => {
+  const run = readinessRun(t, TARGET, bigDump());
+  const size = fs.statSync(path.join(run.out, 'screen.json')).size;
+  assert.ok(size > 1024 * 1024 && size < 8 * 1024 * 1024, `capture dump is ${size} bytes`);
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), []);
+});
+
+test('comparison accepts an expensive capture dump instead of aborting on the document bound', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'big-base');
+  const headRun = path.join(fixture.root, 'big-head');
+  const nodes = bigDump().nodes;
+  capture(preparation, 'base', baseRun, { nodes });
+  capture(preparation, 'head', headRun, { nodes });
+  const size = fs.statSync(path.join(baseRun, 'screen.json')).size;
+  assert.ok(size > 1024 * 1024, `capture dump is ${size} bytes`);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'big-comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.reasons, []);
+});
+
+test('a manifest above the document bound is still refused', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-manifest-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'proof-manifest.json');
+  fs.writeFileSync(file, JSON.stringify({ version: 1, padding: BIG_TEXT }));
+  assert.throws(() => readProofManifest(file), /Proof JSON exceeds 1048576 bytes/u);
+});

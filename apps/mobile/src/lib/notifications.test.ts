@@ -15,11 +15,13 @@ import {
   getLocalScopeKey,
   persistGlanceableSink,
 } from '@/lib/glanceable/persist';
+import { _setScopeStoreForTests } from '@/lib/glanceable/scope';
 import {
   type GlanceableSinkContext,
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
@@ -70,6 +72,7 @@ const mocks = vi.hoisted(() => ({
   captureEvent: vi.fn(),
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
@@ -102,6 +105,7 @@ vi.mock('expo-notifications', () => ({
   setNotificationHandler: mocks.setNotificationHandler,
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -218,7 +222,6 @@ vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
     { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
     { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
     {
@@ -265,6 +268,11 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', async importOriginal
 // storage is replaced; payload parsing, mapping, and the pending slot are real.
 async function loadNotifications() {
   vi.resetModules();
+  // The hint reads go through the widget store, whose resolver lazy-loads the
+  // native module this pure suite cannot import; the reset above created a new
+  // scope module, so the seam is installed on that instance.
+  const scope = await import('@/lib/glanceable/scope');
+  scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
   const pending = await import('./deep-link-launch');
   pending._setSecureStoreForTests({
     setItemAsync: vi.fn().mockResolvedValue(undefined),
@@ -306,6 +314,7 @@ beforeEach(() => {
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
   mocks.getNotificationChannelAsync.mockResolvedValue(null);
   mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -319,37 +328,17 @@ beforeEach(() => {
   mocks.clearLastNotificationResponse.mockImplementation(() => {
     mocks.lastResponse = null;
   });
+  // The hint reads go through the widget store, which lazy-loads the native
+  // module the pure suite cannot import; the seam supplies the same mock the
+  // credential path uses.
+  _setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
 });
 
-describe('retired notification payloads', () => {
-  it.each([
-    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-  ])('ignores $type without displaying a foreground notification', async data => {
+describe('a push kind this build does not declare', () => {
+  it('parses to null at the OS boundary, so its tap and banner stay untouched', async () => {
     const loaded = await loadNotifications();
-    expect(loaded.parseNotificationData(data)).toBeNull();
-    loaded.setupNotificationHandler();
-    const handler = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
-      handleNotification: (notification: {
-        request: { content: { data: unknown; title: string; body: string } };
-      }) => Promise<{
-        shouldShowBanner: boolean;
-        shouldShowList: boolean;
-        shouldSetBadge: boolean;
-        shouldPlaySound: boolean;
-      }>;
-    };
-    expect(
-      await handler.handleNotification({
-        request: { content: { data, title: 'Kilo', body: 'Activity update' } },
-      })
-    ).toMatchObject({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldSetBadge: false,
-      shouldPlaySound: false,
-    });
+
+    expect(loaded.parseNotificationData({ type: 'retired_kind', sandboxId: 's1' })).toBeNull();
   });
 });
 
@@ -480,14 +469,19 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
   });
 
-  it('swallows a per-channel failure and still creates the remaining channels', async () => {
+  it('retries a failed pass once and both concurrent callers then post', async () => {
     mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+
+    // The failed pass wrote five channels; the retry wrote all six again.
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(10);
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -501,8 +495,9 @@ describe('ensureAndroidNotificationChannels', () => {
     mocks.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error('delete failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
 
+    // A failed delete never failed the pass, so there is no retry pass.
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
@@ -513,31 +508,25 @@ describe('ensureAndroidNotificationChannels', () => {
     });
   });
 
-  it('retries every channel after a pass that failed one write', async () => {
-    mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
+  it('resolves false and drops the memo when the write fails in both passes', async () => {
+    mocks.setNotificationChannelAsync.mockImplementation((id: string) =>
+      id === 'needs-input' ? Promise.reject(new Error('channel failed')) : Promise.resolve()
+    );
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await ensureAndroidNotificationChannels();
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
-    mocks.setNotificationChannelAsync.mockClear();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    // A pass that failed a required channel is not cached: the next start
-    // retries before it posts, and a channel the framework never created would
-    // drop that post.
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
-      'needs-input',
-      'agent-progress',
-      'agent-briefing',
-      'balance',
-      'security',
-      'followed-sessions-lock-screen',
-    ]);
+    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.captureException).toHaveBeenCalledTimes(2);
 
-    // A fully successful pass is cached again.
+    // The memo is dropped, so the next caller runs a fresh pass once the channel
+    // write works again.
     mocks.setNotificationChannelAsync.mockClear();
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+    mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
   });
 
   it('keeps a fully successful pass cached', async () => {
@@ -797,6 +786,7 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
   it.each([
     null,
+    { type: 'retired_kind', sandboxId: 's1' },
     { type: 'security_finding', scope: 'personal' },
     { type: 'security_finding', scope: [], findingId: 'finding-invalid' },
     {
@@ -1324,6 +1314,33 @@ const needsInputPush = {
   category: 'attention',
 };
 
+// Kinds this app retired. A server that has not stopped sending them still
+// delivers them, and their banner is drawn from the server-supplied title and
+// body, so a foreground delivery would draw one whose tap resolves no route.
+const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
+  [
+    'chat.message',
+    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+  ],
+  ['instance-lifecycle', { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }],
+  [
+    'scheduled-action',
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
+  ],
+];
+
+describe('a push kind this app retired', () => {
+  it.each(RETIRED_PUSHES)('suppresses the %s banner', async (_kind, data) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({
+        request: { content: { title: 'KiloClaw', body: 'Your instance is ready', data } },
+      })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+});
+
 describe('per-Focus agent-progress suppression', () => {
   it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
     mocks.platform.OS = 'ios';
@@ -1532,6 +1549,62 @@ describe('applyGlanceablePushData', () => {
       organizationId: 'org-9',
     });
 
+    unregisterGlanceableSink(sink);
+  });
+
+  it('applies a push with the screen locked when the identity hints answer', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: SCOPE_KEY,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        organizationBound: true,
+      })
+    );
+
+    expect(result).toBe(true);
+    expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
+
+    setProtectedDataAvailable(true);
+    unregisterGlanceableSink(sink);
+  });
+
+  it('drops a push before the first unlock without reading it as a sign-out', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+    // The keychain has not been unlocked since boot, so the hints cannot answer.
+    mocks.getItemAsync.mockResolvedValue(null);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-02T00:00:00.000Z' })
+    );
+
+    expect(result).toBe(false);
+    expect(sink.publish).not.toHaveBeenCalled();
+    // The seeded scope is the one this process already acts for; an unanswered
+    // hint must not retire it.
+    expect(getLocalScopeKey()).toBe(SCOPE_KEY);
+    expect(getLastGlanceableSnapshot()?.revision).toBe(3);
+
+    setProtectedDataAvailable(true);
     unregisterGlanceableSink(sink);
   });
 
@@ -2092,7 +2165,9 @@ describe('setupNotificationBackgroundHandler', () => {
     await executor({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: { eventId: 'e2', taskName: 'active-agents-glanceable-background-task' },
@@ -2185,7 +2260,9 @@ describe('runBackgroundNotificationTask', () => {
     const result = await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2217,7 +2294,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2244,7 +2323,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2411,6 +2492,7 @@ describe('foreground attention-push suppression', () => {
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
     const needsInput = await import('./needs-input-notification');
+    const presentation = await import('./needs-input-presentation');
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
@@ -2420,7 +2502,7 @@ describe('foreground attention-push suppression', () => {
         };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
-    return { loaded, needsInput, registration };
+    return { loaded, needsInput, presentation, registration };
   }
 
   const attentionPush = {
@@ -2434,19 +2516,24 @@ describe('foreground attention-push suppression', () => {
     sessionId: 'ses_1',
     title: 'Fix the bug',
     kind: 'permission',
+    raiseId: null,
     prUrl: null,
     organizationId: null,
     previews: 'generic',
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
+    // The marker is only a fast path; the OS says the notification is on screen.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: presentation.notificationIdentifierForSession('ses_1') } },
+    ]);
 
     const behavior = await registration.handleNotification({
       request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
@@ -2455,8 +2542,30 @@ describe('foreground attention-push suppression', () => {
     expect(behavior.shouldSetBadge).toBe(false);
   });
 
-  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+  it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
     const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
+    // The user swiped the notification away: the marker is stale and must not
+    // suppress the only presentation the raise has left.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'expo-push-remote-1',
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(mocks.getPresentedNotificationsAsync).toHaveBeenCalled();
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2468,7 +2577,7 @@ describe('foreground attention-push suppression', () => {
     // suppressing it would drop the only notification the app presents.
     const behavior = await registration.handleNotification({
       request: {
-        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        identifier: presentation.notificationIdentifierForSession('ses_1'),
         content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
@@ -2502,14 +2611,14 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows the server attention push again after the raise is answered headless', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
 
-    needsInput.clearPostedNeedsInputNotification('ses_1');
+    presentation.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
       request: {
@@ -2612,6 +2721,10 @@ describe('cold iOS background delivery', () => {
 
   async function loadColdBackground() {
     vi.resetModules();
+    // A static import cannot reach the module instance `resetModules` just
+    // created, and the hint reads must run on that instance.
+    const scope = await import('@/lib/glanceable/scope');
+    scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
     await import('@/lib/glanceable/delivery-registration');
     const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
       import('./notifications'),

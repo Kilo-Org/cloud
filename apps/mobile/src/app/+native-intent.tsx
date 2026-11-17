@@ -137,9 +137,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return '/(app)/transcript-undelivered-fixture';
     }
     // Dev-only agent chat screen with its composer, for the design gate: a live
-    // session never holds still long enough for a cell to bracket it.
-    if (/(?:^|\/)dev\/agent-chat-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/agent-chat-fixture';
+    // session never holds still long enough for a cell to bracket it. The
+    // optional query selects the fixture's still state, so it is forwarded.
+    const agentChatFixture = /(?:^|\/)dev\/agent-chat-fixture\/?(\?.*)?$/.exec(path);
+    if (agentChatFixture) {
+      return `/(app)/agent-chat-fixture${agentChatFixture[1] ?? ''}`;
     }
     // Dev-only auth transition: the real sign-in screen, mounted inside the
     // signed-in app, so sign-in can be exercised while an account is active.
@@ -176,6 +178,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const profilePickerRoute = profilePickerFixtureRoute(path);
     if (profilePickerRoute) {
       return profilePickerRoute;
+    }
+    // Dev-only Buy credits rows against fixed store answers
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
+    const creditsPackPrices =
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
+        path
+      );
+    if (creditsPackPrices) {
+      return `/(app)/credits-pack-prices-fixture?state=${creditsPackPrices[1]}`;
     }
   }
   if (handleAppActionPath({ path, initial })) {

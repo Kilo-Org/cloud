@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
-import type { SessionSnapshot } from './types';
+import { upsertByRequestId } from './pending-requests';
+import { permissionAskedIdentitySchema } from './schemas';
+import type { SessionSnapshot, UnreadablePermissionState } from './types';
 
 const permissionSchema = z
   .object({
@@ -44,6 +46,8 @@ const recordSchema = z.record(z.string(), z.unknown());
 export type NativePendingRequests = {
   permissions: z.infer<typeof permissionSchema>[];
   questions: z.infer<typeof questionSchema>[];
+  /** Permission requests this app could not read, oldest first. */
+  unreadablePermissions: UnreadablePermissionState[];
 };
 export type NativePendingQuestion = z.infer<typeof questionSchema>;
 export type NativeConversation = {
@@ -67,7 +71,7 @@ export function reduceNativePendingRequests(
     const inventory = inventorySchema.safeParse(
       wrapper.success ? wrapper.data['pending'] : undefined
     );
-    if (!inventory.success) return { permissions: [], questions: [] };
+    if (!inventory.success) return { permissions: [], questions: [], unreadablePermissions: [] };
     return {
       permissions: inventory.data.permissions.map(item => ({
         ...item,
@@ -80,6 +84,9 @@ export function reduceNativePendingRequests(
         id: item.requestID,
         metadata: { kind: 'question' as const },
       })),
+      // The runner inventory is the authoritative snapshot, so it also clears
+      // unreadable notices: it knows every request still pending for the CLI.
+      unreadablePermissions: [],
     };
   }
   const native = recordSchema.safeParse(wrapper.success ? wrapper.data['data'] : undefined);
@@ -87,17 +94,37 @@ export function reduceNativePendingRequests(
   if (!data.success) return pending;
   if (event.type === 'permission.asked') {
     const parsed = permissionSchema.safeParse(data.data);
-    if (!parsed.success) return pending;
-    const permission = parsed.data;
+    if (parsed.success) {
+      const permission = parsed.data;
+      return {
+        ...pending,
+        permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],
+        // A readable request supersedes an unreadable notice for the same id.
+        unreadablePermissions: pending.unreadablePermissions.filter(
+          item => item.requestId !== permission.id
+        ),
+      };
+    }
+    const identity = permissionAskedIdentitySchema.safeParse(data.data);
+    if (!identity.success) return pending;
+    // The scope could not be read, so no consent card may stand for this id: a
+    // card already shown for it would describe a scope the app no longer holds.
     return {
       ...pending,
-      permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],
+      permissions: pending.permissions.filter(item => item.id !== identity.data.id),
+      // In place, so a replayed request keeps its place in the oldest-first list.
+      unreadablePermissions: [
+        ...upsertByRequestId(pending.unreadablePermissions, { requestId: identity.data.id }),
+      ],
     };
   }
   if (event.type === 'permission.replied')
     return {
       ...pending,
       permissions: pending.permissions.filter(item => item.id !== data.data['requestID']),
+      unreadablePermissions: pending.unreadablePermissions.filter(
+        item => item.requestId !== data.data['requestID']
+      ),
     };
   if (event.type === 'form.created') {
     const form = questionSchema.safeParse(data.data['form']);

@@ -117,7 +117,13 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
     ready: () => source.document() !== null,
     dump: () => JSON.stringify(snapshot()),
     startSampling: (intervalMs, maxMs) => {
-      sampler.start(intervalMs, maxMs);
+      // One in-app sample walks and serializes the whole document twice.
+      // Measured on the emulator: ~150 ms per tick on a mid-size screen, so a
+      // 120 ms cadence asks for more than the JS thread has and the app cannot
+      // finish hydrating while a cell samples it — the gate then measures a
+      // screen stuck on its own loading skeleton. The device never samples
+      // faster than it can measure.
+      sampler.start(Math.max(intervalMs, 250), maxMs);
     },
     stopSampling: () => JSON.stringify({ samples: sampler.stop(), truncated: sampler.truncated() }),
     dispose: () => {

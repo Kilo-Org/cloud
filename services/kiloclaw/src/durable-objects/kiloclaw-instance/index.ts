@@ -100,6 +100,7 @@ import {
   getProviderRegion,
   getRuntimeId,
   getStorageId,
+  INSTANCE_READY_EMAIL_RESET,
   loadState,
   storageUpdate,
   syncProviderStateForStorage,
@@ -133,11 +134,6 @@ import {
   syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
-import {
-  dispatchReadyPush,
-  LIFECYCLE_NOTIFICATION_RESET,
-  maybeDispatchStartFailurePush,
-} from './lifecycle-push';
 import { runScheduledActionApply } from './scheduled-action-apply';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
@@ -582,13 +578,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
     });
-    await maybeDispatchStartFailurePush(
-      this.env,
-      this.s,
-      this.ctx,
-      'provider_start_failed',
-      message
-    );
   }
 
   private async markRestartFailedFromProvider(message: string): Promise<void> {
@@ -987,7 +976,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             pendingDestroyMachineId: null,
             pendingDestroyVolumeId: null,
             pendingPostgresMarkOnFinalize: false,
-            ...LIFECYCLE_NOTIFICATION_RESET,
+            ...INSTANCE_READY_EMAIL_RESET,
           })
         )
       : syncProviderStateForStorage(
@@ -1025,7 +1014,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.pendingDestroyMachineId = null;
       this.s.pendingDestroyVolumeId = null;
       this.s.pendingPostgresMarkOnFinalize = false;
-      Object.assign(this.s, LIFECYCLE_NOTIFICATION_RESET);
+      Object.assign(this.s, INSTANCE_READY_EMAIL_RESET);
     }
     this.s.loaded = true;
 
@@ -2413,14 +2402,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
     this.s.pendingStartReason = options?.reason ?? null;
-    // Re-arm the failure push flag so this start attempt can trigger its own
-    // notification even if a previous attempt already sent one.
-    this.s.startFailurePushSentForAttempt = false;
     await this.persist({
       status: 'starting',
       startingAt: this.s.startingAt,
       pendingStartReason: this.s.pendingStartReason,
-      startFailurePushSentForAttempt: false,
     });
     await this.scheduleAlarm();
 
@@ -2982,7 +2967,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
-    startFailurePushSentForAttempt: boolean;
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
     envKeyAppDOKeySet: boolean | null;
@@ -3077,7 +3061,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
-      startFailurePushSentForAttempt: this.s.startFailurePushSentForAttempt,
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
       envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
@@ -3119,7 +3102,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Atomically check-and-set the instance ready flag. Returns shouldNotify: true
    * on the first call per provision lifecycle, false on all subsequent calls.
    * Used by the controller checkin handler to trigger the one-time "instance
-   * ready" email and mobile push.
+   * ready" email.
    */
   async tryMarkInstanceReady(): Promise<{
     shouldNotify: boolean;
@@ -3137,10 +3120,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.provisionedAt && this.s.provisionedAt < Date.now() - 1000 * 60 * 60 * 6) {
       return { shouldNotify: false, userId: this.s.userId };
     }
-
-    // Mobile push fires fire-and-forget so the checkin response isn't blocked
-    // on the notifications RPC. Email dispatch happens via the controller route.
-    this.ctx.waitUntil(dispatchReadyPush(this.env, this.s));
 
     return { shouldNotify: true, userId: this.s.userId };
   }

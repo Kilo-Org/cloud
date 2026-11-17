@@ -1,10 +1,9 @@
-/** Credit activity uses the first value of a repeated org query parameter.
+/** Every route that takes an `?org=` scope (credit activity, usage,
+ * integrations) uses the first value of a repeated org query parameter.
  * Empty first values mean no explicit scope; later values are never a fallback.
  * Both the route guard and screen use this normalization before membership checks.
  */
-export function normalizeCreditActivityOrgParam(
-  value: string | string[] | undefined
-): string | undefined {
+export function normalizeOrgQueryParam(value: string | string[] | undefined): string | undefined {
   if (!Array.isArray(value) && value !== undefined && value.length > 0) {
     return value;
   }

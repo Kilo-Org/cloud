@@ -81,6 +81,7 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
 }));
 
 jest.mock('@/lib/bounded-service-fetch', () => ({
+  ...jest.requireActual('@/lib/bounded-service-fetch'),
   fetchWithinBudget: jest.fn(async () => ({
     ok: true,
     json: async () => ({
@@ -89,9 +90,11 @@ jest.mock('@/lib/bounded-service-fetch', () => ({
   })),
 }));
 
-jest.mock('@/routers/cli-sessions-v2-router', () => {
+jest.mock('@/lib/session-associated-pr', () => {
   const { z } = jest.requireActual('zod');
+  const actual = jest.requireActual('@/lib/session-associated-pr');
   return {
+    sessionAssociatedPr: actual.sessionAssociatedPr,
     associatedPrSchema: z.object({}).passthrough(),
     formatAssociatedPr: () => null,
   };

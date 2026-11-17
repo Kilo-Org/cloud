@@ -56,12 +56,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
   readDb: {},
 }));
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
-}));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
-  isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
+jest.mock('@kilocode/worker-utils/organization-membership', () => ({
+  ...jest.requireActual<object>('@kilocode/worker-utils/organization-membership'),
+  hasEffectiveOrganizationAccess: (...args: unknown[]) => mockMembership(...args),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
@@ -99,7 +96,10 @@ jest.mock('@sentry/nextjs', () => ({
     ({ next }: { next: () => unknown }) =>
       next(),
 }));
-jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({ isMobileClient: () => false }));
+jest.mock('@kilocode/web-shared/lib/app-headers', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/app-headers'),
+  isMobileClient: () => false,
+}));
 jest.mock('@kilocode/web-shared/lib/trpc/control-plane-budget', () => ({
   withControlPlaneBudget: ({ next }: { next: () => unknown }) => next(),
   controlPlanePathFromInfo: () => 'fixture',

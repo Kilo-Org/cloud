@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Sesyon ajant ou gen yon aktyalizasyon",
-      "chatMessage": "Ou gen yon nouvo mesaj",
-      "instanceLifecycle": "Enstans ou gen yon aktyalizasyon",
-      "scheduledAction": "Yon aksyon pwograme gen yon aktyalizasyon",
       "lowBalance": "Saldo ou bezwen atansyon",
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Travay fini"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Echwe: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Entèwonp: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · San tit",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Alèt depans",
       "body": "Depans {{scopeName}} te depase ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nouvo rezilta sekirite ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} nan {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nouvo rezilta sekirite ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avètisman SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
+      "title": "Avètisman SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vyolasyon SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
+      "title": "Vyolasyon SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Yon chèk sekirite gen yon aktyalizasyon"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} pare",
-      "body": "Tape pou kòmanse chaje."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} echwe pou kòmanse",
-      "body": "Kòmansman echwe."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} ap rekòmanse byento",
-      "body": "Pwograme pou rekòmanse nan {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} rekòmansman anile",
-      "body": "Rekòmansman ki te pwograme a anile."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ap mete ajou byento",
-      "bodyWithTag": "Mete ajou nan {{targetImageTag}} nan {{when}}.",
-      "bodyWithoutTag": "Mete ajou pwograme nan {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} aktyalizasyon anile",
-      "body": "Aktyalizasyon ki te pwograme a anile."
     }
   },
   "sessionReady": {

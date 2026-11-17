@@ -161,9 +161,15 @@ describe('user export UI access', () => {
 });
 
 describe('user exports router guards and serialization', () => {
-  it('rejects API-token authentication for data export procedures', () => {
-    expect(() => __test__.requireWebSession(true)).toThrow(TRPCError);
-    expect(() => __test__.requireWebSession(false)).not.toThrow();
+  it('rejects a bearer token that is not a device session', () => {
+    expect(() => __test__.requireSignedInSession({ authViaToken: true })).toThrow(TRPCError);
+    expect(() => __test__.requireSignedInSession({ authViaToken: false })).not.toThrow();
+  });
+
+  it('accepts the mobile app device session, which is a first-party sign-in', () => {
+    expect(() =>
+      __test__.requireSignedInSession({ authViaToken: true, deviceSessionId: 'device-session' })
+    ).not.toThrow();
   });
 
   it('allows non-admin users to access their personal exports', async () => {

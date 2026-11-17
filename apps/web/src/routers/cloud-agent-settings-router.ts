@@ -1,17 +1,17 @@
 import 'server-only';
+import { TRPCClientError } from '@trpc/client';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   ORGANIZATION_MANAGE_ROLES,
   canManageOrganization,
 } from '@kilocode/app-shared/organizations';
-import { cloud_agent_user_settings } from '@kilocode/db/schema';
+import { cloud_agent_user_settings, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
   sandboxSelectionCapabilitiesSchema,
-  type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   BuiltinAgentSettingsInputSchema,
@@ -54,12 +54,12 @@ const CloudAgentSettingsSchema = z.object({
   contextUnavailableReason: z.string().optional(),
   builtinAgents: BuiltinAgentSettingsInputSchema,
   repositories: z.array(RepositorySettingsRowSchema),
-  capabilities: sandboxSelectionCapabilitiesSchema,
+  capabilities: sandboxSelectionCapabilitiesSchema.nullable(),
   // Repository-scoped capability views so a GitLab row never offers a
   // GitHub-only allocation such as Vercel.
   capabilitiesByPlatform: z.object({
-    github: sandboxSelectionCapabilitiesSchema,
-    gitlab: sandboxSelectionCapabilitiesSchema,
+    github: sandboxSelectionCapabilitiesSchema.nullable(),
+    gitlab: sandboxSelectionCapabilitiesSchema.nullable(),
   }),
 });
 
@@ -73,6 +73,27 @@ function ownerFromInput(organizationId: string | undefined, userId: string): Pro
 
 function toRepositoryPlatform(platform: string): RepositoryPlatform {
   return platform === 'gitlab' ? 'gitlab' : 'github';
+}
+
+async function loadSettingsCapabilities(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string | undefined
+) {
+  try {
+    const capabilities = await loadSandboxCapabilities(user, headersList, organizationId);
+    const [github, gitlab] = await Promise.all(
+      (['github', 'gitlab'] as const).map(platform =>
+        loadSandboxCapabilities(user, headersList, organizationId, platform)
+      )
+    );
+    return { capabilities, capabilitiesByPlatform: { github, gitlab } };
+  } catch (error) {
+    const code: unknown =
+      error instanceof TRPCClientError ? (error.data?.code ?? error.shape?.data?.code) : undefined;
+    if (code !== 'SERVICE_UNAVAILABLE') throw error;
+    return { capabilities: null, capabilitiesByPlatform: { github: null, gitlab: null } };
+  }
 }
 
 export const cloudAgentSettingsRouter = createTRPCRouter({
@@ -94,12 +115,13 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [capabilities, settings, bindings, builtinAgents] = await Promise.all([
-        loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
-        getSandboxAllocationSettings(db, owner),
-        listBindings(db, owner),
-        getBuiltinAgentSettings(db, ctx.user.id),
-      ]);
+      const [{ capabilities, capabilitiesByPlatform }, settings, bindings, builtinAgents] =
+        await Promise.all([
+          loadSettingsCapabilities(ctx.user, ctx.headersList, organizationId),
+          getSandboxAllocationSettings(db, owner),
+          listBindings(db, owner),
+          getBuiltinAgentSettings(db, ctx.user.id),
+        ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
       const rowKey = (fullName: string, platform: RepositoryPlatform) =>
@@ -129,24 +151,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         });
       }
 
-      const repositoryPlatforms: RepositoryPlatform[] = ['github', 'gitlab'];
-      const repositoryCapabilities = new Map<RepositoryPlatform, SandboxSelectionCapabilities>();
-      await Promise.all(
-        repositoryPlatforms.map(async platform => {
-          const caps = await loadSandboxCapabilities(
-            ctx.user,
-            ctx.headersList,
-            organizationId,
-            platform
-          );
-          repositoryCapabilities.set(platform, caps);
-        })
-      );
-
       const repositories = [...rows.values()]
         .map(row => {
-          if (!row.allocation) return row;
-          const caps = repositoryCapabilities.get(row.repositoryPlatform) ?? capabilities;
+          if (!row.allocation || !capabilities) return row;
+          const caps = capabilitiesByPlatform[row.repositoryPlatform] ?? capabilities;
           const ownerReason = getSavedAllocationReason(capabilities, row.allocation);
           const repositoryReason = findSandboxOption(
             caps,
@@ -166,9 +174,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
             a.repositoryPlatform.localeCompare(b.repositoryPlatform)
         );
 
-      const contextReason = settings.contextAllocation
-        ? getSavedAllocationReason(capabilities, settings.contextAllocation)
-        : undefined;
+      const contextReason =
+        settings.contextAllocation && capabilities
+          ? getSavedAllocationReason(capabilities, settings.contextAllocation)
+          : undefined;
 
       return {
         canManage,
@@ -177,10 +186,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         builtinAgents,
         repositories,
         capabilities,
-        capabilitiesByPlatform: {
-          github: repositoryCapabilities.get('github') ?? capabilities,
-          gitlab: repositoryCapabilities.get('gitlab') ?? capabilities,
-        },
+        capabilitiesByPlatform,
       };
     }),
 

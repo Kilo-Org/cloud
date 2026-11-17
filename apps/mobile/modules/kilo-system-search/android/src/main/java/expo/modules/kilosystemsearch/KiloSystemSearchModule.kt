@@ -131,6 +131,44 @@ private data class StoredDocument(
 private data class PendingRoute(val identifier: String, val fromEarlierProcess: Boolean)
 
 /**
+ * What the launch Intent answers now: its identifier, that it is spent, or that
+ * the activity carrying it is not up yet.
+ */
+private sealed interface LaunchTap {
+  data class Picked(val identifier: String) : LaunchTap
+
+  data object Spent : LaunchTap
+
+  data object Unavailable : LaunchTap
+}
+
+/** The tap one consume routes, and the taps it spends so a single consume never navigates twice. */
+private data class Route(val identifier: String, val dropSlot: PendingRoute?, val spendLaunch: Boolean)
+
+/**
+ * The newer of the two taps. The slot itself says which of them is newer; only
+ * the launch read can be unknown.
+ */
+private fun routeOf(slot: PendingRoute?, launch: LaunchTap): Route? = when {
+  slot == null -> when (launch) {
+    is LaunchTap.Picked -> Route(launch.identifier, dropSlot = null, spendLaunch = true)
+    // Nothing to route: Unavailable is retried, Spent is finished.
+    LaunchTap.Spent, LaunchTap.Unavailable -> null
+  }
+  // The slot predates this process, so the launch tap is the newer request.
+  slot.fromEarlierProcess -> when (launch) {
+    is LaunchTap.Picked -> Route(launch.identifier, dropSlot = slot, spendLaunch = true)
+    LaunchTap.Spent -> Route(slot.identifier, dropSlot = slot, spendLaunch = false)
+    // The newer tap exists but cannot be read yet: route neither, so the older
+    // tap cannot win a later consume.
+    LaunchTap.Unavailable -> null
+  }
+  // The slot was parked after this process started, so it is the newer request.
+  // The launch tap is spent in every case, readable or not: it is the older one.
+  else -> Route(slot.identifier, dropSlot = slot, spendLaunch = true)
+}
+
+/**
  * The subset of an AppSearch session this module uses, so the platform store
  * (API 31+) and the Jetpack local store (below 31) can both back it.
  */
@@ -240,39 +278,32 @@ class KiloSystemSearchModule : Module() {
    * so the tap that launched this process is the newer request: the launch tap
    * is resolved and the leftover is dropped, rather than resolving an old
    * identifier first and opening its screen on a launch the reader made for
-   * something else.
+   * something else. When that newer tap cannot be read yet — `currentActivity`
+   * is still coming up — neither is routed, because routing the older one would
+   * win a later consume the newer tap is owed.
    */
   private fun consumePendingRoute(): String? {
-    val pending = readPendingRoute()
-    val launchIdentifier = readLaunchIdentifier()
-    val leftover = pending?.takeIf { launchIdentifier != null && it.fromEarlierProcess }
-    leftover?.let { clearPendingRoute(it.identifier) }
-    val slot = if (leftover == null) pending else null
-    val identifier = slot?.identifier ?: launchIdentifier ?: return null
-    val route = resolveRoute(identifier)
-    if (slot != null) {
-      clearPendingRoute(slot.identifier)
-    } else {
+    val route = routeOf(readPendingRoute(), readLaunchTap()) ?: return null
+    val resolved = resolveRoute(route.identifier)
+    route.dropSlot?.let { clearPendingRoute(it.identifier) }
+    if (route.spendLaunch) {
       launchIntentRead = true
     }
-    return route
+    return resolved
   }
 
   /**
-   * The identifier of the launch Intent, or null when it is not ours.
-   *
-   * The Intent is read again on every consume until it is marked read, and it
-   * is marked read only after its resolution succeeded: on a cold start
-   * `currentActivity` can still be null when JavaScript makes its first
-   * consume, and giving up then would forfeit the launch tap for the rest of
-   * the process's life.
+   * What the launch Intent answers now, which is not always its identifier: a
+   * cold start can make its first consume before `currentActivity` is up, and
+   * giving up then would forfeit the launch tap for the rest of the process's
+   * life.
    */
-  private fun readLaunchIdentifier(): String? {
+  private fun readLaunchTap(): LaunchTap {
     if (launchIntentRead) {
-      return null
+      return LaunchTap.Spent
     }
-    val intent = appContext.currentActivity?.intent ?: return null
-    return pickedIdentifier(intent)
+    val intent = appContext.currentActivity?.intent ?: return LaunchTap.Unavailable
+    return pickedIdentifier(intent)?.let { LaunchTap.Picked(it) } ?: LaunchTap.Spent
   }
 
   /**

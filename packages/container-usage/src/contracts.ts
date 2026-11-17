@@ -19,6 +19,9 @@ export const billingSubjectSchema = z
   .strict();
 export type BillingSubject = z.infer<typeof billingSubjectSchema>;
 
+export const billingModeSchema = z.enum(['shadow', 'paid']);
+export type BillingMode = z.infer<typeof billingModeSchema>;
+
 export const billingActorSchema = z
   .object({
     type: z.enum(['user', 'bot']),
@@ -203,7 +206,7 @@ export type BudgetVerdict = z.infer<typeof budgetVerdictSchema>;
 
 export const heartbeatAckSchema = recordAckSchema
   .extend({
-    billingMode: z.enum(['shadow', 'paid']).optional(),
+    billingMode: billingModeSchema.optional(),
     budget: budgetVerdictSchema,
   })
   .strict();
@@ -213,6 +216,17 @@ export type ContainerUsageRpcMethods = {
   recordStart: (input: RecordStartInput) => Promise<RecordStartResult>;
   recordHeartbeat: (input: RecordHeartbeatInput) => Promise<HeartbeatAck>;
   recordStop: (input: RecordStopInput) => Promise<RecordAck>;
+};
+
+export const containerBillingStatusInputSchema = usageContextBaseSchema.pick({
+  service: true,
+  subject: true,
+});
+
+export type ContainerBillingStatusRpcMethods = {
+  getBillingMode: (
+    input: z.infer<typeof containerBillingStatusInputSchema>
+  ) => Promise<'shadow' | 'paid'>;
 };
 
 export function intervalId(service: string, instanceId: string, startEpochMs: number): string {

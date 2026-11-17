@@ -7,6 +7,8 @@ import {
   kilo2EventSchema,
   kilo2FormSchema,
   kilo2PermissionSchema,
+  kilo2MessageSchema,
+  kilo2SessionPath,
 } from './kilo2-api.js';
 import {
   createKilo2Reads,
@@ -17,39 +19,10 @@ import {
 import type { HarnessActivity } from './harness-activity.js';
 import { kilo2MessageActivity, kilo2PartId } from './kilo2-message-activity.js';
 import type { Kilo2Message } from '../../../src/shared/kilo2-conversation.js';
+import { nativeErrorSchema, nativeTurnError } from './kilo2-native-error.js';
 import { logToFile } from '../utils.js';
 
-const nativeErrorSchema = z.object({
-  type: z.string(),
-  message: z.string(),
-  status: z.number().int().optional(),
-});
-
-/** Native error types that the failure classifier knows by an SDK error name. */
-const NATIVE_ERROR_NAMES = new Map([
-  ['provider.auth', 'ProviderAuthError'],
-  ['provider.content-filter', 'ContentFilterError'],
-]);
-
-/**
- * Kilo v2 classifies a rate limit from a provider code or text as well, so the
- * error can arrive without an HTTP status.
- */
-const NATIVE_ERROR_STATUSES = new Map([['provider.rate-limit', 429]]);
-
-/**
- * The native execution error in the shape `classifyAssistantFailure` reads.
- * An HTTP status is the most specific signal, so it becomes an `APIError`.
- */
-export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
-  const status = error.status ?? NATIVE_ERROR_STATUSES.get(error.type);
-  if (status !== undefined)
-    return { name: 'APIError', data: { message: error.message, statusCode: status } };
-  return {
-    name: NATIVE_ERROR_NAMES.get(error.type) ?? 'UnknownError',
-    data: { message: error.message },
-  };
-}
+export { nativeTurnError } from './kilo2-native-error.js';
 
 const MAX_FRAME_CHARS = 4 * 1024 * 1024;
 const MAX_TRACKED_MESSAGES = 1024;
@@ -199,6 +172,12 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       return;
     }
     if (typeof id !== 'string') return;
+    // The next step start clears retry status. Emit before native reads so a failed
+    // read cannot preserve it.
+    if (event.type === 'session.execution.started')
+      emit('session.turn.open', { sessionID: id }, directory);
+    if (event.type === 'session.execution.started' || event.type === 'session.step.started')
+      emit('session.status', { sessionID: id, status: { type: 'busy' } }, directory);
     const textKind = event.type.startsWith('session.text.')
       ? 'text'
       : event.type.startsWith('session.reasoning.')
@@ -257,16 +236,28 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
         { sessionID: id, source: { version: 'v2', session: info } },
         nativeDirectory
       );
+      if (event.type === 'session.synthetic') {
+        const messageID = z.string().startsWith('evt_').parse(event.id).replace(/^evt_/, 'msg_');
+        const message = kilo2MessageSchema.parse(
+          await api.data(`${kilo2SessionPath(id)}/message/${encodeURIComponent(messageID)}`, {
+            signal,
+          })
+        );
+        if (message.id !== messageID || message.type !== 'synthetic')
+          throw new Error('Native notice identity mismatch');
+        if (changed(id, message))
+          emit(
+            'conversation.message.updated',
+            { sessionID: id, source: { version: 'v2', session: info }, message },
+            nativeDirectory
+          );
+      }
       if (event.type === 'session.created' || event.type === 'session.renamed') {
         emit(
           event.type === 'session.created' ? 'session.created' : 'session.updated',
           { info: { ...info, directory: nativeDirectory } },
           nativeDirectory
         );
-      }
-      if (event.type === 'session.execution.started') {
-        emit('session.turn.open', { sessionID: id }, nativeDirectory);
-        emit('session.status', { sessionID: id, status: { type: 'busy' } }, nativeDirectory);
       }
       // Read the native database. This preserves content ordinals, tool state,
       // and user-message identity without maintaining a second execution state machine.

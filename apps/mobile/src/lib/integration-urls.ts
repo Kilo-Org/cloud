@@ -1,26 +1,18 @@
-export function getGitLabIntegrationUrl(webBaseUrl: string, organizationId?: string): string {
-  const baseUrl = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
-  if (!organizationId) {
-    return `${baseUrl}/integrations/gitlab`;
-  }
-  return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/integrations/gitlab`;
+function trimTrailingSlash(webBaseUrl: string): string {
+  return webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
 }
+
+// Every provider's connect flow now starts on an app-shell page
+// (`app-shell-handoff`), and Bitbucket's workspace access token is pasted in the
+// app's own connect sheet (`app/(app)/bitbucket-connect.tsx`), so no provider
+// opens a full-web `/integrations/...` page from the app any more.
 
 // The BYOK key editor has no mobile screen, so a reviewer blocked by a broken
 // key sends the user to the web settings page that owns it.
 export function getByokUrl(webBaseUrl: string, organizationId?: string): string {
-  const baseUrl = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
+  const baseUrl = trimTrailingSlash(webBaseUrl);
   if (!organizationId) {
     return `${baseUrl}/byok`;
   }
   return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/byok`;
-}
-
-// Bitbucket is org-only (see PLATFORM_CAPABILITIES), so unlike the GitHub/
-// GitLab helpers above there is no personal variant — it links straight to
-// the org's Code Reviewer settings page (apps/web's
-// organizations/[id]/code-reviews), pre-selecting the Bitbucket tab.
-export function getBitbucketIntegrationUrl(webBaseUrl: string, organizationId: string): string {
-  const baseUrl = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
-  return `${baseUrl}/organizations/${encodeURIComponent(organizationId)}/code-reviews?platform=bitbucket`;
 }

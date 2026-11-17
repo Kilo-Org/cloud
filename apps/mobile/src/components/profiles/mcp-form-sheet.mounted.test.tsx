@@ -1,7 +1,7 @@
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
+import { McpFormSheet, type McpSaveFailure } from '@/components/profiles/mcp-form-sheet';
 import {
   booleanHandler,
   changeText,
@@ -16,6 +16,7 @@ import {
 } from '@/components/profiles/mcp-form-sheet.test-helpers';
 import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
@@ -73,8 +74,7 @@ vi.mock('@/components/ui/dialog', () => ({
 function mountSheet(
   options: {
     existingNames?: readonly string[];
-    nameConflictFromServer?: boolean;
-    saveFailure?: string | null;
+    saveFailure?: McpSaveFailure | null;
   } = {}
 ) {
   return renderWithProviders(
@@ -82,7 +82,6 @@ function mountSheet(
       server: null,
       existingNames: options.existingNames ?? [],
       isSaving: false,
-      nameConflictFromServer: options.nameConflictFromServer ?? false,
       saveFailure: options.saveFailure ?? null,
       onClose: () => {
         h.onClose();
@@ -185,7 +184,7 @@ describe('McpFormSheet refused save', () => {
   });
 
   it('shows a name conflict the server reported on the name field', async () => {
-    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'name-conflict' } });
 
     expect(fieldError(renderer.root, 'Server name')).toBe(i18n.t('profiles.mcp.nameConflict'));
 
@@ -193,7 +192,7 @@ describe('McpFormSheet refused save', () => {
   });
 
   it('clears a server-reported name conflict once the name changes', async () => {
-    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'name-conflict' } });
 
     changeText(renderer.root, 'Server name', 'another-name');
 
@@ -203,13 +202,24 @@ describe('McpFormSheet refused save', () => {
   });
 
   it('renders a failed save inside the sheet', async () => {
-    const { renderer, unmount } = await mountSheet({
-      saveFailure: i18n.t('profiles.mcp.saveFailed'),
-    });
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'refused' } });
 
-    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('profiles.mcp.saveFailed')
-    );
+    const failed = i18n.t('profiles.mcp.saveFailed');
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === failed);
+
+    expect(status?.props.className).toContain('text-destructive');
+
+    unmount();
+  });
+
+  it('names the cap in the warn tone when a create is refused past it', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'limit' } });
+
+    const cap = i18n.t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === cap);
+
+    expect(status?.props.className).toContain('text-warn');
+    expect(status?.props.className).not.toContain('text-destructive');
 
     unmount();
   });

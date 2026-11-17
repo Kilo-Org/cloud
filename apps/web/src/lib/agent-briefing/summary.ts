@@ -57,7 +57,7 @@ import {
   type BriefingReportRow,
 } from './store';
 
-import { briefingFactsSchema } from './evidence';
+import { type BriefingFacts } from './evidence';
 
 const estimateClaimsSchema = z.object({
   purpose: z.literal('agent-briefing-estimate'),
@@ -195,8 +195,11 @@ async function requestBriefingSummary(
 // A reasoning model spends output tokens on hidden reasoning before the answer, so its cap must
 // leave room for both. Other models keep the smaller cap, which every model's output limit fits.
 const REASONING_MAX_OUTPUT_TOKENS = 16_384;
-export function briefingPrompt(row: BriefingReportRow, language: string): string {
-  const facts = briefingFactsSchema.parse(row.facts);
+export function briefingPrompt(
+  row: BriefingReportRow,
+  facts: BriefingFacts,
+  language: string
+): string {
   const input = {
     capturedAt: new Date(row.captured_at).toISOString(),
     nightStartAt: new Date(row.night_start_at).toISOString(),
@@ -603,8 +606,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
   });
   if (!row) return;
   try {
-    await assertBriefingSourcesAccessible(row);
-    const facts = briefingFactsSchema.parse(row.facts);
+    const { facts } = await assertBriefingSourcesAccessible(row);
     if (!briefingHasActivity(facts.scorecard)) throw new Error('permission_unavailable');
     const setting = await briefingContextSettings(row.kilo_user_id, row.organization_id);
     const authorization = z
@@ -627,7 +629,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
       .from(kilocode_users)
       .where(eq(kilocode_users.id, row.kilo_user_id));
     if (!user) throw new Error('permission_unavailable');
-    const prompt = briefingPrompt(row, row.language);
+    const prompt = briefingPrompt(row, facts, row.language);
     const bound = await briefingPriceBound(
       authorization.model,
       prompt,

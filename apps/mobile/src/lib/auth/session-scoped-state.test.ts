@@ -26,6 +26,10 @@ const shareMock = vi.hoisted(() => ({
   clearAccountStagedShareNavigation: vi.fn(),
 }));
 
+const mergeOperationKeyMock = vi.hoisted(() => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
 
 // The staged share deliveries are the account-bound store this clear owns; its
@@ -51,6 +55,11 @@ vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
 // spied here; the store's own behavior is pinned in `lib/form-draft.mounted.test.tsx`.
 vi.mock('@/lib/form-draft', () => formDraftMock);
 
+// The retained merge intent keys live in a module-level store; the boundary's
+// call is spied here and the store's own behavior is pinned in
+// `lib/operation-key-store.test.ts`.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => mergeOperationKeyMock);
+
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 import {
@@ -58,14 +67,19 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import {
+  getCodeReviewerAnalyticsSelection,
+  setCodeReviewerAnalyticsPeriod,
+  setCodeReviewerAnalyticsPlatform,
+} from '@/lib/hooks/use-code-reviewer-analytics-filters';
+import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
 import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
-  clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
+  clearSessionScopedState,
 } from './session-scoped-state';
 /* eslint-enable import/first */
 
@@ -111,6 +125,7 @@ const mocks = vi.hoisted(() => ({
   clearFilePartCache: vi.fn(),
   clearMarkdownImageConfirmMemory: vi.fn(),
   clearSessionAutoApprove: vi.fn(),
+  clearUserSessionTitles: vi.fn(),
   clearToolCardImageCache: vi.fn(),
   clearRemoteMcpServers: vi.fn(),
   clearSettingsToolsEnabled: vi.fn(),
@@ -143,6 +158,11 @@ vi.mock('@/components/agents/markdown-image-confirm', () => ({
 }));
 vi.mock('@/components/agents/session-auto-approve', () => ({
   clearSessionAutoApprove: mocks.clearSessionAutoApprove,
+}));
+// The per-session rename titles are account-scoped memory; the boundary's call is
+// observed through this spy, and the store's own suite pins what it clears.
+vi.mock('@/components/agents/session-detail-rename-state', () => ({
+  clearUserSessionTitles: mocks.clearUserSessionTitles,
 }));
 // Partial on purpose: the mirror's manifest reads `extensionForMime` from this
 // module, and `clearArtifactMirror` never calls it.
@@ -209,6 +229,7 @@ const SESSION_MEMBERS = [
   mocks.clearFilePartCache,
   mocks.clearClipboardImages,
   mocks.clearSessionAutoApprove,
+  mocks.clearUserSessionTitles,
   mocks.forgetRemoteMcp,
   mocks.clearRemoteMcpServers,
   mocks.clearChatBackends,
@@ -415,6 +436,33 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
   });
 
+  it('deletes the mirror root once, then signals the provider', () => {
+    let mirrorWasGone: boolean | null = null;
+    mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
+      mirrorWasGone = !fakeFs.state.rootExists;
+    });
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
+    expect(fakeFs.state.rootExists).toBe(false);
+    expect(mirrorWasGone).toBe(true);
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays idempotent and never throws when the mirror is already gone', () => {
+    clearSystemSearchIndexOnSignedOutLaunch();
+    fakeFs.deleted.length = 0;
+
+    expect(() => {
+      clearSystemSearchIndexOnSignedOutLaunch();
+    }).not.toThrow();
+
+    expect(fakeFs.deleted).toEqual([]);
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(2);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(2);
+  });
+
   it('reports a failed re-clear through telemetry and never throws', async () => {
     const failure = new Error('The system search index failed with code 2.');
     nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(failure);
@@ -541,9 +589,33 @@ describe('clearSessionScopedState', () => {
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
   });
 
+  // The analytics filters store stays real as well: the next account must not
+  // open an organization on the previous account's platform and period.
+  it('drops the per-organization analytics selection on sign-out', () => {
+    setCodeReviewerAnalyticsPlatform('session-scoped-analytics-org', 'gitlab');
+    setCodeReviewerAnalyticsPeriod('session-scoped-analytics-org', 90);
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'gitlab',
+      period: 90,
+    });
+
+    clearSessionScopedState();
+
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'github',
+      period: 30,
+    });
+  });
+
   it('drops the typed profile form drafts, including their secrets', () => {
     clearSessionScopedState();
 
     expect(formDraftMock.clearFormDrafts).toHaveBeenCalled();
+  });
+
+  it('drops the retained merge intent keys, so no merge replays across accounts', () => {
+    clearSessionScopedState();
+
+    expect(mergeOperationKeyMock.clearMergeOperationKeys).toHaveBeenCalled();
   });
 });

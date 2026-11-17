@@ -49,7 +49,7 @@ export function harness(
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
   const files = new Map<string, number>();
-  const index: { text: string | null } = { text: null };
+  const index: { text: string | null; fails?: boolean } = { text: null };
   const tasks: Task[] = [];
   const inspected: string[] = [];
   const released: string[] = [];
@@ -82,7 +82,12 @@ export function harness(
       files.set(to, size);
     },
     path: name => `/models/${name}`,
-    readIndex: () => index.text,
+    readIndex: () => {
+      if (index.fails === true) {
+        throw new Error('storage unavailable');
+      }
+      return index.text;
+    },
     writeIndex: text => {
       index.text = text;
     },

@@ -6,6 +6,7 @@ import {
   notificationHistoryFilters,
   notificationHistoryTarget,
 } from '@/lib/notification-history';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 
 const LOW_BALANCE_PARAMS = { organizationName: 'Acme', minimumBalanceUsd: '5' };
 
@@ -23,6 +24,27 @@ describe('notificationHistoryCopy', () => {
 
     expect(copy.headline).toBe('Warnung bei niedrigem Guthaben');
     expect(copy.detail).toBe('Das Guthaben von Acme fiel unter $5');
+  });
+
+  it('renders the shared body entry of a security finding row in the requested language', () => {
+    const copy = notificationHistoryCopy(
+      {
+        i18nKey: 'internal.securityFindingSlaBreach',
+        i18nParams: {
+          severity: 'high',
+          findingTitle: 'XSS in admin',
+          repoFullName: 'acme/api',
+        },
+        title: 'SLA breach',
+        body: 'XSS in admin in acme/api',
+      },
+      'es'
+    );
+
+    expect(copy).toEqual({
+      headline: 'Incumplimiento de SLA',
+      detail: 'XSS in admin en acme/api',
+    });
   });
 
   it('renders English copy for a locale the push catalog does not carry', () => {
@@ -103,15 +125,18 @@ describe('notificationHistoryCopy', () => {
   it('keeps the title of a session the user named after the app', () => {
     const copy = notificationHistoryCopy(
       {
-        i18nKey: 'cloudAgentSession.completed',
+        i18nKey: 'sessionReady',
         i18nParams: { sessionTitle: 'Kilo' },
         title: 'Kilo',
-        body: 'Task completed',
+        body: 'Your Kilo session is ready to control from your phone',
       },
       'en'
     );
 
-    expect(copy).toEqual({ headline: 'Kilo', detail: 'Task completed' });
+    expect(copy).toEqual({
+      headline: 'Kilo',
+      detail: 'Your Kilo session is ready to control from your phone',
+    });
   });
 });
 
@@ -123,34 +148,27 @@ describe('notificationHistoryTarget', () => {
     ],
     [{ type: 'agent_briefing', url: '/agent-briefing' }, '/(app)/agent-briefing'],
   ])('opens the push destination of a %o row without the push marker', (payload, href) => {
-    expect(notificationHistoryTarget(payload)).toMatchObject({ href });
+    expect(notificationHistoryTarget(payload)?.href).toBe(href);
   });
 
   it('keeps the other query params and drops only the push marker', () => {
     expect(
-      notificationHistoryTarget({ type: 'low_balance', organizationId: 'org-acme' })
-    ).toMatchObject({
-      href: '/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-acme',
-    });
+      notificationHistoryTarget({ type: 'low_balance', organizationId: 'org-acme' })?.href
+    ).toBe('/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-acme');
     expect(
       notificationHistoryTarget({
         type: 'spend_alert',
         scope: 'organization',
         organizationId: 'org-acme',
-      })
-    ).toMatchObject({
-      href: '/(app)/(tabs)/(3_profile)/spend-alerts?org=org-acme',
-    });
+      })?.href
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?org=org-acme');
   });
 
   it('routes a security finding row to its scope', () => {
     expect(
-      notificationHistoryTarget({
-        type: 'security_finding',
-        findingId: 'f-1',
-        scope: 'org-9',
-      })
-    ).toMatchObject({ href: '/(app)/security-agent/org-9/findings/f-1' });
+      notificationHistoryTarget({ type: 'security_finding', findingId: 'f-1', scope: 'org-9' })
+        ?.href
+    ).toBe('/(app)/security-agent/org-9/findings/f-1');
   });
 
   it('carries the payload the row was recorded from', () => {
@@ -172,17 +190,40 @@ describe('notificationHistoryTarget', () => {
     expect(notificationHistoryTarget({})).toBeNull();
   });
 
-  it.each([
-    {
-      type: 'chat.message',
-      sandboxId: 'sandbox-1',
-      conversationId: 'conversation-1',
-      messageId: 'm1',
-    },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
-  ])('has no history destination for retired $type notifications', payload => {
-    expect(notificationHistoryTarget(payload)).toBeNull();
+  it('reports no destination for a kind the schema declares but this app retired', () => {
+    expect(
+      notificationHistoryTarget({
+        type: 'chat.message',
+        sandboxId: 's1',
+        conversationId: 'c1',
+        messageId: 'm1',
+      })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({ type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' })
+    ).toBeNull();
+    expect(
+      notificationHistoryTarget({
+        type: 'scheduled-action',
+        event: 'scheduled_restart_notice',
+        sandboxId: 's1',
+      })
+    ).toBeNull();
+  });
+});
+
+describe('isRetiredPushType', () => {
+  it.each(['chat.message', 'instance-lifecycle', 'scheduled-action'])(
+    'retires a %s row',
+    pushType => {
+      expect(isRetiredPushType(pushType)).toBe(true);
+    }
+  );
+
+  it('keeps a kind the app still routes, and anything it does not know', () => {
+    expect(isRetiredPushType('cloud_agent_session')).toBe(false);
+    expect(isRetiredPushType('low_balance')).toBe(false);
+    expect(isRetiredPushType('retired_kind')).toBe(false);
   });
 });
 

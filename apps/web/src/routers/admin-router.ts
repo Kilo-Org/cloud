@@ -34,7 +34,7 @@ import {
   modelsByProvider,
   ai_gateway_sync_providers_state,
   ai_gateway_metadata_cache,
-  api_request_log,
+  api_request_log_2,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -2593,12 +2593,12 @@ export const adminRouter = createTRPCRouter({
       const [summary] = await db
         .select({
           recordCount: count(),
-          sizeBytes: sql<number>`pg_total_relation_size('api_request_log'::regclass)`.mapWith(
+          sizeBytes: sql<number>`pg_total_relation_size('api_request_log_2'::regclass)`.mapWith(
             Number
           ),
-          oldestCreatedAt: min(api_request_log.created_at),
+          oldestCreatedAt: min(api_request_log_2.created_at),
         })
-        .from(api_request_log);
+        .from(api_request_log_2);
 
       return summary;
     }),
@@ -2774,8 +2774,8 @@ export const adminRouter = createTRPCRouter({
 
           try {
             const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
-            // The export streams messages/parts in ingest order; re-sort by the
-            // time-ordered IDs so the trace matches the cloud-agent-next UI.
+            // The export streams messages/parts in ingest order; re-sort in the
+            // transcript's turn order so the trace matches the cloud-agent-next UI.
             return {
               messages: sortSessionMessagesForDisplay(snapshot?.messages ?? []),
               format: 'v2' as const,

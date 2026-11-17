@@ -236,8 +236,9 @@ jobs:
     # The suite drives one browser and one Node process, so it does not use the
     # large runner the single job used: measured end to end, the heavier shard
     # takes the same time on 4 vCPU. Repo variables are not exposed to fork pull
-    # requests, so the job falls back to ubuntu-latest there.
-    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    # requests, so the job falls back to ubuntu-24.04 there: ubuntu-latest is now
+    # 26.04, where the pinned Playwright has no Chromium build.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 20
     env:
       CI: 'true'

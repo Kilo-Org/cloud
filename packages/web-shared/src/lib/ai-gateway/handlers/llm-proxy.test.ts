@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
+import { agent_briefing_snapshots, api_request_log_2, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import type {
@@ -49,6 +50,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
+  getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -97,6 +99,7 @@ import {
   type RequestLoggingMode,
 } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
@@ -134,7 +137,10 @@ import type * as GatewayConfigModule from '@kilocode/web-shared/lib/ai-gateway/g
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { EnkryptOutputGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { apiRequestLogBlobSchema } from '@kilocode/web-shared/lib/r2/api-request-log';
+import {
+  apiRequestLogBlobKey,
+  apiRequestLogBlobSchema,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 
 jest.mock('next/server', () => {
   return {
@@ -356,6 +362,7 @@ const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 
 beforeEach(() => {
   mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+  jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -999,7 +1006,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: false,
-          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: [],
         },
       ],
@@ -1072,7 +1078,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
           outcome: 'selected',
           gateway: 'vercel',
           bounded_spending: false,
-          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: [],
         },
       ],
@@ -1167,7 +1172,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: false,
-          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: [],
         },
       ],
@@ -1221,7 +1225,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     expect(archived).not.toHaveProperty('vercel');
   });
 
-  it('passes the Vercel request ID to request logging', async () => {
+  it('passes the usage ID and Vercel request ID to request logging', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(
@@ -1229,9 +1233,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
+    const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+    expect(usageId).toEqual(expect.any(String));
     expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        logging: expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
+        logging: expect.objectContaining({
+          usage_id: usageId,
+          vercel_request_id: 'iad1::iad1::request-id',
+        }),
         responseTransforms: null,
       })
     );
@@ -1824,13 +1833,18 @@ describe('POST /api/v1/chat/completions request handling', () => {
       apiUrl: 'https://ai-gateway.vercel.sh/v1',
     } satisfies Provider;
 
+    // Neither Claude nor OpenAI models carry the Kilo provider exclusions, which a Vercel
+    // route needs the inference provider cache to resolve.
+    const VERCEL_MODEL = 'moonshotai/kimi-k2.5';
+
     afterEach(() => {
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     });
 
     function setOrganization(
       settings: OrganizationSettings,
-      features: Partial<OrganizationFeatures>
+      features: Partial<OrganizationFeatures>,
+      plan: OrganizationPlan | null = 'enterprise'
     ) {
       mockedGetUserFromAuth.mockResolvedValue({
         user: {
@@ -1844,41 +1858,37 @@ describe('POST /api/v1/chat/completions request handling', () => {
       mockedGetBalanceAndOrgSettings.mockResolvedValue({
         balance: 1000,
         settings,
-        plan: 'enterprise',
+        plan: plan ?? undefined,
       });
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue({
         ...DEFAULT_ORGANIZATION_FEATURES,
         ...features,
       });
     }
 
-    it.each([
-      ['openrouter', provider, { disable_openrouter: true }, 'OpenRouter'],
-      ['vercel', vercelProvider, { disable_vercel_ai_gateway: true }, 'the Vercel AI Gateway'],
-    ] as const)(
-      'rejects a request routed through a disabled %s gateway',
-      async (_gateway, selectedProvider, settings, gatewayName) => {
-        setOrganization(settings, { gateway_settings: ['org-1'] });
-        mockedGetProvider.mockResolvedValue(
-          providerResult({
-            provider: selectedProvider,
-            userByok: null,
-            isFree: false,
-            bypassAccessCheck: false,
-          })
-        );
+    it('rejects a request routed through a disabled OpenRouter gateway', async () => {
+      setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
-        const { handleLlmProxyRequest } = await import('./llm-proxy');
-        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
-        expect(response.status).toBe(403);
-        await expect(response.json()).resolves.toMatchObject({
-          error: `This request would be routed through ${gatewayName}, which your organization has disabled.`,
-          error_type: 'provider_not_allowed',
-        });
-        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-      }
-    );
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
 
     it('ignores a disabled gateway while the organization feature is off', async () => {
       setOrganization({ disable_openrouter: true }, {});
@@ -1898,24 +1908,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
         'https://OPENROUTER.AI.:8443/api/v1',
         { disable_openrouter: true },
         'OpenRouter',
-      ],
-      [
-        'custom',
-        'https://ai-gateway.vercel.sh/v1',
-        { disable_vercel_ai_gateway: true },
-        'the Vercel AI Gateway',
-      ],
-      [
-        'custom-public',
-        'https://vercel.sh/v1',
-        { disable_vercel_ai_gateway: true },
-        'the Vercel AI Gateway',
-      ],
-      [
-        'direct-byok',
-        'https://other.VERCEL.SH.:8443/v1',
-        { disable_vercel_ai_gateway: true },
-        'the Vercel AI Gateway',
       ],
     ] as const)(
       'rejects a %s provider targeting the disabled gateway at %s',
@@ -1969,13 +1961,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
       ['https://openrouter.ai.attacker.example/v1', { disable_openrouter: true }, ['org-1']],
       ['https://notopenrouter.ai/v1', { disable_openrouter: true }, ['org-1']],
       ['https://openrouter.ai@api.example.com/v1', { disable_openrouter: true }, ['org-1']],
-      [
-        'https://ai-gateway.vercel.sh.attacker.example/v1',
-        { disable_vercel_ai_gateway: true },
-        ['org-1'],
-      ],
-      ['https://notvercel.sh/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
-      ['https://openrouter.ai/api/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
       ['https://ai-gateway.vercel.sh/v1', { disable_openrouter: true }, ['org-1']],
       ['https://openrouter.ai/api/v1', {}, ['org-1']],
       ['https://openrouter.ai/api/v1', { disable_openrouter: true }, []],
@@ -1999,42 +1984,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
       }
     );
 
-    it('rejects a BYOK route through a disabled Vercel AI Gateway', async () => {
-      setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-1'] });
-      mockedGetProvider.mockResolvedValue(
-        providerResult({
-          provider: vercelProvider,
-          userByok: [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
-          isFree: false,
-          bypassAccessCheck: false,
-        })
-      );
-
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-
-      expect(response.status).toBe(403);
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      [{ disable_vercel_ai_gateway: true }, ['org-1'], true],
-      [{ disable_vercel_ai_gateway: true }, [], false],
-      [{ disable_openrouter: true }, ['org-1'], false],
-    ] as const)(
-      'tells provider selection whether the organization turned Vercel off (%j, %j)',
-      async (settings, organizationIds, organizationDisabledVercelAiGateway) => {
-        setOrganization(settings, { gateway_settings: [...organizationIds] });
-
-        const { handleLlmProxyRequest } = await import('./llm-proxy');
-        await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-
-        expect(mockedGetProvider.mock.calls[0]?.[0].organizationDisabledVercelAiGateway).toBe(
-          organizationDisabledVercelAiGateway
-        );
-      }
-    );
-
     it('pins Vercel AI Gateway requests to the data region', async () => {
       setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
       mockedGetProvider.mockResolvedValue(
@@ -2047,7 +1996,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
 
       expect(response.status).toBe(200);
       expect(
@@ -2056,10 +2005,74 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBe('jp');
     });
 
-    it('keeps OpenRouter requests on the global base URL when a data region is set', async () => {
+    it('rejects a Kilo OpenRouter route when a data region is set', async () => {
       setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'Your organization requires inference in the European Union region, which this request cannot use.',
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects a custom provider route when a data region is set', async () => {
+      setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, type: 'custom', apiUrl: 'https://api.example.com/v1' },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(403);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('serves a request on the user’s own OpenRouter key while OpenRouter is disabled', async () => {
+      setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, apiKey: 'sk-user-openrouter' },
+          userByok: [{ decryptedAPIKey: 'sk-user-openrouter', providerId: 'openrouter' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+    });
+
+    it('serves a request on the user’s own OpenRouter key when a data region is set', async () => {
+      setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, apiKey: 'sk-user-openrouter' },
+          userByok: [{ decryptedAPIKey: 'sk-user-openrouter', providerId: 'openrouter' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
       expect(response.status).toBe(200);
@@ -2068,6 +2081,121 @@ describe('POST /api/v1/chat/completions request handling', () => {
       );
       expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
     });
+
+    it('does not pin a Vercel route carrying the user’s provider key to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: [{ decryptedAPIKey: 'key', providerId: 'moonshotai' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+    });
+
+    it('does not pin a Vercel route carrying the user’s Vercel AI Gateway key to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...vercelProvider, apiKey: 'sk-user-vercel' },
+          userByok: [{ decryptedAPIKey: 'sk-user-vercel', providerId: 'vercel-ai-gateway' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+    });
+
+    it.each(['teams', null] as const)(
+      'ignores the settings of an organization whose plan is %s',
+      async plan => {
+        setOrganization(
+          { disable_openrouter: true, data_region: 'eu' },
+          { gateway_settings: ['org-1'] },
+          plan
+        );
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: false,
+          })
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ openRouterDisabled: false })
+        );
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
+          'https://openrouter.ai/api/v1'
+        );
+        expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+      }
+    );
+
+    it('does not pin a Vercel route of a non-enterprise organization to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] }, 'teams');
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+    });
+
+    it.each([
+      ['a disabled OpenRouter', { disable_openrouter: true }, true],
+      ['a data region', { data_region: 'eu' }, true],
+      ['no gateway setting', {}, false],
+    ] as const)(
+      'asks routing to bypass the Vercel opt-out list with %s: %s',
+      async (_name, settings, expected) => {
+        setOrganization(settings, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: vercelProvider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: false,
+          })
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ openRouterDisabled: expected })
+        );
+      }
+    );
   });
 
   describe('organization BYOK keys and the organization provider allow-list', () => {
@@ -2256,6 +2384,96 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       }
     );
+  });
+
+  describe('delegated routes and the organization provider policy', () => {
+    type DelegatedRoute = 'an OpenAI ChatGPT connection' | 'a Claude billing connection';
+    const delegatedRoutes: Record<DelegatedRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
+      'an OpenAI ChatGPT connection': {
+        provider: { ...provider, type: 'openai-chatgpt' },
+        userByok: null,
+      },
+      'a Claude billing connection': {
+        provider: { ...provider, type: 'claude-billing' },
+        userByok: null,
+      },
+    };
+
+    /**
+     * Sends one request through a delegated route under an enterprise organization policy that
+     * admits `admittedProviders` for the model.
+     */
+    async function sendThrough(route: DelegatedRoute, admittedProviders: readonly string[]) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: [...admittedProviders] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: true,
+        eligibleProviderRoutes: new Set(admittedProviders),
+      });
+      mockedIsModelAllowedForProviderKey.mockImplementation(
+        async (_policy, _modelId, providerSlug) => admittedProviders.includes(providerSlug)
+      );
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          ...delegatedRoutes[route],
+          isFree: false,
+          bypassAccessCheck: false,
+          skipBalanceCheck: true,
+        })
+      );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    }
+
+    afterEach(() => {
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedIsModelAllowedForProviderKey.mockResolvedValue(true);
+    });
+
+    it('refuses a ChatGPT connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'openai'
+      );
+    });
+
+    it('serves a ChatGPT connection whose upstream provider the organization policy admits', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic', 'openai']);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a Claude billing connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('a Claude billing connection', ['openai']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'anthropic'
+      );
+    });
   });
 
   it.each(['openrouter', 'vercel'] as const)(
@@ -2830,6 +3048,169 @@ describe.each([
       ...privacy,
     };
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
+  });
+});
+
+describe('organization data-collection policy on provider-policy exempt routes', () => {
+  const exemptProvider = {
+    ...provider,
+    type: 'custom',
+    apiUrl: 'https://upstream.example.com/v1',
+  } satisfies Provider;
+
+  function setOrganizationDataCollection(dataCollection: 'allow' | 'deny') {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: dataCollection },
+      plan: 'enterprise',
+    });
+  }
+
+  function privateCustomLlm(publicId: string): CustomLlm {
+    return {
+      public_id: publicId,
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        organization_ids: [],
+      },
+    };
+  }
+
+  /** The local fake LLM counts as a free model only while it is enabled for local development. */
+  function enableLocalFakeLlm() {
+    return jest.replaceProperty(process, 'env', {
+      ...process.env,
+      NODE_ENV: 'development',
+      FAKE_LLM_URL: 'http://127.0.0.1:8811',
+    } as NodeJS.ProcessEnv);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedFindCustomLlm.mockResolvedValue(null);
+    mockedIsCustomLlm.mockResolvedValue(false);
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    // Free route shapes reach the free-model rate limit, so pin its default for this block.
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'custom', choices: [] }),
+    });
+  });
+
+  afterEach(() => {
+    // `clearAllMocks` keeps implementations, so restore the module-level custom LLM stubs.
+    mockedFindCustomLlm.mockResolvedValue(null);
+    mockedIsCustomLlm.mockResolvedValue(false);
+  });
+
+  // Each case returns the route its shape produces, so the assertion covers the real route: a
+  // direct-BYOK route with a user key, a custom LLM route, and the local fake LLM route. A model is
+  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free id.
+  const directByokRoute: ProviderRoute = {
+    provider: {
+      ...exemptProvider,
+      type: 'direct-byok',
+      async transformRequest(context) {
+        delete context.request.body.provider;
+      },
+    },
+    userByok: [{ decryptedAPIKey: 'test-key', providerId: 'openai' }],
+    isFree: true,
+    bypassAccessCheck: true,
+  };
+  const customLlmRoute: ProviderRoute = {
+    provider: exemptProvider,
+    userByok: null,
+    isFree: false,
+    bypassAccessCheck: true,
+  };
+  const localFakeRoute: ProviderRoute = {
+    provider: exemptProvider,
+    userByok: null,
+    isFree: true,
+    bypassAccessCheck: true,
+  };
+  it.each([
+    {
+      shape: 'a non-public custom LLM',
+      model: 'acme/private-model',
+      route: customLlmRoute,
+      customLlm: true,
+    },
+    {
+      shape: 'a bespoke direct-BYOK id with a free model',
+      model: 'acme/bespoke-model:free',
+      route: directByokRoute,
+      customLlm: false,
+    },
+    {
+      shape: 'the local fake LLM',
+      model: 'fake-deterministic',
+      route: localFakeRoute,
+      customLlm: false,
+      localFake: true,
+    },
+  ])(
+    'rejects a data-collection-required model on an exempt route: $shape',
+    async ({ model, route, customLlm, localFake }) => {
+      setOrganizationDataCollection('deny');
+      if (customLlm) mockCustomLlm(privateCustomLlm(model));
+      const localFakeEnv = localFake ? enableLocalFakeLlm() : null;
+      try {
+        mockedGetProvider.mockImplementationOnce(async ({ request }) => {
+          // The organization preference is on the request before routing picks an exempt route.
+          expect(request.body.provider).toEqual(
+            expect.objectContaining({ data_collection: 'deny' })
+          );
+          return providerResult(route);
+        });
+
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: 'data_collection_required',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      } finally {
+        localFakeEnv?.restore();
+      }
+    }
+  );
+
+  it('serves an exempt route whose model needs data collection for an organization that allows it', async () => {
+    setOrganizationDataCollection('allow');
+    mockCustomLlm(privateCustomLlm('acme/private-model'));
+    mockedGetProvider.mockImplementationOnce(async ({ request }) => {
+      expect(request.body.provider).toEqual(expect.objectContaining({ data_collection: 'allow' }));
+      return providerResult({
+        provider: exemptProvider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: true,
+      });
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -4605,7 +4986,9 @@ describe('briefing gateway accounting receipts', () => {
 
   async function finishAfterTasks() {
     await Promise.all(
-      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? undefined : task))
+      jest
+        .mocked(after)
+        .mock.calls.map(([task]) => Promise.resolve(typeof task === 'function' ? undefined : task))
     );
   }
 
@@ -4978,7 +5361,7 @@ describe('Enkrypt output guardrail', () => {
   function enkryptRequestBodies() {
     return fetchSpy.mock.calls
       .filter(([url]) => url === enkryptDetectUrl)
-      .map(([, init]) => JSON.parse(String(init?.body)) as { text: string; detectors: unknown });
+      .map(([, init]) => readJsonBody(init?.body) as { text: string; detectors: unknown });
   }
 
   async function runAfterTasks() {
@@ -5435,7 +5818,6 @@ describe('Enkrypt output guardrail', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: false,
-          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: [],
         },
       ],
@@ -5556,7 +5938,7 @@ describe('Enkrypt output guardrail', () => {
       },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const request = JSON.parse(String(init?.body)) as {
+      const request = readJsonBody(init?.body) as {
         text: string;
         detectors: Record<string, unknown>;
       };
@@ -5599,13 +5981,13 @@ describe('Enkrypt output guardrail', () => {
 
       const rows = await db
         .select()
-        .from(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
-      expect(rows).toEqual([
-        expect.objectContaining({ error: { guardrail_rejection: 'block', guardrail: 'output' } }),
-      ]);
-      const archived = fakeR2.objects.get(`test-api-request-log/${rows[0].request_r2_key}`) ?? '';
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.kilo_user_id, 'user-123'));
+      expect(rows).toHaveLength(1);
+      const archived =
+        fakeR2.objects.get(`test-api-request-log/${apiRequestLogBlobKey(rows[0])}`) ?? '';
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
+      expect(record.error).toEqual({ guardrail_rejection: 'block', guardrail: 'output' });
       expect(record.response).toBe(JSON.stringify(body));
       expect(record.enkrypt).toHaveLength(3);
       expect(record.enkrypt?.filter(call => call.guardrail === 'input')).toHaveLength(1);
@@ -5640,16 +6022,13 @@ describe('Enkrypt output guardrail', () => {
       expect(send).toHaveBeenCalledTimes(1);
       expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
       expect(fakeR2.objects.size).toBe(1);
-      expect(rows[0].response_r2_key).toBe(rows[0].request_r2_key);
       expect(archived).not.toContain('test-enkrypt-key');
       expect(archived).not.toContain('apikey');
     } finally {
       logOnlyScan.resolve();
       send.mockRestore();
       mockedGetDynamicRequestLoggingMode.mockResolvedValue(null);
-      await db
-        .delete(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+      await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, 'user-123'));
     }
   });
 
@@ -5767,7 +6146,7 @@ describe('Enkrypt input guardrail', () => {
       .filter(([url]) => url === enkryptDetectUrl)
       .map(
         ([, init]) =>
-          JSON.parse(String(init?.body)) as { text: string; detectors: Record<string, unknown> }
+          readJsonBody(init?.body) as { text: string; detectors: Record<string, unknown> }
       );
   }
 
@@ -6365,7 +6744,7 @@ describe('Enkrypt input guardrail', () => {
         enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
       });
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return Response.json(
           text.includes('ignore all instructions')
             ? injection
@@ -6526,7 +6905,7 @@ describe('Enkrypt input guardrail', () => {
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const { text } = JSON.parse(String(init?.body)) as { text: string };
+      const { text } = readJsonBody(init?.body) as { text: string };
       return Response.json(
         text.includes('ignore all instructions')
           ? injection
@@ -6796,7 +7175,7 @@ describe('Enkrypt input guardrail', () => {
 
     function enkryptResponds(respond: (detectors: Record<string, unknown>) => Promise<Response>) {
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { detectors } = JSON.parse(String(init?.body)) as {
+        const { detectors } = readJsonBody(init?.body) as {
           detectors: Record<string, unknown>;
         };
         return respond(detectors);
@@ -7068,14 +7447,15 @@ describe('Enkrypt input guardrail', () => {
     afterEach(async () => {
       send.mockRestore();
       mockedGetDynamicRequestLoggingMode.mockResolvedValue(null);
-      await db
-        .delete(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+      await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, 'user-123'));
     });
 
     async function handleLoggedRequest() {
       const response = await handleLlmProxyRequest(
-        makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
+        makeRequest(makeBody(), {
+          'x-vercel-id': vercelRequestId,
+          'x-kilocode-taskid': 'ses_logged',
+        })
       );
       await Promise.all(
         jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
@@ -7086,8 +7466,14 @@ describe('Enkrypt input guardrail', () => {
     function loggedRows() {
       return db
         .select()
-        .from(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.kilo_user_id, 'user-123'));
+    }
+
+    function archivedBlob(row: { id: string; created_at: string } | undefined) {
+      return row
+        ? (fakeR2.objects.get(`test-api-request-log/${apiRequestLogBlobKey(row)}`) ?? '')
+        : '';
     }
 
     describe.each(['input', 'output'] as const)('%s error body capture', guardrail => {
@@ -7226,9 +7612,8 @@ describe('Enkrypt input guardrail', () => {
           }
 
           const rows = await loggedRows();
-          expect(rows).toEqual([expect.objectContaining({ status_code: 503 })]);
-          const archived =
-            fakeR2.objects.get(`test-api-request-log/${rows[0].request_r2_key}`) ?? '';
+          expect(rows).toHaveLength(1);
+          const archived = archivedBlob(rows[0]);
           const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
           expect(record.response).toBe(JSON.stringify(body));
           expect(record.enkrypt).toEqual([
@@ -7278,23 +7663,24 @@ describe('Enkrypt input guardrail', () => {
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
         const rows = await loggedRows();
         expect(rows).toEqual([
-          expect.objectContaining({
+          {
+            id: mockedLogUnrewrittenResponse.mock.calls[0]?.[0].logging.usage_id,
+            created_at: expect.any(String),
+            generation_id: null,
             kilo_user_id: 'user-123',
             organization_id: 'org-1',
-            status_code: status,
-            provider: provider.type,
-            model: 'openai/gpt-4o',
-            error: { guardrail_rejection: verdict },
-          }),
+            session_id: 'ses_logged',
+            requested_model: 'openai/gpt-4o',
+          },
         ]);
-        const archived =
-          fakeR2.objects.get(`test-api-request-log/${rows[0].response_r2_key}`) ?? '';
+        const archived = archivedBlob(rows[0]);
         const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
         const attempts = enkrypt.status >= 500 ? 2 : 1;
         expect(record).toMatchObject({
-          version: 1,
+          version: 2,
           request: expect.objectContaining({ messages: [{ role: 'user', content: 'hello' }] }),
           response: JSON.stringify(body),
+          error: { guardrail_rejection: verdict },
         });
         expect(record.enkrypt).toEqual(
           Array.from({ length: attempts }, () => ({
@@ -7315,7 +7701,6 @@ describe('Enkrypt input guardrail', () => {
         expect(send).toHaveBeenCalledTimes(1);
         expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
         expect(fakeR2.objects.size).toBe(1);
-        expect(rows[0].request_r2_key).toBe(rows[0].response_r2_key);
         expect(archived).not.toContain('test-enkrypt-key');
         expect(archived).not.toContain('apikey');
       }
@@ -7339,7 +7724,7 @@ describe('Enkrypt input guardrail', () => {
       expect(response.status).toBe(400);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       const [row] = await loggedRows();
-      const archived = fakeR2.objects.get(`test-api-request-log/${row?.request_r2_key}`) ?? '';
+      const archived = archivedBlob(row);
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
       const request = {
         text: HELLO_SCAN_TEXT,
@@ -7385,7 +7770,7 @@ describe('Enkrypt input guardrail', () => {
       const allowed = '{ "summary": { "injection_attack": 0 }, "result_message": null }';
       const blocked = '{ "summary": { "injection_attack": 1 }, "result_message": "blocked" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return new Response(text.includes('ignore all instructions') ? blocked : allowed);
       });
 
@@ -7410,7 +7795,7 @@ describe('Enkrypt input guardrail', () => {
       expect(response.status).toBe(400);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       const [row] = await loggedRows();
-      const archived = fakeR2.objects.get(`test-api-request-log/${row?.response_r2_key}`) ?? '';
+      const archived = archivedBlob(row);
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
       expect(
         record.enkrypt
@@ -7465,7 +7850,7 @@ describe('Enkrypt input guardrail', () => {
       const loggedResponse =
         '{ "summary": { "policy_violation": 1 }, "result_message": "raw log-only response" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const request = JSON.parse(String(init?.body)) as { detectors: Record<string, unknown> };
+        const request = readJsonBody(init?.body) as { detectors: Record<string, unknown> };
         if (!('policy_violation' in request.detectors)) return new Response(allowedResponse);
         await logOnlyScan.promise;
         return new Response(loggedResponse);

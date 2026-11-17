@@ -107,7 +107,6 @@ describe('agent LLM turn runner core', () => {
       appendEvents: () => {},
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -147,7 +146,6 @@ describe('agent LLM turn runner core', () => {
       },
       conversationEvents: [createUserMessage('Inspect this page')],
       executeToolCall: () => Promise.resolve({ ok: true, value: { text: 'Page text' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -215,7 +213,6 @@ describe('agent LLM turn runner core', () => {
       },
       conversationEvents: [createUserMessage('Click save')],
       executeToolCall,
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -274,7 +271,6 @@ describe('agent LLM turn runner core', () => {
       },
       conversationEvents: [createUserMessage('Inspect this page')],
       executeToolCall: () => Promise.resolve({ ok: true, value: { text: 'Page text' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: maxAgentToolRounds,
       model: 'anthropic/claude-sonnet-4',
@@ -323,7 +319,6 @@ describe('agent LLM turn runner core', () => {
       },
       conversationEvents: [createUserMessage('Hi')],
       executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -385,7 +380,6 @@ describe('agent LLM turn runner core', () => {
       appendEvents: () => {},
       conversationEvents: [createUserMessage('Hi')],
       executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -424,7 +418,6 @@ describe('agent LLM turn runner core', () => {
         appendEvents: () => {},
         conversationEvents: [createUserMessage('Hi')],
         executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
-        failureMessage: String,
         fetch,
         maxToolRounds: 4,
         model: 'anthropic/claude-sonnet-4',
@@ -478,7 +471,6 @@ describe('prepareTools', () => {
       appendEvents: () => {},
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
-      failureMessage: String,
       fetch: () => Promise.resolve(new Response('', { status: 500 })),
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -547,7 +539,6 @@ describe('prepareTools', () => {
       appendEvents: () => {},
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
-      failureMessage: String,
       fetch: () => Promise.resolve(new Response('', { status: 500 })),
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -588,7 +579,6 @@ describe('prepareTools', () => {
       appendEvents: () => {},
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
-      failureMessage: String,
       fetch: () => Promise.resolve(new Response('', { status: 500 })),
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
@@ -615,8 +605,6 @@ describe('stream retry', () => {
     appendEvents,
     conversationEvents: [createUserMessage('Hello')],
     executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: '' } }),
-    failureMessage: (error: unknown) =>
-      `failed: ${error instanceof Error ? error.message : String(error)}`,
     fetch,
     maxToolRounds: 4,
     model: 'kilo-auto/efficient',
@@ -662,7 +650,7 @@ describe('stream retry', () => {
     expect(calls).toBe(2);
     const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
     expect(texts).toContain('Recovered.');
-    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+    expect(appended.some(event => event.type === 'error')).toBe(false);
   });
 
   it('resets partially streamed text into the same event on retry', async () => {
@@ -725,8 +713,11 @@ describe('stream retry', () => {
     await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
 
     expect(calls).toBe(3);
-    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
-    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
+    const errorEvents = appended.filter(event => event.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    expect(errorEvents[0]).toMatchObject({ retry: 'turn', type: 'error' });
+    // The raw runner string never reaches the transcript.
+    expect(appended.some(event => event.type === 'message')).toBe(false);
   });
 
   it('does not retry a non-retriable HTTP status', async () => {
@@ -740,9 +731,48 @@ describe('stream retry', () => {
     await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
 
     expect(calls).toBe(1);
-    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
-    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
+    const errorEvents = appended.filter(event => event.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    // A rejected key cannot be fixed by repeating the request, so the notice offers no Retry.
+    expect(errorEvents[0]).not.toHaveProperty('retry');
+    expect(appended.some(event => event.type === 'message')).toBe(false);
   });
+
+  it(
+    'answers a tool call that never ran when the user stops the turn',
+    { timeout: 15_000 },
+    async () => {
+      const abort = new AbortController();
+      const appended: AgentConversationEvent[] = [];
+      const fetch: FetchLike = () =>
+        Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      const options = {
+        ...baseOptions(fetch, events => appended.push(...events)),
+        executeToolCall: () => {
+          abort.abort();
+          const error = new Error('The user aborted a request.');
+          error.name = 'AbortError';
+          return Promise.reject(error);
+        },
+        signal: abort.signal,
+      };
+
+      await runLlmTurn(options);
+
+      const toolCall = appended.find(event => event.type === 'tool-call');
+      // A replayed call without a result is rejected by the provider, so the stopped call still gets one.
+      expect(appended.find(event => event.type === 'tool-result')).toMatchObject({
+        ok: false,
+        toolCallId: toolCall?.id,
+      });
+      expect(appended.at(-1)).toMatchObject({ role: 'assistant', text: 'Stopped.' });
+    }
+  );
 });
 
 describe('truncated completion retry', () => {
@@ -773,8 +803,6 @@ describe('truncated completion retry', () => {
       appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
       conversationEvents: [createUserMessage('Create a workflow')],
       executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
-      failureMessage: (error: unknown) =>
-        `failed: ${error instanceof Error ? error.message : String(error)}`,
       fetch,
       maxToolRounds: 4,
       model: 'kilo-auto/efficient',
@@ -793,8 +821,7 @@ describe('truncated completion retry', () => {
 
     expect(calls).toBe(2);
     expect(updates.at(-1)).toBe('Saved the workflow.');
-    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
-    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+    expect(appended.some(event => event.type === 'error')).toBe(false);
   });
 
   it('does not retry a completion that stopped normally', async () => {
@@ -815,7 +842,6 @@ describe('truncated completion retry', () => {
       appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'kilo-auto/efficient',
@@ -850,8 +876,6 @@ describe('truncated completion retry', () => {
       appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
       conversationEvents: [createUserMessage('Hello')],
       executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
-      failureMessage: (error: unknown) =>
-        `failed: ${error instanceof Error ? error.message : String(error)}`,
       fetch,
       maxToolRounds: 4,
       model: 'kilo-auto/efficient',
@@ -868,7 +892,7 @@ describe('truncated completion retry', () => {
     expect(calls).toBe(1);
     const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
     expect(texts).toContain('Partial answer before the overflow');
-    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+    expect(appended.some(event => event.type === 'error')).toBe(false);
   });
 });
 
@@ -885,7 +909,6 @@ describe('identical failing tool call guard', () => {
       },
       conversationEvents: [createUserMessage('Run the workflow')],
       executeToolCall: () => Promise.resolve({ error: 'Workflow run failed', ok: false }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 8,
       model: 'anthropic/claude-sonnet-4',
@@ -945,7 +968,6 @@ describe('per-tool failure cap', () => {
         }
         return Promise.resolve({ error: `failure ${String(callIndex)}`, ok: false });
       },
-      failureMessage: String,
       fetch,
       maxToolRounds: 40,
       model: 'anthropic/claude-sonnet-4',
@@ -1304,7 +1326,6 @@ describe('reasoning details on persisted tool calls', () => {
       },
       conversationEvents: [createUserMessage('Read the page')],
       executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'ok' } }),
-      failureMessage: String,
       fetch,
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',

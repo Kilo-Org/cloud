@@ -380,6 +380,41 @@ describe('filterSessionCustomModeOptions', () => {
 });
 
 describe('resolveSendSelection', () => {
+  it.each(['high', undefined])(
+    'uses the current picker model and variant %s instead of stale session metadata',
+    variant => {
+      expect(
+        resolveSendSelection(
+          { mode: 'code', model: 'original/model', variant: 'original-variant' },
+          { model: 'current/model', variant }
+        )
+      ).toEqual({ mode: 'code', model: 'current/model', variant });
+    }
+  );
+
+  it('falls back to session metadata when the picker has no model', () => {
+    expect(
+      resolveSendSelection(
+        { mode: 'plan', model: 'session/model', variant: 'high' },
+        { model: undefined, variant: undefined }
+      )
+    ).toEqual({ mode: 'plan', model: 'session/model', variant: 'high' });
+  });
+
+  it('keeps a runtime agent model pin above the current picker selection', () => {
+    expect(
+      resolveSendSelection(
+        {
+          mode: 'reviewer',
+          model: 'original/model',
+          variant: 'original-variant',
+          runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', model: 'pinned/model' }],
+        },
+        { model: 'current/model', variant: 'high' }
+      )
+    ).toEqual({ mode: 'reviewer', model: 'pinned/model', variant: undefined });
+  });
+
   it('returns the selected mode, model, and variant', () => {
     expect(
       resolveSendSelection({

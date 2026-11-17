@@ -4,17 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
+import { SESSION_CARD_SCOPE_KEY } from '@/lib/glanceable/widget-store';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import {
   _resetSessionCardScopeStoreForTests,
   _setSessionCardScopeStoreForTests,
   _settleSessionCardScopeWritesForTests,
+  pruneSessionCardScopes,
   readSessionCardScopes,
   rememberSessionCardScope,
 } from './session-card-scope';
@@ -39,10 +42,12 @@ import {
 } from './session-follow-restore';
 import { sessionCardStaleAfterSeconds } from './session-card-facts';
 import {
+  _sessionCardPressKeysForTests,
+  beginSessionCardPress,
   renderSessionCardPress,
   SESSION_CARD_STALE_AFTER_SECONDS,
   type SessionActivity,
-  sessionCardPress,
+  sessionCardPressKey,
 } from './session-card-press';
 
 type Props = Record<string, unknown>;
@@ -178,6 +183,9 @@ beforeEach(() => {
   _resetSessionCardScopeStoreForTests();
   _setSessionCardScopeStoreForTests(scopeStore);
   storedScopes.clear();
+  // A keychain that has been unlocked since boot answers the probe, which is
+  // what lets an absent record read as absent instead of unreadable.
+  storedScopes.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
   scopeReadsFail = false;
 });
 
@@ -267,7 +275,7 @@ describe('the follow scope record', () => {
     followSession(RUNNING, CTX, NOW);
     await _settleSessionCardScopeWritesForTests();
     const recorded = await readSessionCardScopes();
-    expect(recorded?.get('session-1')).toEqual(CTX);
+    expect(recorded?.get('session-1')).toMatchObject(CTX);
 
     endAllSessionCards();
     await _settleSessionCardScopeWritesForTests();
@@ -281,7 +289,7 @@ describe('the follow scope record', () => {
       setProtectedDataAvailable(true);
     });
 
-    it('reads the records as unavailable instead of calling the keychain', async () => {
+    it('reads a refused record as unavailable', async () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
       const read = vi.fn(scopeStore.getItemAsync);
@@ -291,15 +299,19 @@ describe('the follow scope record', () => {
       });
 
       setProtectedDataAvailable(false);
+      scopeReadsFail = true;
       const records = await readSessionCardScopes();
 
       // Unavailable, never empty: an empty map would make every followed card
-      // out of scope and end it.
+      // out of scope and end it. The record is written
+      // AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked device still tries the
+      // read; the refusal is what makes it unreadable.
       expect(records).toBeNull();
-      expect(read).not.toHaveBeenCalled();
+      expect(read).toHaveBeenCalled();
     });
 
-    it('does not write a follow it could only half record', async () => {
+    it('records a follow while the device is locked', async () => {
+      storedScopes.set(SESSION_CARD_SCOPE_KEY, JSON.stringify({ version: 1, cards: {} }));
       const write = vi.fn(scopeStore.setItemAsync);
       _setSessionCardScopeStoreForTests({
         getItemAsync: scopeStore.getItemAsync,
@@ -310,10 +322,27 @@ describe('the follow scope record', () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
 
-      // The card stays followed; only the record it cannot write is skipped, and
-      // the next follow or restore writes it.
+      // The record is readable with the screen locked once the device has been
+      // unlocked after boot, so a follow records then.
+      expect(storedScopes.get(SESSION_CARD_SCOPE_KEY)).toContain('"session-1"');
+    });
+
+    it('does not write a follow over a record it cannot read while locked', async () => {
+      // A keychain the device has not unlocked since boot cannot answer the
+      // probe either, so nothing it returns proves the record is empty.
+      storedScopes.delete(WIDGET_STORE_CLASS_MARKER.key);
+      const write = vi.fn(scopeStore.setItemAsync);
+      _setSessionCardScopeStoreForTests({
+        getItemAsync: scopeStore.getItemAsync,
+        setItemAsync: write,
+      });
+
+      setProtectedDataAvailable(false);
+      rememberSessionCardScope('session-1', CTX);
+      await _settleSessionCardScopeWritesForTests();
+
+      // The map this follow built would drop every other card's scope.
       expect(write).not.toHaveBeenCalled();
-      expect(storedScopes.has('session-1')).toBe(false);
     });
   });
 });
@@ -434,7 +463,7 @@ describe('discoverSessionCards', () => {
 
     // A read that proved nothing must not cost the card its record.
     const records = await readSessionCardScopes();
-    expect(records?.get('session-1')).toEqual(CTX);
+    expect(records?.get('session-1')).toMatchObject(CTX);
   });
 
   it('keeps the records when its own discovery failed but a later one read ActivityKit', async () => {
@@ -466,7 +495,7 @@ describe('discoverSessionCards', () => {
     await _settleSessionCardScopeWritesForTests();
 
     const kept = await readSessionCardScopes();
-    expect(kept?.get('session-1')).toEqual(CTX);
+    expect(kept?.get('session-1')).toMatchObject(CTX);
   });
 });
 
@@ -589,30 +618,44 @@ describe('dismissFinishedSessionCard', () => {
   });
 
   it('drops the press state of the dismissed card', async () => {
-    const card = fakeActivity('native-3', { sessionId: 'session-3', statusKind: 'needsInput' });
+    const card = fakeActivity('native-3', {
+      sessionId: 'session-3',
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'approval-3',
+    });
     mocks.instances = [card];
     discoverSessionCards();
-    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
-    expect(sessionCardPress('session-3')).toEqual({ notice: 'Approve failed' });
+    const key = sessionCardPressKey('session-3', 'approval-3');
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: 'Approve failed' });
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
+    expect(_sessionCardPressKeysForTests()).toEqual([key]);
     card.props = { ...card.props, statusKind: 'idle' };
 
     dismissFinishedSessionCard('session-3');
 
     expect(isSessionFollowed('session-3')).toBe(false);
-    expect(sessionCardPress('session-3')).toBeUndefined();
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
   });
 
   it('drops the press state of a card iOS ended', async () => {
-    const card = fakeActivity('native-4', { sessionId: 'session-4', statusKind: 'needsInput' });
+    const card = fakeActivity('native-4', {
+      sessionId: 'session-4',
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'approval-4',
+    });
     mocks.instances = [card];
     discoverSessionCards();
-    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
+    const key = sessionCardPressKey('session-4', 'approval-4');
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: 'Approve failed' });
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
 
     mocks.instances = [];
     discoverSessionCards();
 
     expect(isSessionFollowed('session-4')).toBe(false);
-    expect(sessionCardPress('session-4')).toBeUndefined();
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
   });
 });
 
@@ -735,7 +778,7 @@ describe('a restore with no stored account', () => {
     expect(isSessionFollowed('session-1')).toBe(true);
     await _settleSessionCardScopeWritesForTests();
     const kept = await readSessionCardScopes();
-    expect(kept?.get('session-1')).toEqual(CTX);
+    expect(kept?.get('session-1')).toMatchObject(CTX);
   });
 });
 
@@ -798,7 +841,66 @@ describe('a restore with no live card', () => {
 
     expect(isSessionFollowed('session-2')).toBe(true);
     const records = await readSessionCardScopes();
-    expect(records?.get('session-2')).toEqual(CTX);
+    expect(records?.get('session-2')).toMatchObject(CTX);
+  });
+});
+
+describe('a record rewritten while the restore waits', () => {
+  it('keeps a session record when it is re-followed under the same account while the restore waits', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    /* A record left behind for a session whose card is no longer live, so the
+       record is the earlier one for that session and the re-follow rewrites it. */
+    rememberSessionCardScope('session-B', CTX);
+    await _settleSessionCardScopeWritesForTests();
+
+    const restore = restoreFollowedSessionCards(async () => {
+      followSession({ ...RUNNING, id: 'session-B' }, CTX, NOW);
+      await _settleSessionCardScopeWritesForTests();
+      return { kind: 'account', ctx: CTX };
+    });
+    await restore;
+    await _settleSessionCardScopeWritesForTests();
+
+    const records = await readSessionCardScopes();
+    expect(records?.has('session-B')).toBe(true);
+    /* The card that follow started is in scope on the next restore, rather
+       than ended as an unrecorded one. */
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+    expect(isSessionFollowed('session-B')).toBe(true);
+  });
+
+  it('a re-follow after a restart does not collide with the persisted revision', async () => {
+    storedScopes.set(
+      SESSION_CARD_SCOPE_KEY,
+      JSON.stringify({
+        version: 1,
+        cards: {
+          'session-1': { userId: CTX.userId, organizationId: CTX.organizationId, revision: 7 },
+        },
+      })
+    );
+    const before = await readSessionCardScopes();
+    if (before === null) {
+      throw new Error('the seeded record must be readable');
+    }
+    expect(before.get('session-1')?.revision).toBe(7);
+
+    /* A restart: the in-memory revision high-water mark is gone, the store is
+       not, so the next revision must come from what was persisted. */
+    _resetSessionCardScopeStoreForTests();
+    _setSessionCardScopeStoreForTests(scopeStore);
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+
+    const after = await readSessionCardScopes();
+    expect(after?.get('session-1')?.revision).toBe(8);
+
+    pruneSessionCardScopes([], before);
+    await _settleSessionCardScopeWritesForTests();
+
+    const kept = await readSessionCardScopes();
+    expect(kept?.has('session-1')).toBe(true);
   });
 });
 
@@ -846,5 +948,150 @@ describe('follow revision and card freshness', () => {
     );
     // Quiet long ago: it is stale now.
     expect(sessionCardStaleAfterSeconds(active, NOW + 60 * 60_000)).toBe(0);
+  });
+});
+
+// A press belongs to the request the card shows, not to the session. These
+// cases pin which card a press may repaint and how far the store may grow.
+describe('the Approve press of one session card', () => {
+  const APPROVAL_A = 'a'.repeat(64);
+  const APPROVAL_B = 'b'.repeat(64);
+  const FAILED_LINE = 'Approve failed';
+
+  function followOne(): FakeActivity {
+    followSession(RUNNING, CTX, NOW);
+    const card = mocks.instances[0];
+    if (card === undefined) {
+      throw new Error('expected a card');
+    }
+    return card;
+  }
+
+  function awaitRequest(card: FakeActivity, approvalKey: string): void {
+    card.props = {
+      ...card.props,
+      statusKind: 'needsInput',
+      statusSince: '2026-10-12T10:02:00.000Z',
+      awaitingPermission: true,
+      approvalKey,
+    };
+  }
+
+  function failPress(key: string): void {
+    beginSessionCardPress(key)?.fail({ kind: 'approve-failed', notice: FAILED_LINE });
+  }
+
+  it('keeps the failure line through a tray update of the same request', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const key = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(key);
+    await renderSessionCardPress(card as unknown as SessionActivity, key);
+
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(card.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        notice: FAILED_LINE,
+        awaitingPermission: true,
+        approvalKey: APPROVAL_A,
+      }),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('never draws a failed request on the request that replaced it', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+    await renderSessionCardPress(card as unknown as SessionActivity, keyA);
+
+    awaitRequest(card, APPROVAL_B);
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+    // `settleCardWork` awaits the native update, which assigns the new props.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(card.props.notice).toBeUndefined();
+    expect(card.props.approving).not.toBe(true);
+    expect(card.props).toMatchObject({ awaitingPermission: true, approvalKey: APPROVAL_B });
+    expect(_sessionCardPressKeysForTests()).toEqual([]);
+  });
+
+  it('does not clear a newer request when an older one is settled late', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_B);
+    card.update.mockClear();
+    card.props = { ...card.props, approving: true };
+
+    await renderSessionCardPress(
+      card as unknown as SessionActivity,
+      sessionCardPressKey('session-1', APPROVAL_A),
+      true
+    );
+
+    expect(card.update).not.toHaveBeenCalled();
+    expect(card.props).toMatchObject({
+      approving: true,
+      awaitingPermission: true,
+      approvalKey: APPROVAL_B,
+    });
+  });
+
+  it('retires a superseded entry even when the card already draws the pushed request', () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+
+    // A server push moved the card to the next request, so the tray rebuild
+    // draws exactly what is already on screen and no update runs; only the
+    // unconditional prune can retire the failed entry.
+    awaitRequest(card, APPROVAL_B);
+    // The rebuild stamps the sync's own version; matching it keeps the drawn
+    // content identical to the pushed card.
+    card.props = { ...card.props, updatedAt: new Date(NOW + 60_000).toISOString() };
+    syncFollowedSessionCards(
+      // The row reports the same request the push already drew.
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:02:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(_sessionCardPressKeysForTests()).not.toContain(keyA);
+    expect(card.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps one entry per current request and refuses a token minted for a deleted key', async () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+    await renderSessionCardPress(card as unknown as SessionActivity, keyA);
+
+    const retired = beginSessionCardPress(sessionCardPressKey('session-1', 'retired-request'));
+    for (let index = 0; index < 20; index += 1) {
+      failPress(sessionCardPressKey('session-1', `request-${index}`));
+    }
+
+    syncFollowedSessionCards(
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:03:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(_sessionCardPressKeysForTests()).toEqual([keyA]);
+    // The merge retired the older entry, so its token is dead. A later
+    // admission for the same key string is a different attempt.
+    expect(retired?.fail({ kind: 'approve-failed', notice: FAILED_LINE })).toBe(false);
+    const reused = beginSessionCardPress(sessionCardPressKey('session-1', 'retired-request'));
+    expect(reused).not.toBeNull();
+    reused?.abandon();
   });
 });

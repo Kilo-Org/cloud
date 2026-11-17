@@ -37,7 +37,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { CHATGPT_ACCESS_FLAG } from '@kilocode/app-shared/feature-flags';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;

@@ -7,6 +7,7 @@ import {
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  pushBodyCatalogKey,
   resolvePushLocale,
   translatePush,
   type DispatchPushInput,
@@ -292,7 +293,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       } else if (input.push.i18nKey !== undefined) {
         // Per-token translation of the system copy. User-authored fields
         // (session title, conversation title, finding title, instance name)
-        // arrive as i18nParams and pass through the catalog templates.
+        // arrive as i18nParams and pass through the catalog templates. The body
+        // key comes from `pushBodyCatalogKey` because sibling kinds can share
+        // one body entry, while each keeps its own title under `i18nKey`.
         title = translatePush(
           resolvedLocale,
           `${input.push.i18nKey}.title`,
@@ -301,7 +304,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         );
         body = translatePush(
           resolvedLocale,
-          `${input.push.i18nKey}.body`,
+          pushBodyCatalogKey(input.push.i18nKey),
           input.push.i18nParams,
           input.push.body
         );

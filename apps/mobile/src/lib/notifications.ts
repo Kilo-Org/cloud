@@ -71,10 +71,11 @@ import {
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
+import { isRetiredPushType } from './retired-push-types';
 import {
   isAppOwnedNeedsInputNotification,
-  isNeedsInputNotificationPosted,
-} from './needs-input-notification';
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 
@@ -137,22 +138,29 @@ const appBadgeSink: GlanceableSink = {
   },
 };
 
+/** The one field the retirement check needs from a raw push payload. */
+const pushTypeCarrierSchema = z.object({ type: z.string() });
+
+/**
+ * The `type` discriminator of a raw push payload, when it carries one. Read
+ * straight off the payload, before the push-data parse, so a kind this build no
+ * longer declares still reaches the retirement check (`isRetiredPushType`).
+ */
+function rawPushType(data: unknown): string | null {
+  const parsed = pushTypeCarrierSchema.safeParse(data);
+  return parsed.success ? parsed.data.type : null;
+}
+
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
+// A payload this build's schema does not declare — a kind the server removed,
+// or one a newer server added — parses to null and its tap does nothing. A kind
+// this build retired is suppressed by the foreground handler instead
+// (`isRetiredPushType`), which runs before this parse.
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
-  if (!parsed.success) {
-    return null;
-  }
-  if (
-    parsed.data.type === 'chat.message' ||
-    parsed.data.type === 'instance-lifecycle' ||
-    parsed.data.type === 'scheduled-action'
-  ) {
-    return null;
-  }
-  return parsed.data;
+  return parsed.success ? parsed.data : null;
 }
 
 // Fallback terminal end for sinks without a native terminal contract.
@@ -307,15 +315,18 @@ const suppressed = {
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     handleNotification: async notification => {
-      const parsed = pushDataSchema.safeParse(notification.request.content.data);
-      const data = parsed.success ? parsed.data : null;
-      if (
-        data?.type === 'chat.message' ||
-        data?.type === 'instance-lifecycle' ||
-        data?.type === 'scheduled-action'
-      ) {
+      const retiredType = rawPushType(notification.request.content.data);
+      if (retiredType !== null && isRetiredPushType(retiredType)) {
+        // A kind this app retired still arrives from a server that has not
+        // stopped sending it. It no longer parses and the catalog no longer has
+        // its copy, but its banner would still be drawn from the
+        // server-supplied title and body, so this check is the only thing
+        // between it and a foreground banner whose tap resolves no route.
         return suppressed;
       }
+
+      const parsed = pushDataSchema.safeParse(notification.request.content.data);
+      const data = parsed.success ? parsed.data : null;
 
       if (data?.type === 'session_live_update') {
         // The session carrier is data-only: the app draws the ongoing
@@ -368,8 +379,8 @@ export function setupNotificationHandler() {
       if (
         data?.type === 'cloud_agent_session' &&
         data.category === 'attention' &&
-        isNeedsInputNotificationPosted(data.cliSessionId) &&
-        !isAppOwnedNeedsInputNotification(notification.request.identifier)
+        !isAppOwnedNeedsInputNotification(notification.request.identifier) &&
+        (await readNeedsInputPresentation(data.cliSessionId)) === 'presented'
       ) {
         return suppressed;
       }
@@ -644,22 +655,25 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  const path = data && notificationPathForData(data);
-  if (data && path) {
-    // Stash the session's destination the same way the warm tap paths do
-    // (notification-actions.ts), so a session push that launches the app lands
-    // in the session's organization instead of the previously selected one.
-    setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
+  if (data) {
+    const href = notificationPathForData(data);
+    if (href !== null) {
+      // Stash the session's destination the same way the warm tap paths do
+      // (notification-actions.ts), so a session push that launches the app lands
+      // in the session's organization instead of the previously selected one.
+      setPendingDeepLink(href, 'notification', pendingDeepLinkOptionsForData(data));
+    }
   }
   Notifications.clearLastNotificationResponse();
 }
 
 // Single-flight promise so concurrent callers share one channel-creation pass.
 // The promise never rejects: a per-channel failure is reported to Sentry and
-// the remaining channels still get created. A pass that failed any required
-// channel is not cached (see `ensureAndroidNotificationChannels`), so a later
-// start retries before it posts to a channel that may not exist.
-let androidChannelsPromise: Promise<void> | null = null;
+// the remaining channels still get created, and the pass retries once before it
+// settles. A pass that failed both attempts is not cached (see
+// `ensureAndroidNotificationChannels`), so a later start retries before it posts
+// to a channel that may not exist.
+let androidChannelsPromise: Promise<boolean> | null = null;
 
 // The channels the two named kinds replaced. Android keeps an app-created
 // channel until the app deletes it, so a stale one would still appear in the
@@ -706,6 +720,11 @@ export function planAndroidChannelWrite(
   return { bypassDnd: dndAccessGranted !== false };
 }
 
+// The typechecked half of the silent-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const silentAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS;
+
 /** Every channel re-write (create and rename) must pass the same sound policy. */
 function androidChannelConfiguration(
   channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
@@ -722,9 +741,7 @@ function androidChannelConfiguration(
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
-      ? { sound: null, enableVibrate: false }
-      : {}),
+    ...(silentAndroidChannelIds.includes(channel.id) ? { sound: null, enableVibrate: false } : {}),
   };
 }
 
@@ -788,10 +805,6 @@ async function writeAndroidNotificationChannel(
   );
 }
 
-const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(
-  channel => channel.id !== 'kiloclaw'
-);
-
 const CHANNEL_NAME_KEYS = {
   'needs-input': 'glanceable.needsInput',
   'agent-progress': 'notifications.channel.agentProgress',
@@ -799,7 +812,29 @@ const CHANNEL_NAME_KEYS = {
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
   'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
-} as const satisfies Record<Exclude<AndroidNotificationChannelId, 'kiloclaw'>, string>;
+} as const;
+
+/** The android channel ids this app posts to and has a translated name for. */
+type MobileAndroidNotificationChannelId = keyof typeof CHANNEL_NAME_KEYS;
+
+/** Whether this app creates and posts to the shared channel. */
+function isMobileAndroidChannel(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]
+): channel is (typeof ANDROID_NOTIFICATION_CHANNELS)[number] & {
+  id: MobileAndroidNotificationChannelId;
+} {
+  return channel.id in CHANNEL_NAME_KEYS;
+}
+
+/**
+ * The channels this app creates. `ANDROID_NOTIFICATION_CHANNELS` is shared with
+ * the push producers, so it can carry a channel for a product this app has no
+ * screen for; creating one of those would add a row to the system settings list
+ * for a notification the app can never post.
+ */
+const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(channel =>
+  isMobileAndroidChannel(channel)
+);
 
 /**
  * The user-visible name for one channel in the active catalog language. Creation
@@ -849,25 +884,34 @@ async function createAndroidNotificationChannels(): Promise<boolean> {
 }
 
 /**
- * Create the Android notification channels once. No-op on iOS. Idempotent and
- * single-flight: every call returns the same module-level promise, and a
- * per-channel failure never rejects it (reported to Sentry instead).
+ * Create the Android notification channels once. No-op on iOS. Resolves `true` there.
+ * Idempotent and single-flight: every call returns the same module-level
+ * promise, and a per-channel failure never rejects it (reported to Sentry
+ * instead).
  *
- * A pass that failed a required channel write is not cached: the framework
- * drops a post addressed to a channel the app never created, so the next start
- * must retry the channels before it posts. Channel writes are idempotent, so a
- * retry is safe, and a fully successful pass is cached again.
+ * Resolves `true` when every required channel exists. A failed pass is retried
+ * once before the shared promise settles, so no concurrent poster proceeds
+ * against a half-created set; only then does it resolve `false` and drop the
+ * memo, so the next start runs a fresh pass. A poster must not post on `false` —
+ * the framework silently drops a notification addressed to a channel the app
+ * never created.
  */
 // eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
-export function ensureAndroidNotificationChannels(): Promise<void> {
+export function ensureAndroidNotificationChannels(): Promise<boolean> {
   if (Platform.OS !== 'android') {
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
   androidChannelsPromise ??= (async () => {
-    const allChannelsWritten = await createAndroidNotificationChannels();
-    if (!allChannelsWritten) {
-      androidChannelsPromise = null;
+    if (await createAndroidNotificationChannels()) {
+      return true;
     }
+    // One retry before the shared promise settles, so no concurrent poster
+    // proceeds against a half-created set.
+    if (await createAndroidNotificationChannels()) {
+      return true;
+    }
+    androidChannelsPromise = null;
+    return false;
   })();
   return androidChannelsPromise;
 }

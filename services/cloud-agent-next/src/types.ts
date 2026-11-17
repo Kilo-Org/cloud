@@ -21,7 +21,10 @@ import type { CallbackJob } from './callbacks/index.js';
 import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
-import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import type {
+  ContainerBillingStatusRpcMethods,
+  ContainerUsageRpcMethods,
+} from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -467,6 +470,9 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  CLOUD_AGENT_SENTRY_DSN?: string;
+  CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
+  CF_VERSION_METADATA?: { id: string };
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
@@ -487,12 +493,15 @@ export type Env = {
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   SESSION_SYNC?: Fetcher;
-  /** Record-only container lifecycle usage meter. */
-  CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
+  CONTAINER_USAGE_METER: ContainerUsageRpcMethods & ContainerBillingStatusRpcMethods;
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for workspace artifacts synchronized from `/artifacts`. */
+  WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
+  /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
+  WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
@@ -501,8 +510,10 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
-  /** Comma-separated org UUIDs whose new downloaded cloud-agent-web sandboxes run Kilo v2. */
+  /** Comma-separated org UUIDs, or `*` for all accounts' new cloud-agent-web sandboxes. */
   RUNTIME_KILO2_ORG_IDS?: string;
+  /** Comma-separated org UUIDs, or `*`, that select Kilo v2 from every session origin. */
+  RUNTIME_KILO2_ALL_SESSION_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

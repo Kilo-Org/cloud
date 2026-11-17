@@ -135,6 +135,7 @@ describe('SessionInfoDialog compute costs', () => {
     expect(markup).toContain('$1.25');
     expect(markup).toContain('Shared by all chats in this workspace');
     expect(markup).toContain('$0.66');
+    expect(markup).toContain('Compute cost');
     expect(markup).not.toContain('arrive late');
     expect(markup).not.toContain('BYOC');
     expect(markup).not.toContain('Compute rate');
@@ -209,7 +210,7 @@ describe('SessionInfoDialog compute costs', () => {
     };
     const markup = render();
     expect(markup).toContain('Total cost');
-    expect(markup).toMatch(/>Compute<\/dt>/);
+    expect(markup).toMatch(/>Compute cost<\/dt>/);
     expect(markup).toContain('No usage yet');
     expect(markup).toContain('$0.00');
     expect(markup).not.toContain('Shared by all chats');

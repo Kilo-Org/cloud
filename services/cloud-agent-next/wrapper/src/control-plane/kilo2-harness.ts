@@ -3,7 +3,7 @@ import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js'
 import { createMessageId } from '../../../src/shared/message-id.js';
 import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
 import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js';
-import { git, logToFile } from '../utils.js';
+import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
 import {
@@ -16,6 +16,7 @@ import {
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
+import { readKilo2BackgroundActivity } from './kilo2-background.js';
 
 const ptySchema = z.object({
   id: z.string(),
@@ -172,7 +173,7 @@ export function createKilo2Harness(options: {
         });
         const servers = z
           .array(mcpServerSchema)
-          .parse(await api.request(`/api/mcp?${query}`, { signal }));
+          .parse(await api.data(`/api/mcp?${query}`, { signal }));
         if (servers.find(server => server.name === MCP_SERVER_NAME)?.status.status === 'connected')
           return;
       } catch {
@@ -327,19 +328,21 @@ export function createKilo2Harness(options: {
     },
     interrupt,
     async drainSession(input) {
+      const request: BunFetchRequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
+        // Bun's socket idle timeout can expire while native background work runs.
+        // The completion owner and native supervisor bound this wait instead.
+        timeout: false,
+        signal: input.signal,
+      };
       let response: Response;
       try {
         response = await fetchKiloServer(
           options.server,
           `/api/rpc/kilocode.session-drain/drain?${locationQuery(input.directory)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
-            // Drain can wait for arbitrarily long native work. The completion owner bounds
-            // transport failures and missing markers without timing out a running child.
-            signal: input.signal,
-          }
+          request
         );
       } catch (error) {
         if (input.signal?.aborted) throw error;
@@ -412,34 +415,24 @@ export function createKilo2Harness(options: {
       );
     },
     async generateCommitMessage(input) {
-      const diff = await git(['diff', 'HEAD', '--no-ext-diff', '--no-textconv'], {
-        cwd: input.path,
-        signal: input.signal,
-        timeoutMs: 10_000,
-        maxOutputBytes: 128 * 1024,
-      });
-      const status = await git(['status', '--short'], {
-        cwd: input.path,
-        signal: input.signal,
-        timeoutMs: 10_000,
-        maxOutputBytes: 32 * 1024,
-      });
-      if (diff.exitCode !== 0 || status.exitCode !== 0)
-        throw new Error('Cannot read changes for commit message generation');
-      const result = z.object({ text: z.string() }).parse(
-        await api.data('/api/experimental/generate', {
-          method: 'POST',
-          body: {
-            prompt: `Write a short git commit message for these changes. Return only the commit message.\n\nStatus:\n${status.stdout}\n\nDiff:\n${diff.stdout}`,
-          },
-          signal: input.signal,
-        })
-      );
-      return { message: result.text };
+      const result = z
+        .object({ output: z.object({ message: z.string() }) })
+        .parse(
+          await post(
+            `/api/rpc/kilocode.commit-message/generate?${locationQuery(input.path)}`,
+            { input: { path: input.path } },
+            input.signal
+          )
+        );
+      return result.output;
     },
     isUnavailableError: isKiloServerUnreachableError,
     updateCloudAgentMcp,
-    reads,
+    reads: {
+      ...reads,
+      getBackgroundActivity: (id, directory, signal) =>
+        readKilo2BackgroundActivity(api, id, directory, signal),
+    },
     terminals,
     worktree: {
       async listSessionIds(directory) {

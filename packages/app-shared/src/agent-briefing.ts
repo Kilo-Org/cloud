@@ -1,3 +1,4 @@
+import { characterCut } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 
 export const BRIEFING_MAX_SESSIONS = 32;
@@ -279,6 +280,7 @@ const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
 const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
 const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
 const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
+const REDACTED_CREDENTIAL = '[redacted credential]';
 // A token that continues a credential past the value screening replaces is treated as
 // credential material only when it looks like an encoded secret rather than prose or an
 // identifier: 20 characters or more that mix letters with digits, 32 characters or more
@@ -383,38 +385,46 @@ function briefingExcerptCarriesCredential(text: string): boolean {
   return false;
 }
 
-/** Replaces the value of every credential flag. */
-function redactCredentialFlags(text: string): string {
+/** Replaces ordered spans, skipping any that start inside an earlier span. */
+function replaceSpans(
+  text: string,
+  spans: ReadonlyArray<{ start: number; length: number }>
+): string {
   const pieces: string[] = [];
   let cursor = 0;
-  for (const { valueStart, value } of credentialFlagSites(text)) {
-    if (valueStart < cursor || REDACTION_PLACEHOLDER.test(value)) continue;
-    pieces.push(text.slice(cursor, valueStart), '[redacted credential]');
-    cursor = valueStart + value.length;
+  for (const { start, length } of spans) {
+    if (start < cursor) continue;
+    pieces.push(text.slice(cursor, start), REDACTED_CREDENTIAL);
+    cursor = start + length;
   }
   if (pieces.length === 0) return text;
   pieces.push(text.slice(cursor));
   return pieces.join('');
 }
 
+/** Replaces the value of every credential flag. */
+function redactCredentialFlags(text: string): string {
+  const spans: Array<{ start: number; length: number }> = [];
+  for (const { valueStart, value } of credentialFlagSites(text)) {
+    if (REDACTION_PLACEHOLDER.test(value)) continue;
+    spans.push({ start: valueStart, length: value.length });
+  }
+  return replaceSpans(text, spans);
+}
+
 /** Replaces the value of every credential assignment. */
 function redactCredentialAssignments(text: string): string {
-  const pieces: string[] = [];
-  let cursor = 0;
+  const spans: Array<{ start: number; length: number }> = [];
   for (const key of text.matchAll(CREDENTIAL_KEY)) {
     const name = key[1];
     if (!name || !isCredentialKeyName(name)) continue;
     const start = key.index ?? 0;
-    if (start < cursor) continue;
     const valueStart = start + key[0].length;
     const assigned = credentialValue(name, text, valueStart);
     if (!assigned || REDACTION_PLACEHOLDER.test(assigned)) continue;
-    pieces.push(text.slice(cursor, start), '[redacted credential]');
-    cursor = valueStart + assigned.length;
+    spans.push({ start, length: valueStart + assigned.length - start });
   }
-  if (pieces.length === 0) return text;
-  pieces.push(text.slice(cursor));
-  return pieces.join('');
+  return replaceSpans(text, spans);
 }
 
 export function redactBriefingExcerpt(
@@ -423,7 +433,7 @@ export function redactBriefingExcerpt(
 ): string {
   let redacted = value
     .replace(PRIVATE_KEY_BLOCK, '[redacted key]')
-    .replace(BEARER_VALUE, '[redacted credential]');
+    .replace(BEARER_VALUE, REDACTED_CREDENTIAL);
   redacted = redactCredentialAssignments(redactCredentialFlags(redacted));
   for (const [shape, replacement] of CREDENTIAL_VALUE_SHAPES) {
     redacted = redacted.replace(shape, replacement);
@@ -447,10 +457,12 @@ export function redactBriefingExcerptOrDrop(
 
 /**
  * A title for a session or a source. The report schema requires one, so a title that
- * screening cannot clear becomes a neutral fallback.
+ * screening cannot clear, or one whose first character is wider than the cap and so
+ * truncates to nothing, becomes a neutral fallback.
  */
 export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
-  return redactBriefingExcerptOrDrop(value, maxBytes) ?? BRIEFING_FALLBACK_TITLE;
+  const title = redactBriefingExcerptOrDrop(value, maxBytes);
+  return title === undefined || title === '' ? BRIEFING_FALLBACK_TITLE : title;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {
@@ -458,6 +470,14 @@ export function truncateBriefingUtf8(value: string, maxBytes: number): string {
   return end === value.length ? value : value.slice(0, end);
 }
 
+/**
+ * The end of the longest prefix of `value` that fits in `maxBytes` UTF-8 bytes,
+ * on a character boundary. The byte walk counts every code point exactly, so the
+ * byte-feasible end may fall inside one character: a joiner sequence, a flag, a
+ * skin-tone or keycap modifier, or a combining mark. The cut then backs up to the
+ * character boundary at or before that end, so a capped excerpt never ends inside
+ * a drawn character. A value that fits entirely keeps its own length.
+ */
 function briefingUtf8End(value: string, maxBytes: number): number {
   let bytes = 0;
   let end = 0;
@@ -470,5 +490,5 @@ function briefingUtf8End(value: string, maxBytes: number): number {
     bytes += width;
     end += pair ? 2 : 1;
   }
-  return end;
+  return end === value.length ? end : characterCut(value, end);
 }

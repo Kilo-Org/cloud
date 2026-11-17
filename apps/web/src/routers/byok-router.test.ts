@@ -18,6 +18,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   };
 });
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models', () => ({
+  getKiloEmbeddingModelCatalogFromDatabase: jest.fn(async () => null),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getOpenRouterTranscriptionModels: jest.fn(async () => ({ data: [] })),
+}));
+
 import { createCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
@@ -25,6 +34,8 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
@@ -138,6 +149,30 @@ describe('BYOK Router', () => {
     await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
   });
 
+  describe('listProviders', () => {
+    test('offers every addable provider and not the deprecated codestral key', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const providers = await caller.byok.listProviders({});
+      const ids = providers.map(provider => provider.id);
+
+      expect(ids).toContain('anthropic');
+      expect(ids).toContain('openrouter');
+      expect(ids).not.toContain('codestral');
+      expect(providers.every(provider => provider.name.length > 0)).toBe(true);
+    });
+
+    test('hides the experimental direct providers until the feature is enabled', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const providers = await caller.byok.listProviders({});
+      const ids = providers.map(provider => provider.id);
+
+      expect(ids).not.toContain('bedrock-byok');
+      expect(ids).not.toContain('vertex-byok');
+    });
+  });
+
   describe('list', () => {
     test('should return empty array when organization has no keys', async () => {
       const caller = await createCallerForUser(ownerUser.id);
@@ -162,7 +197,9 @@ describe('BYOK Router', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(created.id);
       expect(result[0].provider_id).toBe('anthropic');
-      expect(result[0].provider_name).toBe('anthropic');
+      // The response carries the name every client shows, so a picker and a key
+      // list do not each resolve the same id through their own table.
+      expect(result[0].provider_name).toBe('Anthropic');
       expect(result[0].created_by).toBe(ownerUser.id);
     });
 
@@ -656,7 +693,7 @@ describe('BYOK Router', () => {
 
       expect(result.id).toBeDefined();
       expect(result.provider_id).toBe('anthropic');
-      expect(result.provider_name).toBe('anthropic');
+      expect(result.provider_name).toBe('Anthropic');
       expect(result.created_by).toBe(ownerUser.id);
       expect(result.created_at).toBeDefined();
       expect(result.updated_at).toBeDefined();
@@ -1216,7 +1253,7 @@ describe('BYOK Router', () => {
         expect(created).toEqual({
           id: expect.any(String),
           provider_id: 'bedrock',
-          provider_name: 'bedrock',
+          provider_name: 'AWS Bedrock',
           management_source: 'user',
           is_enabled: true,
           serve_catalog_models: false,
@@ -1870,6 +1907,137 @@ describe('BYOK Router', () => {
           )
         );
       }
+    });
+
+    describe('System One, embedding and transcription models', () => {
+      type Metadata = Awaited<ReturnType<typeof getOpenRouterModelsMetadataFromDatabase>>;
+      const decisions = { output_modalities: ['decisions'] };
+      const systemOne = { id: 'acme/system-one-fixture', name: 'System One Fixture' };
+      const systemOneOpen = { id: 'acme/system-one-open', name: 'System One Open' };
+      const embedding = { id: 'acme/embedding-fixture', name: 'Embedding Fixture' };
+      const transcription = { id: 'acme/transcription-fixture', name: 'Transcription Fixture' };
+      const systemOneEntry = 'System One Fixture, System One (acme/system-one-fixture)';
+      const systemOneOpenEntry = 'System One Open, System One (acme/system-one-open)';
+      const embeddingEntry = 'Embedding Fixture, embeddings (acme/embedding-fixture)';
+      const transcriptionEntry =
+        'Transcription Fixture, transcription (acme/transcription-fixture)';
+
+      // The catalog metadata is read through process-wide caches, so the metadata is stubbed to keep
+      // them unfilled for the test above.
+      beforeEach(() => {
+        const openRouterMetadata: Metadata = {
+          [systemOne.id]: { ...systemOne, architecture: decisions, endpoints: [] },
+          [systemOneOpen.id]: { ...systemOneOpen, architecture: decisions, endpoints: [] },
+          '~acme/system-one-alias': {
+            id: '~acme/system-one-alias',
+            name: 'System One Alias',
+            architecture: decisions,
+            endpoints: [],
+          },
+          'acme/system-one-free:free': {
+            id: 'acme/system-one-free:free',
+            name: 'System One Free',
+            architecture: decisions,
+            endpoints: [],
+          },
+        };
+        const vercelMetadata: Metadata = {
+          [systemOne.id]: {
+            ...systemOne,
+            type: 'evaluation',
+            endpoints: [{ provider_name: 'bedrock' }],
+          },
+          // Vercel serves this model as a language model, not as an evaluation model.
+          [systemOneOpen.id]: { ...systemOneOpen, type: 'language', endpoints: [] },
+          [embedding.id]: {
+            ...embedding,
+            type: 'embedding',
+            endpoints: [{ provider_name: 'openai' }],
+          },
+          [transcription.id]: { ...transcription, type: 'transcription', endpoints: [] },
+        };
+        jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(openRouterMetadata);
+        jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
+        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue({
+          defaultModel: embedding.id,
+          models: [embedding, { id: 'acme/embedding-free:free', name: 'Embedding Free' }],
+          aliases: {},
+        } as Awaited<ReturnType<typeof getKiloEmbeddingModelCatalogFromDatabase>>);
+        jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({
+          data: [transcription, { id: 'acme/transcription-free:free', name: 'Transcription Free' }],
+        } as Awaited<ReturnType<typeof getOpenRouterTranscriptionModels>>);
+      });
+
+      afterEach(() => {
+        const actual = jest.requireActual<typeof GatewayModelsCache>(
+          '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+        );
+        jest
+          .mocked(getOpenRouterModelsMetadataFromDatabase)
+          .mockImplementation(actual.getOpenRouterModelsMetadataFromDatabase);
+        jest
+          .mocked(getVercelModelsMetadataFromDatabase)
+          .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
+        jest
+          .mocked(getVercelModelsFromDatabase)
+          .mockImplementation(actual.getVercelModelsFromDatabase);
+        jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue(null);
+        jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({ data: [] });
+      });
+
+      test('labels them by endpoint and lists them under the OpenRouter key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result.openrouter).toEqual(
+          expect.arrayContaining([
+            systemOneEntry,
+            systemOneOpenEntry,
+            embeddingEntry,
+            transcriptionEntry,
+          ])
+        );
+      });
+
+      test('lists them under Vercel keys only when Vercel serves the matching model type', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result['vercel-ai-gateway']).toEqual(
+          expect.arrayContaining([systemOneEntry, embeddingEntry])
+        );
+        expect(result['vercel-ai-gateway']).not.toContain(systemOneOpenEntry);
+        expect(result['vercel-ai-gateway']).not.toContain(transcriptionEntry);
+        expect(result.bedrock).toContain(systemOneEntry);
+        expect(result.bedrock).not.toContain(embeddingEntry);
+        expect(result.openai).toContain(embeddingEntry);
+        expect(result.openai).not.toContain(systemOneEntry);
+        expect(result.openai).not.toContain(transcriptionEntry);
+      });
+
+      test('skips free models and aliases', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        const entries = Object.values(result).flat();
+        expect(entries.filter(entry => entry.includes('System One Alias, System One'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('System One Free, System One'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('Embedding Free'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('Transcription Free'))).toEqual([]);
+      });
+
+      test('lists the other models when the transcription models cannot be read', async () => {
+        jest
+          .mocked(getOpenRouterTranscriptionModels)
+          .mockRejectedValue(new Error('OpenRouter is down'));
+
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result.openrouter).toEqual(expect.arrayContaining([systemOneEntry, embeddingEntry]));
+        expect(result.openrouter).not.toContain(transcriptionEntry);
+      });
     });
   });
 

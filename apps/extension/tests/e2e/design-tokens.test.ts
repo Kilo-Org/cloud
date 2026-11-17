@@ -304,7 +304,7 @@ test('Case B — enabled Send brand', async () => {
 
     const styles = await expectBackgroundRgb(
       sendButton,
-      { blue: 134, green: 245, red: 247 },
+      { blue: 0, green: 221, red: 255 },
       'enabled Send background'
     );
     expectRgb(styles.color, { blue: 31, green: 31, red: 31 }, 'enabled Send color');
@@ -576,6 +576,7 @@ test('Case E — eyebrow + old-paint scan', async () => {
 
     const bannedChannels = [
       { blue: 0, green: 255, red: 237 },
+      { blue: 134, green: 245, red: 247 },
       { blue: 11, green: 9, red: 9 },
     ] as const;
 

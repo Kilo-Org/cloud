@@ -24,10 +24,13 @@ vi.mock('./postgres', () => ({
   applyStart: vi.fn(),
   applyHeartbeat: vi.fn(),
   applyStop: vi.fn(),
+  getContainerUsageDb: vi.fn(),
+  resolveBillingMode: vi.fn(),
 }));
 
-import { applyHeartbeat, applyStart, applyStop } from './postgres';
+import { applyHeartbeat, applyStart, applyStop, resolveBillingMode } from './postgres';
 import { ContainerUsageMeter } from './meter';
+import { billingModeFor } from './billing-config';
 
 const context = {
   service: 'cloud-agent-next',
@@ -37,8 +40,8 @@ const context = {
   actor: { type: 'user' as const, id: 'user-1' },
 };
 
-function createMeter() {
-  return new ContainerUsageMeter({} as ExecutionContext, {} as Cloudflare.Env);
+function createMeter(env = {} as Cloudflare.Env) {
+  return new ContainerUsageMeter({} as ExecutionContext, env);
 }
 
 function validStart(): RecordStartInput {
@@ -93,6 +96,51 @@ beforeEach(() => {
 });
 
 describe('ContainerUsageMeter', () => {
+  it.each(['paid', 'shadow'] as const)('reports the admission billing decision: %s', async mode => {
+    vi.mocked(resolveBillingMode).mockResolvedValueOnce(mode);
+    await expect(
+      createMeter().getBillingMode({
+        service: 'cloud-agent-next-sandbox-containers-code-review',
+        subject: { type: 'user', id: 'oauth/provider/user' },
+      })
+    ).resolves.toBe(mode);
+    expect(resolveBillingMode).toHaveBeenCalledExactlyOnceWith(
+      undefined,
+      expect.objectContaining({ enabled: false }),
+      'cloud-agent-next-sandbox-containers-code-review',
+      { type: 'user', id: 'oauth/provider/user' },
+      expect.any(Date)
+    );
+    expect(applyStart).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { subject: { type: 'user', id: 'paid-user' }, expected: 'paid' },
+    { subject: { type: 'org', id: 'paid-org' }, expected: 'paid' },
+    { subject: { type: 'user', id: 'paid-org' }, expected: 'shadow' },
+    { subject: { type: 'org', id: 'paid-user' }, expected: 'shadow' },
+    { subject: { type: 'user', id: 'other-user' }, expected: 'shadow' },
+  ] as const)('reads the current billing policy for $subject', async ({ subject, expected }) => {
+    const meter = createMeter({
+      CONTAINER_BILLING_SERVICES: 'cloud-agent-next',
+      CONTAINER_BILLING_USER_IDS: '',
+      CONTAINER_BILLING_ORG_IDS: '',
+      CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'paid-user',
+      CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: 'paid-org',
+      CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+    } as unknown as Cloudflare.Env);
+    vi.mocked(resolveBillingMode).mockImplementationOnce(async (_db, config, service, subject) =>
+      billingModeFor(config, service, subject)
+    );
+
+    await expect(
+      meter.getBillingMode({ service: 'cloud-agent-next-sandbox-containers-standard3', subject })
+    ).resolves.toBe(expected);
+    expect(applyStart).not.toHaveBeenCalled();
+    expect(applyHeartbeat).not.toHaveBeenCalled();
+    expect(applyStop).not.toHaveBeenCalled();
+  });
+
   it('writes an admitted start directly to PostgreSQL', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({

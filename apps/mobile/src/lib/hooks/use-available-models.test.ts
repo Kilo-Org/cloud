@@ -15,7 +15,11 @@ import {
 vi.mock('expo-secure-store', () => ({}));
 vi.mock('@tanstack/react-query', () => ({}));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
-vi.mock('@/lib/storage-keys', () => ({ AUTH_TOKEN_KEY: 'mock-token' }));
+vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
+  AUTH_TOKEN_KEY: 'mock-token',
+  ORGANIZATION_STORAGE_KEY: 'organization',
+}));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: () => Promise.resolve(null),
 }));

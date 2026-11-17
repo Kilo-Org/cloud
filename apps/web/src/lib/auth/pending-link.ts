@@ -244,7 +244,7 @@ export async function completePendingLink(
   return completePendingLinkByHash(hashPendingLinkSecret(parsed), resolvedUserId);
 }
 
-export async function completePendingLinkByHash(
+async function completePendingLinkByHash(
   secretHash: string,
   resolvedUserId: string
 ): Promise<PendingLinkResult> {
@@ -291,17 +291,36 @@ export async function completePendingLinkByHash(
   return { status: 'linked', provider: row.provider };
 }
 
+/**
+ * A completion failure never reaches the sign-in response: it is reported as a
+ * failed link, so the sign-in still succeeds without the attach.
+ */
+async function completeFailClosed(
+  complete: () => Promise<PendingLinkResult>
+): Promise<PendingLinkResult> {
+  try {
+    return await complete();
+  } catch {
+    return { status: 'failed', reason: 'LINKING-FAILED' };
+  }
+}
+
 /** The mobile 200-body field for a sign-in that carried a pending link token. */
 export async function resolvePendingLinkForUser(
   secret: string | undefined,
   resolvedUserId: string
 ): Promise<PendingLinkResult | undefined> {
   if (!secret) return undefined;
-  try {
-    return await completePendingLink(secret, resolvedUserId);
-  } catch {
-    return { status: 'failed', reason: 'LINKING-FAILED' };
-  }
+  return completeFailClosed(() => completePendingLink(secret, resolvedUserId));
+}
+
+/** The same mapping for a caller that stored only the pending link's secret hash. */
+export async function resolveStoredPendingLinkForUser(
+  secretHash: string | null,
+  resolvedUserId: string
+): Promise<PendingLinkResult | undefined> {
+  if (!secretHash) return undefined;
+  return completeFailClosed(() => completePendingLinkByHash(secretHash, resolvedUserId));
 }
 
 export async function setPendingLinkCookie(secret: string): Promise<void> {

@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
+import { backgroundActivityScenario } from './fake-llm-background-activity.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -619,27 +620,53 @@ type Message = {
  * echo an empty completion.
  */
 export function extractLastUserMessageText(body: unknown): string {
-  if (typeof body !== 'object' || body === null) return '';
+  return lastUserMessageTextParts(body).join('');
+}
+
+/** The text parts of the last user message, skipping reminder-only messages. */
+function lastUserMessageTextParts(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) return [];
   const messages = (body as { messages?: unknown }).messages;
-  if (!Array.isArray(messages)) return '';
+  if (!Array.isArray(messages)) return [];
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as Message;
     if (msg?.role !== 'user') continue;
     const content = msg.content;
-    const text =
+    const parts =
       typeof content === 'string'
-        ? content
+        ? [content]
         : Array.isArray(content)
           ? content
               .filter(part => part?.type === 'text' || part?.type === undefined)
               .map(part => part.text ?? '')
-              .join('')
-          : '';
-    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(text)) continue;
-    return text;
+          : [];
+    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(parts.join(''))) continue;
+    return parts;
   }
-  return '';
+  return [];
+}
+
+/**
+ * The scope and prompt of the last user message. The scope marker leads the
+ * whole text, or one text part: the server puts its own context in a synthetic
+ * text part before the user's prompt. A marker inside a part's text, as in a
+ * title request that quotes the prompt, is not a scope.
+ */
+export function extractRequestPromptScope(body: unknown): {
+  scope: string | undefined;
+  text: string;
+} {
+  const parts = lastUserMessageTextParts(body);
+  const whole = extractPromptScope(parts.join(''));
+  if (whole.scope !== undefined) return whole;
+  for (const [index, part] of parts.entries()) {
+    const scoped = extractPromptScope(part);
+    if (scoped.scope === undefined) continue;
+    const text = [...parts.slice(0, index), scoped.text, ...parts.slice(index + 1)].join('');
+    return { scope: scoped.scope, text };
+  }
+  return whole;
 }
 
 /**
@@ -1794,6 +1821,7 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   'background-task'(args, ctx) {
     runChildTask(args, ctx, true);
   },
+  'background-activity': backgroundActivityScenario,
 
   cron(args, ctx) {
     runSchedule(
@@ -1930,7 +1958,7 @@ async function handleChatCompletions(
   const messageCount = Array.isArray(messages) ? messages.length : 0;
   const bodyModel = isRecord(body) && typeof body.model === 'string' ? body.model : undefined;
   const lastUserText = extractLastUserMessageText(body);
-  const { scope, text: prompt } = extractPromptScope(lastUserText);
+  const { scope, text: prompt } = extractRequestPromptScope(body);
   state.lastUserText = lastUserText;
   const directive = parseDirective(prompt);
   const tools = advertisedTools(body);

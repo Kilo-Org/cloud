@@ -321,6 +321,26 @@ export function wireEnvLocal(): WireResult {
   const recordedCaSources = readRecordedCaSources(lines, section);
   const bundlePath = caBundlePath();
 
+  // Everything the developer wrote — the shell's own CA, the repo-root
+  // `.env.local` line, and whatever an env file only `scripts/dev.sh` reads
+  // names — has to end up in the bundle, but the section's own line names the
+  // bundle. The command prefix replaces those files' values, so a CA only they
+  // named would stop being trusted without this. Collected before the
+  // real-warehouse branch: that one writes the bundle too.
+  const earlierCaPaths: string[] = [];
+  for (const envFile of EARLIER_ENV_FILES) {
+    const caPath = caPathInEnvFile(path.join(REPO_ROOT, envFile));
+    if (caPath !== undefined) earlierCaPaths.push(caPath);
+  }
+  const developerCaPaths = [
+    ...recordedCaSources,
+    ...parseEnvEntries(outsideSection.join('\n'))
+      .filter(entry => entry.key === CA_KEY)
+      .map(entry => entry.value),
+    ...earlierCaPaths,
+    process.env.NODE_EXTRA_CA_CERTS ?? '',
+  ];
+
   // An empty value is no warehouse: `getMissingSnowflakeEnvKeys` in the app
   // filters on falsy, so `SNOWFLAKE_ACCOUNT_HOST=` reports the key as missing
   // exactly like an absent one. Kept only when something real is set.
@@ -328,6 +348,14 @@ export function wireEnvLocal(): WireResult {
     entry => entry.key === 'SNOWFLAKE_ACCOUNT_HOST' && entry.value !== ''
   );
   if (outsideHost !== undefined) {
+    // The bundle still gets written: `serviceCommand` prefixes the nextjs
+    // command with `NODE_EXTRA_CA_CERTS=<bundle>` whenever the mock is in the
+    // selection — the core group always has it — so a fresh checkout's first
+    // wire must not leave `next dev` pointing at a path with no file behind it
+    // (Node warns and ignores it, and the developer's own CA stops being
+    // trusted). The mock's certificate changes nothing on this path: nothing
+    // talks to the mock over TLS, and no section names the bundle.
+    writeCaBundle(developerCaPaths);
     if (!section) return { status: 'keptRealWarehouse', removedSection: false };
     writeEnvLines(
       envLocalPath,
@@ -337,24 +365,7 @@ export function wireEnvLocal(): WireResult {
     return { status: 'keptRealWarehouse', removedSection: true };
   }
 
-  // Everything the developer wrote — the shell's own CA, the repo-root
-  // `.env.local` line, and whatever an env file only `scripts/dev.sh` reads
-  // names — has to end up in the bundle, but the section's own line names the
-  // bundle. The command prefix replaces those files' values, so a CA only they
-  // named would stop being trusted without this.
-  const earlierCaPaths: string[] = [];
-  for (const envFile of EARLIER_ENV_FILES) {
-    const caPath = caPathInEnvFile(path.join(REPO_ROOT, envFile));
-    if (caPath !== undefined) earlierCaPaths.push(caPath);
-  }
-  writeCaBundle([
-    ...recordedCaSources,
-    ...parseEnvEntries(outsideSection.join('\n'))
-      .filter(entry => entry.key === CA_KEY)
-      .map(entry => entry.value),
-    ...earlierCaPaths,
-    process.env.NODE_EXTRA_CA_CERTS ?? '',
-  ]);
+  writeCaBundle(developerCaPaths);
 
   const envBlock = fs
     .readFileSync(

@@ -450,6 +450,60 @@ test('a real warehouse keeps its own CA line and the file byte-identical', async
   }
 });
 
+test('a real warehouse still leaves the CA bundle behind for the prefixed command', async () => {
+  const fixture = wireEnvLocalFixture(undefined);
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  delete process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const developerCaPath = path.join(fixture.root, 'developer-ca.pem');
+    fs.writeFileSync(developerCaPath, 'DEVELOPER CA\n');
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `NODE_EXTRA_CA_CERTS=${developerCaPath}\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
+    );
+
+    // A fresh checkout's order: the real warehouse is written first and the
+    // stack has never run, so no bundle exists yet — but the nextjs command is
+    // prefixed with `NODE_EXTRA_CA_CERTS=<bundle>` all the same, because the
+    // core group always carries the mock.
+    assert.equal(fs.existsSync(fixture.caBundlePath), false);
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: false });
+
+    // The bundle exists and carries the CA the developer named; the file it
+    // named stays untouched, so the bytes keep reaching the app either way.
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nDEVELOPER CA\n');
+    assert.equal(
+      fs.readFileSync(fixture.envLocalPath, 'utf8'),
+      `NODE_EXTRA_CA_CERTS=${developerCaPath}\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n`
+    );
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
+test('a real warehouse folds the shell CA and earlier env-file CAs into the bundle', async () => {
+  const fixture = wireEnvLocalFixture('SNOWFLAKE_ACCOUNT_HOST=real.example:443\n');
+  const ambient = process.env.NODE_EXTRA_CA_CERTS;
+  try {
+    const shellCaPath = path.join(fixture.root, 'shell-ca.pem');
+    const earlierCaPath = path.join(fixture.root, 'earlier-ca.pem');
+    fs.writeFileSync(shellCaPath, 'SHELL CA\n');
+    fs.writeFileSync(earlierCaPath, 'EARLIER CA\n');
+    writeEnvFile(fixture.root, 'apps/web/.env.development.local', `NODE_EXTRA_CA_CERTS=${earlierCaPath}\n`);
+    process.env.NODE_EXTRA_CA_CERTS = shellCaPath;
+
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: false });
+
+    assert.equal(fs.readFileSync(fixture.caBundlePath, 'utf8'), 'CERT\nEARLIER CA\nSHELL CA\n');
+  } finally {
+    if (ambient === undefined) delete process.env.NODE_EXTRA_CA_CERTS;
+    else process.env.NODE_EXTRA_CA_CERTS = ambient;
+    fixture.restore();
+  }
+});
+
 test('a real warehouse above the section makes the entry take its section back out', async () => {
   const fixture = wireEnvLocalFixture('NEXTAUTH_SECRET=dev\n');
   const ambient = process.env.NODE_EXTRA_CA_CERTS;

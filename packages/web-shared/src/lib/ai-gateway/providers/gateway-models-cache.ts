@@ -15,6 +15,10 @@ import {
   type GatewayModelMap,
   type GatewayModelWithEndpoints,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import {
+  applyLatestAliasTargets,
+  getLatestAliasTargets,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
 import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
@@ -25,7 +29,12 @@ const TTL_MS = 300_000;
  * are not stored yet keeps its previous entry, or is left out until the refresh job stores them. A
  * list or joined catalog that looks truncated throws, so callers keep the last good map.
  */
-function createGatewayModelsFetcher(gateway: Provider, source: GatewayModelsSource, name: string) {
+function createGatewayModelsFetcher(
+  gateway: Provider,
+  source: GatewayModelsSource,
+  name: string,
+  finalize: (models: GatewayModelMap) => Promise<GatewayModelMap> = async models => models
+) {
   let previous: GatewayModelMap = {};
   return createCachedFetch<GatewayModelMap>(
     async () => {
@@ -41,7 +50,7 @@ function createGatewayModelsFetcher(gateway: Provider, source: GatewayModelsSour
         );
       }
       previous = retainPreviousEntries(joined, previous);
-      return previous;
+      return finalize(previous);
     },
     TTL_MS,
     {},
@@ -55,10 +64,12 @@ export const getVercelModelsMetadataFromDatabase = createGatewayModelsFetcher(
   'Vercel'
 );
 
+/** Latest aliases resolve to their stored targets, falling back to OpenRouter's live targets. */
 export const getOpenRouterModelsMetadataFromDatabase = createGatewayModelsFetcher(
   OPENROUTER,
   openRouterGatewayModelsSource,
-  'OpenRouter'
+  'OpenRouter',
+  async models => applyLatestAliasTargets(models, await getLatestAliasTargets(), Date.now())
 );
 
 export async function resolveOpenRouterModelAlias(modelId: string): Promise<string> {

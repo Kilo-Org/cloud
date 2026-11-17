@@ -510,6 +510,15 @@ describe('browser tool session', () => {
       ref: 'e11',
     });
     await expect(second.resolveTarget('e99')).resolves.toBeUndefined();
+  });
+
+  it("drops a released caller's registry and keeps the other caller's refs", async () => {
+    const { session } = createSession();
+    const first = session.bindCaller('panel:panel-1:conversation-1');
+    const second = session.bindCaller('panel:panel-1:conversation-2');
+
+    first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
+    second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
 
     session.releaseCaller('panel:panel-1:conversation-1');
 

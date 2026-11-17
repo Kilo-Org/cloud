@@ -851,7 +851,7 @@ describe('run_workflow', () => {
     expect(result.ok).toBe(true);
     expect(mockedRunWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({
-        evalInTab: ctx.evalInTab,
+        evalInTab: expect.any(Function),
         getTabUrl: ctx.getTabUrl,
         navigateTab: ctx.navigateTab,
       }),
@@ -861,6 +861,10 @@ describe('run_workflow', () => {
         tabId: ctx.selectedTabId,
         workflow: expect.objectContaining({ id: 'wf-1' }),
       })
+    );
+    // The run's page scripts go through the run's own workflow caller, and the lease ends with the run.
+    expect(ctx.releaseBrowserCaller).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'workflow' })
     );
   });
 

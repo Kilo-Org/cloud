@@ -11,6 +11,7 @@ export interface TabTakeOverPrompt {
  * waits here; the panel renders the card and answers it. A reload drops the
  * waiting call with the panel, so the prompt is deliberately not persisted.
  */
+// oxlint-disable-next-line unicorn/no-useless-undefined -- init-declarations requires an initializer; the prompt is absent until a call asks.
 let prompt: TabTakeOverPrompt | undefined = undefined;
 const resolutions = new Map<string, (accepted: boolean) => void>();
 const listeners = new Set<() => void>();

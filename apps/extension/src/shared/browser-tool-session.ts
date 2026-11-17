@@ -200,6 +200,16 @@ export interface BrowserToolTabsApi {
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
 
+/**
+ * Identity of one tab's viewport state. The tab session and every caller view
+ * share the same object, so a viewport override a resize applied from one
+ * caller belongs to the tab and is cleared once when the tab's session is
+ * disposed.
+ */
+export interface BrowserToolViewportState {
+  readonly tabId: number;
+}
+
 export interface BrowserToolSession {
   /**
    * Attaches the debugger and enables the CDP domains, once. Idempotent, and
@@ -279,6 +289,8 @@ export interface BrowserToolSession {
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /** The tab's viewport identity, shared with every caller view of this tab. */
+  readonly viewportState: BrowserToolViewportState;
 }
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -1312,6 +1324,7 @@ export const createBrowserToolSession = ({
    */
   const backend: BrowserToolBackend = debuggerApi === undefined ? 'scripting' : 'debugger';
   const target: ChromeDebuggerTarget = { tabId };
+  const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
@@ -2778,7 +2791,7 @@ export const createBrowserToolSession = ({
 
     return evaluateTabCode({
       code,
-      send: (method, params) => debuggerApi.sendCommand(target, method, params),
+      send: (method, params) => Promise.resolve(debuggerApi.sendCommand(target, method, params)),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });
   };
@@ -2796,16 +2809,19 @@ export const createBrowserToolSession = ({
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, refs),
     consoleMessages: () => [...consoleBuffer],
     // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
-    dispose: async () => {
+    dispose: () => {
       refs.clear();
       refsByCaller.delete(callerKey);
+      return Promise.resolve();
     },
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
-    registerRefs: (entries, options) => registerRefs(refs, entries, options),
+    registerRefs: (entries, options) => {
+      registerRefs(refs, entries, options);
+    },
     releaseCaller: key => {
       refsByCaller.get(key)?.clear();
       refsByCaller.delete(key);
@@ -2813,6 +2829,7 @@ export const createBrowserToolSession = ({
     resolveTarget: targetText => resolveTarget(targetText, refs),
     send,
     takeDialog,
+    viewportState,
   });
 
   // Subscribe before any attach so a detach that lands during attach is not missed.
@@ -2832,7 +2849,9 @@ export const createBrowserToolSession = ({
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
-    registerRefs: (entries, options) => registerRefs(defaultRefs, entries, options),
+    registerRefs: (entries, options) => {
+      registerRefs(defaultRefs, entries, options);
+    },
     releaseCaller: callerKey => {
       refsByCaller.get(callerKey)?.clear();
       refsByCaller.delete(callerKey);
@@ -2840,5 +2859,6 @@ export const createBrowserToolSession = ({
     resolveTarget: targetText => resolveTarget(targetText, defaultRefs),
     send,
     takeDialog,
+    viewportState,
   };
 };

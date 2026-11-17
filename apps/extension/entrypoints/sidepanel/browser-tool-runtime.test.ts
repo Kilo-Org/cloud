@@ -148,7 +148,8 @@ describe('side panel browser tool caller', () => {
         'The tab stays with Kilo CLI session Price check. Ask the user to stop that session or choose another tab.',
       ok: false,
     });
-    expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+    // No second send with takeOver: the panel never took the tab.
+    expect(mocks.sendMessage.mock.calls.at(1)).toBeUndefined();
   });
 
   it('resolves to an error result when the background is unreachable', async () => {

@@ -1112,6 +1112,7 @@ export const AgentChatPanel = ({
           getTabUrl: tabId => getTabUrl(tabId),
           mode: runMode,
           navigateTab: (tabId, url) => navigateTab(tabId, url),
+          releaseBrowserCaller,
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,

@@ -119,7 +119,14 @@ export const createBrowserRuntime = ({
     const previous = chains.get(tabId) ?? Promise.resolve();
     const { promise: gate, resolve } = Promise.withResolvers<void>();
 
-    chains.set(tabId, previous.then(() => gate));
+    // The chain entry settles only after both the earlier call and this one's gate: callers run in admission order.
+    chains.set(
+      tabId,
+      (async (): Promise<void> => {
+        await previous;
+        await gate;
+      })()
+    );
 
     await previous;
 

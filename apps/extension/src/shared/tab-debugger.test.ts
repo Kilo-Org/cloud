@@ -154,7 +154,7 @@ describe('tab debugger helpers', () => {
     const calls: unknown[] = [];
     const send = (method: string, params?: Record<string, unknown>) => {
       calls.push({ method, params });
-      return { result: { type: 'number', value: 12_345 } };
+      return Promise.resolve({ result: { type: 'number', value: 12_345 } });
     };
 
     await expect(
@@ -177,10 +177,11 @@ describe('tab debugger helpers', () => {
   });
 
   it('returns eval errors without detaching the shared attachment', async () => {
-    const send = () => ({
-      exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
-      result: { type: 'object' },
-    });
+    const send = () =>
+      Promise.resolve({
+        exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
+        result: { type: 'object' },
+      });
 
     await expect(
       evaluateTabCode({
@@ -194,9 +195,8 @@ describe('tab debugger helpers', () => {
   });
 
   it('reports a session send failure as an eval error', async () => {
-    const send = (): Record<string, unknown> => {
-      throw new Error('The debugger detached from the tab.');
-    };
+    const send = (): Promise<Record<string, unknown>> =>
+      Promise.reject(new Error('The debugger detached from the tab.'));
 
     await expect(evaluateTabCode({ code: 'return 42;', send })).resolves.toStrictEqual({
       error: 'The debugger detached from the tab.',
@@ -206,9 +206,10 @@ describe('tab debugger helpers', () => {
 
   it('summarizes huge eval string results', async () => {
     const hugeValue = 'x'.repeat(8001);
-    const send = () => ({
-      result: { type: 'string', value: hugeValue },
-    });
+    const send = () =>
+      Promise.resolve({
+        result: { type: 'string', value: hugeValue },
+      });
 
     await expect(
       evaluateTabCode({

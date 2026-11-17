@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AGENT_TAB_WAIT_MS, createTabLeaseRegistry } from './browser-tab-leases';
-import type { TabLeasePersistence } from './browser-tab-leases';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  AGENT_TAB_WAIT_MS,
+  createStorageSessionLeasePersistence,
+  createTabLeaseRegistry,
+} from './browser-tab-leases';
+import type { PersistedTabLease, TabLeasePersistence } from './browser-tab-leases';
 import type { BrowserCaller } from './browser-caller';
 
 const panel = (conversationId: string): BrowserCaller => ({
@@ -17,27 +21,26 @@ const agent = (sessionHandle: string): BrowserCaller => ({
 
 const workflow = (runId: string): BrowserCaller => ({ kind: 'workflow', runId });
 
-const createPersistence = (initial: unknown = []): TabLeasePersistence & {
+const createPersistence = (
+  initial: PersistedTabLease[] = []
+): TabLeasePersistence & {
   readonly stored: () => unknown;
   readonly writes: () => readonly unknown[];
 } => {
-  let stored: unknown = initial;
+  let stored: PersistedTabLease[] = initial;
   const writes: unknown[] = [];
 
   return {
-    read: async () => stored,
+    read: () => Promise.resolve(stored),
     stored: () => stored,
-    write: async leases => {
-      stored = leases;
+    write: leases => {
+      stored = [...leases];
       writes.push(leases);
+      return Promise.resolve();
     },
     writes: () => writes,
   };
 };
-
-afterEach(() => {
-  vi.useRealTimers();
-});
 
 describe('tab leases', () => {
   it('grants a free tab to each caller in turn and reports the holder', async () => {
@@ -51,7 +54,7 @@ describe('tab leases', () => {
     await expect(leases.acquire(7, owner)).resolves.toStrictEqual({ kind: 'granted' });
   });
 
-  it('queues a different panel FIFO and grants it when the owner releases', async () => {
+  it('queues a different panel behind the owner instead of granting it', async () => {
     const leases = createTabLeaseRegistry({});
     const first = panel('conversation-1');
     const second = panel('conversation-2');
@@ -63,21 +66,37 @@ describe('tab leases', () => {
 
     let secondSettled = false;
     let thirdSettled = false;
-    void secondWait.then(() => {
+    const secondWatcher = (async (): Promise<void> => {
+      await secondWait;
       secondSettled = true;
-    });
-    void thirdWait.then(() => {
+    })();
+    const thirdWatcher = (async (): Promise<void> => {
+      await thirdWait;
       thirdSettled = true;
-    });
+    })();
 
     await Promise.resolve();
     expect(secondSettled).toBe(false);
     expect(thirdSettled).toBe(false);
+    expect(leases.holder(7)?.caller).toStrictEqual(first);
+
+    void secondWatcher;
+    void thirdWatcher;
+  });
+
+  it('grants the queue FIFO as each owner releases the tab', async () => {
+    const leases = createTabLeaseRegistry({});
+    const first = panel('conversation-1');
+    const second = panel('conversation-2');
+    const third = panel('conversation-3');
+
+    await leases.acquire(7, first);
+    const secondWait = leases.acquire(7, second);
+    const thirdWait = leases.acquire(7, third);
 
     leases.release(7, first);
     await expect(secondWait).resolves.toStrictEqual({ kind: 'granted' });
     expect(leases.holder(7)?.caller).toStrictEqual(second);
-    expect(thirdSettled).toBe(false);
 
     leases.release(7, second);
     await expect(thirdWait).resolves.toStrictEqual({ kind: 'granted' });
@@ -99,6 +118,8 @@ describe('tab leases', () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(wait).resolves.toStrictEqual({ kind: 'busy' });
     expect(leases.holder(7)?.caller).toStrictEqual(owner);
+
+    vi.useRealTimers();
   });
 
   it('never lets an agent take a tab from a panel: it waits, then reports busy', async () => {
@@ -113,6 +134,8 @@ describe('tab leases', () => {
     await vi.advanceTimersByTimeAsync(AGENT_TAB_WAIT_MS);
     await expect(wait).resolves.toStrictEqual({ kind: 'busy' });
     expect(leases.holder(7)?.caller).toStrictEqual(owner);
+
+    vi.useRealTimers();
   });
 
   it('asks a panel to confirm before it takes a tab from an agent', async () => {
@@ -154,13 +177,17 @@ describe('tab leases', () => {
 
     const wait = leases.acquire(7, panel('conversation-1'), { takeOver: true });
     let settled = false;
-    void wait.then(() => {
+    const watcher = (async (): Promise<void> => {
+      await wait;
       settled = true;
-    });
+    })();
 
     await vi.advanceTimersByTimeAsync(0);
     expect(settled).toBe(false);
     expect(leases.holder(7)?.caller).toStrictEqual(workflow('run-1'));
+
+    void watcher;
+    vi.useRealTimers();
   });
 
   it('releases every tab a caller holds and drops its queued waits', async () => {
@@ -233,9 +260,7 @@ describe('tab leases', () => {
     await leases.acquire(7, owner, { title: 'Panel' });
     await leases.flush();
 
-    expect(persistence.stored()).toStrictEqual([
-      { caller: owner, tabId: 7, title: 'Panel' },
-    ]);
+    expect(persistence.stored()).toStrictEqual([{ caller: owner, tabId: 7, title: 'Panel' }]);
 
     leases.release(7, owner);
     await leases.flush();
@@ -244,8 +269,12 @@ describe('tab leases', () => {
   });
 
   it('ignores a malformed persisted record instead of blocking the tab', async () => {
-    const persistence = createPersistence([{ nonsense: true }]);
-    const leases = createTabLeaseRegistry({ persistence });
+    const leases = createTabLeaseRegistry({
+      persistence: createStorageSessionLeasePersistence({
+        getItem: () => [{ nonsense: true }],
+        setItem: () => Promise.resolve(),
+      }),
+    });
 
     await expect(leases.acquire(7, panel('conversation-1'))).resolves.toStrictEqual({
       kind: 'granted',

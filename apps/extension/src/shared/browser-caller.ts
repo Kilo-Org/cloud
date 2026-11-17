@@ -28,12 +28,15 @@ export type BrowserCaller = z.infer<typeof browserCallerSchema>;
 /** One stable key per caller, used for leases and per-caller ref registries. */
 export const browserCallerKey = (caller: BrowserCaller): string => {
   switch (caller.kind) {
-    case 'agent':
+    case 'agent': {
       return `agent:${encodeURIComponent(caller.controllerId)}:${encodeURIComponent(caller.sessionHandle)}`;
-    case 'panel':
+    }
+    case 'panel': {
       return `panel:${encodeURIComponent(caller.panelId)}:${encodeURIComponent(caller.conversationId)}`;
-    case 'workflow':
+    }
+    case 'workflow': {
       return `workflow:${encodeURIComponent(caller.runId)}`;
+    }
   }
 };
 

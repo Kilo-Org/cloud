@@ -477,10 +477,8 @@ const executeRunWorkflow = async (
 
   // One caller per run: the tab lease and the ref registry belong to this run, not to the conversation.
   const caller: BrowserCaller = { kind: 'workflow', runId: crypto.randomUUID() };
-  let result: WorkflowRunResult;
-
   try {
-    result = await runWorkflow(
+    const result = await runWorkflow(
       // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
       // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
       // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
@@ -497,12 +495,12 @@ const executeRunWorkflow = async (
         workflow,
       }
     );
+
+    return runResultToToolResult(result, dryRun, workflow.name);
   } finally {
     // The run's lease ends here so a waiting caller (another conversation, or a CLI agent) can take the tab.
     await ctx.releaseBrowserCaller(caller);
   }
-
-  return runResultToToolResult(result, dryRun, workflow.name);
 };
 
 const executeDeleteWorkflow = async (

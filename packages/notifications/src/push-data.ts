@@ -3,11 +3,7 @@ import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  securityLifecyclePayloadShape,
-} from './notification-events';
+import { securityLifecyclePayloadShape } from './notification-events';
 import { sessionLiveActivityContentStateSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
@@ -25,22 +21,6 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
  * Zod-parsed by the mobile notification handler before use.
  */
 export const pushDataSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('chat.message'),
-    sandboxId: nonEmptyStringSchema,
-    conversationId: nonEmptyStringSchema,
-    messageId: nonEmptyStringSchema,
-  }),
-  z.object({
-    type: z.literal('instance-lifecycle'),
-    event: instanceLifecycleEventSchema,
-    sandboxId: nonEmptyStringSchema,
-  }),
-  z.object({
-    type: z.literal('scheduled-action'),
-    event: scheduledActionEventSchema,
-    sandboxId: nonEmptyStringSchema,
-  }),
   z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,

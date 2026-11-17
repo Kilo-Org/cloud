@@ -765,58 +765,64 @@ test.skip('Agents session transcript opens pinned to the bottom', async () => {
 });
 
 /*
- * The pill's grace is `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx and is a page timer, so
- * the test drives it with the page clock and advances to the deadline that component records when
- * it schedules the timer: nothing here assumes when the effect starts, and the duration is pinned.
+ * The pill's grace is `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx and is a page timer that
+ * the view arms when it mounts. The test installs a fake clock before the panel's first load (a
+ * timer armed under a real clock cannot be driven), asserts the exact window the view recorded,
+ * and then jumps to one millisecond either side of the deadline.
  */
 const OFFLINE_PILL_GRACE_MS = 5000;
-const OFFLINE_PILL_DUE_AT_ATTRIBUTE = 'data-offline-due-at';
+const OFFLINE_PILL_DUE_AT = 'data-offline-grace-due-at';
+const OFFLINE_PILL_STARTED_AT = 'data-offline-grace-started-at';
 
 test('Agents offline pill waits out the connect grace period', async () => {
-  const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
+  const { cleanup, context, extensionId } = await setupAgentsTest({ ingestSilent: true });
   try {
-    const sidePanel = await getSidePanel();
-
     /*
-     * Install the clock before the Agents view exists, because its grace `setTimeout` is created
-     * when the view mounts. Then freeze it: `pauseAt` cannot jump into the past and time keeps
-     * running after `install`, so the target is read from the page and given a margin. With the
-     * clock paused, nothing can pass between the view's `Date.now()` and its `setTimeout`, so the
-     * recorded deadline is exactly the frozen instant plus the grace.
+     * The Agents view mounts during page load, so the clock has to be installed before the first
+     * navigation or its grace `setTimeout` is a real timer. Time still flows after `install`, so
+     * the panel boots normally.
      */
+    const sidePanel = await context.newPage();
     await sidePanel.clock.install();
-    const freezeAt = (await sidePanel.evaluate(() => Date.now())) + 1000;
-    await sidePanel.clock.pauseAt(freezeAt);
-
-    const t0 = await sidePanel.evaluate(() => Date.now());
-    // Proof the clock is frozen at the instant the view will start its timer from.
-    expect(t0).toBe(freezeAt);
-
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    await expect(sidePanel.getByLabel('Settings')).toBeVisible({ timeout: 15_000 });
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
 
-    /* The effect that schedules the timer runs after real async work, so wait for the deadline it
-       recorded rather than for a fixed flush; under the paused clock its value cannot drift. */
-    const dueAtMarker = sidePanel.locator(`[${OFFLINE_PILL_DUE_AT_ATTRIBUTE}]`);
+    const dueAtMarker = sidePanel.locator(`[${OFFLINE_PILL_DUE_AT}]`);
     await expect(dueAtMarker).toHaveCount(1, { timeout: 15_000 });
 
-    const dueAt = t0 + OFFLINE_PILL_GRACE_MS;
-    // The grace duration itself: the deadline is the paused instant plus exactly five seconds.
-    await expect(dueAtMarker).toHaveAttribute(OFFLINE_PILL_DUE_AT_ATTRIBUTE, String(dueAt));
+    const grace = await sidePanel.evaluate(
+      ([dueAtAttribute, startedAtAttribute]) => {
+        const node = document.querySelector(`[${dueAtAttribute}]`);
+
+        return {
+          dueAt: Number(node?.getAttribute(dueAtAttribute)),
+          now: Date.now(),
+          startedAt: Number(node?.getAttribute(startedAtAttribute)),
+        };
+      },
+      [OFFLINE_PILL_DUE_AT, OFFLINE_PILL_STARTED_AT]
+    );
+
+    // The grace duration itself, from the two instants the view recorded when it armed the timer.
+    expect(grace.dueAt - grace.startedAt).toBe(OFFLINE_PILL_GRACE_MS);
 
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
 
     /*
      * Jump with `pauseAt`, which sets the page clock to an exact instant and fires only the timers
-     * due by then. `runFor` is paced by real time and measured an overshoot of ~14 ms on a
-     * millisecond-precision window.
+     * due by then; `runFor` is paced by real time and measured an overshoot of ~14 ms. The first
+     * jump also freezes the clock, so the view has no chance to arm a second window.
      */
-    // One millisecond before the deadline the pill must still be absent.
-    await sidePanel.clock.pauseAt(dueAt - 1);
+    // One millisecond before the recorded deadline the pill must still be absent.
+    await sidePanel.clock.pauseAt(grace.dueAt - 1);
     await expect(offlinePill).toBeHidden();
 
     // One millisecond past it the timer has fired and the pill is rendered.
-    await sidePanel.clock.pauseAt(dueAt + 1);
+    await sidePanel.clock.pauseAt(grace.dueAt + 1);
     await expect(offlinePill).toBeVisible();
   } finally {
     await cleanup();

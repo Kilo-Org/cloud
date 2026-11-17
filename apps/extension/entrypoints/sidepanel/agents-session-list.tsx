@@ -41,6 +41,12 @@ const ACTIVE_POLL_DISCONNECTED_MS = 10_000;
 /** Suppress the Offline pill during the initial dial and transient blips. */
 const OFFLINE_PILL_GRACE_MS = 5000;
 
+/** One scheduled grace window: when the timer was armed, and when it is due. */
+interface GraceWindow {
+  readonly dueAt: number;
+  readonly startedAt: number;
+}
+
 const errorStatusShapeSchema = z.looseObject({
   data: z.looseObject({ httpStatus: z.number().optional() }).optional(),
   shape: z
@@ -182,10 +188,10 @@ const ActiveSessionsSection = ({
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
   const [showOffline, setShowOffline] = useState(false);
-  // The grace deadline the effect below schedules, exposed for the E2E.
+  // The grace window the effect below schedules, exposed for the E2E.
   // The effect runs after real async work: auth, storage, or the connect attempt.
-  // `Date.now()` is the page clock the test drives, so the deadline is exact in its frame.
-  const [offlineDueAt, setOfflineDueAt] = useState<number | null>(null);
+  // `Date.now()` is the page clock the test drives, so both instants are exact in its frame.
+  const [offlineGrace, setOfflineGrace] = useState<GraceWindow | null>(null);
 
   useEffect(() => {
     const unsubscribe = userWebConnection.onConnectionChange((connectedStatus: boolean) => {
@@ -198,10 +204,11 @@ const ActiveSessionsSection = ({
   useEffect(() => {
     if (connected) {
       setShowOffline(false);
-      setOfflineDueAt(null);
+      setOfflineGrace(null);
       return;
     }
-    setOfflineDueAt(Date.now() + OFFLINE_PILL_GRACE_MS);
+    const startedAt = Date.now();
+    setOfflineGrace({ dueAt: startedAt + OFFLINE_PILL_GRACE_MS, startedAt });
     const timer = setTimeout(() => {
       setShowOffline(true);
     }, OFFLINE_PILL_GRACE_MS);
@@ -282,7 +289,10 @@ const ActiveSessionsSection = ({
     <div className={sectionClass}>
       <div
         className="flex items-center gap-2"
-        data-offline-due-at={offlineDueAt === null ? undefined : String(offlineDueAt)}
+        data-offline-grace-due-at={offlineGrace === null ? undefined : String(offlineGrace.dueAt)}
+        data-offline-grace-started-at={
+          offlineGrace === null ? undefined : String(offlineGrace.startedAt)
+        }
       >
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>

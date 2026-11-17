@@ -59,6 +59,26 @@ export async function POST(
     // Negative grants (debits) never store an expiry, so their supplied date has no effect.
     if (amount_usd == null || amount_usd > 0) {
       if (expiryTime <= Date.now()) {
+        // A replay of an idempotent category writes nothing, so the expiry rule does not apply to it.
+        const category = promoCreditCategoriesByKey.get(credit_category);
+        if (category?.is_idempotent) {
+          const [existing] = await db
+            .select({ id: credit_transactions.id })
+            .from(credit_transactions)
+            .where(
+              and(
+                eq(credit_transactions.kilo_user_id, user.id),
+                isNull(credit_transactions.organization_id),
+                eq(credit_transactions.credit_category, credit_category)
+              )
+            )
+            .limit(1);
+          if (existing) {
+            return warnAndCreateErrorResponse(
+              `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
+            );
+          }
+        }
         return warnAndCreateErrorResponse('Credit expiry date must be in the future');
       }
     }

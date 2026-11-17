@@ -170,6 +170,53 @@ describe('POST /admin/api/users/add-credit', () => {
     ).toHaveLength(0);
   });
 
+  it('reports an already applied idempotent grant instead of a past expiry on replay', async () => {
+    const categoryKey = `expiry-replay-${crypto.randomUUID()}`;
+    const lookup = promoCreditCategoriesByKey.get.bind(promoCreditCategoriesByKey);
+    const template = lookup('custom');
+    const spy = jest.spyOn(promoCreditCategoriesByKey, 'get').mockImplementation(key =>
+      key === categoryKey && template
+        ? {
+            ...template,
+            credit_category: categoryKey,
+            adminUI_label: 'Expiry replay grant',
+            expect_negative_amount: false,
+            is_idempotent: true,
+          }
+        : lookup(key)
+    );
+    try {
+      const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+      const recipient = await insertTestUser();
+      mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+      const grant = {
+        email: recipient.google_user_email,
+        credit_category: categoryKey,
+        amount_usd: 10,
+        creditKind: 'promotional',
+        credit_expiry_date: '2030-01-01T00:00:00.000Z',
+      };
+      expect((await POST(request(grant))).status).toBe(200);
+
+      const replay = await POST(
+        request({ ...grant, credit_expiry_date: '2024-06-01T00:00:00.000Z' })
+      );
+
+      expect(replay.status).toBe(400);
+      await expect(replay.json()).resolves.toMatchObject({
+        error: expect.stringContaining('has already been applied'),
+      });
+      expect(
+        await db
+          .select({ id: credit_transactions.id })
+          .from(credit_transactions)
+          .where(eq(credit_transactions.kilo_user_id, recipient.id))
+      ).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('rejects a malformed credit_expiry_date instead of writing an invalid transaction', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();

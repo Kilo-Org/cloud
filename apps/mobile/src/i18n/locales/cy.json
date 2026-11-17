@@ -4893,6 +4893,7 @@
       "saveFailedTitle": "Methwyd cadw’r sbardun",
       "deleteTitle": "Dileu’r sbardun hwn?",
       "deleteMessage": "Bydd galwadau i {{name}} yn methu. Ni ellir dad-wneud hyn.",
+      "deleteMessageScheduled": "Bydd rhediadau'r sbardun {{name}} sydd wedi'u trefnu yn stopio. Ni ellir dad-wneud hyn.",
       "runNow": "Rhedeg nawr",
       "runStarted": "Dechreuodd y rhediad",
       "created": "Crëwyd sbardun",

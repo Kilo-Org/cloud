@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Kāore i taea te tiaki i te kaiwhakaara",
       "deleteTitle": "Mukua tēnei kaiwhakaara?",
       "deleteMessage": "Ka rahua ngā karanga ki {{name}}. Kāore e taea tēnei te whakahoki.",
+      "deleteMessageScheduled": "Ka mutu ngā rere kua whakaritea o te kaiwhakaara {{name}}. Kāore e taea tēnei te whakahoki.",
       "runNow": "Rere ināianei",
       "runStarted": "Kua tīmata te rerenga",
       "created": "Kua waihangatia te kaiwhakaara",

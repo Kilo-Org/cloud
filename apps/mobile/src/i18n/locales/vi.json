@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Không thể lưu trình kích hoạt",
       "deleteTitle": "Xóa trình kích hoạt này?",
       "deleteMessage": "Các lệnh gọi tới {{name}} sẽ thất bại. Không thể hoàn tác thao tác này.",
+      "deleteMessageScheduled": "Các lần chạy đã lên lịch của trình kích hoạt {{name}} sẽ dừng. Không thể hoàn tác thao tác này.",
       "runNow": "Chạy ngay",
       "runStarted": "Đã bắt đầu chạy",
       "created": "Đã tạo trình kích hoạt",

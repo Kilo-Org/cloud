@@ -4689,6 +4689,7 @@
       "saveFailedTitle": "Não foi possível guardar o acionador",
       "deleteTitle": "Eliminar este acionador?",
       "deleteMessage": "As chamadas para {{name}} vão falhar. Esta ação não pode ser anulada.",
+      "deleteMessageScheduled": "As execuções agendadas de {{name}} param. Esta ação não pode ser anulada.",
       "runNow": "Executar agora",
       "runStarted": "Execução iniciada",
       "created": "Acionador criado",

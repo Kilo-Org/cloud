@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Kiciyaha lama kaydin karin",
       "deleteTitle": "Ma tirtirtaa kiciyahan?",
       "deleteMessage": "Wicitaannada ku socda {{name}} way fashilmi doonaan. Tan lama noqon karo.",
+      "deleteMessageScheduled": "Socodka la qorsheeyay ee kiciyahan {{name}} wuu joogsan doonaa. Tan lama noqon karo.",
       "runNow": "Socodsii hadda",
       "runStarted": "Socodku waa bilaabmay",
       "created": "Kiciye waa la abuuray",

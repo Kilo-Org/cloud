@@ -4753,6 +4753,7 @@
       "saveFailedTitle": "Spouštěč se nepodařilo uložit",
       "deleteTitle": "Smazat tento spouštěč?",
       "deleteMessage": "Volání na {{name}} selžou. Tuto akci nelze vrátit.",
+      "deleteMessageScheduled": "Naplánované běhy {{name}} se zastaví. Tuto akci nelze vrátit.",
       "runNow": "Spustit nyní",
       "runStarted": "Spuštění zahájeno",
       "created": "Spouštěč vytvořen",

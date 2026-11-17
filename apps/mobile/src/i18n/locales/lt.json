@@ -4753,6 +4753,7 @@
       "saveFailedTitle": "Nepavyko išsaugoti trigerio",
       "deleteTitle": "Ištrinti šį trigerį?",
       "deleteMessage": "Iškvietimai į {{name}} bus nesėkmingi. To atšaukti negalima.",
+      "deleteMessageScheduled": "Suplanuoti trigerio {{name}} paleidimai sustos. To atšaukti negalima.",
       "runNow": "Paleisti dabar",
       "runStarted": "Paleidimas pradėtas",
       "created": "Trigeris sukurtas",

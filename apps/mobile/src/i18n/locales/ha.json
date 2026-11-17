@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "An kasa ajiye mai jawowa",
       "deleteTitle": "A share wannan mai jawowa?",
       "deleteMessage": "Kira zuwa {{name}} ba zai yi nasara ba. Ba za a iya dawo da wannan ba.",
+      "deleteMessageScheduled": "Gudanarwar mai jawowa {{name}} wadda aka tsara za ta tsaya. Ba za a iya dawo da wannan ba.",
       "runNow": "Gudana yanzu",
       "runStarted": "An fara gudana",
       "created": "An ƙirƙiri mai jawowa",

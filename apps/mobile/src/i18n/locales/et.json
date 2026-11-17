@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Päästiku salvestamine ebaõnnestus",
       "deleteTitle": "Kustutada see päästik?",
       "deleteMessage": "Kutsed nimele {{name}} nurjuvad. Seda ei saa tagasi võtta.",
+      "deleteMessageScheduled": "Päästiku nimega {{name}} ajastatud käivitused lõppevad. Seda ei saa tagasi võtta.",
       "runNow": "Käivita kohe",
       "runStarted": "Käivitus alustatud",
       "created": "Päästik loodud",

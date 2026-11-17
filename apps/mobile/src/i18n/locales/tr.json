@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Tetikleyici kaydedilemedi",
       "deleteTitle": "Bu tetikleyici silinsin mi?",
       "deleteMessage": "{{name}} adresine yapılan çağrılar başarısız olur. Bu işlem geri alınamaz.",
+      "deleteMessageScheduled": "{{name}} tetikleyicisinin zamanlanmış çalıştırmaları durur. Bu işlem geri alınamaz.",
       "runNow": "Şimdi çalıştır",
       "runStarted": "Çalıştırma başladı",
       "created": "Tetikleyici oluşturuldu",

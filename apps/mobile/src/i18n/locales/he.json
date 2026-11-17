@@ -4683,6 +4683,7 @@
       "saveFailedTitle": "לא ניתן היה לשמור את הטריגר",
       "deleteTitle": "למחוק את הטריגר הזה?",
       "deleteMessage": "קריאות אל {{name}} ייכשלו. לא ניתן לבטל זאת.",
+      "deleteMessageScheduled": "הריצות המתוזמנות של {{name}} ייעצרו. לא ניתן לבטל זאת.",
       "runNow": "הרץ עכשיו",
       "runStarted": "ההרצה החלה",
       "created": "הטריגר נוצר",

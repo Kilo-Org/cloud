@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "ቀስቅሴውን ማስቀመጥ አልተቻለም",
       "deleteTitle": "ይህን ቀስቅሴ ይሰርዙ፧",
       "deleteMessage": "ወደ {{name}} የሚደረጉ ጥሪዎች ይከሽፋሉ። ይህ ሊቀለበስ አይችልም።",
+      "deleteMessageScheduled": "የ{{name}} የተያዙ ሩጫዎች ይቆማሉ። ይህ ሊቀለበስ አይችልም።",
       "runNow": "አሁን ያስኪዱ",
       "runStarted": "ሩጫ ተጀምሯል",
       "created": "ቀስቅሴ ተፈጥሯል",

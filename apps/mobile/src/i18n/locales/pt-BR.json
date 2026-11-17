@@ -4689,6 +4689,7 @@
       "saveFailedTitle": "Não foi possível salvar o gatilho",
       "deleteTitle": "Excluir este gatilho?",
       "deleteMessage": "As chamadas para {{name}} falharão. Isso não pode ser desfeito.",
+      "deleteMessageScheduled": "As execuções agendadas do gatilho {{name}} serão interrompidas. Isso não pode ser desfeito.",
       "runNow": "Executar agora",
       "runStarted": "Execução iniciada",
       "created": "Gatilho criado",

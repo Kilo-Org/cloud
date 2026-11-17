@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Kunne ikke gemme udløseren",
       "deleteTitle": "Slet denne udløser?",
       "deleteMessage": "Kald til {{name}} vil fejle. Dette kan ikke fortrydes.",
+      "deleteMessageScheduled": "Planlagte kørsler af {{name}} stopper. Dette kan ikke fortrydes.",
       "runNow": "Kør nu",
       "runStarted": "Kørsel startet",
       "created": "Udløser oprettet",

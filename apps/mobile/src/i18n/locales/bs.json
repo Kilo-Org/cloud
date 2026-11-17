@@ -4683,6 +4683,7 @@
       "saveFailedTitle": "Nije moguće sačuvati okidač",
       "deleteTitle": "Izbrisati ovaj okidač?",
       "deleteMessage": "Pozivi na {{name}} neće uspjeti. Ovo se ne može poništiti.",
+      "deleteMessageScheduled": "Zakazana pokretanja za {{name}} prestaju. Ovo se ne može poništiti.",
       "runNow": "Pokreni sada",
       "runStarted": "Pokretanje je započeto",
       "created": "Okidač je kreiran",

@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Tsy afaka nitahiry ny fanentanana",
       "deleteTitle": "Hamafa ity fanentanana ity?",
       "deleteMessage": "Tsy hahomby ny fiantsoana an'i {{name}}. Tsy azo averina izany.",
+      "deleteMessageScheduled": "Mijanona ny hazakazaka voalahatra an'ny fanentanana {{name}}. Tsy azo averina izany.",
       "runNow": "Hazakazaho izao",
       "runStarted": "Nanomboka ny fanatanterahana",
       "created": "Voaforona ny fanentanana",

@@ -4683,6 +4683,7 @@
       "saveFailedTitle": "Impossibile salvare l'attivatore",
       "deleteTitle": "Eliminare questo attivatore?",
       "deleteMessage": "Le chiamate a {{name}} non riusciranno. L'operazione non può essere annullata.",
+      "deleteMessageScheduled": "Le esecuzioni pianificate di {{name}} si interrompono. L'operazione non può essere annullata.",
       "runNow": "Esegui ora",
       "runStarted": "Esecuzione avviata",
       "created": "Attivatore creato",

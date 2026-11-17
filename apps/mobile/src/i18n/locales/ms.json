@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Tidak dapat menyimpan pencetus",
       "deleteTitle": "Padamkan pencetus ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak boleh dibatalkan.",
+      "deleteMessageScheduled": "Larian yang dijadualkan bagi pencetus {{name}} akan berhenti. Tindakan ini tidak boleh dibatalkan.",
       "runNow": "Jalankan sekarang",
       "runStarted": "Larian dimulakan",
       "created": "Pencetus dicipta",

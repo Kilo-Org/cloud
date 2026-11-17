@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Kakaawwaa olkaa'uu hin dandeenye",
       "deleteTitle": "Kakaawwaa kana haquu?",
       "deleteMessage": "Waamichaawwan {{name}} irratti ni kufu. Kun hin deebi'u.",
+      "deleteMessageScheduled": "Hojiiwwan karoorfame kan kakaawwaa {{name}} ni dhaabamu. Kun hin deebi'u.",
       "runNow": "Amma hojjedhu",
       "runStarted": "Hojii jalqabame",
       "created": "Kakaawwaan uumame",

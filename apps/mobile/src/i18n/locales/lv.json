@@ -4683,6 +4683,7 @@
       "saveFailedTitle": "Neizdevās saglabāt trigeri",
       "deleteTitle": "Dzēst šo trigeri?",
       "deleteMessage": "Izsaukumi uz {{name}} neizdosies. To nevar atsaukt.",
+      "deleteMessageScheduled": "Trigera {{name}} ieplānotās palaišanas apstāsies. To nevar atsaukt.",
       "runNow": "Palaist tagad",
       "runStarted": "Palaišana sākta",
       "created": "Trigeris izveidots",

@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Akukwazekanga ukugcina isibangeli",
       "deleteTitle": "Susa lesi sibangeli?",
       "deleteMessage": "Izingcingo eziya ku-{{name}} zizohluleka. Lokhu ngeke kubuyiselwe.",
+      "deleteMessageScheduled": "Ukusebenza okuhleliwe kwesibangeli {{name}} kuzoma. Lokhu ngeke kubuyiselwe.",
       "runNow": "Sebenza manje",
       "runStarted": "Ukusebenza kuqalile",
       "created": "Isibangeli sidalwe",

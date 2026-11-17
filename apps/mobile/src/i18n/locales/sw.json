@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Imeshindwa kuhifadhi kichocheo",
       "deleteTitle": "Futa kichocheo hiki?",
       "deleteMessage": "Miito kwa {{name}} itashindikana. Hili haliwezi kutenduliwa.",
+      "deleteMessageScheduled": "Utekelezaji uliopangwa wa {{name}} utasimama. Hili haliwezi kutenduliwa.",
       "runNow": "Tekeleza sasa",
       "runStarted": "Utekelezaji umeanza",
       "created": "Kichocheo kimeundwa",

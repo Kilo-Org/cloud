@@ -4613,6 +4613,7 @@
       "saveFailedTitle": "Hindi maimbak ang pampapagana",
       "deleteTitle": "Tanggalin ang pampapaganang ito?",
       "deleteMessage": "Mabibigo ang mga tawag sa {{name}}. Hindi na ito maibabalik.",
+      "deleteMessageScheduled": "Titigil ang mga naka-iskedyul na pagtakbo ng {{name}}. Hindi na ito maibabalik.",
       "runNow": "Patakbuhin ngayon",
       "runStarted": "Nagsimula ang pagtakbo",
       "created": "Nagawa ang pampapagana",

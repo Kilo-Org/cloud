@@ -8,11 +8,12 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -26,6 +27,7 @@ import {
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { deviceTimeZone } from '@/lib/intl-cache';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
@@ -36,16 +38,28 @@ type TriggerCreateScreenProps = Readonly<{
   organizationId?: string;
 }>;
 
+/** Whether a draft differs from the one a fresh create screen starts on. */
+function isDraftDirty(draft: TriggerDraft): boolean {
+  const fresh = createTriggerDraft(draft.timezone);
+  for (const key of Object.keys(fresh) as (keyof TriggerDraft)[]) {
+    if (draft[key] !== fresh[key]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const router = useRouter();
+  const stackSafeReplace = useStackSafeReplace();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const create = useMutation(trpc.webhookTriggers.create.mutationOptions());
   const problems = triggerDraftProblems(draft, { mode: 'create', authConfigured: false });
   const submitting = feedback.status === 'pending';
+  const guard = useMetadataLeaveGuard({ enabled: true, isDirty: () => isDraftDirty(draft) });
 
   const submit = async () => {
     const attempt = begin();
@@ -64,7 +78,18 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
         return;
       }
       announcingToast.success(t('cloudAgent.triggers.created'));
-      router.replace(triggerDetailHref(created.triggerId, organizationId) as Href);
+      // Landing on the detail replaces this create screen: Back must not return
+      // to a form for a trigger that now exists. Leaving through the guard
+      // disarms it first, so the retire `navigation.reset` that
+      // `useStackSafeReplace` runs after the push is never intercepted as a
+      // Back on a draft that was just saved. The detail route's stack repair
+      // then puts the triggers list beneath it, so Back returns to the list on
+      // every entry path. Replacing (push, then retire) is the commit shape the
+      // Android native stack survives (KILO-APP-25); the same moves the
+      // organization group form makes after its create.
+      guard.leaveWithoutAsking(() => {
+        stackSafeReplace.replace(triggerDetailHref(created.triggerId, organizationId) as Href);
+      });
     } catch (error) {
       const message = readTrpcErrorField(error, 'message') ?? t('common.somethingWentWrong');
       attempt.fail({ kind: isRetryableTrpcError(error) ? 'retryable' : 'rejected', message });
@@ -106,6 +131,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
           }}
         />
       </TabScreenScrollView>
+      {guard.dialog}
     </View>
   );
 }

@@ -11,6 +11,11 @@ import { triggerScopeQuery } from './trigger-scope';
 
 const TRIGGERS_ROOT = '/(app)/(tabs)/(3_profile)/triggers';
 
+/** The path a triggers-list push resolves to, without a scope query. */
+export function triggerListPath(): Href {
+  return TRIGGERS_ROOT as Href;
+}
+
 export function triggersListHref(organizationId?: string): Href {
   return `${TRIGGERS_ROOT}${triggerScopeQuery(organizationId)}` as Href;
 }

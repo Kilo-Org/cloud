@@ -79,8 +79,13 @@ export default function ProfileLayout() {
         {/* The profile tree's screens land without a transition when the stack
             repair pushes them (`profile-route-stack.ts`), so a profile link
             opened without its parents does not slide the rebuilt screens past
-            the reader. */}
+            the reader. The trigger screens make the same moves
+            (`use-repair-trigger-route-stack.ts`), so they read the same
+            parameter. */}
         {getProfileRouteNames('profileTab').map(name => (
+          <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+        ))}
+        {['triggers/index', 'triggers/new', 'triggers/[trigger-id]'].map(name => (
           <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
         ))}
       </Stack>

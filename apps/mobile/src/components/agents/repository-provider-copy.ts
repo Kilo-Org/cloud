@@ -52,6 +52,12 @@ export type ConnectCardOffer = {
   offersAction: boolean;
   /** The restriction the card states outright, or `undefined` for none. */
   noteKey: string | undefined;
+  /**
+   * The same restriction for the compact row after a repository is selected.
+   * That row has no title, so its copy names the provider itself where the card
+   * leans on its header for that.
+   */
+  compactNoteKey: string | undefined;
 };
 
 /**
@@ -64,26 +70,33 @@ export type ConnectCardOffer = {
  * (`resolveRepositoryGroups`), so this decides among organization members.
  *
  * `role` is `undefined` until the membership list answers. That state keeps the
- * action: the card never blocks on a verdict it does not have, and a member who
- * keeps the authority would otherwise watch the action arrive after the card had
- * painted. The new-session shell resolves the membership before it mounts this
- * section, so the unresolved state is a retry, not a first frame.
+ * action on purpose: the card never blocks on a verdict it does not have, and
+ * refusing one a member may hold would read worse than the delay. The list is
+ * the same one the new-session shell already reads, so this is a retry path and
+ * not the first frame; when it does answer late, the card's note and action
+ * settle in one change instead of the card appearing inert first.
  */
 export function connectCardOffer(
   platform: RepositoryPlatform,
   role: string | undefined
 ): ConnectCardOffer {
   if (platform !== 'bitbucket') {
-    return { offersAction: true, noteKey: undefined };
+    return { offersAction: true, noteKey: undefined, compactNoteKey: undefined };
   }
   if (role !== undefined && !canManageOrganizationBilling(role)) {
     // The member cannot connect it, so the note names the roles that can and the
     // step left to them instead of an action that can only end in a refusal.
-    return { offersAction: false, noteKey: 'prReview.connect.bitbucketAdminOnlyDescription' };
+    return {
+      offersAction: false,
+      noteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
+      // The compact row carries no header, so this copy names Bitbucket itself.
+      compactNoteKey: 'codeReviewer.bitbucket.notConnectedReadOnly',
+    };
   }
   return {
     offersAction: true,
     noteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
+    compactNoteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
   };
 }
 

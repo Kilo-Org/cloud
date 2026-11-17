@@ -165,14 +165,13 @@ export function NewSessionRepositorySection({
     switch (status) {
       case 'connect': {
         const offer = connectCardOffer(platform, role);
-        // The compact row after a selection keeps the same gate as the expanded
-        // card: a member who cannot complete the connect gets the note alone.
         return selectedRepository === null ? (
           renderConnectCard(platform)
         ) : (
           <View className="mt-3 gap-2">
-            {offer.noteKey ? <Text variant="muted">{t(offer.noteKey)}</Text> : null}
-            {offer.offersAction ? renderConnectActions(platform) : null}
+            {/* This row has no header, so its note names the provider itself. */}
+            {offer.compactNoteKey ? <Text variant="muted">{t(offer.compactNoteKey)}</Text> : null}
+            {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
           </View>
         );
       }
@@ -251,8 +250,21 @@ export function NewSessionRepositorySection({
           ) : null}
           {offer.noteKey ? <Text variant="muted">{t(offer.noteKey)}</Text> : null}
         </View>
-        {offer.offersAction ? renderConnectActions(platform) : null}
+        {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
       </CollapsibleSection>
+    );
+  }
+
+  /**
+   * The refresh a connect card keeps when it offers no connect action. The
+   * action row owns the same control, so a member who cannot connect still has
+   * the provider list's one way to ask again after someone else connects it.
+   */
+  function renderRefreshOnly(): ReactElement {
+    return (
+      <View className="flex-row justify-end">
+        <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
+      </View>
     );
   }
 

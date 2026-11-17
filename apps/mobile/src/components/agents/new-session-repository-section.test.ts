@@ -243,8 +243,9 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
   // action row (`textNode`), which the card header's copy alone does not match.
   it('names the roles that can connect instead of offering a refused action', () => {
     // Every organization Bitbucket connect takes billing authority, so a member
-    // without it gets the restriction as the card's whole content rather than a
-    // tap that can only end in the server's refusal.
+    // without it gets the restriction instead of a tap that can only end in the
+    // server's refusal, and keeps the refresh that asks the provider again once
+    // someone else connects it.
     orgState.role = 'member';
     const renderer = mountSection({
       organizationId: 'org-1',
@@ -255,7 +256,13 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
     expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
-    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+    // The refresh is the card's only control once the connect action is gone.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+      })
+    ).toBeDefined();
     // The card keeps its header and its collapsible frame: only the action goes.
     expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
     expect(
@@ -295,7 +302,9 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
 
-  it('states the restriction in the compact row of a member who already selected', () => {
+  it('names Bitbucket in the compact row of a member who already selected', () => {
+    // This row has no header, so the copy names the provider instead of relying
+    // on one, and the refresh stays as the only control.
     orgState.role = 'member';
     const renderer = mountSection({
       value: 'github:owner/repo',
@@ -304,10 +313,10 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     });
 
     const text = renderedText(renderer);
-    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
     expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
-    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
     expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
   });
 

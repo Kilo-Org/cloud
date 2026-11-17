@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Canje-canje",
     "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
-    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
+    "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai."
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -1466,7 +1467,8 @@
       "repositoryLine": "Bitoci: {{reviews}} · Abubuwan da aka gano: {{findings}}",
       "empty": "Babu bitoci masu nazari tukuna",
       "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
-      "off": "An kashe nazari ga wannan ƙungiyar.",
+      "offTitle": "An kashe nazari ga {{platform}}",
+      "offDescription": "Kunna ta a cikin saitunan ƙungiya a yanar gizo don nazari ya adana bitocin da aka kammala.",
       "couldNotLoad": "An kasa loda nazari"
     },
     "council": {

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Változtatások",
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "privateRepositoryA11y": "{{name}}, magán adattár"
+    "privateRepositoryA11y": "{{name}}, magán adattár",
+    "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el."
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -1466,7 +1467,8 @@
       "repositoryLine": "Kódellenőrzések: {{reviews}} · Találatok: {{findings}}",
       "empty": "Még nincs statisztikával rendelkező kódellenőrzés",
       "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
-      "off": "A statisztika ki van kapcsolva ennél a szervezetnél.",
+      "offTitle": "A statisztika ki van kapcsolva a {{platform}} platformhoz",
+      "offDescription": "Kapcsold be a statisztikát a szervezeti beállításokban a weben, hogy rögzítsd a befejezett kódellenőrzéseket.",
       "couldNotLoad": "Nem sikerült betölteni a statisztikát"
     },
     "council": {

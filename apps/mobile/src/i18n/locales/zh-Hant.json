@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "變更",
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
-    "privateRepositoryA11y": "{{name}}，私有儲存庫"
+    "privateRepositoryA11y": "{{name}}，私有儲存庫",
+    "legalDocumentEnglishOnly": "本文件僅提供英文版本。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -923,7 +924,8 @@
       "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
-      "off": "此組織已關閉分析。",
+      "offTitle": "已關閉 {{platform}} 的分析",
+      "offDescription": "在網頁版組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料"
     },
     "council": {

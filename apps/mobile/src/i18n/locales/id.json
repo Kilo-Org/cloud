@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori pribadi"
+    "privateRepositoryA11y": "{{name}}, repositori pribadi",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -923,7 +924,8 @@
       "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
-      "off": "Analitik nonaktif untuk organisasi ini.",
+      "offTitle": "Analitik nonaktif untuk {{platform}}",
+      "offDescription": "Aktifkan analitik di Pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
       "couldNotLoad": "Tidak dapat memuat analitik"
     },
     "council": {

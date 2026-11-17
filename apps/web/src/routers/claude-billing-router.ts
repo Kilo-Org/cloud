@@ -15,12 +15,13 @@ import {
   type ClaudeBillingOwner,
   type ClaudeBillingScopeSharing,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   baseProcedure,
   createTRPCRouter,
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
+import { isClaudeBillingLinkingConfigured } from '@kilocode/web-shared/lib/auth/claude/config';
+import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
@@ -69,6 +70,8 @@ export const ClaudeBillingStatusSchema = z.object({
   providerName: z.literal(CLAUDE_BILLING_PROVIDER_NAME),
   /** Whether the signed-in person may start or remove the connection. */
   canManage: z.boolean(),
+  /** Whether Kilo can complete a new link here: the OAuth app and operator are configured. */
+  linkingAvailable: z.boolean(),
   /** Whether this scope can use the person's connected personal payer. */
   canSharePersonal: z.boolean(),
   /** Connected Claude links controlled by the caller that can be shared to this scope. */
@@ -115,6 +118,7 @@ function statusOf(
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage,
+    linkingAvailable: isClaudeBillingLinkingConfigured() && isClaudeOperatorConfigured(),
     canSharePersonal,
     shareableLinks: sharing.shareableLinks,
     sharedWith: sharing.sharedWith,
@@ -139,8 +143,8 @@ async function buildScopeStatus(
 
 function forbiddenManageMessage(owner: ClaudeBillingOwner): string {
   return owner.kind === 'organization'
-    ? 'Only an organization owner or admin with access to this feature can link it.'
-    : 'Linked billing with Claude Platform is not available for your account yet.';
+    ? 'Only an organization owner or admin can link it.'
+    : 'Linked billing with Claude Platform is not available for this account.';
 }
 
 async function executeShare(
@@ -162,11 +166,7 @@ async function executeShare(
       message: 'Select another scope to share its Claude link.',
     });
   }
-  if (
-    !sourceResolved.canManage ||
-    !targetResolved.canManage ||
-    !(await isClaudePlatformOAuthEnabled(targetResolved.userEmail))
-  ) {
+  if (!sourceResolved.canManage || !targetResolved.canManage) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: forbiddenManageMessage(

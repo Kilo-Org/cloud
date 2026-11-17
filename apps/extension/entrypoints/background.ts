@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable import/max-dependencies, max-lines */
 import { storage } from '#imports';
 import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
@@ -11,6 +11,7 @@ import {
   createStorageSessionLeasePersistence,
   createTabLeaseRegistry,
 } from '@/src/shared/browser-tab-leases';
+import { startLocalAgentsHost } from '@/src/shared/local-agents/host';
 import {
   ADD_TO_MEMORY_MENU_ID,
   enableActionClickSidePanel,
@@ -468,6 +469,9 @@ const handleAddToMemoryClick = (
 };
 
 export default defineBackground(() => {
+  // Local agents register every listener here so one service-worker wake serves either feature.
+  startLocalAgentsHost();
+
   const chromeApi = (
     globalThis as typeof globalThis & {
       chrome?: {

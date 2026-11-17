@@ -57,6 +57,13 @@ Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter ki
 - Do not commit `.output/` build artifacts.
 - `validate:firefox` runs the lockfile-pinned `web-ext` on the repository's Node (`engines` and `.nvmrc`). If `web-ext` crashes there, change the pinned `web-ext` version or report the crash; do not introduce another runtime or download packages while validating.
 
+## Releases
+
+- `.github/workflows/extension-store-release.yml` is the only release path. A manual dispatch on main builds the Chrome, Firefox and sources zips, writes one CycloneDX SBOM per browser, tags the commit `kilo-extension-release/<version>`, and publishes a GitHub Release with the notes and both SBOMs.
+- `apps/extension/CHANGELOG.md` is generated: the same workflow writes the section for the released version into the version-bump PR. Do not edit it by hand, and do not hand-write a section for a version you are about to build.
+- A version is released once. The tag pins it to the commit its zips were built from, so a dispatch of an already-released version fails; merge the bump PR to build a higher one.
+- `KILO_EXTENSION_SBOM_MODULES_DIR` turns on the module record the SBOM reads, and only the two zip steps set it. The sources-zip rebuild check builds without it and diffs the output, so a plugin that changed build bytes would fail the release.
+
 ## Agent Modes
 
 - Safe mode exposes the read-only `kilo_browser_*` entries of the vendored Playwright MCP contract (`kilo_browser_snapshot`, `kilo_browser_find`, `kilo_browser_take_screenshot`, and every other `readOnly` contract entry), `web_search`, `search_memories`, `get_memory`, workflow read tools (`search_workflows`, `get_workflow`), and card-gated tools (`save_workflow`, `save_memory`). The retired page tool names (`get_page_snapshot`, `find_in_page`, `get_element_details`, `get_viewport_screenshot`) exist only as aliases when an already-persisted conversation is loaded; nothing new may emit them.

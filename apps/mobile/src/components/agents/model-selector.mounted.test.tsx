@@ -249,7 +249,7 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
     expect(selectedSlot?.type).toBe('View');
     expect(unselectedSlot?.type).toBe('View');
     expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
-    expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+    expect(selectedSlot?.props.style).toEqual({ width: 18 });
 
     // Only the contents differ: the check marks the selected row.
     expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
@@ -466,11 +466,12 @@ describe('ModelSelector loading chip', () => {
     expect(textStrings(renderer.root)).not.toContain('Model');
     const skeletons = renderer.root.findAllByType('Skeleton');
     expect(skeletons).toHaveLength(1);
-    // The bar takes the label line's own `text-sm` box and the default model's
-    // measured label width, so the pill is the size it will have once that model
-    // arrives; a shorter bar grew it by 3.4 dp on the emulator.
-    expect(skeletons[0]?.props.className).toContain('h-[17.5px]');
-    expect(skeletons[0]?.props.className).toContain('w-[75.5px]');
+    // The bar takes the label line's own `text-sm` box (`h-5` on the scale), so
+    // the pill is the height it will have once the model arrives. Its width is a
+    // spacing step, not the arriving label's measured width: the width belongs to
+    // the label, and the contract keeps that decision on the scale.
+    expect(skeletons[0]?.props.className).toContain('h-5');
+    expect(skeletons[0]?.props.className).toContain('w-20');
     // `bg-muted-soft`, not the default fill: that one equals the pill's own
     // `bg-secondary` in the light palette, so the bar would paint nothing.
     expect(skeletons[0]?.props.className).toContain('bg-muted-soft');

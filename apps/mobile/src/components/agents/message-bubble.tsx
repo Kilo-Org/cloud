@@ -253,7 +253,7 @@ function MessageBubbleImpl({
          bubble and its own status line, which is what keeps a turn's status and
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
-      <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
+      <View className={cn('gap-2 px-4 pt-1 pb-7', trailingFailure && 'items-end')}>
         {statedByPreparation ? null : (
           <>
             <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
@@ -344,7 +344,7 @@ function MessageBubbleImpl({
   // reader announces it after the row instead of folding it into the bubble.
   const noReplyNote =
     isUser && noReplyRecorded === true ? (
-      <View className="px-4 pt-1 pb-[24px]">
+      <View className="px-4 pt-1 pb-7">
         <Text className="text-right text-sm text-muted-foreground">
           {t('agentChat.messageBubble.noReplyRecorded')}
         </Text>

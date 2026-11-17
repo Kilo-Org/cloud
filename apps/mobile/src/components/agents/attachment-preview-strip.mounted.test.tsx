@@ -297,7 +297,7 @@ function chipSurfaces(root: TestRenderer.ReactTestInstance): TestRenderer.ReactT
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       typeof node.props.className === 'string' &&
-      node.props.className.includes('rounded-md border border-border bg-card')
+      node.props.className.includes('rounded-lg border border-border')
   );
 }
 
@@ -559,8 +559,9 @@ describe('AttachmentPreviewStrip — composer chip alignment', () => {
     // The alignment lives on the strip's content container; the surface keeps
     // its own size classes and no horizontal padding.
     expect(surfaces[0]?.props.className).toBe(
-      'overflow-hidden rounded-md border border-border bg-card h-[46px] w-48'
+      'overflow-hidden rounded-lg border border-border w-48'
     );
+    expect(surfaces[0]?.props.style).toEqual({ height: 46 });
     expect(surfaces[0]?.props.className).not.toContain('pl-');
 
     renderer.unmount();
@@ -923,7 +924,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     const renderer = await openMarkdownPreview();
 
     const previewScrollView = nodesByType(renderer.root, 'ScrollView').find(
-      node => node.props.contentContainerClassName === 'px-6 pb-6 pt-2'
+      node => node.props.contentContainerClassName === 'gap-6 px-4 pt-3 pb-6'
     );
     expect(previewScrollView?.props.className).toBe('flex-1');
 
@@ -1277,7 +1278,7 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     const surface = chipSurfaces(renderer.root)[0];
 
     // 46 px of surface minus the 1 dp border on each side is the body's 44 dp.
-    expect(surface?.props.className).toContain('h-[46px]');
+    expect(surface?.props.style).toEqual({ height: 46 });
     expect(chipBody(renderer.root).props.hitSlop).toBeUndefined();
 
     renderer.unmount();

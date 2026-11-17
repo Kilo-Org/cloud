@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { CenteredState } from '@/components/centered-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -66,17 +67,18 @@ export function CouncilRefusalScreen({
   const actionKey = membershipState === 'some' ? personalActionKey(true) : personalActionKey(false);
   return (
     <CenteredState contentContainerClassName="px-6">
-      <View className="items-center gap-3">
+      <View className="items-center gap-4">
         <Text className="text-center text-xs text-muted-foreground">
           {t(unavailableCopyKey(scope, platformSupportsCouncil, refusalReason))}
         </Text>
         {personal ? (
           <Button
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               if (membershipState === 'some') {
                 // The reviewer scope list is the account switcher: every
-                // membership on one screen, and a pick there reopens the
-                // picked account's council screen — where the switch reads.
+                // membership on one screen, and a pick there opens the picked
+                // account's platform list — where the switch reads.
                 router.replace('/(app)/code-reviewer' as Href);
                 return;
               }

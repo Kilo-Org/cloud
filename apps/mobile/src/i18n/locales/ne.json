@@ -387,6 +387,7 @@
       "saveFailed": "कुञ्जी सुरक्षित गर्न सकिएन।",
       "invalidCredentials": "प्रमाणपत्रहरू जाँच गरेर फेरि प्रयास गर्नुहोस्।",
       "fieldRequired": "{{field}} आवश्यक छ।",
+      "incompleteMapping": "म्यापिङ {{number}} मा गेटवे मोडेल slug र डिप्लोयमेन्ट नाम दुवै आवश्यक छन्।",
       "apiKeyLabel": "API कुञ्जी",
       "apiKeyPlaceholder": "कुञ्जी टाँस्नुहोस्",
       "apiKeyRequired": "कुञ्जी प्रविष्ट गर्नुहोस्।",

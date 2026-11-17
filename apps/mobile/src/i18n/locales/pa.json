@@ -387,6 +387,7 @@
       "saveFailed": "ਕੁੰਜੀ ਸੇਵ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "invalidCredentials": "ਕ੍ਰੈਡੈਂਸ਼ੀਅਲਾਂ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "fieldRequired": "{{field}} ਲੋੜੀਂਦਾ ਹੈ।",
+      "incompleteMapping": "ਮੈਪਿੰਗ {{number}} ਲਈ ਗੇਟਵੇ ਮਾਡਲ slug ਅਤੇ ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ ਦੋਵੇਂ ਲੋੜੀਂਦੇ ਹਨ।",
       "apiKeyLabel": "API ਕੁੰਜੀ",
       "apiKeyPlaceholder": "ਕੁੰਜੀ ਪੇਸਟ ਕਰੋ",
       "apiKeyRequired": "ਕੁੰਜੀ ਦਰਜ ਕਰੋ।",

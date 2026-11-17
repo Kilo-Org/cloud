@@ -387,6 +387,7 @@
       "saveFailed": "Det gick inte att spara nyckeln.",
       "invalidCredentials": "Kontrollera autentiseringsuppgifterna och försök igen.",
       "fieldRequired": "{{field}} måste anges.",
+      "incompleteMapping": "Mappning {{number}} måste ha både gatewaymodellens slug och ett distributionsnamn.",
       "apiKeyLabel": "API-nyckel",
       "apiKeyPlaceholder": "Klistra in nyckeln",
       "apiKeyRequired": "Ange nyckeln.",

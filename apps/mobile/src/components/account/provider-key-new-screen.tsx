@@ -213,10 +213,14 @@ export function ProviderKeyNewScreen() {
       });
       return;
     }
-    if (credential.tag === 'refused') {
-      // Every field is filled but the shape they add up to was refused, so
-      // telling the reader to enter the key would name a value they can see.
-      attempt.fail({ kind: 'refused', message: t('profile.providerKeys.invalidCredentials') });
+    if (credential.tag === 'incomplete-mapping' || credential.tag === 'refused') {
+      // A half-filled mapping is on screen, so its number points at the row to
+      // fix; every other shape refusal names no value the reader can see.
+      const message =
+        credential.tag === 'incomplete-mapping'
+          ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
+          : t('profile.providerKeys.invalidCredentials');
+      attempt.fail({ kind: 'refused', message });
       return;
     }
     try {

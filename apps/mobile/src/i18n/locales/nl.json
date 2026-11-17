@@ -387,6 +387,7 @@
       "saveFailed": "Kan de sleutel niet opslaan.",
       "invalidCredentials": "Controleer de inloggegevens en probeer het opnieuw.",
       "fieldRequired": "{{field}} is verplicht.",
+      "incompleteMapping": "Koppeling {{number}} heeft zowel een slug van gatewaymodel als een deploymentnaam nodig.",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Plak de sleutel",
       "apiKeyRequired": "Voer de sleutel in.",

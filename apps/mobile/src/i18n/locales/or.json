@@ -387,6 +387,7 @@
       "saveFailed": "କୀ ସେଭ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
       "invalidCredentials": "କ୍ରେଡେନସିଆଲ୍ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "fieldRequired": "{{field}} ଆବଶ୍ୟକ।",
+      "incompleteMapping": "ମ୍ୟାପିଂ {{number}} ପାଇଁ ଉଭୟ ଗେଟୱେ ମଡେଲ୍ ସ୍ଲଗ୍ ଏବଂ ଡିପ୍ଲୟମେଣ୍ଟ ନାମ ଆବଶ୍ୟକ।",
       "apiKeyLabel": "API କୀ",
       "apiKeyPlaceholder": "କୀ ପେଷ୍ଟ କରନ୍ତୁ",
       "apiKeyRequired": "କୀ ଲେଖନ୍ତୁ।",

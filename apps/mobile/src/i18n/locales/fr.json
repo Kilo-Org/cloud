@@ -387,6 +387,7 @@
       "saveFailed": "Impossible d'enregistrer la clé.",
       "invalidCredentials": "Vérifiez les identifiants et réessayez.",
       "fieldRequired": "Le champ {{field}} est obligatoire.",
+      "incompleteMapping": "La correspondance {{number}} nécessite à la fois un slug du modèle de la passerelle et un nom de déploiement.",
       "apiKeyLabel": "Clé API",
       "apiKeyPlaceholder": "Collez la clé",
       "apiKeyRequired": "Saisissez la clé.",

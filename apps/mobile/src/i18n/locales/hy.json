@@ -387,6 +387,7 @@
       "saveFailed": "Չհաջողվեց պահել բանալին։",
       "invalidCredentials": "Ստուգեք մուտքի տվյալները և նորից փորձեք։",
       "fieldRequired": "«{{field}}» դաշտը պարտադիր է։",
+      "incompleteMapping": "Համապատասխանեցում {{number}}-ի համար պահանջվում են և՛ gateway մոդելի slug-ը, և՛ տեղակայման անվանումը։",
       "apiKeyLabel": "API բանալի",
       "apiKeyPlaceholder": "Տեղադրեք բանալին",
       "apiKeyRequired": "Մուտքագրեք բանալին։",

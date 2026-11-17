@@ -387,6 +387,7 @@
       "saveFailed": "Ključa ni bilo mogoče shraniti.",
       "invalidCredentials": "Preveri poverilnice in poskusi znova.",
       "fieldRequired": "Polje {{field}} je obvezno.",
+      "incompleteMapping": "Preslikava {{number}} potrebuje tako oznako modela prehoda kot ime namestitve.",
       "apiKeyLabel": "Ključ API",
       "apiKeyPlaceholder": "Prilepi ključ",
       "apiKeyRequired": "Vnesi ključ.",

@@ -387,6 +387,7 @@
       "saveFailed": "Furaha lama kaydin karin.",
       "invalidCredentials": "Hubi aqoonsiyada oo isku day mar kale.",
       "fieldRequired": "{{field}} waa qasab.",
+      "incompleteMapping": "Isku-xidhka {{number}} wuxuu u baahan yahay labadaba: slug-ga moodelka gateway iyo magaca deployment.",
       "apiKeyLabel": "Furaha API",
       "apiKeyPlaceholder": "Ku dheji furaha",
       "apiKeyRequired": "Geli furaha.",

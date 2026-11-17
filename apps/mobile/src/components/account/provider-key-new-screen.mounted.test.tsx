@@ -402,7 +402,7 @@ describe('ProviderKeyNewScreen', () => {
     expect(credentialForm(root).values.current).toEqual({ region: 'us-east-1' });
   });
 
-  it('refuses a half-filled mapping as a credential problem, not a missing key', async () => {
+  it('names the half-filled mapping instead of refusing the whole credential', async () => {
     state.params = { provider: 'azure' };
     state.providers = [{ id: 'azure', name: 'Azure Foundry' }];
     const root = await mount();
@@ -416,7 +416,30 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(state.mutateAsync).not.toHaveBeenCalled();
-    expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+    expect(statusMessages(root)).toEqual([
+      'Mapping 1 needs both a gateway model slug and a deployment name.',
+    ]);
+  });
+
+  it('counts the rows the form shows, including one nothing was typed into', async () => {
+    state.params = { provider: 'azure' };
+    state.providers = [{ id: 'azure', name: 'Azure Foundry' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = { apiKey: 'azure-key', resourceName: 'foundry' };
+      const { mappings } = credentialForm(root);
+      mappings.current.set(0, {});
+      mappings.current.set(1, { customModelId: 'gpt-4o' });
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(statusMessages(root)).toEqual([
+      'Mapping 2 needs both a gateway model slug and a deployment name.',
+    ]);
   });
 
   it('warns that replacing a key replaces its model mappings', async () => {

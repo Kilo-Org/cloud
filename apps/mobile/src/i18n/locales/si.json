@@ -387,6 +387,7 @@
       "saveFailed": "යතුර සුරැකීමට නොහැකි විය.",
       "invalidCredentials": "අක්තපත්‍ර පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "fieldRequired": "{{field}} අවශ්‍ය වේ.",
+      "incompleteMapping": "සිතියම්ගත කිරීම {{number}} සඳහා gateway මාදිලි slug සහ deployment නාමය යන දෙකම අවශ්‍ය වේ.",
       "apiKeyLabel": "API යතුර",
       "apiKeyPlaceholder": "යතුර අලවන්න",
       "apiKeyRequired": "යතුර ඇතුළත් කරන්න.",

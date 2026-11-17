@@ -252,16 +252,23 @@ export function credentialProblem(input: {
 
 /**
  * What one form's fields add up to: the credential to send, the field still
- * empty, or a shape the server's own check refuses.
+ * empty, one mapping row still half filled, or a shape the server's own check
+ * refuses.
  */
 export type CredentialRead =
   | { readonly tag: 'ready'; readonly credential: string }
   | { readonly tag: 'missing'; readonly field: CredentialFieldId }
+  /**
+   * One mapping row has one side filled. `mapping` is its 1-based position
+   * among the rows the form shows, so the refusal can name the row.
+   */
+  | { readonly tag: 'incomplete-mapping'; readonly mapping: number }
   | { readonly tag: 'refused' };
 
 /**
  * The credential a structured form holds. `rows` are Azure's mapping rows as
- * typed; a row with neither side filled asks for nothing.
+ * typed, in the order the form shows them; a row with neither side filled asks
+ * for nothing.
  */
 export function readStructuredCredential(input: {
   providerId: string;
@@ -274,12 +281,17 @@ export function readStructuredCredential(input: {
   if (missing) {
     return { tag: 'missing', field: missing };
   }
-  const modelMappings = input.rows
-    .map(row => ({
-      gatewayModelSlug: (row.gatewayModelSlug ?? '').trim(),
-      customModelId: (row.customModelId ?? '').trim(),
-    }))
-    .filter(row => row.gatewayModelSlug !== '' || row.customModelId !== '');
+  const modelMappings: ModelMapping[] = [];
+  for (const [index, row] of input.rows.entries()) {
+    const gatewayModelSlug = (row.gatewayModelSlug ?? '').trim();
+    const customModelId = (row.customModelId ?? '').trim();
+    if (gatewayModelSlug !== '' || customModelId !== '') {
+      if (gatewayModelSlug === '' || customModelId === '') {
+        return { tag: 'incomplete-mapping', mapping: index + 1 };
+      }
+      modelMappings.push({ gatewayModelSlug, customModelId });
+    }
+  }
   const credential = {
     providerId: input.providerId,
     mode: input.mode,

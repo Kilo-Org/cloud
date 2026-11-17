@@ -387,6 +387,7 @@
       "saveFailed": "Açarı saxlamaq mümkün olmadı.",
       "invalidCredentials": "Etimadnamələri yoxla və yenidən cəhd et.",
       "fieldRequired": "{{field}} tələb olunur.",
+      "incompleteMapping": "Uyğunlaşdırma {{number}} üçün həm gateway modelinin slug-ı, həm də deployment adı tələb olunur.",
       "apiKeyLabel": "API açarı",
       "apiKeyPlaceholder": "Açarı yapışdır",
       "apiKeyRequired": "Açarı daxil et.",

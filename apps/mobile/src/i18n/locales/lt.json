@@ -387,6 +387,7 @@
       "saveFailed": "Nepavyko išsaugoti rakto.",
       "invalidCredentials": "Patikrinkite prisijungimo duomenis ir bandykite dar kartą.",
       "fieldRequired": "Laukas „{{field}}“ yra privalomas.",
+      "incompleteMapping": "Susiejime {{number}} turi būti nurodyti ir šliuzo modelio identifikatorius, ir diegimo pavadinimas.",
       "apiKeyLabel": "API raktas",
       "apiKeyPlaceholder": "Įklijuokite raktą",
       "apiKeyRequired": "Įveskite raktą.",

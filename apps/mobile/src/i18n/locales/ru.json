@@ -387,6 +387,7 @@
       "saveFailed": "Не удалось сохранить ключ.",
       "invalidCredentials": "Проверьте учётные данные и повторите попытку.",
       "fieldRequired": "Поле «{{field}}» обязательно.",
+      "incompleteMapping": "Для сопоставления {{number}} нужно указать и slug модели шлюза, и имя развёртывания.",
       "apiKeyLabel": "API-ключ",
       "apiKeyPlaceholder": "Вставьте ключ",
       "apiKeyRequired": "Введите ключ.",

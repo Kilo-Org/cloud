@@ -387,6 +387,7 @@
       "saveFailed": "Iċ-ċavetta ma setgħetx tiġi ssejvjata.",
       "invalidCredentials": "Iċċekkja l-kredenzjali u erġa' pprova.",
       "fieldRequired": "Il-qasam {{field}} huwa meħtieġ.",
+      "incompleteMapping": "Mappjar {{number}} jeħtieġ kemm slug tal-mudell tal-gateway kif ukoll isem tad-deployment.",
       "apiKeyLabel": "Ċavetta tal-API",
       "apiKeyPlaceholder": "Waħħal iċ-ċavetta",
       "apiKeyRequired": "Daħħal iċ-ċavetta.",

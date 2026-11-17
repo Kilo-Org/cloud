@@ -387,6 +387,7 @@
       "saveFailed": "Клучот не можеше да се зачува.",
       "invalidCredentials": "Провери ги акредитивите и обиди се повторно.",
       "fieldRequired": "Полето {{field}} е задолжително.",
+      "incompleteMapping": "Мапирање {{number}} мора да има и slug на gateway моделот и име на deployment.",
       "apiKeyLabel": "API клуч",
       "apiKeyPlaceholder": "Залепи го клучот",
       "apiKeyRequired": "Внеси го клучот.",

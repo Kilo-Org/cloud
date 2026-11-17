@@ -387,6 +387,7 @@
       "saveFailed": "Der Schlüssel konnte nicht gespeichert werden.",
       "invalidCredentials": "Überprüfe die Anmeldedaten und versuche es erneut.",
       "fieldRequired": "{{field}} ist erforderlich.",
+      "incompleteMapping": "Zuordnung {{number}} benötigt sowohl einen Gateway-Modell-Slug als auch einen Deployment-Namen.",
       "apiKeyLabel": "API-Schlüssel",
       "apiKeyPlaceholder": "Schlüssel einfügen",
       "apiKeyRequired": "Gib den Schlüssel ein.",

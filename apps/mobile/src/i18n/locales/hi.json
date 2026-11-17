@@ -387,6 +387,7 @@
       "saveFailed": "कुंजी सहेजी नहीं जा सकी।",
       "invalidCredentials": "क्रेडेंशियल जाँचें और फिर से कोशिश करें।",
       "fieldRequired": "{{field}} आवश्यक है।",
+      "incompleteMapping": "मैपिंग {{number}} के लिए गेटवे मॉडल स्लग और डिप्लॉयमेंट नाम दोनों आवश्यक हैं।",
       "apiKeyLabel": "API कुंजी",
       "apiKeyPlaceholder": "कुंजी पेस्ट करें",
       "apiKeyRequired": "कुंजी डालें।",

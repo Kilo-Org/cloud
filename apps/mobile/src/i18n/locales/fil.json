@@ -387,6 +387,7 @@
       "saveFailed": "Hindi ma-save ang key.",
       "invalidCredentials": "Suriin ang mga credential at subukang muli.",
       "fieldRequired": "Kailangan ang {{field}}.",
+      "incompleteMapping": "Kailangan ng Mapping {{number}} ang parehong gateway model slug at deployment name.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "I-paste ang key",
       "apiKeyRequired": "Ilagay ang key.",

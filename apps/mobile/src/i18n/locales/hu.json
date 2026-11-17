@@ -387,6 +387,7 @@
       "saveFailed": "Nem sikerült menteni a kulcsot.",
       "invalidCredentials": "Ellenőrizd a hitelesítő adatokat, és próbáld újra.",
       "fieldRequired": "A(z) {{field}} mező kitöltése kötelező.",
+      "incompleteMapping": "A(z) {{number}}. megfeleltetéshez a gateway-modell slug és a deployment neve is szükséges.",
       "apiKeyLabel": "API-kulcs",
       "apiKeyPlaceholder": "Illeszd be a kulcsot",
       "apiKeyRequired": "Add meg a kulcsot.",

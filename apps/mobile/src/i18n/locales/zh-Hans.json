@@ -387,6 +387,7 @@
       "saveFailed": "无法保存密钥。",
       "invalidCredentials": "请检查凭据后重试。",
       "fieldRequired": "{{field}} 为必填项。",
+      "incompleteMapping": "映射 {{number}} 需要同时填写网关模型 slug 和部署名称。",
       "apiKeyLabel": "API 密钥",
       "apiKeyPlaceholder": "粘贴密钥",
       "apiKeyRequired": "请输入密钥。",

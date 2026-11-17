@@ -387,6 +387,7 @@
       "saveFailed": "Kunne ikke lagre nøkkelen.",
       "invalidCredentials": "Kontroller legitimasjonen og prøv igjen.",
       "fieldRequired": "{{field}} må fylles ut.",
+      "incompleteMapping": "Tilordning {{number}} må ha både en slug for gateway-modell og et deployment-navn.",
       "apiKeyLabel": "API-nøkkel",
       "apiKeyPlaceholder": "Lim inn nøkkelen",
       "apiKeyRequired": "Skriv inn nøkkelen.",

@@ -387,6 +387,7 @@
       "saveFailed": "కీని సేవ్ చేయడం సాధ్యపడలేదు.",
       "invalidCredentials": "ఆధారాలను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "fieldRequired": "{{field}} అవసరం.",
+      "incompleteMapping": "మ్యాపింగ్ {{number}}కు గేట్‌వే మోడల్ స్లగ్ మరియు డిప్లాయ్‌మెంట్ పేరు రెండూ అవసరం.",
       "apiKeyLabel": "API కీ",
       "apiKeyPlaceholder": "కీని అతికించండి",
       "apiKeyRequired": "కీని నమోదు చేయండి.",

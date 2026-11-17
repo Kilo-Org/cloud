@@ -387,6 +387,7 @@
       "saveFailed": "Neizdevās saglabāt atslēgu.",
       "invalidCredentials": "Pārbaudi akreditācijas datus un mēģini vēlreiz.",
       "fieldRequired": "Lauks “{{field}}” ir obligāts.",
+      "incompleteMapping": "Kartējumam {{number}} ir nepieciešams gan vārtejas modeļa slug, gan izvietojuma nosaukums.",
       "apiKeyLabel": "API atslēga",
       "apiKeyPlaceholder": "Ielīmē atslēgu",
       "apiKeyRequired": "Ievadi atslēgu.",

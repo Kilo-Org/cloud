@@ -387,6 +387,7 @@
       "saveFailed": "விசையைச் சேமிக்க முடியவில்லை.",
       "invalidCredentials": "நற்சான்றுகளைச் சரிபார்த்து மீண்டும் முயலவும்.",
       "fieldRequired": "{{field}} தேவை.",
+      "incompleteMapping": "மேப்பிங் {{number}}-க்கு gateway மாடல் slug மற்றும் deployment பெயர் இரண்டும் தேவை.",
       "apiKeyLabel": "API விசை",
       "apiKeyPlaceholder": "விசையை ஒட்டவும்",
       "apiKeyRequired": "விசையை உள்ளிடவும்.",

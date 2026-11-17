@@ -387,6 +387,7 @@
       "saveFailed": "Kāore i taea te penapena i te kī.",
       "invalidCredentials": "Tirohia ngā tohu tuakiri, ka ngana anō.",
       "fieldRequired": "E hiahiatia ana te {{field}}.",
+      "incompleteMapping": "Me whai te Hononga {{number}} i tētahi gateway model slug me tētahi deployment name.",
       "apiKeyLabel": "Kī API",
       "apiKeyPlaceholder": "Whakapiria te kī",
       "apiKeyRequired": "Tāurutia te kī.",

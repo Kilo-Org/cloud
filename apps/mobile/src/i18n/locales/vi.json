@@ -387,6 +387,7 @@
       "saveFailed": "Không thể lưu khóa.",
       "invalidCredentials": "Hãy kiểm tra thông tin xác thực rồi thử lại.",
       "fieldRequired": "Bắt buộc nhập {{field}}.",
+      "incompleteMapping": "Ánh xạ {{number}} cần có cả slug mô hình gateway và tên deployment.",
       "apiKeyLabel": "Khóa API",
       "apiKeyPlaceholder": "Dán khóa",
       "apiKeyRequired": "Nhập khóa.",

@@ -387,6 +387,7 @@
       "saveFailed": "Anahtar kaydedilemedi.",
       "invalidCredentials": "Kimlik bilgilerini kontrol edip tekrar dene.",
       "fieldRequired": "{{field}} gerekli.",
+      "incompleteMapping": "Eşleme {{number}} için hem bir gateway model slug'ı hem de bir dağıtım adı gerekli.",
       "apiKeyLabel": "API anahtarı",
       "apiKeyPlaceholder": "Anahtarı yapıştır",
       "apiKeyRequired": "Anahtarı gir.",

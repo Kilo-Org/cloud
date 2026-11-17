@@ -387,6 +387,7 @@
       "saveFailed": "キーを保存できませんでした。",
       "invalidCredentials": "認証情報を確認して、もう一度お試しください。",
       "fieldRequired": "{{field}}は必須です。",
+      "incompleteMapping": "マッピング{{number}}には、ゲートウェイモデルのスラッグとデプロイ名の両方が必要です。",
       "apiKeyLabel": "APIキー",
       "apiKeyPlaceholder": "キーを貼り付け",
       "apiKeyRequired": "キーを入力してください。",

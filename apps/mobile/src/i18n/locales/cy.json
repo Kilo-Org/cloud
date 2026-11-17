@@ -387,6 +387,7 @@
       "saveFailed": "Methu cadw'r allwedd.",
       "invalidCredentials": "Gwiriwch y manylion adnabod a rhowch gynnig arall arni.",
       "fieldRequired": "Mae angen {{field}}.",
+      "incompleteMapping": "Mae angen slug model porth ac enw gosodiad ar Fapiad {{number}}.",
       "apiKeyLabel": "Allwedd API",
       "apiKeyPlaceholder": "Gludo'r allwedd",
       "apiKeyRequired": "Rhowch yr allwedd.",

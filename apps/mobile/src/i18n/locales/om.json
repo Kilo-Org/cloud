@@ -387,6 +387,7 @@
       "saveFailed": "Furtuu olkaa'uun hin danda'amne.",
       "invalidCredentials": "Ragaalee eenyummaa mirkaneessiitii irra deebi'ii yaali.",
       "fieldRequired": "{{field}} barbaachisaadha.",
+      "incompleteMapping": "Walqabsiisa {{number}} slug moodeela gateway fi maqaa deployment lachuu qabaachuu qaba.",
       "apiKeyLabel": "Furtuu API",
       "apiKeyPlaceholder": "Furtuu maxxansi",
       "apiKeyRequired": "Furtuu galchi.",

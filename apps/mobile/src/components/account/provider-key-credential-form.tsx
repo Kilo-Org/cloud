@@ -171,6 +171,10 @@ export function ProviderKeyCredentialForm({
             className={STATE_ACTION_CLASS}
             disabled={disabled}
             onPress={() => {
+              // The row enters the draft here, empty, so the draft keeps the
+              // form's order: a refusal can then name the row it is about by
+              // its visible number, untouched rows included.
+              mappings.current.set(nextRowId, {});
               setRows(current => [...current, { id: nextRowId }]);
               setNextRowId(current => current + 1);
             }}

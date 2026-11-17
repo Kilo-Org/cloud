@@ -387,6 +387,7 @@
       "saveFailed": "Non se puido gardar a clave.",
       "invalidCredentials": "Comproba as credenciais e téntao de novo.",
       "fieldRequired": "O campo {{field}} é obrigatorio.",
+      "incompleteMapping": "A correspondencia {{number}} necesita tanto un slug do modelo da pasarela como un nome do despregamento.",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Pega a clave",
       "apiKeyRequired": "Introduce a clave.",

@@ -387,6 +387,7 @@
       "saveFailed": "Ключът не можа да бъде запазен.",
       "invalidCredentials": "Провери идентификационните данни и опитай отново.",
       "fieldRequired": "Полето „{{field}}“ е задължително.",
+      "incompleteMapping": "Съпоставяне {{number}} изисква както slug на gateway модела, така и име на внедряването.",
       "apiKeyLabel": "API ключ",
       "apiKeyPlaceholder": "Постави ключа",
       "apiKeyRequired": "Въведи ключа.",

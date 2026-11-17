@@ -387,6 +387,7 @@
       "saveFailed": "Cheia nu a putut fi salvată.",
       "invalidCredentials": "Verifică datele de autentificare și încearcă din nou.",
       "fieldRequired": "Câmpul {{field}} este obligatoriu.",
+      "incompleteMapping": "Maparea {{number}} necesită atât un gateway model slug, cât și un deployment name.",
       "apiKeyLabel": "Cheie API",
       "apiKeyPlaceholder": "Lipește cheia",
       "apiKeyRequired": "Introdu cheia.",

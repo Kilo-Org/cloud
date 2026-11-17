@@ -387,6 +387,7 @@
       "saveFailed": "A kò lè fi kọ́kọ́rọ́ náà pamọ́.",
       "invalidCredentials": "Ṣàyẹ̀wò àwọn ìwé-ẹ̀rí ìwọlé náà kí o sì tún gbìyànjú.",
       "fieldRequired": "A nílò {{field}}.",
+      "incompleteMapping": "Ìsopọ̀ {{number}} nílò slug àwòṣe gateway àti orúkọ deployment méjèèjì.",
       "apiKeyLabel": "Kọ́kọ́rọ́ API",
       "apiKeyPlaceholder": "Lẹ kọ́kọ́rọ́ náà síbí",
       "apiKeyRequired": "Tẹ kọ́kọ́rọ́ náà.",

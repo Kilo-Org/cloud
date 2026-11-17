@@ -387,6 +387,7 @@
       "saveFailed": "Ekki tókst að vista lykilinn.",
       "invalidCredentials": "Athugaðu innskráningarupplýsingarnar og reyndu aftur.",
       "fieldRequired": "Reiturinn {{field}} er nauðsynlegur.",
+      "incompleteMapping": "Vörpun {{number}} þarf bæði auðkenni gáttarlíkans og heiti uppsetningar.",
       "apiKeyLabel": "API-lykill",
       "apiKeyPlaceholder": "Límdu lykilinn",
       "apiKeyRequired": "Sláðu inn lykilinn.",

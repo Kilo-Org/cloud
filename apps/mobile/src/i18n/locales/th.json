@@ -387,6 +387,7 @@
       "saveFailed": "ไม่สามารถบันทึกคีย์ได้.",
       "invalidCredentials": "ตรวจสอบข้อมูลรับรองแล้วลองอีกครั้ง.",
       "fieldRequired": "ต้องระบุ {{field}}.",
+      "incompleteMapping": "การแมป {{number}} ต้องมีทั้ง slug ของโมเดลเกตเวย์และชื่อการปรับใช้.",
       "apiKeyLabel": "คีย์ API",
       "apiKeyPlaceholder": "วางคีย์",
       "apiKeyRequired": "ป้อนคีย์.",

@@ -387,6 +387,7 @@
       "saveFailed": "کلید محفوظ نہیں کی جا سکی۔",
       "invalidCredentials": "اسناد چیک کریں اور دوبارہ کوشش کریں۔",
       "fieldRequired": "{{field}} درکار ہے۔",
+      "incompleteMapping": "میپنگ {{number}} کے لیے گیٹ وے ماڈل slug اور ڈیپلائمنٹ کا نام دونوں درکار ہیں۔",
       "apiKeyLabel": "API کلید",
       "apiKeyPlaceholder": "کلید پیسٹ کریں",
       "apiKeyRequired": "کلید درج کریں۔",

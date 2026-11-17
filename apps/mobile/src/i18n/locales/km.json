@@ -387,6 +387,7 @@
       "saveFailed": "មិនអាចរក្សាទុកសោបានទេ។",
       "invalidCredentials": "ពិនិត្យព័ត៌មានផ្ទៀងផ្ទាត់ ហើយព្យាយាមម្តងទៀត។",
       "fieldRequired": "ត្រូវការ {{field}}។",
+      "incompleteMapping": "ការផ្គូផ្គង {{number}} ត្រូវការទាំង gateway model slug និង deployment name។",
       "apiKeyLabel": "សោ API",
       "apiKeyPlaceholder": "បិទភ្ជាប់សោ",
       "apiKeyRequired": "បញ្ចូលសោ។",

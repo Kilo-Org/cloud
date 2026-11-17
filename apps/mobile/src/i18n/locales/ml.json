@@ -387,6 +387,7 @@
       "saveFailed": "കീ സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "invalidCredentials": "ക്രെഡൻഷ്യലുകൾ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "fieldRequired": "{{field}} ആവശ്യമാണ്.",
+      "incompleteMapping": "മാപ്പിംഗ് {{number}}-ന് ഒരു ഗേറ്റ്‌വേ മോഡൽ സ്ലഗും ഡിപ്ലോയ്‌മെന്റ് നാമവും ആവശ്യമാണ്.",
       "apiKeyLabel": "API കീ",
       "apiKeyPlaceholder": "കീ പേസ്റ്റ് ചെയ്യുക",
       "apiKeyRequired": "കീ നൽകുക.",

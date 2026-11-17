@@ -387,6 +387,7 @@
       "saveFailed": "Kľúč sa nepodarilo uložiť.",
       "invalidCredentials": "Skontroluj prihlasovacie údaje a skús to znova.",
       "fieldRequired": "Pole {{field}} je povinné.",
+      "incompleteMapping": "Mapovanie {{number}} vyžaduje slug modelu brány aj názov nasadenia.",
       "apiKeyLabel": "Kľúč API",
       "apiKeyPlaceholder": "Vlož kľúč",
       "apiKeyRequired": "Zadaj kľúč.",

@@ -387,6 +387,7 @@
       "saveFailed": "ቁልፉን ማስቀመጥ አልተቻለም።",
       "invalidCredentials": "የማረጋገጫ መረጃዎቹን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "fieldRequired": "{{field}} ያስፈልጋል።",
+      "incompleteMapping": "ማዛመጃ {{number}} ሁለቱንም የGateway ሞዴል slug እና የDeployment ስም ያስፈልገዋል።",
       "apiKeyLabel": "የAPI ቁልፍ",
       "apiKeyPlaceholder": "ቁልፉን ይለጥፉ",
       "apiKeyRequired": "ቁልፉን ያስገቡ።",

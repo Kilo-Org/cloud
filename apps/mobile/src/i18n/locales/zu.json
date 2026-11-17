@@ -387,6 +387,7 @@
       "saveFailed": "Akukwazekanga ukulondoloza ukhiye.",
       "invalidCredentials": "Hlola imininingwane yokungena bese uzama futhi.",
       "fieldRequired": "{{field}} kuyadingeka.",
+      "incompleteMapping": "Ukufanisa {{number}} kudinga kokubili i-gateway model slug kanye negama le-deployment.",
       "apiKeyLabel": "Ukhiye we-API",
       "apiKeyPlaceholder": "Namathisela ukhiye",
       "apiKeyRequired": "Faka ukhiye.",

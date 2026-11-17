@@ -387,6 +387,7 @@
       "saveFailed": "نەتوانرا کلیلەکە پاشەکەوت بکرێت.",
       "invalidCredentials": "زانیارییەکانی چوونەژوورەوە بپشکنە و دووبارە هەوڵ بدەرەوە.",
       "fieldRequired": "{{field}} پێویستە.",
+      "incompleteMapping": "بەستنەوەی {{number}} پێویستی بە هەردوو gateway model slug و deployment name هەیە.",
       "apiKeyLabel": "کلیلی API",
       "apiKeyPlaceholder": "کلیلەکە بلکێنە",
       "apiKeyRequired": "کلیلەکە بنووسە.",

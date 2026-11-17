@@ -387,6 +387,7 @@
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄີໄດ້.",
       "invalidCredentials": "ກວດສອບຂໍ້ມູນຮັບຮອງ ແລ້ວລອງໃໝ່.",
       "fieldRequired": "ຕ້ອງລະບຸ {{field}}.",
+      "incompleteMapping": "ການຈັບຄູ່ {{number}} ຕ້ອງມີທັງ slug ໂມເດວ gateway ແລະ ຊື່ deployment.",
       "apiKeyLabel": "ຄີ API",
       "apiKeyPlaceholder": "ວາງຄີ",
       "apiKeyRequired": "ປ້ອນຄີ.",

@@ -387,6 +387,7 @@
       "saveFailed": "Kon nie die sleutel stoor nie.",
       "invalidCredentials": "Gaan die geloofsbriewe na en probeer weer.",
       "fieldRequired": "{{field}} is verpligtend.",
+      "incompleteMapping": "Koppeling {{number}} het beide 'n gateway-model-slug en 'n ontplooiingsnaam nodig.",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Plak die sleutel",
       "apiKeyRequired": "Voer die sleutel in.",

@@ -387,6 +387,7 @@
       "saveFailed": "Tidak dapat menyimpan kunci.",
       "invalidCredentials": "Semak kelayakan dan cuba lagi.",
       "fieldRequired": "{{field}} diperlukan.",
+      "incompleteMapping": "Pemetaan {{number}} memerlukan kedua-dua slug model gateway dan nama deployment.",
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tampal kunci",
       "apiKeyRequired": "Masukkan kunci.",

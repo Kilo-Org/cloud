@@ -387,6 +387,7 @@
       "saveFailed": "تعذّر حفظ المفتاح.",
       "invalidCredentials": "تحقّق من بيانات الاعتماد وحاول مرة أخرى.",
       "fieldRequired": "الحقل {{field}} مطلوب.",
+      "incompleteMapping": "يتطلب التعيين {{number}} كلاً من المعرّف المختصر لنموذج البوابة واسم النشر.",
       "apiKeyLabel": "مفتاح API",
       "apiKeyPlaceholder": "الصق المفتاح",
       "apiKeyRequired": "أدخل المفتاح.",

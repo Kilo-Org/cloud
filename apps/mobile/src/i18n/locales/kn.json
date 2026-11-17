@@ -387,6 +387,7 @@
       "saveFailed": "ಕೀಯನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "invalidCredentials": "ರುಜುವಾತುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "fieldRequired": "{{field}} ಅಗತ್ಯವಿದೆ.",
+      "incompleteMapping": "ಮ್ಯಾಪಿಂಗ್ {{number}}: ಗೇಟ್‌ವೇ ಮಾಡೆಲ್ ಸ್ಲಗ್ ಮತ್ತು ಡಿಪ್ಲಾಯ್‌ಮೆಂಟ್ ಹೆಸರು ಎರಡೂ ಅಗತ್ಯವಿದೆ.",
       "apiKeyLabel": "API ಕೀ",
       "apiKeyPlaceholder": "ಕೀಯನ್ನು ಪೇಸ್ಟ್ ಮಾಡಿ",
       "apiKeyRequired": "ಕೀಯನ್ನು ನಮೂದಿಸಿ.",

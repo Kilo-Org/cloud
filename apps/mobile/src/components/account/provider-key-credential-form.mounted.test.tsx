@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { credentialForm } from '@/lib/byok/credential-fields';
+import { credentialForm, type ModelMapping } from '@/lib/byok/credential-fields';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { ProviderKeyCredentialForm } from './provider-key-credential-form';
@@ -20,7 +20,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 let renderer: ReactTestRenderer | undefined = undefined;
 const onEdit = vi.fn();
 
-async function mount(providerId: string, mode: 'apiKey' | 'accessKeys') {
+async function mount(
+  providerId: string,
+  mode: 'apiKey' | 'accessKeys',
+  mappings?: { current: Map<number, Partial<ModelMapping>> }
+) {
   const form = credentialForm(providerId, mode);
   if (!form) {
     throw new Error(`no structured form for ${providerId}`);
@@ -37,7 +41,7 @@ async function mount(providerId: string, mode: 'apiKey' | 'accessKeys') {
         },
         disabled: false,
         values: { current: {} },
-        mappings: { current: new Map() },
+        mappings: mappings ?? { current: new Map() },
         errors: {},
       })
     );
@@ -89,6 +93,30 @@ describe('ProviderKeyCredentialForm secret inputs', () => {
     }
 
     expect(onEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('registers each added mapping row in the order it is shown', async () => {
+    const mappings: { current: Map<number, Partial<ModelMapping>> } = { current: new Map() };
+    const root = await mount('azure', 'apiKey', mappings);
+    const addMapping = () => {
+      const [button] = root.findAll(node => Object.is(node.type, 'Button')).slice(-1);
+      if (!button) {
+        throw new Error('missing the add-mapping button');
+      }
+      act(() => {
+        (button.props.onPress as () => void)();
+      });
+    };
+
+    addMapping();
+    addMapping();
+
+    // The draft holds every row on screen, empty or not: a refusal names a row
+    // by the number the form prints, and an untouched row above it still counts.
+    expect([...mappings.current.entries()]).toEqual([
+      [0, {}],
+      [1, {}],
+    ]);
   });
 
   it('masks Azure’s key and never suggests or learns from it', async () => {

@@ -387,6 +387,7 @@
       "saveFailed": "ကီးကို သိမ်းဆည်း၍ မရပါ။",
       "invalidCredentials": "အထောက်အထားများကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
       "fieldRequired": "{{field}} လိုအပ်ပါသည်။",
+      "incompleteMapping": "ချိတ်ဆက်မှု {{number}} တွင် Gateway model slug နှင့် Deployment အမည် နှစ်ခုလုံး လိုအပ်ပါသည်။",
       "apiKeyLabel": "API ကီး",
       "apiKeyPlaceholder": "ကီးကို ကူးထည့်ပါ",
       "apiKeyRequired": "ကီးကို ထည့်ပါ။",

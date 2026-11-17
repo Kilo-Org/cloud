@@ -387,6 +387,7 @@
       "saveFailed": "No s'ha pogut desar la clau.",
       "invalidCredentials": "Comprova les credencials i torna-ho a provar.",
       "fieldRequired": "El camp {{field}} és obligatori.",
+      "incompleteMapping": "L'assignació {{number}} necessita tant un slug del model de la passarel·la com un nom del desplegament.",
       "apiKeyLabel": "Clau d'API",
       "apiKeyPlaceholder": "Enganxa la clau",
       "apiKeyRequired": "Introdueix la clau.",

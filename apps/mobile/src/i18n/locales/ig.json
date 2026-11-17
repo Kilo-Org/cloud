@@ -387,6 +387,7 @@
       "saveFailed": "Enweghị ike ichekwa igodo ahụ.",
       "invalidCredentials": "Lelee ozi nbanye ahụ wee nwaa ọzọ.",
       "fieldRequired": "A chọrọ {{field}}.",
+      "incompleteMapping": "Njikọ {{number}} chọrọ ma gateway model slug ma aha deployment.",
       "apiKeyLabel": "Igodo API",
       "apiKeyPlaceholder": "Mado igodo ahụ",
       "apiKeyRequired": "Tinye igodo ahụ.",

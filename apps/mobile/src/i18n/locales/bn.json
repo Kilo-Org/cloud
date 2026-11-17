@@ -387,6 +387,7 @@
       "saveFailed": "কী-টি সংরক্ষণ করা যায়নি।",
       "invalidCredentials": "ক্রেডেনশিয়াল যাচাই করে আবার চেষ্টা করুন।",
       "fieldRequired": "{{field}} প্রয়োজন।",
+      "incompleteMapping": "ম্যাপিং {{number}}-এ গেটওয়ে মডেল স্লাগ এবং ডিপ্লয়মেন্টের নাম দুটোই প্রয়োজন।",
       "apiKeyLabel": "API কী",
       "apiKeyPlaceholder": "কী-টি পেস্ট করুন",
       "apiKeyRequired": "কী-টি দিন।",

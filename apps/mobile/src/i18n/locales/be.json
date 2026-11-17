@@ -387,6 +387,7 @@
       "saveFailed": "Не ўдалося захаваць ключ.",
       "invalidCredentials": "Праверце ўліковыя даныя і паспрабуйце зноў.",
       "fieldRequired": "Поле «{{field}}» абавязковае.",
+      "incompleteMapping": "Супастаўленне {{number}} патрабуе і slug мадэлі шлюза, і назву разгортвання.",
       "apiKeyLabel": "Ключ API",
       "apiKeyPlaceholder": "Устаўце ключ",
       "apiKeyRequired": "Увядзіце ключ.",

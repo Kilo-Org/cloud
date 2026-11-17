@@ -387,6 +387,7 @@
       "saveFailed": "Tsy voatahiry ny lakile.",
       "invalidCredentials": "Hamarino ny mari-panamarinana ary andramo indray.",
       "fieldRequired": "Ilaina ny {{field}}.",
+      "incompleteMapping": "Tsy maintsy misy gateway model slug sy anaran'ny deployment ny Fampifandraisana {{number}}.",
       "apiKeyLabel": "Lakile API",
       "apiKeyPlaceholder": "Apetaho ny lakile",
       "apiKeyRequired": "Ampidiro ny lakile.",

@@ -387,6 +387,7 @@
       "saveFailed": "無法儲存金鑰。",
       "invalidCredentials": "請檢查憑證後再試一次。",
       "fieldRequired": "{{field}} 為必填。",
+      "incompleteMapping": "對應 {{number}} 需同時填寫閘道模型 slug 和部署名稱。",
       "apiKeyLabel": "API 金鑰",
       "apiKeyPlaceholder": "貼上金鑰",
       "apiKeyRequired": "請輸入金鑰。",

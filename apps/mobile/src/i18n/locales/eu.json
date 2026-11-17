@@ -387,6 +387,7 @@
       "saveFailed": "Ezin izan da gakoa gorde.",
       "invalidCredentials": "Egiaztatu kredentzialak eta saiatu berriro.",
       "fieldRequired": "{{field}} derrigorrezkoa da.",
+      "incompleteMapping": "{{number}}. esleipenak bai atebideko ereduaren slug-a bai inplementazio-izena behar ditu.",
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
       "apiKeyRequired": "Idatzi gakoa.",

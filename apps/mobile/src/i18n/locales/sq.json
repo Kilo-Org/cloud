@@ -387,6 +387,7 @@
       "saveFailed": "Çelësi nuk u ruajt dot.",
       "invalidCredentials": "Kontrollo kredencialet dhe provo përsëri.",
       "fieldRequired": "Fusha {{field}} është e detyrueshme.",
+      "incompleteMapping": "Hartëzimi {{number}} duhet të ketë edhe slug-un e modelit të gateway-t, edhe emrin e deployment-it.",
       "apiKeyLabel": "Çelësi API",
       "apiKeyPlaceholder": "Ngjit çelësin",
       "apiKeyRequired": "Fut çelësin.",

@@ -387,6 +387,7 @@
       "saveFailed": "Δεν ήταν δυνατή η αποθήκευση του κλειδιού.",
       "invalidCredentials": "Έλεγξε τα διαπιστευτήρια και δοκίμασε ξανά.",
       "fieldRequired": "Το πεδίο «{{field}}» είναι υποχρεωτικό.",
+      "incompleteMapping": "Η αντιστοίχιση {{number}} χρειάζεται και slug μοντέλου gateway και όνομα deployment.",
       "apiKeyLabel": "Κλειδί API",
       "apiKeyPlaceholder": "Επικόλλησε το κλειδί",
       "apiKeyRequired": "Εισήγαγε το κλειδί.",

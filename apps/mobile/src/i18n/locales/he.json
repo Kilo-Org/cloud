@@ -387,6 +387,7 @@
       "saveFailed": "לא ניתן לשמור את המפתח.",
       "invalidCredentials": "יש לבדוק את פרטי הגישה ולנסות שוב.",
       "fieldRequired": "יש למלא את השדה {{field}}.",
+      "incompleteMapping": "במיפוי {{number}} יש למלא גם slug של מודל gateway וגם שם פריסה.",
       "apiKeyLabel": "מפתח API",
       "apiKeyPlaceholder": "הדבק את המפתח",
       "apiKeyRequired": "יש להזין את המפתח.",

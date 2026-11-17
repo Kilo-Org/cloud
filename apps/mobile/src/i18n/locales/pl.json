@@ -387,6 +387,7 @@
       "saveFailed": "Nie udało się zapisać klucza.",
       "invalidCredentials": "Sprawdź dane uwierzytelniające i spróbuj ponownie.",
       "fieldRequired": "Pole {{field}} jest wymagane.",
+      "incompleteMapping": "Mapowanie {{number}} wymaga podania zarówno slugu modelu w bramie, jak i nazwy wdrożenia.",
       "apiKeyLabel": "Klucz API",
       "apiKeyPlaceholder": "Wklej klucz",
       "apiKeyRequired": "Wpisz klucz.",

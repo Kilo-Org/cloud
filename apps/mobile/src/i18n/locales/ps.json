@@ -387,6 +387,7 @@
       "saveFailed": "کیلي خوندي نه شوه.",
       "invalidCredentials": "اعتبارنامې وګورئ او بیا هڅه وکړئ.",
       "fieldRequired": "{{field}} اړین دی.",
+      "incompleteMapping": "نښلونه {{number}} د gateway ماډل slug او د deployment نوم دواړو ته اړتیا لري.",
       "apiKeyLabel": "API کیلي",
       "apiKeyPlaceholder": "کیلي پیسټ کړئ",
       "apiKeyRequired": "کیلي ولیکئ.",

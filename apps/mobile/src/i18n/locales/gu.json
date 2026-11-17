@@ -387,6 +387,7 @@
       "saveFailed": "કી સાચવી શકાઈ નથી.",
       "invalidCredentials": "ઓળખપત્રો તપાસો અને ફરી પ્રયાસ કરો.",
       "fieldRequired": "{{field}} જરૂરી છે.",
+      "incompleteMapping": "મેપિંગ {{number}} માટે ગેટવે મોડેલ સ્લગ અને ડિપ્લોયમેન્ટ નામ બંને જરૂરી છે.",
       "apiKeyLabel": "API કી",
       "apiKeyPlaceholder": "કી પેસ્ટ કરો",
       "apiKeyRequired": "કી દાખલ કરો.",

@@ -6,6 +6,8 @@ import {
   credentialProblem,
   type CredentialValues,
   firstMissingField,
+  type ModelMapping,
+  readStructuredCredential,
 } from './credential-fields';
 
 describe('credentialForm', () => {
@@ -140,6 +142,53 @@ describe('credentialPayload', () => {
       location: 'global',
       googleCredentials: { clientEmail: 'service@example.test', privateKey: 'pem' },
     });
+  });
+});
+
+describe('readStructuredCredential', () => {
+  const form = credentialForm('azure', 'apiKey');
+
+  function readAzure(rows: readonly Partial<ModelMapping>[]) {
+    if (!form) {
+      throw new Error('missing the Azure form');
+    }
+    return readStructuredCredential({
+      providerId: 'azure',
+      mode: 'apiKey',
+      form,
+      values: { apiKey: 'k', resourceName: 'r' },
+      rows,
+    });
+  }
+
+  it('names the row a half-filled mapping sits in', () => {
+    expect(readAzure([{ gatewayModelSlug: 'gpt-4' }])).toEqual({
+      tag: 'incomplete-mapping',
+      mapping: 1,
+    });
+    expect(
+      readAzure([{ gatewayModelSlug: 'gpt-4', customModelId: 'gpt-4' }, { customModelId: 'x' }])
+    ).toEqual({ tag: 'incomplete-mapping', mapping: 2 });
+  });
+
+  it('asks nothing of a row with neither side filled', () => {
+    expect(readAzure([{}, { gatewayModelSlug: ' ', customModelId: '' }])).toEqual({
+      tag: 'ready',
+      credential: JSON.stringify({ apiKey: 'k', resourceName: 'r' }),
+    });
+  });
+
+  it('keeps the complete mappings and drops the empty rows', () => {
+    expect(readAzure([{}, { gatewayModelSlug: ' gpt-4 ', customModelId: ' gpt-4o ' }, {}])).toEqual(
+      {
+        tag: 'ready',
+        credential: JSON.stringify({
+          apiKey: 'k',
+          resourceName: 'r',
+          modelMappings: [{ gatewayModelSlug: 'gpt-4', customModelId: 'gpt-4o' }],
+        }),
+      }
+    );
   });
 });
 

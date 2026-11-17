@@ -454,6 +454,7 @@
       "saveFailed": "Could not save the key.",
       "invalidCredentials": "Check the credentials and try again.",
       "fieldRequired": "{{field}} is required.",
+      "incompleteMapping": "Mapping {{number}} needs both a gateway model slug and a deployment name.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "Paste the key",
       "apiKeyRequired": "Enter the key.",

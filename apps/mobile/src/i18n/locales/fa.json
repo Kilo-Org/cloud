@@ -387,6 +387,7 @@
       "saveFailed": "ذخیره کلید ممکن نشد.",
       "invalidCredentials": "اطلاعات اعتبارسنجی را بررسی کنید و دوباره تلاش کنید.",
       "fieldRequired": "{{field}} الزامی است.",
+      "incompleteMapping": "نگاشت {{number}} به هر دو مورد شناسه مدل درگاه و نام استقرار نیاز دارد.",
       "apiKeyLabel": "کلید API",
       "apiKeyPlaceholder": "کلید را جای‌گذاری کنید",
       "apiKeyRequired": "کلید را وارد کنید.",

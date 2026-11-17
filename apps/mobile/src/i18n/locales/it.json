@@ -387,6 +387,7 @@
       "saveFailed": "Impossibile salvare la chiave.",
       "invalidCredentials": "Controlla le credenziali e riprova.",
       "fieldRequired": "Il campo {{field}} è obbligatorio.",
+      "incompleteMapping": "La mappatura {{number}} richiede sia uno slug del modello del gateway sia un nome del deployment.",
       "apiKeyLabel": "Chiave API",
       "apiKeyPlaceholder": "Incolla la chiave",
       "apiKeyRequired": "Inserisci la chiave.",

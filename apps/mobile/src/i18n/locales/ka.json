@@ -387,6 +387,7 @@
       "saveFailed": "გასაღების შენახვა ვერ მოხერხდა.",
       "invalidCredentials": "შეამოწმეთ ავტორიზაციის მონაცემები და სცადეთ ხელახლა.",
       "fieldRequired": "{{field}} სავალდებულოა.",
+      "incompleteMapping": "შესაბამისობა {{number}} საჭიროებს როგორც Gateway-ის მოდელის slug-ს, ისე deployment-ის სახელს.",
       "apiKeyLabel": "API გასაღები",
       "apiKeyPlaceholder": "ჩასვით გასაღები",
       "apiKeyRequired": "შეიყვანეთ გასაღები.",

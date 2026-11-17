@@ -387,6 +387,7 @@
       "saveFailed": "Čuvanje ključa nije uspelo.",
       "invalidCredentials": "Proveri akreditive i pokušaj ponovo.",
       "fieldRequired": "Polje {{field}} je obavezno.",
+      "incompleteMapping": "Mapiranje {{number}} mora imati i slug gateway modela i naziv deploymenta.",
       "apiKeyLabel": "API ključ",
       "apiKeyPlaceholder": "Nalepi ključ",
       "apiKeyRequired": "Unesi ključ.",

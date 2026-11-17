@@ -387,6 +387,7 @@
       "saveFailed": "Avaimen tallentaminen epäonnistui.",
       "invalidCredentials": "Tarkista tunnistetiedot ja yritä uudelleen.",
       "fieldRequired": "{{field}} on pakollinen.",
+      "incompleteMapping": "Vastaavuus {{number}} tarvitsee sekä yhdyskäytävän mallin tunnisteen että käyttöönoton nimen.",
       "apiKeyLabel": "API-avain",
       "apiKeyPlaceholder": "Liitä avain",
       "apiKeyRequired": "Anna avain.",

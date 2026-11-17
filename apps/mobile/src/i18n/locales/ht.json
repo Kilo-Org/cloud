@@ -387,6 +387,7 @@
       "saveFailed": "Nou pa t ka anrejistre kle a.",
       "invalidCredentials": "Verifye idantifyan yo epi eseye ankò.",
       "fieldRequired": "{{field}} obligatwa.",
+      "incompleteMapping": "Korespondans {{number}} bezwen yon slug modèl gateway ak yon non deplwaman.",
       "apiKeyLabel": "Kle API",
       "apiKeyPlaceholder": "Kole kle a",
       "apiKeyRequired": "Antre kle a.",

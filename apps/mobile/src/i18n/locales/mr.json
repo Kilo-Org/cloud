@@ -387,6 +387,7 @@
       "saveFailed": "की जतन करता आली नाही.",
       "invalidCredentials": "क्रेडेन्शियल्स तपासा आणि पुन्हा प्रयत्न करा.",
       "fieldRequired": "{{field}} आवश्यक आहे.",
+      "incompleteMapping": "मॅपिंग {{number}} साठी गेटवे मॉडेल स्लग आणि डिप्लॉयमेंट नाव दोन्ही आवश्यक आहेत.",
       "apiKeyLabel": "API की",
       "apiKeyPlaceholder": "की पेस्ट करा",
       "apiKeyRequired": "की प्रविष्ट करा.",

@@ -387,6 +387,7 @@
       "saveFailed": "Түлхүүрийг хадгалж чадсангүй.",
       "invalidCredentials": "Нэвтрэх мэдээллээ шалгаад дахин оролдоно уу.",
       "fieldRequired": "{{field}} шаардлагатай.",
+      "incompleteMapping": "Харгалзуулалт {{number}}: Gateway загварын slug болон Deployment нэр хоёулаа шаардлагатай.",
       "apiKeyLabel": "API түлхүүр",
       "apiKeyPlaceholder": "Түлхүүрийг буулгана уу",
       "apiKeyRequired": "Түлхүүрийг оруулна уу.",

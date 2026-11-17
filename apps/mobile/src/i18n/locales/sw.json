@@ -387,6 +387,7 @@
       "saveFailed": "Imeshindwa kuhifadhi ufunguo.",
       "invalidCredentials": "Kagua vitambulisho kisha ujaribu tena.",
       "fieldRequired": "{{field}} inahitajika.",
+      "incompleteMapping": "Ulinganishaji {{number}} unahitaji slug ya modeli ya gateway na jina la deployment.",
       "apiKeyLabel": "Ufunguo wa API",
       "apiKeyPlaceholder": "Bandika ufunguo",
       "apiKeyRequired": "Weka ufunguo.",

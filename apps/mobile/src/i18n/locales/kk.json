@@ -387,6 +387,7 @@
       "saveFailed": "Кілтті сақтау мүмкін болмады.",
       "invalidCredentials": "Тіркелгі деректерін тексеріп, қайталап көріңіз.",
       "fieldRequired": "{{field}} өрісі міндетті.",
+      "incompleteMapping": "{{number}}-сәйкестікте шлюз моделінің slug мәні де, deployment атауы да көрсетілуі керек.",
       "apiKeyLabel": "API кілті",
       "apiKeyPlaceholder": "Кілтті қойыңыз",
       "apiKeyRequired": "Кілтті енгізіңіз.",

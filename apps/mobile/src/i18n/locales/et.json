@@ -387,6 +387,7 @@
       "saveFailed": "Võtme salvestamine ebaõnnestus.",
       "invalidCredentials": "Kontrolli mandaate ja proovi uuesti.",
       "fieldRequired": "{{field}} on kohustuslik.",
+      "incompleteMapping": "Vastendus {{number}} vajab nii lüüsi mudeli slugi kui ka juurutuse nime.",
       "apiKeyLabel": "API-võti",
       "apiKeyPlaceholder": "Kleebi võti",
       "apiKeyRequired": "Sisesta võti.",

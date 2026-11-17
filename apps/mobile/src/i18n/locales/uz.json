@@ -387,6 +387,7 @@
       "saveFailed": "Kalitni saqlab bo'lmadi.",
       "invalidCredentials": "Hisob ma'lumotlarini tekshirib, qaytadan urinib ko'ring.",
       "fieldRequired": "{{field}} kiritilishi shart.",
+      "incompleteMapping": "Moslashuv {{number}} uchun gateway modeli slugi ham, deployment nomi ham kiritilishi shart.",
       "apiKeyLabel": "API kaliti",
       "apiKeyPlaceholder": "Kalitni joylang",
       "apiKeyRequired": "Kalitni kiriting.",

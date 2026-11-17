@@ -387,6 +387,7 @@
       "saveFailed": "Ba a iya adana maɓallin ba.",
       "invalidCredentials": "Duba takardun shaidar sannan ka sake gwadawa.",
       "fieldRequired": "Ana buƙatar {{field}}.",
+      "incompleteMapping": "Taswira {{number}} tana buƙatar duka slug na samfurin gateway da sunan deployment.",
       "apiKeyLabel": "Maɓallin API",
       "apiKeyPlaceholder": "Liƙa maɓallin",
       "apiKeyRequired": "Shigar da maɓallin.",

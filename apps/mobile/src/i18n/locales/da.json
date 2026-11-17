@@ -387,6 +387,7 @@
       "saveFailed": "Nøglen kunne ikke gemmes.",
       "invalidCredentials": "Kontrollér legitimationsoplysningerne, og prøv igen.",
       "fieldRequired": "{{field}} er påkrævet.",
+      "incompleteMapping": "Tilknytning {{number}} kræver både et slug for gateway-model og et deployment-navn.",
       "apiKeyLabel": "API-nøgle",
       "apiKeyPlaceholder": "Indsæt nøglen",
       "apiKeyRequired": "Angiv nøglen.",

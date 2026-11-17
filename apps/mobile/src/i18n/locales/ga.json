@@ -387,6 +387,7 @@
       "saveFailed": "Níorbh fhéidir an eochair a shábháil.",
       "invalidCredentials": "Seiceáil na dintiúir agus bain triail eile as.",
       "fieldRequired": "Tá {{field}} riachtanach.",
+      "incompleteMapping": "Ní mór slug samhla an gheata agus ainm imscartha araon a bheith ag Mapáil {{number}}.",
       "apiKeyLabel": "Eochair API",
       "apiKeyPlaceholder": "Greamaigh an eochair",
       "apiKeyRequired": "Cuir isteach an eochair.",

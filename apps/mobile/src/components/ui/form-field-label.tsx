@@ -39,8 +39,13 @@ export function FormFieldLabel({
   return (
     <View
       className={cn(
-        'flex-row items-center gap-2',
-        accessoryIsTarget && LABELLED_LINE_MIN_HEIGHT_CLASS
+        // A target-sized accessory makes the row taller than the copy, so the
+        // copy aligns to the top: centring it would put half of the added
+        // height above the label, where it reads as a hole under the card's
+        // edge instead of the gap the accessory needs.
+        accessoryIsTarget
+          ? cn('flex-row items-start gap-2', LABELLED_LINE_MIN_HEIGHT_CLASS)
+          : 'flex-row items-center gap-2'
       )}
     >
       <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{label}</Text>

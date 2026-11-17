@@ -229,3 +229,45 @@ describe('FormField direction-aware content alignment', () => {
     expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
   });
 });
+
+describe('FormField label row with a target-sized accessory', () => {
+  function mountLabelRow(props: { labelAccessoryIsTarget?: boolean }) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('login.emailAddress'),
+          labelAccessory: createElement('Controls'),
+          ...props,
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const labelRow = renderer.root
+      .findAllByType('View')
+      .find(node => String(node.props.className).includes('flex-row'));
+    if (labelRow === undefined) {
+      throw new Error('the label row was not rendered');
+    }
+    return labelRow;
+  }
+
+  it('aligns the copy to the top so the target height falls below the label', () => {
+    // A centred copy would put half of the accessory's extra height above the
+    // label, where it reads as a hole under the card's own top padding: the
+    // row has to give the height to the gap between the label and the field.
+    const classes = String(mountLabelRow({ labelAccessoryIsTarget: true }).props.className);
+
+    expect(classes).toContain('items-start');
+    expect(classes).toContain('min-h-[44px]');
+    expect(classes).not.toContain('items-center');
+  });
+
+  it('keeps the plain one-line label row for an accessory that is not a target', () => {
+    const classes = String(mountLabelRow({}).props.className);
+
+    expect(classes).toContain('items-center');
+    expect(classes).not.toContain('min-h-[44px]');
+  });
+});

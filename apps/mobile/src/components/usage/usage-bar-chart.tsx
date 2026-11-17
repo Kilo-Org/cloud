@@ -2,6 +2,7 @@ import Svg, { Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatCalendarDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,12 +40,7 @@ export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarC
 
   return (
     <View className="gap-2">
-      <View
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={accessibilityLabel}
-        className="rounded-lg bg-secondary p-3"
-      >
+      <Card accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
         <Svg
           width="100%"
           height={PLOT_HEIGHT}
@@ -73,16 +69,12 @@ export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarC
           })}
           <Rect x={0} y={99.6} width={100} height={0.4} fill={colors.ringTrack} />
         </Svg>
-      </View>
+      </Card>
       {first != null && (
         <View className="flex-row justify-between">
-          <Text className="text-xs text-muted-foreground">
-            {formatCalendarDate(first, i18n.language)}
-          </Text>
+          <Text variant="caption">{formatCalendarDate(first, i18n.language)}</Text>
           {last != null && last !== first && (
-            <Text className="text-xs text-muted-foreground">
-              {formatCalendarDate(last, i18n.language)}
-            </Text>
+            <Text variant="caption">{formatCalendarDate(last, i18n.language)}</Text>
           )}
         </View>
       )}

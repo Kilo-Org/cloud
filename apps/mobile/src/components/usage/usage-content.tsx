@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { Card } from '@/components/ui/card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -48,15 +49,15 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
-      <Text className="text-lg font-bold text-foreground">{value}</Text>
+    <Card className="flex-1">
+      <Text variant="figure">{value}</Text>
       {subtext !== undefined && (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" numberOfLines={1}>
           {subtext}
         </Text>
       )}
-      <Text className="text-xs text-muted-foreground">{label}</Text>
-    </View>
+      <Text variant="caption">{label}</Text>
+    </Card>
   );
 }
 
@@ -108,7 +109,7 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           accessibilityLabel={t('usage.rangePicker')}
         />
         {scope.kind === 'organization' && !scope.orgWide && (
-          <Text className="text-xs text-muted-foreground">{t('usage.orgSelfNotice')}</Text>
+          <Text variant="caption">{t('usage.orgSelfNotice')}</Text>
         )}
       </View>
 
@@ -129,15 +130,29 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1 gap-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
+              <Card className="flex-1 gap-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1 gap-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
+              <Card className="flex-1 gap-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
           </View>
-          <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />
+          <Card>
+            <Skeleton className="h-32 w-full rounded-lg" />
+          </Card>
         </View>
       )}
 

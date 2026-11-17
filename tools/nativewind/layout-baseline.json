@@ -378,11 +378,6 @@
   "apps/mobile/src/components/tour/tour-screen.tsx": { "L2": 1, "L4": 2, "L6": 1 },
   "apps/mobile/src/components/tour/tour-step-header.tsx": { "L4": 1 },
   "apps/mobile/src/components/trusted-hosts-screen.tsx": { "L3": 2, "L4": 2 },
-  "apps/mobile/src/components/usage/organization-usage-screen.tsx": { "L2": 1 },
-  "apps/mobile/src/components/usage/personal-usage-screen.tsx": { "L2": 1 },
-  "apps/mobile/src/components/usage/usage-bar-chart.tsx": { "L4": 1 },
-  "apps/mobile/src/components/usage/usage-breakdown-list.tsx": { "L3": 2, "L4": 1 },
-  "apps/mobile/src/components/usage/usage-content.tsx": { "L4": 1, "L8": 5 },
   "apps/mobile/src/components/voice-input-settings-screen.tsx": { "L4": 2 },
   "apps/mobile/src/components/voice-test-field.tsx": { "L4": 1, "L8": 2 }
 }

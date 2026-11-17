@@ -3464,9 +3464,7 @@
       "guardrails": "سنوورە پارێزەرەکان",
       "byok": "کلیلی خۆت بەکاربهێنە",
       "auditLogs": "تۆمارەکانی وردبینی",
-      "requestLogs": "تۆمارەکانی داواکاری",
-      "subOrganizations": "ژێرڕێکخراوەکان",
-      "distributeFunds": "دابەشکردنی پارە"
+      "requestLogs": "تۆمارەکانی داواکاری"
     },
     "usageStats": {
       "inputTokens": "تۆکنەکانی تێدراو",

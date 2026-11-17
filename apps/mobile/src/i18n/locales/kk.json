@@ -3464,9 +3464,7 @@
       "guardrails": "Қорғаныс шектеулері",
       "byok": "Өз кілтіңізді пайдалану",
       "auditLogs": "Аудит журналдары",
-      "requestLogs": "Сұраныс журналдары",
-      "subOrganizations": "Еншілес ұйымдар",
-      "distributeFunds": "Қаражатты бөлу"
+      "requestLogs": "Сұраныс журналдары"
     },
     "usageStats": {
       "inputTokens": "Кіріс токендері",

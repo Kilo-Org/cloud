@@ -3464,9 +3464,7 @@
       "guardrails": "ଗାର୍ଡରେଲ୍",
       "byok": "ନିଜର କି ଆଣନ୍ତୁ",
       "auditLogs": "ଅଡିଟ୍ ଲଗ୍",
-      "requestLogs": "ଅନୁରୋଧ ଲଗ୍",
-      "subOrganizations": "ଉପ-ସଂଗଠନ",
-      "distributeFunds": "ପାଣ୍ଠି ବଣ୍ଟନ କରନ୍ତୁ"
+      "requestLogs": "ଅନୁରୋଧ ଲଗ୍"
     },
     "usageStats": {
       "inputTokens": "ଇନପୁଟ୍ ଟୋକନ୍",

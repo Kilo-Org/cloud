@@ -3521,9 +3521,7 @@
       "guardrails": "Zaštitna ograničenja",
       "byok": "Vlastiti ključ",
       "auditLogs": "Revizijski zapisnici",
-      "requestLogs": "Zapisnici zahtjeva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodjela sredstava"
+      "requestLogs": "Zapisnici zahtjeva"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

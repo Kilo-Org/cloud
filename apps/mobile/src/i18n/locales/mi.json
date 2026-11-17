@@ -3464,9 +3464,7 @@
       "guardrails": "Ngā taiapa haumaru",
       "byok": "Kawea mai tō ake kī",
       "auditLogs": "Ngā pūkete arotake",
-      "requestLogs": "Ngā pūkete tono",
-      "subOrganizations": "Ngā rōpū iti",
-      "distributeFunds": "Tohaina ngā pūtea"
+      "requestLogs": "Ngā pūkete tono"
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",

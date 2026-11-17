@@ -3464,9 +3464,7 @@
       "guardrails": "Babes-mugak",
       "byok": "Erabili zure gakoa",
       "auditLogs": "Ikuskaritza-erregistroak",
-      "requestLogs": "Eskaeren erregistroak",
-      "subOrganizations": "Azpierakundeak",
-      "distributeFunds": "Banatu funtsak"
+      "requestLogs": "Eskaeren erregistroak"
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",

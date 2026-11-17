@@ -3464,9 +3464,7 @@
       "guardrails": "Izivikelo",
       "byok": "Sebenzisa ukhiye wakho",
       "auditLogs": "Amarekhodi okucwaninga",
-      "requestLogs": "Amarekhodi ezicelo",
-      "subOrganizations": "Izinhlangano ezingaphansi",
-      "distributeFunds": "Yaba izimali"
+      "requestLogs": "Amarekhodi ezicelo"
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",

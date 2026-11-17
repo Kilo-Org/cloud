@@ -3469,9 +3469,7 @@
       "guardrails": "Koruma kuralları",
       "byok": "Kendi anahtarınızı kullanın",
       "auditLogs": "Denetim günlükleri",
-      "requestLogs": "İstek günlükleri",
-      "subOrganizations": "Alt kuruluşlar",
-      "distributeFunds": "Fonları dağıt"
+      "requestLogs": "İstek günlükleri"
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

@@ -3464,9 +3464,7 @@
       "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
       "auditLogs": "Diiwaannada hubinta",
-      "requestLogs": "Diiwaannada codsiyada",
-      "subOrganizations": "Ururrada hoose",
-      "distributeFunds": "Qaybi lacagta"
+      "requestLogs": "Diiwaannada codsiyada"
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

@@ -3578,9 +3578,7 @@
       "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
       "auditLogs": "Revizijski dnevniki",
-      "requestLogs": "Dnevniki zahtev",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Razdeli sredstva"
+      "requestLogs": "Dnevniki zahtev"
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

@@ -6,7 +6,6 @@ import {
 import { type Href } from 'expo-router';
 
 import {
-  Building2,
   Cpu,
   FileText,
   KeyRound,
@@ -16,7 +15,6 @@ import {
   Shield,
   SlidersHorizontal,
   Users,
-  Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
 import { providerKeysHref } from '@/lib/byok/provider-key-scope';
@@ -33,12 +31,9 @@ import { WEB_BASE_URL } from '@/lib/config';
  * each web page applies to itself, so a member never sees a row that would
  * bounce them off the page it opened:
  *
- * - the sidebar hides Model Access, Request logs, Invoices, Sub-organizations
- *   and BYOK from a role without billing authority
- *   (`canManageOrganizationBilling`);
+ * - the sidebar hides Model Access, Request logs, Invoices and BYOK from a
+ *   role without billing authority (`canManageOrganizationBilling`);
  * - the sidebar hides Model Access and Groups below the enterprise plan;
- * - `sub-organizations` and `distribute-funds` additionally redirect for a
- *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
  * - `providers-and-models` and `byok` render for every member, and
@@ -49,27 +44,26 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   the organization dashboard rather than pages of their own, and the
  *   dashboard links to the seats purchase, so the hub lists none of them.
  *
- * Usage, the audit log, custom modes, groups and BYOK are the areas the app
- * reads and writes itself, so their rows open the app's own screens instead of
- * a page. Usage is visible to every member, as on the web sidebar; the audit
- * log's gate is the one its procedure applies (billing role and the enterprise
- * plan); groups the enterprise plan it is sold with; custom modes no gate,
- * which is the gate its page has; and BYOK opens the app's own provider-keys
- * screen with the organization's scope, behind the web sidebar's billing-role
- * gate.
+ * Usage, the audit log, request logs, custom modes, groups and BYOK are the
+ * areas the app reads and writes itself, so their rows open the app's own
+ * screens instead of a page. Usage is visible to every member, as on the web
+ * sidebar; the audit log's gate is the one its procedure applies (billing role
+ * and the enterprise plan); groups take the enterprise plan they are sold
+ * with; request logs and BYOK take the sidebar's billing-role gate, which their
+ * procedures apply too; custom modes take no gate, which is the gate their page
+ * has. BYOK additionally opens the app's own provider-keys screen with the
+ * organization's scope.
+ *
+ * Two web destinations the sidebar lists have no row here at all:
+ * `sub-organizations` and its `distribute-funds` section are a parent-only
+ * administration area this app does not reimplement, so the hub names neither
+ * and links nowhere for them.
  */
-type OrgSettingsArea =
-  | 'providersAndModels'
-  | 'guardrails'
-  | 'requestLogs'
-  | 'subOrganizations'
-  | 'distributeFunds';
+type OrgSettingsArea = 'providersAndModels' | 'guardrails';
 
 export type OrgSettingsGate = Readonly<{
   role: OrganizationRole | undefined;
   plan: 'teams' | 'enterprise';
-  /** The organization has no parent: `parent_organization_id === null`. */
-  isTopLevel: boolean;
   /** The organization's Kilo Encrypt setting, which decides whether guardrails exist. */
   guardrailsEnabled: boolean;
 }>;
@@ -124,42 +118,11 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/guardrails',
     visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled,
   },
-  // The SSO card, the email preferences card and the data collection card live
-  // on the organization dashboard itself, and that page links to the seats
-  // purchase. The hub does not list a row that lands there: no suffix means a
-  // dashboard card, and the dashboard is never a settings destination here.
-  // "Request Logs": billing role.
-  {
-    area: 'requestLogs',
-    icon: FileText,
-    suffix: '/request-logs',
-    visible: gate => canManageOrganizationBilling(gate.role),
-  },
-  // "Integrations": no gate in the sidebar or on the page. The hub opens the
-  // app's own integrations screen from its members card, so no web row lists it.
-  // "Sub-organizations": billing role and a top-level organization.
-  {
-    area: 'subOrganizations',
-    icon: Building2,
-    suffix: '/sub-organizations',
-    visible: gate => canManageOrganizationBilling(gate.role) && gate.isTopLevel,
-  },
-  // Distribute funds is a sub-organizations section, so it carries that
-  // section's gate rather than a page of its own.
-  {
-    area: 'distributeFunds',
-    icon: Wallet,
-    suffix: '/sub-organizations/distribute-funds',
-    visible: gate => canManageOrganizationBilling(gate.role) && gate.isTopLevel,
-  },
 ];
 
 const TITLE_KEYS = {
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   guardrails: 'organization.settingsOnWeb.guardrails',
-  requestLogs: 'organization.settingsOnWeb.requestLogs',
-  subOrganizations: 'organization.settingsOnWeb.subOrganizations',
-  distributeFunds: 'organization.settingsOnWeb.distributeFunds',
 } satisfies Record<OrgSettingsArea, string>;
 
 /**

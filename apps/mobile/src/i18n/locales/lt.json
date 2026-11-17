@@ -3578,9 +3578,7 @@
       "guardrails": "Apsaugos ribos",
       "byok": "Naudoti savo raktą",
       "auditLogs": "Audito žurnalai",
-      "requestLogs": "Užklausų žurnalai",
-      "subOrganizations": "Antrinės organizacijos",
-      "distributeFunds": "Paskirstyti lėšas"
+      "requestLogs": "Užklausų žurnalai"
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",

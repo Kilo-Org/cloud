@@ -3464,9 +3464,7 @@
       "guardrails": "Daangaa eegumsaa",
       "byok": "Furtuu mataa keetii fayyadami",
       "auditLogs": "Galmeewwan odiitii",
-      "requestLogs": "Galmeewwan gaaffii",
-      "subOrganizations": "Dhaabbilee jalaa",
-      "distributeFunds": "Maallaqa qoodi"
+      "requestLogs": "Galmeewwan gaaffii"
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",

@@ -3521,9 +3521,7 @@
       "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
       "auditLogs": "Jurnale de audit",
-      "requestLogs": "Jurnale de cereri",
-      "subOrganizations": "Suborganizații",
-      "distributeFunds": "Distribuie fonduri"
+      "requestLogs": "Jurnale de cereri"
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",

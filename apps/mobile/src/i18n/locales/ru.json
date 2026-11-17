@@ -3583,9 +3583,7 @@
       "guardrails": "Ограничения",
       "byok": "Собственный ключ",
       "auditLogs": "Журналы аудита",
-      "requestLogs": "Журналы запросов",
-      "subOrganizations": "Дочерние организации",
-      "distributeFunds": "Распределение средств"
+      "requestLogs": "Журналы запросов"
     },
     "usageStats": {
       "inputTokens": "Входные токены",

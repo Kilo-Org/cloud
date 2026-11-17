@@ -3464,9 +3464,7 @@
       "guardrails": "Sikkerhetsrammer",
       "byok": "Bruk din egen nøkkel",
       "auditLogs": "Revisjonslogger",
-      "requestLogs": "Forespørselslogger",
-      "subOrganizations": "Underorganisasjoner",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Forespørselslogger"
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",

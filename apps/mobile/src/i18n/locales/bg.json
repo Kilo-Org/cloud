@@ -3464,9 +3464,7 @@
       "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
       "auditLogs": "Одитни журнали",
-      "requestLogs": "Журнали на заявките",
-      "subOrganizations": "Подорганизации",
-      "distributeFunds": "Разпредели средства"
+      "requestLogs": "Журнали на заявките"
     },
     "usageStats": {
       "inputTokens": "Входни токени",

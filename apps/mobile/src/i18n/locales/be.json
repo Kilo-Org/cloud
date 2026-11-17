@@ -3578,9 +3578,7 @@
       "guardrails": "Абмежаванні бяспекі",
       "byok": "Уласны ключ",
       "auditLogs": "Журналы аўдыту",
-      "requestLogs": "Журналы запытаў",
-      "subOrganizations": "Падарганізацыі",
-      "distributeFunds": "Размеркаваць сродкі"
+      "requestLogs": "Журналы запытаў"
     },
     "usageStats": {
       "inputTokens": "Уваходныя токены",

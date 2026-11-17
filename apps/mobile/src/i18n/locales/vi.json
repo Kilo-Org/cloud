@@ -3469,9 +3469,7 @@
       "guardrails": "Rào chắn an toàn",
       "byok": "Dùng khóa riêng của bạn",
       "auditLogs": "Nhật ký kiểm tra",
-      "requestLogs": "Nhật ký yêu cầu",
-      "subOrganizations": "Tổ chức con",
-      "distributeFunds": "Phân bổ tiền"
+      "requestLogs": "Nhật ký yêu cầu"
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",

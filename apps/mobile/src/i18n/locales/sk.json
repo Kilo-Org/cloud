@@ -3578,9 +3578,7 @@
       "guardrails": "Ochranné pravidlá",
       "byok": "Vlastný kľúč",
       "auditLogs": "Protokoly auditu",
-      "requestLogs": "Protokoly požiadaviek",
-      "subOrganizations": "Podorganizácie",
-      "distributeFunds": "Rozdeliť prostriedky"
+      "requestLogs": "Protokoly požiadaviek"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",

@@ -3526,9 +3526,7 @@
       "guardrails": "מעקות בטיחות",
       "byok": "שימוש במפתח משלך",
       "auditLogs": "יומני ביקורת",
-      "requestLogs": "יומני בקשות",
-      "subOrganizations": "ארגוני משנה",
-      "distributeFunds": "חלוקת כספים"
+      "requestLogs": "יומני בקשות"
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",

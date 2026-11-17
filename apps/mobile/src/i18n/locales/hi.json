@@ -3469,9 +3469,7 @@
       "guardrails": "गार्डरेल",
       "byok": "अपनी खुद की की (key) इस्तेमाल करें",
       "auditLogs": "ऑडिट लॉग",
-      "requestLogs": "रिक्वेस्ट लॉग",
-      "subOrganizations": "सब-संगठन",
-      "distributeFunds": "फ़ंड बाँटें"
+      "requestLogs": "रिक्वेस्ट लॉग"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

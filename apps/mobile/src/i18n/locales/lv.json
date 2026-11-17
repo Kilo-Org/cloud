@@ -3521,9 +3521,7 @@
       "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
       "auditLogs": "Audita žurnāli",
-      "requestLogs": "Pieprasījumu žurnāli",
-      "subOrganizations": "Apakšorganizācijas",
-      "distributeFunds": "Sadalīt līdzekļus"
+      "requestLogs": "Pieprasījumu žurnāli"
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",

@@ -3464,9 +3464,7 @@
       "guardrails": "Kawalan keselamatan",
       "byok": "Bawa kunci anda sendiri",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "subOrganizations": "Suborganisasi",
-      "distributeFunds": "Agihkan dana"
+      "requestLogs": "Log permintaan"
     },
     "usageStats": {
       "inputTokens": "Token masukan",

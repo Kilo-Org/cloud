@@ -3464,9 +3464,7 @@
       "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
       "auditLogs": "Mga audit log",
-      "requestLogs": "Mga request log",
-      "subOrganizations": "Mga sub-organisasyon",
-      "distributeFunds": "Ipamahagi ang pondo"
+      "requestLogs": "Mga request log"
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",

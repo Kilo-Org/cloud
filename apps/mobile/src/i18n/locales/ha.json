@@ -3464,9 +3464,7 @@
       "guardrails": "Matakan kariya",
       "byok": "Kawo maɓallinka na kanka",
       "auditLogs": "Rajistun bincike",
-      "requestLogs": "Rajistun buƙatu",
-      "subOrganizations": "Ƙananan ƙungiyoyi",
-      "distributeFunds": "Raba kuɗi"
+      "requestLogs": "Rajistun buƙatu"
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",

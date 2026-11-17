@@ -3464,9 +3464,7 @@
       "guardrails": "Àwọn ààlà ààbò",
       "byok": "Lo kọ́kọ́rọ́ tìrẹ",
       "auditLogs": "Àwọn àkọsílẹ̀ àyẹ̀wò",
-      "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè",
-      "subOrganizations": "Àwọn àjọ abẹ́lé",
-      "distributeFunds": "Pín owó"
+      "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè"
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",

@@ -3464,9 +3464,7 @@
       "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
       "auditLogs": "Auditnaplók",
-      "requestLogs": "Kérésnaplók",
-      "subOrganizations": "Alszervezetek",
-      "distributeFunds": "Pénzeszközök elosztása"
+      "requestLogs": "Kérésnaplók"
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

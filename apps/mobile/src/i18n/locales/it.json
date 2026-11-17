@@ -3526,9 +3526,7 @@
       "guardrails": "Guardrail",
       "byok": "Usa la tua chiave",
       "auditLogs": "Registri di controllo",
-      "requestLogs": "Registri delle richieste",
-      "subOrganizations": "Sotto-organizzazioni",
-      "distributeFunds": "Distribuisci fondi"
+      "requestLogs": "Registri delle richieste"
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",

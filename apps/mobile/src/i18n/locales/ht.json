@@ -3464,9 +3464,7 @@
       "guardrails": "Baryè sekirite",
       "byok": "Itilize pwòp kle ou",
       "auditLogs": "Jounal odit",
-      "requestLogs": "Jounal demann",
-      "subOrganizations": "Sou-òganizasyon",
-      "distributeFunds": "Distribye lajan"
+      "requestLogs": "Jounal demann"
     },
     "usageStats": {
       "inputTokens": "Jeton antre",

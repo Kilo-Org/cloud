@@ -3464,9 +3464,7 @@
       "guardrails": "ມາດຕະການປ້ອງກັນ",
       "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
       "auditLogs": "ບັນທຶກການກວດສອບ",
-      "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
-      "subOrganizations": "ອົງກອນຍ່ອຍ",
-      "distributeFunds": "ແຈກຢາຍເງິນທຶນ"
+      "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ"
     },
     "usageStats": {
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",

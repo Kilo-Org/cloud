@@ -3464,9 +3464,7 @@
       "guardrails": "របាំងការពារ",
       "byok": "ប្រើសោផ្ទាល់ខ្លួន",
       "auditLogs": "កំណត់ហេតុសវនកម្ម",
-      "requestLogs": "កំណត់ហេតុសំណើ",
-      "subOrganizations": "អង្គការរង",
-      "distributeFunds": "បែងចែកមូលនិធិ"
+      "requestLogs": "កំណត់ហេតុសំណើ"
     },
     "usageStats": {
       "inputTokens": "តូខេនទិន្នន័យបញ្ចូល",

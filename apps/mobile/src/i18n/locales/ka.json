@@ -3464,9 +3464,7 @@
       "guardrails": "დამცავი წესები",
       "byok": "საკუთარი გასაღების გამოყენება",
       "auditLogs": "აუდიტის ჟურნალები",
-      "requestLogs": "მოთხოვნების ჟურნალები",
-      "subOrganizations": "ქვეორგანიზაციები",
-      "distributeFunds": "თანხების განაწილება"
+      "requestLogs": "მოთხოვნების ჟურნალები"
     },
     "usageStats": {
       "inputTokens": "შემავალი ტოკენები",

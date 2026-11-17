@@ -3469,9 +3469,7 @@
       "guardrails": "防護機制",
       "byok": "自備金鑰",
       "auditLogs": "稽核記錄",
-      "requestLogs": "請求記錄",
-      "subOrganizations": "子組織",
-      "distributeFunds": "分配資金"
+      "requestLogs": "請求記錄"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",

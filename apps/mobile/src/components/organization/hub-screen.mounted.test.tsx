@@ -1027,6 +1027,19 @@ describe('Organization hub settings-on-the-web group', () => {
     expect(headings(renderer)).toHaveLength(1);
     unmount();
   });
+
+  it('lists no row for the removed sub-organization areas', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // The two areas are gone from the hub and open nothing: neither a web page
+    // nor a replacement screen stands in for them.
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).not.toContain('Sub-organizations');
+    expect(titles).not.toContain('Distribute funds');
+    unmount();
+  });
 });
 
 describe('Organization hub Kilo Pass icon tile', () => {

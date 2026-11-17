@@ -3464,9 +3464,7 @@
       "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
       "auditLogs": "Rexistros de auditoría",
-      "requestLogs": "Rexistros de solicitudes",
-      "subOrganizations": "Suborganizacións",
-      "distributeFunds": "Distribuír fondos"
+      "requestLogs": "Rexistros de solicitudes"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

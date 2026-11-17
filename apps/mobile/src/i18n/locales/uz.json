@@ -3464,9 +3464,7 @@
       "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
       "auditLogs": "Audit jurnallari",
-      "requestLogs": "So'rovlar jurnallari",
-      "subOrganizations": "Quyi tashkilotlar",
-      "distributeFunds": "Mablag'larni taqsimlash"
+      "requestLogs": "So'rovlar jurnallari"
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",

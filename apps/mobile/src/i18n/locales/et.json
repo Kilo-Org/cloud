@@ -3464,9 +3464,7 @@
       "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
       "auditLogs": "Auditilogid",
-      "requestLogs": "Päringulogid",
-      "subOrganizations": "Alamorganisatsioonid",
-      "distributeFunds": "Jaota vahendeid"
+      "requestLogs": "Päringulogid"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

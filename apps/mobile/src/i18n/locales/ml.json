@@ -3464,9 +3464,7 @@
       "guardrails": "ഗാർഡ്‌റെയിലുകൾ",
       "byok": "സ്വന്തം കീ ഉപയോഗിക്കുക",
       "auditLogs": "ഓഡിറ്റ് ലോഗുകൾ",
-      "requestLogs": "അഭ്യർത്ഥന ലോഗുകൾ",
-      "subOrganizations": "ഉപ-ഓർഗനൈസേഷനുകൾ",
-      "distributeFunds": "ഫണ്ടുകൾ വിതരണം ചെയ്യുക"
+      "requestLogs": "അഭ്യർത്ഥന ലോഗുകൾ"
     },
     "usageStats": {
       "inputTokens": "ഇൻപുട്ട് ടോക്കണുകൾ",

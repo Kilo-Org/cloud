@@ -3464,9 +3464,7 @@
       "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
       "auditLogs": "Kumbukumbu za ukaguzi",
-      "requestLogs": "Kumbukumbu za maombi",
-      "subOrganizations": "Mashirika tanzu",
-      "distributeFunds": "Gawa fedha"
+      "requestLogs": "Kumbukumbu za maombi"
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",

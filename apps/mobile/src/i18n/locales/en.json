@@ -3544,9 +3544,7 @@
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
       "auditLogs": "Audit logs",
-      "requestLogs": "Request logs",
-      "subOrganizations": "Sub-organizations",
-      "distributeFunds": "Distribute funds"
+      "requestLogs": "Request logs"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",

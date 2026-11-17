@@ -3464,9 +3464,7 @@
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
       "auditLogs": "Tarkastuslokit",
-      "requestLogs": "Pyyntölokit",
-      "subOrganizations": "Alaorganisaatiot",
-      "distributeFunds": "Jaa varoja"
+      "requestLogs": "Pyyntölokit"
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

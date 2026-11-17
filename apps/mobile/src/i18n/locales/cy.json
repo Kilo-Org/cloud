@@ -3692,9 +3692,7 @@
       "guardrails": "Mesurau diogelu",
       "byok": "Dewch â'ch allwedd eich hun",
       "auditLogs": "Logiau archwilio",
-      "requestLogs": "Logiau ceisiadau",
-      "subOrganizations": "Is-sefydliadau",
-      "distributeFunds": "Dosbarthu arian"
+      "requestLogs": "Logiau ceisiadau"
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",

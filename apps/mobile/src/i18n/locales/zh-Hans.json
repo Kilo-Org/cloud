@@ -3469,9 +3469,7 @@
       "guardrails": "防护规则",
       "byok": "自带密钥",
       "auditLogs": "审计日志",
-      "requestLogs": "请求日志",
-      "subOrganizations": "子组织",
-      "distributeFunds": "分配资金"
+      "requestLogs": "请求日志"
     },
     "usageStats": {
       "inputTokens": "输入词元",

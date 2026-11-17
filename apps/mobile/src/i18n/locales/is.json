@@ -3464,9 +3464,7 @@
       "guardrails": "Öryggismörk",
       "byok": "Notaðu eigin lykil",
       "auditLogs": "Endurskoðunarskrár",
-      "requestLogs": "Beiðnaskrár",
-      "subOrganizations": "Undirfélög",
-      "distributeFunds": "Dreifa fjármunum"
+      "requestLogs": "Beiðnaskrár"
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",

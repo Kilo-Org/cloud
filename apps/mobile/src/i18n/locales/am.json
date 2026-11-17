@@ -3464,9 +3464,7 @@
       "guardrails": "የጥበቃ ገደቦች",
       "byok": "የራስዎን ቁልፍ ይጠቀሙ",
       "auditLogs": "የኦዲት መዝገቦች",
-      "requestLogs": "የጥያቄ መዝገቦች",
-      "subOrganizations": "ንዑስ ድርጅቶች",
-      "distributeFunds": "ገንዘብ ያከፋፍሉ"
+      "requestLogs": "የጥያቄ መዝገቦች"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

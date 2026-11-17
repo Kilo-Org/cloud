@@ -3464,9 +3464,7 @@
       "guardrails": "গার্ডরেল",
       "byok": "নিজের কী ব্যবহার করুন",
       "auditLogs": "অডিট লগ",
-      "requestLogs": "রিকোয়েস্ট লগ",
-      "subOrganizations": "উপ-সংস্থা",
-      "distributeFunds": "ফান্ড বণ্টন করুন"
+      "requestLogs": "রিকোয়েস্ট লগ"
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",

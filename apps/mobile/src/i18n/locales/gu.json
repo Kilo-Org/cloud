@@ -3464,9 +3464,7 @@
       "guardrails": "ગાર્ડરેલ્સ",
       "byok": "તમારી પોતાની કી વાપરો",
       "auditLogs": "ઑડિટ લૉગ",
-      "requestLogs": "રિક્વેસ્ટ લૉગ",
-      "subOrganizations": "પેટા-સંસ્થાઓ",
-      "distributeFunds": "ભંડોળ વહેંચો"
+      "requestLogs": "રિક્વેસ્ટ લૉગ"
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",

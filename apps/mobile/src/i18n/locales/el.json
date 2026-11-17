@@ -3464,9 +3464,7 @@
       "guardrails": "Όρια ασφαλείας",
       "byok": "Χρήση δικού σας κλειδιού",
       "auditLogs": "Αρχεία ελέγχου",
-      "requestLogs": "Αρχεία αιτημάτων",
-      "subOrganizations": "Υπο-οργανισμοί",
-      "distributeFunds": "Κατανομή κεφαλαίων"
+      "requestLogs": "Αρχεία αιτημάτων"
     },
     "usageStats": {
       "inputTokens": "Διακριτικά εισόδου",

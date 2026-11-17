@@ -3464,9 +3464,7 @@
       "guardrails": "Qoruyucu qaydalar",
       "byok": "Öz açarınızdan istifadə edin",
       "auditLogs": "Audit jurnalları",
-      "requestLogs": "Sorğu jurnalları",
-      "subOrganizations": "Alt təşkilatlar",
-      "distributeFunds": "Vəsaitləri bölüşdür"
+      "requestLogs": "Sorğu jurnalları"
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",

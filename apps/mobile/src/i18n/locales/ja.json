@@ -3469,9 +3469,7 @@
       "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
     },
     "usageStats": {
       "inputTokens": "入力トークン",

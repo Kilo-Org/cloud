@@ -3697,9 +3697,7 @@
       "guardrails": "ضوابط الحماية",
       "byok": "استخدام مفتاحك الخاص",
       "auditLogs": "سجلات التدقيق",
-      "requestLogs": "سجلات الطلبات",
-      "subOrganizations": "المؤسسات الفرعية",
-      "distributeFunds": "توزيع الأموال"
+      "requestLogs": "سجلات الطلبات"
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",

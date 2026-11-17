@@ -3464,9 +3464,7 @@
       "guardrails": "Хамгаалалтын хязгаарлалт",
       "byok": "Өөрийн түлхүүрээ ашиглах",
       "auditLogs": "Аудитын бүртгэлүүд",
-      "requestLogs": "Хүсэлтийн бүртгэлүүд",
-      "subOrganizations": "Дэд байгууллагууд",
-      "distributeFunds": "Хөрөнгө хуваарилах"
+      "requestLogs": "Хүсэлтийн бүртгэлүүд"
     },
     "usageStats": {
       "inputTokens": "Оролтын токенууд",

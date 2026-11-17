@@ -3635,9 +3635,7 @@
       "guardrails": "Salvagwardji",
       "byok": "Uża ċ-ċavetta tiegħek",
       "auditLogs": "Reġistri tal-awditjar",
-      "requestLogs": "Reġistri tat-talbiet",
-      "subOrganizations": "Sotto-organizzazzjonijiet",
-      "distributeFunds": "Iddistribwixxi l-fondi"
+      "requestLogs": "Reġistri tat-talbiet"
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",

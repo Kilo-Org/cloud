@@ -3526,9 +3526,7 @@
       "guardrails": "Garde-fous",
       "byok": "Utiliser votre propre clé",
       "auditLogs": "Journaux d'audit",
-      "requestLogs": "Journaux des requêtes",
-      "subOrganizations": "Sous-organisations",
-      "distributeFunds": "Répartir les fonds"
+      "requestLogs": "Journaux des requêtes"
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",

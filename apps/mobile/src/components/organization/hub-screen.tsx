@@ -249,11 +249,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan }, organizationId);
 
   // The organization dashboard's own settings on the web, one row per area.
-  // The group waits for the membership payload because the parent link decides
-  // whether the sub-organization rows exist: painting them on the cached list
-  // entry's `null` and removing them a request later would move every row
-  // under them. It is the last group on the screen, so its arrival pushes
-  // nothing above it.
+  // The group waits for the membership payload because that payload carries the
+  // Kilo Encrypt setting the guardrails row's gate reads: painting the row on
+  // the cached list entry's absence and removing it a request later would move
+  // every row under it. It is the last group on the screen, so its arrival
+  // pushes nothing above it.
   const settingsRows =
     orgWithMembers.data == null && !membershipUnavailable
       ? null
@@ -261,7 +261,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           {
             role,
             plan: org.plan,
-            isTopLevel: parentLink === null,
             guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt === true,
           },
           organizationId

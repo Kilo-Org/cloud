@@ -3635,9 +3635,7 @@
       "guardrails": "Ráillí cosanta",
       "byok": "D'eochair féin",
       "auditLogs": "Logaí iniúchta",
-      "requestLogs": "Logaí iarratas",
-      "subOrganizations": "Fo-eagraíochtaí",
-      "distributeFunds": "Dáil cistí"
+      "requestLogs": "Logaí iarratas"
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",

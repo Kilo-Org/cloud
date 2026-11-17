@@ -3469,9 +3469,7 @@
       "guardrails": "Guardrails",
       "byok": "Eigenen Schlüssel verwenden",
       "auditLogs": "Audit-Logs",
-      "requestLogs": "Anfrage-Logs",
-      "subOrganizations": "Unterorganisationen",
-      "distributeFunds": "Guthaben verteilen"
+      "requestLogs": "Anfrage-Logs"
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",

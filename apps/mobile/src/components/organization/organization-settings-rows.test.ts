@@ -11,7 +11,6 @@ import {
 // The row table carries icon components; the pure node project cannot load the
 // native icon package, and the icons are not what this suite asserts.
 vi.mock('@/components/ui/icons', () => ({
-  Building2: 'Building2',
   Cpu: 'Cpu',
   FileText: 'FileText',
   KeyRound: 'KeyRound',
@@ -21,7 +20,6 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
-  Wallet: 'Wallet',
 }));
 
 // Every row is an absolute web URL, so the suite needs the base the app bakes
@@ -32,7 +30,6 @@ function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
     role: 'owner',
     plan: 'enterprise',
-    isTopLevel: true,
     guardrailsEnabled: true,
     ...overrides,
   };
@@ -50,13 +47,7 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
-    expect(areas()).toEqual([
-      'providersAndModels',
-      'guardrails',
-      'requestLogs',
-      'subOrganizations',
-      'distributeFunds',
-    ]);
+    expect(areas()).toEqual(['providersAndModels', 'guardrails']);
   });
 
   it('lists no web area for a member, who reads every destination in the app', () => {
@@ -65,19 +56,7 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
-    expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'guardrails',
-      'requestLogs',
-      'subOrganizations',
-      'distributeFunds',
-    ]);
-  });
-
-  it('hides the sub-organization rows for a child organization', () => {
-    const rows = areas({ role: 'billing_manager', isTopLevel: false });
-    expect(rows).not.toContain('subOrganizations');
-    expect(rows).not.toContain('distributeFunds');
-    expect(rows).toContain('providersAndModels');
+    expect(areas({ role: 'admin', plan: 'teams' })).toEqual(['guardrails']);
   });
 
   it('hides guardrails when the organization has not enabled Kilo Encrypt', () => {
@@ -88,6 +67,19 @@ describe('visibleOrgSettingsRows', () => {
     const rows = areas({ role: 'billing_manager' });
     expect(rows).not.toContain('guardrails');
     expect(rows).toContain('providersAndModels');
+  });
+
+  it('offers no row for the removed sub-organization destinations', () => {
+    for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
+      for (const plan of ['enterprise', 'teams'] as const) {
+        for (const row of visibleOrgSettingsRows(gate({ role, plan }), 'org_1')) {
+          // The hub names neither area and links nowhere for them.
+          expect(row.url).not.toContain('sub-organizations');
+          expect(row.url).not.toContain('distribute-funds');
+          expect(row.url).not.toContain('request-logs');
+        }
+      }
+    }
   });
 
   it('opens a page of its own for every row, never the dashboard', () => {
@@ -105,14 +97,10 @@ describe('visibleOrgSettingsRows', () => {
       }
     }
     const byArea = new Map(visibleOrgSettingsRows(gate(), 'org_1').map(row => [row.area, row.url]));
-    expect(byArea.get('subOrganizations')?.endsWith('/organizations/org_1/sub-organizations')).toBe(
+    expect(byArea.get('providersAndModels')?.endsWith('/organizations/org_1/providers-and-models')).toBe(
       true
     );
-    expect(
-      byArea
-        .get('distributeFunds')
-        ?.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
-    ).toBe(true);
+    expect(byArea.get('guardrails')?.endsWith('/organizations/org_1/guardrails')).toBe(true);
   });
 
   it('keeps every in-app area out of the web group', () => {
@@ -124,6 +112,7 @@ describe('visibleOrgSettingsRows', () => {
         expect(rows).not.toContain('customModes');
         expect(rows).not.toContain('groups');
         expect(rows).not.toContain('byok');
+        expect(rows).not.toContain('requestLogs');
       }
     }
   });
@@ -148,7 +137,7 @@ describe('visibleInAppSettingsRows', () => {
     expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
   });
 
-  it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
+  it('keeps the billing rows for a billing role on the teams plan, where the audit log is refused', () => {
     expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails', 'byok']);
   });
 

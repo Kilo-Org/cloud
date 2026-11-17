@@ -3464,9 +3464,7 @@
       "guardrails": "Պաշտպանիչ սահմանափակումներ",
       "byok": "Սեփական բանալի",
       "auditLogs": "Աուդիտի մատյաններ",
-      "requestLogs": "Հարցումների մատյաններ",
-      "subOrganizations": "Ենթակազմակերպություններ",
-      "distributeFunds": "Բաշխել միջոցները"
+      "requestLogs": "Հարցումների մատյաններ"
     },
     "usageStats": {
       "inputTokens": "Մուտքային տոկեններ",

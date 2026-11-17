@@ -3464,9 +3464,7 @@
       "guardrails": "گارڈ ریلز",
       "byok": "اپنی کلید خود لائیں",
       "auditLogs": "آڈٹ لاگز",
-      "requestLogs": "درخواست لاگز",
-      "subOrganizations": "ذیلی تنظیمیں",
-      "distributeFunds": "فنڈز تقسیم کریں"
+      "requestLogs": "درخواست لاگز"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

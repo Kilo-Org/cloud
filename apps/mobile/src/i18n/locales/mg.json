@@ -3464,9 +3464,7 @@
       "guardrails": "Fefy fiarovana",
       "byok": "Ampiasao ny lakilenao manokana",
       "auditLogs": "Rakitry ny fanaraha-maso",
-      "requestLogs": "Rakitry ny fangatahana",
-      "subOrganizations": "Zana-pikambanana",
-      "distributeFunds": "Hizara vola"
+      "requestLogs": "Rakitry ny fangatahana"
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

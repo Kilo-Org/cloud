@@ -3464,9 +3464,7 @@
       "guardrails": "ਗਾਰਡਰੇਲ",
       "byok": "ਆਪਣੀ ਖੁਦ ਦੀ ਕੁੰਜੀ ਵਰਤੋ",
       "auditLogs": "ਆਡਿਟ ਲੌਗ",
-      "requestLogs": "ਬੇਨਤੀ ਲੌਗ",
-      "subOrganizations": "ਉਪ-ਸੰਸਥਾਵਾਂ",
-      "distributeFunds": "ਫੰਡ ਵੰਡੋ"
+      "requestLogs": "ਬੇਨਤੀ ਲੌਗ"
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",

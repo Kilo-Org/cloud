@@ -3464,9 +3464,7 @@
       "guardrails": "Mgbochi nchekwa",
       "byok": "Jiri igodo nke gị",
       "auditLogs": "Ndekọ nyocha",
-      "requestLogs": "Ndekọ arịrịọ",
-      "subOrganizations": "Òtù ndị dị n'okpuru",
-      "distributeFunds": "Kesaa ego"
+      "requestLogs": "Ndekọ arịrịọ"
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",

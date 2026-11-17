@@ -3464,9 +3464,7 @@
       "guardrails": "Guardrails",
       "byok": "ใช้คีย์ของคุณเอง",
       "auditLogs": "บันทึกการตรวจสอบ",
-      "requestLogs": "บันทึกคำขอ",
-      "subOrganizations": "องค์กรย่อย",
-      "distributeFunds": "จัดสรรเงินทุน"
+      "requestLogs": "บันทึกคำขอ"
     },
     "usageStats": {
       "inputTokens": "โทเคนขาเข้า",

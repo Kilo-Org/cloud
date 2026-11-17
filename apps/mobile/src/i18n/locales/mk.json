@@ -3464,9 +3464,7 @@
       "guardrails": "Заштитни ограничувања",
       "byok": "Сопствен клуч (BYOK)",
       "auditLogs": "Дневници за ревизија",
-      "requestLogs": "Дневници на барања",
-      "subOrganizations": "Подорганизации",
-      "distributeFunds": "Распредели средства"
+      "requestLogs": "Дневници на барања"
     },
     "usageStats": {
       "inputTokens": "Влезни токени",

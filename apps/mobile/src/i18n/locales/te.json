@@ -3464,9 +3464,7 @@
       "guardrails": "గార్డ్‌రైల్స్",
       "byok": "మీ స్వంత కీని ఉపయోగించండి",
       "auditLogs": "ఆడిట్ లాగ్‌లు",
-      "requestLogs": "రిక్వెస్ట్ లాగ్‌లు",
-      "subOrganizations": "ఉప-సంస్థలు",
-      "distributeFunds": "నిధులను పంపిణీ చేయండి"
+      "requestLogs": "రిక్వెస్ట్ లాగ్‌లు"
     },
     "usageStats": {
       "inputTokens": "ఇన్‌పుట్ టోకెన్లు",

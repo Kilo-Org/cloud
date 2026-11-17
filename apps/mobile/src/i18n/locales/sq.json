@@ -3464,9 +3464,7 @@
       "guardrails": "Masat mbrojtëse",
       "byok": "Përdor çelësin tënd",
       "auditLogs": "Regjistrat e auditimit",
-      "requestLogs": "Regjistrat e kërkesave",
-      "subOrganizations": "Nënorganizatat",
-      "distributeFunds": "Shpërndaj fondet"
+      "requestLogs": "Regjistrat e kërkesave"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",

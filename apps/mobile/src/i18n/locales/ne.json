@@ -3464,9 +3464,7 @@
       "guardrails": "गार्डरेलहरू",
       "byok": "आफ्नै की प्रयोग गर्नुहोस्",
       "auditLogs": "अडिट लगहरू",
-      "requestLogs": "अनुरोध लगहरू",
-      "subOrganizations": "उप-संस्थाहरू",
-      "distributeFunds": "रकम बाँड्नुहोस्"
+      "requestLogs": "अनुरोध लगहरू"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",

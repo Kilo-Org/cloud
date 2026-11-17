@@ -3464,9 +3464,7 @@
       "guardrails": "ಗಾರ್ಡ್‌ರೇಲ್‌ಗಳು",
       "byok": "ನಿಮ್ಮ ಸ್ವಂತ ಕೀ ಬಳಸಿ",
       "auditLogs": "ಆಡಿಟ್ ಲಾಗ್‌ಗಳು",
-      "requestLogs": "ವಿನಂತಿ ಲಾಗ್‌ಗಳು",
-      "subOrganizations": "ಉಪ-ಸಂಸ್ಥೆಗಳು",
-      "distributeFunds": "ಹಣವನ್ನು ಹಂಚಿ"
+      "requestLogs": "ವಿನಂತಿ ಲಾಗ್‌ಗಳು"
     },
     "usageStats": {
       "inputTokens": "ಇನ್‌ಪುಟ್ ಟೋಕನ್‌ಗಳು",

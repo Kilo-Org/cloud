@@ -3583,9 +3583,7 @@
       "guardrails": "Zabezpieczenia",
       "byok": "Własny klucz",
       "auditLogs": "Dzienniki audytu",
-      "requestLogs": "Dzienniki żądań",
-      "subOrganizations": "Organizacje podrzędne",
-      "distributeFunds": "Rozdziel środki"
+      "requestLogs": "Dzienniki żądań"
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",

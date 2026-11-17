@@ -3469,9 +3469,7 @@
       "guardrails": "Guardrails",
       "byok": "Eigen sleutel gebruiken",
       "auditLogs": "Auditlogboeken",
-      "requestLogs": "Verzoeklogboeken",
-      "subOrganizations": "Suborganisaties",
-      "distributeFunds": "Tegoed verdelen"
+      "requestLogs": "Verzoeklogboeken"
     },
     "usageStats": {
       "inputTokens": "Invoertokens",

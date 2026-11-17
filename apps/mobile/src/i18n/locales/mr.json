@@ -3464,9 +3464,7 @@
       "guardrails": "गार्डरेल्स",
       "byok": "तुमची स्वतःची की वापरा",
       "auditLogs": "ऑडिट लॉग",
-      "requestLogs": "विनंती लॉग",
-      "subOrganizations": "उप-संस्था",
-      "distributeFunds": "निधी वाटप करा"
+      "requestLogs": "विनंती लॉग"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

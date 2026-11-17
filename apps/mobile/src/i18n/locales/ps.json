@@ -3464,9 +3464,7 @@
       "guardrails": "خوندي حدونه",
       "byok": "خپله کیلي راوړئ",
       "auditLogs": "د پلټنې لاګونه",
-      "requestLogs": "د غوښتنو لاګونه",
-      "subOrganizations": "فرعي سازمانونه",
-      "distributeFunds": "پیسې ووېشئ"
+      "requestLogs": "د غوښتنو لاګونه"
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",

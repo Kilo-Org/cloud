@@ -3464,9 +3464,7 @@
       "guardrails": "Skyddsräcken",
       "byok": "Använd egen nyckel",
       "auditLogs": "Granskningsloggar",
-      "requestLogs": "Förfrågningsloggar",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fördela medel"
+      "requestLogs": "Förfrågningsloggar"
     },
     "usageStats": {
       "inputTokens": "Inmatade token",

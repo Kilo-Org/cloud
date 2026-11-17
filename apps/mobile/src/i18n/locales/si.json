@@ -3464,9 +3464,7 @@
       "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
       "auditLogs": "විගණන ලොග",
-      "requestLogs": "ඉල්ලීම් ලොග",
-      "subOrganizations": "උප සංවිධාන",
-      "distributeFunds": "අරමුදල් බෙදා හරින්න"
+      "requestLogs": "ඉල්ලීම් ලොග"
     },
     "usageStats": {
       "inputTokens": "ආදාන ටෝකන",

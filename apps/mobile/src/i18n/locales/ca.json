@@ -3521,9 +3521,7 @@
       "guardrails": "Salvaguardes",
       "byok": "Utilitza la teva pròpia clau",
       "auditLogs": "Registres d'auditoria",
-      "requestLogs": "Registres de sol·licituds",
-      "subOrganizations": "Suborganitzacions",
-      "distributeFunds": "Distribueix fons"
+      "requestLogs": "Registres de sol·licituds"
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",

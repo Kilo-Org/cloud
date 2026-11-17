@@ -3464,9 +3464,7 @@
       "guardrails": "محدودیت‌های ایمنی",
       "byok": "استفاده از کلید خودتان",
       "auditLogs": "گزارش‌های حسابرسی",
-      "requestLogs": "گزارش‌های درخواست",
-      "subOrganizations": "زیرسازمان‌ها",
-      "distributeFunds": "توزیع اعتبار"
+      "requestLogs": "گزارش‌های درخواست"
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",

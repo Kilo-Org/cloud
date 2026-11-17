@@ -3464,9 +3464,7 @@
       "guardrails": "Veiligheidsreëls",
       "byok": "Gebruik jou eie sleutel",
       "auditLogs": "Ouditlogs",
-      "requestLogs": "Versoeklogs",
-      "subOrganizations": "Sub-organisasies",
-      "distributeFunds": "Versprei fondse"
+      "requestLogs": "Versoeklogs"
     },
     "usageStats": {
       "inputTokens": "Invoertekens",

@@ -83,12 +83,25 @@ export const claimTab = async (
 
     const granted = await Promise.race([claim, cancelled]);
 
-    if (stopped() && !granted) {
-      // The run is gone for good: drop the wait it may still hold in the background.
-      await releaseBrowserCaller(caller);
+    if (!stopped()) {
+      return granted;
     }
 
-    return granted;
+    // The run is gone, so its lease is not needed.
+    // Release now, and again if the grant lands afterwards.
+    // A late grant belongs to a caller whose run never got to use the tab.
+    await releaseBrowserCaller(caller);
+    void (async (): Promise<void> => {
+      try {
+        if (await claim) {
+          await releaseBrowserCaller(caller);
+        }
+      } catch {
+        // The claim itself failed; the release above already covered the queued wait.
+      }
+    })();
+
+    return false;
   } catch {
     return false;
   } finally {

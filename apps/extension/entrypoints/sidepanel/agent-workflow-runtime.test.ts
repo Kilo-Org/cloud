@@ -114,6 +114,41 @@ describe('workflow tab claim', () => {
     });
   });
 
+  it('releases a grant that lands after the turn is stopped', async () => {
+    const { promise: heldClaim, resolve: resolveClaim } = Promise.withResolvers<unknown>();
+
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockReturnValueOnce(heldClaim);
+    mocks.sendMessage.mockResolvedValue({
+      ok: true,
+      released: 1,
+      type: RELEASE_BROWSER_CALLER_MESSAGE,
+    });
+    const abort = new AbortController();
+    const isReleaseMessage = (message: unknown): boolean =>
+      typeof message === 'object' &&
+      message !== null &&
+      'type' in message &&
+      message.type === RELEASE_BROWSER_CALLER_MESSAGE;
+    const releaseMessages = (): number =>
+      mocks.sendMessage.mock.calls.filter(([message]) => isReleaseMessage(message)).length;
+
+    const claim = claimTab(7, runCaller, { signal: abort.signal });
+
+    abort.abort();
+
+    await expect(claim).resolves.toBe(false);
+    expect(releaseMessages()).toBe(1);
+
+    // The background granted the claim anyway, after the abort.
+    // The run is gone, so the late grant is dropped and released here.
+    resolveClaim({ granted: true, ok: true, type: CLAIM_TAB_MESSAGE });
+
+    await vi.waitFor(() => {
+      expect(releaseMessages()).toBe(2);
+    });
+  });
+
   it('does not claim at all once the turn is stopped', async () => {
     mocks.sendMessage.mockReset();
     const abort = new AbortController();

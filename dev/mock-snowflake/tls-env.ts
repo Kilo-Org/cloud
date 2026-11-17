@@ -13,6 +13,24 @@ export const MOCK_SNOWFLAKE_PORT = 4792;
 export const PORT = Number(process.env.MOCK_SNOWFLAKE_PORT ?? MOCK_SNOWFLAKE_PORT);
 export const HOST = '127.0.0.1';
 
+/**
+ * The `SNOWFLAKE_*` keys `writeEnvSnippet` emits, which the legacy-section scan
+ * in `stack-service.ts` accepts as the writer's own: a run of lines holding
+ * these keys, blank lines and recorded CA comments is what the pre-end-marker
+ * writer left, and anything else out there is the developer's.
+ */
+export const SNIPPET_ENV_KEYS = [
+  'SNOWFLAKE_ACCOUNT_HOST',
+  'SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER',
+  'SNOWFLAKE_USERNAME',
+  'SNOWFLAKE_ROLE',
+  'SNOWFLAKE_WAREHOUSE',
+  'SNOWFLAKE_DATABASE',
+  'SNOWFLAKE_SCHEMA',
+  'SNOWFLAKE_PRIVATE_KEY_PEM',
+  'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+] as const;
+
 const here = dirname(fileURLToPath(import.meta.url));
 export const fixturesDir = join(here, 'fixtures');
 export const tlsDir = join(fixturesDir, 'tls');
@@ -83,18 +101,18 @@ export function writeEnvSnippet(port: number): string {
   }
   // dotenv keeps a multi-line value on one line, so the newlines are escaped.
   const escapedPem = pem.replaceAll('\n', '\\n');
-  const block = [
-    `SNOWFLAKE_ACCOUNT_HOST=${HOST}:${port}`,
-    'SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER=localtest',
-    'SNOWFLAKE_USERNAME=local',
-    'SNOWFLAKE_ROLE=ACCOUNTADMIN',
-    'SNOWFLAKE_WAREHOUSE=local',
-    'SNOWFLAKE_DATABASE=local',
-    'SNOWFLAKE_SCHEMA=PUBLIC',
-    `SNOWFLAKE_PRIVATE_KEY_PEM=${escapedPem}`,
-    'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT=local',
-    '',
-  ].join('\n');
+  const values: Record<(typeof SNIPPET_ENV_KEYS)[number], string> = {
+    SNOWFLAKE_ACCOUNT_HOST: `${HOST}:${port}`,
+    SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER: 'localtest',
+    SNOWFLAKE_USERNAME: 'local',
+    SNOWFLAKE_ROLE: 'ACCOUNTADMIN',
+    SNOWFLAKE_WAREHOUSE: 'local',
+    SNOWFLAKE_DATABASE: 'local',
+    SNOWFLAKE_SCHEMA: 'PUBLIC',
+    SNOWFLAKE_PRIVATE_KEY_PEM: escapedPem,
+    SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: 'local',
+  };
+  const block = [...SNIPPET_ENV_KEYS.map(key => `${key}=${values[key]}`), ''].join('\n');
   mkdirSync(fixturesDir, { recursive: true });
   writeFileSync(envPath, block, { mode: 0o600 });
   return envPath;

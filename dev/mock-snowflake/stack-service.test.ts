@@ -487,6 +487,122 @@ test('a CA line the developer changed since is left alone when the section goes'
   }
 });
 
+test('a legacy section leaves developer SNOWFLAKE_* tuning keys appended after it out', async () => {
+  const legacy = [
+    'NEXTAUTH_SECRET=dev',
+    '',
+    SECTION_START,
+    'SNOWFLAKE_ACCOUNT_HOST=127.0.0.1:4792',
+    'SNOWFLAKE_USERNAME=local',
+    'NODE_EXTRA_CA_CERTS=/old/cert.pem',
+    'SNOWFLAKE_LOG_LEVEL=debug',
+  ].join('\n');
+  const fixture = wireEnvLocalFixture(legacy);
+  process.env.MOCK_SNOWFLAKE_PORT = '5492';
+  try {
+    // `SNOWFLAKE_LOG_LEVEL` is a key the writer never emits: a wire outside any
+    // section means the run the old writer left ended before it. The line must
+    // stand alone — this fixture's `snowflake-env.txt` names no real host, so a
+    // rewrite keeps the file's own entries and appends the section after them.
+    assert.deepEqual(await fixture.wire(), {
+      status: 'rewritten',
+      previousAccountHost: '127.0.0.1:4792',
+      accountHost: '127.0.0.1:5492',
+    });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.startsWith('NEXTAUTH_SECRET=dev\n\n'));
+    // The developer's line keeps its tail position, outside the managed
+    // section, and counts as the file's own host entry.
+    assert.ok(content.includes('SNOWFLAKE_LOG_LEVEL=debug'));
+    assert.ok(content.indexOf('SNOWFLAKE_LOG_LEVEL=debug') > content.indexOf(SECTION_END));
+    assert.equal(content.split('SNOWFLAKE_LOG_LEVEL=').length - 1, 1);
+    assert.equal(countKeyLines(content, 'SNOWFLAKE_LOG_LEVEL'), 1);
+    // The rewrite still landed (the legacy host moved to the current port).
+    assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:5492$/m);
+  } finally {
+    delete process.env.MOCK_SNOWFLAKE_PORT;
+    fixture.restore();
+  }
+});
+
+test('removing the section on a real warehouse keeps developer keys it does not own', async () => {
+  // The fixture's `snowflake-env.txt` is read-only here: the wire below only
+  // removes the section, so it starts no mock and the port never conflicts.
+  const fixture = wireEnvLocalFixture(
+    [
+      'NEXTAUTH_SECRET=dev',
+      '',
+      SECTION_START,
+      'SNOWFLAKE_ACCOUNT_HOST=127.0.0.1:4792',
+      'SNOWFLAKE_USERNAME=local',
+      'NODE_EXTRA_CA_CERTS=/old/cert.pem',
+      'SNOWFLAKE_LOG_LEVEL=debug',
+      // A real warehouse the developer appended this legacy run must not
+      // own: the entry takes only its own lines back out on a real host.
+      'SNOWFLAKE_ACCOUNT_HOST=real.example:443',
+      '',
+    ].join('\n')
+  );
+  try {
+    assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.equal(content.includes(SECTION_START), false);
+    assert.equal(content.includes(SECTION_END), false);
+    // The developer's tuning key and the real host both stay.
+    assert.ok(content.includes('SNOWFLAKE_LOG_LEVEL=debug'));
+    assert.equal(countKeyLines(content, 'SNOWFLAKE_ACCOUNT_HOST'), 1);
+    assert.equal(
+      content,
+      'NEXTAUTH_SECRET=dev\nSNOWFLAKE_LOG_LEVEL=debug\nSNOWFLAKE_ACCOUNT_HOST=real.example:443\n'
+    );
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('a wire replaces the section after a developer line the legacy writer left', async () => {
+  const fixture = wireEnvLocalFixture(
+    [
+      'NEXTAUTH_SECRET=dev',
+      '',
+      SECTION_START,
+      'SNOWFLAKE_ACCOUNT_HOST=127.0.0.1:4792',
+      'SNOWFLAKE_USERNAME=local',
+      'NODE_EXTRA_CA_CERTS=/old/cert.pem',
+      'SNOWFLAKE_LOG_LEVEL=debug',
+    ].join('\n')
+  );
+  try {
+    // `SNOWFLAKE_LOG_LEVEL` is a key the writer never emits: the run the old
+    // writer left ends there. The section for the port the mock still listens
+    // on is re-emitted in place, and the developer's line stays after this
+    // range — not absorbed by it.
+    assert.deepEqual(await fixture.wire(), {
+      status: 'rewritten',
+      previousAccountHost: '127.0.0.1:4792',
+      accountHost: '127.0.0.1:4792',
+    });
+
+    const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.ok(content.startsWith('NEXTAUTH_SECRET=dev\n\n'));
+    assert.ok(content.includes('SNOWFLAKE_LOG_LEVEL=debug'));
+    assert.ok(content.indexOf('SNOWFLAKE_LOG_LEVEL=debug') > content.indexOf(SECTION_END));
+    assert.equal(content.split('SNOWFLAKE_LOG_LEVEL=').length - 1, 1);
+    assert.equal(countKeyLines(content, 'SNOWFLAKE_LOG_LEVEL'), 1);
+    // The rewrite still landed (the legacy host moved to the current port).
+    assert.match(content, /^SNOWFLAKE_ACCOUNT_HOST=127\.0\.0\.1:4792$/m);
+
+    // And the file settles: the same wire twice leaves the section identical.
+    const settled = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    assert.deepEqual(await fixture.wire(), { status: 'unchanged' });
+    assert.equal(fs.readFileSync(fixture.envLocalPath, 'utf8'), settled);
+  } finally {
+    fixture.restore();
+  }
+});
+
 for (const [separatorNote, separator] of [
   ['a heading comment', '\n# my real warehouse\n'],
   ['nothing at all', '\n'],

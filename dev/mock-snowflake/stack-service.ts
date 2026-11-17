@@ -26,7 +26,14 @@ import { pathToFileURL } from 'node:url';
 
 import { parseEnvEntries, stripEnvValue } from './env-file';
 import { startMockSnowflake } from './server';
-import { MOCK_SNOWFLAKE_PORT, caBundlePath, caCertPath, loadTls, writeEnvSnippet } from './tls-env';
+import {
+  MOCK_SNOWFLAKE_PORT,
+  SNIPPET_ENV_KEYS,
+  caBundlePath,
+  caCertPath,
+  loadTls,
+  writeEnvSnippet,
+} from './tls-env';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -83,11 +90,15 @@ function keyOf(line: string): string {
  * Locates the range this entry owns. With both markers that is the section; a
  * section written before the end marker existed is what the old writer appended
  * to the end of the file, so its range is the run it left there: blanks, the
- * `SNOWFLAKE_*` entries, one CA line and the recorded source comments. The scan
- * stops at anything else, because everything else is the developer's: a real
- * warehouse block, a heading comment, an unrelated key. A second entry for a key
- * the run already holds ends it too — the writer emits each key once, so a
- * repeat means another block starts there.
+ * writer's own `SNOWFLAKE_*` entries, one CA line and the recorded source
+ * comments. The scan only continues over lines `writeEnvSnippet` could have
+ * written — the keys `SNIPPET_ENV_KEYS` names, plus the CA line — so a key the
+ * writer never emits (the app's optional tuning like `SNOWFLAKE_LOG_LEVEL`, for
+ * instance) ends the run and keeps the developer's line out of this owned
+ * range. Any other line is the developer's too: a real warehouse block, a
+ * heading comment, an unrelated key. A second entry for a key the run already
+ * holds ends it as well — the writer emits each key once, so a repeat means
+ * another block starts there.
  */
 function findManagedSection(lines: string[]): LineRange | undefined {
   const start = lines.findIndex(line => line.trim() === SECTION_START);
@@ -95,16 +106,20 @@ function findManagedSection(lines: string[]): LineRange | undefined {
   const last = lines.findIndex((line, index) => index > start && line.trim() === SECTION_END);
   if (last !== -1) return { start, end: last + 1 };
 
+  const snippetKeys = new Set<string>(SNIPPET_ENV_KEYS);
   const keys = new Set<string>();
   let end = start + 1;
   while (end < lines.length) {
     const line = lines[end] ?? '';
-    if (line.trim() === '' || line.startsWith(CA_SOURCE_PREFIX)) {
+    if (line.trim() === '' || line.startsWith(CA_SOURCE_PREFIX) || line.startsWith(`${CA_KEY}=`)) {
+      const key = keyOf(line);
+      if (keys.has(key)) break;
+      keys.add(key);
       end++;
       continue;
     }
-    if (!line.startsWith('SNOWFLAKE_') && !line.startsWith(`${CA_KEY}=`)) break;
     const key = keyOf(line);
+    if (!snippetKeys.has(key)) break;
     if (keys.has(key)) break;
     keys.add(key);
     end++;

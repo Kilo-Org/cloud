@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Muudatused",
     "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
-    "privateRepositoryA11y": "{{name}}, privaatne repositoorium"
+    "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
+    "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
-      "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
+      "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
+      "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
     },
     "scopeList": {
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Ülevaatused: {{reviews}} · Leiud: {{findings}}",
       "empty": "Analüütikaga ülevaatusi veel pole",
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
-      "off": "Analüütika on selles organisatsioonis välja lülitatud.",
+      "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
+      "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
       "couldNotLoad": "Analüütikat ei õnnestunud laadida"
     },
     "council": {

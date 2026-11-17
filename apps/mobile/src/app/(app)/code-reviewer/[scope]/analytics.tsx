@@ -19,7 +19,11 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import {
+  PERSONAL_SCOPE,
+  PLATFORM_CAPABILITIES,
+  reviewerPlatformLabel,
+} from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
@@ -202,7 +206,22 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     body = <AnalyticsSkeleton />;
   } else {
     const { summary, repositories, settings } = dashboard.data;
-    body = (
+    body = !settings.enabled ? (
+      // Analytics is enabled per platform, so a disabled one is a state, not an
+      // empty dataset: the zero stat cards and the generic empty state would
+      // read as data the organization has none of. One EmptyState names the
+      // platform whose setting is off and says where to turn it on; the
+      // segment controls above stay so the reader can flip to the other
+      // platform without leaving the screen.
+      <EmptyState
+        placement="center"
+        icon={LineChart}
+        title={t('codeReviewer.analytics.offTitle', {
+          platform: reviewerPlatformLabel(settings.platform),
+        })}
+        description={t('codeReviewer.analytics.offDescription')}
+      />
+    ) : (
       <View className="gap-6 pt-4">
         {stale ? (
           <QueryError
@@ -217,11 +236,6 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             }
             isRetrying={dashboard.isFetching}
           />
-        ) : null}
-        {!settings.enabled ? (
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.off')}
-          </Text>
         ) : null}
         <View className="gap-3">
           <View className="flex-row gap-3">
@@ -251,15 +265,11 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {repositories.length === 0 ? (
-          // The muted note above already says analytics is off, so the generic
-          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={
-              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
-            }
+            description={t('codeReviewer.analytics.emptyDescription')}
           />
         ) : (
           <View className="gap-2">

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Fiovana",
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
-    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana"
+    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
+    "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
-      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"
+      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
+      "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
     },
     "scopeList": {
       "personalStillAvailable": "Mbola azo ampiasaina eto ambany ny tahirin-kaody manokana.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
+      "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
+      "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
       "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
     },
     "council": {

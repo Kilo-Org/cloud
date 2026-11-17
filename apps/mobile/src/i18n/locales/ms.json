@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori persendirian"
+    "privateRepositoryA11y": "{{name}}, repositori persendirian",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
-      "tokenPlaceholder": "Token akses ruang kerja"
+      "tokenPlaceholder": "Token akses ruang kerja",
+      "tokenRefused": "Bitbucket tidak menerima token ruang kerja ini. Semak bahawa ia mempunyai skop di atas, kemudian cuba lagi."
     },
     "scopeList": {
       "personalStillAvailable": "Repositori peribadi masih tersedia di bawah.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Semakan: {{reviews}} · Penemuan: {{findings}}",
       "empty": "Belum ada semakan dengan analitik",
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
-      "off": "Analitik dimatikan untuk organisasi ini.",
+      "offTitle": "Analitik dimatikan untuk {{platform}}",
+      "offDescription": "Dayakannya dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
       "couldNotLoad": "Tidak dapat memuatkan analitik"
     },
     "council": {

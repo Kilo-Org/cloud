@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
-    "privateRepositoryA11y": "{{name}}, privatno spremište"
+    "privateRepositoryA11y": "{{name}}, privatno spremište",
+    "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -1377,7 +1378,8 @@
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru sa potrebnim dozvolama i nalepi ga ispod.",
       "scopes": "Nalog: čitanje · Repozitorijumi: čitanje/pisanje · PR-ovi: čitanje · Veb-dojavnici: čitanje/pisanje",
-      "tokenPlaceholder": "Token za pristup radnom prostoru"
+      "tokenPlaceholder": "Token za pristup radnom prostoru",
+      "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Proveri da li ima dozvole navedene iznad, pa pokušaj ponovo."
     },
     "scopeList": {
       "personalStillAvailable": "Lični repozitorijumi su i dalje dostupni ispod.",
@@ -1489,7 +1491,8 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda sa analitikom",
       "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uključi je u podešavanjima organizacije na vebu da beleži završene preglede.",
       "couldNotLoad": "Nije moguće učitati analitiku"
     },
     "council": {

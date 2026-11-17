@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
     "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
-    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
+    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
+    "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama."
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
-      "tokenPlaceholder": "Tokanii hayyama iddoo hojii"
+      "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
+      "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
     },
     "scopeList": {
       "personalStillAvailable": "Kuusaawwan koodii dhuunfaa ammallee armaan gaditti ni argamu.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Sakatta'a: {{reviews}} · Argamoota: {{findings}}",
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
-      "off": "Istaatiksiin dhaabbata kanaaf cufameera.",
+      "offTitle": "Istaatiksiin {{platform}} cufameera",
+      "offDescription": "Sakatta'awwan xumuraman galmeessuuf Istaatiksiin Qindaa'ina dhaabbataa weebii irratti isa bani.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
     },
     "council": {

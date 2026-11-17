@@ -175,7 +175,8 @@
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
     "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
-    "privateRepositoryA11y": "{{name}}, repozitor privat"
+    "privateRepositoryA11y": "{{name}}, repozitor privat",
+    "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
-      "tokenPlaceholder": "Token qasjeje për hapësirën e punës"
+      "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
+      "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
     },
     "scopeList": {
       "personalStillAvailable": "Depot personale janë ende të disponueshme më poshtë.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
       "empty": "Ende nuk ka shqyrtime me statistika",
       "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
-      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
+      "offTitle": "Statistikat janë çaktivizuar për {{platform}}",
+      "offDescription": "Aktivizo statistikat në cilësimet e organizatës në ueb për të regjistruar shqyrtimet e përfunduara.",
       "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
     },
     "council": {

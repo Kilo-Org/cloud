@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { Check, Cloud, Server, Terminal } from '@/components/ui/icons';
@@ -162,7 +162,12 @@ export default function InstancePickerScreen() {
   // renders (a poll tick, the bridge refresh); FlashList's memoized cell
   // compares `renderItem` by identity before re-rendering a mounted row.
   const renderItem = useCallback(
-    ({ item: row }: ListRenderItemInfo<InstancePickerListItem>) => {
+    ({ item: row }: { item: InstancePickerListItem | undefined }) => {
+      // A stale index past the end of the rows (the model picker's renderItem
+      // carries the same guard for the same reason).
+      if (!row) {
+        return null;
+      }
       if (row.type === 'header') {
         return (
           <Text
@@ -313,8 +318,15 @@ export default function InstancePickerScreen() {
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={listItems}
-        keyExtractor={item => item.key}
-        getItemType={item => item.type}
+        // FlashList stores its props during render and can index `data` past
+        // its end for a render React discarded; the fallbacks are the ones
+        // FlashList uses when these callbacks are absent (see the model
+        // picker's comment).
+        keyExtractor={(item: InstancePickerListItem | undefined, index) =>
+          item?.key ?? String(index)
+        }
+        getItemType={(item: InstancePickerListItem | undefined) => item?.type}
+        maintainVisibleContentPosition={{ disabled: true }}
         contentContainerStyle={{ paddingBottom: bottomClearance }}
         ListHeaderComponent={
           <Pressable

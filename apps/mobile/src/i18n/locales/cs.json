@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
-    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář",
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -1400,7 +1401,8 @@
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",
@@ -1513,7 +1515,8 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
-      "off": "Analytika je pro tuto organizaci vypnutá.",
+      "offTitle": "Analytika je pro {{platform}} vypnutá",
+      "offDescription": "Zapněte analytiku v nastavení organizace na webu, aby zaznamenávala dokončené kontroly.",
       "couldNotLoad": "Analytiku se nepodařilo načíst"
     },
     "council": {

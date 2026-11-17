@@ -46,10 +46,11 @@ import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
+import { seatCountReadout } from '@/components/organization/billing-model';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatNumber, formatPrefixedMoney } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -343,17 +344,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <KvRow
             label={t('organization.hub.organizationSeats')}
             // `requireSeats` is the enforcement switch; total is the raw
-            // purchased capacity and can legitimately be zero.
-            value={
-              org.requireSeats
-                ? isolateLtrBidiText(
-                    `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
-                      org.seatCount.total,
-                      i18n.language
-                    )}`
-                  )
-                : formatNumber(org.seatCount.used, i18n.language)
-            }
+            // purchased capacity and can legitimately be zero, so the shared
+            // readout prints the used count alone until seats were bought.
+            value={seatCountReadout({
+              seatsEnforced: org.requireSeats,
+              used: org.seatCount.used,
+              total: org.seatCount.total,
+            })}
             valueFace="numeric"
           />
           {/* The plan is the tier the seats belong to, so it closes the card

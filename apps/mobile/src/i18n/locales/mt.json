@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Bidliet",
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
-    "privateRepositoryA11y": "{{name}}, repositorju privat"
+    "privateRepositoryA11y": "{{name}}, repositorju privat",
+    "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss."
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1423,7 +1424,8 @@
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
-      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol"
+      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
+      "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
     },
     "scopeList": {
       "personalStillAvailable": "Ir-repożitorji personali xorta disponibbli hawn taħt.",
@@ -1537,7 +1539,8 @@
       "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
-      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "offTitle": "L-istatistika hija mitfija għal {{platform}}",
+      "offDescription": "Attivaha fis-settjar tal-organizzazzjoni fuq il-web biex tirrekordja reviżjonijiet kompluti.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
     },
     "council": {

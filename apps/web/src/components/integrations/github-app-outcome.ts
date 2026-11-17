@@ -113,7 +113,7 @@ export function buildAppReturnOutcomeView(input: {
               : input.error === 'multiple_installations_disabled'
                 ? 'This Kilo organization can currently connect only one GitHub organization.'
                 : input.error === 'installation_start_refused'
-                  ? 'Only an organization owner or admin can start this GitHub installation. Ask one to connect it.'
+                  ? 'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they can manage it in GitHub.'
                   : input.error === 'installation_unavailable'
                     ? INSTALLATION_UNAVAILABLE_MESSAGE
                     : input.error === 'install_state_user_mismatch'

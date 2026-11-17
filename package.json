@@ -61,6 +61,7 @@
     "@expo/agent-cli": "1.0.22",
     "@expo/fingerprint": "~0.21.5",
     "@kilocode/db": "workspace:*",
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@oxlint/plugins": "1.88.0",

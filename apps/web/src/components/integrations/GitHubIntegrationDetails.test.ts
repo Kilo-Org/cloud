@@ -327,7 +327,7 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.cta).toBe('Back');
     expect(view.title).toBe('Cannot complete installation');
     expect(view.description).toBe(
-      'Only an organization owner or admin can start this GitHub installation. Ask one to connect it.'
+      'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they can manage it in GitHub.'
     );
     expect(view.description).not.toContain('Try again');
     expect(view.href).toBe('/cloud/sessions?error=installation_start_refused');

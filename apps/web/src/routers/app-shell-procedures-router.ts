@@ -20,7 +20,9 @@ import { userRouter } from '@/routers/user-router';
  * shell page needs. This router therefore holds exactly the procedures the
  * shell pages and the components they render call, and nothing else:
  *
- * - `models.selectorList`: the model picker on the integration pages.
+ * - `models.selectorList` and `models.preferred`: the model picker on the
+ *   integration pages, which reads the selectable list and the preferred
+ *   ordering `ModelCombobox` groups it by.
  * - `user.*`: the connected-accounts page's provider list, link and unlink,
  *   plus the Discord guild status card.
  * - `organizations.withMembers`, `seats`,
@@ -43,6 +45,7 @@ export const appShellProceduresRouter = createTRPCRouter({
   },
   models: {
     selectorList: modelsRouter.selectorList,
+    preferred: modelsRouter.preferred,
   },
   user: {
     getAuthProviders: userRouter.getAuthProviders,

@@ -14,7 +14,6 @@ import { SettingsSection } from '@/components/organization/settings-form-section
 import { Text } from '@/components/ui/text';
 import {
   detectorChoice,
-  GUARDRAILS_LIMITS,
   type GuardrailsDraft,
   OUTPUT_DETECTOR_IDS,
   type OutputDetectorsDraft,
@@ -88,7 +87,6 @@ export function OutputGuardrailsSection({
               <LineListField
                 label={t('organizationGuardrails.keywordsLabel')}
                 hint={t('organizationGuardrails.keywordsHint')}
-                maxLength={GUARDRAILS_LIMITS.keywords * GUARDRAILS_LIMITS.keywordLength}
                 value={detectors.keyword_detector.banned_keywords}
                 disabled={disabled}
                 onChange={banned_keywords => {
@@ -103,7 +101,6 @@ export function OutputGuardrailsSection({
               <LineListField
                 label={t('organizationGuardrails.detector.topics.label')}
                 hint={t('organizationGuardrails.topicsHint')}
-                maxLength={GUARDRAILS_LIMITS.topics * GUARDRAILS_LIMITS.topicLength}
                 value={detectors.topic_detector.topic}
                 disabled={disabled}
                 onChange={topic => {

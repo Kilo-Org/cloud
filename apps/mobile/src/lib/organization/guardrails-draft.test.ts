@@ -6,6 +6,7 @@ import {
   buildUpdateInput,
   detectorChoice,
   fromDraft,
+  GUARDRAILS_LIMITS,
   type OrgGuardrailsConfig,
   type OrgPolicyRule,
   parseLineList,
@@ -208,6 +209,23 @@ describe('guardrailsIssues', () => {
       banned_keywords: ['x'.repeat(101)],
     };
     expect(guardrailsIssues(toDraft(saved), true)).toContain('keywordTooLong');
+  });
+
+  it('accepts a maximal keyword list whose newlines take it past the old text cap', () => {
+    const saved = config();
+    saved.output.detectors.keyword_detector = {
+      enabled: true,
+      action: 'block',
+      banned_keywords: Array.from({ length: GUARDRAILS_LIMITS.keywords }, () => 'x'.repeat(100)),
+    };
+    const draft = toDraft(saved);
+    // 200 entries of 100 characters plus their 199 newlines: the product of the
+    // two caps is 20,000, so a whole-text cap would cut the last keyword short.
+    expect(draft.outputDetectors.keyword_detector.banned_keywords.length).toBeGreaterThan(
+      GUARDRAILS_LIMITS.keywords * GUARDRAILS_LIMITS.keywordLength
+    );
+    expect(guardrailsIssues(draft, true)).not.toContain('keywordsTooMany');
+    expect(guardrailsIssues(draft, true)).not.toContain('keywordTooLong');
   });
 
   it('rejects a detector list past its cap, a duplicate rule id, and an empty entity list', () => {

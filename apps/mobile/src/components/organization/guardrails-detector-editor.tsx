@@ -121,19 +121,24 @@ export function PiiEntitiesField({
  * A detector's list of keywords or topics: one entry per line. The field keeps
  * its own text in the screen's draft, so a section collapse or another
  * detector's edit never discards what was typed.
+ *
+ * The field carries no whole-text cap. `guardrailsIssues` validates the parsed
+ * entries against the per-entry and entry-count limits, and a cap computed from
+ * their product would cut a maximal list short: 200 keywords of 100 characters
+ * are 20,199 characters once their newlines count, and 50 topics of 100 are
+ * 5,049. A paste stays whole and the save is refused with the reason instead of
+ * a last keyword silently losing its tail.
  */
 export function LineListField({
   label,
   hint,
   value,
-  maxLength,
   onChange,
   disabled,
 }: Readonly<{
   label: string;
   hint: string;
   value: string;
-  maxLength: number;
   onChange: (next: string) => void;
   disabled: boolean;
 }>) {
@@ -143,7 +148,6 @@ export function LineListField({
         label={label}
         multiline
         numberOfLines={3}
-        maxLength={maxLength}
         defaultValue={value}
         disabled={disabled}
         onChangeText={onChange}

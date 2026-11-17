@@ -33,6 +33,7 @@ vi.mock('react-native', async () => {
   return {
     Platform: { OS: 'ios' },
     useColorScheme: () => 'light',
+    Pressable: 'Pressable',
     View: 'View',
     Switch: 'Switch',
     ScrollView: forwardRef(function ScrollViewStub(
@@ -50,7 +51,19 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The subtask row is the shared `PreferenceRow`: its spinner reaches the icon
+// barrel (whose lucide modules this project cannot parse in the mounted
+// environment) and its flip calls the haptics wrapper, which reaches `expo`.
+vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {

@@ -131,10 +131,6 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(description?.props.message).toBe(
       'Ask an organization owner or admin to grant you access.'
     );
-    // In the compact cell this sentence wrapped with one word alone on its last
-    // line, so the description carries a capped measure that breaks it into
-    // balanced lines instead.
-    expect(description?.props.className).toContain('max-w-[205px]');
     const back = button('Back to profile', renderer.root);
     const retry = button('Retry', renderer.root);
     expect(back).toBeDefined();

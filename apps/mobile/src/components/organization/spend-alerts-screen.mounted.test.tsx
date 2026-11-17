@@ -221,6 +221,14 @@ function channelSwitches(renderer: ReactTestRenderer, channelKey: string): React
   );
 }
 
+/** The row that stands in for the push switch when push is unavailable. */
+function pushOffRow(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  const caption = i18n.t('spendAlerts.pushOffByCategory');
+  return byType(renderer, 'Pressable').find(
+    node => node.findAll(child => child.props.children === caption).length > 0
+  );
+}
+
 function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
   const field = byType(renderer, 'FormField').find(node => node.props.label === label);
   if (!field) {
@@ -726,7 +734,7 @@ describe('SpendAlertsScreen push agreement', () => {
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(channelSwitches(renderer, i18n.t('common.email'))).toHaveLength(2);
 
-    press(byType(renderer, 'Pressable')[0]);
+    press(pushOffRow(renderer));
 
     expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
@@ -735,6 +743,6 @@ describe('SpendAlertsScreen push agreement', () => {
     const { renderer } = await mountLoaded({ pushChannelBlocked: true });
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
-    expect(byType(renderer, 'Pressable')).toHaveLength(2);
+    expect(pushOffRow(renderer)).toBeDefined();
   });
 });

@@ -52,7 +52,10 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
 // The choice row fires its own selection haptic; the wrapper's real module reaches
 // `expo-haptics` and then `expo`, whose async-require setup reads the app-only
 // `__DEV__` global. Mocking the wrapper keeps `expo` out of the suite.

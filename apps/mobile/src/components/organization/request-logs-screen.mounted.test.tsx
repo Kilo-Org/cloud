@@ -95,6 +95,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/ui/icons', () => ({ FileText: 'FileText' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));

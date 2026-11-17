@@ -102,6 +102,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   Mail: 'Mail',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
@@ -109,6 +110,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
+  UsersRound: 'UsersRound',
   Wallet: 'Wallet',
 }));
 

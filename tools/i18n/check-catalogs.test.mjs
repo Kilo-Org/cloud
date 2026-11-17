@@ -1940,16 +1940,15 @@ const POLICY_PUSH_FILES = {
 // nothing when any of that drifts.
 const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
 const editDescriptor = (source, edit) => {
-  const descriptor = source.match(NOTIFICATIONS_DESCRIPTOR)?.[0];
-  assert.ok(descriptor, 'the checker must declare the notifications descriptor');
-  const edited = edit(descriptor);
-  assert.notEqual(edited, descriptor, 'the edit must change the descriptor');
+  const descriptors = source.match(new RegExp(NOTIFICATIONS_DESCRIPTOR.source, 'g')) ?? [];
   assert.equal(
-    source.match(NOTIFICATIONS_DESCRIPTOR)?.length,
+    descriptors.length,
     1,
     'the notifications descriptor must be unique in the checker source'
   );
-  return source.replace(descriptor, edited);
+  const edited = edit(descriptors[0]);
+  assert.notEqual(edited, descriptors[0], 'the edit must change the descriptor');
+  return source.replace(descriptors[0], edited);
 };
 const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
   descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');

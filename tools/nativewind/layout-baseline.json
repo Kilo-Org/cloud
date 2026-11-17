@@ -20,6 +20,7 @@
   "apps/mobile/src/components/account/provider-key-provider-picker-screen.tsx": { "L7": 1 },
   "apps/mobile/src/components/account/provider-keys-screen.tsx": { "L4": 1, "L8": 2 },
   "apps/mobile/src/components/add-credits-row.tsx": { "L8": 1 },
+  "apps/mobile/src/components/agents/chat-composer-input-row.tsx": { "L4": 1 },
   "apps/mobile/src/components/agents/markdown-html-details.tsx": { "L7": 1 },
   "apps/mobile/src/components/agents/new-session-prompt-clone.tsx": { "L4": 2 },
   "apps/mobile/src/components/agents/new-session-prompt.tsx": { "L4": 1 },

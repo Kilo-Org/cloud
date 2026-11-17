@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "إعداد المزوّد",
+      "connectOwnerOnly": "اطلب من مالك مؤسسة أو مشرف ربط المزوّد.",
       "couldNotLoad": "تعذّر تحميل المراجعات.",
       "noReviews": "لا توجد مراجعات بعد",
       "noReviewsDescription": "تظهر المراجعات هنا بعد أن يراجع مراجع الشفرة طلب سحب.",
@@ -2559,6 +2560,7 @@
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
     "signOutSessionLabel": "تسجيل الخروج من {{device}}، تسجيل الدخول: {{signedIn}}، آخر ظهور: {{lastSeen}}",
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
+    "sessionSignOutFailed": "تعذّر تسجيل الخروج من هذه الجلسة. حاول مرة أخرى.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
     "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. آخر ظهور: {{lastSeen}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة.",
@@ -2689,12 +2691,14 @@
     "manage": {
       "billingHistory": "سجل الفوترة",
       "billingHistoryEmpty": "لا يوجد سجل فوترة بعد.",
+      "billingHistoryError": "تعذّر تحميل سجل فوترة",
       "cancel": "إلغاء الاشتراك",
       "cancelDescription": "يظل Kilo Pass نشطًا حتى نهاية فترة الفوترة ولن يتم تجديده.",
       "cancelScheduled": "يُلغى في {{date}}",
       "cancelScheduledChange": "إلغاء التغيير المجدول",
       "cancelled": "تم إلغاء الاشتراك",
       "creditHistoryEmpty": "لا يوجد رصيد من Kilo Pass بعد.",
+      "creditHistoryError": "تعذّر تحميل سجل الرصيد",
       "resume": "استئناف الاشتراك",
       "resumeCancelledDescription": "سيعود Kilo Pass إلى التجديد التلقائي مجددًا.",
       "resumePausedDescription": "سيُستأنف Kilo Pass الآن، قبل موعد الاستئناف المجدول.",
@@ -3558,7 +3562,7 @@
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
       "unavailableSessionsDescription": "لم تعد هذه المؤسسة متاحة. لا يمكن تحميل جلساتها.",
-      "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
+      "accessDeniedDescription": "اطلب من مالك المؤسسة أو مشرفها منحك صلاحية الوصول."
     },
     "create": {
       "title": "إنشاء مؤسسة",

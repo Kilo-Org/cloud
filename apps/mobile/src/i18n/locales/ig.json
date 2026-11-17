@@ -1366,7 +1366,8 @@
       "noReviews": "Enwebeghị nyocha",
       "noReviewsDescription": "Nyocha na-apụta ebe a mgbe onye nyocha koodu nyochachara arịrịọ ijikọ koodu.",
       "startManualReview": "Jiri aka malite nyocha",
-      "configureProvider": "Hazie onye na-enye ọrụ"
+      "configureProvider": "Hazie onye na-enye ọrụ",
+      "connectOwnerOnly": "Rịọ onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha jikọọ onye na-enye ọrụ."
     },
     "platformList": {
       "checking": "Na-enyocha…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
     "signOutSessionLabel": "Pụọ na {{device}}, a banyere na {{signedIn}}, a hụrụ ikpeazụ na {{lastSeen}}",
     "sessionSignedOut": "Apụrụ na nnọkọ ahụ.",
+    "sessionSignOutFailed": "Enweghị ike ịpụ na nnọkọ a. Nwaa ọzọ.",
     "signOutThisDeviceTitle": "Pụọ na ngwaọrụ a?",
     "signOutThisSessionTitle": "Pụọ na nnọkọ a?",
     "signOutThisSessionMessage": "A ga-eme ka {{device}} pụọ. A hụrụ ikpeazụ na {{lastSeen}}. Ọ ka nwere ike ịnweta API ruo otu awa.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Akụkọ ịkwụ ụgwọ",
       "billingHistoryEmpty": "Enweghị akụkọ ịkwụ ụgwọ ka ugbu a.",
+      "billingHistoryError": "Enweghị ike ibudata akụkọ ịkwụ ụgwọ",
       "cancel": "Kagbuo ndenye aha",
       "cancelDescription": "Kilo Pass gị ga-anọgide na-arụ ọrụ ruo ngwụcha oge ịkwụ ụgwọ, a gaghịkwa emeghari ya ọhụrụ.",
       "cancelScheduled": "Ọ ga-akagbu na {{date}}",
       "cancelScheduledChange": "Kagbuo mgbanwe a haziri",
       "cancelled": "Akagburu ndenye aha",
       "creditHistoryEmpty": "Enweghị kredit Kilo Pass ka ugbu a.",
+      "creditHistoryError": "Enweghị ike ibudata akụkọ kredit",
       "resume": "Maliteghachi ndenye aha",
       "resumeCancelledDescription": "Kilo Pass gị ga-amaliteghachi imeghari ọhụrụ na-akpaghị aka.",
       "resumePausedDescription": "Kilo Pass gị ga-amaliteghachi ugbu a, tupu ụbọchị a haziri maka ịmaliteghachi ya.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Họrọ ụlọ ọrụ",
       "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
       "unavailableSessionsDescription": "Ụlọ ọrụ a adịkwaghị. Enweghị ike ibudata nnọkọ ya.",
-      "accessDeniedDescription": "Ị nweghị ikike ịbanye n'ụlọ ọrụ a."
+      "accessDeniedDescription": "Rịọ onye nwe ụlọ ọrụ ma ọ bụ onye nchịkwa ya ka o nye gị ikike ịbanye."
     },
     "create": {
       "title": "Mepụta òtù",

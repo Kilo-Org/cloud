@@ -1366,7 +1366,8 @@
       "noReviews": "შემოწმებები ჯერ არ არის",
       "noReviewsDescription": "შემოწმებები აქ გამოჩნდება მას შემდეგ, რაც კოდის შემმოწმებელი PR-ს შეამოწმებს.",
       "startManualReview": "ხელით შემოწმების დაწყება",
-      "configureProvider": "პროვაიდერის გამართვა"
+      "configureProvider": "პროვაიდერის გამართვა",
+      "connectOwnerOnly": "სთხოვეთ ორგანიზაციის მფლობელს ან ადმინისტრატორს, რომ დააკავშიროს პროვაიდერი."
     },
     "platformList": {
       "checking": "მოწმდება…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ამ მოწყობილობიდან გასვლა",
     "signOutSessionLabel": "{{device}}-დან გასვლა, შესვლა: {{signedIn}}, ბოლო აქტივობა: {{lastSeen}}",
     "sessionSignedOut": "სესია დაიხურა.",
+    "sessionSignOutFailed": "ამ სესიიდან გასვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "signOutThisDeviceTitle": "გავიდეთ ამ მოწყობილობიდან?",
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",
     "signOutThisSessionMessage": "{{device}} ანგარიშიდან გახვალთ. ბოლო აქტივობა: {{lastSeen}}. მოწყობილობას API-ზე წვდომა კიდევ ერთ საათამდე შეიძლება შეუნარჩუნდეს.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "გადახდების ისტორია",
       "billingHistoryEmpty": "გადახდების ისტორია ჯერ არ არის.",
+      "billingHistoryError": "გადახდების ისტორია ვერ ჩაიტვირთა",
       "cancel": "გამოწერის გაუქმება",
       "cancelDescription": "თქვენი Kilo Pass აქტიური დარჩება ანგარიშსწორების პერიოდის ბოლომდე და აღარ განახლდება.",
       "cancelScheduled": "გაუქმდება {{date}}",
       "cancelScheduledChange": "დაგეგმილი ცვლილების გაუქმება",
       "cancelled": "გამოწერა გაუქმდა",
       "creditHistoryEmpty": "Kilo Pass-ის კრედიტები ჯერ არ არის.",
+      "creditHistoryError": "კრედიტების ისტორია ვერ ჩაიტვირთა",
       "resume": "გამოწერის აღდგენა",
       "resumeCancelledDescription": "თქვენი Kilo Pass კვლავ ავტომატურად განახლდება.",
       "resumePausedDescription": "თქვენი Kilo Pass ახლავე აღდგება, დაგეგმილ თარიღამდე.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "აირჩიეთ ორგანიზაცია",
       "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად თქვენს პროფილში აირჩიეთ სხვა ორგანიზაცია.",
       "unavailableSessionsDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. მისი სესიების ჩატვირთვა შეუძლებელია.",
-      "accessDeniedDescription": "თქვენ არ გაქვთ წვდომა ამ ორგანიზაციაზე."
+      "accessDeniedDescription": "სთხოვეთ ორგანიზაციის მფლობელს ან ადმინისტრატორს, მოგანიჭოთ წვდომა."
     },
     "create": {
       "title": "ორგანიზაციის შექმნა",

@@ -1366,7 +1366,8 @@
       "noReviews": "अद्याप कोणतेही पुनरावलोकन नाही",
       "noReviewsDescription": "कोड पुनरावलोककाने पुल रिक्वेस्टचे पुनरावलोकन केल्यानंतर ते येथे दिसेल.",
       "startManualReview": "पुनरावलोकन स्वतः सुरू करा",
-      "configureProvider": "सेवा पुरवठादाराच्या सेटिंग्ज ठरवा"
+      "configureProvider": "सेवा पुरवठादाराच्या सेटिंग्ज ठरवा",
+      "connectOwnerOnly": "संस्थेच्या मालक किंवा प्रशासकाला सेवा पुरवठादार जोडण्यास सांगा."
     },
     "platformList": {
       "checking": "तपासत आहे…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "या डिव्हाइसवरून साइन आउट करा",
     "signOutSessionLabel": "{{device}} वरून साइन आउट करा, साइन इन: {{signedIn}}, शेवटचे सक्रिय: {{lastSeen}}",
     "sessionSignedOut": "सत्र साइन आउट झाले.",
+    "sessionSignOutFailed": "या सत्रातून साइन आउट करता आले नाही. पुन्हा प्रयत्न करा.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
     "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. शेवटचे सक्रिय: {{lastSeen}}. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "बिलिंग इतिहास",
       "billingHistoryEmpty": "अद्याप कोणताही बिलिंग इतिहास नाही.",
+      "billingHistoryError": "बिलिंग इतिहास लोड करू शकले नाही",
       "cancel": "सदस्यता रद्द करा",
       "cancelDescription": "तुमचा Kilo Pass बिलिंग कालावधी संपेपर्यंत सक्रिय राहील आणि त्याचे नूतनीकरण होणार नाही.",
       "cancelScheduled": "{{date}} रोजी रद्द होईल",
       "cancelScheduledChange": "नियोजित बदल रद्द करा",
       "cancelled": "सदस्यता रद्द केली",
       "creditHistoryEmpty": "अद्याप कोणतेही Kilo Pass क्रेडिट नाहीत.",
+      "creditHistoryError": "क्रेडिट इतिहास लोड करू शकले नाही",
       "resume": "सदस्यता पुन्हा सुरू करा",
       "resumeCancelledDescription": "तुमच्या Kilo Pass चे पुन्हा आपोआप नूतनीकरण होऊ लागेल.",
       "resumePausedDescription": "तुमचा Kilo Pass त्याच्या नियोजित पुनरारंभ तारखेपूर्वी आत्ताच पुन्हा सुरू होईल.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी खाते निवडण्याच्या सूचीतून दुसरे खाते निवडा.",
       "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जाऊ शकत नाहीत.",
-      "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
+      "accessDeniedDescription": "तुम्हाला प्रवेश देण्यासाठी संस्थेच्या मालकास किंवा प्रशासकास विनंती करा."
     },
     "create": {
       "title": "संस्था तयार करा",

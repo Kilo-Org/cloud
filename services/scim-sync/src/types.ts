@@ -82,7 +82,10 @@ export type ScimSyncDOStatus = {
   cursorSource: CursorSource;
   /** Non-null whenever the loop is stuck, which is what an operator looks for. */
   eventFailure: EventFailureState | null;
-  /** Events the loop gave up on and stepped over, over the object's lifetime. */
+  /**
+   * Parked rows still inside the retention window at read time, not a lifetime
+   * total: a row past its window is not counted, even before a tick deletes it.
+   */
   parkedCount: number;
   nextAlarmAt: number | null;
   lastPoll: PollResult | null;

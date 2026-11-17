@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Configurar proveedor",
+      "connectOwnerOnly": "Pídele a un propietario o a un administrador de la organización que conecte un proveedor.",
       "couldNotLoad": "No se pudieron cargar las revisiones.",
       "noReviews": "Aún no hay revisiones",
       "noReviewsDescription": "Las revisiones aparecen aquí cuando el revisor de código analiza un PR.",
@@ -2462,6 +2463,7 @@
     "signOutThisDevice": "Cerrar sesión en este dispositivo",
     "signOutSessionLabel": "Cerrar sesión en {{device}}, inicio de sesión: {{signedIn}}, última actividad: {{lastSeen}}",
     "sessionSignedOut": "Sesión cerrada.",
+    "sessionSignOutFailed": "No se pudo cerrar esta sesión. Inténtalo de nuevo.",
     "signOutThisDeviceTitle": "¿Cerrar sesión en este dispositivo?",
     "signOutThisSessionTitle": "¿Cerrar esta sesión?",
     "signOutThisSessionMessage": "Se cerrará la sesión en {{device}}. Última actividad: {{lastSeen}}. El dispositivo puede conservar el acceso a la API durante una hora como máximo.",
@@ -2587,12 +2589,14 @@
     "manage": {
       "billingHistory": "Historial de facturación",
       "billingHistoryEmpty": "Aún no hay historial de facturación.",
+      "billingHistoryError": "No se pudo cargar el historial de facturación",
       "cancel": "Cancelar suscripción",
       "cancelDescription": "Tu Kilo Pass seguirá activo hasta el final del periodo de facturación y no se renovará.",
       "cancelScheduled": "Se cancela el {{date}}",
       "cancelScheduledChange": "Cancelar cambio programado",
       "cancelled": "Suscripción cancelada",
       "creditHistoryEmpty": "Aún no hay créditos de Kilo Pass.",
+      "creditHistoryError": "No se pudo cargar el historial de créditos",
       "resume": "Reanudar suscripción",
       "resumeCancelledDescription": "Tu Kilo Pass volverá a renovarse automáticamente.",
       "resumePausedDescription": "Tu Kilo Pass se reanuda ahora, antes de la fecha de reanudación programada.",
@@ -3387,7 +3391,7 @@
       "selectOrganization": "Seleccionar una organización",
       "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización ya no está disponible. No se pueden cargar sus sesiones.",
-      "accessDeniedDescription": "No tienes acceso a esta organización."
+      "accessDeniedDescription": "Pide a un propietario o administrador de la organización que te conceda acceso."
     },
     "create": {
       "title": "Crear organización",

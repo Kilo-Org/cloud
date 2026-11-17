@@ -1366,7 +1366,8 @@
       "noReviews": "Mbola tsy misy fanamarinana",
       "noReviewsDescription": "Hiseho eto ny fanamarinana rehefa manamarina PR ny Code Reviewer.",
       "startManualReview": "Atombohy mivantana ny fanamarinana",
-      "configureProvider": "Amboary ny fikiran'ny mpanome tolotra"
+      "configureProvider": "Amboary ny fikiran'ny mpanome tolotra",
+      "connectOwnerOnly": "Mangataha ny tompon'ny fikambanana na ny mpitantana mba hampifandray mpanome tolotra."
     },
     "platformList": {
       "checking": "Manamarina…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Mivoaha amin'ity fitaovana ity",
     "signOutSessionLabel": "Mivoaha amin'ny {{device}}, niditra {{signedIn}}, hita farany {{lastSeen}}",
     "sessionSignedOut": "Nifarana ny fidirana tamin'ity fotoam-piasana ity.",
+    "sessionSignOutFailed": "Tsy afaka nivoaka tamin'ity fotoam-piasana ity. Andramo indray.",
     "signOutThisDeviceTitle": "Hivoaka amin'ity fitaovana ity ve?",
     "signOutThisSessionTitle": "Hivoaka amin'ity fotoam-piasana ity ve?",
     "signOutThisSessionMessage": "Havoaka amin'ny kaonty ny {{device}}. Hita farany {{lastSeen}}. Mbola afaka mampiasa ny API hatramin'ny adiny iray izany.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Tantaran'ny fandoavam-bola",
       "billingHistoryEmpty": "Mbola tsy misy tantaran'ny fandoavam-bola.",
+      "billingHistoryError": "Tsy azo alaina ny tantaran'ny fandoavam-bola",
       "cancel": "Foano ny famandrihana",
       "cancelDescription": "Mijanona ho mavitrika hatramin'ny fiafaran'ny vanim-potoana fandoavam-bola ny Kilo Pass anao ary tsy havaozina intsony.",
       "cancelScheduled": "Hofoanana amin'ny {{date}}",
       "cancelScheduledChange": "Foano ny fanovana voalahatra",
       "cancelled": "Voafoana ny famandrihana",
       "creditHistoryEmpty": "Mbola tsy misy kredita Kilo Pass.",
+      "creditHistoryError": "Tsy azo alaina ny tantaran'ny kredita",
       "resume": "Tohizo ny famandrihana",
       "resumeCancelledDescription": "Hiverina havaozina ho azy indray ny Kilo Pass anao.",
       "resumePausedDescription": "Mitohy izao ny Kilo Pass anao, alohan'ny daty voalahatra hitohizany.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Misafidiana fikambanana",
       "unavailableDescription": "Tsy azo idirana intsony ity fikambanana ity. Misafidiana iray ao amin'ny mombamomba anao mba hanohizana.",
       "unavailableSessionsDescription": "Tsy azo idirana intsony ity fikambanana ity. Tsy azo alaina ny sesiony azy.",
-      "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."
+      "accessDeniedDescription": "Angataho amin'ny tompony na mpitantana ny fikambanana mba hanome alalana anao hiditra."
     },
     "create": {
       "title": "Hamorona fikambanana",

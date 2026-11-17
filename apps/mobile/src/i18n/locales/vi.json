@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
+      "connectOwnerOnly": "Hãy yêu cầu chủ sở hữu tổ chức hoặc quản trị viên kết nối nhà cung cấp.",
       "couldNotLoad": "Không thể tải danh sách lượt rà soát.",
       "noReviews": "Chưa có lượt rà soát nào",
       "noReviewsDescription": "Kết quả sẽ xuất hiện tại đây sau khi Trình rà soát mã chạy trên một yêu cầu hợp nhất.",
@@ -2431,6 +2432,7 @@
     "signOutThisDevice": "Đăng xuất khỏi thiết bị này",
     "signOutSessionLabel": "Đăng xuất khỏi {{device}}, đăng nhập lúc {{signedIn}}, hoạt động gần nhất {{lastSeen}}",
     "sessionSignedOut": "Đã đăng xuất phiên.",
+    "sessionSignOutFailed": "Không thể đăng xuất phiên này. Hãy thử lại.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
     "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Hoạt động gần nhất {{lastSeen}}. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
@@ -2553,12 +2555,14 @@
     "manage": {
       "billingHistory": "Lịch sử thanh toán",
       "billingHistoryEmpty": "Chưa có lịch sử thanh toán.",
+      "billingHistoryError": "Không thể tải lịch sử thanh toán",
       "cancel": "Hủy gói đăng ký",
       "cancelDescription": "Kilo Pass của bạn vẫn hoạt động đến hết kỳ thanh toán và sẽ không được gia hạn.",
       "cancelScheduled": "Sẽ hủy vào {{date}}",
       "cancelScheduledChange": "Hủy thay đổi đã lên lịch",
       "cancelled": "Đã hủy gói đăng ký",
       "creditHistoryEmpty": "Chưa có tín dụng Kilo Pass nào.",
+      "creditHistoryError": "Không thể tải lịch sử tín dụng Kilo Pass",
       "resume": "Tiếp tục gói đăng ký",
       "resumeCancelledDescription": "Kilo Pass của bạn sẽ lại được tự động gia hạn.",
       "resumePausedDescription": "Kilo Pass của bạn sẽ tiếp tục ngay bây giờ, trước ngày tiếp tục đã lên lịch.",
@@ -3330,7 +3334,7 @@
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
       "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
-      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
+      "accessDeniedDescription": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức cấp quyền truy cập cho bạn."
     },
     "create": {
       "title": "Tạo tổ chức",

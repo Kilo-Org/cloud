@@ -1,3 +1,21 @@
+import { TRPCError } from '@trpc/server';
+import {
+  ensureOrganizationAccess,
+  ensureOrganizationsAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
+  const { initTRPC } = jest.requireActual('@trpc/server');
+  const t = initTRPC.create();
+  return { baseProcedure: t.procedure, createTRPCRouter: t.router };
+});
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {}, db: {} }));
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({ getEnvVariable: jest.fn() }));
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
+  ensureOrganizationAccess: jest.fn(),
+  ensureOrganizationsAccess: jest.fn(),
+  getOrganizationsAccessRoles: jest.fn(),
+}));
+
 jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {} }));
 jest.mock('@/lib/snowflake', () => ({
   resolveSnowflakeConfig: jest.fn(),
@@ -511,4 +529,370 @@ describe('usage analytics procedures', () => {
     await expect(invoke()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockExecuteSnowflakeStatement).not.toHaveBeenCalled();
   });
+});
+
+// These seams exercise the router and SQL generation without a database or warehouse.
+describe('autoModel analytics', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockResolveSnowflakeConfig.mockReturnValue(SNOWFLAKE_CONFIG);
+    mockExecuteSnowflakeStatement.mockResolvedValue([]);
+  });
+
+  const invokeAll = async (
+    filters: Omit<typeof baseFilters, 'granularity'> & { granularity: 'hour' | 'day' } & Record<
+        string,
+        unknown
+      >
+  ) => {
+    await caller().getSummary(filters);
+    await caller().getTimeseries({ ...filters, metric: 'cost' });
+    await caller().getBreakdown({ ...filters, dimension: 'model', metric: 'cost' });
+    await caller().getTable({ ...filters, groupBy: [] });
+  };
+
+  it.each(['hour', 'day'] as const)(
+    'binds alias and model filters on all %s endpoints',
+    async granularity => {
+      const startDate = new Date(Date.now() - 3600_000).toISOString();
+      const endDate = new Date().toISOString();
+      const alias = "custom'); DROP TABLE usage; --";
+      await invokeAll({
+        ...baseFilters,
+        startDate,
+        endDate,
+        granularity,
+        autoModels: [alias, 'Balanced'],
+        excludedAutoModels: ['unknown'],
+        models: ['classifier/model'],
+        excludedModels: ['inference/model'],
+        costSource: 'market',
+      });
+      expect(mockExecuteSnowflakeStatement).toHaveBeenCalledTimes(4);
+      for (const [request] of mockExecuteSnowflakeStatement.mock.calls) {
+        expect(request.statement).toContain(
+          granularity === 'hour' ? 'MICRODOLLAR_USAGE_HOURLY' : 'MICRODOLLAR_USAGE_DAILY'
+        );
+        expect(request.statement).toContain('auto_model IN (?, ?)');
+        expect(request.statement).toContain('auto_model NOT IN (?)');
+        expect(request.statement).toContain('model IN (?)');
+        expect(request.statement).toContain('model NOT IN (?)');
+        expect(request.statement).toContain('kilo_user_id = ?');
+        expect(request.statement).toContain('organization_id = ?');
+        expect(request.statement).toContain('total_market_cost_microdollars');
+        expect(request.statement).not.toContain(alias);
+        expect(request.bindings?.map(b => b.value).slice(2)).toEqual([
+          CTX_USER,
+          '',
+          'classifier/model',
+          alias,
+          'Balanced',
+          'inference/model',
+          'unknown',
+        ]);
+        expect(request.statement).toContain(
+          granularity === 'hour'
+            ? 'usage_hour >= ? AND usage_hour < ?'
+            : 'usage_date >= ? AND usage_date < ?'
+        );
+      }
+    }
+  );
+
+  it.each(['hour', 'day'] as const)(
+    'retains untagged aliases without widening any scope in all %s endpoints',
+    async granularity => {
+      const startDate = new Date(Date.now() - 3600_000).toISOString();
+      const endDate = new Date().toISOString();
+      const excludedAlias = "custom') OR 1=1 --";
+      const scopes = [
+        { filters: {}, values: [CTX_USER, ''] },
+        { filters: { personalScope: 'include-orgs' as const }, values: [CTX_USER] },
+        {
+          filters: { organizationId: PARENT_ORG, viewAs: 'self' as const },
+          values: [PARENT_ORG, CTX_USER],
+        },
+        {
+          filters: {
+            organizationId: PARENT_ORG,
+            viewAs: 'org-wide' as const,
+            userIds: ['org-user'],
+          },
+          values: [PARENT_ORG, 'org-user'],
+        },
+        {
+          filters: { organizationIds: [PARENT_ORG, CHILD_ORG_A], userIds: ['org-user'] },
+          values: [PARENT_ORG, CHILD_ORG_A, 'org-user'],
+        },
+      ];
+      for (const scope of scopes) {
+        for (const autoModels of [undefined, ['Balanced']]) {
+          mockExecuteSnowflakeStatement.mockClear();
+          await invokeAll({
+            ...baseFilters,
+            startDate,
+            endDate,
+            granularity,
+            ...scope.filters,
+            autoModels,
+            excludedAutoModels: ['Efficient', excludedAlias],
+            excludedModels: ['classifier/model'],
+            excludedProviders: ['vercel'],
+          });
+          expect(mockExecuteSnowflakeStatement).toHaveBeenCalledTimes(4);
+          for (const [request] of mockExecuteSnowflakeStatement.mock.calls) {
+            const timeColumn = granularity === 'hour' ? 'usage_hour' : 'usage_date';
+            const dateValues =
+              granularity === 'hour'
+                ? [startDate, endDate]
+                : [
+                    startDate.slice(0, 10),
+                    new Date(new Date(endDate).setUTCHours(24, 0, 0, 0)).toISOString().slice(0, 10),
+                  ];
+            expect(request.statement).toContain(`${timeColumn} >= ? AND ${timeColumn} < ?`);
+            expect(request.statement).toContain(
+              'userIds' in scope.filters ? 'kilo_user_id IN (?)' : 'kilo_user_id = ?'
+            );
+            if ('organizationIds' in scope.filters)
+              expect(request.statement).toContain('organization_id IN (?, ?)');
+            else if ('organizationId' in scope.filters || !('personalScope' in scope.filters))
+              expect(request.statement).toContain('organization_id = ?');
+            expect(request.statement).toContain(
+              '\n  AND (auto_model NOT IN (?, ?) OR auto_model IS NULL)'
+            );
+            expect(request.statement.match(/\bOR\b/g)).toHaveLength(1);
+            expect(request.statement).toContain('\n  AND model NOT IN (?)');
+            expect(request.statement).toContain('\n  AND provider NOT IN (?)');
+            expect(request.statement).not.toContain(excludedAlias);
+            expect(request.statement.includes('auto_model IN (?)')).toBe(Boolean(autoModels));
+            expect(request.bindings?.map(b => b.value)).toEqual([
+              ...dateValues,
+              ...scope.values,
+              ...(autoModels ?? []),
+              'classifier/model',
+              'Efficient',
+              excludedAlias,
+              'vercel',
+            ]);
+          }
+        }
+      }
+    }
+  );
+
+  it.each(['hour', 'day'] as const)(
+    'maps %s alias labels and table metric positions without normalization',
+    async granularity => {
+      const filters = {
+        ...baseFilters,
+        granularity,
+        startDate: new Date(Date.now() - 3600_000).toISOString(),
+        endDate: new Date().toISOString(),
+      };
+      // SQL NULL fixtures exercise runtime behavior beyond the client's string-only cell type.
+      mockExecuteSnowflakeStatement
+        .mockResolvedValueOnce([
+          ['bucket', '12', 'BaLaNcEd'],
+          ['bucket', '3', null],
+        ] as string[][])
+        .mockResolvedValueOnce([
+          ['unknown', '3'],
+          [null, '1'],
+        ] as string[][])
+        .mockResolvedValueOnce([
+          [
+            'bucket',
+            '',
+            'classifier/model',
+            '',
+            '',
+            '',
+            '',
+            '10',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            'BaLaNcEd',
+          ],
+          ['bucket', '', '', '', '', '', '', '20', '12', '13', '14', '15', '16', '17', null],
+        ] as string[][]);
+      expect(
+        (await caller().getTimeseries({ ...filters, metric: 'requests', splitBy: 'autoModel' }))
+          .timeseries
+      ).toEqual([
+        { datetime: 'bucket', value: 12, label: 'BaLaNcEd' },
+        { datetime: 'bucket', value: 3, label: undefined },
+      ]);
+      expect(
+        (await caller().getBreakdown({ ...filters, dimension: 'autoModel', metric: 'requests' }))
+          .breakdown
+      ).toEqual([
+        { key: 'unknown', label: 'unknown', value: 3, percentage: 75 },
+        { key: '', label: '', value: 1, percentage: 25 },
+      ]);
+      expect(
+        (await caller().getTable({ ...filters, groupBy: ['model', 'autoModel'] })).rows
+      ).toEqual([
+        {
+          datetime: 'bucket',
+          dimensions: { model: 'classifier/model', autoModel: 'BaLaNcEd' },
+          costMicrodollars: 10,
+          requestCount: 2,
+          inputTokens: 3,
+          outputTokens: 4,
+          cacheWriteTokens: 5,
+          cacheHitTokens: 6,
+          errorCount: 7,
+        },
+        {
+          datetime: 'bucket',
+          dimensions: { model: '', autoModel: '' },
+          costMicrodollars: 20,
+          requestCount: 12,
+          inputTokens: 13,
+          outputTokens: 14,
+          cacheWriteTokens: 15,
+          cacheHitTokens: 16,
+          errorCount: 17,
+        },
+      ]);
+      expect(mockExecuteSnowflakeStatement.mock.calls[0][0].statement).toContain(
+        'auto_model AS label'
+      );
+      expect(mockExecuteSnowflakeStatement.mock.calls[1][0].statement).toContain(
+        'auto_model AS key'
+      );
+      expect(mockExecuteSnowflakeStatement.mock.calls[2][0].statement).toContain(
+        'GROUP BY 1, model, auto_model'
+      );
+    }
+  );
+
+  it.each(['personal', 'include-orgs', 'self', 'org-wide', 'multi-org'] as const)(
+    'preserves %s authorization and scope with aliases',
+    async scope => {
+      const scoped =
+        scope === 'personal'
+          ? {}
+          : scope === 'include-orgs'
+            ? { personalScope: 'include-orgs' as const }
+            : scope === 'multi-org'
+              ? { organizationIds: [PARENT_ORG, CHILD_ORG_A] }
+              : { organizationId: PARENT_ORG, viewAs: scope };
+      await invokeAll({ ...baseFilters, ...scoped, autoModels: ['Balanced'] });
+      for (const [r] of mockExecuteSnowflakeStatement.mock.calls) {
+        const values = r.bindings?.map(b => b.value) ?? [];
+        expect(values).toContain('Balanced');
+        if (scope === 'multi-org') {
+          expect(r.statement).toContain('organization_id IN (?, ?)');
+          expect(values).toEqual(['2026-06-04', '2026-06-05', PARENT_ORG, CHILD_ORG_A, 'Balanced']);
+        } else if (scope === 'org-wide') {
+          expect(values).toEqual(['2026-06-04', '2026-06-05', PARENT_ORG, 'Balanced']);
+        } else {
+          expect(r.statement).toContain('kilo_user_id = ?');
+          expect(values).toContain(CTX_USER);
+          if (scope === 'self') expect(values).toContain(PARENT_ORG);
+          if (scope === 'personal') expect(values).toContain('');
+          if (scope === 'include-orgs') expect(r.statement).not.toContain('organization_id = ?');
+        }
+      }
+      if (scope === 'multi-org')
+        expect(ensureOrganizationsAccess).toHaveBeenCalledWith(
+          expect.anything(),
+          [PARENT_ORG, CHILD_ORG_A],
+          ['owner', 'admin', 'billing_manager']
+        );
+      if (scope === 'org-wide')
+        expect(ensureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), PARENT_ORG, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      if (scope === 'self')
+        expect(ensureOrganizationAccess).toHaveBeenCalledWith(
+          expect.anything(),
+          PARENT_ORG,
+          undefined
+        );
+    }
+  );
+
+  it.each(['personal', 'self', 'org-wide', 'multi-org'] as const)(
+    'denies %s before any warehouse query despite an alias',
+    async scope => {
+      jest.mocked(ensureOrganizationAccess).mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
+      jest
+        .mocked(ensureOrganizationsAccess)
+        .mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
+      const scoped =
+        scope === 'personal'
+          ? { userIds: ['other'] }
+          : scope === 'multi-org'
+            ? { organizationIds: [PARENT_ORG, CHILD_ORG_A] }
+            : { organizationId: PARENT_ORG, viewAs: scope };
+      const f = { ...baseFilters, ...scoped, autoModels: ['Balanced'] };
+      const invokes = [
+        () => caller().getSummary(f),
+        () => caller().getTimeseries({ ...f, metric: 'cost' }),
+        () => caller().getBreakdown({ ...f, dimension: 'model', metric: 'cost' }),
+        () => caller().getTable({ ...f, groupBy: [] }),
+      ];
+      for (const invoke of invokes)
+        await expect(invoke()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockExecuteSnowflakeStatement).not.toHaveBeenCalled();
+    }
+  );
+
+  it('leaves default requests and empty alias lists identical', async () => {
+    await invokeAll(baseFilters);
+    const defaults = mockExecuteSnowflakeStatement.mock.calls.map(([r]) => ({
+      statement: r.statement,
+      bindings: r.bindings,
+    }));
+    jest.clearAllMocks();
+    await invokeAll({ ...baseFilters, autoModels: [], excludedAutoModels: [] });
+    expect(
+      mockExecuteSnowflakeStatement.mock.calls.map(([r]) => ({
+        statement: r.statement,
+        bindings: r.bindings,
+      }))
+    ).toEqual(defaults);
+    for (const r of defaults) expect(r.statement).not.toContain('auto_model');
+  });
+
+  it.each(['autoModels', 'excludedAutoModels'])(
+    'bounds %s and rejects injected dimensions',
+    field => {
+      expect(
+        UsageAnalyticsFiltersSchema.safeParse({
+          ...baseFilters,
+          [field]: Array(MAX_FILTER_VALUES + 1).fill('a'),
+        }).success
+      ).toBe(false);
+      expect(
+        UsageAnalyticsFiltersSchema.safeParse({
+          ...baseFilters,
+          [field]: ['a'.repeat(MAX_FILTER_VALUE_LENGTH + 1)],
+        }).success
+      ).toBe(false);
+      expect(
+        UsageAnalyticsFiltersSchema.parse({ ...baseFilters, [field]: ['unknown', ''] })[
+          field as 'autoModels'
+        ]
+      ).toEqual(['unknown', '']);
+      expect(
+        TableInputSchema.safeParse({ ...baseFilters, groupBy: ['auto_model; DROP TABLE usage'] })
+          .success
+      ).toBe(false);
+      expect(
+        TableInputSchema.safeParse({
+          ...baseFilters,
+          groupBy: ['autoModel', 'model', 'provider', 'feature'],
+        }).success
+      ).toBe(false);
+    }
+  );
 });

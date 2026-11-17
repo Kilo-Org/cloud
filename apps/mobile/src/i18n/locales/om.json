@@ -1366,7 +1366,8 @@
       "noReviews": "Ammaaf sakatta'iinsi hin jiru",
       "noReviewsDescription": "Sakatta'aan koodii gaaffii makuu irratti erga hojjeteen booda sakatta'awwan asitti mul'atu.",
       "startManualReview": "Sakatta'a harkaa jalqabi",
-      "configureProvider": "Waltajjii qindeessi"
+      "configureProvider": "Waltajjii qindeessi",
+      "connectOwnerOnly": "Waltajjii walqabsiisuuf abbaa dhaabbataa ykn bulchaa gaafadhu."
     },
     "platformList": {
       "checking": "Mirkaneessaa jira…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Meeshaa kana herrega keessaa baasi",
     "signOutSessionLabel": "{{device}} herrega keessaa baasi, yeroo seene {{signedIn}}, dhumarratti kan mul'ate {{lastSeen}}",
     "sessionSignedOut": "Turtiin herrega keessaa baafameera.",
+    "sessionSignOutFailed": "Turtii kana herrega keessaa baasuu hin dandeenye. Irra deebi'ii yaali.",
     "signOutThisDeviceTitle": "Meeshaa kana herrega keessaa baastaa?",
     "signOutThisSessionTitle": "Turtii kana herrega keessaa baastaa?",
     "signOutThisSessionMessage": "{{device}} herrega keessaa baafama. Dhumarratti kan mul'ate {{lastSeen}}. Hanga sa'aatii tokkootti API fayyadamuu itti fufuu danda'a.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Seenaa kaffaltii",
       "billingHistoryEmpty": "Ammaaf seenaan kaffaltii hin jiru.",
+      "billingHistoryError": "Seenaa kaffaltii fe'uu hin dandeenye",
       "cancel": "Miseensummaa haqi",
       "cancelDescription": "Kilo Pass kee hanga xumura yeroo kaffaltii hojiirra tura, hin haaromfamu.",
       "cancelScheduled": "{{date}} irratti haqama",
       "cancelScheduledChange": "Jijjiirama karoorfame haqi",
       "cancelled": "Miseensummaan haqameera",
       "creditHistoryEmpty": "Ammaaf kireeditiin Kilo Pass hin jiru.",
+      "creditHistoryError": "Seenaa kireeditii fe'uu hin dandeenye",
       "resume": "Miseensummaa itti fufsiisi",
       "resumeCancelledDescription": "Kilo Pass kee ammas ofumaan haaromfamuu jalqaba.",
       "resumePausedDescription": "Kilo Pass kee guyyaa itti fufuuf karoorfame dura, amma itti fufa.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Dhaabbata filadhu",
       "unavailableDescription": "Dhaabbanni kun kana booda hin argamu. Itti fufuuf piroofaayilii kee irraa dhaabbata filadhu.",
       "unavailableSessionsDescription": "Dhaabbanni kun kana booda hin argamu. Seesiniin isaa hin fe'atamuu danda'u.",
-      "accessDeniedDescription": "Dhaabbata kana bira ga'uuf hayyama hin qabdu."
+      "accessDeniedDescription": "Abbaa dhaabbataa ykn bulchaa dhaabbataa tokko akka hayyama siif kennu gaafadhu."
     },
     "create": {
       "title": "Dhaabbata uumi",

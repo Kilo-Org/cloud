@@ -1366,7 +1366,8 @@
       "noReviews": "هنوز بررسی‌ای وجود ندارد",
       "noReviewsDescription": "پس از اجرای بررسی‌کننده کد روی یک درخواست ادغام، بررسی‌ها اینجا نمایش داده می‌شوند.",
       "startManualReview": "شروع بررسی دستی",
-      "configureProvider": "پیکربندی ارائه‌دهنده"
+      "configureProvider": "پیکربندی ارائه‌دهنده",
+      "connectOwnerOnly": "از مالک یا مدیر سازمان بخواهید یک ارائه‌دهنده را متصل کند."
     },
     "platformList": {
       "checking": "در حال بررسی…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "خروج از این دستگاه",
     "signOutSessionLabel": "خروج از {{device}}، ورود در {{signedIn}}، آخرین بازدید {{lastSeen}}",
     "sessionSignedOut": "خروج از نشست انجام شد.",
+    "sessionSignOutFailed": "خروج از این نشست انجام نشد. دوباره تلاش کنید.",
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",
     "signOutThisSessionMessage": "دستگاه {{device}} از حساب خارج می‌شود. آخرین بازدید {{lastSeen}}. ممکن است تا یک ساعت به API دسترسی داشته باشد.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "تاریخچهٔ صورتحساب",
       "billingHistoryEmpty": "هنوز تاریخچهٔ صورتحسابی وجود ندارد.",
+      "billingHistoryError": "بارگذاری تاریخچهٔ صورتحسابی ممکن نشد",
       "cancel": "لغو اشتراک",
       "cancelDescription": "Kilo Pass شما تا پایان دورهٔ صورتحساب فعال می‌ماند و تمدید نخواهد شد.",
       "cancelScheduled": "در {{date}} لغو می‌شود",
       "cancelScheduledChange": "لغو تغییر زمان‌بندی‌شده",
       "cancelled": "اشتراک لغو شد",
       "creditHistoryEmpty": "هنوز اعتباری از Kilo Pass وجود ندارد.",
+      "creditHistoryError": "بارگذاری تاریخچهٔ اعتبار ممکن نشد",
       "resume": "ازسرگیری اشتراک",
       "resumeCancelledDescription": "Kilo Pass شما دوباره به‌طور خودکار تمدید می‌شود.",
       "resumePausedDescription": "Kilo Pass شما هم‌اکنون، پیش از تاریخ ازسرگیری زمان‌بندی‌شده، از سر گرفته می‌شود.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
       "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
-      "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
+      "accessDeniedDescription": "از مالک یا مدیر سازمان بخواهید به شما دسترسی بدهد."
     },
     "create": {
       "title": "ایجاد سازمان",

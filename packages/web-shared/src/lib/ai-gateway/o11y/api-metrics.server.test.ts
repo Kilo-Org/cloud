@@ -383,4 +383,30 @@ describe('emitApiMetricsForResponse', () => {
     expect(deferred).toHaveLength(0);
     expect(mockedFetch).not.toHaveBeenCalled();
   });
+
+  test('sends nothing for an endpoint that is not https or loopback', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      O11Y_SERVICE_URL: 'http://o11y.example.test',
+      O11Y_KILO_GATEWAY_CLIENT_SECRET: 'test-secret',
+    }));
+    // The endpoint is read when the module loads, so the check needs a second module instance.
+    const moduleWithRejectedEndpoint = await import('./api-metrics.server');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    moduleWithRejectedEndpoint.emitApiMetricsForResponse(params, Promise.resolve(null), 100);
+    moduleWithRejectedEndpoint.emitGatewayApiMetrics({ ...params, completeRequestMs: 20 });
+    await new Promise(resolve => setImmediate(resolve));
+
+    // Run whatever the emitters deferred, so a missing guard would reach the fetch mock.
+    const { after: afterForLoadedModule } = jest.requireMock('next/server') as { after: jest.Mock };
+    const deferred = afterForLoadedModule.mock.calls.map(([task]) =>
+      Promise.resolve(typeof task === 'function' ? (task as () => unknown)() : task)
+    );
+    await Promise.all(deferred);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(deferred).toHaveLength(0);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
 });

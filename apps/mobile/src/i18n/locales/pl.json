@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
+      "connectOwnerOnly": "Poproś właściciela organizacji lub administratora o połączenie dostawcy.",
       "couldNotLoad": "Nie udało się wczytać przeglądów.",
       "noReviews": "Brak przeglądów",
       "noReviewsDescription": "Przeglądy pojawią się tutaj, gdy recenzent kodu przeanalizuje PR.",
@@ -2494,6 +2495,7 @@
     "signOutThisDevice": "Wyloguj to urządzenie",
     "signOutSessionLabel": "Wyloguj {{device}}, logowanie: {{signedIn}}, ostatnia aktywność: {{lastSeen}}",
     "sessionSignedOut": "Zakończono sesję logowania.",
+    "sessionSignOutFailed": "Nie udało się zakończyć tej sesji logowania. Spróbuj ponownie.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
     "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Ostatnia aktywność: {{lastSeen}}. Może nadal mieć dostęp do API przez maksymalnie godzinę.",
@@ -2621,12 +2623,14 @@
     "manage": {
       "billingHistory": "Historia płatności",
       "billingHistoryEmpty": "Brak historii płatności.",
+      "billingHistoryError": "Nie udało się wczytać historii płatności",
       "cancel": "Anuluj subskrypcję",
       "cancelDescription": "Twój Kilo Pass pozostanie aktywny do końca okresu rozliczeniowego i nie zostanie odnowiony.",
       "cancelScheduled": "Wygasa {{date}}",
       "cancelScheduledChange": "Anuluj zaplanowaną zmianę",
       "cancelled": "Subskrypcja anulowana",
       "creditHistoryEmpty": "Brak kredytów z Kilo Pass.",
+      "creditHistoryError": "Nie udało się wczytać historii kredytów z Kilo Pass",
       "resume": "Wznów subskrypcję",
       "resumeCancelledDescription": "Twój Kilo Pass znów będzie odnawiany automatycznie.",
       "resumePausedDescription": "Twój Kilo Pass zostanie wznowiony teraz, przed zaplanowaną datą wznowienia.",
@@ -3444,7 +3448,7 @@
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
-      "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
+      "accessDeniedDescription": "Poproś właściciela organizacji lub administratora o przyznanie Ci dostępu."
     },
     "create": {
       "title": "Utwórz organizację",

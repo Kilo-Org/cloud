@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "配置代码托管平台",
+      "connectOwnerOnly": "请让组织所有者或管理员连接代码托管平台。",
       "couldNotLoad": "无法加载审查记录。",
       "noReviews": "暂无审查记录",
       "noReviewsDescription": "代码审查器审查拉取请求后，这里将显示审查记录。",
@@ -2431,6 +2432,7 @@
     "signOutThisDevice": "在此设备上退出登录",
     "signOutSessionLabel": "在{{device}}上退出登录，登录于 {{signedIn}}，最后在线 {{lastSeen}}",
     "sessionSignedOut": "会话已退出登录。",
+    "sessionSignOutFailed": "无法退出此登录会话。请重试。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",
     "signOutThisSessionMessage": "{{device}} 将退出登录，最后在线 {{lastSeen}}。其 API 访问权限最多仍可保留一小时。",
@@ -2553,12 +2555,14 @@
     "manage": {
       "billingHistory": "账单记录",
       "billingHistoryEmpty": "暂无账单记录。",
+      "billingHistoryError": "无法加载账单记录",
       "cancel": "取消订阅",
       "cancelDescription": "你的 Kilo Pass 将保持有效至当前计费周期结束，之后不再续订。",
       "cancelScheduled": "将于 {{date}} 取消",
       "cancelScheduledChange": "取消计划变更",
       "cancelled": "已取消订阅",
       "creditHistoryEmpty": "暂无 Kilo Pass 积分。",
+      "creditHistoryError": "无法加载 Kilo Pass 积分记录",
       "resume": "恢复订阅",
       "resumeCancelledDescription": "你的 Kilo Pass 将重新开始自动续订。",
       "resumePausedDescription": "你的 Kilo Pass 将立即恢复，早于原定的恢复日期。",
@@ -3330,7 +3334,7 @@
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
-      "accessDeniedDescription": "你无权访问此组织。"
+      "accessDeniedDescription": "请让组织所有者或管理员授予你访问权限。"
     },
     "create": {
       "title": "创建组织",

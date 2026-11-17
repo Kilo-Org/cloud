@@ -1366,7 +1366,8 @@
       "noReviews": "Ստուգումներ դեռ չկան",
       "noReviewsDescription": "Ստուգումներն այստեղ կհայտնվեն, երբ Կոդի ստուգիչը ստուգի pull request։",
       "startManualReview": "Սկսել ձեռքով ստուգում",
-      "configureProvider": "Կարգավորել մատակարարը"
+      "configureProvider": "Կարգավորել մատակարարը",
+      "connectOwnerOnly": "Խնդրիր կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին միացնել մատակարար։"
     },
     "platformList": {
       "checking": "Ստուգվում է…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Դուրս գալ այս սարքից",
     "signOutSessionLabel": "Դուրս գալ {{device}} սարքից, մուտք՝ {{signedIn}}, վերջին ակտիվություն՝ {{lastSeen}}",
     "sessionSignedOut": "Նստաշրջանից դուրս եկաք։",
+    "sessionSignOutFailed": "Չհաջողվեց դուրս գալ այս նստաշրջանից։ Փորձեք կրկին։",
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նստաշրջանից",
     "signOutThisSessionMessage": "{{device}} դուրս կգա հաշվից։ Վերջին ակտիվությունը՝ {{lastSeen}}։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Վճարումների պատմություն",
       "billingHistoryEmpty": "Վճարումների պատմություն դեռ չկա։",
+      "billingHistoryError": "Չհաջողվեց բեռնել վճարումների պատմությունը",
       "cancel": "Չեղարկել բաժանորդագրությունը",
       "cancelDescription": "Ձեր Kilo Pass-ը ակտիվ կմնա մինչև վճարային ժամանակաշրջանի ավարտը և չի երկարաձգվի։",
       "cancelScheduled": "Կչեղարկվի՝ {{date}}",
       "cancelScheduledChange": "Չեղարկել պլանավորված փոփոխությունը",
       "cancelled": "Բաժանորդագրությունը չեղարկվեց",
       "creditHistoryEmpty": "Kilo Pass-ի կրեդիտներ դեռ չկան։",
+      "creditHistoryError": "Չհաջողվեց բեռնել կրեդիտների պատմությունը",
       "resume": "Վերսկսել բաժանորդագրությունը",
       "resumeCancelledDescription": "Ձեր Kilo Pass-ը կրկին ավտոմատ կերպով կերկարաձգվի։",
       "resumePausedDescription": "Ձեր Kilo Pass-ը կվերսկսվի հիմա՝ նախքան վերսկսման պլանավորված ամսաթիվը։",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Ընտրել կազմակերպություն",
       "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Շարունակելու համար ձեր պրոֆիլում ընտրեք այլ կազմակերպություն։",
       "unavailableSessionsDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Դրա նստաշրջանները հնարավոր չէ բեռնել։",
-      "accessDeniedDescription": "Դուք այս կազմակերպություն մուտք գործելու իրավունք չունեք։"
+      "accessDeniedDescription": "Խնդրեք կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին տրամադրել ձեզ մուտք։"
     },
     "create": {
       "title": "Ստեղծել կազմակերպություն",

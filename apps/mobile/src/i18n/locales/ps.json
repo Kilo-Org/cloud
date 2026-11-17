@@ -1366,7 +1366,8 @@
       "noReviews": "تر اوسه هېڅ بیاکتنه نشته",
       "noReviewsDescription": "کله چې د کوډ بیاکتونکی د یو پل ریکویسټ بیاکتنه وکړي، بیاکتنې به دلته ښکاره شي.",
       "startManualReview": "لاسي بیاکتنه پیل کړئ",
-      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ"
+      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ",
+      "connectOwnerOnly": "له یو سازمان مالک یا مدیر څخه وغواړئ چې یو خدمت چمتو کوونکی ونښلوي."
     },
     "platformList": {
       "checking": "کتل کېږي…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "له دې وسیلې ووځئ",
     "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}، وروستی لیدل شوی وخت: {{lastSeen}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
+    "sessionSignOutFailed": "له دې ناستې ووتل ونه شول، بیا هڅه وکړئ.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
     "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وروستی لیدل شوی وخت: {{lastSeen}}. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "د تادیاتو تاریخچه",
       "billingHistoryEmpty": "تر اوسه د تادیاتو تاریخچه نشته.",
+      "billingHistoryError": "د تادیاتو تاریخچه بارېدلای نشوه",
       "cancel": "ګډون لغوه کړئ",
       "cancelDescription": "ستاسو Kilo Pass د تادیې دورې تر پایه فعال پاتې کېږي او بیا به نه نوي کېږي.",
       "cancelScheduled": "په {{date}} لغوه کېږي",
       "cancelScheduledChange": "ټاکل شوی بدلون لغوه کړئ",
       "cancelled": "ګډون لغوه شو",
       "creditHistoryEmpty": "تر اوسه د Kilo Pass کریډیټونه نشته.",
+      "creditHistoryError": "د Kilo Pass کریډیټونو تاریخچه بارېدلای نشوه",
       "resume": "ګډون بیا پیل کړئ",
       "resumeCancelledDescription": "ستاسو Kilo Pass بیا په اتومات ډول نوي کېدل پیلوي.",
       "resumePausedDescription": "ستاسو Kilo Pass د بیا پیل له ټاکل شوې نېټې مخکې همدا اوس بیا پیلېږي.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
       "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان ناستې نشي لوډ کېدلی.",
-      "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
+      "accessDeniedDescription": "د یو سازمان له مالک یا مدیر څخه وغوښتئ چې تاسو ته لاسرسی درکړي."
     },
     "create": {
       "title": "سازمان جوړ کړئ",

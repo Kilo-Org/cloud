@@ -1366,7 +1366,8 @@
       "noReviews": "Engar yfirferðir ennþá",
       "noReviewsDescription": "Yfirferðir birtast hér þegar kóðarýnirinn fer yfir samrunabeiðni.",
       "startManualReview": "Hefja handvirka yfirferð",
-      "configureProvider": "Stilla þjónustuveitanda"
+      "configureProvider": "Stilla þjónustuveitanda",
+      "connectOwnerOnly": "Biddu eiganda eða stjórnanda samtakanna um að tengja þjónustuveitanda."
     },
     "platformList": {
       "checking": "Athuga…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Skrá þetta tæki út",
     "signOutSessionLabel": "Skrá {{device}} út, innskráning {{signedIn}}, síðast virkt {{lastSeen}}",
     "sessionSignedOut": "Skráð var út úr lotunni.",
+    "sessionSignOutFailed": "Ekki tókst að skrá þessa lotu út. Reyndu aftur.",
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
     "signOutThisSessionMessage": "{{device}} verður skráð út. Síðast virkt {{lastSeen}}. Það getur haldið API-aðgangi í allt að klukkustund.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Greiðsluferill",
       "billingHistoryEmpty": "Enginn greiðsluferill enn.",
+      "billingHistoryError": "Tókst ekki að hlaða greiðsluferil",
       "cancel": "Segja upp áskrift",
       "cancelDescription": "Kilo Pass verður áfram virkt til loka greiðslutímabilsins og endurnýjast ekki.",
       "cancelScheduled": "Lýkur {{date}}",
       "cancelScheduledChange": "Hætta við áætlaða breytingu",
       "cancelled": "Áskrift sagt upp",
       "creditHistoryEmpty": "Engin Kilo Pass-inneign enn.",
+      "creditHistoryError": "Tókst ekki að hlaða inneignarferil",
       "resume": "Halda áskrift áfram",
       "resumeCancelledDescription": "Kilo Pass byrjar aftur að endurnýjast sjálfkrafa.",
       "resumePausedDescription": "Kilo Pass fer aftur í gang núna, á undan áætluðum degi.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
       "unavailableSessionsDescription": "Þetta félag er ekki lengur tiltækt. Ekki er hægt að hlaða setum þess.",
-      "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."
+      "accessDeniedDescription": "Biddu eiganda eða stjórnanda félagsins um að veita þér aðgang."
     },
     "create": {
       "title": "Stofna félag",

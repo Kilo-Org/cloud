@@ -45,7 +45,7 @@ import { useCustomPricingConfig } from '@/components/organizations/providers-and
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { GatewaysTab } from '@/components/organizations/providers-and-models/GatewaysTab';
+import { AdvancedPoliciesTab } from '@/components/organizations/providers-and-models/AdvancedPoliciesTab';
 
 type Props = {
   organizationId: string;
@@ -108,7 +108,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       { enabled: organizationData?.plan === 'enterprise' }
     )
   );
-  const showGatewaysTab = gatewaySettings?.available === true;
+  const showAdvancedPoliciesTab = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -503,7 +503,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
-            {showGatewaysTab && <TabsTrigger value="gateways">Gateways</TabsTrigger>}
+            {showAdvancedPoliciesTab && (
+              <TabsTrigger value="advanced-policies">Advanced policies</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -560,9 +562,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
 
-          {showGatewaysTab && (
-            <TabsContent value="gateways" className="mt-6">
-              <GatewaysTab
+          {showAdvancedPoliciesTab && (
+            <TabsContent value="advanced-policies" className="mt-6">
+              <AdvancedPoliciesTab
                 organizationId={organizationId}
                 canEdit={canEdit}
                 settings={gatewaySettings}
@@ -573,7 +575,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
         <ModelDetailsDialog
           organizationId={organizationId}
-          showGatewayAvailability={showGatewaysTab}
+          showGatewayAvailability={showAdvancedPoliciesTab}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

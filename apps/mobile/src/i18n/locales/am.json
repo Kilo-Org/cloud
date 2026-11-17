@@ -1366,7 +1366,8 @@
       "noReviews": "እስካሁን ምንም ግምገማዎች የሉም",
       "noReviewsDescription": "የኮድ ገምጋሚው የኮድ ውህደት ጥያቄን ከገመገመ በኋላ ግምገማዎች እዚህ ይታያሉ።",
       "startManualReview": "ግምገማ ራስዎ ያስጀምሩ",
-      "configureProvider": "አቅራቢውን ያዋቅሩ"
+      "configureProvider": "አቅራቢውን ያዋቅሩ",
+      "connectOwnerOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ አቅራቢውን እንዲያገናኙ ይጠይቁ።"
     },
     "platformList": {
       "checking": "በመፈተሽ ላይ…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "ከዚህ መሣሪያ ይውጡ",
     "signOutSessionLabel": "ከ{{device}} ይውጡ፣ የገቡበት ጊዜ፦ {{signedIn}}፣ ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
+    "sessionSignOutFailed": "ከዚህ ክፍለ ጊዜ መውጣት አልተቻለም። እንደገና ይሞክሩ።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
     "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "የክፍያ ታሪክ",
       "billingHistoryEmpty": "እስካሁን የክፍያ ታሪክ የለም።",
+      "billingHistoryError": "የክፍያ ታሪክ ሊጫን አልቻለም",
       "cancel": "የደንበኝነት ምዝገባን ሰርዝ",
       "cancelDescription": "የእርስዎ Kilo Pass እስከ የክፍያ ጊዜው መጨረሻ ድረስ ንቁ ሆኖ ይቆያል፣ እና አይታደስም።",
       "cancelScheduled": "በ{{date}} ይሰረዛል",
       "cancelScheduledChange": "የታቀደውን ለውጥ ሰርዝ",
       "cancelled": "የደንበኝነት ምዝገባ ተሰርዟል",
       "creditHistoryEmpty": "እስካሁን ምንም የKilo Pass ክሬዲቶች የሉም።",
+      "creditHistoryError": "የክሬዲት ታሪክ ሊጫን አልቻለም",
       "resume": "የደንበኝነት ምዝገባን ቀጥል",
       "resumeCancelledDescription": "የእርስዎ Kilo Pass እንደገና በራስ-ሰር መታደስ ይጀምራል።",
       "resumePausedDescription": "የእርስዎ Kilo Pass ከታቀደው የመቀጠያ ቀን በፊት አሁን ይቀጥላል።",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
       "unavailableSessionsDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። የዚህ ድርጅት ክፍለ ጊዜዎችን መጫን አይቻልም።",
-      "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"
+      "accessDeniedDescription": "የመዳረስ ፈቃድ እንዲሰጥዎት የድርጅት ባለቤትን ወይም አስተዳዳሪን ይጠይቁ።"
     },
     "create": {
       "title": "ድርጅት ይፍጠሩ",

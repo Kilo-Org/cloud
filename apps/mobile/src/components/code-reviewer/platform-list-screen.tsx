@@ -20,6 +20,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
   useBitbucketReadiness,
@@ -70,11 +71,18 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   });
   // This screen fetches the memberships itself — its access classification and
   // its Retry read that query — so it resolves the title from the same rule the
-  // screens without a list use, over the list it already has.
-  const scopeTitle = reviewerScopeTitle(scope, organizations.data, {
-    personal: t('common.personal'),
-    organization: t('common.organization'),
-  });
+  // screens without a list use, over the list it already has, and remembers the
+  // name that list delivers for a scope the reader may lose next.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);

@@ -9,6 +9,29 @@ import { getGrantedClaudeBillingConnection } from './store';
 import { getAuthoritativeClaudeBillingState } from './payer-state';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
+// A test that needs a different APP_URL loads the module again under
+// jest.resetModules() with a doMock factory, because the static import above is
+// bound to the real constants module.
+const withOverriddenAppUrl = async (
+  run: (
+    load: () => Promise<{
+      getAuthoritativeClaudeBillingState: typeof getAuthoritativeClaudeBillingState;
+    }>
+  ) => Promise<void>
+): Promise<void> => {
+  jest.resetModules();
+  jest.doMock('@kilocode/web-shared/lib/constants', () => ({
+    ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
+    APP_URL: 'http://app.example.com',
+  }));
+  try {
+    await run(() => import('./payer-state'));
+  } finally {
+    jest.dontMock('@kilocode/web-shared/lib/constants');
+    jest.resetModules();
+  }
+};
+
 const owner = { kind: 'personal', kiloUserId: 'owner' } as const;
 const ORGANIZATION_ID = '00000000-0000-4000-8000-000000000002';
 const OTHER_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000003';
@@ -186,4 +209,15 @@ describe('Cross-region Claude payer state', () => {
       ).resolves.toBeNull();
     }
   );
+
+  it('requires an https or loopback app endpoint', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    await withOverriddenAppUrl(async load => {
+      const { getAuthoritativeClaudeBillingState: loadState } = await load();
+      await expect(loadState(owner)).rejects.toThrow(
+        'Claude payer-state endpoint is not configured'
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });

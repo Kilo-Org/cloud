@@ -1412,7 +1412,8 @@
       "noReviews": "Zatím žádné kontroly",
       "noReviewsDescription": "Kontroly se zde zobrazí, jakmile agent pro kontrolu kódu zkontroluje PR.",
       "startManualReview": "Zahájit ruční kontrolu",
-      "configureProvider": "Nastavit poskytovatele"
+      "configureProvider": "Nastavit poskytovatele",
+      "connectOwnerOnly": "Požádejte vlastníka organizace nebo správce, aby připojil poskytovatele."
     },
     "platformList": {
       "checking": "Kontroluje se…",
@@ -3084,6 +3085,7 @@
     "signOutThisDevice": "Odhlásit toto zařízení",
     "signOutSessionLabel": "Odhlásit zařízení {{device}}, přihlášení: {{signedIn}}, poslední aktivita: {{lastSeen}}",
     "sessionSignedOut": "Relace byla odhlášena.",
+    "sessionSignOutFailed": "Tuto relaci se nepodařilo odhlásit. Zkuste to znovu.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",
     "signOutThisSessionMessage": "Zařízení {{device}} se odhlásí. Poslední aktivita: {{lastSeen}}. Přístup k API mu může zůstat ještě až hodinu.",
@@ -3210,12 +3212,14 @@
     "manage": {
       "billingHistory": "Historie fakturace",
       "billingHistoryEmpty": "Zatím žádná historie fakturace.",
+      "billingHistoryError": "Nepodařilo se načíst historii fakturace",
       "cancel": "Zrušit předplatné",
       "cancelDescription": "Váš Kilo Pass zůstane aktivní do konce fakturačního období a neobnoví se.",
       "cancelScheduled": "Zruší se {{date}}",
       "cancelScheduledChange": "Zrušit naplánovanou změnu",
       "cancelled": "Předplatné zrušeno",
       "creditHistoryEmpty": "Zatím žádné kredity z Kilo Pass.",
+      "creditHistoryError": "Nepodařilo se načíst historii kreditů",
       "resume": "Obnovit předplatné",
       "resumeCancelledDescription": "Váš Kilo Pass se bude opět automaticky obnovovat.",
       "resumePausedDescription": "Váš Kilo Pass se znovu aktivuje hned, ještě před plánovaným datem obnovení.",
@@ -3452,7 +3456,7 @@
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
       "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
-      "accessDeniedDescription": "Nemáte přístup do této organizace."
+      "accessDeniedDescription": "Požádejte vlastníka organizace nebo správce o udělení přístupu."
     },
     "create": {
       "title": "Vytvořit organizaci",

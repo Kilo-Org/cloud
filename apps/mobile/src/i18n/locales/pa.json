@@ -1366,7 +1366,8 @@
       "noReviews": "ਅਜੇ ਕੋਈ ਸਮੀਖਿਆ ਨਹੀਂ",
       "noReviewsDescription": "ਕੋਡ ਸਮੀਖਿਅਕ ਵੱਲੋਂ ਕਿਸੇ ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਤੋਂ ਬਾਅਦ ਸਮੀਖਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "startManualReview": "ਦਸਤੀ ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ",
-      "configureProvider": "ਪ੍ਰਦਾਤਾ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ"
+      "configureProvider": "ਪ੍ਰਦਾਤਾ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ",
+      "connectOwnerOnly": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।"
     },
     "platformList": {
       "checking": "ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "signOutSessionLabel": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ, ਸਾਈਨ ਇਨ ਕੀਤਾ: {{signedIn}}, ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}",
     "sessionSignedOut": "ਸੈਸ਼ਨ ਸਾਈਨ ਆਉਟ ਹੋ ਗਿਆ।",
+    "sessionSignOutFailed": "ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "signOutThisDeviceTitle": "ਕੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionTitle": "ਕੀ ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionMessage": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}। ਇਸ ਤੋਂ ਬਾਅਦ ਵੀ ਇਸ ਦੀ API ਤੱਕ ਪਹੁੰਚ ਇੱਕ ਘੰਟੇ ਤੱਕ ਬਣੀ ਰਹਿ ਸਕਦੀ ਹੈ।",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "ਬਿਲਿੰਗ ਇਤਿਹਾਸ",
       "billingHistoryEmpty": "ਅਜੇ ਕੋਈ ਬਿਲਿੰਗ ਇਤਿਹਾਸ ਨਹੀਂ ਹੈ।",
+      "billingHistoryError": "ਬਿਲਿੰਗ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "cancel": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਰੱਦ ਕਰੋ",
       "cancelDescription": "ਤੁਹਾਡਾ Kilo Pass ਬਿਲਿੰਗ ਮਿਆਦ ਦੇ ਅੰਤ ਤੱਕ ਕਿਰਿਆਸ਼ੀਲ ਰਹੇਗਾ ਅਤੇ ਰੀਨਿਊ ਨਹੀਂ ਹੋਵੇਗਾ।",
       "cancelScheduled": "{{date}} ਨੂੰ ਰੱਦ ਹੋਵੇਗਾ",
       "cancelScheduledChange": "ਨਿਰਧਾਰਿਤ ਬਦਲਾਅ ਰੱਦ ਕਰੋ",
       "cancelled": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਰੱਦ ਕੀਤੀ ਗਈ",
       "creditHistoryEmpty": "ਅਜੇ ਕੋਈ Kilo Pass ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹੈ।",
+      "creditHistoryError": "Kilo Pass ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "resume": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
       "resumeCancelledDescription": "ਤੁਹਾਡਾ Kilo Pass ਦੁਬਾਰਾ ਆਪਣੇ-ਆਪ ਰੀਨਿਊ ਹੋਣਾ ਸ਼ੁਰੂ ਹੋ ਜਾਵੇਗਾ।",
       "resumePausedDescription": "ਤੁਹਾਡਾ Kilo Pass ਆਪਣੀ ਨਿਰਧਾਰਿਤ ਮੁੜ-ਸ਼ੁਰੂਆਤ ਮਿਤੀ ਤੋਂ ਪਹਿਲਾਂ, ਹੁਣੇ ਮੁੜ ਸ਼ੁਰੂ ਹੋ ਜਾਵੇਗਾ।",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
       "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਕੋਈ ਹੋਰ ਸੰਸਥਾ ਚੁਣੋ।",
       "unavailableSessionsDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸ ਦੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕਦੇ।",
-      "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
+      "accessDeniedDescription": "ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਕਹੋ।"
     },
     "create": {
       "title": "ਸੰਸਥਾ ਬਣਾਓ",

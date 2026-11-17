@@ -1764,6 +1764,57 @@ test('accepts a one-token push value that reads the same in every language', () 
   assert.deepEqual(found, []);
 });
 
+// One key per piece of copy holds for the push catalog too: two producers that
+// state the same thing read one entry, or a translator can drift them apart.
+const DUPLICATE_PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { securityUpdate: 'A security check has an update' } },
+  internal: { securityLifecycle: { title: 'Kilo', body: 'A security check has an update' } },
+};
+const DUPLICATE_PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.securityUpdate', undefined, 'A security check has an update');",
+  "const push = { i18nKey: 'internal.securityLifecycle' };",
+].join('\n');
+
+test('rejects two push keys that hold one piece of copy', () => {
+  const found = run({
+    pushEnglish: DUPLICATE_PUSH_ENGLISH,
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { securityUpdate: 'Проверка безопасности обновилась' } },
+      internal: { securityLifecycle: { title: 'Kilo', body: 'Обновление проверки безопасности' } },
+    },
+    pushSource: DUPLICATE_PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/en: 2 keys hold the copy "A security check has an update"/
+  );
+});
+
+test('accepts push producers that read one shared key', () => {
+  // Both session producers state the session title, so one entry carries it and
+  // each payload names its own base.
+  const found = run({
+    pushEnglish: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Your Kilo session is ready to control from your phone' },
+    },
+    pushTranslated: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Сессия Kilo готова к управлению с телефона' },
+    },
+    pushSource: [
+      "const sessionPush = { i18nKey: 'agentSession.notification' };",
+      "const readyPush = { i18nKey: 'sessionReady' };",
+      "translatePush(locale, 'session.title', undefined, '{{sessionTitle}}');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
 // A language whose preposition for this message is the English word keeps the
 // copy: reviewed per (value, tag) in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS.
 const SHARED_PREPOSITION_ENGLISH = {

@@ -1435,7 +1435,8 @@
       "noReviews": "Níl aon athbhreithniú ann fós",
       "noReviewsDescription": "Beidh athbhreithnithe le feiceáil anseo nuair a dhéanfaidh an tAthbhreithneoir cóid athbhreithniú ar iarratas tarraingthe.",
       "startManualReview": "Tosaigh athbhreithniú de láimh",
-      "configureProvider": "Cumraigh soláthraí"
+      "configureProvider": "Cumraigh soláthraí",
+      "connectOwnerOnly": "Iarr ar Úinéir eagraíochta nó Riarthóir soláthraí a cheangal."
     },
     "platformList": {
       "checking": "Ag seiceáil…",
@@ -3138,6 +3139,7 @@
     "signOutThisDevice": "Sínigh amach ón ngléas seo",
     "signOutSessionLabel": "Sínigh amach ó {{device}}, síniú isteach: {{signedIn}}, feicthe go deireanach: {{lastSeen}}",
     "sessionSignedOut": "Seisiún sínithe amach.",
+    "sessionSignOutFailed": "Níorbh fhéidir síniú amach ón seisiún seo. Bain triail eile as.",
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Síneofar {{device}} amach. Feicthe go deireanach: {{lastSeen}}. Is féidir leis rochtain API a choinneáil ar feadh uair an chloig ar a mhéad.",
@@ -3267,12 +3269,14 @@
     "manage": {
       "billingHistory": "Stair bhilleála",
       "billingHistoryEmpty": "Níl aon stair bhilleála ann fós.",
+      "billingHistoryError": "Níorbh fhéidir stair bhilleála a lódáil",
       "cancel": "Cealaigh an síntiús",
       "cancelDescription": "Fanfaidh do Kilo Pass gníomhach go dtí deireadh na tréimhse billeála agus ní athnuafar é.",
       "cancelScheduled": "Cealófar ar {{date}}",
       "cancelScheduledChange": "Cealaigh an t-athrú sceidealaithe",
       "cancelled": "Cealaíodh an síntiús",
       "creditHistoryEmpty": "Níl aon chreidmheas Kilo Pass ann fós.",
+      "creditHistoryError": "Níorbh fhéidir stair chreidmheasa a lódáil",
       "resume": "Atosaigh an síntiús",
       "resumeCancelledDescription": "Tosóidh do Kilo Pass ag athnuachan go huathoibríoch arís.",
       "resumePausedDescription": "Atosóidh do Kilo Pass anois, roimh an dáta atosaithe sceidealaithe.",
@@ -3509,7 +3513,7 @@
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
       "unavailableSessionsDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Ní féidir a seisiúin a luchtú.",
-      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
+      "accessDeniedDescription": "Iarr ar úinéir nó ar riarthóir eagraíochta rochtain a thabhairt duit."
     },
     "create": {
       "title": "Cruthaigh eagraíocht",

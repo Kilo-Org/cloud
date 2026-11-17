@@ -33,12 +33,11 @@ import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-pl
 import { openSessionPreviewStore } from './session-preview-state';
 import { formatSpokenCost, sessionRowAccessibilityLabel } from './session-row-accessibility-label';
 
-/** Container shape only. `'list'` (default) keeps the Agents list look
- * (`stripMode="inline"`, inner padding so the strip sits inside the
- * padding). `'card'` mirrors the Home card look (`stripMode="edge"`,
- * `last` so no divider, no inner padding so the strip meets the
- * rounded tile border). Content flags (`live`, `needsInput`,
- * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
+/** Container shape only. `'list'` (default) is the flat-list row: the strip
+ * and the content start at the 14pt gutter, with a hairline under all but the
+ * last row. `'card'` keeps the row's divider off (`last`) for a card that
+ * draws its own edge. Content flags (`live`, `needsInput`, `subtitle`, `meta`,
+ * `metaWhileLive`) are passed identically in both. */
 export type RowVariant = 'list' | 'card';
 
 /**
@@ -323,9 +322,7 @@ export function StoredSessionRow({
         metaWhileLive={metaWhileLive}
         needsInput={needsInput}
         platformIcon={platformIcon}
-        stripMode={variant === 'card' ? 'edge' : 'inline'}
         last={variant === 'card' ? true : undefined}
-        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
     </Pressable>
   );

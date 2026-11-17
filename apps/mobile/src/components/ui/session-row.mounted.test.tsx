@@ -13,9 +13,8 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedSoft: '#777777' }),
 }));
@@ -247,30 +246,45 @@ describe('SessionRow mounted layout', () => {
     expect(root.findAll(node => Object.is(node.type, 'Pressable'))).toHaveLength(0);
   });
 
-  it.each(['edge', 'inline'] as const)(
-    'retains full text, title identity, and two-line limits with the %s strip',
-    stripMode => {
-      const root = renderRow({ live: true, meta, metaWhileLive: true, stripMode });
-      const title = textNode(root, content.title);
-      const subtitle = textNode(root, content.subtitle);
-      expect(title.props.numberOfLines).toBe(2);
-      expect(title.props.className).toContain('text-sm');
-      expect(title.props.className).toContain('text-foreground');
-      expect(subtitle.props.numberOfLines).toBe(2);
-      expect(subtitle.props.className).toContain('text-muted-foreground');
-      expect(root.findAll(node => Object.is(node.type, 'AgentBadge'))).toHaveLength(
-        stripMode === 'edge' ? 1 : 0
-      );
+  it('retains full text, title identity, and two-line limits', () => {
+    const root = renderRow({ live: true, meta, metaWhileLive: true });
+    const title = textNode(root, content.title);
+    const subtitle = textNode(root, content.subtitle);
+    expect(title.props.numberOfLines).toBe(2);
+    expect(title.props.className).toContain('text-sm');
+    expect(title.props.className).toContain('text-foreground');
+    expect(subtitle.props.numberOfLines).toBe(2);
+    expect(subtitle.props.className).toContain('text-muted-foreground');
+    expect(root.findAll(node => Object.is(node.type, 'RowChevron'))).toHaveLength(1);
 
-      const updatedMeta = '$0.0042 · 13 MINUTES AGO';
-      renderRow({ live: true, meta: updatedMeta, metaWhileLive: true, stripMode });
+    const updatedMeta = '$0.0042 · 13 MINUTES AGO';
+    renderRow({ live: true, meta: updatedMeta, metaWhileLive: true });
 
-      expect(textNode(root, content.title)).toBe(title);
-      expect(textNode(root, content.subtitle)).toBe(subtitle);
-      expect(title.children).toEqual([content.title]);
-      expect(subtitle.children).toEqual([content.subtitle]);
-      expect(textNode(root, updatedMeta).props.numberOfLines).toBe(1);
-      expect(root.findAll(node => Object.is(node.type, 'ChevronRight'))).toHaveLength(1);
-    }
-  );
+    expect(textNode(root, content.title)).toBe(title);
+    expect(textNode(root, content.subtitle)).toBe(subtitle);
+    expect(title.children).toEqual([content.title]);
+    expect(subtitle.children).toEqual([content.subtitle]);
+    expect(textNode(root, updatedMeta).props.numberOfLines).toBe(1);
+    expect(root.findAll(node => Object.is(node.type, 'RowChevron'))).toHaveLength(1);
+  });
+
+  // The row's geometry is the contract's flat-list row: its content starts at
+  // the 14pt gutter, the divider is the hairline, and no caller passes padding
+  // (the Agents list used to add `pl-[22px] pr-[22px]` and the Chat row
+  // `px-4 py-3` of its own).
+  it.each([
+    { name: 'an inner row', last: false, divider: 1 },
+    { name: 'the last row', last: true, divider: 0 },
+  ])('draws the gutter and hairline on $name', ({ last, divider }) => {
+    const root = renderRow({ last });
+    const container = root.findAll(
+      node => typeof node.type === 'string' && node.type === 'View'
+    )[0];
+    const classes = String(container?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'px-4', 'py-3']));
+    expect(classes).not.toContain('pl-[22px]');
+    expect(classes.includes('border-b-[0.5px]')).toBe(divider === 1);
+    expect(classes.includes('border-hair-soft')).toBe(divider === 1);
+  });
 });

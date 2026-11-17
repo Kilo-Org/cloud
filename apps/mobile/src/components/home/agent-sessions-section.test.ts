@@ -79,7 +79,6 @@ vi.mock('@/components/agents/remote-session-exit-alert', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 // The zero state's glyph comes from the icon set, whose native renderer the
 // pure project does not load.

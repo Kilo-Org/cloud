@@ -72,7 +72,6 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

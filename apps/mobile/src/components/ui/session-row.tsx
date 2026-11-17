@@ -1,17 +1,15 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
 
 import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { AgentBadge } from '@/components/ui/agent-badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
 import { agentColor, isPlaceholderTint, stateTint } from '@/lib/agent-color';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
@@ -79,22 +77,13 @@ type SessionRowProps = {
   onPress?: () => void;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
-  /**
-   * Where the hue strip is drawn.
-   * - `edge` (default): absolute-positioned strip glued to the row's left
-   *   edge. Used by Home cards where the strip sits against the card border.
-   * - `inline`: strip rendered as an inline flex child, so it respects the
-   *   row's horizontal padding. Used by the Agents list rows.
-   */
-  stripMode?: 'edge' | 'inline';
-  className?: string;
 };
 
 /**
- * Used by Home and Agents list. Composes agent hue strip + eyebrow +
- * ellipsized title + mono meta + chevron. The strip, eyebrow and tile always
- * share one tint: the pinned `agentState`, else the hue hashed from
- * `agentLabel`.
+ * The flat list's session row: hue strip at the 14pt gutter, eyebrow, title,
+ * subtitle, meta and disclosure mark, with a hairline under every row but the
+ * last. Its geometry is the contract's (`apps/mobile/AGENTS.md`, "Flat list
+ * rows"), so a caller adds no padding of its own.
  */
 export function SessionRow({
   agentLabel,
@@ -110,11 +99,8 @@ export function SessionRow({
   platformIcon,
   onPress,
   last,
-  stripMode = 'edge',
   subtitleVariant = 'mono',
-  className,
 }: Readonly<SessionRowProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
   // A row that is neither live nor waiting recedes behind one that is. The
@@ -216,27 +202,13 @@ export function SessionRow({
   const row = (
     <View
       className={cn(
-        'relative flex-row items-center gap-3 py-[13px] pl-[18px] pr-3',
-        !last && 'border-b-[0.5px] border-hair-soft',
-        className
+        'flex-row items-center gap-3 px-4 py-3',
+        !last && 'border-b-[0.5px] border-hair-soft'
       )}
     >
-      {stripMode === 'edge' ? (
-        <AgentBadge
-          agent={agentLabel}
-          tint={color}
-          variant="strip"
-          className={dimStrip ? 'opacity-30' : undefined}
-        />
-      ) : (
-        <View
-          className={cn(
-            'w-[3px] self-stretch rounded-[2px]',
-            color.hueClass,
-            dimStrip && 'opacity-30'
-          )}
-        />
-      )}
+      <View
+        className={cn('w-[3px] self-stretch rounded-[2px]', color.hueClass, dimStrip && 'opacity-30')}
+      />
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
           <Eyebrow
@@ -266,7 +238,7 @@ export function SessionRow({
       {/* The row is top-aligned so a multi-line title keeps its first line in
           line with the eyebrow; the disclosure mark centers on the row. */}
       <View className="self-center">
-        <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+        <RowChevron />
       </View>
     </View>
   );

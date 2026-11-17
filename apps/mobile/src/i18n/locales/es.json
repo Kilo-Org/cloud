@@ -4755,5 +4755,175 @@
     "unavailableDescription": "Este enlace para compartir ha caducado o se ha revocado.",
     "transcriptUnavailableTitle": "No se pudo cargar esta transcripción",
     "transcriptUnavailableDescription": "El enlace sigue funcionando. Vuelve a intentarlo en un momento."
+  },
+  "organizationGuardrails": {
+    "title": "Barreras de seguridad de IA",
+    "permissionDenied": "Solo los propietarios y administradores de la organización pueden gestionar las barreras de seguridad de IA.",
+    "unavailable": "Las barreras de seguridad de IA no están disponibles para esta organización.",
+    "loadError": "No se pudieron cargar las barreras de seguridad de IA",
+    "statusSaving": "Guardando…",
+    "statusSaved": "Guardado",
+    "statusFailed": "No se pudo guardar.",
+    "inputTitle": "Barreras de seguridad de entrada",
+    "inputDescription": "Analiza cada entrada con Enkrypt AI, incluidos los resultados de herramientas. Un detector de bloqueo rechaza la solicitud cuando Enkrypt no está disponible.",
+    "outputTitle": "Barreras de seguridad de salida",
+    "outputDescription": "Analiza las respuestas con Enkrypt AI antes de que las reciban los miembros. Desactivado salvo que lo actives.",
+    "detectorsHint": "Bloqueo rechaza una solicitud marcada. Solo registrar la registra sin retrasar la solicitud.",
+    "detectorsHintOutput": "Bloqueo hace fallar una respuesta marcada. Solo registrar la registra sin retrasar la respuesta.",
+    "choiceLog": "Solo registrar",
+    "applyTo": "Aplicar a",
+    "applyToAllMembers": "Todos los miembros",
+    "applyKiloDefault": "Aplicar predeterminado de Kilo",
+    "invalidSavedTitle": "No se puede leer la configuración guardada de los detectores de entrada",
+    "invalidSavedBody": "Las solicitudes se bloquean hasta que se vuelvan a guardar los detectores de entrada. Los detectores siguientes parten del predeterminado de Kilo.",
+    "invalidSavedOutputTitle": "No se puede leer la configuración guardada de los detectores de salida",
+    "invalidSavedOutputBody": "Las respuestas se retienen hasta que se vuelvan a guardar los detectores de salida. Elige los detectores de salida a continuación.",
+    "blockingOutputNote": "Un detector de salida de bloqueo retiene la respuesta hasta que Enkrypt la haya revisado por completo. Usa Solo registrar para evitar el retraso.",
+    "inputDetectorRequired": "Activa al menos un detector de entrada.",
+    "outputDetectorRequired": "Activa al menos un detector de salida.",
+    "rulesTooMany": "Añade hasta {{max}} reglas.",
+    "ruleIdRequired": "Introduce un ID de regla.",
+    "ruleIdInvalid": "Un ID de regla solo puede contener letras, números, puntos, guiones y guiones bajos.",
+    "ruleTextRequired": "Describe lo que la regla prohíbe o exige.",
+    "keywordTooLong": "Cada palabra clave puede tener hasta {{max}} caracteres.",
+    "topicTooLong": "Cada tema puede tener hasta {{max}} caracteres.",
+    "keywordsTooMany": "Añade hasta {{max}} palabras clave.",
+    "topicsTooMany": "Añade hasta {{max}} temas.",
+    "piiEntityRequired": "Selecciona al menos un tipo de datos que detectar.",
+    "keywordRequired": "Añade al menos una palabra clave.",
+    "topicRequired": "Añade al menos un tema.",
+    "policyTextRequired": "Introduce el texto de la política.",
+    "ruleRequired": "Añade al menos una regla.",
+    "ruleIdDuplicate": "Cada regla necesita su propio ID de regla.",
+    "piiEntities": "Datos que detectar",
+    "keywordsLabel": "Palabras clave",
+    "keywordsHint": "Una palabra clave por línea.",
+    "topicsHint": "Un tema por línea.",
+    "policyFormat": "Formato de la política",
+    "policyFormatRules": "Reglas estructuradas",
+    "policyFormatRulesDescription": "Una regla por requisito, con categoría y gravedad. Recomendado.",
+    "policyFormatText": "Texto de la política",
+    "policyFormatTextDescription": "Pega una política existente como texto sin formato.",
+    "rulesEmpty": "Aún no hay reglas. Cada regla describe algo que las entradas no deben contener ni solicitar.",
+    "addRule": "Añadir regla",
+    "ruleNumber": "Regla {{number}}",
+    "ruleRemove": "Eliminar regla {{number}}",
+    "ruleIdLabel": "ID de regla",
+    "ruleNameLabel": "Nombre (opcional)",
+    "ruleTextLabel": "Regla",
+    "ruleRiskCategory": "Categoría de riesgo",
+    "ruleApplicability": "Ámbito",
+    "ruleFrameworks": "Marcos normativos",
+    "detector": {
+      "promptInjection": {
+        "label": "Inyección de prompts",
+        "description": "Detecta intentos de anular instrucciones o hacer jailbreak al modelo."
+      },
+      "policyViolation": {
+        "label": "Infracción de la política",
+        "description": "Marca las entradas que infringen la política de tu organización, escrita como texto o reglas.",
+        "descriptionOutput": "Marca las respuestas que infringen la política de tu organización, escrita como texto o reglas."
+      },
+      "pii": {
+        "label": "PII y secretos",
+        "description": "Detecta datos personales, credenciales, direcciones IP y URL."
+      },
+      "keywords": {
+        "label": "Palabras clave prohibidas",
+        "descriptionOutput": "Detecta respuestas que contienen cualquier palabra clave de tu lista."
+      },
+      "topics": {
+        "label": "Temas",
+        "descriptionOutput": "Marca las respuestas sobre cualquier tema de tu lista."
+      },
+      "toxicity": {
+        "label": "Toxicidad",
+        "description": "Detecta lenguaje tóxico, insultante, amenazante o de odio."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detecta contenido sexual u otro contenido no apto para el trabajo."
+      },
+      "bias": {
+        "label": "Sesgo",
+        "description": "Detecta lenguaje sesgado o discriminatorio."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Datos personales",
+        "description": "Nombres, direcciones de correo electrónico, números de teléfono."
+      },
+      "secrets": {
+        "label": "Secretos",
+        "description": "Claves de API, tokens, contraseñas."
+      },
+      "ipAddress": {
+        "label": "Direcciones IP",
+        "description": "Direcciones IPv4 e IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Direcciones web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Seguridad y fraude",
+      "safetyHarm": "Protección y daños",
+      "privacyDataProtection": "Privacidad y protección de datos",
+      "brandReputationTrust": "Marca y reputación",
+      "biasFairnessEthical": "Sesgo y equidad",
+      "legalIpLiability": "Responsabilidad legal y de PI",
+      "productMisuse": "Uso indebido del producto",
+      "performanceQuality": "Rendimiento y calidad"
+    },
+    "applicability": {
+      "user": "Entrada del usuario",
+      "userAssistant": "Entrada del usuario y respuestas"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Ley de IA de la UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Función de Enterprise",
+    "enterpriseOnly": "Esta función solo está disponible en Enterprise.",
+    "readOnly": "Solo los propietarios y administradores de la organización pueden cambiar esta configuración.",
+    "loadError": "No se pudieron cargar los proveedores y modelos",
+    "tabModels": "Modelos",
+    "tabProviders": "Proveedores",
+    "tabGateways": "Pasarelas",
+    "modelsDescription": "Desactiva un modelo para bloquearlo para todos los miembros. Los modelos de proveedores permitidos empiezan activados.",
+    "modelsDeniedOnly": "Solo denegados",
+    "modelsEmpty": "Ningún modelo coincide con esta búsqueda.",
+    "providersDescription": "Desactiva un proveedor para que Kilo deje de enrutar solicitudes a él en esta organización.",
+    "providersNeedCatalog": "Los interruptores de proveedores son de solo lectura hasta que se cargue el catálogo completo de modelos. Toca Reintentar arriba para editarlos.",
+    "providersEmpty": "Ningún proveedor coincide con esta búsqueda.",
+    "allowAllShown": "Permitir todos los mostrados",
+    "denyAllShown": "Denegar todos los mostrados",
+    "gatewaysDescription": "Kilo enruta las solicitudes de modelos a través de Vercel AI Gateway u OpenRouter. Si una pasarela está desactivada, esas solicitudes fallan.",
+    "emptyProviderList": "Permite al menos un proveedor. Si la lista está vacía, se bloquean todas las rutas de modelos de Kilo.",
+    "gatewaysUnavailable": "La configuración de pasarelas no está disponible para esta organización.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Las solicitudes de OpenRouter no están fijadas a una región.",
+    "inferenceRegion": "Región de inferencia",
+    "inferenceRegionDescription": "Fija las solicitudes de Vercel AI Gateway a esta región. Si un modelo no está disponible allí, la solicitud falla.",
+    "disableOpenrouterNote": "Desactivar OpenRouter también bloquea las claves BYOK que enrutan solicitudes a través de él.",
+    "emptyModelList": "Deja al menos un modelo activado. Si deniegas todos los modelos, los miembros no tendrán nada que usar.",
+    "catalogUnavailable": "No se cargó el catálogo completo de modelos, así que solo se muestran tus listas guardadas. Vuelve a intentarlo para cargar todos los modelos.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "Unión Europea",
+      "au": "Australia",
+      "jp": "Japón"
+    }
   }
 }

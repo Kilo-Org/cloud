@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA kršenje"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Bezbednosna provera ima ažuriranje"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Vaša Kilo sesija je spremna za upravljanje sa vašeg telefona"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

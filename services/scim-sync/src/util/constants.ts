@@ -24,8 +24,10 @@ export const SEED_CURSOR_KEY = 'seed_cursor';
  * the filter is an allowlist, so an event type missing here is never returned.
  *
  * These ten match both the SDK's union and the published catalog at
- * https://workos.com/docs/events. SDK 12.x adds `dsync.token.created` and
- * `dsync.token.revoked`, which are not typeable at the catalog-pinned 11.x.
+ * https://workos.com/docs/events. The SDK also names `dsync.token.created` and
+ * `dsync.token.revoked`; they stay out because their payload describes a
+ * directory token, which no route here accepts, so listing them would only
+ * return events this worker has to park.
  */
 export const DSYNC_EVENTS: EventName[] = [
   'dsync.activated',

@@ -28,16 +28,18 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useContextPicker } from '@/components/context-control';
-import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
@@ -49,6 +51,7 @@ import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
@@ -174,8 +177,6 @@ export function ProfileScreen() {
         icon={Building2}
         title={t('organization.boundary.selectOrganization')}
         hue="lime"
-        className="rounded-lg bg-secondary px-3"
-        last
         onPress={openPicker}
       />
     ) : (
@@ -185,9 +186,7 @@ export function ProfileScreen() {
           orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
         }
         hue="lime"
-        className="rounded-lg bg-secondary px-3"
         disabled={!orgRole}
-        last
         onPress={() => {
           router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
         }}
@@ -278,113 +277,99 @@ export function ProfileScreen() {
       <TabScreenScrollView
         ref={deleteScrollRef}
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         onKeyboardOcclusionChange={setDeleteKeyboardOcclusion}
         onLayout={onDeleteScrollLayout}
       >
-        {/* Credits */}
-        <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+        {/* Credits: the balance and its purchase action, plus the spend entry,
+            because spend and remaining credits are the two halves of the same
+            question. */}
+        <Section>
+          <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={LineChart}
+              title={t('usage.title')}
+              subtitle={t('usage.entrySubtitle')}
+              hue="sage"
+              onPress={() => {
+                router.push('/(app)/usage' as Href);
+              }}
+            />
+          </RowGroup>
+        </Section>
 
-        {/* Usage: one row on the balance's own section, because spend and
-            remaining credits are the two halves of the same question. */}
-        <View className="mt-3">
-          <ConfigureRow
-            icon={LineChart}
-            title={t('usage.title')}
-            subtitle={t('usage.entrySubtitle')}
-            hue="sage"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/usage' as Href);
-            }}
-          />
-        </View>
-
-        {/* Code Reviewer */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('common.agents')}
-          </Text>
-          <ConfigureRow
-            icon={GitPullRequest}
-            title={t('common.codeReviewer')}
-            subtitle={t('profile.codeReviewerSubtitle')}
-            hue="honey"
-            className="rounded-lg bg-secondary px-3"
-            disabled={!agentScope}
-            onPress={() => {
-              if (agentScope) {
-                router.push(getCodeReviewerProfilePath(agentScope));
-              }
-            }}
-          />
-          <ConfigureRow
-            icon={ShieldCheck}
-            title={t('common.securityAgent')}
-            subtitle={t('profile.securityAgentSubtitle')}
-            hue="honey"
-            className="rounded-lg bg-secondary px-3"
-            disabled={!agentScope}
-            onPress={() => {
-              if (agentScope) {
-                router.push(getSecurityAgentPath(agentScope));
-              }
-            }}
-          />
-          <ConfigureRow
-            icon={Users}
-            title={t('profiles.title')}
-            subtitle={t('profiles.entrySubtitle')}
-            // Agents step: the row lists the agent profiles, and its two
-            // siblings in this section already carry `honey`. The neutral tile
-            // made one row of three read as disabled.
-            hue="honey"
-            className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              router.push(getProfilesPath());
-            }}
-          />
-          {/* Cloud Agent triggers are a native screen, for the scope in view:
-              the personal triggers, or the selected organization's. */}
-          <ConfigureRow
-            icon={Workflow}
-            title={t('cloudAgent.triggers.title')}
-            subtitle={t('cloudAgent.triggers.subtitle')}
-            hue="honey"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push(triggersListHref(organizationId ?? undefined));
-            }}
-          />
-        </View>
+        <Section label={t('common.agents')}>
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={GitPullRequest}
+              title={t('common.codeReviewer')}
+              subtitle={t('profile.codeReviewerSubtitle')}
+              hue="honey"
+              disabled={!agentScope}
+              onPress={() => {
+                if (agentScope) {
+                  router.push(getCodeReviewerProfilePath(agentScope));
+                }
+              }}
+            />
+            <ConfigureRow
+              icon={ShieldCheck}
+              title={t('common.securityAgent')}
+              subtitle={t('profile.securityAgentSubtitle')}
+              hue="honey"
+              disabled={!agentScope}
+              onPress={() => {
+                if (agentScope) {
+                  router.push(getSecurityAgentPath(agentScope));
+                }
+              }}
+            />
+            <ConfigureRow
+              icon={Users}
+              title={t('profiles.title')}
+              subtitle={t('profiles.entrySubtitle')}
+              // Agents step: the row lists the agent profiles, and its two
+              // siblings in this section already carry `honey`. The neutral tile
+              // made one row of three read as disabled.
+              hue="honey"
+              onPress={() => {
+                router.push(getProfilesPath());
+              }}
+            />
+            {/* Cloud Agent triggers are a native screen, for the scope in view:
+                the personal triggers, or the selected organization's. */}
+            <ConfigureRow
+              icon={Workflow}
+              title={t('cloudAgent.triggers.title')}
+              subtitle={t('cloudAgent.triggers.subtitle')}
+              hue="honey"
+              onPress={() => {
+                router.push(triggersListHref(organizationId ?? undefined));
+              }}
+            />
+          </RowGroup>
+        </Section>
 
         {/* PR Review */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.reviews')}
-          </Text>
-          <ConfigureRow
-            icon={GitMerge}
-            title={t('common.prReview')}
-            subtitle={t('common.prReviewSubtitle')}
-            hue="gold"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push(getPrReviewEntryPath());
-            }}
-          />
-        </View>
+        <Section label={t('profile.reviews')}>
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={GitMerge}
+              title={t('common.prReview')}
+              subtitle={t('common.prReviewSubtitle')}
+              hue="gold"
+              onPress={() => {
+                router.push(getPrReviewEntryPath());
+              }}
+            />
+          </RowGroup>
+        </Section>
 
         {/* Organization */}
         {showOrganizationSection && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.organization')}
-            </Text>
+          <Section label={t('common.organization')}>
             {organizationsError ? (
               <QueryError
                 variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
@@ -395,82 +380,73 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              <>
+              <RowGroup leadingTile>
                 {(organizationId != null || hasOrganizations) && organizationRow}
                 <ConfigureRow
                   icon={Plus}
                   title={t('organization.create.title')}
                   hue="lime"
-                  className="rounded-lg bg-secondary px-3"
-                  last
                   onPress={() => {
                     router.push(CREATE_ORGANIZATION_HREF);
                   }}
                 />
-              </>
+              </RowGroup>
             )}
-          </View>
+          </Section>
         )}
 
         {/* App */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.app')}
-          </Text>
-          {__DEV__ && SESSION_SYNC_URL && (
+        <Section label={t('profile.app')}>
+          <RowGroup leadingTile>
+            {__DEV__ && SESSION_SYNC_URL && (
+              <ConfigureRow
+                icon={SlidersHorizontal}
+                title={t('nativeRemote.title')}
+                hue="sage"
+                onPress={() => {
+                  router.push('/(app)/native-remote' as Href);
+                }}
+              />
+            )}
             <ConfigureRow
               icon={SlidersHorizontal}
-              title={t('nativeRemote.title')}
+              title={t('common.preferences')}
+              subtitle={t('profile.preferencesSubtitle')}
               hue="sage"
-              className="rounded-lg bg-secondary px-3"
               onPress={() => {
-                router.push('/(app)/native-remote' as Href);
+                router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
               }}
             />
-          )}
-          <ConfigureRow
-            icon={SlidersHorizontal}
-            title={t('common.preferences')}
-            subtitle={t('profile.preferencesSubtitle')}
-            hue="sage"
-            className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={BookOpenCheck}
-            title={t('agentBriefing.title')}
-            subtitle={t('agentBriefing.historyHint')}
-            hue="sage"
-            className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              router.push('/(app)/agent-briefing' as Href);
-            }}
-          />
-          {/* Permanent replay entry: opens the tour at any time, including
-              after the account finished or skipped it. Opening it is an
-              explicit user action, never a re-arm of the auto-open. */}
-          <ConfigureRow
-            icon={BookOpenCheck}
-            title={t('tour.tutorialLabel')}
-            hue="sage"
-            className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              router.push('/(app)/tour' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Sparkles}
-            title={t('profile.changelog')}
-            hue="sage"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/changelog' as Href);
-            }}
-          />
-        </View>
+            <ConfigureRow
+              icon={BookOpenCheck}
+              title={t('agentBriefing.title')}
+              subtitle={t('agentBriefing.historyHint')}
+              hue="sage"
+              onPress={() => {
+                router.push('/(app)/agent-briefing' as Href);
+              }}
+            />
+            {/* Permanent replay entry: opens the tour at any time, including
+                after the account finished or skipped it. Opening it is an
+                explicit user action, never a re-arm of the auto-open. */}
+            <ConfigureRow
+              icon={BookOpenCheck}
+              title={t('tour.tutorialLabel')}
+              hue="sage"
+              onPress={() => {
+                router.push('/(app)/tour' as Href);
+              }}
+            />
+            <ConfigureRow
+              icon={Sparkles}
+              title={t('profile.changelog')}
+              hue="sage"
+              onPress={() => {
+                router.push('/(app)/changelog' as Href);
+              }}
+            />
+          </RowGroup>
+        </Section>
 
         {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
@@ -484,28 +460,25 @@ export function ProfileScreen() {
             row's height, so painting a row directly cannot shift the sections
             below — only the skeleton's exit fade remains. */}
         {linkedAccounts.kind === 'hidden' ? null : (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.linkedAccounts')}
-            </Text>
-
+          <Section label={t('profile.linkedAccounts')}>
             {linkedAccounts.kind === 'skeleton' ? (
               <Animated.View exiting={FadeOut.duration(150)}>
-                {/* Content-shaped skeleton (icon tile + two text bars in the
-                    row's own bg-secondary card): a plain block read as an
-                    empty box in the e5 spot check (2026-09-07). Heights sum to
-                    the ConfigureRow row (py-3 + 38 text block) so the swap to
-                    real rows does not shift the sections below. Bars are
-                    bg-muted-soft: the theme's bg-muted equals bg-secondary,
-                    so default-tone bars were invisible here (b911 e2 spot
-                    check). */}
-                <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3">
-                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
-                  <View className="flex-1 gap-0.5">
-                    <Skeleton className="h-5 w-32 rounded bg-muted-soft" />
-                    <Skeleton className="h-4 w-48 rounded bg-muted-soft" />
+                {/* Content-shaped skeleton in the group's own row shape: a
+                    plain block read as an empty box in the e5 spot check
+                    (2026-09-07). Its bars sit where the row's title and
+                    subtitle settle, so the swap to real rows does not shift the
+                    sections below. Bars are bg-muted-soft: the theme's bg-muted
+                    equals bg-secondary, so default-tone bars were invisible
+                    here (b911 e2 spot check). */}
+                <RowGroup>
+                  <View className="min-h-[48px] flex-row items-center gap-3 px-4 py-3">
+                    <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
+                    <View className="flex-1 gap-0.5">
+                      <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
+                      <Skeleton className="h-3 w-48 rounded bg-muted-soft" />
+                    </View>
                   </View>
-                </View>
+                </RowGroup>
               </Animated.View>
             ) : null}
 
@@ -519,21 +492,20 @@ export function ProfileScreen() {
               />
             ) : null}
 
-            {listedProviders === null
-              ? null
-              : listedProviders.map((p, index) => (
-                  <View key={`${p.provider}-${p.email}`}>
-                    <ConfigureRow
-                      icon={KeyRound}
-                      title={providerLabel(p.provider)}
-                      subtitle={p.email}
-                      subtitleNumberOfLines={1}
-                      hue="moss"
-                      className="rounded-lg bg-secondary px-3"
-                      last={index === listedProviders.length - 1}
-                    />
-                  </View>
+            {listedProviders === null ? null : (
+              <RowGroup leadingTile>
+                {listedProviders.map(p => (
+                  <ConfigureRow
+                    key={`${p.provider}-${p.email}`}
+                    icon={KeyRound}
+                    title={providerLabel(p.provider)}
+                    subtitle={p.email}
+                    subtitleNumberOfLines={1}
+                    hue="moss"
+                  />
                 ))}
+              </RowGroup>
+            )}
 
             {linkedAccounts.kind === 'rowsStale' ? (
               <View className="flex-row items-center gap-3">
@@ -552,62 +524,64 @@ export function ProfileScreen() {
                 </Button>
               </View>
             ) : null}
-          </View>
+          </Section>
         )}
 
         {/* Connected services — the integrations hub. Its own section rather
             than a row in App: the hub manages external accounts, and its row
             takes the next curated hue step in reading order. */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('integrations.sectionTitle')}
-          </Text>
-          <ConfigureRow
-            icon={Plug}
-            title={t('integrations.title')}
-            subtitle={t('integrations.entrySubtitle')}
-            hue="pine"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
-            }}
-          />
-        </View>
+        <Section label={t('integrations.sectionTitle')}>
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={Plug}
+              title={t('integrations.title')}
+              subtitle={t('integrations.entrySubtitle')}
+              hue="pine"
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+              }}
+            />
+          </RowGroup>
+        </Section>
 
-        {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
-        <View className="mt-6 gap-3">
-          <ActionTile
-            icon={MessageSquare}
-            label={t('profile.feedback')}
-            hue="fern"
-            onPress={() => {
-              void feedbackPrompt.requestPrompt(userId);
-            }}
-          />
-          <ActionTile
-            icon={Lock}
-            label={t('profile.privacyChoices')}
-            hue="fern"
-            onPress={showPrivacyChoices}
-          />
-          <ActionTile
-            icon={DirectionalLogOut}
-            label={t('common.signOut')}
-            hue="fern"
-            onPress={requestSignOut}
-          />
-          <ActionTile
-            icon={Trash2}
-            label={t('profile.deleteAccount')}
-            hue="fern"
-            destructive
-            disabled={deletePending}
-            onPress={confirmDeleteAccount}
-          />
+        <Section>
+          <RowGroup leadingTile>
+            <ConfigureRow
+              variant="action"
+              icon={MessageSquare}
+              title={t('profile.feedback')}
+              hue="fern"
+              onPress={() => {
+                void feedbackPrompt.requestPrompt(userId);
+              }}
+            />
+            <ConfigureRow
+              variant="action"
+              icon={Lock}
+              title={t('profile.privacyChoices')}
+              hue="fern"
+              onPress={showPrivacyChoices}
+            />
+            <ConfigureRow
+              variant="action"
+              icon={DirectionalLogOut}
+              title={t('common.signOut')}
+              hue="fern"
+              onPress={requestSignOut}
+            />
+            <ConfigureRow
+              variant="action"
+              icon={Trash2}
+              title={t('profile.deleteAccount')}
+              hue="fern"
+              destructive
+              disabled={deletePending}
+              onPress={confirmDeleteAccount}
+            />
+          </RowGroup>
 
           {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
-            <View className="gap-3 rounded-lg bg-secondary p-3">
+            <Card className="gap-3">
               <FormField
                 label={t('profile.confirmationCode')}
                 placeholder={t('profile.confirmationCodePlaceholder')}
@@ -632,13 +606,13 @@ export function ProfileScreen() {
               >
                 <Text>{t('profile.confirmDeletion')}</Text>
               </Button>
-            </View>
+            </Card>
           )}
 
-          <Text className="text-center text-xs text-muted-foreground">
+          <Text variant="caption" className="text-center">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
           </Text>
-        </View>
+        </Section>
       </TabScreenScrollView>
 
       {confirmDialog}

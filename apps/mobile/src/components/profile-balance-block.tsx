@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
@@ -48,9 +49,7 @@ export function BalanceBlock({
   onRetry,
 }: BalanceBlockProps) {
   // Keep the expanded line-action target inside the card even when the note wraps.
-  const shellClass = stacked
-    ? 'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-3'
-    : 'min-h-16 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-3';
+  const shellClass = stacked ? 'min-h-16 gap-2' : 'min-h-16 flex-row items-center gap-2';
   const valueColumnClass = stacked
     ? 'min-w-0 min-h-[48px] flex-1 justify-center gap-1'
     : 'min-w-0 flex-1 gap-1';
@@ -102,10 +101,10 @@ export function BalanceBlock({
   );
 
   return (
-    // The shell draws the card and takes no touch itself, so the account
-    // picker's hit slop above it (the Credits header row) still reaches into
-    // the card's top padding; its own controls keep their touches.
-    <View className={shellClass} pointerEvents="box-none">
+    // The card takes no touch itself, so the account picker's hit slop above it
+    // (the Credits header row) still reaches into the card's top padding; its
+    // own controls keep their touches.
+    <Card className={shellClass} pointerEvents="box-none">
       <Animated.View className={contentClass} layout={LinearTransition.duration(200)}>
         {/* `flex-row` keeps the column's `flex-1` on the horizontal axis. */}
         <View className={valueColumnClass}>
@@ -115,6 +114,6 @@ export function BalanceBlock({
         {!stacked && visibilityControl}
       </Animated.View>
       {stacked ? <View className="items-end">{action}</View> : action}
-    </View>
+    </Card>
   );
 }

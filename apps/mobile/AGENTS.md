@@ -244,6 +244,30 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
+### Layout contract
+
+One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+
+| Concern | Contract | Use |
+|---|---|---|
+| Page gutter | 14pt on every screen, header, sheet, list row, section header and empty state. No other horizontal page inset. | `SCREEN_GUTTER_CLASS` from `@/lib/layout` |
+| Screen body | Section gap 21pt, gutter, 10.5pt top pad. | `SCREEN_BODY_CLASS` from `@/lib/layout` as the scroll body's `contentContainerClassName` |
+| Section | Label plus content blocks, 10.5pt apart. | `Section` from `@/components/ui/section` |
+| Section header | 10pt mono uppercase eyebrow, muted; optional 11pt mono primary action and notice. Gutter-free inside a padded body; `inset` for a full-bleed list. | `SectionHeader` from `@/components/ui/section-header` |
+| Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
+| Row anatomy | `min-h-[48px] flex-row items-center gap-3 px-4 py-3`; 30pt `IconTile`; title `text-sm font-medium text-foreground` on one line; subtitle `text-xs text-muted-foreground` with `mt-0.5`; trailing `RowChevron`, `Switch`, `RowCheck` or a value. | `ConfigureRow` (`variant="action"` for an in-place command), `PreferenceRow`, `KvRow`, `ChoiceRow` from `@/components/ui/*` |
+| Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`; rows own no card and no grouped divider |
+| Card | Non-row block (balance, metric, form, info): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. | `Card` from `@/components/ui/card` |
+| Radii | Controls `rounded-md`; tiles and thumbnails `rounded-lg`; cards, row groups and dialogs `rounded-xl`; pills, avatars and the FAB `rounded-full`. Nothing else. | the primitives above |
+| Dividers | 0.5pt `border-hair-soft`. Never `border-border` for a row divider. | `RowGroup`, flat list rows |
+| Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
+| Screen header | First child of the screen root; `size="large"` on tab roots; never override its gutter, title typography or bottom padding. A badge on the title line goes through `titleAccessory`. | `ScreenHeader` |
+| Sheet header | Every formSheet route and imperative `Sheet`. The body uses the same body class. | `SheetHeader` |
+| States | Loading, empty, error and happy states for every data screen. A skeleton mirrors the primitive's geometry. | `Skeleton`, `EmptyState`, `QueryError`, `CenteredState` |
+| Primary action | One per screen. A pinned footer uses one shared primitive; an inline action ends its section. | the footer in `@/components/ui/` |
+| FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]` outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+
 ## Translations
 
 Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed

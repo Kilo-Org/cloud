@@ -15,6 +15,7 @@ import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
@@ -294,45 +295,39 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The header is one text line tall, like every other Profile section
-          heading, so "Credits" starts at the screen's top padding instead of
-          sitting at the bottom of a 44dp box. The picker keeps its touch target
-          on the shared line-action box: a 28dp frame that floats over the line
-          and reaches past 44dp with hitSlop, without growing the row. */}
-      <View
-        className={cn(
-          'gap-3',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
-        )}
-      >
-        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
-          {t('profile.credits')}
-        </Text>
-        {canPickContext && (
-          <Pressable
-            className={cn(
-              LINE_ACTION_BOX_CLASS,
-              // A short account or org name must still carry the 44pt reach.
-              'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
-              narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
-            )}
-            hitSlop={LINE_ACTION_HIT_SLOP}
-            onPress={openPicker}
-            accessibilityRole="button"
-            accessibilityLabel={selectedLabel}
-            accessibilityHint={t('profile.selectAccount')}
-          >
-            <Text
-              className="min-w-0 shrink text-xs font-medium text-muted-foreground"
-              numberOfLines={1}
-              ellipsizeMode="tail"
+      {/* The account picker shares the label's line; a narrow window wraps it
+          under the label. It keeps its touch target on the shared line-action
+          box: a 28dp frame that floats over the line and reaches past 44dp with
+          hitSlop, without growing the row. */}
+      <SectionHeader
+        label={t('profile.credits')}
+        notice={
+          canPickContext ? (
+            <Pressable
+              className={cn(
+                LINE_ACTION_BOX_CLASS,
+                // A short account or org name must still carry the 44pt reach.
+                'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
+                narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
+              )}
+              hitSlop={LINE_ACTION_HIT_SLOP}
+              onPress={openPicker}
+              accessibilityRole="button"
+              accessibilityLabel={selectedLabel}
+              accessibilityHint={t('profile.selectAccount')}
             >
-              {selectedLabel}
-            </Text>
-            <ChevronDown size={14} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      </View>
+              <Text
+                className="min-w-0 shrink text-xs font-medium text-muted-foreground"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedLabel}
+              </Text>
+              <ChevronDown size={14} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null
+        }
+      />
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />

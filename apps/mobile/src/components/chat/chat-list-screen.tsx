@@ -1,19 +1,18 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Plus } from '@/components/ui/icons';
+import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
+import { MessageCircle } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -27,9 +26,10 @@ import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
+import { cn } from '@/lib/utils';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -58,7 +58,6 @@ export function ChatListScreen() {
 function ScopedChatListScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
@@ -185,7 +184,7 @@ function ScopedChatListScreen() {
   const fabStyle = useMemo(
     () => ({
       bottom: tabBarHeight + FAB_MARGIN,
-      right: 20,
+      right: FAB_GUTTER,
       width: FAB_SIZE,
       height: FAB_SIZE,
     }),
@@ -222,10 +221,15 @@ function ScopedChatListScreen() {
     }
     if (isLoading) {
       return (
-        <View className="pt-[18px]">
+        <View className="pt-1">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <View key={index} className="py-1.5">
-              <Skeleton className="mx-[22px] h-[52px] rounded-none" />
+            <View key={index} className="flex-row items-center gap-3 px-4 py-3">
+              <Skeleton className="h-[30px] w-[3px] rounded-full" />
+              <View className="flex-1 gap-1">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-32" />
+              </View>
             </View>
           ))}
         </View>
@@ -273,22 +277,9 @@ function ScopedChatListScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.chat')}
-          titleContent={
-            <View className="flex-row items-center gap-2">
-              <Text
-                // An explicit pixel line height keeps the title's header
-                // measurement stable on Android.
-                className="text-[30px] font-semibold leading-[36px] text-foreground"
-                numberOfLines={1}
-              >
-                {t('common.chat')}
-              </Text>
-              <BetaPill />
-            </View>
-          }
+          titleAccessory={<BetaPill />}
           size="large"
           showBackButton={false}
-          className="px-[22px] pb-1"
           headerRight={<BackendSettingsControl />}
         />
         {/* The account every read on this screen is scoped to: the chat list
@@ -303,27 +294,18 @@ function ScopedChatListScreen() {
             account list resolves or changes. It sits at the header's own
             gutter and on its own row: the 30px title already fills the title
             row, so a trailing cluster would paint over it on a phone. */}
-        <View className="px-[22px] pb-1">
+        <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1')}>
           <ContextControl />
         </View>
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('modelChat.list.new')}
-            accessibilityState={{ disabled: starting, busy: starting }}
+          <Fab
+            label={t('modelChat.list.new')}
             testID="chat-new-fab"
-            disabled={starting}
+            busy={starting}
             onPress={start}
-            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
             style={fabStyle}
-          >
-            {starting ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Plus size={24} color={colors.primaryForeground} />
-            )}
-          </Pressable>
+          />
         )}
       </View>
     </StateSurfaceInsets>

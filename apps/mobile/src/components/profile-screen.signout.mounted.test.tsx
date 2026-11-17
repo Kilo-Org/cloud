@@ -157,7 +157,6 @@ vi.mock('@/components/ui/icons', () => ({
   Workflow: 'Workflow',
 }));
 
-vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
@@ -204,7 +203,10 @@ describe('ProfileScreen sign-out confirmation', () => {
 
   function pressSignOutTile(renderer: TestRenderer.ReactTestRenderer) {
     const tile = renderer.root.find(
-      node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
+      node =>
+        isType(node, 'ConfigureRow') &&
+        node.props.variant === 'action' &&
+        node.props.title === 'Sign out'
     );
     callProp(tile, 'onPress');
   }

@@ -141,7 +141,6 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1, width: 400, height: 800 }),
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 16, FAB_SIZE: 56 }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));

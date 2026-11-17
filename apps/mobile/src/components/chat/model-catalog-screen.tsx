@@ -131,7 +131,7 @@ export function ModelCatalogScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('modelChat.catalog.title')} />
       <ModelSearchField search={search} />
-      <View className="px-[22px] pb-2">
+      <View className="px-4 pb-2">
         <SegmentedControl
           options={[
             { value: 'fits', label: t('modelChat.catalog.fitsTab') },

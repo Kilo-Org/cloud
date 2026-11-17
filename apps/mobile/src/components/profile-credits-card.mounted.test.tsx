@@ -320,17 +320,19 @@ async function choose(label: string) {
 }
 
 /**
- * The header container's classes: the row that lays out the credits eyebrow
- * beside the account picker. The card's outer box is the only View whose whole
- * class list is `gap-3`, so the header is the one that adds to it.
+ * The header container's classes: the label line that carries the credits
+ * eyebrow and the account picker. The section header is the one row that packs
+ * its children to the end and wraps them when they cannot share a line.
  */
 function headerClasses(renderer: ReactTestRenderer): string[] {
   const header = renderer.root.find(node => {
     if (!Object.is(node.type, 'View')) {
       return false;
     }
-    const className = String(node.props.className);
-    return className.includes('gap-3') && className !== 'gap-3';
+    const tokens = classesOf(node);
+    return (
+      tokens.includes('flex-wrap') && tokens.includes('justify-end') && tokens.includes('items-end')
+    );
   });
   return String(header.props.className).split(' ');
 }
@@ -360,11 +362,11 @@ function renders(node: ReactTestInstance, text: string): boolean {
   );
 }
 
-/** The card's balance shell: its only `min-h-16 rounded-lg bg-secondary` box. */
+/** The card's balance shell: its only `min-h-16 rounded-xl bg-secondary` box. */
 function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
   return renderer.root.find(
     node =>
-      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-lg', 'bg-secondary'])
+      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-xl', 'bg-secondary'])
   );
 }
 
@@ -1287,7 +1289,7 @@ describe('CreditsCard add-credits entry point', () => {
     let ancestor = action.parent;
     let insideBalanceCard = false;
     while (ancestor !== null) {
-      if (hasClasses(ancestor, ['min-h-16', 'rounded-lg', 'bg-secondary'])) {
+      if (hasClasses(ancestor, ['min-h-16', 'rounded-xl', 'bg-secondary'])) {
         insideBalanceCard = true;
         break;
       }
@@ -1313,13 +1315,15 @@ describe('CreditsCard credits header', () => {
     unmount();
   });
 
-  it('stacks the credits eyebrow above the account picker in a narrow window', async () => {
+  it('wraps the account picker under the label in a narrow window', async () => {
     windowDims.width = 160;
     const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
 
     const classes = headerClasses(renderer);
-    expect(classes).toContain('flex-col');
-    expect(classes).not.toContain('flex-row');
+    // One wrapping row: the picker takes its own line when the label cannot
+    // share it, instead of squeezing the eyebrow into a broken column.
+    expect(classes).toContain('flex-wrap');
+    expect(classes).not.toContain('flex-col');
     // The eyebrow keeps its full copy instead of breaking mid-word.
     expect(texts()).toContain('Credits');
     unmount();
@@ -1332,7 +1336,7 @@ describe('CreditsCard credits header', () => {
     // padding like the other Profile section headings; a taller row pushes it
     // down and opens a hole under the screen title.
     expect(headerClasses(renderer)).not.toContain('min-h-[44px]');
-    expect(headerClasses(renderer)).toContain('items-center');
+    expect(headerClasses(renderer)).toContain('items-end');
     const picker = renderer.root.find(
       node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
     );

@@ -1,8 +1,4 @@
 {
-  "apps/mobile/src/app/(app)/agent-chat/folder-picker.tsx": { "L7": 1 },
-  "apps/mobile/src/app/(app)/agent-chat/instance-picker.tsx": { "L3": 2 },
-  "apps/mobile/src/app/(app)/agent-chat/mode-picker.tsx": { "L3": 2 },
-  "apps/mobile/src/app/(app)/agent-chat/repo-picker.tsx": { "L3": 2, "L4": 1 },
   "apps/mobile/src/app/(app)/code-reviewer/[scope]/[platform]/(edit)/council.tsx": {
     "L2": 1,
     "L3": 6
@@ -56,8 +52,6 @@
   "apps/mobile/src/components/agents/message-bubble.tsx": { "L1": 2 },
   "apps/mobile/src/components/agents/message-details-sheet.tsx": { "L2": 1 },
   "apps/mobile/src/components/agents/message-text-select-sheet.tsx": { "L2": 1 },
-  "apps/mobile/src/components/agents/model-picker-content.tsx": { "L3": 2 },
-  "apps/mobile/src/components/agents/model-selector.tsx": { "L1": 3, "L3": 2, "L8": 6 },
   "apps/mobile/src/components/agents/new-session-cloud-environment-row.tsx": { "L4": 1 },
   "apps/mobile/src/components/agents/new-session-environment-row.tsx": { "L4": 1 },
   "apps/mobile/src/components/agents/new-session-profile-row.tsx": { "L8": 1 },

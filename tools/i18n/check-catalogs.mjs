@@ -175,6 +175,7 @@ const WORDED_COUNTS = new Set([
   'securityAgent.automation.queued:two:ar',
   'securityAgent.settingsOverview.repositoriesCount:one:ar',
   'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.composer.charactersRemaining:one:mi',
   'agentChat.partRenderer.updatedFileCount:one:ar',
   'agentChat.partRenderer.updatedFileCount:two:ar',
   'agentChat.olderMessages.omitted:two:ar',

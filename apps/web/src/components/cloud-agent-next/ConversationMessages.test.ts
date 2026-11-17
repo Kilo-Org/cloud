@@ -655,8 +655,8 @@ describe('ConversationMessages', () => {
       expect(button).not.toContain('aria-controls=');
       expect(button).not.toContain('disabled=');
     }
-    // Collapsed triggers must not advertise any controlled element: every
-    // aria-controls match in the page belongs to an expanded disclosure.
+    // Every disclosure on this page is collapsed, so no element advertises a
+    // controlled region here.
     expect(html.match(/aria-controls="[^"]+"/g) ?? []).toHaveLength(0);
     expect(html.match(/data-tool-card=/g)).toHaveLength(4);
     expect(html).toContain('WebFetch');

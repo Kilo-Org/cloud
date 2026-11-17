@@ -204,7 +204,11 @@ function KiloPassEndedBody({
           <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
           <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
         </View>
-        <KiloPassCreditHistorySection history={creditHistory} />
+        {/* A section break larger than the gaps inside a section, so the plan
+            summary and the ledgers do not read as one block. */}
+        <View className="mt-1">
+          <KiloPassCreditHistorySection history={creditHistory} />
+        </View>
         {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
         {!isStoreManagedPass(subscription) && (
           <KiloPassBillingHistorySection history={billingHistory} />

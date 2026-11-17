@@ -246,3 +246,41 @@ describe.each(SECTIONS)('$name history section', section => {
     renderer.unmount();
   });
 });
+
+/** The literal children of every rendered Text node, in render order. */
+function textNodeChildren(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return nodesOfType(renderer, 'Text').flatMap(node =>
+    node.children.filter((child): child is string => typeof child === 'string')
+  );
+}
+
+function creditEntry(description: string): KiloPassCreditEntry {
+  return { ...CREDIT_ENTRY, description };
+}
+
+// The screen header already prints "Kilo Pass", so each row title drops that
+// leading product name and keeps the part that tells the rows apart.
+describe('credit row titles', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it.each([
+    ['Kilo Pass monthly credits — Tier 19', 'Monthly credits — Tier 19'],
+    ['Kilo Pass base credits (19, monthly)', 'Base credits (19, monthly)'],
+    // No leading product name: the description prints exactly as the server sent it.
+    [CREDIT_DESCRIPTION, CREDIT_DESCRIPTION],
+  ])('prints the row for %s as %s', async (description, expected) => {
+    const renderer = await renderElement(
+      createElement(KiloPassCreditHistorySection, {
+        history: { query: ledgerQuery(), entries: [creditEntry(description)], hasMore: false },
+      })
+    );
+    const titles = textNodeChildren(renderer);
+    expect(titles).toContain(expected);
+    if (description !== expected) {
+      expect(titles).not.toContain(description);
+    }
+    renderer.unmount();
+  });
+});

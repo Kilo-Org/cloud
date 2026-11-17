@@ -93,10 +93,27 @@ function SectionError({
   );
 }
 
+/**
+ * A row title without the product name the screen header already prints: a row
+ * that repeats it buries the part that tells the rows apart, the credits' own
+ * kind and tier. Only one leading "Kilo Pass " is removed, and the remainder
+ * keeps its sentence capital so the title still reads as a title.
+ */
+function creditRowTitle(description: string): string {
+  const stripped = description.replace(/^kilo pass\s+/i, '');
+  if (stripped === description) {
+    return firstNonEmpty(description, i18n.t('common.creditHistory'));
+  }
+  if (stripped.length === 0) {
+    return i18n.t('common.creditHistory');
+  }
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {
   return (
     <HistoryLine
-      title={firstNonEmpty(entry.description, i18n.t('common.creditHistory'))}
+      title={creditRowTitle(entry.description)}
       date={historyDate(entry.date)}
       amount={formatPrefixedMoney(entry.amountUsd, i18n.language)}
     />

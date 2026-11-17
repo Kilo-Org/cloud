@@ -1,5 +1,6 @@
+import { type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { type HostInstance, Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -21,6 +22,7 @@ export function SheetHeader({
   doneDisabled = false,
   topInset = 'always',
   surfaceClassName = 'bg-background',
+  titleRef,
 }: {
   title: string;
   /**
@@ -53,6 +55,12 @@ export function SheetHeader({
    * near-black window behind it; the app canvas colour is the default.
    */
   surfaceClassName?: string;
+  /**
+   * The title's native node. A sheet that opens into a modal environment
+   * needs a focus target for assistive technology (`sendAccessibilityEvent`
+   * on Android), and the title is the one node every sheet has.
+   */
+  titleRef?: Ref<HostInstance>;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -122,6 +130,7 @@ export function SheetHeader({
             title stays leading against the sheet edge. */}
           <View className="min-w-0 shrink grow">
             <Text
+              ref={titleRef}
               className={cn('text-lg font-semibold text-foreground', onCancel && 'text-center')}
               numberOfLines={2}
               ellipsizeMode={titleEllipsis}

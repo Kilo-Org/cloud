@@ -9,6 +9,7 @@ import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
 import {
   inviteEmailError,
+  inviteEmailErrorMessages,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
 import {
@@ -232,6 +233,7 @@ export function InviteMemberSheet() {
           textContentType="emailAddress"
           autoFocus
           validate={inviteEmailError}
+          reserveErrorMessages={inviteEmailErrorMessages()}
           error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
           onChangeText={value => {
             emailRef.current = value;

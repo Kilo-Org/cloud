@@ -30,10 +30,25 @@ export function parseEmails(value: string): string[] {
     .filter(email => email !== '');
 }
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the threshold rule can show. */
+export function thresholdErrorMessages(): readonly [invalid: string] {
+  return [i18n.t('organization.lowBalanceAlert.thresholdError')];
+}
+
 export function thresholdError(value: string): string | null {
-  return parseThreshold(value) == null
-    ? i18n.t('organization.lowBalanceAlert.thresholdError')
-    : null;
+  const [message] = thresholdErrorMessages();
+  return parseThreshold(value) == null ? message : null;
+}
+
+/**
+ * The reserve set for `FormField`'s `reserveErrorMessages`: every message the
+ * recipient rule can show.
+ */
+export function emailsErrorMessages(): readonly [required: string, invalid: string] {
+  return [
+    i18n.t('organization.lowBalanceAlert.emailsRequired'),
+    i18n.t('organization.lowBalanceAlert.emailsInvalid'),
+  ];
 }
 
 /**
@@ -43,13 +58,12 @@ export function thresholdError(value: string): string | null {
  * separate addresses, so neither repeats it.
  */
 export function emailsError(value: string): string | null {
+  const [required, invalid] = emailsErrorMessages();
   const emails = parseEmails(value);
   if (emails.length === 0) {
-    return i18n.t('organization.lowBalanceAlert.emailsRequired');
+    return required;
   }
-  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success)
-    ? i18n.t('organization.lowBalanceAlert.emailsInvalid')
-    : null;
+  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success) ? invalid : null;
 }
 
 /** Where a failed save belongs and what it says, both localized. */

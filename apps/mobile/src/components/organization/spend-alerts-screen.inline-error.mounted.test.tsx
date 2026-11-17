@@ -1,7 +1,8 @@
 // The spend view's live-disabled Save, judged on what a person can read: the
 // real field, the real validators, and the screen's own change wiring. The
 // sibling suite mocks `FormField` as a host name to assert wiring, so this one
-// leaves it unmocked and requires the message to reach a rendered text node.
+// leaves it unmocked and requires the message to reach the input's composed
+// accessibility label, which the reserved copy never populates.
 
 import { createElement } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -240,7 +241,12 @@ describe('SpendAlertsScreen limit above the maximum', () => {
       windowPicker.onChange('168');
     });
 
-    expect(texts(renderer)).toContain(expectedMaxError);
+    // The reserve set keeps an invisible copy of every message the rule can
+    // show, so rendered text cannot prove the rule fired. The composed label
+    // carries the visible state: label, required, then the message.
+    expect(String(inputByLabel(renderer, LIMIT).props.accessibilityLabel)).toContain(
+      expectedMaxError
+    );
     expect(saveButton(renderer).props.disabled).toBe(true);
   });
 });

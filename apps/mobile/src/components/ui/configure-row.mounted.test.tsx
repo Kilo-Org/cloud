@@ -80,10 +80,10 @@ function renderRow(
   return renderer.root;
 }
 
-/** The classes of the row body: the one View that carries the row padding. */
+/** The classes of the row body: the one element that carries the row padding. */
 function rowClasses(root: TestRenderer.ReactTestInstance): string[] {
   const body = root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('py-3')
+    node => typeof node.props.className === 'string' && node.props.className.includes('py-3')
   );
   return String(body.props.className).split(' ');
 }
@@ -248,7 +248,7 @@ describe('ConfigureRow disabled cue', () => {
 });
 
 describe('ConfigureRow test handle', () => {
-  it('puts the caller\'s testID on the tappable row', () => {
+  it("puts the caller's testID on the tappable row", () => {
     const control = renderRow({ testID: 'configure-1' }).find(node =>
       Object.is(node.type, 'Pressable')
     );

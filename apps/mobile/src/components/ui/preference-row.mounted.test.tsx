@@ -24,6 +24,10 @@ vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+// A switch row renders no chevron or check mark; the frame imports the marks
+// for its other trailing variants, so this suite stubs them out of its graph.
+vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 // The real palettes, so the switch-colour assertions below hold the token pairs
 // the screen actually renders rather than values invented for the test. The
 // import has to be dynamic: `vi.mock` factories are hoisted above this file's
@@ -315,7 +319,7 @@ describe('PreferenceRow', () => {
 });
 
 describe('PreferenceRow test handle', () => {
-  it('puts the caller\'s testID on the row container', () => {
+  it("puts the caller's testID on the row container", () => {
     const row = renderRow({ value: true, onValueChange: () => undefined, testID: 'pref-1' }).find(
       node => typeof node.type === 'string' && node.props.testID === 'pref-1'
     );

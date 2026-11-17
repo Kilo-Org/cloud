@@ -3,7 +3,7 @@
 // 'lucide-react-native' directly is lint-banned.
 // The type re-export below is erased at transpile (TS `export type`), so it
 // adds no runtime import of the package barrel.
-export type { LucideIcon } from 'lucide-react-native';
+export type { LucideIcon, LucideProps } from 'lucide-react-native';
 export { default as Archive } from 'lucide-react-native/icons/archive';
 export { default as ArchiveRestore } from 'lucide-react-native/icons/archive-restore';
 export { default as AlertCircle } from 'lucide-react-native/icons/circle-alert';

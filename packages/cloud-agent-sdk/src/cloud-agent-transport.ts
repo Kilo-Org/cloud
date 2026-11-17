@@ -549,16 +549,23 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
     /**
      * One best-effort page read for a reconnect whose cancel removed a still
-     * scheduled catch-up: its page replays only when no cursor exists yet
-     * (otherwise it is recorded without replaying bounded rows), and a failed
-     * read arms a fresh retry chain for this connection.
+     * scheduled catch-up. The reconnect reached only this helper or the
+     * no-cursor fallback, so such a read always replays on a cursorless
+     * connect; here it is recorded without replaying bounded rows over the
+     * reconnect's live socket replay (which this connection owns), and a
+     * failed read arms a fresh retry chain.
      */
     function dispatchRetryRead(expectedGeneration: number): void {
+      const epoch = snapshotCatchUpEpoch;
       void readSnapshot().then(read => {
         if (expectedGeneration !== lifecycleGeneration) return;
-        const onPage = lastEventId === null ? replayInitialPage : recordInitialPageOnly;
-        if (!applySnapshotRead(read, onPage, expectedGeneration)) {
-          scheduleSnapshotRetry(onPage, expectedGeneration, 0);
+        // A newer reconnect superseded this read: record, same as below.
+        if (epoch !== snapshotCatchUpEpoch) {
+          if (read.kind === 'page') recordInitialPageOnly(read.page);
+          return;
+        }
+        if (!applySnapshotRead(read, recordInitialPageOnly, expectedGeneration)) {
+          scheduleSnapshotRetry(recordInitialPageOnly, expectedGeneration, 0);
         }
       });
     }

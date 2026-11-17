@@ -9,6 +9,7 @@ import {
 } from './briefing-notification-toggle';
 
 const mutate = vi.hoisted(() => vi.fn());
+const preferencesRead = vi.hoisted(() => ({ isError: false, refetch: vi.fn() }));
 
 vi.mock('react-native', () => ({ View: 'View', ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -39,7 +40,8 @@ vi.mock('@/lib/agent-briefing', () => ({
       morningEnd: '11:00',
       language: 'en',
     },
-    isError: false,
+    isError: preferencesRead.isError,
+    refetch: preferencesRead.refetch,
   }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
@@ -80,6 +82,29 @@ it('shows the device-notifications link from Briefing settings', () => {
   act(() => {
     mounted.unmount();
   });
+});
+
+it('retries the brief preferences when their read fails', () => {
+  preferencesRead.isError = true;
+  preferencesRead.refetch.mockClear();
+  const mounted = mount(BriefingNotificationToggle, {});
+
+  // The failed read leaves the switch unavailable and offers its own retry:
+  // the setting is not saved from here, so the retry is the only action.
+  const retry = mounted.root.find(
+    node =>
+      (node.type as string) === 'Button' &&
+      node.findAll(child => child.props.children === 'common.retry').length > 0
+  );
+  act(() => {
+    (retry.props.onPress as () => void)();
+  });
+  expect(preferencesRead.refetch).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    mounted.unmount();
+  });
+  preferencesRead.isError = false;
 });
 
 it('saves the brief preference from its Notifications category row', () => {

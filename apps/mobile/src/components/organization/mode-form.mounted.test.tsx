@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModeForm } from '@/components/organization/mode-form';
@@ -191,11 +191,43 @@ function hintLines(root: ReactTestInstance): readonly string[] {
     .filter(child => typeof child === 'string');
 }
 
+/* `renderWithProviders` returns no update path, so the modes list lives in props
+ * of a test-owned wrapper: the test re-renders the same ModeForm instance with a
+ * longer list by changing the wrapper's state, the way a refetched query would. */
+
+/** The modes list a mounted create form sees, changeable through `renderWith`. */
+type ModesBox = {
+  modes: readonly OrgMode[];
+  renderWith: (next: readonly OrgMode[]) => void;
+};
+
+function CreateFormHarness({ box }: Readonly<{ box: ModesBox }>) {
+  const [, setVersion] = useState(0);
+  box.renderWith = (next: readonly OrgMode[]) => {
+    box.modes = next;
+    act(() => {
+      setVersion(version => version + 1);
+    });
+  };
+  return createElement(ModeForm, {
+    organizationId: 'org-1',
+    mode: undefined,
+    existingModes: box.modes,
+  });
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountCreateForm() {
-  return renderWithProviders(
-    createElement(ModeForm, { organizationId: 'org-1', mode: undefined, existingModes })
-  );
+function mountCreateForm(modes: readonly OrgMode[] = existingModes) {
+  const box: ModesBox = {
+    modes,
+    // Overwritten by the harness on mount; typed as a real body so the lint
+    // rule for empty functions stays quiet.
+    renderWith: () => undefined,
+  };
+  return renderWithProviders(createElement(CreateFormHarness, { box })).then(result => ({
+    ...result,
+    box,
+  }));
 }
 
 beforeEach(() => {
@@ -265,6 +297,48 @@ describe('ModeForm identifier hint', () => {
     changeField(renderer.root, nameLabel, 'Security Reviewer');
 
     expect(hintLines(renderer.root)).toContain(`security-reviewer · ${identifierHint}`);
+
+    unmount();
+  });
+
+  it('re-derives the suggestion when the modes list arrives after the name was typed', async () => {
+    const { renderer, box, unmount } = await mountCreateForm([]);
+
+    changeField(renderer.root, nameLabel, 'مراجع الأمن');
+    expect(hintLines(renderer.root)).toContain(`mode · ${identifierHint}`);
+
+    box.renderWith([...existingModes, storedMode('mode-3', 'The fallback', 'mode')]);
+    expect(hintLines(renderer.root)).toContain(`mode-2 · ${identifierHint}`);
+
+    unmount();
+  });
+
+  it('shows the plain hint again once the name is cleared', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, 'مراجع الأمن');
+    changeField(renderer.root, nameLabel, '');
+
+    const lines = hintLines(renderer.root);
+    expect(lines).toContain(identifierHint);
+    expect(lines).not.toContain(` · ${identifierHint}`);
+
+    unmount();
+  });
+
+  it('saves a create with the derived identifier when the person left it empty', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, 'مراجع الأمن');
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: 'مراجع الأمن', slug: 'mode', config: expect.anything() },
+      expect.anything()
+    );
 
     unmount();
   });

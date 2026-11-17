@@ -90,10 +90,17 @@ const FALLBACK_SLUG = 'mode';
  * lowercase, every run of other characters folded to one hyphen, no leading or
  * trailing hyphen. A name that folds away completely — Arabic, Hebrew, `###` —
  * suggests `mode`, then `mode-2`, `mode-3`, … past the ones the organization
- * already holds, so the suggestion is never empty and never taken. A derived slug
- * is a suggestion the person can replace.
+ * already holds, so the suggestion is never taken. An empty or whitespace-only
+ * name suggests nothing (`''`): the fallback covers a name that folds away, not
+ * a field the person has not filled. A derived slug is a suggestion the person
+ * can replace.
  */
 export function modeSlugFromName(name: string, takenSlugs: readonly string[] = []): string {
+  // Nothing typed derives nothing; only a name whose characters fold away
+  // reaches the fallback counter below.
+  if (name.trim().length === 0) {
+    return '';
+  }
   const folded = name
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')

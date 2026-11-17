@@ -57,6 +57,13 @@ describe('modeSlugFromName', () => {
     expect(modeSlugFromName('-Docs-')).toBe('docs');
   });
 
+  it('suggests nothing for an empty or whitespace-only name, taken slugs or not', () => {
+    expect(modeSlugFromName('')).toBe('');
+    expect(modeSlugFromName('   ')).toBe('');
+    expect(modeSlugFromName('', ['architect', 'mode'])).toBe('');
+    expect(modeSlugFromName('   ', ['mode'])).toBe('');
+  });
+
   it('suggests a free mode counter when the name folds away completely', () => {
     expect(modeSlugFromName('###')).toBe('mode');
     expect(modeSlugFromName('وضع الاستدلال')).toBe('mode');
@@ -159,6 +166,25 @@ describe('orgModeFormSaveValues', () => {
     expect(
       orgModeFormSaveValues(values({ slug: '', name: 'وضع' }), 'create', ['mode', 'mode-2']).slug
     ).toBe('mode-3');
+  });
+
+  it('derives the fallback for a fold-away name on create, empty slug or not', () => {
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', []).slug).toBe(
+      'mode'
+    );
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', ['mode']).slug).toBe(
+      'mode-2'
+    );
+  });
+
+  it('derives nothing from an empty name, so the save is refused as missing', () => {
+    const saved = orgModeFormSaveValues(values({ slug: '', name: '' }), 'create', []);
+    expect(saved.slug).toBe('');
+    expect(saved.name).toBe('');
+    expect(validateOrgModeForm(saved, [])).toEqual({
+      name: 'nameRequired',
+      slug: 'identifierRequired',
+    });
   });
 
   it('keeps an identifier the person typed on create', () => {

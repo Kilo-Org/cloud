@@ -21,6 +21,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isStructuredCredentialProvider } from '@kilocode/app-shared/byok-credentials';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -148,7 +149,10 @@ export function ProviderKeyProviderPickerScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.chooseProvider')} />
+      <ScreenHeader
+        title={t('profile.providerKeys.chooseProvider')}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-row items-center gap-2 px-4 pb-1 pt-2">
         <Search size={18} color={colors.mutedForeground} />
         <Input

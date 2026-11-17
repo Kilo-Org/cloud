@@ -768,13 +768,16 @@ test('Agents offline pill waits out the connect grace period', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
   try {
     const sidePanel = await getSidePanel();
-    await navigateToAgentsMode(sidePanel);
 
     // The mocked ingest socket never completes the connected handshake. The
-    // Pill must stay hidden for the whole grace period, then appear.
+    // Grace clock starts when the Agents view dials, not when this test gets
+    // To observe it: navigating switches the mode and mounts the list, so the
+    // Clock must precede the switch. An assertion anchored after the switch
+    // Loses every millisecond setup spends, and a loaded runner fails it.
     const offlinePill = sidePanel.getByText('Offline');
-    const startedAt = Date.now();
     await expect(offlinePill).toBeHidden();
+    const startedAt = Date.now();
+    await navigateToAgentsMode(sidePanel);
     // Sample across the first 3s — one check could miss an immediate render.
     const samples = await Promise.all(
       [0, 500, 1000, 1500, 2000, 2500, 3000].map(async delayMs => {

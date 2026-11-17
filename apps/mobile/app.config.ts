@@ -140,8 +140,8 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
-  // @kilocode/notifications: this is the first build that creates the split
+  // This version must stay at or above AGENT_CHANNEL_SPLIT_APP_VERSION in
+  // @kilocode/notifications: that is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
   version: '1.0.16',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +

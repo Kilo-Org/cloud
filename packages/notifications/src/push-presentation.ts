@@ -38,16 +38,11 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
 export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
- * The first mobile version that creates both split agent channels. `app_version`
+ * The first mobile build that creates both split agent channels. `app_version`
  * on a push token is the build that created that device's channels, so a lower
- * version only has `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
- *
- * This must stay the version in `apps/mobile/app.config.ts` — the build this
- * branch ships. It cannot be a version that already reached users without the
- * split: `1.0.11` was released before the split channels existed, so a token
- * recorded there has no `needs-input`/`agent-progress` channel and Android 8+
- * would drop the push. Only the build configured here creates both channels, so
- * only that build and later may be addressed with them.
+ * version has only `LEGACY_AGENT_ANDROID_CHANNEL_ID`: `1.0.11` was released
+ * before the split, so a token recorded there has no `needs-input`/
+ * `agent-progress` channel and Android 8+ would drop a push addressed to it.
  */
 export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 
@@ -202,11 +197,17 @@ export function agentNotificationKindForPushData(data: PushData): AgentNotificat
   return isAgentPushData(data) ? agentKindForAgentPush(data) : null;
 }
 
+/** The Android channel that carries each kind. Total, so a new kind fails typecheck. */
+const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChannelId> = {
+  'needs-input': 'needs-input',
+  progress: 'agent-progress',
+};
+
 /** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
 ): AndroidNotificationChannelId {
-  return kind === 'needs-input' ? 'needs-input' : 'agent-progress';
+  return AGENT_KIND_CHANNEL[kind];
 }
 
 /**

@@ -10,32 +10,36 @@ class HomeWidgetRefreshModule : Module() {
   private var operationEpoch = 0L
   private var destroyed = false
   private val context get() = requireNotNull(appContext.reactContext)
+
+  /** A JS number is a Double; this is the one place the native epoch becomes one. */
+  private fun currentOperationEpoch(): Double = synchronized(operationLock) { operationEpoch.toDouble() }
+
+  /**
+   * The one gate for a JS mutation: only a later operation writes, and a destroyed
+   * module never writes. `configure` and `clear` take an epoch; every other
+   * registration deliberately does not.
+   */
+  private fun withEpoch(epoch: Long, action: () -> Unit) {
+    synchronized(operationLock) {
+      if (destroyed || epoch <= operationEpoch) return
+      operationEpoch = epoch
+      action()
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("HomeWidgetRefresh")
-    Function("getOperationEpoch") { synchronized(operationLock) { operationEpoch.toDouble() } }
+    Function("getOperationEpoch") { currentOperationEpoch() }
     AsyncFunction("configure") { payload: String ->
       val json = JSONObject(payload)
-      val epoch = json.getLong("operationEpoch")
-      synchronized(operationLock) {
-        if (!destroyed && epoch > operationEpoch) {
-          operationEpoch = epoch
-          HomeWidgetStore.configure(context, json)
-        }
-      }
+      withEpoch(json.getLong("operationEpoch")) { HomeWidgetStore.configure(context, json) }
     }
-    AsyncFunction("clear") { epoch: Long ->
-      synchronized(operationLock) {
-        if (!destroyed && epoch > operationEpoch) {
-          operationEpoch = epoch
-          HomeWidgetStore.clear(context)
-        }
-      }
-    }
+    AsyncFunction("clear") { epoch: Long -> withEpoch(epoch) { HomeWidgetStore.clear(context) } }
     AsyncFunction("setFixtureMode") { enabled: Boolean -> HomeWidgetStore.fixture(context, enabled) }
     AsyncFunction("getData") { HomeWidgetStore.data(context)?.let { jsonMap(it) } }
     AsyncFunction("getWidgetPushToken") { null as String? }
     AsyncFunction("widgetsChanged") { HomeWidgetStore.schedule(context, replace = true) }
-    AsyncFunction("isCurrent") { scope: String, epoch: Int, generation: String -> HomeWidgetStore.current(context, scope, epoch, generation) }
+    AsyncFunction("isCurrent") { scope: String, epoch: Long, generation: String -> HomeWidgetStore.current(context, scope, epoch, generation) }
     OnDestroy {
       synchronized(operationLock) {
         destroyed = true

@@ -44,8 +44,8 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
  */
 export function genericPushContentForPushData(
   data: PushData,
-  // Old callers omit locale; remove the default when every caller passes a token locale.
-  locale: string | null | undefined = 'en'
+  // A token with no locale is English; resolvePushLocale owns that rule.
+  locale?: string | null
 ): { title: string; body: string } {
   // The one generic title is content-free and identical for every variant, so
   // only the body's leaf differs.

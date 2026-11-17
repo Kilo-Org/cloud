@@ -3303,6 +3303,14 @@ export const CustomPricingConfigSchema = z.object({
             path: [index, 'model'],
           });
         }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
+            path: [index, 'model'],
+          });
+        }
         seen.add(model);
       }
     }),

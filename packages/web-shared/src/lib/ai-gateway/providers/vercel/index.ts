@@ -17,10 +17,15 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  getVercelModelIdOverrides,
+  mapModelIdToVercel,
+  mapVercelModelIdToOpenRouter,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromDatabase,
+  isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -137,13 +142,26 @@ export async function isVercelModel(requestedModel: string) {
 }
 
 /**
- * Whether a request to Vercel may name the model. Like `isValidOpenRouterModelId`, it assumes the
- * model is valid while Vercel's model list is unavailable, so requests through a user's own Vercel
- * key keep working during a metadata outage.
+ * Whether a request to Vercel may name the model. Vercel must serve the model, and the request must
+ * name it by a Kilo model ID: an OpenRouter ID, a retained legacy alias, or the OpenRouter-style ID
+ * a Vercel-only model is listed under. Vercel's own spelling, such as `zai/glm-5` for `z-ai/glm-5`,
+ * is rejected. Like `isValidOpenRouterModelId`, it assumes the model is valid while Vercel's model
+ * list is unavailable, so requests through a user's own Vercel key keep working during a metadata
+ * outage.
  */
 export async function isValidVercelModelId(requestedModel: string) {
-  const vercelModels = await getVercelModelsFromDatabase();
-  return vercelModels.size === 0 || vercelModels.has(await mapModelIdToVercel(requestedModel));
+  const [vercelModels, overrides, vercelModelId] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    getVercelModelIdOverrides(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  if (vercelModels.size === 0) return true;
+  if (!vercelModels.has(vercelModelId)) return false;
+
+  return (
+    mapVercelModelIdToOpenRouter(vercelModelId, overrides) === requestedModel ||
+    (await isValidOpenRouterModelId(requestedModel))
+  );
 }
 
 /**

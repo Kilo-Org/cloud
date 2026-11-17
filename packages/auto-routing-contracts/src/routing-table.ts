@@ -3,7 +3,12 @@ import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { addDuplicateKeyIssues } from './duplicate-keys';
-import { POLICY_SETTING_VALUE_DEFAULTS } from './policy-settings';
+import {
+  POLICY_SETTINGS,
+  POLICY_SETTING_VALUE_DEFAULTS,
+  POLICY_SETTING_VALUE_SCHEMAS,
+  SWITCH_COST_FACTOR_MIN,
+} from './policy-settings';
 import {
   ProductionTokenProfileSchema,
   type ProductionTokenProfile,
@@ -168,14 +173,18 @@ const routingTableFields = {
   // Benchmark run id.
   version: z.string().min(1),
   generatedAt: z.string().min(1),
-  minAccuracy: z.number().min(0).max(1),
-  accuracyNoiseBand: z.number().min(0).max(1).optional(),
+  minAccuracy: POLICY_SETTING_VALUE_SCHEMAS.minAccuracy,
+  accuracyNoiseBand: POLICY_SETTING_VALUE_SCHEMAS.accuracyNoiseBand.optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor.
-  switchCostFactor: z.number().min(1),
+  // A published table accepts any factor at or above the policy minimum: the
+  // upper bound is an input limit, and a stored table must keep parsing.
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN),
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
-  bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
+  bestAccuracySwitchThreshold: POLICY_SETTING_VALUE_SCHEMAS.bestAccuracySwitchThreshold.default(
+    POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed
+  ),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
   effortByComplexity: EffortByComplexitySchema.optional(),
   switchHorizonTurns: z.number().int().positive().nullable().optional(),
@@ -307,11 +316,15 @@ export function rankCandidates(
   const floor =
     minAccuracy - (options?.accuracyNoiseBand ?? POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand);
   const requestTokens = options?.requestTokens ?? null;
+  const byAccuracyThenCost = (
+    x: { accuracy: number; avgCostUsd: number },
+    y: { accuracy: number; avgCostUsd: number }
+  ) => y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd =
         requestTokens !== null && c.pricing != null
-          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          ? estimateRequestCostUsd(c, { uncachedInputTokens: requestTokens, cachedInputTokens: 0 })
           : requestTokens !== null && c.estimatedRequestCostUsd != null
             ? c.estimatedRequestCostUsd
             : estimateRequestCostUsd(c, options?.profile ?? null);
@@ -339,16 +352,10 @@ export function rankCandidates(
     })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
-      if (!a.competes) {
-        const x = a.candidate;
-        const y = b.candidate;
-        return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
-      }
+      if (!a.competes) return byAccuracyThenCost(a.candidate, b.candidate);
       if (a.free !== b.free) return a.free ? -1 : 1;
       if (a.value !== b.value) return a.value < b.value ? -1 : 1;
-      const x = a.candidate;
-      const y = b.candidate;
-      return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
+      return byAccuracyThenCost(a.candidate, b.candidate);
     })
     .map(s => s.candidate);
 }

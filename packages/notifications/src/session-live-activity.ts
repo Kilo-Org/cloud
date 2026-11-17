@@ -15,7 +15,7 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,

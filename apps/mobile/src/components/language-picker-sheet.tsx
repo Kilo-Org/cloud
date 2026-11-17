@@ -56,7 +56,9 @@ const emptyListContentContainerStyle = {
   justifyContent: 'center',
 } satisfies ViewStyle;
 
-type RestartFailure = 'reload-failed' | 'restart-skipped';
+// `restart-guarded` cannot arrive from a manual pick — the pick never reads the
+// attempt record — and is handled like `restart-skipped` for safety.
+type RestartFailure = 'reload-failed' | 'restart-skipped' | 'restart-guarded';
 
 export function LanguagePickerSheet({
   onClose,
@@ -211,10 +213,11 @@ export function LanguagePickerSheet({
         break;
       }
       case 'reload-failed':
-      case 'restart-skipped': {
-        // Both leave the language saved without a relaunch; offer the sheet's
-        // retry so the user can ask for the restart again. The outcome names
-        // the step that failed, so Retry resumes from there.
+      case 'restart-skipped':
+      case 'restart-guarded': {
+        // All three leave the language saved without a relaunch; offer the
+        // sheet's retry so the user can ask for the restart again. The outcome
+        // names the step that failed, so Retry resumes from there.
         setBusy(false);
         setRestarting(false);
         setRestartFailure(outcome.kind);
@@ -244,16 +247,15 @@ export function LanguagePickerSheet({
   };
 
   // A failed reload already forced the direction, so Retry only reloads again.
-  // A skipped restart never forced it: the attempt record could not be
-  // written, which is exactly the state the automatic relaunch refuses to run
-  // from. Reloading there would come back in the previous direction with no
-  // record, so Retry re-runs the apply path instead and the record write is
-  // retried before anything reloads.
+  // Both skipped kinds re-run the apply (a guarded automatic follow is not
+  // reachable here, but the same recovery is right): a skipped restart never
+  // forced the direction, so reloading would come back with the previous one, and
+  // re-running the apply retries the record write before anything reloads.
   const retryRestart = async () => {
     if (busy) {
       return;
     }
-    if (restartFailure === 'restart-skipped') {
+    if (restartFailure === 'restart-skipped' || restartFailure === 'restart-guarded') {
       setRestartFailure(null);
       await handleDone();
       return;

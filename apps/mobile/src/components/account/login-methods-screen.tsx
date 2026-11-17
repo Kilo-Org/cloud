@@ -20,15 +20,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
-
-/** The web page that starts a link: the round trip needs the browser's session. */
-const CONNECTED_ACCOUNTS_URL = `${WEB_BASE_URL}/connected-accounts`;
 
 /** The unlink procedure's provider argument, so a row cannot name an unchecked id. */
 type AuthProviderId = inferRouterInputs<MobileRouter>['user']['unlinkAuthProvider']['provider'];
@@ -254,10 +250,13 @@ export function LoginMethodsScreen() {
           className="mt-3 rounded-lg bg-secondary px-3"
           last
           onPress={() => {
-            void openExternalUrl(CONNECTED_ACCOUNTS_URL, {
-              label: t('profile.signInMethods.title'),
-              retryOnError: true,
-            });
+            void openAppShellHandoff(
+              { page: 'connected-accounts' },
+              {
+                label: t('profile.signInMethods.title'),
+                retryOnError: true,
+              }
+            );
           }}
         />
       </TabScreenScrollView>

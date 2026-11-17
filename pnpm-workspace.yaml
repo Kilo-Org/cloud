@@ -184,8 +184,15 @@ overrides:
   # would silently change the zod the shipped MCP client is built against.
   # Follow the catalog pin so the two cannot drift apart.
   '@modelcontextprotocol/sdk>zod': 'catalog:'
+  # cmdk declares ranges for these Radix packages, so the lockfile keeps an
+  # older copy of each beside the version apps/web now pins. A blanket entry
+  # would also move the copies that other parents' ranges resolve, so name the
+  # parent and the reviewed version.
+  'cmdk>@radix-ui/react-compose-refs': 1.1.5
+  'cmdk>@radix-ui/react-id': 1.1.4
+  'cmdk>@radix-ui/react-primitive': 2.2.0
   picomatch@^2: 2.3.2
-  picomatch@^4: 4.0.4
+  picomatch@^4: 4.0.7
   yaml: 2.8.4
   undici@^7: 7.30.1
   path-to-regexp: 8.4.2

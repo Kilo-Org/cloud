@@ -14,7 +14,7 @@ import {
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { statusMeta } from '@/components/code-reviewer/review-list-screen';
+import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,

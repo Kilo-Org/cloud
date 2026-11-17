@@ -3,13 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import {
   shouldClearConnectCheckFailed,
   shouldSetConnectCheckFailed,
@@ -24,7 +23,7 @@ type UseGitHubReposRefreshParams = {
 
 type UseGitHubReposRefreshResult = {
   /**
-   * Mints the install state, opens the browser, refetches on return, and reports
+   * Mints the hand-off token, opens the browser, refetches on return, and reports
    * every failure. Resolves when the flow ends, so a caller can hold its own
    * busy state over the whole of it instead of returning before the mint settles.
    */
@@ -102,13 +101,11 @@ export function useGitHubReposRefresh({
   // ── Open GitHub integration ──────────────────────────────────────
   const openGitHubIntegration = useCallback(async () => {
     try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: organizationId ?? undefined,
-        returnTo: '/cloud/sessions',
+      const url = await appShellHandoffUrl({
+        page: 'github-app',
+        ...(organizationId ? { organizationId } : {}),
       });
-      const wait = await openAuthorizationAndWaitForReturn(
-        getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token)
-      );
+      const wait = await openAuthorizationAndWaitForReturn(url);
       // A launch that fails after the app's own return edge ended the wait
       // never reaches the catch below.
       reportLateLaunchFailure(wait, {

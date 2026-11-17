@@ -22,6 +22,8 @@ export async function activityFixture(
     skillMarkdown?: string;
     repositoryAgent?: { slug: string; markdown: string };
     runtimeAgents?: ControlPlaneRouteSpec['runtimeAgents'];
+    /** Top-level (session) permission map; defaults to `{ '*': 'allow' }`. */
+    permission?: ControlPlaneRouteSpec['permission'];
   } = {}
 ) {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-activity-781-')));
@@ -54,7 +56,10 @@ export async function activityFixture(
       options.repositoryAgent.markdown
     );
   }
-  const profile = { runtimeAgents: options.runtimeAgents };
+  const profile = {
+    runtimeAgents: options.runtimeAgents,
+    ...(options.permission === undefined ? {} : { permission: options.permission }),
+  };
   if (options.runtimeAgents?.length) await materializeRuntimeProfile(root, profile);
   let respond: () => Promise<ModelReply> = async () => ({ text: 'done' });
   let requests = 0;
@@ -104,7 +109,7 @@ export async function activityFixture(
         model: 'contract/fake-deterministic',
         small_model: 'contract/fake-deterministic',
         share: 'disabled',
-        permission: { '*': 'allow' },
+        permission: options.permission ?? { '*': 'allow' },
         agent: {
           title: { disable: true },
           ...(options.subagentPermission
@@ -218,11 +223,12 @@ export async function activityFixture(
         if (!result.data) throw new Error('Session creation failed');
         return result.data.id;
       },
-      async prompt(sessionID: string, text = 'fixture work', dir = directory) {
+      async prompt(sessionID: string, text = 'fixture work', dir = directory, agent?: string) {
         const result = await client.session.promptAsync(
           {
             sessionID,
             directory: dir,
+            ...(agent === undefined ? {} : { agent }),
             model: { providerID: 'contract', modelID: 'fake-deterministic' },
             parts: [{ type: 'text', text }],
           },

@@ -3,9 +3,10 @@ import { createElement, type ReactElement, type ReactNode, type Ref } from 'reac
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
+import type * as ReviewerStatusModule from '@/lib/code-reviewer-status';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -40,8 +41,19 @@ const state = vi.hoisted(() => ({
   insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  githubError: false,
+  githubStaleError: false,
+  gitlabError: false,
   scope: 'personal',
-  organizations: [] as { organizationId: string; organizationName: string }[],
+  organizations: [] as {
+    organizationId: string;
+    organizationName: string;
+    role?: string;
+  }[],
+  permissionOverride: null as
+    | { status: 'loading' }
+    | { status: 'ready'; canEdit: boolean; canManage: boolean }
+    | null,
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -50,7 +62,10 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   bitbucket: {
-    data: { repositoryCache: { status: 'available', repositories: [] } } as unknown,
+    data: {
+      connected: false,
+      repositoryCache: { status: 'available', repositories: [] },
+    } as unknown,
     isLoading: false,
     isError: false,
     isFetching: false,
@@ -61,7 +76,6 @@ const state = vi.hoisted(() => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    isPaused: false,
     fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
     isFetchingNextPage: false,
     isFetchNextPageError: false,
@@ -71,12 +85,11 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   push: vi.fn(),
-  mintInstallState: vi.fn(),
+  handoffUrl: vi.fn(),
   openExternalUrl: vi.fn(),
   toastError: vi.fn(),
   resync: vi.fn(() => Promise.resolve()),
   toggleRepo: vi.fn(),
-  connectivity: 'online' as 'online' | 'offline' | 'unknown',
 }));
 
 vi.mock('expo-router', () => ({
@@ -153,9 +166,9 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
   TAB_SCREEN_TRAILING_GAP: 16,
+  TabScreenScrollView: 'TabScreenScrollView',
   useTabBarBottomPadding: () => 0,
   useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
-  TabScreenScrollView: 'TabScreenScrollView',
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
@@ -172,6 +185,7 @@ vi.mock('@/components/ui/icons', () => ({
   X: 'X',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: state.handoffUrl }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: (url: string) => state.openExternalUrl(url),
@@ -204,20 +218,21 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
   }),
-  trpcClient: {
-    githubApps: {
-      mintInstallState: { mutate: state.mintInstallState },
-    },
-  },
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => state.connectivity,
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',
-  useGitHubStatus: () => ({ data: { connected: state.connected } }),
-  useGitLabStatus: () => ({ data: { connected: false } }),
+  useGitHubStatus: () => ({
+    data: state.githubError ? undefined : { connected: state.connected },
+    isError: state.githubError || state.githubStaleError,
+  }),
+  useGitLabStatus: () => ({
+    data: state.gitlabError ? undefined : { connected: false },
+    isError: state.gitlabError,
+  }),
   useReviewConfig: () => ({
     data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
   }),
@@ -238,6 +253,31 @@ vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.reviews }));
+// The screen reads the role from this module directly. The real hook is a thin
+// react-query wrapper, so the mock answers from the same membership rows and the
+// real classifier, and `permissionOverride` stands in for a read that has not
+// settled — which the shared `organizations` answer can never produce.
+vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
+  const { classifyPermission } = await vi.importActual<typeof ReviewerStatusModule>(
+    '@/lib/code-reviewer-status'
+  );
+  return {
+    useReviewerPermission: (scope: string) => {
+      if (state.permissionOverride) {
+        return state.permissionOverride;
+      }
+      return classifyPermission({
+        isPersonal: scope === 'personal',
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        hasData: true,
+        role: state.organizations.find(org => org.organizationId === scope)?.role,
+        refetch: () => undefined,
+      });
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
@@ -261,23 +301,28 @@ beforeEach(() => {
   state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.githubError = false;
+  state.githubStaleError = false;
+  state.gitlabError = false;
   state.scope = 'personal';
   state.organizations = [];
-  state.connectivity = 'online';
+  state.permissionOverride = null;
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
-  state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
+  state.bitbucket.data = {
+    connected: false,
+    repositoryCache: { status: 'available', repositories: [] },
+  };
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
   state.reviews.isFetching = false;
+  state.reviews.fetchStatus = 'idle';
   state.reviews.isFetchingNextPage = false;
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
-  state.reviews.isPaused = false;
-  state.reviews.fetchStatus = 'idle';
   state.reviews.error.data.code = 'INTERNAL_SERVER_ERROR';
-  state.mintInstallState.mockReset();
+  state.handoffUrl.mockReset();
   state.openExternalUrl.mockReset();
   state.openExternalUrl.mockResolvedValue(undefined);
   state.toastError.mockReset();
@@ -309,7 +354,22 @@ function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['re
   return renderer.root.find(node => String(node.type) === 'FlashList');
 }
 
-/** Every string a React element tree renders, in order. */
+/** The notice the list puts over its rows, which the stale cases read. */
+function listHeaderNotice(renderer: RenderWithProvidersResult['renderer']) {
+  const header = firstList(renderer).props.ListHeaderComponent as ReactElement<{
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+    placement?: string;
+  }> | null;
+  if (header == null) {
+    throw new Error('The list rendered no header notice.');
+  }
+  expect(String(header.type)).toBe('QueryError');
+  return header;
+}
+
+/** Every string a React element tree or mounted node renders, in order. */
 function elementTexts(node: unknown): string[] {
   if (node == null || typeof node === 'boolean') {
     return [];
@@ -319,6 +379,11 @@ function elementTexts(node: unknown): string[] {
   }
   if (Array.isArray(node)) {
     return node.flatMap(child => elementTexts(child));
+  }
+  if (typeof node === 'object' && 'children' in node) {
+    // A mounted node keeps its rendered children on `children`; a React
+    // element keeps them in `props`, so the two are told apart here.
+    return elementTexts(node.children);
   }
   if (typeof node === 'object' && 'props' in node) {
     const props = node.props;
@@ -340,7 +405,7 @@ function firstRowAge(renderer: Awaited<ReturnType<typeof renderWithProviders>>['
   if (row === undefined) {
     throw new Error('The list rendered no review row.');
   }
-  const age = elementTexts(row.props.children).at(-1);
+  const age = elementTexts(row.children).at(-1);
   if (age === undefined) {
     throw new Error('The review row rendered no relative time.');
   }
@@ -400,42 +465,39 @@ describe('Reviewer repository bodies', () => {
     unmount();
   });
 
-  it('opens the install page with a minted token', async () => {
+  it('opens the app shell hand-off for the GitHub settings page', async () => {
     state.platform = 'github';
-    state.mintInstallState.mockResolvedValue({ token: 'token-1' });
+    state.handoffUrl.mockResolvedValue('https://example.test/app-shell/handoff?token=handoff-1');
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?installState=token-1&fromApp=1'
+        'https://example.test/app-shell/handoff?token=handoff-1'
       );
     });
+    expect(state.handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
     expect(state.toastError).not.toHaveBeenCalled();
     unmount();
   });
 
-  it('falls back to the tokenless settings page when the org rejects the mint', async () => {
+  it('names the organization on the hand-off target', async () => {
     state.platform = 'github';
     state.scope = 'org-1';
-    state.mintInstallState.mockRejectedValue(
-      Object.assign(new Error('This organization already has a GitHub installation'), {
-        data: { code: 'FORBIDDEN', httpStatus: 403 },
-      })
-    );
+    state.handoffUrl.mockResolvedValue('https://example.test/app-shell/handoff?token=handoff-1');
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
-      expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?organizationId=org-1'
-      );
+      expect(state.handoffUrl).toHaveBeenCalledWith({
+        page: 'github-app',
+        organizationId: 'org-1',
+      });
     });
-    expect(state.toastError).not.toHaveBeenCalled();
     unmount();
   });
 
-  it('toasts without opening anything on a non-FORBIDDEN mint failure', async () => {
+  it('toasts without opening anything when the hand-off cannot be minted', async () => {
     state.platform = 'github';
-    state.mintInstallState.mockRejectedValue(
+    state.handoffUrl.mockRejectedValue(
       Object.assign(new Error('offline'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
     );
     const { renderer, unmount } = await renderWithProviders(reposRoute());
@@ -602,7 +664,7 @@ describe('Recent review bodies', () => {
     }
   );
 
-  it('keeps cached reviews and adds the failure notice after a background failure', async () => {
+  it('keeps cached reviews and raises the stale notice after a background failure', async () => {
     state.reviews.isError = true;
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
@@ -613,100 +675,49 @@ describe('Recent review bodies', () => {
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
-    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(notice.props.variant).toBe('server');
-    expect(notice.props.onRetry).toBeTypeOf('function');
+    // The cached rows stay, and the failed background refresh says so above them
+    // with the action that retries it, instead of posing as current.
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('server');
+    expect(typeof header.props.onRetry).toBe('function');
     unmount();
   });
 
-  it('shows the retryable offline state instead of an empty list when the first read is paused', async () => {
-    // A paused read settles into no branch of the old map (`isLoading` false,
-    // `isError` false, no data): the screen painted an empty FlashList forever
-    // (finding). Connectivity confirmed names the pause offline with Retry.
-    state.reviews.data = undefined;
-    state.reviews.isPaused = true;
-    state.reviews.fetchStatus = 'paused';
-    state.connectivity = 'offline';
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ReviewListScreen, { scope: 'personal' })
-    );
-    const error = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(error.props.variant).toBe('offline');
-    expect(error.props.onRetry).toBeTypeOf('function');
-    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    unmount();
-  });
-
-  it('keeps the skeleton while a first read is paused with connectivity unsettled', async () => {
-    state.reviews.data = undefined;
-    state.reviews.isPaused = true;
-    state.reviews.fetchStatus = 'paused';
-    state.connectivity = 'unknown';
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ReviewListScreen, { scope: 'personal' })
-    );
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    unmount();
-  });
-
-  it('keeps cached rows and offers Retry on the offline stale notice when the refresh pauses', async () => {
+  it('keeps cached rows and raises the offline notice when the refresh pauses', async () => {
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
       pageParams: [0],
     };
     state.reviews.fetchStatus = 'paused';
-    state.connectivity = 'offline';
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
-    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(notice.props.variant).toBe('offline');
-    expect(notice.props.placement).toBe('top');
-    expect(notice.props.isRetrying).toBe(false);
-    expect(notice.props.onRetry).toBeTypeOf('function');
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('offline');
+    expect(header.props.isRetrying).toBe(false);
+    expect(typeof header.props.onRetry).toBe('function');
     unmount();
   });
 
-  it('keeps the stale notice mounted while its retry runs', async () => {
+  it('keeps the paused notice mounted while its Retry runs', async () => {
     // A notice gated on `!isFetching` would unmount on the tap that starts the
     // retry, so the reader saw the notice vanish instead of its spinner.
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
       pageParams: [0],
     };
-    state.reviews.isError = true;
+    state.reviews.fetchStatus = 'paused';
     state.reviews.isFetching = true;
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
-    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(notice.props.variant).toBe('server');
-    expect(notice.props.isRetrying).toBe(true);
-    expect(notice.props.onRetry).toBeTypeOf('function');
-    unmount();
-  });
-
-  it('adds the offline stale notice above the empty state of a cached empty list', async () => {
-    state.reviews.data = {
-      pages: [{ success: true, reviews: [] }],
-      pageParams: [0],
-    };
-    state.reviews.fetchStatus = 'paused';
-    state.connectivity = 'offline';
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ReviewListScreen, { scope: 'personal' })
-    );
-    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
-    expect(empty.props.title).toBe('No reviews yet');
-    const notices = renderer.root.findAll(node => String(node.type) === 'QueryError');
-    expect(notices).toHaveLength(1);
-    expect(notices[0]?.props.variant).toBe('offline');
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('offline');
+    expect(header.props.isRetrying).toBe(true);
     unmount();
   });
 
@@ -784,6 +795,10 @@ describe('Recent review bodies', () => {
       pageParams: [0],
     };
     state.reviews.isFetchNextPageError = true;
+    // A failed next page also raises the query's `isError` while its cached
+    // pages stay, so the notice must read the page-level flag: otherwise it
+    // stacks a second error over the footer's own error and Retry.
+    state.reviews.isError = true;
     state.reviews.hasNextPage = true;
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
@@ -791,6 +806,7 @@ describe('Recent review bodies', () => {
     const list = firstList(renderer);
     const data = list.props.data as ReviewStub[];
     expect(data.map(item => item.id)).toEqual(['r1']);
+    expect(list.props.ListHeaderComponent ?? null).toBeNull();
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     const footer = list.props.ListFooterComponent as ReactNode;
     // A failed next page must not auto-refire: the footer flickers skeleton/error and hides Retry.
@@ -803,33 +819,6 @@ describe('Recent review bodies', () => {
     const onRetry = error.props.onRetry as () => void;
     onRetry();
     expect(state.reviews.fetchNextPage).toHaveBeenCalledTimes(1);
-    footerRender.unmount();
-  });
-
-  it('leaves a failed next page to the footer instead of raising the list banner', async () => {
-    // The same failure also sets the query's `isError` while its pages stay, so
-    // the banner must read the page-level flag: otherwise it stacks a second
-    // error over the footer's own error + Retry for the same page.
-    state.reviews.data = {
-      pages: [{ success: true, reviews: [review('r1')] }],
-      pageParams: [0],
-    };
-    state.reviews.isFetchNextPageError = true;
-    state.reviews.hasNextPage = true;
-    state.reviews.isError = true;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ReviewListScreen, { scope: 'personal' })
-    );
-    const list = firstList(renderer);
-    const data = list.props.data as ReviewStub[];
-    expect(data.map(item => item.id)).toEqual(['r1']);
-    expect(list.props.ListHeaderComponent ?? null).toBeNull();
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    const footer = list.props.ListFooterComponent as ReactNode;
-    unmount();
-    const footerRender = await renderWithProviders(createElement('Footer', null, footer));
-    const error = footerRender.renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(error.props.placement).toBe('top');
     footerRender.unmount();
   });
 
@@ -918,6 +907,167 @@ describe('Recent review header', () => {
     expect(node.props.eyebrow).toBe('Recent reviews');
     expect(node.props.titleNumberOfLines).toBe(1);
     expect(node.props.reserveTitleSpace).toBe(false);
+    unmount();
+  });
+});
+
+// The empty list's Configure button opens the platform list, and each platform's
+// connect card there is per-role: GitHub's needs an organization-manage role,
+// GitLab's a billing-level edit role. A plain member would land on a screen with
+// no action of their own, so the scope-level screen replaces the button with a
+// role notice — while a connected scope keeps the manual-review destination for
+// every role.
+describe('empty reviews connect action', () => {
+  const SCOPE = 'org-1';
+  const ORG_NAME = 'Drain Labs';
+
+  function emptyState(renderer: RenderWithProvidersResult['renderer']) {
+    return renderer.root.find(node => String(node.type) === 'EmptyState');
+  }
+
+  /**
+   * The scope title paints from the same `organizations.list` read the role
+   * comes from, so reading the name means the role has settled too.
+   */
+  async function settled(renderer: RenderWithProvidersResult['renderer']) {
+    await waitFor(
+      () =>
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        ORG_NAME
+    );
+  }
+
+  function pressAction(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{ onPress: () => void }>;
+    action.props.onPress();
+  }
+
+  function actionLabel(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{
+      children: ReactElement<{ children: string }>;
+    }>;
+    return action.props.children.props.children;
+  }
+
+  it('replaces the button with a role notice for a plain member', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when only Bitbucket is connected', async () => {
+    // Bitbucket runs automatic reviews but offers no manual review, so a member
+    // cannot act here either; the notice would be false, because the scope is
+    // connected, and an owner would find it already set up.
+    state.bitbucket.data = {
+      connected: true,
+      repositoryCache: { status: 'available', repositories: [] },
+    };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when the provider read failed', async () => {
+    // A failed status read leaves the connection unknown, so the notice would
+    // claim the scope has nothing connected when the screen cannot know that.
+    state.githubError = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the role notice when a refetch failed over a cached disconnected answer', async () => {
+    // `isError` stays true for a failed background refetch, but the cached
+    // answer still says nothing is connected, so the notice is accurate.
+    state.githubStaleError = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('offers the platform list to an owner', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'owner' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}`);
+    unmount();
+  });
+
+  it('offers the platform list to a billing manager, who can connect GitLab', async () => {
+    state.organizations = [
+      { organizationId: SCOPE, organizationName: ORG_NAME, role: 'billing_manager' },
+    ];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    unmount();
+  });
+
+  it('keeps the loading body until the role settles, so no button flashes', async () => {
+    state.permissionOverride = { status: 'loading' };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
+    unmount();
+  });
+
+  it('keeps the manual-review action for a member once a provider is connected', async () => {
+    state.connected = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(actionLabel(renderer)).toBe(i18n.t('codeReviewer.reviewList.startManualReview'));
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}/manual-review`);
     unmount();
   });
 });

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { FileText, GitPullRequest, LineChart, type LucideIcon } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -16,17 +17,27 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useTRPC } from '@/lib/trpc';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
+/**
+ * The day window the dashboard covers. The label is the day count and its unit
+ * in one existing catalog string — the same three the usage screen paints for
+ * the same windows — so a segment reads "30 days" instead of a bare number the
+ * reader cannot attribute to days.
+ */
 const PERIOD_OPTIONS = [
-  { value: '7', label: '7' },
-  { value: '30', label: '30' },
-  { value: '90', label: '90' },
+  { value: '7', labelKey: 'spendAlerts.window7d' },
+  { value: '30', labelKey: 'spendAlerts.window30d' },
+  { value: '90', labelKey: 'usage.range90d' },
 ] as const;
 
 const PLATFORM_OPTIONS = (['github', 'gitlab'] as const).map(platform => ({
@@ -84,6 +95,23 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { platform, period, setPlatform, setPeriod } = useCodeReviewerAnalyticsFilters(scope);
 
+  // The organization's own name for the header, and the row a denial titles
+  // itself with. The route already rejected the personal scope, so this read
+  // always has an organization to look up.
+  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  // The name this app last showed stands in once the reader loses the
+  // membership, so the denial below still names the organization it is about.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
+
   const dashboard = useQuery(
     trpc.codeReviews.analytics.getDashboard.queryOptions({
       organizationId: scope,
@@ -92,19 +120,22 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     })
   );
 
-  const number = (value: number) => formatNumber(value, i18n.language);
+  // A denial is not a failed read: the reader cannot see this organization's
+  // analytics at all, so the screen says so with the same surface the platform
+  // list renders, and Retry re-resolves the membership a restored one lands.
+  // Every other failure, and the cached data beside a failed refetch, keeps the
+  // dashboard's own error state below.
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: true,
+    errors: [dashboard.error],
+  });
 
-  // The dashboard read settles only when it can send: on the default online
-  // network mode, an offline device keeps it `pending` with `fetchStatus:
-  // 'paused'`, which the old branch map reported as the skeleton forever —
-  // no error, no Retry (finding: blank analytics offline). The config
-  // classifier owns this split for the reviewer screens: a pause whose
-  // connectivity the app has confirmed names itself as the offline state with
-  // Retry, and a pause while connectivity is still unsettled stays the
-  // skeleton. A cached dashboard with a refetch that is now paused or failed
-  // keeps the metrics and gains the stale-notice line, so stale rows never
-  // pose as current without a way out.
-  const body = useQueryBodyState({
+  // The dashboard read classifies through the shared body state: a read the
+  // online manager pauses while the device is offline never reaches
+  // react-query's error branch, so the screen would keep its skeleton forever.
+  // The classifier names a confirmed pause as the offline state with Retry and
+  // keeps an unsettled probe inside loading.
+  const readState = useQueryBodyState({
     data: dashboard.data,
     isError: dashboard.isError,
     isFetching: dashboard.isFetching,
@@ -113,20 +144,80 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       void dashboard.refetch();
     },
   });
-  const failure = queryBodyFailure(body, dashboard.isFetching);
-  // Cached metrics with a refresh that cannot run: the classifier reports
-  // `ready` the moment data exists, so the notice comes from the read itself —
-  // paused (connectivity lost) or failed (the refetch errored). The brief for
-  // this finding names both: rows stay, the reader learns they are stale and
-  // gets the action that refreshes them. The notice is not gated on
-  // `!isFetching`, or a Retry would unmount the surface it is running on.
-  const stale = dashboard.data != null && (dashboard.isError || dashboard.fetchStatus === 'paused');
+  const failure = queryBodyFailure(readState, dashboard.isFetching);
 
-  let content: ReactNode = null;
-  if (!failure && body.body.status === 'ready' && dashboard.data) {
+  const periodOptions = PERIOD_OPTIONS.map(option => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
+
+  if (access !== 'granted') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        // The denied header carries the granted header's identity: this
+        // screen's own name over the organization, so a lost membership still
+        // reads as the analytics screen the reader tried to open.
+        eyebrow={t('codeReviewer.analytics.title')}
+        backFallback={CODE_REVIEWER_HOME_PATH}
+        kind={access}
+        onRetry={() => {
+          void Promise.allSettled([organizations.refetch(), dashboard.refetch()]);
+        }}
+        isRetrying={organizations.isFetching || dashboard.isFetching}
+      />
+    );
+  }
+
+  const number = (value: number) => formatNumber(value, i18n.language);
+
+  // Cached metrics with a refresh that cannot run: the notice carries the
+  // action that refreshes them, and it stays mounted while that retry runs, so
+  // stale figures never pose as current without a way out.
+  const stale = dashboard.data != null && (dashboard.isError || dashboard.fetchStatus === 'paused');
+  const stalePaused = !dashboard.isError && dashboard.fetchStatus === 'paused';
+
+  let body: ReactNode = null;
+  if (failure) {
+    // A paused read names itself offline; a failed one keeps its own tRPC
+    // variant and offers Retry only for a retryable code.
+    const failedVariant = stalePaused ? 'offline' : trpcErrorVariant(dashboard.error);
+    body = (
+      <QueryError
+        variant={failedVariant}
+        title={
+          failedVariant === 'offline'
+            ? t('queryError.offlineTitle')
+            : t('codeReviewer.analytics.couldNotLoad')
+        }
+        onRetry={
+          stalePaused || isRetryableTrpcError(dashboard.error)
+            ? () => void dashboard.refetch()
+            : undefined
+        }
+        isRetrying={failure.isRetrying}
+      />
+    );
+  } else if (readState.body.status === 'loading' || dashboard.data === undefined) {
+    body = <AnalyticsSkeleton />;
+  } else {
     const { summary, repositories, settings } = dashboard.data;
-    content = (
+    body = (
       <View className="gap-6 px-6 pt-4">
+        {stale ? (
+          <QueryError
+            variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
+            placement="top"
+            className="px-0 pt-0"
+            title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+            onRetry={
+              stalePaused || isRetryableTrpcError(dashboard.error)
+                ? () => void dashboard.refetch()
+                : undefined
+            }
+            isRetrying={dashboard.isFetching}
+          />
+        ) : null}
         {!settings.enabled ? (
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.analytics.off')}
@@ -160,11 +251,15 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {repositories.length === 0 ? (
+          // The muted note above already says analytics is off, so the generic
+          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={t('codeReviewer.analytics.emptyDescription')}
+            description={
+              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
+            }
           />
         ) : (
           <View className="gap-2">
@@ -195,57 +290,16 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
-  let readState: ReactNode = null;
-  if (failure) {
-    // A permanent code (denial, not found) keeps its own variant and no Retry:
-    // the classifier folds every error into `server`, so the thrown error's
-    // own tRPC variant decides the surface when the read failed rather than
-    // paused.
-    const failedVariant = dashboard.isError ? trpcErrorVariant(dashboard.error) : failure.variant;
-    const failedTitle =
-      failedVariant === 'offline'
-        ? t('queryError.offlineTitle')
-        : t('codeReviewer.analytics.couldNotLoad');
-    const failedRetryable = dashboard.isError ? isRetryableTrpcError(dashboard.error) : true;
-    readState = (
-      <QueryError
-        variant={failedVariant}
-        placement="top"
-        className="px-0 pt-0"
-        title={failedTitle}
-        onRetry={failedRetryable ? () => void dashboard.refetch() : undefined}
-        isRetrying={failure.isRetrying}
-      />
-    );
-  } else if (body.body.status === 'loading') {
-    readState = <AnalyticsSkeleton />;
-  } else if (stale) {
-    // The metrics stay, so the notice carries the action that refreshes them:
-    // a pause always offers Retry, while a permanent code keeps its own
-    // variant and no Retry. The notice stays mounted while that Retry runs, so
-    // `isRetrying` reports the read rather than disappearing with it.
-    const stalePaused = !dashboard.isError && dashboard.fetchStatus === 'paused';
-    readState = (
-      <QueryError
-        variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
-        placement="top"
-        className="px-0 pt-0"
-        title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
-        onRetry={
-          stalePaused || isRetryableTrpcError(dashboard.error)
-            ? () => void dashboard.refetch()
-            : undefined
-        }
-        isRetrying={dashboard.isFetching}
-      />
-    );
-  }
-
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={t('codeReviewer.analytics.title')}
-        eyebrow={t('common.codeReviewer')}
+        title={scopeTitle}
+        // One line, like the review list this scope also opens: the name arrives
+        // with the membership read and a longer one tail-truncates inside the
+        // same line instead of growing the header. The eyebrow keeps the
+        // screen's own name there, since the organization name is user prose.
+        titleNumberOfLines={1}
+        eyebrow={t('codeReviewer.analytics.title')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pt-4">
         <View className="gap-2">
@@ -256,7 +310,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             onChange={setPlatform}
           />
           <SegmentedControl
-            options={PERIOD_OPTIONS}
+            options={periodOptions}
             value={String(period)}
             accessibilityLabel={t('usage.rangePicker')}
             onChange={value => {
@@ -267,13 +321,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             }}
           />
         </View>
-        {/* One body surface below the filters: a paused or failed first load
-            paints the classifier's offline/server state with Retry instead of
-            the skeleton that would never settle; cached metrics keep their
-            content and report a refresh that is paused or failed with an
-            actionable notice above them. */}
-        {readState}
-        {content}
+        {body}
       </TabScreenScrollView>
     </View>
   );

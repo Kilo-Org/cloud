@@ -581,6 +581,9 @@ function RootLayoutNav({
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+  // Groups are not part of `pathname`, so both the (app) and the (auth)
+  // legal screen answer to `/legal/<document>`.
+  const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
   const {
@@ -854,6 +857,7 @@ function RootLayoutNav({
         needsConsent,
         onConsentRoute,
         onConsentReviewRoute,
+        onLegalRoute,
         languageReloadFailed,
         restoreFailed,
       }),
@@ -870,6 +874,7 @@ function RootLayoutNav({
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
+      onLegalRoute,
       languageReloadFailed,
       restoreFailed,
     ]
@@ -1149,6 +1154,7 @@ function RootLayoutNav({
     needsConsent,
     onConsentRoute,
     onConsentReviewRoute,
+    onLegalRoute,
     languageReloadFailed,
     restoreFailed,
   });

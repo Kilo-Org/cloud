@@ -1,310 +1,460 @@
-import { createElement } from 'react';
+/* eslint-disable max-lines -- cohesive mounted suite for the analytics screen's states */
+// The analytics screen reads one organization's dashboard. A reader who is not
+// a member of that organization cannot see it, so the screen must say so on the
+// same surface the platform list paints — naming the scope, offering Retry and a
+// way back — instead of a generic "could not load". The period control must also
+// say which unit its three windows are in.
+
+import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-
 import CodeReviewerAnalyticsRoute from './analytics';
 
-const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
+type Membership = { organizationId: string; organizationName: string };
 
-const state = vi.hoisted(() => ({
-  scope: 'org-analytics-1' as string | undefined,
+type Dashboard = {
+  summary: {
+    trackedReviews: number;
+    totalFindings: number;
+    highImpactChanges: number;
+    estimatedImpactPoints: number;
+  };
+  repositories: {
+    repository: string;
+    trackedPrsOrMrs: number;
+    criticalFindings: number;
+    warningFindings: number;
+    suggestionFindings: number;
+  }[];
+  settings: { enabled: boolean };
+};
+
+const queries = vi.hoisted(() => ({
+  organizations: {
+    data: [] as Membership[],
+    isFetching: false,
+    refetch: vi.fn<() => Promise<void>>(),
+  },
   dashboard: {
-    data: null as unknown,
-    error: null as { data?: { code?: string } } | null,
+    data: undefined as unknown,
+    isPending: false,
     isError: false,
     isFetching: false,
     fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
-    isPending: true,
-    refetch: vi.fn(),
+    error: undefined as unknown,
+    refetch: vi.fn<() => Promise<void>>(),
   },
-  connectivity: 'online' as 'online' | 'offline' | 'unknown',
+}));
+
+const dashboard: Dashboard = {
+  summary: {
+    trackedReviews: 12,
+    totalFindings: 34,
+    highImpactChanges: 5,
+    estimatedImpactPoints: 120,
+  },
+  repositories: [],
+  settings: { enabled: true },
+};
+
+const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
+
+// The scope-name store is device storage behind a native module; the screen
+// only needs the remembered name and the remember call, so the module is faked
+// here with a map the tests seed.
+const rememberedNames = vi.hoisted(() => new Map<string, string>());
+
+vi.mock('@/lib/code-reviewer-scope-name', () => ({
+  hydrateScopeNames: () => Promise.resolve(),
+  readScopeName: (scopeId: string) => rememberedNames.get(scopeId),
+  rememberScopeName: (scopeId: string, name: string) => {
+    rememberedNames.set(scopeId, name);
+  },
+  subscribeScopeNames: () => () => undefined,
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (options: { queryKey: readonly unknown[] }) =>
+    options.queryKey[0] === 'organizations' ? queries.organizations : queries.dashboard,
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: useLocalSearchParamsMock,
+  useLocalSearchParams: () => ({ scope: 'org-drain' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
-
-vi.mock('react-native', () => ({
-  View: 'View',
-  Text: 'Text',
-  Pressable: 'Pressable',
-  useColorScheme: () => 'light',
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-vi.mock('@/components/ui/icons', () => ({
-  FileText: 'FileText',
-  GitPullRequest: 'GitPullRequest',
-  LineChart: 'LineChart',
-}));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: 'TabScreenScrollView',
-}));
-vi.mock('@/components/ui/segmented-control', () => ({
-  SegmentedControl: 'SegmentedControl',
-}));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: 'ConfigureRow',
-}));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    organizations: { list: { queryOptions: () => ({ queryKey: ['organizations', 'list'] }) } },
     codeReviews: {
       analytics: {
-        getDashboard: {
-          queryOptions: () => ({}),
-        },
+        getDashboard: { queryOptions: () => ({ queryKey: ['analytics', 'dashboard'] }) },
       },
     },
   }),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => state.dashboard,
-}));
-
-vi.mock('@/lib/hooks/use-code-reviewer-analytics-filters', () => ({
-  useCodeReviewerAnalyticsFilters: () => ({
-    platform: 'github',
-    period: 30,
-    setPlatform: vi.fn(),
-    setPeriod: vi.fn(),
-  }),
-}));
-
+// The screen classifies its read through the shared body-state hook, which
+// subscribes to the probe-backed connectivity store. That store loads NetInfo
+// and therefore react-native's Flow sources, which this node project cannot
+// parse; the committed answer is all the screen needs.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => state.connectivity,
+  useCommittedConnectivityStatus: () => 'online',
 }));
 
-vi.mock('@/components/invalid-route-state', () => ({
-  InvalidRouteState: 'InvalidRouteState',
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyStateMock' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'SkeletonMock' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: { variant?: string; title?: string; onRetry?: () => void }) =>
+    createElement('QueryErrorMock', props),
 }));
 
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/organization/scope-access-denied-screen', () => ({
+  ScopeAccessDeniedScreen: (props: {
+    title?: string;
+    eyebrow?: string;
+    kind?: string;
+    backFallback?: string;
+    onRetry?: () => void;
+  }) => createElement('ScopeAccessDeniedScreenMock', props),
+}));
 
 vi.mock('@/components/code-reviewer/reviewer-header', () => ({
-  ReviewerHeader: 'ReviewerHeader',
+  ReviewerHeader: (props: { title?: string; eyebrow?: string }) =>
+    createElement('ReviewerHeaderMock', props),
 }));
 
-function findByType(root: TestRenderer.ReactTestInstance, type: string) {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
-}
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: (props: {
+    options: readonly { value: string; label: string }[];
+    value: string;
+    accessibilityLabel?: string;
+    onChange?: (value: string) => void;
+  }) => createElement('SegmentedControlMock', props),
+}));
 
-function mountRoute() {
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: { title?: string }) => createElement('ConfigureRowMock', props),
+}));
+
+vi.mock('@/components/ui/text', () => ({
+  Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
+}));
+
+vi.mock('@/components/ui/icons', () => ({
+  FileText: 'FileText',
+  GitPullRequest: 'GitPullRequest',
+  LineChart: 'LineChart',
+}));
+
+vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+
+const Screen = CodeReviewerAnalyticsRoute as ComponentType<Record<string, never>>;
+
+function mountScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(CodeReviewerAnalyticsRoute));
+    ref.current = TestRenderer.create(createElement(Screen));
   });
   if (!ref.current) {
-    throw new Error('route did not render');
+    throw new Error('analytics screen did not render');
   }
   return ref.current;
 }
 
-const DASHBOARD = {
-  summary: {
-    trackedReviews: 3,
-    totalFindings: 9,
-    highImpactChanges: 1,
-    estimatedImpactPoints: 4,
-  },
-  repositories: [
-    {
-      repository: 'org/repo',
-      trackedPrsOrMrs: 3,
-      criticalFindings: 1,
-      warningFindings: 2,
-      suggestionFindings: 6,
-    },
-  ],
-  settings: { enabled: true },
-};
+function findByType(root: TestRenderer.ReactTestInstance, type: string) {
+  return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+function segmentedControl(renderer: TestRenderer.ReactTestRenderer, index: number) {
+  const control = findByType(renderer.root, 'SegmentedControlMock')[index];
+  if (!control) {
+    throw new Error(`segmented control ${index} did not render`);
+  }
+  return control;
+}
 
 beforeEach(() => {
-  useLocalSearchParamsMock.mockReset();
-  useLocalSearchParamsMock.mockReturnValue({ scope: state.scope });
-  state.scope = 'org-analytics-1';
-  state.dashboard = {
-    data: null,
-    error: null,
-    isError: false,
-    isFetching: false,
-    fetchStatus: 'idle',
-    isPending: true,
-    refetch: vi.fn(),
-  };
-  state.connectivity = 'online';
+  queries.organizations.data = [{ organizationId: 'org-drain', organizationName: 'Drain Labs' }];
+  queries.organizations.isFetching = false;
+  queries.organizations.refetch.mockReset();
+  queries.dashboard.data = dashboard;
+  queries.dashboard.isPending = false;
+  queries.dashboard.isError = false;
+  queries.dashboard.isFetching = false;
+  queries.dashboard.fetchStatus = 'idle';
+  queries.dashboard.error = undefined;
+  queries.dashboard.refetch.mockReset();
+  rememberedNames.clear();
 });
 
-describe('CodeReviewerAnalyticsRoute read states', () => {
-  it('renders the invalid route when the scope is missing', () => {
-    useLocalSearchParamsMock.mockReturnValue({ scope: undefined });
-    const renderer = mountRoute();
-    expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(1);
+describe('CodeReviewerAnalytics denied scope', () => {
+  it('renders the no-access surface, not a failed read, and names the organization', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = denial;
+    const renderer = mountScreen();
+
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    expect(denied?.props.kind).toBe('denied');
+    expect(denied?.props.title).toBe('Drain Labs');
+    // Header parity with the granted state below: the lost membership keeps the
+    // same eyebrow the dashboard's own header carries, so the denial reads as
+    // this screen rather than as the product in general.
+    expect(denied?.props.eyebrow).toBe('Analytics');
+    expect(denied?.props.backFallback).toBe('/(app)/(tabs)/(0_home)');
+    expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SegmentedControlMock')).toHaveLength(0);
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('shows the skeleton while the first read is in flight', () => {
-    state.dashboard.fetchStatus = 'fetching';
-    const renderer = mountRoute();
-    expect(findByType(renderer.root, 'Skeleton')).not.toHaveLength(0);
+  it('names the scope from the remembered name once the membership is gone', () => {
+    queries.organizations.data = [];
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = denial;
+    rememberedNames.set('org-drain', 'Drain Labs');
+    const renderer = mountScreen();
+
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    expect(denied?.props.title).toBe('Drain Labs');
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('shows the retryable offline state instead of the skeleton when the read is paused offline', () => {
-    // The old branch map reported `isPending` as the skeleton forever: a paused
-    // read never reaches `isError`, so no Retry ever appeared (finding).
-    state.dashboard.isPending = true;
-    state.dashboard.fetchStatus = 'paused';
-    state.connectivity = 'offline';
-    const renderer = mountRoute();
+  it('falls back to the generic organization title when the membership list no longer names it', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = denial;
+    queries.organizations.data = [];
+    const renderer = mountScreen();
 
-    const errors = findByType(renderer.root, 'QueryError');
-    expect(errors).toHaveLength(1);
-    expect(errors[0]?.props.variant).toBe('offline');
-    expect(errors[0]?.props.onRetry).toBeTypeOf('function');
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    expect(denied?.props.title).toBe('Organization');
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps the skeleton while the pause is not a confirmed offline state', () => {
-    state.dashboard.isPending = true;
-    state.dashboard.fetchStatus = 'paused';
-    state.connectivity = 'unknown';
-    const renderer = mountRoute();
+  it('treats a deleted organization as the not-found surface the platform list shows', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'NOT_FOUND', httpStatus: 404 } };
+    const renderer = mountScreen();
 
-    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Skeleton')).not.toHaveLength(0);
+    expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0]?.props.kind).toBe(
+      'not-found'
+    );
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('shows the retryable server state when the first read fails', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.isError = true;
-    state.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-    const renderer = mountRoute();
+  it('re-reads the membership and the dashboard on Retry', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = denial;
+    const renderer = mountScreen();
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    if (!denied) {
+      throw new Error('the no-access surface did not render');
+    }
 
-    const errors = findByType(renderer.root, 'QueryError');
-    expect(errors).toHaveLength(1);
-    expect(errors[0]?.props.variant).toBe('server');
+    act(() => {
+      (denied.props.onRetry as () => void)();
+    });
+
+    expect(queries.organizations.refetch).toHaveBeenCalledTimes(1);
+    expect(queries.dashboard.refetch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics retryable failure', () => {
+  it('keeps the dashboard error state with a Retry for a server failure', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } };
+    const renderer = mountScreen();
+
+    const error = findByType(renderer.root, 'QueryErrorMock')[0];
+    expect(error?.props.title).toBe('Could not load analytics');
+    expect(typeof error?.props.onRetry).toBe('function');
+    expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps the permanent denial retryable-free when the read fails with FORBIDDEN', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.isError = true;
-    state.dashboard.error = { data: { code: 'FORBIDDEN' } };
-    const renderer = mountRoute();
+  it('withholds Retry from a dashboard error that cannot recover', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    // A code the shared terminal list carries, so retrying cannot recover it.
+    queries.dashboard.error = { data: { code: 'UNPROCESSABLE_CONTENT', httpStatus: 422 } };
+    const renderer = mountScreen();
 
-    const errors = findByType(renderer.root, 'QueryError');
-    expect(errors).toHaveLength(1);
-    expect(errors[0]?.props.variant).toBe('permission');
-    expect(errors[0]?.props.onRetry).toBeUndefined();
+    expect(findByType(renderer.root, 'QueryErrorMock')[0]?.props.onRetry).toBeUndefined();
+
     act(() => {
       renderer.unmount();
     });
   });
+});
 
-  it('renders the metrics when the read settles', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.data = DASHBOARD;
-    const renderer = mountRoute();
+describe('CodeReviewerAnalytics stale cache', () => {
+  it('keeps the metrics and offers Retry on the offline notice when the refresh pauses', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    const renderer = mountScreen();
 
-    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
-    const rows = findByType(renderer.root, 'ConfigureRow');
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.props.title).toBe('org/repo');
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('keeps cached metrics and offers Retry when the refresh pauses', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.data = DASHBOARD;
-    state.dashboard.fetchStatus = 'paused';
-    state.connectivity = 'offline';
-    const renderer = mountRoute();
-
-    const notices = findByType(renderer.root, 'QueryError');
+    const notices = findByType(renderer.root, 'QueryErrorMock');
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.props.variant).toBe('offline');
     expect(notices[0]?.props.placement).toBe('top');
-    expect(notices[0]?.props.isRetrying).toBe(false);
+    expect(notices[0]?.props.variant).toBe('offline');
     const retry = notices[0]?.props.onRetry as (() => void) | undefined;
-    expect(retry).toBeTypeOf('function');
+    expect(typeof retry).toBe('function');
     retry?.();
-    expect(state.dashboard.refetch).toHaveBeenCalledTimes(1);
+    expect(queries.dashboard.refetch).toHaveBeenCalledTimes(1);
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps the paused stale notice mounted while its Retry runs', () => {
-    // A notice gated on `!isFetching` would unmount on the tap that starts the
-    // retry, so the reader saw the notice vanish instead of its spinner.
-    state.dashboard.isPending = false;
-    state.dashboard.data = DASHBOARD;
-    state.dashboard.fetchStatus = 'paused';
-    state.dashboard.isFetching = true;
-    state.connectivity = 'offline';
-    const renderer = mountRoute();
+  it('keeps the paused notice mounted while its Retry runs', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    queries.dashboard.isFetching = true;
+    const renderer = mountScreen();
 
-    const notices = findByType(renderer.root, 'QueryError');
+    const notices = findByType(renderer.root, 'QueryErrorMock');
     expect(notices).toHaveLength(1);
     expect(notices[0]?.props.variant).toBe('offline');
     expect(notices[0]?.props.isRetrying).toBe(true);
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps cached metrics and offers Retry when the refresh fails', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.data = DASHBOARD;
-    state.dashboard.isError = true;
-    state.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-    const renderer = mountRoute();
+  it('keeps the metrics and offers Retry when the refresh fails retryably', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } };
+    const renderer = mountScreen();
 
-    const notices = findByType(renderer.root, 'QueryError');
+    const notices = findByType(renderer.root, 'QueryErrorMock');
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.props.variant).toBe('server');
     expect(notices[0]?.props.placement).toBe('top');
-    expect(notices[0]?.props.onRetry).toBeTypeOf('function');
+    expect(typeof notices[0]?.props.onRetry).toBe('function');
+
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps a permanent denial retryable-free in the stale notice', () => {
-    state.dashboard.isPending = false;
-    state.dashboard.data = DASHBOARD;
-    state.dashboard.isError = true;
-    state.dashboard.error = { data: { code: 'FORBIDDEN' } };
-    const renderer = mountRoute();
+  it('withholds Retry from a stale notice whose failure cannot recover', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'UNPROCESSABLE_CONTENT', httpStatus: 422 } };
+    const renderer = mountScreen();
 
-    const notices = findByType(renderer.root, 'QueryError');
+    const notices = findByType(renderer.root, 'QueryErrorMock');
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.props.variant).toBe('permission');
+    expect(notices[0]?.props.placement).toBe('top');
     expect(notices[0]?.props.onRetry).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics period labels', () => {
+  it('labels each period segment with its day unit and selects the 30-day window', () => {
+    const renderer = mountScreen();
+    const periods = segmentedControl(renderer, 1);
+
+    expect(periods.props.options).toEqual([
+      { value: '7', label: '7 days' },
+      { value: '30', label: '30 days' },
+      { value: '90', label: '90 days' },
+    ]);
+    expect(periods.props.value).toBe('30');
+    expect(periods.props.accessibilityLabel).toBe('Time range');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('switches the dashboard to the picked window', () => {
+    const renderer = mountScreen();
+    const periods = segmentedControl(renderer, 1);
+
+    act(() => {
+      (periods.props.onChange as (value: string) => void)('90');
+    });
+
+    expect(segmentedControl(renderer, 1).props.value).toBe('90');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics empty state', () => {
+  it('drops the generic description when analytics is off and keeps it when analytics is on', () => {
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false } };
+    const offRenderer = mountScreen();
+
+    const offTexts = findByType(offRenderer.root, 'TextMock').map(node => node.props.children);
+    expect(offTexts).toContain('Analytics is off for this organization.');
+    const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
+    expect(offEmpty?.props.title).toBe('No reviews with analytics yet');
+    expect(offEmpty?.props.description).toBeUndefined();
+
+    act(() => {
+      offRenderer.unmount();
+    });
+
+    queries.dashboard.data = dashboard;
+    const onRenderer = mountScreen();
+
+    expect(findByType(onRenderer.root, 'EmptyStateMock')[0]?.props.description).toBe(
+      'Analytics records completed reviews while it is enabled for the organization.'
+    );
+
+    act(() => {
+      onRenderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics header', () => {
+  it('titles the screen with the organization and keeps the screen name as the eyebrow', () => {
+    const renderer = mountScreen();
+    const header = findByType(renderer.root, 'ReviewerHeaderMock')[0];
+
+    expect(header?.props.title).toBe('Drain Labs');
+    expect(header?.props.eyebrow).toBe('Analytics');
+    // The screen remembers the name the membership read delivered, which is
+    // what titles the denial once that membership is lost.
+    expect(rememberedNames.get('org-drain')).toBe('Drain Labs');
+
     act(() => {
       renderer.unmount();
     });

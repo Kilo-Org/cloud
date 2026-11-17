@@ -7,30 +7,25 @@ import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { trpcClient } from '@/lib/trpc';
 
 const PLATFORM_CONFIG = {
   github: {
     icon: GitBranch,
     label: 'codeReviewer.providerConnect.githubApp',
     buttonLabel: 'common.connectGithub',
-    getUrl: getGitHubIntegrationUrl,
     errorMessage: 'codeReviewer.providerConnect.githubError',
   },
   gitlab: {
     icon: GitMerge,
     label: 'codeReviewer.providerConnect.gitlabAccount',
     buttonLabel: 'common.connectGitlab',
-    getUrl: getGitLabIntegrationUrl,
     errorMessage: 'codeReviewer.providerConnect.gitlabError',
   },
 } as const;
@@ -47,20 +42,17 @@ export function ProviderConnectCard<T>({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [connecting, setConnecting] = useState(false);
-  const { icon: Icon, label, buttonLabel, getUrl, errorMessage } = PLATFORM_CONFIG[platform];
+  const { icon: Icon, label, buttonLabel, errorMessage } = PLATFORM_CONFIG[platform];
 
   const connect = async () => {
     setConnecting(true);
     try {
       const orgId = scope === PERSONAL_SCOPE ? undefined : scope;
-      let url = getUrl(WEB_BASE_URL, orgId);
-      if (platform === 'github') {
-        const result = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: orgId ?? undefined,
-          returnTo: '/cloud/sessions',
-        });
-        url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, result.token);
-      }
+      const url = await appShellHandoffUrl(
+        platform === 'github'
+          ? { page: 'github-app', ...(orgId ? { organizationId: orgId } : {}) }
+          : { page: 'integration', platform: 'gitlab', ...(orgId ? { organizationId: orgId } : {}) }
+      );
       const wait = await openAuthorizationAndWaitForReturn(url);
       // A launch that fails after the app's own return edge ended the wait never
       // reaches the catch below.

@@ -14,6 +14,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { SectionLabel } from '@/components/organization/section-label';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -78,14 +79,6 @@ function BillingCardError({
         <Text>{t('common.retry')}</Text>
       </Button>
     </View>
-  );
-}
-
-function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
   );
 }
 
@@ -327,15 +320,12 @@ export function OrganizationBillingScreen() {
           </View>
         )}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-          <BillingWebSettings
-            subscriptionsUrl={subscriptionsUrl}
-            planLabel={changePlanOnBanner ? null : changePlanLabel}
-            autoTopUpUrl={organizationBillingUrl(organizationId)}
-            autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-          />
-        </View>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

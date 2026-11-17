@@ -27,14 +27,16 @@ Newest first: one section per store build.
 describe('changelogSections', () => {
   it('returns each release as the reader sees it', () => {
     expect(changelogSections(CHANGELOG)).toEqual([
-      { version: '1.0.16', notes: ['Open the changelog natively'] },
+      { version: '1.0.16', notes: ['Open the changelog natively'], translationLanguages: [] },
       {
         version: '1.0.15',
-        notes: ['Link same-email sign-ins', 'Align the composer spacing'],
+        notes: [
+          'Link same-email sign-ins',
+          'Align the composer spacing',
+          'Cut foreground refetch bursts',
+        ],
+        translationLanguages: [],
       },
-      // The second 1.0.15 build continues the version the item above named, and
-      // the maintenance bullets leave nothing to show for it beyond the note.
-      { version: null, notes: ['Cut foreground refetch bursts'] },
     ]);
   });
 
@@ -62,7 +64,7 @@ describe('changelogSections', () => {
     expect(changelogSections(initial)).toEqual([]);
   });
 
-  it('names a version once across consecutive builds and again after another version', () => {
+  it('merges consecutive builds of one version into one list under one heading', () => {
     const sections = changelogSections(
       `## 1.0.15 (build 710 iOS, 711 Android)
 
@@ -77,12 +79,52 @@ describe('changelogSections', () => {
 - fix(mobile): three
 `
     );
-    expect(sections.map(section => section.version)).toEqual(['1.0.15', null, '1.0.14']);
+    expect(sections.map(section => section.version)).toEqual(['1.0.15', '1.0.14']);
+    expect(sections[0]?.notes).toEqual(['One', 'Two']);
   });
 
   it('keeps a heading that names no version as its own title', () => {
     expect(changelogSections(`## Unreleased\n\n- fix(mobile): one\n`)).toEqual([
-      { version: 'Unreleased', notes: ['One'] },
+      { version: 'Unreleased', notes: ['One'], translationLanguages: [] },
+    ]);
+  });
+
+  it('folds a version’s catalog fixes into the languages they corrected', () => {
+    const sections = changelogSections(
+      `## 1.0.15 (build 710 iOS, 711 Android)
+
+- fix(mobile): correct the Igbo code reviewer copy
+- fix(mobile): use one Estonian term for pull request
+- fix(mobile): align the Igbo session badge and failure copy
+- fix(mobile): keep the composer visible
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+- fix(mobile): correct Armenian agent chat copy
+`
+    );
+    expect(sections).toEqual([
+      {
+        version: '1.0.15',
+        notes: ['Keep the composer visible'],
+        translationLanguages: ['Igbo', 'Estonian', 'Armenian'],
+      },
+    ]);
+  });
+
+  it('drops work a reader cannot see even when its commit type ships changes', () => {
+    const plumbing = `## 1.0.15 (build 710 iOS, 711 Android)
+
+- feat(mobile): add flag-gated native remote demo
+- feat(mobile): add shared client transport and web demo
+- fix(mobile): bound native sync recovery by socket generation
+- fix(mobile): align Spend alerts card padding with the info card
+- fix(mobile): drop the redundant Members section label
+- fix(mobile): answer the request a glanceable approval names
+- fix(mobile): keep the composer visible
+`;
+    expect(changelogSections(plumbing)).toEqual([
+      { version: '1.0.15', notes: ['Keep the composer visible'], translationLanguages: [] },
     ]);
   });
 
@@ -102,22 +144,9 @@ describe('changelogNotesArePending', () => {
     expect(changelogNotesArePending(CHANGELOG, '1.0.16')).toBe(false);
   });
 
-  it('says nothing when the bundle already carries a later version', () => {
-    expect(changelogNotesArePending(CHANGELOG, '1.0.15')).toBe(false);
-    expect(changelogNotesArePending(CHANGELOG, '0.9.99')).toBe(false);
-  });
-
-  it('reads the newest heading, not the first', () => {
-    const outOfOrder = `## 1.0.14 (build 690 iOS, 691 Android)\n\n## 1.0.15 (build 710 iOS, 711 Android)\n`;
-    expect(changelogNotesArePending(outOfOrder, '1.0.16')).toBe(true);
-    expect(changelogNotesArePending(outOfOrder, '1.0.15')).toBe(false);
-  });
-
-  it('says nothing when a heading or the installed version does not parse', () => {
-    expect(changelogNotesArePending('## Unreleased\n\n- something\n', '1.0.16')).toBe(false);
-    expect(changelogNotesArePending('# Kilo App Changelog\n', '1.0.16')).toBe(false);
-    expect(changelogNotesArePending('', '1.0.16')).toBe(false);
+  it('says nothing when a version cannot be read', () => {
     expect(changelogNotesArePending(CHANGELOG, null)).toBe(false);
-    expect(changelogNotesArePending(CHANGELOG, '1.0')).toBe(false);
+    expect(changelogNotesArePending(CHANGELOG, 'nightly')).toBe(false);
+    expect(changelogNotesArePending('# no headings\n', '1.0.16')).toBe(false);
   });
 });

@@ -481,7 +481,8 @@
       "viewReceipt": "Lihat resit"
     },
     "changelog": "Yang baharu",
-    "changelogVersionPending": "Nota versi ini akan tiba bersama kemas kini apl seterusnya."
+    "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
+    "changelogTranslationFixes": "Pembetulan terjemahan untuk {{languages}}"
   },
   "preferences": {
     "general": "Umum",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Tetapan pengebilan di web",
       "changePlan": "Tukar pelan",
       "buySeats": "Beli slot pengguna",
-      "planManagedOnWeb": "Pelan diurus di web.",
-      "seatsManagedOnWeb": "Slot pengguna diurus di web.",
-      "autoTopUpManagedOnWeb": "Tambah nilai automatik diurus di web.",
+      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di web.",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
       "opensOnWeb": "Dibuka di web"

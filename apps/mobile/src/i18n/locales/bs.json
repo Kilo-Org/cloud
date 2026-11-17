@@ -481,7 +481,8 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Šta je novo",
-    "changelogVersionPending": "Bilješke za ovu verziju stižu uz sljedeće ažuriranje aplikacije."
+    "changelogVersionPending": "Bilješke za verziju {{version}} stižu uz sljedeće ažuriranje aplikacije.",
+    "changelogTranslationFixes": "Ispravke prijevoda: {{languages}}"
   },
   "preferences": {
     "general": "Općenito",
@@ -3383,9 +3384,7 @@
       "manageOnWeb": "Postavke naplate na webu",
       "changePlan": "Promijeni plan",
       "buySeats": "Kupi korisnička mjesta",
-      "planManagedOnWeb": "Plan se upravlja na webu.",
-      "seatsManagedOnWeb": "Korisničkim mjestima se upravlja na webu.",
-      "autoTopUpManagedOnWeb": "Automatskom dopunom se upravlja na webu.",
+      "managedOnWeb": "Planom, korisničkim mjestima i automatskom dopunom upravlja se na webu.",
       "setupAutoTopUp": "Postavi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na webu"

@@ -481,7 +481,8 @@
       "viewReceipt": "Ikusi agiria"
     },
     "changelog": "Berritasunak",
-    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
+    "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
+    "changelogTranslationFixes": "Itzulpen-zuzenketak hizkuntza hauetan: {{languages}}"
   },
   "preferences": {
     "general": "Orokorra",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
-      "planManagedOnWeb": "Plana webean kudeatzen da.",
-      "seatsManagedOnWeb": "Lizentziak webean kudeatzen dira.",
-      "autoTopUpManagedOnWeb": "Birkarga automatikoa webean kudeatzen da.",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"

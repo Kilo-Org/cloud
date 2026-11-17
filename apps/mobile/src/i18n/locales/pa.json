@@ -481,7 +481,8 @@
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
     "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
-    "changelogVersionPending": "ਇਸ ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।"
+    "changelogVersionPending": "{{version}} ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।",
+    "changelogTranslationFixes": "{{languages}} ਲਈ ਅਨੁਵਾਦ ਸੁਧਾਰ"
   },
   "preferences": {
     "general": "ਆਮ",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਬਿਲਿੰਗ ਸੈਟਿੰਗਾਂ",
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
-      "planManagedOnWeb": "ਪਲਾਨ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
-      "seatsManagedOnWeb": "ਸੀਟਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
-      "autoTopUpManagedOnWeb": "ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
       "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"

@@ -481,7 +481,8 @@
       "viewReceipt": "Lihat tanda terima"
     },
     "changelog": "Yang baru",
-    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
+    "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
+    "changelogTranslationFixes": "Perbaikan terjemahan untuk {{languages}}"
   },
   "preferences": {
     "general": "Umum",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
-      "planManagedOnWeb": "Paket dikelola di web.",
-      "seatsManagedOnWeb": "Lisensi pengguna dikelola di web.",
-      "autoTopUpManagedOnWeb": "Isi ulang otomatis dikelola di web.",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"

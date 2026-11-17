@@ -481,7 +481,8 @@
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
     "changelog": "Kas naujo",
-    "changelogVersionPending": "Šios versijos pastabos pasirodys su kitu programėlės atnaujinimu."
+    "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
+    "changelogTranslationFixes": "Vertimų pataisymai: {{languages}}"
   },
   "preferences": {
     "general": "Bendra",
@@ -3440,9 +3441,7 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
-      "planManagedOnWeb": "Planas valdomas žiniatinklyje.",
-      "seatsManagedOnWeb": "Vietos valdomos žiniatinklyje.",
-      "autoTopUpManagedOnWeb": "Automatinis papildymas valdomas žiniatinklyje.",
+      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi žiniatinklyje.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"

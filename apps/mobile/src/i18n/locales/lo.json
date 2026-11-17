@@ -481,7 +481,8 @@
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
     "changelog": "ມີຫຍັງໃໝ່",
-    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນນີ້ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ"
+    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນ {{version}} ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ",
+    "changelogTranslationFixes": "ການແກ້ໄຂການແປສຳລັບ {{languages}}"
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "ການຕັ້ງຄ່າການຮຽກເກັບເງິນໃນເວັບ",
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
-      "planManagedOnWeb": "ແຜນຖືກຈັດການຢູ່ໃນເວັບ.",
-      "seatsManagedOnWeb": "ສິດຜູ້ໃຊ້ຖືກຈັດການຢູ່ໃນເວັບ.",
-      "autoTopUpManagedOnWeb": "ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
+      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "opensOnWeb": "ເປີດໃນເວັບ"

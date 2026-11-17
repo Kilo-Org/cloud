@@ -481,7 +481,8 @@
       "viewReceipt": "Դիտել անդորրագիրը"
     },
     "changelog": "Նորություններ",
-    "changelogVersionPending": "Այս տարբերակի նշումները կհայտնվեն հավելվածի հաջորդ թարմացմամբ։"
+    "changelogVersionPending": "{{version}} տարբերակի նշումները կհայտնվեն հավելվածի հաջորդ թարմացմամբ։",
+    "changelogTranslationFixes": "Թարգմանության ուղղումներ՝ {{languages}}"
   },
   "preferences": {
     "general": "Ընդհանուր",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Վճարումների կարգավորումները վեբում",
       "changePlan": "Փոխել պլանը",
       "buySeats": "Գնել տեղեր",
-      "planManagedOnWeb": "Պլանը կառավարվում է վեբում։",
-      "seatsManagedOnWeb": "Տեղերը կառավարվում են վեբում։",
-      "autoTopUpManagedOnWeb": "Ավտոմատ համալրումը կառավարվում է վեբում։",
+      "managedOnWeb": "Պլանը, տեղերը և ավտոմատ համալրումը կառավարվում են վեբում։",
       "setupAutoTopUp": "Կարգավորել ավտոմատ համալրումը",
       "manageAutoTopUp": "Կառավարել ավտոմատ համալրումը",
       "opensOnWeb": "Բացվում է վեբում"

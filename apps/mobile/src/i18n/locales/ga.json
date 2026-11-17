@@ -481,7 +481,8 @@
       "viewReceipt": "Féach ar an admháil"
     },
     "changelog": "Na rudaí nua",
-    "changelogVersionPending": "Beidh nótaí an leagain seo sa chéad nuashonrú eile den aip."
+    "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
+    "changelogTranslationFixes": "Ceartúcháin aistriúcháin do na teangacha seo: {{languages}}"
   },
   "preferences": {
     "general": "Ginearálta",
@@ -3497,9 +3498,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
-      "planManagedOnWeb": "Bainistítear an plean ar an ngréasán.",
-      "seatsManagedOnWeb": "Bainistítear na suíocháin ar an ngréasán.",
-      "autoTopUpManagedOnWeb": "Bainistítear an breisiú uathoibríoch ar an ngréasán.",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"

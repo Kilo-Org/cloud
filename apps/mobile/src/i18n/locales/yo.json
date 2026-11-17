@@ -481,7 +481,8 @@
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
     "changelog": "Àwọn ohun tuntun",
-    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà yìí yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn."
+    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
+    "changelogTranslationFixes": "Àtúnṣe ìtumọ̀ fún {{languages}}"
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Àtúnṣe ìsanwó lórí wẹ́ẹ̀bù",
       "changePlan": "Yí ètò padà",
       "buySeats": "Ra ààyè",
-      "planManagedOnWeb": "A ń ṣàkóso ètò náà lórí wẹ́ẹ̀bù.",
-      "seatsManagedOnWeb": "A ń ṣàkóso àwọn ààyè lórí wẹ́ẹ̀bù.",
-      "autoTopUpManagedOnWeb": "A ń ṣàkóso ìfikún owó aládàáṣe lórí wẹ́ẹ̀bù.",
+      "managedOnWeb": "A ń ṣàkóso ètò náà, àwọn ààyè àti ìfikún owó aládàáṣe lórí wẹ́ẹ̀bù.",
       "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
       "manageAutoTopUp": "Ṣàkóso ìfikún owó aládàáṣe",
       "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"

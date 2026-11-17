@@ -481,7 +481,8 @@
       "viewReceipt": "ქვითრის ნახვა"
     },
     "changelog": "სიახლეები",
-    "changelogVersionPending": "ამ ვერსიის სიახლეები აპის შემდეგ განახლებასთან ერთად გამოჩნდება."
+    "changelogVersionPending": "{{version}} ვერსიის სიახლეები აპის შემდეგ განახლებასთან ერთად გამოჩნდება.",
+    "changelogTranslationFixes": "თარგმანის შესწორებები: {{languages}}"
   },
   "preferences": {
     "general": "ზოგადი",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "ბილინგის პარამეტრები ვებში",
       "changePlan": "გეგმის შეცვლა",
       "buySeats": "ადგილების ყიდვა",
-      "planManagedOnWeb": "გეგმა იმართება ვებში.",
-      "seatsManagedOnWeb": "ადგილები იმართება ვებში.",
-      "autoTopUpManagedOnWeb": "ავტომატური შევსება იმართება ვებში.",
+      "managedOnWeb": "გეგმა, ადგილები და ავტომატური შევსება იმართება ვებში.",
       "setupAutoTopUp": "ავტომატური შევსების დაყენება",
       "manageAutoTopUp": "ავტომატური შევსების მართვა",
       "opensOnWeb": "იხსნება ვებ-ვერსიაში"

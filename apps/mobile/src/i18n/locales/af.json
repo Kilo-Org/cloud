@@ -481,7 +481,8 @@
       "viewReceipt": "Bekyk ontvangsbewys"
     },
     "changelog": "Wat is nuut",
-    "changelogVersionPending": "Hierdie weergawe se notas kom met die volgende opdatering."
+    "changelogVersionPending": "Die notas vir {{version}} kom met die volgende toepassingsopdatering.",
+    "changelogTranslationFixes": "Vertalingsregstellings vir {{languages}}"
   },
   "preferences": {
     "general": "Algemeen",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
-      "planManagedOnWeb": "Die plan word op die web bestuur.",
-      "seatsManagedOnWeb": "Gebruikersplekke word op die web bestuur.",
-      "autoTopUpManagedOnWeb": "Outomatiese aanvulling word op die web bestuur.",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"

@@ -2,6 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { SectionLabel } from '@/components/organization/section-label';
+import { Text } from '@/components/ui/text';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 
 type BillingWebSettingsProps = Readonly<{
   /** The organization's subscription page; the seats page hangs off it. */
@@ -18,10 +21,12 @@ type BillingWebSettingsProps = Readonly<{
  * The billing settings that only the web can change — the plan, the seats and
  * auto top-up.
  *
- * Each destination is drawn by `ExternalBillingLink`: a link on an iOS build in
- * the US storefront, a statement of where the setting lives everywhere else.
- * The statement is the whole of that shape, so a storefront that may not link
- * to web billing is handed no action to take.
+ * A storefront that may link to web billing gets the three destinations as
+ * controls, each under the section's heading. Every other storefront — Android,
+ * and iOS outside the US — gets one statement that says where the settings
+ * live: no heading naming the web, no control, and no purchase call to action,
+ * because the action label is one wherever it is printed. The rule is
+ * `useCanLinkExternalPurchase`.
  */
 export function BillingWebSettings({
   subscriptionsUrl,
@@ -30,25 +35,29 @@ export function BillingWebSettings({
   autoTopUpLabel,
 }: BillingWebSettingsProps) {
   const { t } = useTranslation();
+  const canLink = useCanLinkExternalPurchase();
+  if (!canLink) {
+    return (
+      <View className="rounded-lg bg-secondary p-3">
+        <Text className="text-sm text-muted-foreground">
+          {t('organization.billing.managedOnWeb')}
+        </Text>
+      </View>
+    );
+  }
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
-      {planLabel === null ? null : (
+    <View className="gap-2">
+      <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
+      <View className="gap-3 rounded-lg bg-secondary p-3">
+        {planLabel === null ? null : (
+          <ExternalBillingLink url={subscriptionsUrl} label={planLabel} />
+        )}
         <ExternalBillingLink
-          url={subscriptionsUrl}
-          label={planLabel}
-          description={t('organization.billing.planManagedOnWeb')}
+          url={`${subscriptionsUrl}/seats`}
+          label={t('organization.billing.buySeats')}
         />
-      )}
-      <ExternalBillingLink
-        url={`${subscriptionsUrl}/seats`}
-        label={t('organization.billing.buySeats')}
-        description={t('organization.billing.seatsManagedOnWeb')}
-      />
-      <ExternalBillingLink
-        url={autoTopUpUrl}
-        label={autoTopUpLabel}
-        description={t('organization.billing.autoTopUpManagedOnWeb')}
-      />
+        <ExternalBillingLink url={autoTopUpUrl} label={autoTopUpLabel} />
+      </View>
     </View>
   );
 }

@@ -481,7 +481,8 @@
       "viewReceipt": "Zobraziť potvrdenie"
     },
     "changelog": "Čo je nové",
-    "changelogVersionPending": "Poznámky k tejto verzii prídu s ďalšou aktualizáciou."
+    "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
+    "changelogTranslationFixes": "Opravy prekladov: {{languages}}"
   },
   "preferences": {
     "general": "Všeobecné",
@@ -3440,9 +3441,7 @@
       "manageOnWeb": "Nastavenia fakturácie na webe",
       "changePlan": "Zmeniť plán",
       "buySeats": "Kúpiť miesta",
-      "planManagedOnWeb": "Plán sa spravuje na webe.",
-      "seatsManagedOnWeb": "Miesta sa spravujú na webe.",
-      "autoTopUpManagedOnWeb": "Automatické dobíjanie sa spravuje na webe.",
+      "managedOnWeb": "Plán, miesta a automatické dobíjanie sa spravujú na webe.",
       "setupAutoTopUp": "Nastaviť automatické dobíjanie",
       "manageAutoTopUp": "Spravovať automatické dobíjanie",
       "opensOnWeb": "Otvorí sa na webe"

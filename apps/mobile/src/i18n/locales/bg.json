@@ -481,7 +481,8 @@
       "viewReceipt": "Виж потвърждението"
     },
     "changelog": "Какво е новото",
-    "changelogVersionPending": "Бележките за тази версия идват със следващата актуализация."
+    "changelogVersionPending": "Бележките за версия {{version}} идват със следващата актуализация на приложението.",
+    "changelogTranslationFixes": "Поправки в превода: {{languages}}"
   },
   "preferences": {
     "general": "Общи",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Настройки на плащанията в уеб",
       "changePlan": "Смени плана",
       "buySeats": "Купи места",
-      "planManagedOnWeb": "Планът се управлява в уеб.",
-      "seatsManagedOnWeb": "Местата се управляват в уеб.",
-      "autoTopUpManagedOnWeb": "Автоматичното зареждане се управлява в уеб.",
+      "managedOnWeb": "Планът, местата и автоматичното зареждане се управляват в уеб.",
       "setupAutoTopUp": "Настрой автоматично зареждане",
       "manageAutoTopUp": "Управлявай автоматично зареждане",
       "opensOnWeb": "Отваря се в уеб версията"

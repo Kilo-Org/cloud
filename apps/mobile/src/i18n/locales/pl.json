@@ -481,7 +481,8 @@
       "viewReceipt": "Wyświetl potwierdzenie"
     },
     "changelog": "Co nowego",
-    "changelogVersionPending": "Opis tej wersji dotrze z kolejną aktualizacją aplikacji."
+    "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
+    "changelogTranslationFixes": "Poprawki tłumaczeń na języki: {{languages}}"
   },
   "preferences": {
     "general": "Ogólne",
@@ -3432,9 +3433,7 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
-      "planManagedOnWeb": "Plan jest zarządzany w wersji internetowej.",
-      "seatsManagedOnWeb": "Miejsca są zarządzane w wersji internetowej.",
-      "autoTopUpManagedOnWeb": "Automatyczne doładowanie jest zarządzane w wersji internetowej.",
+      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane w wersji internetowej.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"

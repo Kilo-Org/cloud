@@ -96,9 +96,9 @@ vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }))
 vi.mock('@/components/organization/external-billing-link', async () => {
   const { createElement: h } = await import('react');
   return {
-    // The component's own gate picks the link or the plain line.
-    ExternalBillingLink: (props: { label?: string }) =>
-      h(platform.linkAllowed ? 'ExternalBillingLink' : 'BillingDestinationText', props),
+    // The settings block owns the storefront gate, so this control is always
+    // the control it was asked for.
+    ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props),
   };
 });
 
@@ -369,15 +369,17 @@ describe('OrganizationBillingScreen change plan placement', () => {
     unmount();
   });
 
-  it('states where each setting lives when the storefront rule refuses the link', async () => {
+  it('states where the settings live when the storefront rule refuses the link', async () => {
     // Outside the US storefront nothing links, so the banner has no action and
-    // the card states where each setting lives instead of naming a purchase.
+    // the card states where the settings live: one line, no heading naming the
+    // web, and no purchase call to action.
     boundary.isTrialExpiredForEnforcement = true;
     platform.linkAllowed = false;
     const { renderer, unmount } = await mount();
 
     expect(bannerAction(renderer)).toBeUndefined();
-    expect(renderer.root.findAllByType('BillingDestinationText' as never)).toHaveLength(3);
+    expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
+    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
     unmount();
   });
 

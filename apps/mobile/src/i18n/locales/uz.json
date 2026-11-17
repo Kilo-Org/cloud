@@ -481,7 +481,8 @@
       "viewReceipt": "Kvitansiyani ko'rish"
     },
     "changelog": "Yangiliklar",
-    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
+    "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
+    "changelogTranslationFixes": "{{languages}} uchun tarjima tuzatishlari"
   },
   "preferences": {
     "general": "Umumiy",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Veb-saytdagi to'lovlar sozlamalari",
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
-      "planManagedOnWeb": "Tarif veb-saytda boshqariladi.",
-      "seatsManagedOnWeb": "O'rinlar veb-saytda boshqariladi.",
-      "autoTopUpManagedOnWeb": "Avtomatik to'ldirish veb-saytda boshqariladi.",
+      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish veb-saytda boshqariladi.",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "opensOnWeb": "Vebda ochiladi"

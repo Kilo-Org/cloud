@@ -481,7 +481,8 @@
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
+    "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
+    "changelogTranslationFixes": "Översättningsrättelser för {{languages}}"
   },
   "preferences": {
     "general": "Allmänt",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
-      "planManagedOnWeb": "Planen hanteras på webben.",
-      "seatsManagedOnWeb": "Platser hanteras på webben.",
-      "autoTopUpManagedOnWeb": "Automatisk påfyllning hanteras på webben.",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"

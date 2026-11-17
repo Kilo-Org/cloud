@@ -481,7 +481,8 @@
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
     "changelog": "አዲስ ነገር",
-    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
+    "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
+    "changelogTranslationFixes": "የትርጉም ማስተካከያዎች፦ {{languages}}"
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
-      "planManagedOnWeb": "ዕቅዱ የሚተዳደረው በድር ላይ ነው።",
-      "seatsManagedOnWeb": "የተጠቃሚ ፈቃዶች የሚተዳደሩት በድር ላይ ነው።",
-      "autoTopUpManagedOnWeb": "ራስ-ሰር መሙላት የሚተዳደረው በድር ላይ ነው።",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"

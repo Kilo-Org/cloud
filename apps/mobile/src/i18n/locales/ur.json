@@ -481,7 +481,8 @@
       "viewReceipt": "رسید دیکھیں"
     },
     "changelog": "نیا کیا ہے",
-    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
+    "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
+    "changelogTranslationFixes": "{{languages}} کے لیے ترجمے کی درستیاں"
   },
   "preferences": {
     "general": "عمومی",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
-      "planManagedOnWeb": "پلان ویب پر منظم کیا جاتا ہے۔",
-      "seatsManagedOnWeb": "سیٹیں ویب پر منظم کی جاتی ہیں۔",
-      "autoTopUpManagedOnWeb": "خودکار ٹاپ اپ ویب پر منظم کیا جاتا ہے۔",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"

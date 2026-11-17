@@ -548,7 +548,8 @@
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New",
-    "changelogVersionPending": "The notes for this version arrive with the next app update."
+    "changelogVersionPending": "The notes for {{version}} arrive with the next app update.",
+    "changelogTranslationFixes": "Translation fixes for {{languages}}"
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -3406,9 +3407,7 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
-      "planManagedOnWeb": "The plan is managed on the web.",
-      "seatsManagedOnWeb": "Seats are managed on the web.",
-      "autoTopUpManagedOnWeb": "Auto top-up is managed on the web.",
+      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"

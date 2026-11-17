@@ -481,7 +481,8 @@
       "viewReceipt": "Gweld y dderbynneb"
     },
     "changelog": "Beth sy'n newydd",
-    "changelogVersionPending": "Daw nodiadau'r fersiwn hon gyda'r diweddariad nesaf i'r ap."
+    "changelogVersionPending": "Daw nodiadau fersiwn {{version}} gyda'r diweddariad nesaf i'r ap.",
+    "changelogTranslationFixes": "Trwsio cyfieithiadau ar gyfer {{languages}}"
   },
   "preferences": {
     "general": "Cyffredinol",
@@ -3554,9 +3555,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
-      "planManagedOnWeb": "Caiff y cynllun ei reoli ar y we.",
-      "seatsManagedOnWeb": "Caiff y seddau eu rheoli ar y we.",
-      "autoTopUpManagedOnWeb": "Caiff ail-lenwi awtomatig ei reoli ar y we.",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"

@@ -481,7 +481,8 @@
       "viewReceipt": "Tirohia te rīhīti"
     },
     "changelog": "Ngā mea hou",
-    "changelogVersionPending": "Ka tae mai ngā tuhipoka o tēnei putanga me te whakahōu taupānga e whai ake."
+    "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
+    "changelogTranslationFixes": "Ngā whakatika whakamāoritanga mō {{languages}}"
   },
   "preferences": {
     "general": "Whānui",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Ngā tautuhinga utu i te ipurangi",
       "changePlan": "Huri mahere",
       "buySeats": "Hoko raihana",
-      "planManagedOnWeb": "Ka whakahaerehia te mahere i te ipurangi.",
-      "seatsManagedOnWeb": "Ka whakahaerehia ngā raihana i te ipurangi.",
-      "autoTopUpManagedOnWeb": "Ka whakahaerehia te whakakī aunoa i te ipurangi.",
+      "managedOnWeb": "Ka whakahaerehia te mahere, ngā raihana me te whakakī aunoa i te ipurangi.",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
       "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
       "opensOnWeb": "Ka tuwhera i te ipurangi"

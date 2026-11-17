@@ -481,7 +481,8 @@
       "viewReceipt": "पावती पहा"
     },
     "changelog": "नवीन बदल",
-    "changelogVersionPending": "या आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील."
+    "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
+    "changelogTranslationFixes": "{{languages}} या भाषांसाठी भाषांतर दुरुस्त्या"
   },
   "preferences": {
     "general": "सामान्य",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
-      "planManagedOnWeb": "प्लॅन वेबवर व्यवस्थापित केला जातो.",
-      "seatsManagedOnWeb": "जागा वेबवर व्यवस्थापित केल्या जातात.",
-      "autoTopUpManagedOnWeb": "ऑटो टॉप-अप वेबवर व्यवस्थापित केले जाते.",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"

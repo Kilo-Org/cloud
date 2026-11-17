@@ -481,7 +481,8 @@
       "viewReceipt": "رسید وګورئ"
     },
     "changelog": "نوي بدلونونه",
-    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
+    "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
+    "changelogTranslationFixes": "د {{languages}} لپاره د ژباړې سمونې"
   },
   "preferences": {
     "general": "عمومي",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
-      "planManagedOnWeb": "پلان په ویب کې اداره کېږي.",
-      "seatsManagedOnWeb": "د غړیتوب ځایونه په ویب کې اداره کېږي.",
-      "autoTopUpManagedOnWeb": "اتومات بیا ډکول په ویب کې اداره کېږي.",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"

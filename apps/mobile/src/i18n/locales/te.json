@@ -481,7 +481,8 @@
       "viewReceipt": "రసీదును చూడండి"
     },
     "changelog": "కొత్త విశేషాలు",
-    "changelogVersionPending": "ఈ వెర్షన్ విశేషాలు తదుపరి యాప్ అప్‌డేట్‌తో వస్తాయి."
+    "changelogVersionPending": "{{version}} వెర్షన్ విశేషాలు తదుపరి యాప్ అప్‌డేట్‌తో వస్తాయి.",
+    "changelogTranslationFixes": "{{languages}} భాషలకు అనువాద సవరణలు"
   },
   "preferences": {
     "general": "సాధారణం",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "వెబ్‌లో బిల్లింగ్ సెట్టింగ్‌లు",
       "changePlan": "ప్లాన్ మార్చండి",
       "buySeats": "సీట్లు కొనండి",
-      "planManagedOnWeb": "ప్లాన్ వెబ్‌లో నిర్వహించబడుతుంది.",
-      "seatsManagedOnWeb": "సీట్లు వెబ్‌లో నిర్వహించబడతాయి.",
-      "autoTopUpManagedOnWeb": "ఆటో టాప్-అప్ వెబ్‌లో నిర్వహించబడుతుంది.",
+      "managedOnWeb": "ప్లాన్, సీట్లు మరియు ఆటో టాప్-అప్ వెబ్‌లో నిర్వహించబడతాయి.",
       "setupAutoTopUp": "ఆటో టాప్-అప్ సెటప్ చేయండి",
       "manageAutoTopUp": "ఆటో టాప్-అప్‌ను నిర్వహించండి",
       "opensOnWeb": "వెబ్‌లో తెరుచుకుంటుంది"

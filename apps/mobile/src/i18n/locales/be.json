@@ -481,7 +481,8 @@
       "viewReceipt": "Паглядзець квітанцыю"
     },
     "changelog": "Што новага",
-    "changelogVersionPending": "Нататкі да гэтай версіі прыйдуць з наступным абнаўленнем."
+    "changelogVersionPending": "Нататкі да версіі {{version}} прыйдуць з наступным абнаўленнем праграмы.",
+    "changelogTranslationFixes": "Выпраўленні перакладу: {{languages}}"
   },
   "preferences": {
     "general": "Агульныя",
@@ -3440,9 +3441,7 @@
       "manageOnWeb": "Налады аплаты ў вэб-версіі",
       "changePlan": "Змяніць план",
       "buySeats": "Купіць месцы",
-      "planManagedOnWeb": "План кіруецца ў вэб-версіі.",
-      "seatsManagedOnWeb": "Месцы кіруюцца ў вэб-версіі.",
-      "autoTopUpManagedOnWeb": "Аўтапапаўненне кіруецца ў вэб-версіі.",
+      "managedOnWeb": "План, месцы і аўтапапаўненне кіруюцца ў вэб-версіі.",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
       "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"

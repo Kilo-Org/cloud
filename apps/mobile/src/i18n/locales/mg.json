@@ -481,7 +481,8 @@
       "viewReceipt": "Jereo ny porofo"
     },
     "changelog": "Ny vaovao",
-    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
+    "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
+    "changelogTranslationFixes": "Fanitsiana dikanteny ho an'ny {{languages}}"
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
-      "planManagedOnWeb": "Tantanina amin'ny tranonkala ny drafitra.",
-      "seatsManagedOnWeb": "Tantanina amin'ny tranonkala ny toerana.",
-      "autoTopUpManagedOnWeb": "Tantanina amin'ny tranonkala ny famenoana ho azy.",
+      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"

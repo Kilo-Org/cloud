@@ -481,7 +481,8 @@
       "viewReceipt": "Voir l'accusé de réception"
     },
     "changelog": "Nouveautés",
-    "changelogVersionPending": "Les notes de cette version arriveront avec la prochaine mise à jour."
+    "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
+    "changelogTranslationFixes": "Corrections de traduction pour les langues suivantes : {{languages}}"
   },
   "notifications": {
     "channel": {
@@ -3375,9 +3376,7 @@
       "manageOnWeb": "Paramètres de facturation sur le web",
       "changePlan": "Changer de formule",
       "buySeats": "Acheter des licences",
-      "planManagedOnWeb": "La formule est gérée sur le web.",
-      "seatsManagedOnWeb": "Les licences sont gérées sur le web.",
-      "autoTopUpManagedOnWeb": "La recharge automatique est gérée sur le web.",
+      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur le web.",
       "setupAutoTopUp": "Configurer la recharge automatique",
       "manageAutoTopUp": "Gérer la recharge automatique",
       "opensOnWeb": "S'ouvre sur le web"

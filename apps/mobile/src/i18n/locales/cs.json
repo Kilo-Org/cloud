@@ -481,7 +481,8 @@
       "viewReceipt": "Zobrazit potvrzení"
     },
     "changelog": "Co je nového",
-    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
+    "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
+    "changelogTranslationFixes": "Opravy překladů: {{languages}}"
   },
   "preferences": {
     "general": "Obecné",
@@ -3440,9 +3441,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
-      "planManagedOnWeb": "Plán se spravuje na webu.",
-      "seatsManagedOnWeb": "Uživatelská místa se spravují na webu.",
-      "autoTopUpManagedOnWeb": "Automatické dobití se spravuje na webu.",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"

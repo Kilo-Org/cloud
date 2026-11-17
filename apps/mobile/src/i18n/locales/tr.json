@@ -481,7 +481,8 @@
       "viewReceipt": "Alındıyı görüntüle"
     },
     "changelog": "Yenilikler",
-    "changelogVersionPending": "Bu sürümün notları sonraki uygulama güncellemesiyle gelir."
+    "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
+    "changelogTranslationFixes": "{{languages}} için çeviri düzeltmeleri"
   },
   "preferences": {
     "general": "Genel",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
-      "planManagedOnWeb": "Plan web'de yönetilir.",
-      "seatsManagedOnWeb": "Lisanslar web'de yönetilir.",
-      "autoTopUpManagedOnWeb": "Otomatik yükleme web'de yönetilir.",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"

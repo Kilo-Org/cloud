@@ -481,7 +481,8 @@
       "viewReceipt": "Buka irisidi"
     },
     "changelog": "Okusha",
-    "changelogVersionPending": "Amanothi ale nguqulo azofika nesibuyekezo esilandelayo."
+    "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
+    "changelogTranslationFixes": "Ukulungiswa kokuhumusha kwe-{{languages}}"
   },
   "preferences": {
     "general": "Okujwayelekile",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Izilungiselelo zokukhokha kuwebhu",
       "changePlan": "Shintsha uhlelo",
       "buySeats": "Thenga izikhala",
-      "planManagedOnWeb": "Uhlelo luphathwa kuwebhu.",
-      "seatsManagedOnWeb": "Izikhala ziphathwa kuwebhu.",
-      "autoTopUpManagedOnWeb": "Ukugcwalisa okuzenzakalelayo kuphathwa kuwebhu.",
+      "managedOnWeb": "Uhlelo, izikhala kanye nokugcwalisa okuzenzakalelayo kuphathwa kuwebhu.",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
       "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
       "opensOnWeb": "Kuvuleka kuwebhu"

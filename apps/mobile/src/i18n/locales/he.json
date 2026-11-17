@@ -481,7 +481,8 @@
       "viewReceipt": "הצגת האישור"
     },
     "changelog": "מה חדש",
-    "changelogVersionPending": "ההערות לגרסה זו יגיעו עם עדכון האפליקציה הבא."
+    "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
+    "changelogTranslationFixes": "תיקוני תרגום עבור {{languages}}"
   },
   "preferences": {
     "general": "כללי",
@@ -3375,9 +3376,7 @@
       "manageOnWeb": "הגדרות חיוב באתר",
       "changePlan": "שינוי תוכנית",
       "buySeats": "רכישת רישיונות",
-      "planManagedOnWeb": "התוכנית מנוהלת באתר.",
-      "seatsManagedOnWeb": "הרישיונות מנוהלים באתר.",
-      "autoTopUpManagedOnWeb": "הטעינה האוטומטית מנוהלת באתר.",
+      "managedOnWeb": "התוכנית, הרישיונות והטעינה האוטומטית מנוהלים באתר.",
       "setupAutoTopUp": "הגדרת טעינה אוטומטית",
       "manageAutoTopUp": "ניהול טעינה אוטומטית",
       "opensOnWeb": "נפתח באתר"

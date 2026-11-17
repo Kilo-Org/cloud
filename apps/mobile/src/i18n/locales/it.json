@@ -481,7 +481,8 @@
       "viewReceipt": "Visualizza ricevuta"
     },
     "changelog": "Novità",
-    "changelogVersionPending": "Le note di questa versione arriveranno con il prossimo aggiornamento dell'app."
+    "changelogVersionPending": "Le note della versione {{version}} arriveranno con il prossimo aggiornamento dell'app.",
+    "changelogTranslationFixes": "Correzioni alle traduzioni in {{languages}}"
   },
   "notifications": {
     "channel": {
@@ -3375,9 +3376,7 @@
       "manageOnWeb": "Impostazioni di fatturazione sul web",
       "changePlan": "Cambia piano",
       "buySeats": "Acquista posti",
-      "planManagedOnWeb": "Il piano è gestito sul web.",
-      "seatsManagedOnWeb": "I posti sono gestiti sul web.",
-      "autoTopUpManagedOnWeb": "La ricarica automatica è gestita sul web.",
+      "managedOnWeb": "Il piano, i posti e la ricarica automatica sono gestiti sul web.",
       "setupAutoTopUp": "Configura la ricarica automatica",
       "manageAutoTopUp": "Gestisci la ricarica automatica",
       "opensOnWeb": "Si apre sul web"

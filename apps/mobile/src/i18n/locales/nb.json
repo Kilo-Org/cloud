@@ -481,7 +481,8 @@
       "viewReceipt": "Vis kvittering"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Merknadene for denne versjonen kommer med neste appoppdatering."
+    "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
+    "changelogTranslationFixes": "Oversettelsesrettelser for {{languages}}"
   },
   "preferences": {
     "general": "Generelt",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
-      "planManagedOnWeb": "Planen administreres på nettet.",
-      "seatsManagedOnWeb": "Brukerplasser administreres på nettet.",
-      "autoTopUpManagedOnWeb": "Automatisk påfylling administreres på nettet.",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"

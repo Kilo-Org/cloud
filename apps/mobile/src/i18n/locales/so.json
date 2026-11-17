@@ -481,7 +481,8 @@
       "viewReceipt": "Eeg rasiidka"
     },
     "changelog": "Waxyaabaha cusub",
-    "changelogVersionPending": "Qoraallada noocan waxay la yimaadaan cusboonaysiinta xigta."
+    "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
+    "changelogTranslationFixes": "Hagaajinta tarjumaadda luqadaha {{languages}}"
   },
   "preferences": {
     "general": "Guud",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Dejinta biilasha ee shabakadda",
       "changePlan": "Beddel qorshaha",
       "buySeats": "Iibso boosas",
-      "planManagedOnWeb": "Qorshaha waxaa lagu maamulaa shabakadda.",
-      "seatsManagedOnWeb": "Boosaska waxaa lagu maamulaa shabakadda.",
-      "autoTopUpManagedOnWeb": "Ku-shubidda tooska ah waxaa lagu maamulaa shabakadda.",
+      "managedOnWeb": "Qorshaha, boosaska iyo ku-shubidda tooska ah waxaa lagu maamulaa shabakadda.",
       "setupAutoTopUp": "Deji ku-shubid toos ah",
       "manageAutoTopUp": "Maaree ku-shubid toos ah",
       "opensOnWeb": "Waxay ku furmaysaa webka"

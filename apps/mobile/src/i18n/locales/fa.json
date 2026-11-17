@@ -481,7 +481,8 @@
       "viewReceipt": "مشاهده رسید"
     },
     "changelog": "تازه‌ها",
-    "changelogVersionPending": "یادداشت‌های این نسخه با به‌روزرسانی بعدی برنامه می‌رسند."
+    "changelogVersionPending": "یادداشت‌های نسخهٔ {{version}} با به‌روزرسانی بعدی برنامه می‌رسند.",
+    "changelogTranslationFixes": "اصلاح ترجمه‌ها برای {{languages}}"
   },
   "preferences": {
     "general": "عمومی",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "تنظیمات صورت‌حساب در وب",
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
-      "planManagedOnWeb": "طرح در وب مدیریت می‌شود.",
-      "seatsManagedOnWeb": "مجوزهای کاربری در وب مدیریت می‌شوند.",
-      "autoTopUpManagedOnWeb": "شارژ خودکار در وب مدیریت می‌شود.",
+      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در وب مدیریت می‌شوند.",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
       "opensOnWeb": "در وب باز می‌شود"

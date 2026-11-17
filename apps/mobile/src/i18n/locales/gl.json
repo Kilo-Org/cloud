@@ -481,7 +481,8 @@
       "viewReceipt": "Ver xustificante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versión chegarán coa próxima actualización."
+    "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
+    "changelogTranslationFixes": "Correccións de tradución nos seguintes idiomas: {{languages}}"
   },
   "preferences": {
     "general": "Xeral",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Configuración da facturación na web",
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
-      "planManagedOnWeb": "O plan xestiónase na web.",
-      "seatsManagedOnWeb": "As prazas xestiónanse na web.",
-      "autoTopUpManagedOnWeb": "A recarga automática xestiónase na web.",
+      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
       "opensOnWeb": "Ábrese na web"

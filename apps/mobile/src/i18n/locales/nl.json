@@ -481,7 +481,8 @@
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
     "changelog": "Nieuw in deze versie",
-    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
+    "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
+    "changelogTranslationFixes": "Vertaalcorrecties voor {{languages}}"
   },
   "preferences": {
     "general": "Algemeen",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
-      "planManagedOnWeb": "Het plan wordt op het web beheerd.",
-      "seatsManagedOnWeb": "Licenties worden op het web beheerd.",
-      "autoTopUpManagedOnWeb": "Automatisch opwaarderen wordt op het web beheerd.",
+      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op het web beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"

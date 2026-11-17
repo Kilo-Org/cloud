@@ -481,7 +481,8 @@
       "viewReceipt": "Vezi confirmarea"
     },
     "changelog": "Noutăți",
-    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
+    "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
+    "changelogTranslationFixes": "Corecturi de traducere pentru {{languages}}"
   },
   "preferences": {
     "general": "General",
@@ -3383,9 +3384,7 @@
       "manageOnWeb": "Setările de facturare pe web",
       "changePlan": "Schimbă planul",
       "buySeats": "Cumpără locuri",
-      "planManagedOnWeb": "Planul este gestionat pe web.",
-      "seatsManagedOnWeb": "Locurile sunt gestionate pe web.",
-      "autoTopUpManagedOnWeb": "Reîncărcarea automată este gestionată pe web.",
+      "managedOnWeb": "Planul, locurile și reîncărcarea automată sunt gestionate pe web.",
       "setupAutoTopUp": "Configurează reîncărcarea automată",
       "manageAutoTopUp": "Gestionează reîncărcarea automată",
       "opensOnWeb": "Se deschide pe web"

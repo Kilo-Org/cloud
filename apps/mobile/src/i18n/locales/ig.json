@@ -481,7 +481,8 @@
       "viewReceipt": "Lee akwụkwọ nnata"
     },
     "changelog": "Ihe ọhụrụ",
-    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
+    "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
+    "changelogTranslationFixes": "Mmezi ntụgharị asụsụ maka {{languages}}"
   },
   "preferences": {
     "general": "Izugbe",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Ntọala Ịkwụ ụgwọ na weebụ",
       "changePlan": "Gbanwee atụmatụ",
       "buySeats": "Zụta oghere",
-      "planManagedOnWeb": "A na-ejikwa atụmatụ na weebụ.",
-      "seatsManagedOnWeb": "A na-ejikwa oghere na weebụ.",
-      "autoTopUpManagedOnWeb": "A na-ejikwa mgbakwunye akpaaka na weebụ.",
+      "managedOnWeb": "A na-ejikwa atụmatụ, oghere na mgbakwunye akpaaka na weebụ.",
       "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
       "manageAutoTopUp": "Jikwaa mgbakwunye akpaaka",
       "opensOnWeb": "Na-emepe na weebụ"

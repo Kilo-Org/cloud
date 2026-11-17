@@ -481,7 +481,8 @@
       "viewReceipt": "Angalia risiti"
     },
     "changelog": "Mapya",
-    "changelogVersionPending": "Maelezo ya toleo hili yatakuja na sasisho lijalo."
+    "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
+    "changelogTranslationFixes": "Marekebisho ya tafsiri kwa {{languages}}"
   },
   "preferences": {
     "general": "Jumla",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
-      "planManagedOnWeb": "Mpango unasimamiwa kwenye wavuti.",
-      "seatsManagedOnWeb": "Nafasi zinasimamiwa kwenye wavuti.",
-      "autoTopUpManagedOnWeb": "Kuongeza salio kiotomatiki kunasimamiwa kwenye wavuti.",
+      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye wavuti.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"

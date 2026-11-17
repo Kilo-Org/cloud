@@ -21,6 +21,7 @@ import {
   isVersionBumpCommit,
   linkPullRequest,
   parseConfigVersion,
+  readerFacingSubject,
   sectionHeading,
   splitSections,
 } from './kilo-app-release-notes.mjs';
@@ -236,6 +237,80 @@ test('body lists app PRs oldest first and drops bumps, non-app, app-local, chang
   } finally {
     cleanup(dir);
   }
+});
+
+test('body keeps the subjects a reader sees and drops the rest', () => {
+  const dir = initRepo('kilo-notes-reader-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      { 'apps/mobile/src/demo.ts': 'demo\n' },
+      'feat(mobile): add flag-gated native remote demo (#110)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/sync.ts': 'sync\n' },
+      'fix(mobile): bound native sync recovery by socket generation (#111)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/padding.ts': 'padding\n' },
+      'fix(mobile): align Spend alerts card padding with the info card (#112)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/label.ts': 'label\n' },
+      'fix(mobile): drop the redundant Members section label (#113)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/glance.ts': 'glance\n' },
+      'fix(mobile): answer the request a glanceable approval names (#114)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/signin.ts': 'signin\n' },
+      'fix(auth): link same-email sign-ins (#115)'
+    );
+    // A catalog fix stays: the screen folds a version's language bullets into
+    // one line in the reader's own language, so it needs them.
+    commit(
+      dir,
+      { 'apps/mobile/src/igbo.ts': 'igbo\n' },
+      'fix(mobile): correct the Igbo code reviewer copy (#116)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.stdout,
+      [
+        '- fix(auth): link same-email sign-ins ([#115](https://github.com/Kilo-Org/cloud/pull/115))',
+        '- fix(mobile): correct the Igbo code reviewer copy ([#116](https://github.com/Kilo-Org/cloud/pull/116))',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('readerFacingSubject keeps a subject with no conventional prefix', () => {
+  assert.equal(
+    readerFacingSubject('Quick Chat polish: bubble width (#117)'),
+    'Quick Chat polish: bubble width ([#117](https://github.com/Kilo-Org/cloud/pull/117))'
+  );
+  assert.equal(
+    readerFacingSubject('feat(mobile): add on-device Gemini Nano (#118)'),
+    'feat(mobile): add on-device Gemini Nano ([#118](https://github.com/Kilo-Org/cloud/pull/118))'
+  );
+  assert.equal(readerFacingSubject('docs(mobile): correct a comment (#119)'), null);
+  assert.equal(
+    readerFacingSubject('feat(mobile): add shared client transport and web demo (#120)'),
+    null
+  );
 });
 
 test('linkPullRequest links only the trailing pull-request ref', () => {

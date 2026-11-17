@@ -481,7 +481,8 @@
       "viewReceipt": "受付確認を表示"
     },
     "changelog": "新着情報",
-    "changelogVersionPending": "このバージョンのリリースノートは、次回のアプリアップデートで届きます。"
+    "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
+    "changelogTranslationFixes": "{{languages}}の翻訳の修正"
   },
   "preferences": {
     "general": "一般",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
-      "planManagedOnWeb": "プランはWebで管理されています。",
-      "seatsManagedOnWeb": "シート数はWebで管理されています。",
-      "autoTopUpManagedOnWeb": "自動チャージはWebで管理されています。",
+      "managedOnWeb": "プラン、シート数、自動チャージはWebで管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"

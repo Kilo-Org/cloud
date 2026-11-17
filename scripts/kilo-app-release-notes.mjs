@@ -157,6 +157,80 @@ export function linkPullRequest(subject) {
   );
 }
 
+/** `fix(mobile)!: keep the composer` as its type and its body. */
+const CONVENTIONAL_SUBJECT = /^([a-z][a-z-]*)(?:\([^)]*\))?!?:\s+(.+)$/;
+
+/**
+ * The commit types whose work a reader cannot see in the app. The release
+ * workflow already keeps app-local files out of the notes, so this covers the
+ * types a shipped file can still carry.
+ */
+const INTERNAL_SUBJECT_TYPES = ['build', 'chore', 'ci', 'docs', 'refactor', 'style', 'test'];
+
+/**
+ * Subjects a reader cannot see a change in even though their commit type ships
+ * one: a demo behind a flag, the app's own transport plumbing, and the tweaks
+ * that only move a card's padding or drop a section label. The screen applies
+ * the same list to sections that already shipped
+ * (`apps/mobile/src/components/changelog-sections.ts`).
+ */
+const UNSEEN_WORK = [
+  /\bdemo\b/i,
+  /\bflag[- ]gated\b/i,
+  /\bnative sync\b/i,
+  /\bsocket generation\b/i,
+  /\btransport failures?\b/i,
+  /\bcard padding\b/i,
+  /\bsection label\b/i,
+  /^align .*\bpadding\b/i,
+];
+
+/**
+ * Shipped subjects that name no change in a sentence, dropped until the file
+ * they landed in is gone from the app's history.
+ */
+const UNREADABLE_SUBJECTS = ['answer the request a glanceable approval names'];
+
+/**
+ * One shipped subject as the notes carry it: the linked subject, or null when a
+ * reader cannot see the change in it.
+ *
+ * The per-language catalog fixes stay in: the screen folds one version's
+ * language bullets into a single line in the reader's own language, so it needs
+ * the bullets it folds.
+ */
+export function readerFacingSubject(subject) {
+  const conventional = CONVENTIONAL_SUBJECT.exec(subject);
+  const type = conventional ? conventional[1] : null;
+  if (type !== null && INTERNAL_SUBJECT_TYPES.includes(type)) {
+    return null;
+  }
+  const body = conventional ? conventional[2] : subject;
+  if (UNSEEN_WORK.some(pattern => pattern.test(body))) {
+    return null;
+  }
+  const plain = body
+    .replace(/\(\s*\[?#\d+.*$/, '')
+    .trim()
+    .toLowerCase();
+  if (UNREADABLE_SUBJECTS.includes(plain)) {
+    return null;
+  }
+  return linkPullRequest(subject);
+}
+
+/** The shipped subjects as the notes list them, oldest first. */
+export function readerFacingNotes(subjects) {
+  const notes = [];
+  for (const subject of subjects) {
+    const note = readerFacingSubject(subject);
+    if (note !== null) {
+      notes.push(note);
+    }
+  }
+  return notes;
+}
+
 /**
  * A version-bump commit changed only apps/mobile/app.config.ts (plus the
  * changelog section the workflow lands on the same branch, so the squashed
@@ -435,12 +509,13 @@ function runBody(args) {
     return usage(`--from ref does not resolve: ${options.from}`);
   }
   const subjects = shippedSubjects(options.from, options.to ?? 'HEAD');
-  if (subjects.length === 0) {
+  const notes = readerFacingNotes(subjects);
+  if (notes.length === 0) {
     console.log(NO_CHANGES_MARKER);
     return 0;
   }
-  for (const subject of subjects) {
-    console.log(`- ${linkPullRequest(subject)}`);
+  for (const note of notes) {
+    console.log(`- ${note}`);
   }
   return 0;
 }

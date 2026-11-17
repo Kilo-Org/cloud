@@ -481,7 +481,8 @@
       "viewReceipt": "Prikaži potrdilo"
     },
     "changelog": "Kaj je novega",
-    "changelogVersionPending": "Opombe za to različico prinese naslednja posodobitev aplikacije."
+    "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
+    "changelogTranslationFixes": "Popravki prevodov za jezike: {{languages}}"
   },
   "preferences": {
     "general": "Splošno",
@@ -3440,9 +3441,7 @@
       "manageOnWeb": "Nastavitve obračunavanja na spletu",
       "changePlan": "Spremeni načrt",
       "buySeats": "Kupi uporabniška mesta",
-      "planManagedOnWeb": "Načrt se upravlja na spletu.",
-      "seatsManagedOnWeb": "Uporabniška mesta se upravljajo na spletu.",
-      "autoTopUpManagedOnWeb": "Samodejno polnjenje se upravlja na spletu.",
+      "managedOnWeb": "Načrt, uporabniška mesta in samodejno polnjenje se upravljajo na spletu.",
       "setupAutoTopUp": "Nastavi samodejno polnjenje",
       "manageAutoTopUp": "Upravljaj samodejno polnjenje",
       "opensOnWeb": "Odpre se v spletu"

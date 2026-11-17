@@ -481,7 +481,8 @@
       "viewReceipt": "Түбіртекті көру"
     },
     "changelog": "Жаңалықтар",
-    "changelogVersionPending": "Бұл нұсқаның жазбалары қолданбаның келесі жаңартуымен келеді."
+    "changelogVersionPending": "{{version}} нұсқасының жазбалары қолданбаның келесі жаңартуымен келеді.",
+    "changelogTranslationFixes": "Аударма түзетулері: {{languages}}"
   },
   "preferences": {
     "general": "Жалпы",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Вебтегі төлемдер параметрлері",
       "changePlan": "Жоспарды өзгерту",
       "buySeats": "Орын сатып алу",
-      "planManagedOnWeb": "Жоспар вебте басқарылады.",
-      "seatsManagedOnWeb": "Орындар вебте басқарылады.",
-      "autoTopUpManagedOnWeb": "Автотолықтыру вебте басқарылады.",
+      "managedOnWeb": "Жоспар, орындар және автотолықтыру вебте басқарылады.",
       "setupAutoTopUp": "Автотолықтыруды баптау",
       "manageAutoTopUp": "Автотолықтыруды басқару",
       "opensOnWeb": "Вебте ашылады"

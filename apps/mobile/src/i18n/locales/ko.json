@@ -481,7 +481,8 @@
       "viewReceipt": "접수증 보기"
     },
     "changelog": "새로운 기능",
-    "changelogVersionPending": "이 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다."
+    "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
+    "changelogTranslationFixes": "{{languages}} 번역 수정"
   },
   "preferences": {
     "general": "일반",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "웹에서 결제 설정",
       "changePlan": "요금제 변경",
       "buySeats": "라이선스 구매",
-      "planManagedOnWeb": "요금제는 웹에서 관리됩니다.",
-      "seatsManagedOnWeb": "라이선스는 웹에서 관리됩니다.",
-      "autoTopUpManagedOnWeb": "자동 충전은 웹에서 관리됩니다.",
+      "managedOnWeb": "요금제, 라이선스 및 자동 충전은 웹에서 관리됩니다.",
       "setupAutoTopUp": "자동 충전 설정",
       "manageAutoTopUp": "자동 충전 관리",
       "opensOnWeb": "웹에서 열림"

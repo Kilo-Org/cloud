@@ -481,7 +481,8 @@
       "viewReceipt": "Баримт харах"
     },
     "changelog": "Шинэ зүйлс",
-    "changelogVersionPending": "Энэ хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ."
+    "changelogVersionPending": "{{version}} хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ.",
+    "changelogTranslationFixes": "{{languages}} хэлний орчуулгын засварууд"
   },
   "preferences": {
     "general": "Ерөнхий",
@@ -3326,9 +3327,7 @@
       "manageOnWeb": "Вэб дээрх төлбөр тооцооны тохиргоо",
       "changePlan": "Төлөвлөгөө өөрчлөх",
       "buySeats": "Хэрэглэгчийн эрх авах",
-      "planManagedOnWeb": "Төлөвлөгөө вэб дээр удирдагддаг.",
-      "seatsManagedOnWeb": "Хэрэглэгчийн эрх вэб дээр удирдагддаг.",
-      "autoTopUpManagedOnWeb": "Автомат цэнэглэлт вэб дээр удирдагддаг.",
+      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт вэб дээр удирдагддаг.",
       "setupAutoTopUp": "Автомат цэнэглэлт тохируулах",
       "manageAutoTopUp": "Автомат цэнэглэлт удирдах",
       "opensOnWeb": "Вэб дээр нээгдэнэ"

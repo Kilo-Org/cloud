@@ -481,7 +481,8 @@
       "viewReceipt": "Bestätigung anzeigen"
     },
     "changelog": "Neuigkeiten",
-    "changelogVersionPending": "Neuigkeiten zu dieser Version folgen im nächsten Update."
+    "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
+    "changelogTranslationFixes": "Übersetzungskorrekturen für {{languages}}"
   },
   "preferences": {
     "general": "Allgemein",
@@ -3318,9 +3319,7 @@
       "manageOnWeb": "Abrechnungseinstellungen im Web",
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
-      "planManagedOnWeb": "Der Plan wird im Web verwaltet.",
-      "seatsManagedOnWeb": "Nutzerplätze werden im Web verwaltet.",
-      "autoTopUpManagedOnWeb": "Die automatische Aufladung wird im Web verwaltet.",
+      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden im Web verwaltet.",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
       "opensOnWeb": "Wird im Web geöffnet"

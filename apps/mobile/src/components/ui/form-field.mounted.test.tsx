@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { FormField } from './form-field';
+import { LABELLED_LINE_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { AccessibleStatus } from './accessible-status';
 import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
@@ -259,9 +260,9 @@ describe('FormField label row with a target-sized accessory', () => {
     // row has to give the height to the gap between the label and the field.
     const classes = String(mountLabelRow({ labelAccessoryIsTarget: true }).props.className);
 
-    expect(classes).toContain('items-start');
+    expect(classes).toContain(LABELLED_LINE_ROW_CLASS);
     expect(classes).toContain('min-h-[44px]');
-    expect(classes).not.toContain('items-center');
+    expect(classes).toContain('items-stretch');
   });
 
   it('keeps the plain one-line label row for an accessory that is not a target', () => {

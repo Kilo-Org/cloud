@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
-import { LABELLED_LINE_MIN_HEIGHT_CLASS } from '@/lib/a11y/tap-target';
+import { LABELLED_LINE_MIN_HEIGHT_CLASS, LABELLED_LINE_ROW_CLASS } from '@/lib/a11y/tap-target';
 
 type FormFieldLabelProps = Readonly<{
   /** The label, which is also the accessible name of the value it names. */
@@ -44,7 +44,7 @@ export function FormFieldLabel({
         // height above the label, where it reads as a hole under the card's
         // edge instead of the gap the accessory needs.
         accessoryIsTarget
-          ? cn('flex-row items-start gap-2', LABELLED_LINE_MIN_HEIGHT_CLASS)
+          ? cn(LABELLED_LINE_ROW_CLASS, LABELLED_LINE_MIN_HEIGHT_CLASS)
           : 'flex-row items-center gap-2'
       )}
     >

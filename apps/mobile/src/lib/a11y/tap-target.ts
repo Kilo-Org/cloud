@@ -529,10 +529,12 @@ export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as 
  * The label row is `text-sm`'s 17.5dp line and the target is
  * {@link TOUCH_TARGET_DP}, so the control is the target itself: its own box
  * carries the whole 44dp, laid out below the first line by
- * {@link LABELLED_LINE_MIN_HEIGHT_CLASS}. The horizontal side still reaches
- * with {@link LABELLED_LINE_ACTION_HIT_SLOP}, because the row owns that axis.
+ * {@link LABELLED_LINE_MIN_HEIGHT_CLASS}. Its content starts at the box's top,
+ * on the label's own line, and the rest of the target hangs below the line. The
+ * horizontal side still reaches with {@link LABELLED_LINE_ACTION_HIT_SLOP},
+ * because the row owns that axis.
  */
-export const LABELLED_LINE_ACTION_CLASS = 'h-[44px] min-w-[44px] items-center justify-center';
+export const LABELLED_LINE_ACTION_CLASS = 'h-[44px] min-w-[44px] items-center justify-start';
 
 /**
  * Per-side `hitSlop` of {@link LABELLED_LINE_ACTION_CLASS}. Only the horizontal
@@ -550,6 +552,14 @@ export const LABELLED_LINE_ACTION_HIT_SLOP = { left: 5, right: 5 } as const;
  * and the extra height falls below the label, between it and the field.
  */
 export const LABELLED_LINE_MIN_HEIGHT_CLASS = 'min-h-[44px]';
+
+/**
+ * The alignment a {@link LABELLED_LINE_MIN_HEIGHT_CLASS} row uses. The copy and
+ * the target both start at the row's top, so the target's content sits on the
+ * label's line and its extra height falls below it. Stretching both children
+ * also keeps their centres level, which is what a row of unlike heights needs.
+ */
+export const LABELLED_LINE_ROW_CLASS = 'flex-row items-stretch gap-2';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

@@ -14,9 +14,13 @@ import {
 import { deliverSessionCards, type SessionCardMemory } from './session-card-delivery';
 
 /**
- * At most one aggregate device wake per account scope per window. A change
- * inside the window leaves a trailing refresh for the DO alarm, so the final
- * counts still land. See #6112: these surfaces must never add device wakeups.
+ * At most one aggregate device wake per account scope per window for a refresh
+ * that does not carry an approval move. A change inside the window leaves a
+ * trailing refresh for the DO alarm, so the final counts still land. See #6112:
+ * these surfaces must never add device wakeups; the one exception is the
+ * approval path, which uses the shorter `GLANCEABLE_APPROVAL_MIN_INTERVAL_MS`
+ * below so the Approve control stays responsive, and still coalesces a burst
+ * into one wake per interval rather than one per change.
  */
 export const GLANCEABLE_DELIVERY_MIN_INTERVAL_MS = 10_000;
 

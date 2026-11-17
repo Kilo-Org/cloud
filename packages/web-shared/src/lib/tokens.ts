@@ -13,12 +13,11 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
   isCloudAgentAuthorityHttpPathAllowed,

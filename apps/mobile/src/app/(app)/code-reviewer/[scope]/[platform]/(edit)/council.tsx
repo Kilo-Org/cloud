@@ -48,7 +48,7 @@ import {
 } from '@/lib/hooks/use-reviewer-council';
 import { useTRPC } from '@/lib/trpc';
 import { useQuery } from '@tanstack/react-query';
-import { CouncilRefusalScreen } from './council-refusal-screen';
+import { CouncilRefusalScreen } from '@/components/code-reviewer/council-refusal-screen';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 export default function CouncilRoute() {

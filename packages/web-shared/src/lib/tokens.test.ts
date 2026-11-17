@@ -115,7 +115,7 @@ describe('the verified payload schema', () => {
     env: process.env.NODE_ENV,
     kiloUserId: 'test-user-schema',
     apiTokenPepper: 'test-pepper',
-    version: JWT_TOKEN_VERSION,
+    version: KILO_TOKEN_VERSION,
   };
 
   const validate = (claims: Record<string, unknown>) => {
@@ -152,7 +152,7 @@ describe('the verified payload schema', () => {
   });
 
   test('leaves an outdated version to the version refusal', () => {
-    expect(validate({ ...validClaims, version: JWT_TOKEN_VERSION - 1 }).reason).toBe(
+    expect(validate({ ...validClaims, version: KILO_TOKEN_VERSION - 1 }).reason).toBe(
       'token_version_outdated'
     );
   });

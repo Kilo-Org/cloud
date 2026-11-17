@@ -1015,12 +1015,19 @@ describe('Organization hub settings-on-the-web group', () => {
       .filter(node => node.props.children === i18n.t('organization.settingsOnWeb.title'));
   }
 
-  it('paints no heading for a member, whose destinations are all in the app', async () => {
+  it('paints the heading for a member, whose remaining destination is the shell SSO card', async () => {
     boundary.role = 'member';
+    boundary.plan = 'enterprise';
 
     const { renderer, unmount } = await renderHub();
 
-    expect(headings(renderer)).toHaveLength(0);
+    // Every in-app row is still out of this group, but the SSO card is the
+    // shell's own page and carries no billing gate, so the group has a row.
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.ssoAndDomain'));
     unmount();
   });
 
@@ -1034,12 +1041,19 @@ describe('Organization hub settings-on-the-web group', () => {
     unmount();
   });
 
-  it('paints no heading when no web destination survives for the role', async () => {
-    // An owner on the teams plan has no Model Access row, and the organization
-    // has not enabled Kilo Encrypt, so the group would name nothing.
+  it('paints the heading for a member on teams, whose card the app shell owns', async () => {
+    // A teams dashboard shows data collection where enterprise shows providers
+    // and models, and the app shell owns that card, so the row survives the
+    // member's role gate and the group names it.
+    boundary.role = 'member';
+
     const { renderer, unmount } = await renderHub();
 
-    expect(headings(renderer)).toHaveLength(0);
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.dataCollection'));
     unmount();
   });
 

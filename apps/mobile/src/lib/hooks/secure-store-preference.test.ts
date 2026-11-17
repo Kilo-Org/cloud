@@ -195,49 +195,57 @@ describe('createSecureStorePreference', () => {
     expect(setItemAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('sees a setAsync target as pending while its own write runs', async () => {
+  it('keeps the last durable value visible while a setAsync write runs', async () => {
     getItemAsync.mockResolvedValue(null);
     const writeGate = Promise.withResolvers<undefined>();
-    setItemAsync.mockImplementation(async () => {
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
       await writeGate.promise;
     });
-    const store = createSecureStorePreference<boolean>({
+    const store = createSecureStorePreference<string>({
       key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
     });
 
-    // A pick that must not change memory until the disk takes it: the write is
-    // the pick's whole file, so the pending-write state it holds while running
-    // is what a racing reader (the device-language follow) observes.
-    const applying = store.setAsync(true);
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.get()).toBe('en');
+
+    // A pick that must not change memory until the disk takes it. The write is
+    // pending for the language follow, but getRequested() keeps reporting the
+    // last durable value: the pick may still be rejected by the disk.
+    const applying = store.setAsync('es');
     expect(store.hasPendingWrite()).toBe(true);
-    expect(store.getRequested()).toBe(true);
-    expect(store.get()).toBe(false);
+    expect(store.getRequested()).toBe('en');
 
     writeGate.resolve(undefined);
     await expect(applying).resolves.toBe(true);
 
+    expect(store.getRequested()).toBe('es');
     expect(store.hasPendingWrite()).toBe(false);
-    expect(store.get()).toBe(true);
   });
 
-  it('clears the setAsync pending state after a failed write', async () => {
+  it('keeps the durable value in getRequested after a failed setAsync write', async () => {
     getItemAsync.mockResolvedValue(null);
-    setItemAsync.mockRejectedValue(new Error('disk refused'));
-    const store = createSecureStorePreference<boolean>({
+    setItemAsync.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('disk refused'));
+    const store = createSecureStorePreference<string>({
       key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
     });
 
-    await expect(store.setAsync(true)).resolves.toBe(false);
+    store.set('en');
+    await store.whenPersisted();
 
+    await expect(store.setAsync('es')).resolves.toBe(false);
+
+    // The caller rolls its own apply back; memory keeps the durable choice.
+    expect(store.getRequested()).toBe('en');
     expect(store.hasPendingWrite()).toBe(false);
-    // Memory keeps the previous value; the caller rolls its own apply back.
-    expect(store.get()).toBe(false);
+    expect(store.get()).toBe('en');
   });
 
   it('writes the newest choice, not every choice, when several land during one write', async () => {

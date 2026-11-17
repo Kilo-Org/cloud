@@ -84,8 +84,13 @@ export function requestDeviceLanguageFollow(language: SupportedLanguage): void {
     await previous;
     try {
       await followDeviceLanguage(language);
-    } catch {
-      // A failed step must not drop every later request from the chain.
+    } catch (error) {
+      // A rejection that never reached an outcome — e.g. the dynamic import of
+      // the apply module failing — still did not apply anything, so it is the
+      // follow's failure to report, not one the queue can recover from.
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'startup', 'error.operation': 'language_follow' },
+      });
     }
   })();
 }

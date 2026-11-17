@@ -240,4 +240,27 @@ describe('requestDeviceLanguageFollow', () => {
 
     expect(mocks.restorePickedLanguage).not.toHaveBeenCalled();
   });
+
+  it('reports a rejected step that never produced an outcome', async () => {
+    const moduleLoadFailure = new Error('module load failed');
+    mocks.applyDeviceLanguage.mockRejectedValueOnce(moduleLoadFailure);
+
+    requestDeviceLanguageFollow('es');
+    await vi.waitFor(() => {
+      expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    const [reported, options] = mocks.captureException.mock.calls[0] ?? [];
+    expect(reported).toBe(moduleLoadFailure);
+    expect(options).toEqual({
+      tags: { 'error.subsystem': 'startup', 'error.operation': 'language_follow' },
+    });
+
+    // The rejection must not poison the chain: the next request applies.
+    requestDeviceLanguageFollow('es');
+    await vi.waitFor(() => {
+      expect(i18n.resolvedLanguage).toBe('es');
+    });
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+  });
 });

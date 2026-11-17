@@ -14,6 +14,7 @@ import {
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import { renameAndroidNotificationChannels } from '@/lib/notifications';
 import { prewarmIntl } from '@/lib/intl-cache';
+import { getLanguagePickerBridge } from '@/lib/picker-bridge';
 
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
@@ -48,6 +49,15 @@ function refreshLocalizedNotifications(): void {
   // re-register the needs-input action buttons in the applied one (same
   // localization pass as the channel rename above; idempotent).
   void registerNeedsInputCategories();
+}
+
+/** The login screen's registered draft flush, so a device change it did not ask for persists what it holds. */
+async function flushBeforeReload(): Promise<void> {
+  try {
+    await getLanguagePickerBridge()?.beforeReload?.();
+  } catch {
+    // A failed convenience flush must not block the language change.
+  }
 }
 
 /**
@@ -158,6 +168,11 @@ export async function applyDeviceLanguage(
   language: SupportedLanguage
 ): Promise<ApplyLanguageOutcome> {
   if (I18nManager.isRTL !== isRtlLanguage(language)) {
+    // A device switch to an RTL language while the login screen holds typed
+    // state must persist it the way the picker's reload does: a reload
+    // discards the JS context without running React cleanup, so the login
+    // screen's unmount-time persist cannot be relied on.
+    await flushBeforeReload();
     return restartForDirection(language, true);
   }
 

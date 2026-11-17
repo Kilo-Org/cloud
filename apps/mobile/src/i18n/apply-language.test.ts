@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   readDirectionAttemptAsync: vi.fn(),
   renameAndroidNotificationChannels: vi.fn(),
   registerNeedsInputCategories: vi.fn(),
+  getLanguagePickerBridge: vi.fn(),
+  setLanguagePickerBridge: vi.fn(),
 }));
 
 vi.mock('expo', () => ({ reloadAppAsync: mocks.reloadAppAsync }));
@@ -45,6 +47,10 @@ vi.mock('@/lib/notifications', () => ({
 }));
 vi.mock('@/lib/notification-actions', () => ({
   registerNeedsInputCategories: mocks.registerNeedsInputCategories,
+}));
+vi.mock('@/lib/picker-bridge', () => ({
+  getLanguagePickerBridge: mocks.getLanguagePickerBridge,
+  setLanguagePickerBridge: mocks.setLanguagePickerBridge,
 }));
 
 // The launch-time category registration resolves the button titles from the
@@ -272,5 +278,79 @@ describe('restorePickedLanguage', () => {
 
     changeLanguageSpy.mockRestore();
     hasBundleSpy.mockRestore();
+  });
+});
+
+describe('automatic relaunch — login draft flush', () => {
+  beforeEach(async () => {
+    mocks.setLanguagePreferenceAsync.mockReset().mockResolvedValue(true);
+    mocks.renameAndroidNotificationChannels.mockReset().mockResolvedValue(undefined);
+    mocks.registerNeedsInputCategories.mockReset().mockResolvedValue(undefined);
+    mocks.reloadAppAsync.mockReset().mockResolvedValue(undefined);
+    mocks.writeLanguageReturnTarget.mockReset().mockResolvedValue(undefined);
+    mocks.writeDirectionAttemptAsync.mockReset().mockResolvedValue(true);
+    mocks.readDirectionAttemptAsync.mockReset().mockResolvedValue(null);
+    mocks.syncRtl.mockReset();
+    mocks.i18nManager.isRTL = false;
+    mocks.preference = 'device';
+    mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
+    mocks.getLanguagePickerBridge.mockReset().mockReturnValue(null);
+    await i18n.changeLanguage('en');
+  });
+
+  it('flushes the registered draft write before the automatic relaunch', async () => {
+    mocks.syncRtl.mockReturnValue(false);
+    const flushes: string[] = [];
+    const reloadsWhenFlushed: number[] = [];
+    mocks.getLanguagePickerBridge.mockReturnValue({
+      beforeReload: () => {
+        flushes.push('flush');
+        reloadsWhenFlushed.push(mocks.reloadAppAsync.mock.calls.length);
+        return Promise.resolve();
+      },
+    });
+
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
+
+    expect(flushes).toHaveLength(1);
+    // The flush finished before the reload started: the drafts it writes live
+    // in the same JS context the reload discards.
+    expect(reloadsWhenFlushed).toEqual([0]);
+    expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not flush for a manual pick whose own beforeReload handles it', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    const flushes: string[] = [];
+    mocks.getLanguagePickerBridge.mockReturnValue({
+      beforeReload: () => {
+        flushes.push('flush');
+        return Promise.resolve();
+      },
+    });
+    let manualFlushRan = false;
+
+    await expect(
+      applyLanguagePreference('ar', 'ar', 'login', () => {
+        manualFlushRan = true;
+        return Promise.resolve();
+      })
+    ).resolves.toEqual({ kind: 'restarting-rtl' });
+
+    // The manual path runs the flush the picker handed it; flushing the
+    // registered bridge too would persist the same drafts twice.
+    expect(flushes).toEqual([]);
+    expect(manualFlushRan).toBe(true);
+  });
+
+  it('a throwing bridge flush still lets the automatic relaunch run', async () => {
+    mocks.syncRtl.mockReturnValue(false);
+    mocks.getLanguagePickerBridge.mockReturnValue({
+      beforeReload: () => Promise.reject(new Error('draft write failed')),
+    });
+
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
+
+    expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
   });
 });

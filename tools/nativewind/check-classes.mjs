@@ -11,6 +11,13 @@
  * writing direction only, so they stay invisible until the app is read in an
  * RTL locale.
  *
+ * A surface the contract builds from parts is read as one expression: a card
+ * fill and a card radius split over a `cn()` argument, a ternary branch or a
+ * template chunk are still one hand-built card, and a row divider is judged
+ * together with its colour. Two rules read composition instead of classes — a
+ * `Sheet` without its `SheetHeader`, and a `ScreenHeader` `titleContent` in a
+ * file that does not own one.
+ *
  * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
  * normalisation every other surface shares, and pins or ignores the locale.
  *
@@ -132,6 +139,20 @@ const LAYOUT_RULES = [
     ],
     advice:
       "use the spacing scale (h-12, w-8…) or a constant from @/lib/a11y/tap-target (touch targets) / the row primitive's exported skeleton size",
+  },
+  {
+    id: 'L9',
+    advice:
+      'a row divider is border-hair-soft at 0.5pt; use RowGroup/RowGroupItem/RowFrame, or border-hair-soft directly',
+  },
+  {
+    id: 'L10',
+    advice:
+      'use title with titleAccessory; titleContent replaces the title node and re-spells its typography',
+  },
+  {
+    id: 'L11',
+    advice: 'render SheetHeader as the first child of every Sheet, so the sheet has its title row',
   },
 ];
 
@@ -493,62 +514,64 @@ function isClassConstant(node) {
 }
 
 /**
- * Every class string the layout rules read, grouped the way a class string is
- * written: one `cn(...)` call is one group (its arguments are one surface), and
- * each `className`/`contentContainerClassName` value and each `*_CLASS`
- * constant contributes its own chunks. A chunk inside a `cn()` belongs to that
- * call, so a surface built through `cn()` is judged once.
+ * Every class string the layout rules read, grouped the way one surface is
+ * written. A `className`/`contentContainerClassName` value and each `*_CLASS`
+ * constant is one surface: the literals beside a `${…}`, the branches of a
+ * ternary and the arguments of any `cn()` it calls all describe the same
+ * element, so a card fill and a card radius split across them are still one
+ * hand-built card. A `cn()` call outside those props is a surface of its own,
+ * and one nested inside another surface is already part of it.
  */
 function layoutGroups(program, text) {
   const groups = [];
   const covered = new Set();
-  walk(program, node => {
-    if (
-      node.type !== 'CallExpression' ||
-      node.callee.type !== 'Identifier' ||
-      node.callee.name !== 'cn'
-    ) {
+  const add = (start, chunks) => {
+    const fresh = chunks.filter(chunk => !covered.has(chunk.start));
+    if (fresh.length === 0) {
       return;
     }
-    const chunks = node.arguments.flatMap(argument => stringChunks(argument, text));
-    // A nested `cn()` is already part of the outer call's surface.
-    if (chunks.length === 0 || chunks.every(chunk => covered.has(chunk.start))) {
-      return;
-    }
-    for (const chunk of chunks) {
+    for (const chunk of fresh) {
       covered.add(chunk.start);
     }
-    groups.push({ start: node.start, chunks });
-  });
-  const collect = (value, start) => {
-    const chunks = stringChunks(value, text).filter(chunk => !covered.has(chunk.start));
-    if (chunks.length > 0) {
-      groups.push({ start, chunks });
-    }
+    groups.push({ start, chunks: fresh });
   };
+  const argumentChunks = node => node.arguments.flatMap(argument => stringChunks(argument, text));
+
   walk(program, node => {
     if (
       node.type === 'JSXAttribute' &&
       node.name.type === 'JSXIdentifier' &&
-      CLASS_ATTRIBUTES.has(node.name.name)
+      CLASS_ATTRIBUTES.has(node.name.name) &&
+      node.value !== null
     ) {
-      collect(node.value, node.start);
+      add(node.start, stringChunks(node.value, text));
     } else if (
       node.type === 'VariableDeclarator' &&
       isClassConstant(node.id) &&
       node.init !== null
     ) {
-      collect(node.init, node.start);
+      add(node.start, stringChunks(node.init, text));
+    }
+  });
+  walk(program, node => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'cn'
+    ) {
+      add(node.start, argumentChunks(node));
     }
   });
   return groups;
 }
 
 /**
- * A page gutter written on a scroll body other than `px-4`, and any horizontal
- * padding on a `ScreenHeader`/`SheetHeader` `className`: both move the page
- * inset the contract fixed, and the header's own gutter is what the next screen
- * lines up against.
+ * A page gutter written on a scroll body other than `px-4` — or horizontal
+ * padding on a `CenteredState` content container, which is the same page inset
+ * inside the centered band — and any horizontal padding on a
+ * `ScreenHeader`/`SheetHeader` `className`: both move the page inset the
+ * contract fixed, and the header's own gutter is what the next screen lines up
+ * against.
  */
 const SCROLL_BODIES = new Set([
   'ScrollView',
@@ -558,6 +581,7 @@ const SCROLL_BODIES = new Set([
   'FlashList',
   'KeyboardAwareScrollView',
 ]);
+const CENTERED_BODIES = new Set(['CenteredState']);
 const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
 /** True when one class token writes a horizontal page inset other than `px-4`. */
@@ -581,11 +605,12 @@ function checkScrollGutters(relative, program, text, lineOf) {
       return;
     }
     const name = tagName(node, text).replace(/^Animated\./, '');
-    const gutter = SCROLL_BODIES.has(name)
-      ? 'contentContainerClassName'
-      : HEADER_TAGS.has(name)
-        ? 'className'
-        : null;
+    const gutter =
+      SCROLL_BODIES.has(name) || CENTERED_BODIES.has(name)
+        ? 'contentContainerClassName'
+        : HEADER_TAGS.has(name)
+          ? 'className'
+          : null;
     if (gutter === null) {
       return;
     }
@@ -617,12 +642,13 @@ function checkScrollGutters(relative, program, text, lineOf) {
 }
 
 /**
- * A card surface built by hand: one class string (or one `cn()` call) that
- * pairs a card fill with a card radius. The row and card primitives own that
- * pairing, so every surface they replace can only drift from it.
+ * A card surface built by hand: one class expression that pairs a card fill
+ * with a card radius. The row and card primitives own that pairing, so every
+ * surface they replace can only drift from it. A directional radius counts — a
+ * grouped list cell is the same hand-built card when only its ends round.
  */
 const CARD_SURFACE = /(?<![\w-])bg-(?:secondary|card)(?![\w-])/;
-const CARD_RADIUS = /(?<![\w-])rounded-(?:md|lg|xl|2xl|3xl)(?![\w-])/;
+const CARD_RADIUS = /(?<![\w-])rounded-(?:(?:t|b|l|r|tl|tr|bl|br)-)?(?:md|lg|xl|2xl|3xl)(?![\w-])/;
 
 function cardSurfaceProblem(relative, group, lineOf) {
   const classes = group.chunks.map(chunk => chunk.source).join(' ');
@@ -635,10 +661,28 @@ function cardSurfaceProblem(relative, group, lineOf) {
 }
 
 /**
- * Layout written as numbers in a `style` object: the spacing, type, tracking
- * and radius decisions the classes own, re-decided per element. A value read
- * from an inset, the keyboard or a measurement (an identifier or a call, with
- * no numeric literal but `0`) is measured geometry, not a decision, and passes.
+ * A row separator drawn as a side border in the full-strength border colour:
+ * `border-b border-border` paints a divider at the wrong weight and hue, and it
+ * is what a hand-built row looks like before it moves onto a row primitive.
+ */
+const DIVIDER_SIDE = /(?<![\w-])border-(?:b|t)(?:-(?:\d+|\[[^\]\s]+\]))?(?![\w-])/;
+const DIVIDER_COLOUR = /(?<![\w-])border-border(?![\w-])/;
+
+function dividerProblem(relative, group, lineOf) {
+  const classes = group.chunks.map(chunk => chunk.source).join(' ');
+  const side = DIVIDER_SIDE.exec(classes);
+  if (side === null || !DIVIDER_COLOUR.test(classes)) {
+    return null;
+  }
+  return layoutProblem(relative, lineOf(group.start), 'L9', `${side[0]} border-border`);
+}
+
+/**
+ * Layout written as numbers in a `style` object — the `style` prop or any
+ * `*Style` prop a list takes: the spacing, type, tracking and radius decisions
+ * the classes own, re-decided per element. A value read from an inset, the
+ * keyboard or a measurement (an identifier or a call, with no numeric literal
+ * but `0`) is measured geometry, not a decision, and passes.
  */
 const LAYOUT_STYLE_PROPERTY =
   /^(?:(?:padding|margin)(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical)?|gap|rowGap|columnGap|fontSize|lineHeight|letterSpacing|border(?:Top|Bottom|Start|End)?(?:Left|Right|Start|End)?Radius)$/;
@@ -681,11 +725,14 @@ function checkInlineStyles(relative, program, text, lineOf) {
     if (node.type !== 'JSXOpeningElement') {
       return;
     }
+    // `style` and every `*Style` prop (`contentContainerStyle`,
+    // `columnWrapperStyle`, `ListHeaderComponentStyle`…) reach the same native
+    // style object, so they are read the same way.
     const attribute = node.attributes.find(
       candidate =>
         candidate.type === 'JSXAttribute' &&
         candidate.name.type === 'JSXIdentifier' &&
-        candidate.name.name === 'style'
+        (candidate.name.name === 'style' || candidate.name.name.endsWith('Style'))
     );
     if (attribute?.value === undefined || attribute.value === null) {
       return;
@@ -737,6 +784,98 @@ function checkRowChevrons(relative, program, lineOf) {
   return problems;
 }
 
+/**
+ * `titleContent` replaces the title node `ScreenHeader` paints, so the caller
+ * then re-spells the title's typography and line height. Only the screens whose
+ * title line is not a plain string keep it; everything else passes a `title`
+ * and, for a badge beside it, `titleAccessory`.
+ */
+const TITLE_CONTENT_ALLOWLIST = new Set([
+  'apps/mobile/src/components/chat/chat-screen.tsx',
+  'apps/mobile/src/components/home/home-screen.tsx',
+  'apps/mobile/src/components/profiles/profile-overview-screen.tsx',
+]);
+
+function checkTitleContent(relative, program, lineOf) {
+  if (TITLE_CONTENT_ALLOWLIST.has(relative)) {
+    return [];
+  }
+  const problems = [];
+  walk(program, node => {
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      node.name.name === 'titleContent'
+    ) {
+      problems.push(layoutProblem(relative, lineOf(node.start), 'L10', 'titleContent'));
+    }
+  });
+  return problems;
+}
+
+/**
+ * A sheet opened imperatively renders its own body, so nothing outside it adds
+ * the title row: without `SheetHeader` it starts under the drag handle with no
+ * title and no close control. The files below are the ones that own their first
+ * row instead.
+ */
+const SHEET_MODULE = '@/components/ui/sheet';
+const SHEET_ALLOWLIST = new Set([
+  // A confirmation dialog with its own title and message, not a titled sheet.
+  'apps/mobile/src/components/destructive-confirm-dialog.tsx',
+  // The generic sheet shell: the caller supplies the child surface and its header.
+  'apps/mobile/src/components/agents/session-page-sheet.tsx',
+  // These three draw the todo sheets' title with `SheetTitleRow`.
+  'apps/mobile/src/components/todos/save-draft-as-todo-sheet.tsx',
+  'apps/mobile/src/components/todos/session-todo-link.tsx',
+  'apps/mobile/src/components/todos/todo-link-session-sheet.tsx',
+]);
+
+function checkSheetHeader(relative, program, text, lineOf) {
+  if (SHEET_ALLOWLIST.has(relative)) {
+    return [];
+  }
+  const sheetNames = new Set();
+  walk(program, node => {
+    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
+      return;
+    }
+    if (node.source.value !== SHEET_MODULE) {
+      return;
+    }
+    for (const specifier of node.specifiers) {
+      if (
+        specifier.type === 'ImportSpecifier' &&
+        specifier.importKind !== 'type' &&
+        importedName(specifier.imported) === 'Sheet'
+      ) {
+        sheetNames.add(specifier.local?.name ?? importedName(specifier.imported));
+      }
+    }
+  });
+  if (sheetNames.size === 0) {
+    return [];
+  }
+  const problems = [];
+  let sheetLine = null;
+  let header = false;
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const name = tagName(node, text);
+    if (name === 'SheetHeader') {
+      header = true;
+    } else if (sheetLine === null && sheetNames.has(name)) {
+      sheetLine = lineOf(node.start);
+    }
+  });
+  if (sheetLine !== null && !header) {
+    problems.push(layoutProblem(relative, sheetLine, 'L11', `<${[...sheetNames][0]}>`));
+  }
+  return problems;
+}
+
 /** Whether a file is one the layout contract exempts. */
 function layoutExempt(path) {
   if (!path.startsWith('apps/mobile/src/')) {
@@ -779,10 +918,16 @@ export function checkLayout(relative, program, text, lineOf) {
     if (surface !== null) {
       problems.push(surface);
     }
+    const divider = dividerProblem(relative, group, lineOf);
+    if (divider !== null) {
+      problems.push(divider);
+    }
   }
   problems.push(...checkScrollGutters(relative, program, text, lineOf));
   problems.push(...checkInlineStyles(relative, program, text, lineOf));
   problems.push(...checkRowChevrons(relative, program, lineOf));
+  problems.push(...checkTitleContent(relative, program, lineOf));
+  problems.push(...checkSheetHeader(relative, program, text, lineOf));
   return problems;
 }
 
@@ -944,7 +1089,7 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
  * file per line so two independent deletions edit different lines.
  */
 const LAYOUT_BASELINE_PATH = 'tools/nativewind/layout-baseline.json';
-const LAYOUT_PROBLEM = /^(\S+):\d+: \[(L\d)\] /;
+const LAYOUT_PROBLEM = /^(\S+):\d+: \[(L\d+)\] /;
 
 /** The layout problems of one run, grouped by file and then by rule. */
 function layoutFindings(problems) {

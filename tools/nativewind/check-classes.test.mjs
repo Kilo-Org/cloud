@@ -606,7 +606,7 @@ const ALLOWLISTED = 'apps/mobile/src/components/ui/panel.tsx';
 const SCREEN_FILE = 'apps/mobile/src/screen.tsx';
 
 function layoutProblems(relative, text) {
-  return check(relative, text).filter(problem => /\[L\d\]/.test(problem));
+  return check(relative, text).filter(problem => /\[L\d+\]/.test(problem));
 }
 
 test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
@@ -760,6 +760,192 @@ test('flags an arbitrary size written as calc()', () => {
     layoutProblems(SCREEN_FILE, screen('<View className="h-[calc(100%-4px)]" />')).join('\n'),
     /\[L8\] "h-\[calc\(100%-4px\)\]"/
   );
+});
+
+test('flags a card surface split across the branches of one className expression', () => {
+  // A template literal: the fill in one chunk, the radius in a ternary branch.
+  const templateUrl =
+    "<View className={`mx-4 bg-secondary ${isFirst ? 'rounded-t-xl' : 'rounded-b-xl'}`} />";
+  const template = layoutProblems(SCREEN_FILE, screen(templateUrl));
+  assert.equal(template.length, 1);
+  assert.match(template[0], /screen\.tsx:3: \[L4\] "bg-secondary rounded-t-xl"/);
+  // A ternary between two cn() calls is still one element's class expression.
+  const branches = layoutProblems(
+    SCREEN_FILE,
+    screen("<View className={isFirst ? cn('mx-4 bg-secondary') : cn('rounded-t-xl')} />")
+  );
+  assert.equal(branches.length, 1);
+  assert.match(branches.join('\n'), /\[L4\] "bg-secondary rounded-t-xl"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen(templateUrl)),
+    [],
+    'the primitives own the pairing, so the allowlist still passes'
+  );
+});
+
+test('accepts a card fill and a radius that are written on their own', () => {
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="bg-secondary" />')), []);
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="rounded-lg" />')), []);
+});
+
+test('flags a numeric layout value in a list style prop, not only style', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<>',
+      '<FlashList contentContainerStyle={{ paddingTop: 10.5 }} />',
+      '<FlatList columnWrapperStyle={{ gap: 8 }} />',
+      '<SectionList ListHeaderComponentStyle={[{ marginBottom: 12 }]} />',
+      '</>'
+    )
+  );
+  assert.equal(found.length, 3);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "paddingTop: 10.5"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "gap: 8"/);
+  assert.match(found.join('\n'), /screen\.tsx:6: \[L6\] "marginBottom: 12"/);
+});
+
+test('accepts measured values in a list style prop', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<FlashList contentContainerStyle={{ paddingTop: insets.top }} />',
+        '<FlatList columnWrapperStyle={{ gap: measured }} />'
+      )
+    ),
+    []
+  );
+});
+
+test('flags a row divider drawn in the border colour instead of the hairline', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="border-b border-border" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L9\] "border-b border-border"/);
+  assert.match(found[0], /border-hair-soft/);
+  // A width on the side names the same divider.
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="border-t-2 border-border" />')).join('\n'),
+    /\[L9\] "border-t-2 border-border"/
+  );
+  // The pair is one class expression, so a cn() call is the same divider.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      screen("<View className={cn('border-b', 'border-border')} />")
+    ).join('\n'),
+    /\[L9\] "border-b border-border"/
+  );
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<View className="border-b border-border" />')),
+    []
+  );
+});
+
+test('accepts a hairline divider and a full border', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="border-b border-hair-soft" />')),
+    []
+  );
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="border border-border" />')),
+    []
+  );
+});
+
+test('flags titleContent outside the screens that own a title line', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen('<ScreenHeader title="Sessions" titleContent={<Text />} />')
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L10\] "titleContent"/);
+  assert.match(found[0], /titleAccessory/);
+});
+
+test('accepts titleContent in an allowlisted screen and titleAccessory anywhere', () => {
+  const source = screen('<ScreenHeader title="Sessions" titleContent={<Text />} />');
+  assert.deepEqual(layoutProblems('apps/mobile/src/components/home/home-screen.tsx', source), []);
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<ScreenHeader title="Sessions" titleAccessory={<Badge />} />')
+    ),
+    []
+  );
+});
+
+test('flags a Sheet rendered without its SheetHeader', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      screen('<Sheet visible onClose={onClose}>', '<Text>body</Text>', '</Sheet>')
+  );
+  assert.equal(found.length, 1);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L11\] "<Sheet>"/);
+  assert.match(found.join('\n'), /SheetHeader/);
+  // An aliased import is the same component.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet as SheetSurface } from '@/components/ui/sheet';\n" +
+        screen('<SheetSurface visible onClose={onClose} />')
+    ).join('\n'),
+    /\[L11\] "<SheetSurface>"/
+  );
+});
+
+test('accepts a Sheet with its header, an allowlisted sheet and a local Sheet', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<Sheet visible onClose={onClose}>',
+          '<SheetHeader title="Environment" onDone={onClose} />',
+          '</Sheet>'
+        )
+    ),
+    []
+  );
+  // A confirmation dialog owns its first row instead of a title row.
+  assert.deepEqual(
+    layoutProblems(
+      'apps/mobile/src/components/destructive-confirm-dialog.tsx',
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen('<Sheet visible onClose={onClose}>', '<Text>body</Text>', '</Sheet>')
+    ),
+    []
+  );
+  // A local component named Sheet is not the ui primitive.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from './local-sheet';\n" + screen('<Sheet visible onClose={onClose} />')
+    ),
+    []
+  );
+});
+
+test('flags horizontal padding on a CenteredState content container', () => {
+  for (const classes of ['px-6', 'ps-3', 'pe-1', 'pl-2', 'pr-2', 'p-3']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<CenteredState contentContainerClassName="${classes}" />`)
+    );
+    assert.equal(found.length, 1, classes);
+    assert.match(found[0], /\[L2\] ".+ on <CenteredState> contentContainerClassName"/);
+    assert.match(found[0], /SCREEN_BODY_CLASS/);
+  }
+});
+
+test('accepts the page gutter and vertical padding on a CenteredState', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<CenteredState contentContainerClassName="px-4 py-6" />')),
+    []
+  );
+  // The gutter check is scoped to the centered band, not to every view.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="px-6" />')), []);
 });
 
 /**

@@ -405,4 +405,46 @@ describe('NewSessionPrompt bottom fade band', () => {
 
     renderer.unmount();
   });
+
+  it('sizes the band to the field height while the keyboard motion is partway', async () => {
+    // The field renders between its keyboard-closed floor and its
+    // keyboard-open floor while the keyboard lands, so the band's cut edge
+    // moves with it. One closed line and three open lines put the rendered
+    // height at 52 points a quarter of the way through the motion, which places
+    // the cut edge 9 points into its line: the band is 9 points tall there,
+    // where the closed height would place it 21 points in and make it 3, and
+    // the open height would place it 21 points in and make it 3 as well.
+    const closedHeight = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1);
+    const openHeight = resolveNewSessionPromptHeight(
+      NEW_SESSION_PROMPT_LINE_HEIGHT,
+      NEW_SESSION_PROMPT_DEFAULT_LINES
+    );
+    const progress = 0.25;
+    const renderedHeight = closedHeight + (openHeight - closedHeight) * progress;
+    const scrollY = 12;
+
+    keyboardMotion.value = progress;
+    const renderer = await mountPrompt({
+      frameHeight: 2000,
+      keyboardClosedFrameHeight: 2000,
+      keyboardClosedLineCount: 1,
+      lineCount: NEW_SESSION_PROMPT_DEFAULT_LINES,
+    });
+
+    reportScrollOffset(renderer, scrollY, act);
+
+    // The text view clips at its own bounds, so the band's bottom is the field's
+    // bottom at its rendered height, and the cut edge is the scroll offset plus
+    // that height, one inset below the first line box's start.
+    expect(findFade(renderer, 'bottom')).toEqual({
+      bottom: 0,
+      height: resolveComposerEdgeFadeHeight({
+        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
+        scrollOffset: scrollY + renderedHeight - PROMPT_INPUT_INSET,
+      }),
+    });
+
+    keyboardMotion.value = 0;
+    renderer.unmount();
+  });
 });

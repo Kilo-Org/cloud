@@ -161,7 +161,12 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     (m): m is ActiveOrgMember => isActiveOrgMember(m) && m.id === memberId
   );
 
-  if (isResolving || orgWithMembers.isLoading) {
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must show the skeleton instead
+  // of the member-not-found state, while a real error still reaches QueryError.
+  // The organizationId guard keeps a disabled query (null org, pending
+  // forever) falling through to OrganizationBoundary below.
+  if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
       <SheetScrollView
         className="flex-1 bg-background"

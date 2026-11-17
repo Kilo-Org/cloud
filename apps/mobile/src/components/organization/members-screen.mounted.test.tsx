@@ -12,7 +12,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -24,10 +24,18 @@ import { OrganizationMembersScreen } from './members-screen';
 const withMembersQuery = vi.hoisted(() => ({
   data: undefined as unknown,
   isLoading: false,
+  isPending: false,
   isFetching: false,
   isError: false,
   error: null as unknown,
   refetch: vi.fn(),
+}));
+
+// The identity read's state; the self-row gates need a resolved acting id, so
+// the tests drive the settled-with-no-id shape through it.
+const currentIdentity = vi.hoisted(() => ({
+  userId: 'user-1' as string | undefined,
+  isLoading: false,
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
@@ -166,7 +174,7 @@ vi.mock('@/components/tab-screen', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1' }),
+  useCurrentUserId: () => currentIdentity,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -206,13 +214,30 @@ async function renderScreen(): Promise<string[]> {
   return collectText(renderer.toJSON());
 }
 
+/** Every mount a test forgot to unmount, released in reverse order. */
+const mountedRenderers: { unmount: () => void }[] = [];
+function trackMount(mount: { unmount: () => void }): void {
+  mountedRenderers.push(mount);
+}
+afterEach(() => {
+  unmountAll();
+});
+function unmountAll(): void {
+  while (mountedRenderers.length > 0) {
+    mountedRenderers.pop()?.unmount();
+  }
+}
+
 beforeEach(() => {
   withMembersQuery.data = undefined;
   withMembersQuery.isLoading = false;
+  withMembersQuery.isPending = false;
   withMembersQuery.isFetching = false;
   withMembersQuery.isError = false;
   withMembersQuery.error = null;
   withMembersQuery.refetch.mockClear();
+  currentIdentity.userId = 'user-1';
+  currentIdentity.isLoading = false;
   routerPush.mockClear();
   memberRowProps.length = 0;
 });
@@ -258,8 +283,23 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
   });
 
   it('keeps the loading skeleton ahead of error and empty states', async () => {
+    // A fetch-in-flight read is pending: the mock replays the hook's shape,
+    // where isLoading implies isPending.
     withMembersQuery.isLoading = true;
+    withMembersQuery.isPending = true;
     withMembersQuery.isError = true;
+    const texts = await renderScreen();
+    expect(texts).not.toContain('QUERY_ERROR');
+    expect(texts).not.toContain('EMPTY_STATE:No members yet');
+  });
+
+  it('keeps the skeleton ahead of error and empty states while the read is pending and unfetched', async () => {
+    // A paused pending read with an in-flight error never produced data, so
+    // neither settled body may render; the mock also pins isLoading false,
+    // which is exactly the paused shape.
+    withMembersQuery.isPending = true;
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = undefined;
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
@@ -482,6 +522,76 @@ describe('OrganizationMembersScreen removal refusals', () => {
     });
 
     expect(lastRowProps().removalFailure).toBeNull();
+    unmount();
+  });
+});
+
+describe('OrganizationMembersScreen self-row identity gate', () => {
+  const ownMember = { status: 'active', id: 'user-1', name: 'Owner', email: 'owner@example.com' };
+  const otherMember = { status: 'active', id: 'member-9', name: 'Ada', email: 'ada@example.com' };
+
+  function rowPropsFor(memberId: string): Record<string, unknown> {
+    const props = memberRowProps
+      .filter(row => (row.member as { id: string }).id === memberId)
+      .at(-1);
+    if (!props) {
+      throw new Error(`member row for ${memberId} never rendered`);
+    }
+    return props;
+  }
+
+  it('keeps the caller row read-only while the identity has no id', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = undefined;
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    expect(rowPropsFor('user-1').canManageLimit).toBe(false);
+    unmountAll();
+  });
+
+  it('gates the roster rows while the identity has no id', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = undefined;
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    expect(rowPropsFor('member-9').canManage).toBe(false);
+    expect(rowPropsFor('member-9').canManageLimit).toBe(false);
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    unmountAll();
+  });
+
+  it('opens the caller row menu once the identity resolves to them', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = 'user-1';
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    expect(rowPropsFor('user-1').canManageLimit).toBe(false);
+    expect(rowPropsFor('member-9').canManage).toBe(true);
+    unmountAll();
+  });
+});
+
+describe('OrganizationMembersScreen pending membership read', () => {
+  it('renders no settled state while the read is pending and unfetched', async () => {
+    withMembersQuery.isPending = true;
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const texts = collectText(renderer.toJSON());
+
+    expect(texts).not.toContain('EMPTY_STATE:No members yet');
+    expect(texts).not.toContain('QUERY_ERROR');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
     unmount();
   });
 });

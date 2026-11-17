@@ -309,6 +309,27 @@ describe('MemberLimitSheet error copy', () => {
   });
 });
 
+describe('MemberLimitSheet pending membership read', () => {
+  // A paused (pending, not fetching) read with no cached data must reach the
+  // skeleton, not the member-not-found state: the sheet had no answer yet.
+  it('shows the skeleton, not member-not-found, while the read is pending and unfetched', async () => {
+    query.isPending = true;
+    query.isLoading = false;
+    query.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+});
+
 describe('MemberLimitSheet validation', () => {
   it('shows the range error on an above-maximum amount and keeps save disabled', async () => {
     const { renderer, unmount } = await mountLimitForm(1200);

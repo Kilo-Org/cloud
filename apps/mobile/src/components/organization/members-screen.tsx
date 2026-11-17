@@ -129,7 +129,12 @@ export function OrganizationMembersScreen() {
     );
   }
 
-  const isLoading = orgWithMembers.isLoading;
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must keep the list skeleton
+  // instead of rendering the settled empty roster, while a real error still
+  // reaches QueryError (the invariant low-balance-alert-sheet states for the
+  // same read).
+  const isMembersPending = orgWithMembers.isPending;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   // Web's member card only pairs spend with the limit for a sales-demo
@@ -140,6 +145,13 @@ export function OrganizationMembersScreen() {
   // mirroring the server's `assertOwnerAuthority` and the web's role dropdowns.
   const canManageMembers = canManageOrganization(role);
   const canManageOwners = canManageOrganizationOwners(role);
+  // The self-row gates compare a row's id against the acting id, so they need
+  // a resolved identity: a row whose comparison runs while the identity read
+  // is unresolved (a paused or failed read with no id yet) would read
+  // "not me" for every id, so both gates stay closed until the id exists. The
+  // server still refuses a self role change or self removal; this keeps the
+  // client from offering them.
+  const canManageRow = canManageMembers && currentUserId != null;
 
   const errorView = isError ? selectOrgListErrorView(orgWithMembers.error) : null;
 
@@ -193,11 +205,11 @@ export function OrganizationMembersScreen() {
             <MemberRow
               member={item.member}
               canManage={
-                canManageMembers &&
+                canManageRow &&
                 item.member.id !== currentUserId &&
                 (item.member.role !== 'owner' || canManageOwners)
               }
-              canManageLimit={canManageMembers && item.member.id !== currentUserId}
+              canManageLimit={canManageRow && item.member.id !== currentUserId}
               callerRole={role}
               enableUsageLimits={enableUsageLimits}
               isSalesDemo={isSalesDemo}
@@ -237,7 +249,7 @@ export function OrganizationMembersScreen() {
   };
 
   let emptyBody: ReactNode = null;
-  if (!isLoading && errorView) {
+  if (!isMembersPending && errorView) {
     emptyBody = (
       <QueryError
         variant={errorView.variant}
@@ -245,7 +257,7 @@ export function OrganizationMembersScreen() {
         isRetrying={orgWithMembers.isFetching}
       />
     );
-  } else if (!isLoading && items.length === 0) {
+  } else if (!isMembersPending && items.length === 0) {
     emptyBody = emptyState;
   }
 

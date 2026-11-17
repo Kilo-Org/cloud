@@ -24,8 +24,6 @@ type InvitedMemberRowProps = {
   /** Caller may revoke or resend: management role, and owner only for an owner invite. */
   canManage: boolean;
   organizationId: string;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
 };
 
 function inviteDateLabel(inviteDate: string | null): string | null {
@@ -41,7 +39,6 @@ export function InvitedMemberRow({
   invite,
   canManage,
   organizationId,
-  last,
 }: Readonly<InvitedMemberRowProps>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -92,13 +89,7 @@ export function InvitedMemberRow({
   }
 
   const inner = (
-    <View
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 px-4 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft'
-      )}
-    >
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {invite.email}

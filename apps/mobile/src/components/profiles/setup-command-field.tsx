@@ -9,8 +9,10 @@ import {
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 type SetupCommandFieldProps = Readonly<{
   /** The command the caller holds; seeds the field and sizes the hint. */
@@ -64,7 +66,12 @@ export function SetupCommandField({
     return (
       <View className="gap-1.5">
         <FormFieldLabel label={label} labelAccessory={trailing} />
-        <View className="justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+        <View
+          className={cn(
+            INPUT_BOX_SHAPE_CLASS,
+            'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
+          )}
+        >
           <SelectableText
             accessibilityLabel={label}
             accessibilityHint={accessibilityHint}

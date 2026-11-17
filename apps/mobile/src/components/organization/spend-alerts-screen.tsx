@@ -9,7 +9,7 @@ import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ComponentProps, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -32,8 +32,11 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { KvRow } from '@/components/ui/kv-row';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowChevron } from '@/components/ui/row-chevron';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -44,7 +47,6 @@ import { i18n } from '@/i18n';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
@@ -457,27 +459,21 @@ function SpendAlertsForm({
         />
       </RowGroup>
 
-      {/* The master switch sits in its own group and keeps the row anatomy: the
-          switch's end inset lives in CardSwitch, so every switch on the screen
-          ends level with the label's start. */}
+      {/* The master switch sits in its own group, in the shared switch-row
+          anatomy: the row's own inset holds the switch level with its label. */}
       <RowGroup>
-        <View
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
-        >
-          <Text className="text-sm font-medium text-foreground">{t('spendAlerts.sendAlerts')}</Text>
-          <CardSwitch
-            accessibilityLabel={t('spendAlerts.sendAlerts')}
-            value={enabled}
-            onValueChange={value => {
-              selectionHaptic();
-              setSaved(false);
-              setEnabled(value);
-              // Off hides the rule fields, so they stop gating Save; on restores
-              // their gate with whatever the fields currently hold.
-              setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
-            }}
-          />
-        </View>
+        <PreferenceRow
+          title={t('spendAlerts.sendAlerts')}
+          value={enabled}
+          disabled={false}
+          onValueChange={value => {
+            setSaved(false);
+            setEnabled(value);
+            // Off hides the rule fields, so they stop gating Save; on restores
+            // their gate with whatever the fields currently hold.
+            setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
+          }}
+        />
       </RowGroup>
 
       {enabled ? (
@@ -656,79 +652,76 @@ function RuleCard({
   const pushLabel = formatList([title, t('notifications.push')], i18n.language);
 
   return (
-    <Card>
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="min-w-0 flex-1">
-          <Text className="text-sm font-medium text-foreground">{title}</Text>
-          <Text variant="caption" className="mt-0.5">
-            {subtitle}
-          </Text>
-        </View>
-        <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
-      </View>
-
-      {children}
-
-      <RowGroup>
-        <View
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
-        >
-          <Text className="text-sm font-medium text-foreground">{t('common.email')}</Text>
-          {/* The row's own label names the channel; the card's kind is composed
-              into the switch label, so the two Email rows stay distinct. */}
-          <CardSwitch
-            accessibilityLabel={emailLabel}
-            value={emailEnabled}
-            onValueChange={onEmailChange}
-          />
-        </View>
-        {pushOffByCategory ? (
-          <Pressable
-            onPress={onOpenNotifications}
-            accessibilityRole="button"
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
-            )}
-          >
-            <Text className="text-sm font-medium text-foreground">{t('notifications.push')}</Text>
-            <View className="min-w-0 shrink flex-row items-center gap-2">
-              <Text variant="caption" className="shrink">
-                {t('spendAlerts.pushOffByCategory')}
-              </Text>
-              <RowChevron />
-            </View>
-          </Pressable>
-        ) : (
-          <View
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-row items-center justify-between gap-3 px-4 py-3'
-            )}
-          >
-            <Text className="text-sm font-medium text-foreground">{t('notifications.push')}</Text>
-            <CardSwitch
-              accessibilityLabel={pushLabel}
-              value={pushEnabled}
-              onValueChange={onPushChange}
-            />
+    <View className="gap-3">
+      <Card>
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm font-medium text-foreground">{title}</Text>
+            <Text variant="caption" className="mt-0.5">
+              {subtitle}
+            </Text>
           </View>
+          <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
+        </View>
+
+        {children}
+      </Card>
+
+      {/* The channel rows are their own grouped block beside the card, never a
+          card inside a card: the row inset is the group's, so the switch ends
+          level with the label without the card's pull. */}
+      <RowGroup>
+        <PreferenceRow
+          title={t('common.email')}
+          value={emailEnabled}
+          disabled={false}
+          // The row's own label names the channel; the card's kind is composed
+          // into the switch label, so the two Email rows stay distinct.
+          accessibilityLabel={emailLabel}
+          onValueChange={onEmailChange}
+        />
+        {pushOffByCategory ? (
+          <RowFrame
+            title={t('notifications.push')}
+            onPress={onOpenNotifications}
+            trailing={{
+              kind: 'node',
+              node: (
+                <View className="min-w-0 shrink flex-row items-center gap-2">
+                  <Text variant="caption" className="shrink">
+                    {t('spendAlerts.pushOffByCategory')}
+                  </Text>
+                  <RowChevron />
+                </View>
+              ),
+            }}
+          />
+        ) : (
+          <PreferenceRow
+            title={t('notifications.push')}
+            value={pushEnabled}
+            disabled={false}
+            accessibilityLabel={pushLabel}
+            onValueChange={onPushChange}
+          />
         )}
       </RowGroup>
-    </Card>
+    </View>
   );
 }
 
 function RuleCardSkeleton() {
   return (
-    <Card>
-      <RowSkeleton subtitle />
-      <Skeleton className="h-11 rounded-md" />
+    <View className="gap-3">
+      <Card>
+        <RowSkeleton subtitle trailing="switch" />
+        <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full rounded-md bg-muted-soft')} />
+      </Card>
       <RowGroup>
-        <RowSkeleton />
-        <RowSkeleton />
+        <RowSkeleton trailing="switch" />
+        <RowSkeleton trailing="switch" />
       </RowGroup>
-    </Card>
+    </View>
   );
 }
 
@@ -745,11 +738,11 @@ function SpendAlertsSkeleton() {
           <RowSkeleton />
         </RowGroup>
         <RowGroup>
-          <RowSkeleton />
+          <RowSkeleton trailing="switch" />
         </RowGroup>
         <RuleCardSkeleton />
         <RuleCardSkeleton />
-        <Skeleton className="h-11 rounded-md" />
+        <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full rounded-md bg-muted-soft')} />
       </ScrollView>
     </View>
   );

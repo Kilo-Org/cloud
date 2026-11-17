@@ -21,7 +21,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { RowGroup } from '@/components/ui/row-group';
+import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
@@ -41,7 +41,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
 import { selectOrgListErrorView } from './org-list-error-view';
@@ -171,12 +171,8 @@ export function OrganizationMembersScreen() {
       case 'member': {
         const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-4 bg-secondary',
-              isFirst && 'rounded-t-xl',
-              item.last && 'rounded-b-xl'
-            )}
+          <RowGroupItem
+            position={item.last ? (isFirst ? 'only' : 'last') : isFirst ? 'first' : 'middle'}
           >
             <MemberRow
               member={item.member}
@@ -193,28 +189,22 @@ export function OrganizationMembersScreen() {
               removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
               onRemovalStarted={handleRemovalStarted}
               onRemovalCleared={handleRemovalCleared}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       case 'invite': {
         const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-4 bg-secondary',
-              isFirst && 'rounded-t-xl',
-              item.last && 'rounded-b-xl'
-            )}
+          <RowGroupItem
+            position={item.last ? (isFirst ? 'only' : 'last') : isFirst ? 'first' : 'middle'}
           >
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       default: {

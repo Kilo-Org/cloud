@@ -3,12 +3,13 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { SettingsSwitchRow } from '@/components/organization/settings-form-sections';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroupItem } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
@@ -23,7 +24,18 @@ import {
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
-const ItemSeparator = () => <View className="h-2" />;
+/** Where a grouped cell sits in its section, for its rounded ends. */
+type GroupPosition = 'only' | 'first' | 'middle' | 'last';
+
+function groupPosition(index: number, count: number): GroupPosition {
+  if (count <= 1) {
+    return 'only';
+  }
+  if (index === 0) {
+    return 'first';
+  }
+  return index === count - 1 ? 'last' : 'middle';
+}
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -42,7 +54,7 @@ function ListHeader({
   bulk: ReactNode;
 }>) {
   return (
-    <View className="gap-3 px-4 pt-3 pb-3">
+    <View className="gap-3 pt-3 pb-3">
       <Text variant="caption">{description}</Text>
       <Input
         defaultValue={search}
@@ -87,19 +99,19 @@ export function ProviderAllowList({
   const shown = providers.filter(provider => matchesSearch([provider], search));
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => (
-      <View className="px-4">
-        <SettingsSwitchRow
-          label={item}
+    ({ item, index }: ListRenderItemInfo<string>) => (
+      <RowGroupItem position={groupPosition(index, shown.length)}>
+        <PreferenceRow
+          title={item}
           value={draft.providerAllowList.includes(item)}
           disabled={disabled}
           onValueChange={next => {
             onChange(toggleProvider(draft, item, next));
           }}
         />
-      </View>
+      </RowGroupItem>
     ),
-    [draft, disabled, onChange]
+    [draft, disabled, onChange, shown.length]
   );
 
   return (
@@ -107,8 +119,8 @@ export function ProviderAllowList({
       data={shown}
       keyExtractor={provider => provider}
       renderItem={renderItem}
-      ItemSeparatorComponent={ItemSeparator}
       style={listStyle}
+      contentContainerClassName="px-4"
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
@@ -179,20 +191,20 @@ export function ModelDenyList({
   const shownIds = shown.map(model => model.id);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<DenyListModel>) => (
-      <View className="px-4">
-        <SettingsSwitchRow
-          label={item.name}
-          description={item.id}
+    ({ item, index }: ListRenderItemInfo<DenyListModel>) => (
+      <RowGroupItem position={groupPosition(index, shown.length)}>
+        <PreferenceRow
+          title={item.name}
+          subtitle={item.id}
           value={!draft.modelDenyList.includes(item.id)}
           disabled={disabled}
           onValueChange={next => {
             onChange(toggleModel(draft, item.id, next));
           }}
         />
-      </View>
+      </RowGroupItem>
     ),
-    [draft, disabled, onChange]
+    [draft, disabled, onChange, shown.length]
   );
 
   return (
@@ -200,8 +212,8 @@ export function ModelDenyList({
       data={shown}
       keyExtractor={model => model.id}
       renderItem={renderItem}
-      ItemSeparatorComponent={ItemSeparator}
       style={listStyle}
+      contentContainerClassName="px-4"
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={

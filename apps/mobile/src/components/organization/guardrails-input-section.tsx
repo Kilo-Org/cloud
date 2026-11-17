@@ -15,6 +15,7 @@ import {
 } from '@/components/organization/settings-form-sections';
 import { Button } from '@/components/ui/button';
 import { MenuSheet } from '@/components/ui/menu-sheet';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import {
   applyKiloDefaultPreset,
@@ -79,14 +80,16 @@ export function InputGuardrailsSection({
       }}
     >
       {groups.length > 0 || draft.groupId != null ? (
-        <SettingsValueRow
-          label={t('organizationGuardrails.applyTo')}
-          value={selectedGroupName}
-          disabled={disabled}
-          onPress={() => {
-            setGroupPickerOpen(true);
-          }}
-        />
+        <RowGroup>
+          <SettingsValueRow
+            label={t('organizationGuardrails.applyTo')}
+            value={selectedGroupName}
+            disabled={disabled}
+            onPress={() => {
+              setGroupPickerOpen(true);
+            }}
+          />
+        </RowGroup>
       ) : null}
       <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
       {INPUT_DETECTOR_IDS.map(id => {

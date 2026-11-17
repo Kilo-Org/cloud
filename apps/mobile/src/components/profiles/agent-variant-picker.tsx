@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 
 type AgentVariantPickerProps = Readonly<{
@@ -37,6 +38,7 @@ export function AgentVariantPicker({
               selected={selected}
               label={thinkingEffortLabel(option)}
               disabled={disabled}
+              {...selectableRowA11y({ multi: false, selected, disabled })}
               accessibilityLabel={
                 selected
                   ? t('agentChat.modelSelector.thinkingEffortSelected', {

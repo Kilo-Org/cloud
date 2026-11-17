@@ -284,8 +284,7 @@ describe('OrganizationMembersScreen section labels', () => {
 
     const cards = renderer.root.findAll(
       node =>
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('mx-4 bg-secondary')
+        typeof node.props.className === 'string' && node.props.className.includes('bg-secondary')
     );
     expect(cards).toHaveLength(1);
     const card = cards[0];
@@ -293,6 +292,7 @@ describe('OrganizationMembersScreen section labels', () => {
       throw new Error('member card not found');
     }
     expect(card.props.className).toContain('rounded-t-xl');
+    expect(card.props.className).not.toContain('mx-4');
     unmount();
   });
 

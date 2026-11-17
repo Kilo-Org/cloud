@@ -36,7 +36,7 @@ function sortModes(modes: readonly OrgMode[], language: string): readonly OrgMod
 
 function ModesSkeleton() {
   return (
-    <Card className="mx-4">
+    <Card>
       <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
     </Card>
@@ -106,7 +106,7 @@ export function OrganizationModesScreen() {
   } else {
     const sorted = sortModes(modes, i18n.language);
     body = (
-      <RowGroup className="mx-4">
+      <RowGroup>
         {sorted.map(mode => (
           <OrgRecordRow
             key={mode.id}

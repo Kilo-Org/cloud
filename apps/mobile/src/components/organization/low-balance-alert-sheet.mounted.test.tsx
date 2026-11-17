@@ -64,6 +64,24 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The switch row is the shared `PreferenceRow`: its trailing cell reaches the
+// icon barrel, whose lucide modules this project cannot parse in the mounted
+// environment, so the barrel is stubbed here the way every row suite does.
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    mutedForeground: '#6F6A61',
+    primary: '#000000',
+    primaryForeground: '#FFFFFF',
+  }),
+}));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

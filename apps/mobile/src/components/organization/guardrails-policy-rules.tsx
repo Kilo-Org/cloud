@@ -146,6 +146,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('organizationGuardrails.ruleRiskCategory')}
+              className="px-0"
               value={t(RISK_CATEGORY_KEYS[rule.risk_category])}
               disabled={disabled}
               onPress={() => {
@@ -154,6 +155,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('organizationGuardrails.ruleApplicability')}
+              className="px-0"
               value={t(APPLICABILITY_KEYS[rule.applicability])}
               disabled={disabled}
               onPress={() => {
@@ -162,6 +164,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('securityAgent.filter.severity')}
+              className="px-0"
               value={t(SEVERITY_KEYS[rule.severity])}
               disabled={disabled}
               onPress={() => {

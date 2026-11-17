@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,14 +19,14 @@ import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -42,6 +42,9 @@ type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
   settings: OrgWithMembers['settings'];
 }>;
+
+/** The field's and the save button's own 44pt box under the loading fill. */
+const SAVE_BAR_CLASS = 'w-full rounded-md bg-muted-soft';
 
 function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
   const router = useRouter();
@@ -121,24 +124,17 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <RowGroup>
-        <View
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
-        >
-          <Text className="text-sm font-medium text-foreground">
-            {t('organization.lowBalanceAlert.title')}
-          </Text>
-          <Switch
-            accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
-            value={enabled}
-            onValueChange={value => {
-              selectionHaptic();
-              setEnabled(value);
-              setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
-              revalidate(value, thresholdRef.current, emailsRef.current);
-              clearSaveError();
-            }}
-          />
-        </View>
+        <PreferenceRow
+          title={t('organization.lowBalanceAlert.enableA11y')}
+          value={enabled}
+          disabled={false}
+          onValueChange={value => {
+            setEnabled(value);
+            setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
+            revalidate(value, thresholdRef.current, emailsRef.current);
+            clearSaveError();
+          }}
+        />
       </RowGroup>
 
       {enabled && (
@@ -222,17 +218,17 @@ export function LowBalanceAlertSheet() {
         contentContainerClassName={SCREEN_BODY_CLASS}
       >
         <RowGroup>
-          <RowSkeleton />
+          <RowSkeleton trailing="switch" />
         </RowGroup>
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
-          <Skeleton className="h-11 rounded-md" />
+          <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
         </View>
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-32 rounded" />
-          <Skeleton className="h-11 rounded-md" />
+          <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
         </View>
-        <Skeleton className="h-11 rounded-md" />
+        <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
       </SheetScrollView>
     );
   }

@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { ClipboardPaste } from '@/components/ui/icons';
-import { KvRow } from '@/components/ui/kv-row';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Switch } from '@/components/ui/switch';
@@ -288,15 +288,21 @@ export function ProfileConfigImportSheet({
           >
             <RowGroup>
               {section.items.map(item => (
-                <KvRow
+                <RowFrame
                   key={`${section.category}:${item.id}`}
-                  label={item.label}
-                  value={t(
-                    item.status === 'added'
-                      ? 'profiles.importConfigAdded'
-                      : 'profiles.importConfigChanged'
-                  )}
-                  valueFace="text"
+                  title={item.label}
+                  // A long skill or agent name truncates instead of pushing the
+                  // status out of the row: the value holds its own width.
+                  trailing={{
+                    kind: 'value',
+                    text: t(
+                      item.status === 'added'
+                        ? 'profiles.importConfigAdded'
+                        : 'profiles.importConfigChanged'
+                    ),
+                    face: 'text',
+                    shrink: false,
+                  }}
                 />
               ))}
             </RowGroup>
@@ -314,6 +320,7 @@ export function ProfileConfigImportSheet({
             </View>
           </Section>
         )}
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

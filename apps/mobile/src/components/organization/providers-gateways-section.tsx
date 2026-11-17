@@ -5,12 +5,13 @@ import { ScrollView, View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import {
   SettingsSection,
-  SettingsSwitchRow,
   SettingsValueRow,
 } from '@/components/organization/settings-form-sections';
 import { QueryError } from '@/components/query-error';
 import { Settings2 } from '@/components/ui/icons';
 import { MenuSheet } from '@/components/ui/menu-sheet';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -105,23 +106,25 @@ export function GatewaySettingsSection({
         title={t('organizationModelAccess.tabGateways')}
         description={t('organizationModelAccess.gatewaysDescription')}
       >
-        <SettingsSwitchRow
-          label={t('organizationModelAccess.openrouter')}
-          description={t('organizationModelAccess.openrouterNote')}
-          value={!settings.disable_openrouter}
-          disabled={disabled}
-          onValueChange={enabled => {
-            save.mutate({ organizationId, disable_openrouter: !enabled });
-          }}
-        />
-        <SettingsValueRow
-          label={t('organizationModelAccess.inferenceRegion')}
-          value={t(REGION_KEYS[region])}
-          disabled={disabled}
-          onPress={() => {
-            setRegionPickerOpen(true);
-          }}
-        />
+        <RowGroup>
+          <PreferenceRow
+            title={t('organizationModelAccess.openrouter')}
+            subtitle={t('organizationModelAccess.openrouterNote')}
+            value={!settings.disable_openrouter}
+            disabled={disabled}
+            onValueChange={enabled => {
+              save.mutate({ organizationId, disable_openrouter: !enabled });
+            }}
+          />
+          <SettingsValueRow
+            label={t('organizationModelAccess.inferenceRegion')}
+            value={t(REGION_KEYS[region])}
+            disabled={disabled}
+            onPress={() => {
+              setRegionPickerOpen(true);
+            }}
+          />
+        </RowGroup>
         <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
         <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
       </SettingsSection>

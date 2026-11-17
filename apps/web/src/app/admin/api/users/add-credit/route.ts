@@ -95,7 +95,12 @@ export async function POST(
     (amount_usd == null || amount_usd > 0)
   ) {
     const hours: unknown = requested_expiry_hours;
-    if (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0) {
+    // An unparseable count cannot be trusted, and a negative one would store an
+    // expiry before the current instant. Report each cause on its own.
+    if (typeof hours !== 'number' || !Number.isFinite(hours)) {
+      return warnAndCreateErrorResponse('Expiry hours must be a number');
+    }
+    if (hours < 0) {
       return warnAndCreateErrorResponse('Expiry hours must not be negative');
     }
   }

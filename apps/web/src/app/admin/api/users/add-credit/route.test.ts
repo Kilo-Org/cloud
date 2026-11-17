@@ -299,6 +299,33 @@ describe('POST /admin/api/users/add-credit', () => {
     ).toHaveLength(0);
   });
 
+  it('rejects a positive promotional grant whose expiry_hours is not a number', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'expiry-hours-text',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        expiry_hours: '24',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Expiry hours must be a number',
+    });
+    expect(
+      await db
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).toHaveLength(0);
+  });
+
   it('rejects a positive promotional grant whose expiry_hours is negative', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();

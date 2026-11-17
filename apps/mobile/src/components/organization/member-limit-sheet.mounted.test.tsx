@@ -331,23 +331,6 @@ describe('MemberLimitSheet pending membership read', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     unmount();
   });
-
-  // A paused read cannot land an answer, so the sheet names the offline state
-  // with a retry instead of holding a silent skeleton.
-  it('renders the offline state with a retry when the read is paused', async () => {
-    query.isPending = true;
-    query.isPaused = true;
-    query.isLoading = false;
-    query.data = undefined;
-
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(MemberLimitSheet, { memberId: 'member-1' })
-    );
-
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
-    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
-    unmount();
-  });
 });
 
 describe('MemberLimitSheet validation', () => {

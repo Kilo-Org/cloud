@@ -305,17 +305,6 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
   });
-
-  it('renders the offline state with a retry when the read is paused', async () => {
-    // A paused read cannot land an answer, so the screen names the state and
-    // hands the person the retry, matching the hub's row for the same query.
-    withMembersQuery.isPending = true;
-    withMembersQuery.isPaused = true;
-    withMembersQuery.isLoading = false;
-    withMembersQuery.data = undefined;
-    const texts = await renderScreen();
-    expect(texts).toContain('QUERY_ERROR');
-  });
 });
 
 describe('OrganizationMembersScreen section labels', () => {

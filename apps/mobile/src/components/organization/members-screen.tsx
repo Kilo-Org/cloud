@@ -130,14 +130,11 @@ export function OrganizationMembersScreen() {
   }
 
   // isPending (no data AND no error) rather than isLoading: an offline paused
-  // fetch has isLoading false but no data, so a settled-state branch built on
-  // isLoading would render without an answer. A pause is not progress, though:
-  // no request can land while the manager reports the device offline, so the
-  // read has the offline state with a Retry (hub-screen names it for the same
-  // query), while a fetch in flight keeps the skeleton until it settles. A
-  // real error still reaches QueryError.
+  // fetch has isLoading false but no data — it must keep the list skeleton
+  // instead of rendering a settled body, until the read answers (reconnect)
+  // or the person retries, while a real error still reaches QueryError (the
+  // invariant low-balance-alert-sheet states for the same read).
   const isMembersPending = orgWithMembers.isPending;
-  const isMembersPaused = isMembersPending && orgWithMembers.isPaused;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   // Web's member card only pairs spend with the limit for a sales-demo
@@ -252,17 +249,7 @@ export function OrganizationMembersScreen() {
   };
 
   let emptyBody: ReactNode = null;
-  if (isMembersPaused) {
-    // The read published no answer and cannot run while offline; Retry runs
-    // the fetch once the person taps it (reconnect also refetches).
-    emptyBody = (
-      <QueryError
-        variant="offline"
-        onRetry={() => void orgWithMembers.refetch()}
-        isRetrying={orgWithMembers.isFetching}
-      />
-    );
-  } else if (!isMembersPending && errorView) {
+  if (!isMembersPending && errorView) {
     emptyBody = (
       <QueryError
         variant={errorView.variant}

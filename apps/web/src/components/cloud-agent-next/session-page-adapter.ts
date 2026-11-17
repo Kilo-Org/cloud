@@ -15,7 +15,8 @@ import { z } from 'zod';
 
 type SessionReadOptions = { context: { skipBatch: boolean } };
 const SESSION_READ_OPTIONS: SessionReadOptions = { context: { skipBatch: true } };
-const INITIAL_WEB_HISTORY_PAGE_SIZE = 20;
+const INITIAL_WEB_HISTORY_PAGE_SIZE = 100;
+const INITIAL_CLI_HISTORY_PAGE_SIZE = 20;
 const INITIAL_HISTORY_USER_TURNS = 2;
 const MAX_INITIAL_HISTORY_PAGES = 5;
 const MAX_INITIAL_HISTORY_BYTES = 4 * 1024 * 1024;
@@ -180,7 +181,7 @@ async function readWebSessionSnapshotPage(
   const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query(
     {
       session_id: kiloSessionId,
-      ...(options.cursor ? { cursor: options.cursor } : { limit: INITIAL_WEB_HISTORY_PAGE_SIZE }),
+      ...(options.cursor ? { cursor: options.cursor } : { limit: INITIAL_CLI_HISTORY_PAGE_SIZE }),
     },
     SESSION_READ_OPTIONS
   );

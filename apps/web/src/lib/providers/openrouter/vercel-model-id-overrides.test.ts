@@ -75,23 +75,70 @@ describe('buildVercelModelIdOverrides', () => {
     ).toEqual([{ openrouter_model_id: 'vendor/short', vercel_model_id: 'other/b' }]);
   });
 
-  it('skips free variants', () => {
+  it('matches free variants with free variants of the same canonical model', () => {
     expect(
       buildGenerated(
         catalog({
           openrouter: [
             { id: 'vendor/model:free', canonical_model_id: 'vendor/model' },
-            { id: 'vendor/model-free', canonical_model_id: 'vendor/model-free' },
+            { id: 'vendor/model', canonical_model_id: 'vendor/model' },
+            { id: 'vendor/other-free', canonical_model_id: 'vendor/other-free' },
           ],
           vercel: [
+            { id: 'other/model-free', canonical_model_id: 'vendor/model' },
             { id: 'other/model', canonical_model_id: 'vendor/model' },
-            { id: 'other/model-free', canonical_model_id: 'vendor/model-free' },
+            { id: 'other/other-free', canonical_model_id: 'vendor/other-free' },
           ],
         }),
-        ['vendor/model:free', 'vendor/model-free'],
-        ['other/model', 'other/model-free']
+        ['vendor/model:free', 'vendor/model', 'vendor/other-free'],
+        ['other/model-free', 'other/model', 'other/other-free']
+      )
+    ).toEqual([
+      { openrouter_model_id: 'vendor/model', vercel_model_id: 'other/model' },
+      { openrouter_model_id: 'vendor/model:free', vercel_model_id: 'other/model-free' },
+      { openrouter_model_id: 'vendor/other-free', vercel_model_id: 'other/other-free' },
+    ]);
+  });
+
+  it('never pairs a free model with a paid model', () => {
+    expect(
+      buildGenerated(
+        catalog({
+          openrouter: [
+            { id: 'vendor/paid-only', canonical_model_id: 'vendor/paid-only' },
+            { id: 'vendor/free-only:free', canonical_model_id: 'vendor/free-only' },
+          ],
+          vercel: [
+            { id: 'other/paid-only-free', canonical_model_id: 'vendor/paid-only' },
+            { id: 'other/free-only', canonical_model_id: 'vendor/free-only' },
+          ],
+        }),
+        ['vendor/paid-only', 'vendor/free-only:free'],
+        ['other/paid-only-free', 'other/free-only']
       )
     ).toEqual([]);
+  });
+
+  it('picks the shortest free model ID without considering paid ones', () => {
+    expect(
+      buildGenerated(
+        catalog({
+          openrouter: [
+            { id: 'vendor/m', canonical_model_id: 'vendor/model' },
+            { id: 'vendor/model:free', canonical_model_id: 'vendor/model' },
+          ],
+          vercel: [
+            { id: 'other/m', canonical_model_id: 'vendor/model' },
+            { id: 'other/model-free', canonical_model_id: 'vendor/model' },
+          ],
+        }),
+        ['vendor/m', 'vendor/model:free'],
+        ['other/m', 'other/model-free']
+      )
+    ).toEqual([
+      { openrouter_model_id: 'vendor/m', vercel_model_id: 'other/m' },
+      { openrouter_model_id: 'vendor/model:free', vercel_model_id: 'other/model-free' },
+    ]);
   });
 
   it('skips identical IDs', () => {

@@ -1,71 +1,37 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
 import { type PushData } from './push-data';
+import { GENERIC_PUSH_TITLE_KEY } from './push-i18n-keys';
 
-/**
- * The catalog key and the English sentence of one generic body. The key is
- * derived from the catalog itself, so a body `en.json` does not define is a
- * compile error, and the sentence is written only in `en.json`.
- */
-type GenericBodyCopy = {
-  key: `generic.body.${keyof typeof en.generic.body}`;
-  fallback: string;
-};
+type GenericBodyLeaf = keyof typeof en.generic.body;
 
 // Both session variants show one body: the session_live_update carrier is
 // data-only (the app draws that notification), and neither variant may show the
 // session title.
-const SESSION_UPDATE_BODY: GenericBodyCopy = {
-  key: 'generic.body.cloudAgentSession',
-  fallback: en.generic.body.cloudAgentSession,
-};
+const SESSION_UPDATE_LEAF: GenericBodyLeaf = 'cloudAgentSession';
 
 // Generic, count-free lock-screen banner copy: the ongoing notification never
 // leaks how many agents are running or which sessions they are.
-const ACTIVE_AGENTS_BODY: GenericBodyCopy = {
-  key: 'generic.body.activeAgentsGlanceable',
-  fallback: en.generic.body.activeAgentsGlanceable,
-};
+const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
 
 /**
- * The one body per `PushData` variant. The map is total over `PushData['type']`,
- * so a new variant fails typecheck here until it has an entry.
+ * The one body per `PushData` variant, named by the leaf its sentence lives
+ * under in `en.generic.body`. The map is total over `PushData['type']`, so a new
+ * variant fails typecheck here until it has an entry, and every value is a key
+ * of that catalog subtree, so a leaf `en.json` does not define is a compile
+ * error. The key and the English fallback both come from this one leaf.
  */
-const GENERIC_BODY_BY_TYPE: Record<PushData['type'], GenericBodyCopy> = {
-  cloud_agent_session: SESSION_UPDATE_BODY,
-  session_live_update: SESSION_UPDATE_BODY,
-  'chat.message': {
-    key: 'generic.body.chatMessage',
-    fallback: en.generic.body.chatMessage,
-  },
-  'instance-lifecycle': {
-    key: 'generic.body.instanceLifecycle',
-    fallback: en.generic.body.instanceLifecycle,
-  },
-  'scheduled-action': {
-    key: 'generic.body.scheduledAction',
-    fallback: en.generic.body.scheduledAction,
-  },
-  low_balance: {
-    key: 'generic.body.lowBalance',
-    fallback: en.generic.body.lowBalance,
-  },
-  spend_alert: {
-    key: 'generic.body.spendAlert',
-    fallback: en.generic.body.spendAlert,
-  },
-  security_finding: {
-    key: 'generic.body.securityFinding',
-    fallback: en.generic.body.securityFinding,
-  },
+const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
+  cloud_agent_session: SESSION_UPDATE_LEAF,
+  session_live_update: SESSION_UPDATE_LEAF,
+  low_balance: 'lowBalance',
+  spend_alert: 'spendAlert',
+  security_finding: 'securityFinding',
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
-  security_lifecycle: {
-    key: 'generic.body.securityUpdate',
-    fallback: en.generic.body.securityUpdate,
-  },
-  agent_briefing: ACTIVE_AGENTS_BODY,
-  active_agents_glanceable: ACTIVE_AGENTS_BODY,
+  security_lifecycle: 'securityUpdate',
+  agent_briefing: ACTIVE_AGENTS_LEAF,
+  active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };
 
 /**
@@ -79,14 +45,14 @@ const GENERIC_BODY_BY_TYPE: Record<PushData['type'], GenericBodyCopy> = {
  */
 export function genericPushContentForPushData(
   data: PushData,
-  // Old callers omit locale; remove the default when every caller passes a token locale.
-  locale: string | null | undefined = 'en'
+  // A token with no locale is English; resolvePushLocale owns that rule.
+  locale?: string | null
 ): { title: string; body: string } {
   // The one generic title is content-free and identical for every variant, so
-  // only the body's key and fallback differ.
-  const body = GENERIC_BODY_BY_TYPE[data.type];
+  // only the body's leaf differs.
+  const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
-    title: translatePush(locale, 'generic.title', undefined, en.generic.title),
-    body: translatePush(locale, body.key, undefined, body.fallback),
+    title: translatePush(locale, GENERIC_PUSH_TITLE_KEY, undefined, en.generic.title),
+    body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
   };
 }

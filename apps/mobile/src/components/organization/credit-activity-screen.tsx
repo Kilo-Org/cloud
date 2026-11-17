@@ -29,6 +29,7 @@ import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -172,6 +173,7 @@ export function OrganizationCreditActivityScreen() {
     return (
       <OrganizationBoundary
         title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
         organizationIdOverride={orgParam}
       />
     );
@@ -298,7 +300,10 @@ export function OrganizationCreditActivityScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.creditActivity.title')} />
+      <ScreenHeader
+        title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
       {body}
     </View>
   );

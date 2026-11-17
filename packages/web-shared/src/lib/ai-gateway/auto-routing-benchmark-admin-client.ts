@@ -28,6 +28,7 @@ import {
   AUTO_ROUTING_BENCHMARK_WORKER_URL,
   INTERNAL_API_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import { createWorkerAdminFetch, ErrorBodySchema, type ErrorBody } from './worker-admin-fetch';
 
 const fetchBenchmarkAdmin = createWorkerAdminFetch({
@@ -160,25 +161,26 @@ export async function registerOwnerBenchmarkProfiles(
   },
   signal: AbortSignal = AbortSignal.timeout(5_000)
 ): Promise<RegisterOwnerBenchmarkProfilesResult> {
-  if (!AUTO_ROUTING_BENCHMARK_WORKER_URL || !INTERNAL_API_SECRET) {
+  const endpoint = parseInternalServiceEndpoint(
+    AUTO_ROUTING_BENCHMARK_WORKER_URL,
+    `/admin/profiles/register?router=${request.router}`
+  );
+  if (!endpoint || !INTERNAL_API_SECRET) {
     return {
       ok: false,
       status: 500,
       error: { error: 'Auto routing benchmark worker is not configured' },
     };
   }
-  const response = await fetch(
-    `${AUTO_ROUTING_BENCHMARK_WORKER_URL}/admin/profiles/register?router=${request.router}`,
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${INTERNAL_API_SECRET}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(request),
-      signal,
-    }
-  );
+  const response = await fetch(endpoint.toString(), {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${INTERNAL_API_SECRET}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(request),
+    signal,
+  });
   const body: unknown = await response.json().catch(() => null);
   if (response.ok && BenchmarkProfileStatusesResponseSchema.safeParse(body).success) {
     return { ok: true };

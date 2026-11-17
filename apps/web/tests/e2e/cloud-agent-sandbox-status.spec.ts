@@ -599,7 +599,7 @@ async function expectSafe(page: Page) {
 }
 
 async function shadowHost(control: Locator) {
-  return control.evaluateHandle<HTMLElement>(element => {
+  return control.evaluateHandle<HTMLElement, void>(element => {
     const root = element.getRootNode();
     if (!(root instanceof ShadowRoot) || !(root.host instanceof HTMLElement))
       throw new Error('Expected the individual expansion control in an HTMLElement shadow root');

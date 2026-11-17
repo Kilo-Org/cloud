@@ -44,14 +44,15 @@ import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
-  AzureCredentialsSchema,
-  BedrockCredentialsSchema,
   DirectVertexCredentialsSchema,
-  VertexCredentialsSchema,
   isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { getStructuredCredentialKind } from '@kilocode/app-shared/byok-credentials';
+import {
+  checkStructuredCredential,
+  getStructuredCredentialKind,
+  structuredCredentialSchema,
+} from '@kilocode/app-shared/byok-credentials';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
@@ -440,15 +441,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     if (!value) return null;
     const kind = getStructuredCredentialKind(providerId);
     const schema =
-      kind === 'azure'
-        ? AzureCredentialsSchema
-        : kind === 'bedrock'
-          ? BedrockCredentialsSchema
-          : kind === 'vertex'
-            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
-              ? DirectVertexCredentialsSchema
-              : VertexCredentialsSchema
-            : null;
+      providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
+        ? DirectVertexCredentialsSchema
+        : structuredCredentialSchema(providerId);
     if (!schema) return null;
     let parsed: unknown;
     try {
@@ -456,19 +451,23 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     } catch {
       return 'Invalid JSON. Enter a valid JSON object.';
     }
-    const result = schema.safeParse(parsed);
-    if (!result.success) {
-      if (kind === 'azure') {
-        return result.error.issues.some(issue => issue.path[0] === 'modelMappings')
-          ? 'Each model mapping must include gatewayModelSlug and customModelId.'
-          : 'Enter JSON with apiKey and resourceName.';
-      }
-      if (kind === 'bedrock') {
-        return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
-      }
-      return `Invalid Google Vertex credentials:\n${z.prettifyError(result.error)}`;
+    // The mobile key form runs this same check over the fields it collects, so
+    // the two surfaces refuse exactly the same credentials.
+    const check = checkStructuredCredential(providerId, parsed, schema);
+    if (check.ok) return null;
+    if (check.problem.code === 'not-an-object') {
+      return 'Invalid JSON. Enter a valid JSON object.';
     }
-    return null;
+    if (check.problem.code === 'invalid-model-mapping') {
+      return 'Each model mapping must include gatewayModelSlug and customModelId.';
+    }
+    if (check.problem.code === 'invalid-auth') {
+      return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
+    }
+    if (kind === 'vertex' && check.error) {
+      return `Invalid Google Vertex credentials:\n${z.prettifyError(check.error)}`;
+    }
+    return 'Enter JSON with apiKey and resourceName.';
   };
 
   const closeDialog = () => {
@@ -1218,13 +1217,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <AlertDescription>
                           <p>
                             Once saved, this key is used for the supported models above that none of
-                            your provider keys cover. If you add both a Vercel AI Gateway key and an
-                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                            your provider keys cover, including embedding and System One models. If
+                            you add both a Vercel AI Gateway key and an OpenRouter key, the Vercel
+                            AI Gateway key is used for models it serves.
+                            {selectedProvider === 'openrouter'
+                              ? ' Transcription requests use only an OpenRouter key.'
+                              : ''}
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
                               Organization model and provider restrictions apply to requests that
-                              use this key.
+                              use this key. The organization&apos;s Advanced policies, such as an
+                              inference region, do not.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1237,13 +1241,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If several of your keys can
-                          serve the same model, the one highest in your key list is used.
+                          requests one of the supported models above, including embedding and System
+                          One models served through the Vercel AI Gateway. If several of your keys
+                          can serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
                             Organization-configured model and provider restrictions apply. The key
-                            is not used when the provider allow-list excludes this provider.
+                            is not used when the provider allow-list excludes this provider. The
+                            organization&apos;s Advanced policies, such as an inference region, do
+                            not apply to requests that use the key.
                           </p>
                         ) : null}
                       </AlertDescription>

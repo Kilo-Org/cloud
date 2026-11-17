@@ -132,12 +132,18 @@ export function createBackgroundActivityReader(options: {
     pendingRead = request;
     let failed = false;
     try {
-      const inventory = backgroundActivityInventorySchema.parse(await options.read(request.signal));
-      if (inventory.sessionID !== options.sessionID)
-        throw new Error('Background inventory session mismatch');
+      const value = await options.read(request.signal);
       if (pendingRead === request) {
-        retries = 0;
-        publish({ status: 'current', inventory });
+        if (value === null) {
+          retries = 0;
+          publish({ status: 'inactive' });
+        } else {
+          const inventory = backgroundActivityInventorySchema.parse(value);
+          if (inventory.sessionID !== options.sessionID)
+            throw new Error('Background inventory session mismatch');
+          retries = 0;
+          publish({ status: 'current', inventory });
+        }
       }
     } catch {
       if (pendingRead === request && !dirty) {

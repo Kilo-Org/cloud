@@ -43,18 +43,18 @@ export const CODE_REVIEW_BILLING_CHECK_SUMMARY =
   'Review could not start because the account has insufficient credits.';
 
 /**
- * User-facing reason stored on a review whose organization must reconnect its
- * Claude billing link. Adding credits does not fix this state, so the copy names
- * the reconnect and the person who can perform it.
+ * User-facing reason stored on a review whose organization must link its Claude
+ * billing again. Adding credits does not fix this state, so the copy names the
+ * link and the person who can perform it.
  */
-export const CODE_REVIEW_RECONNECT_FAILURE_MESSAGE = `${CLAUDE_BILLING_RECONNECT_MESSAGE} An organization owner must reconnect Claude billing, then re-run the review.`;
+export const CODE_REVIEW_RECONNECT_FAILURE_MESSAGE = `${CLAUDE_BILLING_RECONNECT_MESSAGE} An organization owner must link Claude billing again, then re-run the review.`;
 
-/** GitHub check run title for a review that waits on a Claude billing reconnect. */
-export const CODE_REVIEW_RECONNECT_CHECK_TITLE = 'Reconnect Claude billing to run this review';
+/** GitHub check run title for a review that waits on a Claude billing link. */
+export const CODE_REVIEW_RECONNECT_CHECK_TITLE = 'Link Claude billing again to run this review';
 
 /** GitHub check run summary and GitLab commit status description. */
 export const CODE_REVIEW_RECONNECT_CHECK_SUMMARY =
-  'Review could not start because the organization must reconnect its Claude billing link.';
+  'Review could not start because the organization must link Claude billing again.';
 
 const CODE_REVIEW_BILLING_NOTICE_BODY = `${CODE_REVIEW_BILLING_NOTICE_MARKER}
 **Kilo Code Review could not run — your account is out of credits.**
@@ -252,8 +252,8 @@ export async function finalizeCodeReviewBillingFailure(
 }
 
 /**
- * Record a review that waits on an organization's Claude billing reconnect.
- * The gate names the reconnect requirement. No pull-request notice is posted:
+ * Record a review that waits on an organization's Claude billing link.
+ * The gate names the link requirement. No pull-request notice is posted:
  * the billing notice names credits, and the check run and the stored review
  * message already explain the refusal.
  */

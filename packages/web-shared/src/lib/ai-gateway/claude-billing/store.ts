@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNull, ne, not, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, not, notExists, or, sql, type SQL } from 'drizzle-orm';
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
@@ -17,12 +17,12 @@ import {
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
 import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
+import { specificRefusalCodesFor } from './refusal';
 
 export type { ClaudeBillingOwner } from './owner';
 
 export type ClaudeBillingOwnerInput = {
   organizationId?: string;
-  scope?: 'shared_services';
 };
 
 export type ClaudeBillingShareableLink = {
@@ -49,12 +49,7 @@ export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
         eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
         isNull(claude_billing_connections.organization_id)
       );
-    case 'member':
-      return and(
-        eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
-        eq(claude_billing_connections.organization_id, owner.organizationId)
-      );
-    case 'shared_services':
+    case 'organization':
       return and(
         eq(claude_billing_connections.organization_id, owner.organizationId),
         isNull(claude_billing_connections.kilo_user_id)
@@ -62,7 +57,7 @@ export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
   }
 }
 
-/** Rows the caller may see: their own rows, plus the shared-services rows of the allowed organizations. */
+/** Rows the caller may see: their own rows, plus the organization rows of the allowed organizations. */
 function claudeBillingVisibleWhere(
   kiloUserId: AnyPgColumn,
   organizationId: AnyPgColumn,
@@ -79,9 +74,7 @@ export function claudeBillingOwnerKey(owner: ClaudeBillingOwner): string {
   switch (owner.kind) {
     case 'personal':
       return `user:${owner.kiloUserId}`;
-    case 'member':
-      return `member:${owner.organizationId}:${owner.kiloUserId}`;
-    case 'shared_services':
+    case 'organization':
       return `org:${owner.organizationId}`;
   }
 }
@@ -109,12 +102,7 @@ export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
         eq(claude_billing_connection_grants.kilo_user_id, owner.kiloUserId),
         isNull(claude_billing_connection_grants.organization_id)
       );
-    case 'member':
-      return and(
-        eq(claude_billing_connection_grants.kilo_user_id, owner.kiloUserId),
-        eq(claude_billing_connection_grants.organization_id, owner.organizationId)
-      );
-    case 'shared_services':
+    case 'organization':
       return and(
         eq(claude_billing_connection_grants.organization_id, owner.organizationId),
         isNull(claude_billing_connection_grants.kilo_user_id)
@@ -122,7 +110,25 @@ export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
   }
 }
 
-/** The oldest still-active grant on this payer becomes its next owner. */
+/**
+ * The grants that still give their payer to a scope Kilo offers: active, and
+ * naming a person or an organization but not both. Only the retired member
+ * scope named both, so such a grant holds no payer and never keeps a row or an
+ * Anthropic profile alive.
+ */
+export function liveClaudeBillingGrantWhere() {
+  return and(
+    isNull(claude_billing_connection_grants.removed_at),
+    or(
+      isNull(claude_billing_connection_grants.kilo_user_id),
+      isNull(claude_billing_connection_grants.organization_id)
+    )
+  );
+}
+
+/**
+ * The oldest live grant on this payer becomes its next owner.
+ */
 async function selectNextActiveGrant(
   onDb: DrizzleConnection,
   payerConnectionId: string,
@@ -138,7 +144,7 @@ async function selectNextActiveGrant(
     .where(
       and(
         eq(claude_billing_connection_grants.payer_connection_id, payerConnectionId),
-        isNull(claude_billing_connection_grants.removed_at),
+        liveClaudeBillingGrantWhere(),
         ...(excludeWhere ? [not(excludeWhere)] : [])
       )
     )
@@ -160,7 +166,7 @@ async function upsertClaudeBillingGrant(
     .insert(claude_billing_connection_grants)
     .values({
       payer_connection_id: payerConnectionId,
-      kilo_user_id: owner.kind === 'shared_services' ? null : owner.kiloUserId,
+      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
       organization_id: owner.kind === 'personal' ? null : owner.organizationId,
       created_by: createdBy,
     })
@@ -231,20 +237,21 @@ export async function getGrantedClaudeBillingConnection(
   return await findGrantedClaudeBillingConnection(owner, fromDb);
 }
 
+/**
+ * The owner a row or grant describes, or null for a row a retired scope wrote:
+ * `member` rows name a person and an organization together, and no current
+ * owner names both.
+ */
 function ownerFromColumns(columns: {
   kilo_user_id: string | null;
   organization_id: string | null;
 }): ClaudeBillingOwner | null {
-  if (columns.organization_id === null) {
-    return columns.kilo_user_id ? { kind: 'personal', kiloUserId: columns.kilo_user_id } : null;
+  if (columns.kilo_user_id && columns.organization_id) return null;
+  if (columns.kilo_user_id) return { kind: 'personal', kiloUserId: columns.kilo_user_id };
+  if (columns.organization_id) {
+    return { kind: 'organization', organizationId: columns.organization_id };
   }
-  return columns.kilo_user_id
-    ? {
-        kind: 'member',
-        kiloUserId: columns.kilo_user_id,
-        organizationId: columns.organization_id,
-      }
-    : { kind: 'shared_services', organizationId: columns.organization_id };
+  return null;
 }
 
 /**
@@ -312,7 +319,7 @@ export async function insertClaudeBillingProfile(
   await onDb
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: owner.kind === 'shared_services' ? null : owner.kiloUserId,
+      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
       organization_id: owner.kind === 'personal' ? null : owner.organizationId,
       user_profile_id: userProfileId,
       created_by: createdBy,
@@ -379,7 +386,7 @@ export async function shareClaudeBillingConnection(
     if (!payerRow) {
       throw new ClaudeBillingShareError('source_unavailable');
     }
-    if (sourceOwner.kind === 'shared_services' && payerRow.created_by !== createdBy) {
+    if (sourceOwner.kind === 'organization' && payerRow.created_by !== createdBy) {
       const [callerGrant] = await tx
         .select({ id: claude_billing_connection_grants.id })
         .from(claude_billing_connection_grants)
@@ -480,6 +487,39 @@ async function reassignPayerOwnerColumns(
     .where(eq(claude_billing_connections.id, payerConnectionId));
 }
 
+/**
+ * Runs `work` while holding the payer lock that sharing and removal take, so no
+ * grant on the payer changes between a read and the write that follows it. A
+ * scope without a row has nothing to serialize.
+ */
+export async function withClaudeBillingPayerLock<T>(
+  owner: ClaudeBillingOwner,
+  work: (tx: DrizzleTransaction) => Promise<T>,
+  onDb: DrizzleConnection = db
+): Promise<T> {
+  return await onDb.transaction(async tx => {
+    const connection = await getGrantedClaudeBillingConnection(owner, tx);
+    if (connection) await lockClaudeBillingPayer(tx, connection.id);
+    return await work(tx);
+  });
+}
+
+/**
+ * The payer `removeClaudeBillingGrant` would retire for this scope, or null when
+ * the scope has no link or another live grant keeps its payer. Removal asks this
+ * before it retires anything, so it can end Kilo's link at Anthropic first and
+ * leave the row in place when that fails.
+ */
+export async function findRetiringClaudeBillingPayer(
+  owner: ClaudeBillingOwner,
+  fromDb: DrizzleConnection = db
+): Promise<UnreferencedClaudeBillingPayer | null> {
+  const connection = await getGrantedClaudeBillingConnection(owner, fromDb);
+  if (!connection) return null;
+  const remaining = await selectNextActiveGrant(fromDb, connection.id, owner);
+  return remaining ? null : { id: connection.id, userProfileId: connection.user_profile_id };
+}
+
 export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   onDb: DrizzleConnection = db
@@ -525,10 +565,8 @@ function ownerToInput(owner: ClaudeBillingOwner): ClaudeBillingOwnerInput {
   switch (owner.kind) {
     case 'personal':
       return {};
-    case 'member':
+    case 'organization':
       return { organizationId: owner.organizationId };
-    case 'shared_services':
-      return { organizationId: owner.organizationId, scope: 'shared_services' };
   }
 }
 
@@ -537,19 +575,16 @@ function formatScopeLabel(
   orgNames: ReadonlyMap<string, string>
 ): string {
   if (owner.kind === 'personal') return 'Personal account';
-  const orgName = orgNames.get(owner.organizationId) ?? 'Organization';
-  return owner.kind === 'shared_services' ? `${orgName} (shared services)` : `${orgName} (member)`;
+  return orgNames.get(owner.organizationId) ?? 'Organization';
 }
 
 function scopeSortRank(
   owner: ClaudeBillingOwner,
   targetOrganizationId: string | undefined
 ): number {
-  if (owner.kind !== 'personal' && owner.organizationId === targetOrganizationId) {
-    return owner.kind === 'member' ? 0 : 1;
-  }
-  if (owner.kind === 'personal') return 2;
-  return owner.kind === 'member' ? 3 : 4;
+  if (owner.kind === 'organization' && owner.organizationId === targetOrganizationId) return 0;
+  if (owner.kind === 'personal') return 1;
+  return 2;
 }
 
 export async function describeClaudeBillingSharing(
@@ -631,7 +666,6 @@ export async function describeClaudeBillingSharing(
     for (const grant of currentGrants) {
       const owner = ownerFromColumns(grant);
       if (!owner || claudeBillingOwnerKey(owner) === targetKey) continue;
-      if (owner.kind === 'member' && !memberOrgIds.has(owner.organizationId)) continue;
       siblingOwners.push(owner);
     }
     siblingOwners.sort(
@@ -709,13 +743,7 @@ export async function describeClaudeBillingSharing(
   const addScope = (payer: ClaudeBillingConnectionRow, scopeOwner: ClaudeBillingOwner | null) => {
     if (!scopeOwner || claudeBillingOwnerKey(scopeOwner) === targetKey) return;
     if (scopeOwner.kind === 'personal' && scopeOwner.kiloUserId !== userId) return;
-    if (
-      scopeOwner.kind === 'member' &&
-      (scopeOwner.kiloUserId !== userId || !memberOrgIds.has(scopeOwner.organizationId))
-    ) {
-      return;
-    }
-    if (scopeOwner.kind === 'shared_services' && !managedOrgIds.has(scopeOwner.organizationId)) {
+    if (scopeOwner.kind === 'organization' && !managedOrgIds.has(scopeOwner.organizationId)) {
       return;
     }
     const existing = byPayer.get(payer.id);
@@ -744,7 +772,7 @@ export async function describeClaudeBillingSharing(
 
   const shareableLinks: ClaudeBillingShareableLink[] = [];
   for (const { payer, scopes } of byPayer.values()) {
-    if (payer.created_by !== userId && !scopes.some(scope => scope.kind !== 'shared_services')) {
+    if (payer.created_by !== userId && !scopes.some(scope => scope.kind === 'personal')) {
       continue;
     }
     scopes.sort(
@@ -778,12 +806,11 @@ export async function describeClaudeBillingSharing(
 }
 
 /**
- * Clears the grants a deleted person held. The organization's shared-services
- * connection and its grant stay when the connector is erased: the connection
- * belongs to the organization, and the row keeps `created_by` as the record of
- * who linked it until an organization owner reconnects it. Routing and the
- * billing card report that connection as requiring a reconnect while its
- * connector is gone.
+ * Clears the grants a deleted person held. An organization connection and its
+ * grant stay when the connector is erased: the connection belongs to the
+ * organization, and the row keeps `created_by` as the record of who linked it
+ * until an organization owner reconnects it. Routing and the billing card
+ * report that connection as requiring a reconnect while its connector is gone.
  */
 export async function removeUserClaudeBillingGrants(
   userId: string,
@@ -832,8 +859,8 @@ export async function removeUserClaudeBillingGrants(
  * Columns that refusal bookkeeping may change on a connected row.
  */
 type ConnectedClaudeBillingConnectionChange = Partial<
-  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_code' | 'last_refusal_at'>
->;
+  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_at'>
+> & { last_refusal_code?: string | null | SQL };
 
 /**
  * Updates only the connected row that refused the request: the same profile with
@@ -861,9 +888,10 @@ async function updateConnectedClaudeBillingConnection(
 }
 
 /**
- * Anthropic refused a request for this profile with `user_profile_not_billable`.
- * Later requests fail without an upstream call until an admin acts. Only a
- * connected row changes, so a removal or a newer reconnect is never undone.
+ * Anthropic refused a request for this profile with `user_profile_not_billable`
+ * or `user_profile_billing_not_authorized`. Later requests fail without an
+ * upstream call until an admin acts. Only a connected row changes, so a removal
+ * or a newer reconnect is never undone.
  */
 export async function markClaudeBillingUnavailable(
   userProfileId: string,
@@ -883,8 +911,16 @@ export async function recordClaudeBillingRefusal(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
+  const keptCodes = specificRefusalCodesFor(refusalCode);
   await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
-    last_refusal_code: refusalCode,
+    // A status-only code says only what the stored specific code already said,
+    // so the specific one stays; a specific code always replaces what it finds.
+    last_refusal_code: keptCodes.length
+      ? sql`case when ${claude_billing_connections.last_refusal_code} in (${sql.join(
+          keptCodes.map(code => sql`${code}`),
+          sql`, `
+        )}) then ${claude_billing_connections.last_refusal_code} else ${refusalCode} end`
+      : refusalCode,
     last_refusal_at: new Date().toISOString(),
   });
 }

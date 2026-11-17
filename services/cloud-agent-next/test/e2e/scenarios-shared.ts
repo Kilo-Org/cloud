@@ -20,6 +20,8 @@ import { kilo2ConversationMessageSchema } from '../../src/shared/kilo2-conversat
 import {
   collectUntilTerminal,
   deleteSession,
+  deleteWorktree,
+  getSessionSnapshot,
   fakeDirective,
   fetchFakeRequests,
   hasPreparationForMessage,
@@ -66,6 +68,8 @@ const CLEANUP_TIMEOUT_MS = 15_000;
  * retirement.
  */
 const DELETE_SESSION_TIMEOUT_MS = 45_000;
+/** Workspace teardown also releases runtime locations, sandboxes and session rows. */
+const WORKSPACE_DELETE_TIMEOUT_MS = 90_000;
 /** Bound for each direct HTTPS auth probe in `auth-reject`. */
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 /** Wrong secret for the bad-signature probe; never the deployed `NEXTAUTH_SECRET`. */
@@ -440,6 +444,33 @@ async function runHotTurn(
   }
 }
 
+const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+
+/** Delete the workspace of a last root session; a failure is returned, not thrown. */
+async function deleteOwningWorkspace(
+  config: DriverConfig,
+  sessionId: string
+): Promise<string | null> {
+  try {
+    const { worktreeId, kiloSessionId } = await getSessionSnapshot(
+      config,
+      sessionId,
+      AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS)
+    );
+    if (!worktreeId) return 'deleteWorktree: the last root session reports no workspace';
+    if (!kiloSessionId) return 'deleteWorktree: the last root session reports no Kilo session';
+    // The fence makes the delete fail if another session joined the workspace.
+    await deleteWorktree(
+      config,
+      { worktreeId, onlyIfSoleSessionId: kiloSessionId },
+      AbortSignal.timeout(WORKSPACE_DELETE_TIMEOUT_MS)
+    );
+    return null;
+  } catch (error) {
+    return `deleteWorktree: ${errorMessage(error)}`;
+  }
+}
+
 /**
  * Cleanup for one started session. Both requests are attempted independently
  * and each is bounded; a failure is reported but never thrown, so it never
@@ -463,7 +494,14 @@ export async function cleanupRemoteSession(
   try {
     await deleteSession(config, sessionId, AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS));
   } catch (error) {
-    failures.push(`deleteSession: ${errorMessage(error)}`);
+    const message = errorMessage(error);
+    if (message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      // The last root of a hosted workspace is removed only with its workspace.
+      const failure = await deleteOwningWorkspace(config, sessionId);
+      if (failure !== null) failures.push(failure);
+    } else {
+      failures.push(`deleteSession: ${message}`);
+    }
   }
   for (const failure of failures) {
     console.error(
@@ -907,15 +945,23 @@ async function runAuthReject(
     durationMs: Date.now() - startedAt,
   });
 
-  if (!config.bearerToken) {
-    return fail('auth-reject requires config.bearerToken (deployed profile only)');
+  let modelToken: string;
+  try {
+    modelToken = config.getBearerToken ? await config.getBearerToken() : (config.bearerToken ?? '');
+  } catch (error) {
+    return fail(`threw: ${errorMessage(error)}`);
+  }
+  if (modelToken.length === 0) {
+    return fail(
+      'auth-reject requires config.getBearerToken or config.bearerToken (deployed profile only)'
+    );
   }
 
   try {
     const probes = buildAuthRejectProbes({
       fakeLlmRootUrl: config.fakeLlmUrl,
       adminToken: resolveFakeAdminToken(),
-      modelToken: config.bearerToken,
+      modelToken,
       badSignatureToken: jwt.sign(
         {
           env: 'test',

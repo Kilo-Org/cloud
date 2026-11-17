@@ -1,9 +1,17 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the server cap constants off disk, which is the only place a mobile mirror that drifted from them is observable */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
   addCommand,
   cleanVariableKey,
   isValidVariableKey,
+  MAX_PROFILE_AGENTS,
+  MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_MCP_SERVERS,
   MAX_SETUP_COMMANDS,
   moveCommand,
   parseSkillFrontmatter,
@@ -242,5 +250,40 @@ describe('setup command list operations', () => {
     expect(moveCommand(commands, 5, -1)).toEqual(commands);
     expect(moveCommand(commands, 0, -1)).not.toBe(commands);
     expect(commands).toEqual(['pnpm install', 'pnpm build', 'pnpm test']);
+  });
+});
+
+describe('profile list caps', () => {
+  // The mobile bundle cannot import the server packages, so each cap is a mirror.
+  // These assertions read the server source, so raising a server cap fails here
+  // in the same change instead of leaving a screen that disables the add early.
+  // The path resolves from this test file, so a runner launched from any working
+  // directory reads the same checkout's server packages.
+  const serverCap = (file: string, name: string): number => {
+    const fromHere = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', file);
+    const source = readFileSync(fromHere, 'utf8');
+    const match = new RegExp(`export const ${name} = (\\d+);`).exec(source);
+    if (match === null) {
+      throw new Error(`${name} is not declared in ${file}`);
+    }
+    return Number(match[1]);
+  };
+
+  it('mirrors the agent, MCP server and slash command caps', () => {
+    expect(MAX_PROFILE_AGENTS).toBe(
+      serverCap('packages/cloud-agent-profile/src/contracts/agents.ts', 'MAX_PROFILE_AGENTS')
+    );
+    expect(MAX_PROFILE_MCP_SERVERS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/profile-mcp-service.ts',
+        'MAX_PROFILE_MCP_SERVERS'
+      )
+    );
+    expect(MAX_PROFILE_KILO_COMMANDS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/contracts/kilo-commands.ts',
+        'MAX_PROFILE_KILO_COMMANDS'
+      )
+    );
   });
 });

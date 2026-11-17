@@ -9,17 +9,16 @@
 // overview. Mounted with a keyed `useQuery` mock so each read can settle into a
 // different state than its siblings.
 
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/components/pr-review/pr-review-submit.test.tsx */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake refetch factories settle without await because they resolve immediately */
 
 import type * as ReactQuery from '@tanstack/react-query';
 import { type ReactNode } from 'react';
-import { type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { PrReviewMergeScreen } from './pr-review-merge-screen';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 type MockQueryResult = {

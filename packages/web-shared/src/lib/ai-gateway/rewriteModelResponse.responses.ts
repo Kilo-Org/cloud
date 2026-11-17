@@ -5,7 +5,7 @@ import {
   createStreamProgressLogger,
   logTerminalStreamEvent,
   partialCapturedBody,
-  readResponseText,
+  rewriteJsonResponse,
   rewriteSseStream,
   rewriteUsage,
   rewriteResponseMetadata,
@@ -42,44 +42,24 @@ export async function rewriteModelResponse_Responses({
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(
+    return rewriteJsonResponse<
+      OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null }
+    >({
       response,
       headers,
       vercelRequestId,
       capture,
-      reasoningEffort
-    );
-    if ('errorResponse' in textResult) {
-      capture?.setReadError(textResult.error);
-      return textResult.errorResponse;
-    }
-    capture?.setBody(textResult.text);
-    const { text } = textResult;
-    let json: OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null };
-    try {
-      json = JSON.parse(text) as OpenAI.Responses.Response &
-        ResponseMetadata & {
-          usage?: OpenRouterUsage | null;
-        };
-    } catch {
-      // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-    if (json.usage) {
-      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
-    }
-    rewriteResponseMetadata(json, usageContext);
-    for (const item of Array.isArray(json.output) ? json.output : []) {
-      restoreResponsesOutputItemId(item);
-    }
-    return NextResponse.json(json, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+      reasoningEffort,
+      mutate: json => {
+        if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
+        if (json.usage) {
+          rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
+        }
+        rewriteResponseMetadata(json, usageContext);
+        for (const item of Array.isArray(json.output) ? json.output : []) {
+          restoreResponsesOutputItemId(item);
+        }
+      },
     });
   }
 
@@ -127,6 +107,7 @@ export async function rewriteModelResponse_Responses({
               json.response.provider_metadata ?? json.response.providerMetadata ?? providerMetadata;
             if (generationId === undefined && json.response.id) {
               generationId = json.response.id;
+              capture?.setGenerationId(generationId);
               logExceptInTest('[rewriteModelResponse] received generation ID', {
                 kind: 'responses',
                 generationId,

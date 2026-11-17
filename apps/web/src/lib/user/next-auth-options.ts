@@ -122,9 +122,9 @@ import { z } from 'zod';
 import {
   getUserFromSession,
   getUserFromSessionForCredentialIssuance,
-  isBlockedTLD,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export type TurnstileJwtPayload = {

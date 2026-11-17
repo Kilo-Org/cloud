@@ -42,7 +42,11 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function renderLink() {
   act(() => {
-    const element = createElement(ExternalBillingLink, { url: URL, label: LABEL, description: DESCRIPTION });
+    const element = createElement(ExternalBillingLink, {
+      url: URL,
+      label: LABEL,
+      description: DESCRIPTION,
+    });
     if (renderer) {
       renderer.update(element);
     } else {

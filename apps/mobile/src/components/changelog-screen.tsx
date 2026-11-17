@@ -11,8 +11,8 @@ import { useSideInsetStyle } from '@/lib/screen-insets';
 import changelog from '../../CHANGELOG.md';
 import {
   changelogNotesArePending,
-  changelogSections,
   type ChangelogSection,
+  changelogSections,
 } from './changelog-sections';
 
 /**
@@ -50,8 +50,8 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
           {section.version}
         </Text>
       )}
-      {section.notes.map(note => (
-        <View key={note} className="flex-row gap-2">
+      {section.notes.map((note, position) => (
+        <View key={`${note}-${position}`} className="flex-row gap-2">
           <Text className="text-sm text-muted-foreground">•</Text>
           <Text className="flex-1 text-sm text-muted-foreground">{note}</Text>
         </View>

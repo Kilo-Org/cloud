@@ -32,9 +32,6 @@ const VERSION_PREFIX = /^\d+\.\d+\.\d+/;
 /** `fix(mobile)!: ` in a commit subject: the type, its scope and the separator. */
 const CONVENTIONAL_PREFIX = /^([a-z][a-z-]*)(?:\([^)]*\))?!?:\s+(.+)$/;
 
-/** A subject that opens with a bare scope, as `(janitor/test-prune): ...` does. */
-const BARE_SCOPE = /^\(/;
-
 /** A slash-joined type, as `chore/remove autotriage code` writes one. */
 const SLASHED_TYPE = /^[a-z][a-z-]*\//;
 
@@ -62,11 +59,19 @@ function versionOf(heading: string): string {
   return VERSION_PREFIX.exec(text)?.[0] ?? text;
 }
 
-/** `subject` without the pull request reference its commit subject ended in. */
+/**
+ * `subject` without the pull request reference a commit subject ends in.
+ *
+ * The changelog links the pull request a change shipped in, which is how a
+ * maintainer traces it. A reader has no use for the number, and the link is not
+ * drawn here, so both forms of the reference come off with the rest of the
+ * record.
+ */
 function withoutPullRequest(subject: string): string {
   const link = PULL_REQUEST_LINK.exec(subject);
-  const bare = BARE_PULL_REQUEST.exec(link ? subject.slice(0, link.index) : subject);
-  return (bare ? subject.slice(0, bare.index) : subject).trim();
+  const withoutLink = link ? subject.slice(0, link.index) : subject;
+  const bare = BARE_PULL_REQUEST.exec(withoutLink);
+  return (bare ? withoutLink.slice(0, bare.index) : withoutLink).trim();
 }
 
 /**
@@ -76,7 +81,7 @@ function withoutPullRequest(subject: string): string {
  */
 function userFacingNote(bullet: string): string | null {
   const line = bullet.trim();
-  if (NO_CHANGE_NOTES.has(line) || BARE_SCOPE.test(line) || SLASHED_TYPE.test(line)) {
+  if (NO_CHANGE_NOTES.has(line) || line.startsWith('(') || SLASHED_TYPE.test(line)) {
     return null;
   }
   const conventional = CONVENTIONAL_PREFIX.exec(line);
@@ -88,7 +93,9 @@ function userFacingNote(bullet: string): string | null {
   if (subject === '') {
     return null;
   }
-  return subject.charAt(0).toUpperCase() + subject.slice(1);
+  // The notes are English commit subjects, so the English casing is the right
+  // one: a Turkish device would otherwise take the leading `i` to `İ`.
+  return subject.charAt(0).toLocaleUpperCase('en') + subject.slice(1);
 }
 
 /**
@@ -118,15 +125,12 @@ export function changelogSections(markdown: string): ChangelogSection[] {
       flush();
       version = versionOf(heading[1] ?? '');
       notes = [];
-      continue;
-    }
-    if (version === null) {
-      continue;
-    }
-    const bullet = NOTE.exec(line);
-    const note = bullet?.[1] === undefined ? null : userFacingNote(bullet[1]);
-    if (note !== null) {
-      notes.push(note);
+    } else if (version !== null) {
+      const bullet = NOTE.exec(line);
+      const note = bullet?.[1] === undefined ? null : userFacingNote(bullet[1]);
+      if (note !== null) {
+        notes.push(note);
+      }
     }
   }
   flush();

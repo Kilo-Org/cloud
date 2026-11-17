@@ -263,7 +263,9 @@ function setupOrganizationMembership(isMember: boolean) {
   vi.mocked(getWorkerDb).mockReturnValue(
     drizzle(async (sql: string) => {
       if (sql.includes('organization_memberships')) {
-        return { rows: isMember ? [['membership-1']] : [] };
+        // The lookup selects the direct role and the inherited role from one row over
+        // the live organization; a non-member gets a row with no role.
+        return { rows: [[isMember ? 'owner' : null, null]] };
       }
       throw new Error(`Unexpected query: ${sql}`);
     }) as never

@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
@@ -11,6 +11,7 @@ import {
   resolveNewSessionPromptHeight,
 } from '@/components/agents/chat-composer-input-height';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { resolveComposerTopFadeHeight } from '@/components/agents/new-session-prompt-fit';
 
 /**
  * The platform the component reads at render. The input's scroll gate is the
@@ -21,16 +22,25 @@ const platform = vi.hoisted(() => ({ OS: 'ios' as 'android' | 'ios' }));
 
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 
-vi.mock('react-native', () => ({
-  AccessibilityInfo: { announceForAccessibility: vi.fn() },
-  I18nManager: { isRTL: false },
-  Platform: platform,
-  Pressable: 'Pressable',
-  Text: 'Text',
-  TextInput: 'TextInput',
-  View: 'View',
-  useWindowDimensions: () => ({ fontScale: 1, height: 891, scale: 2.625, width: 411 }),
-}));
+/**
+ * The platform reaches the component through `Platform.OS`, and the fade band's
+ * top edge is a module-level constant, so a case re-imports the component after
+ * the platform flips and re-registers this factory for that import.
+ */
+function reactNativeMock() {
+  return {
+    AccessibilityInfo: { announceForAccessibility: vi.fn() },
+    I18nManager: { isRTL: false },
+    Platform: platform,
+    Pressable: 'Pressable',
+    Text: 'Text',
+    TextInput: 'TextInput',
+    View: 'View',
+    useWindowDimensions: () => ({ fontScale: 1, height: 891, scale: 2.625, width: 411 }),
+  };
+}
+
+vi.mock('react-native', reactNativeMock);
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -38,7 +48,9 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   useAnimatedStyle: (factory: () => object) => factory(),
-  useSharedValue: <T,>(value: T) => ({ value }),
+  // The field writes the offset during an event and the fade reads it on the
+  // render that event causes, so the value has to outlive that render.
+  useSharedValue: <T,>(value: T) => useRef({ value }).current,
 }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -206,6 +218,101 @@ describe('NewSessionPrompt input scroll gate', () => {
 
     reportContentHeight(renderer, PROMPT_HEIGHT);
     expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
+
+    renderer.unmount();
+  });
+});
+
+/** The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is 7. */
+const PROMPT_INPUT_INSET = 7;
+/**
+ * A scroll offset where the two platforms' cut lines differ: 10 points into the
+ * line under iOS's field top, which is 17 points into the line under Android's
+ * text box.
+ */
+const SCROLLED_OFFSET = PROMPT_INPUT_INSET + 10;
+
+/** The fade band over the cut top line: where it starts and how tall it is. */
+function findTopFade(renderer: ReactTestRenderer) {
+  const node = renderer.root.find(
+    instance => typeof instance.type === 'string' && (instance.type as string) === 'Animated.View'
+  );
+  const [frame, size] = node.props.style as [{ top?: number }, { height?: number }];
+  return { height: size.height, top: frame.top };
+}
+
+/** Report the field's scroll offset the way the native field does. */
+function reportScrollOffset(
+  renderer: ReactTestRenderer,
+  y: number,
+  flush: (callback: () => void) => unknown
+) {
+  const props = findPromptInput(renderer).props as {
+    onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
+  };
+  flush(() => {
+    props.onScroll({ nativeEvent: { contentOffset: { y } } });
+  });
+}
+
+describe('NewSessionPrompt top fade band', () => {
+  beforeEach(() => {
+    platform.OS = 'ios';
+  });
+
+  it('fades from the field top on iOS, where the text view clips at its bounds', async () => {
+    const renderer = await mountPrompt();
+
+    reportScrollOffset(renderer, SCROLLED_OFFSET, act);
+
+    // The text view draws scrolled text through its padding and cuts it at its
+    // own bounds, so the band starts at the field's top edge, and the offset
+    // has to pass the padding before it reaches the cut line.
+    expect(findTopFade(renderer)).toEqual({
+      height: resolveComposerTopFadeHeight({
+        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
+        scrollOffset: SCROLLED_OFFSET - PROMPT_INPUT_INSET,
+      }),
+      top: 0,
+    });
+
+    renderer.unmount();
+  });
+
+  it('fades from the text box on Android, where the edit text clips at its padding', async () => {
+    platform.OS = 'android';
+    // The band's top edge is a module-level constant, so the component must be
+    // re-imported after the platform flips. The persistent `vi.mock` factory is
+    // cached, so `doMock` re-registers it for the fresh import and
+    // `resetModules` clears the module cache.
+    vi.doMock('react-native', reactNativeMock);
+    vi.resetModules();
+    const { NewSessionPrompt: AndroidPrompt } =
+      await import('@/components/agents/new-session-prompt');
+    const { createElement: createAndroidElement } = await import('react');
+    const { act: androidAct, TestRenderer: AndroidRenderer } = await import('@/test/renderer');
+
+    const holder: { current?: ReactTestRenderer } = {};
+    await androidAct(async () => {
+      await Promise.resolve();
+      holder.current = AndroidRenderer.create(createAndroidElement(AndroidPrompt, makeProps()));
+    });
+    const renderer = holder.current;
+    if (!renderer) {
+      throw new Error('prompt did not mount');
+    }
+
+    reportScrollOffset(renderer, SCROLLED_OFFSET, androidAct);
+
+    // The edit text cuts its text at the padding, so the band starts at the
+    // text box, where the offset already measures the cut.
+    expect(findTopFade(renderer)).toEqual({
+      height: resolveComposerTopFadeHeight({
+        lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
+        scrollOffset: SCROLLED_OFFSET,
+      }),
+      top: PROMPT_INPUT_INSET,
+    });
 
     renderer.unmount();
   });

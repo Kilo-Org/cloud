@@ -14,10 +14,14 @@ import { type KiloPassCreditHistory } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { act, TestRenderer } from '@/test/renderer';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ destructive: '#ff3b30' }),
+}));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
@@ -89,6 +93,8 @@ type SectionCase = {
   name: string;
   /** The copy a ledger with no entries prints. */
   emptyCopy: string;
+  /** The copy a failed first page prints. */
+  errorCopy: string;
   /** The entry's description, printed on its row. */
   entryText: string;
   render: (
@@ -102,6 +108,7 @@ const SECTIONS: SectionCase[] = [
   {
     name: 'credit',
     emptyCopy: 'No Kilo Pass credits yet.',
+    errorCopy: "Couldn't load credit history",
     entryText: CREDIT_DESCRIPTION,
     render: (query, entries, hasMore = false) =>
       renderElement(
@@ -113,6 +120,7 @@ const SECTIONS: SectionCase[] = [
   {
     name: 'billing',
     emptyCopy: 'No billing history yet.',
+    errorCopy: "Couldn't load billing history",
     entryText: BILLING_DESCRIPTION,
     render: (query, entries, hasMore = false) =>
       renderElement(
@@ -183,7 +191,8 @@ describe.each(SECTIONS)('$name history section', section => {
       ledgerQuery({ isError: true, error: RETRYABLE_ERROR }),
       'none'
     );
-    expect(allText(renderer)).toContain("Couldn't load");
+    expect(allText(renderer)).toContain(section.errorCopy);
+    expect(nodesOfType(renderer, 'AlertCircle')).toHaveLength(1);
     expect(retryControls(renderer)).toHaveLength(1);
     renderer.unmount();
   });
@@ -195,9 +204,12 @@ describe.each(SECTIONS)('$name history section', section => {
         ledgerQuery({ isError: true, error: { data: { code: permanent.code } } }),
         'none'
       );
-      expect(allText(renderer)).toContain("Couldn't load");
+      expect(allText(renderer)).toContain(section.errorCopy);
       expect(retryControls(renderer)).toHaveLength(0);
-      expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
+      // The terminal case renders no sort of Retry control: the success-path
+      // affordance it replaces is itself an ordinary button, so the gate is
+      // the node that a caller without a retry cannot print.
+      expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
       renderer.unmount();
     }
   );
@@ -241,7 +253,7 @@ describe.each(SECTIONS)('$name history section', section => {
     const renderer = await section.render(ledgerQuery(), 'one');
     const text = allText(renderer);
     expect(text).toContain(section.entryText);
-    expect(text).not.toContain("Couldn't load");
+    expect(text).not.toContain(section.errorCopy);
     expect(retryControls(renderer)).toHaveLength(0);
     renderer.unmount();
   });

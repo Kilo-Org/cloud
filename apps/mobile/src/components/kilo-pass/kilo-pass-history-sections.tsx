@@ -1,21 +1,22 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { AlertCircle } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type KiloPassBillingHistory,
   type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { isRetryableTrpcError } from '@/lib/trpc-error';
-import { capitalize, cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { capitalize, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
@@ -23,7 +24,7 @@ function HistorySection({ title, children }: Readonly<{ title: string; children:
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
         {title}
       </Text>
-      <View className="gap-3 rounded-lg bg-secondary p-3">{children}</View>
+      <View className="gap-3 rounded-lg bg-secondary p-4">{children}</View>
     </View>
   );
 }
@@ -59,7 +60,7 @@ function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 /**
- * A load that failed: the reason, and a retry beside it.
+ * A load that failed: icon, reason, and a retry for it when one can help.
  *
  * A failed later page keeps the rows the list already has and says more could
  * not be loaded; a failed first page has nothing on screen and says so, rather
@@ -73,26 +74,20 @@ function SectionError({
   message,
   onRetry,
 }: Readonly<{ message: string; onRetry?: (() => void) | undefined }>) {
+  const colors = useThemeColors();
   const { t } = useTranslation();
-  if (!onRetry) {
-    return (
-      <View className="flex-row items-center gap-2">
-        <Text className="text-sm text-muted-foreground">{message}</Text>
-      </View>
-    );
-  }
   return (
-    <Pressable
-      // A failed page's way out is a state action, so its own node carries the
-      // shared state-action floor instead of shrinking to its one text line.
-      className={cn('flex-row items-center gap-2 active:opacity-70', STATE_ACTION_CLASS)}
-      accessibilityRole="button"
-      accessibilityLabel={t('common.retry')}
-      onPress={onRetry}
-    >
-      <Text className="text-sm text-muted-foreground">{message}</Text>
-      <Text className="text-sm text-primary">{t('common.retry')}</Text>
-    </Pressable>
+    <View className="gap-2">
+      <View className="flex-row items-center gap-2">
+        <AlertCircle size={16} color={colors.destructive} />
+        <Text className="min-w-0 flex-1 text-sm text-muted-foreground">{message}</Text>
+      </View>
+      {onRetry ? (
+        <Button variant="outline" accessibilityLabel={t('common.retry')} onPress={onRetry}>
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      ) : null}
+    </View>
   );
 }
 
@@ -158,7 +153,7 @@ export function KiloPassCreditHistorySection({
   } else if (firstPageFailed) {
     body = (
       <SectionError
-        message={t('common.couldnTLoad')}
+        message={t('kiloPass.manage.creditHistoryError')}
         onRetry={
           retryable
             ? () => {
@@ -230,7 +225,7 @@ export function KiloPassBillingHistorySection({
   } else if (firstPageFailed) {
     body = (
       <SectionError
-        message={t('common.couldnTLoad')}
+        message={t('kiloPass.manage.billingHistoryError')}
         onRetry={
           retryable
             ? () => {

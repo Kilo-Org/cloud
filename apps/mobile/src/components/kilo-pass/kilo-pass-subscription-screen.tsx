@@ -136,7 +136,9 @@ function KiloPassDetailBody({
     <KiloPassFrame>
       <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
         <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
+          </Text>
           <Text
             className={cn(
               'text-sm',
@@ -201,7 +203,9 @@ function KiloPassEndedBody({
     <KiloPassFrame>
       <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
         <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
+          </Text>
           <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
         </View>
         {/* A section break larger than the gaps inside a section, so the plan

@@ -370,7 +370,7 @@ export const BenchmarkRegistryResponseSchema = z.object({
     .array(
       z.object({
         model: z.string().trim().min(1),
-        variant: z.string().trim().min(1).nullable(),
+        variant: VariantSchema,
         status: BenchmarkProfileStatusSchema,
       })
     )

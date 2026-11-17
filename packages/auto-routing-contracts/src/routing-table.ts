@@ -33,7 +33,8 @@ export const PoolEntrySchema = z.object({
 export type PoolEntry = z.infer<typeof PoolEntrySchema>;
 
 export const BenchmarkPairSchema = PoolEntrySchema.extend({
-  variant: z.string().trim().min(1).nullable(),
+  // Canonical catalog variant key, shared with every other variant field in the package.
+  variant: VariantSchema,
 });
 export type BenchmarkPair = z.infer<typeof BenchmarkPairSchema>;
 

@@ -418,7 +418,7 @@ export const CustomRouterDecisionSchema = z
   .object({
     entry: CustomRouterEntryRefSchema,
     model: z.string().min(1),
-    variant: z.string().trim().min(1).nullable(),
+    variant: VariantSchema,
     stale: z.boolean(),
     // True when no routing decision named a servable entry, so the default or first servable
     // entry was used. taskType and subtaskType still report the classification, if any.

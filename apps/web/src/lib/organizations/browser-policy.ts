@@ -1,11 +1,10 @@
 import type { Organization } from '@kilocode/db/schema';
 import {
-  MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
   OrganizationBrowserAllowedOriginSchema,
   OrganizationBrowserControlSchema,
+  normalizeOrganizationBrowserOrigin,
   type OrganizationBrowserControl,
 } from '@kilocode/db/schema-types';
-import * as z from 'zod';
 
 /**
  * What a Kilo client must apply for browser automation in this organization.
@@ -22,31 +21,60 @@ export const DEFAULT_ORGANIZATION_BROWSER_POLICY: OrganizationBrowserPolicy = {
   browserAllowedOrigins: [],
 };
 
-const BrowserPolicySettingsSchema = z.object({
-  browserControl: OrganizationBrowserControlSchema.optional(),
-  browserAllowedOrigins: z
-    .array(OrganizationBrowserAllowedOriginSchema)
-    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
-    .optional(),
-});
-
 type BrowserPolicyOrganization = Pick<Organization, 'settings'>;
 
+function readField(settings: unknown, key: string): unknown {
+  if (typeof settings !== 'object' || settings === null) {
+    return undefined;
+  }
+  return Object.getOwnPropertyDescriptor(settings, key)?.value;
+}
+
 /**
- * The policy every client applies. The settings column is jsonb, so the browser
- * fields are validated here rather than trusted; an unreadable value falls back
- * to the documented default for that field.
+ * An absent control mode means the organization never set a policy, so the client
+ * default applies. A stored but unreadable value fails closed: a policy nobody can
+ * read must not grant browser access the organization may not have intended.
+ */
+function readControl(value: unknown): OrganizationBrowserControl {
+  if (value === undefined) {
+    return DEFAULT_ORGANIZATION_BROWSER_POLICY.browserControl;
+  }
+  const parsed = OrganizationBrowserControlSchema.safeParse(value);
+  return parsed.success ? parsed.data : 'off';
+}
+
+/**
+ * Origins are independent grants, so one unreadable entry drops only itself; the
+ * rest of the list still applies. A missing or non-array value grants nothing.
+ */
+function readOrigins(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const origins = new Set<string>();
+  for (const entry of value) {
+    const parsed = OrganizationBrowserAllowedOriginSchema.safeParse(entry);
+    if (!parsed.success) {
+      continue;
+    }
+    const origin = normalizeOrganizationBrowserOrigin(parsed.data);
+    if (origin !== null) {
+      origins.add(origin);
+    }
+  }
+  return [...origins];
+}
+
+/**
+ * The policy every client applies. The settings column is jsonb, so each field is
+ * parsed on its own rather than as one object: a damaged origin must not erase a
+ * readable control mode, and vice versa.
  */
 export function resolveOrganizationBrowserPolicy(
   organization: BrowserPolicyOrganization
 ): OrganizationBrowserPolicy {
-  const parsed = BrowserPolicySettingsSchema.safeParse(organization.settings);
-  if (!parsed.success) {
-    return DEFAULT_ORGANIZATION_BROWSER_POLICY;
-  }
   return {
-    browserControl:
-      parsed.data.browserControl ?? DEFAULT_ORGANIZATION_BROWSER_POLICY.browserControl,
-    browserAllowedOrigins: parsed.data.browserAllowedOrigins ?? [],
+    browserControl: readControl(readField(organization.settings, 'browserControl')),
+    browserAllowedOrigins: readOrigins(readField(organization.settings, 'browserAllowedOrigins')),
   };
 }

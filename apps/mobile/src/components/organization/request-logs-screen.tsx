@@ -8,6 +8,7 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -18,7 +19,6 @@ import {
   DirectionalLogs,
 } from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
@@ -74,16 +74,6 @@ const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } sati
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
 const RowSeparator = () => <View className="h-3" />;
-
-function RowSkeleton() {
-  return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/2 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
-  );
-}
 
 /**
  * The body one window paints. A window keeps the rows it already holds while a
@@ -249,13 +239,7 @@ export function OrganizationRequestLogsScreen() {
   const renderBody = (current: RequestLogsBody): ReactNode => {
     switch (current.kind) {
       case 'loading': {
-        return (
-          <View className="gap-3 px-6 pt-4">
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        );
+        return <RequestLogsSkeleton />;
       }
       case 'retryable': {
         return (

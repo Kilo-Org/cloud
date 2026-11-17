@@ -210,6 +210,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogs: 'DirectionalLogs',
 }));
 
 // Every icon the hub composes, including the web-settings rows' own set: the
@@ -1085,6 +1086,9 @@ describe('Organization hub settings-on-the-web group', () => {
       (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    // The row draws the screen's own glyph through the direction-aware wrapper,
+    // so the card's request-logs icon mirrors with the empty state in RTL.
+    expect(row.props.icon).toBe('DirectionalLogs');
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });

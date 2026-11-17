@@ -5,12 +5,12 @@ import {
 } from '@kilocode/app-shared/organizations';
 import { type Href } from 'expo-router';
 
+import { DirectionalLogs } from '@/components/ui/directional-icons';
 import {
   Cpu,
   KeyRound,
   LineChart,
   Lock,
-  Logs,
   type LucideIcon,
   ScrollText,
   Server,
@@ -218,10 +218,12 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   // "Request logs": the sidebar's billing-role gate, and the procedure behind
   // the page answers only that role, so the row and the screen read one gate.
   // Not `FileText`, which is the Invoices row in the same card, and not Audit
-  // logs' `ScrollText`.
+  // logs' `ScrollText`. The glyph is the one the screen's empty state draws, and
+  // it carries its bullets on the reading-start side, so both go through
+  // `DirectionalLogs` and mirror together in right-to-left.
   {
     area: 'requestLogs',
-    icon: Logs,
+    icon: DirectionalLogs,
     href: () => '/(app)/(tabs)/(3_profile)/organization/request-logs',
     visible: gate => canManageOrganizationBilling(gate.role),
   },

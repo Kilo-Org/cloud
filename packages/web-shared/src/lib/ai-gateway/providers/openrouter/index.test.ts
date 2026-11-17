@@ -33,6 +33,27 @@ import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organiz
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import type * as CustomPricingConfigModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import type * as PreferredProviderOrderConfigModule from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import type { CustomPricing } from '@kilocode/db/schema-types';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  ...jest.requireActual<typeof CustomPricingConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config'
+  ),
+  getCustomPricingConfig: jest.fn(() => Promise.resolve({ models: [] })),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  ...jest.requireActual<typeof PreferredProviderOrderConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config'
+  ),
+  getPreferredProviderOrderConfig: jest.fn(() => Promise.resolve({ rules: [] })),
+}));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
   const actual = jest.requireActual<typeof UnavailableModelsModule>(
@@ -529,6 +550,162 @@ describe('Vercel-only models', () => {
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === vercelOnlyModel.id)).toBe(false);
+  });
+});
+
+describe('alias pricing', () => {
+  const alias = buildModel({
+    id: '~vendor/family-latest',
+    name: 'Vendor: Family Latest',
+    description: 'Always the newest family model',
+    context_length: 64_000,
+    pricing: { prompt: '0.000003', completion: '0.000006' },
+  });
+  const target = buildModel({
+    id: 'vendor/family-0101',
+    name: 'Vendor: Family',
+    pricing: { prompt: '0.0000025', completion: '0.0000055' },
+  });
+  const firstRoutePricing = { prompt: '0.000002', completion: '0.000004' };
+  const preferredRoutePricing = { prompt: '0.0000005', completion: '0.0000015' };
+
+  function customPricing(
+    model: string,
+    prompt_per_million: number,
+    overrides: Partial<CustomPricing> = {}
+  ): CustomPricing {
+    return {
+      model,
+      pricing: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million,
+            completion_per_million: prompt_per_million * 2,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  async function getCatalog(catalog: OpenRouterModel[] = [alias, target]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: catalog } }))
+    ) as unknown as typeof fetch;
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    return (id: string) => models.data.find(model => model.id === id);
+  }
+
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [alias.id]: {
+        id: alias.id,
+        name: alias.name,
+        endpoints: [{ tag: 'first-route', pricing: firstRoutePricing }],
+        alias_target: { slug: target.id },
+      },
+      [target.id]: {
+        id: target.id,
+        name: target.name,
+        endpoints: [
+          { tag: 'first-route', pricing: firstRoutePricing },
+          { tag: 'preferred-route', pricing: preferredRoutePricing },
+        ],
+      },
+    });
+    // The rule matches the target id but not the alias id.
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: [target.id], providers: ['preferred-route'] }],
+    });
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getPreferredProviderOrderConfig)
+      .mockResolvedValue(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
+  });
+
+  it("shows the target's preferred route price on the alias and keeps the alias identity", async () => {
+    const model = await getCatalog();
+
+    expect(model(target.id)?.pricing).toEqual(preferredRoutePricing);
+    expect(model(alias.id)).toMatchObject({
+      id: alias.id,
+      name: alias.name,
+      description: alias.description,
+      context_length: alias.context_length,
+      alias_target: target.id,
+      pricing: preferredRoutePricing,
+    });
+  });
+
+  it("shows the target's custom price on the alias without the target's discount label", async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue({
+      models: [customPricing(target.id, 0.25, { discountPercentage: 50 })],
+    });
+
+    const model = await getCatalog();
+
+    expect(model(target.id)?.name).toBe(`${target.name} (50% off)`);
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toEqual(model(target.id)?.pricing);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
+  });
+
+  it("prefers the alias's own custom price over the target's", async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue({
+      models: [
+        customPricing(target.id, 0.25),
+        customPricing(alias.id, 0.75, { discountPercentage: 10 }),
+      ],
+    });
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.name).toBe(`${alias.name} (10% off)`);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000750000',
+      completion: '0.000001500000',
+    });
+    expect(model(target.id)?.pricing).toMatchObject({ prompt: '0.000000250000' });
+  });
+
+  it("ignores the alias's fallback-only custom price, as other catalog entries do", async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue({
+      models: [customPricing(alias.id, 0.75, { fallbackOnly: true })],
+    });
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.pricing).toEqual(preferredRoutePricing);
+  });
+
+  it('keeps the alias price when the target is not in the upstream catalog', async () => {
+    const model = await getCatalog([alias]);
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)).toMatchObject({
+      alias_target: target.id,
+      pricing: firstRoutePricing,
+    });
+  });
+
+  it('keeps the alias price when the target is unavailable', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([target.id]));
+
+    const model = await getCatalog();
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)?.pricing).toEqual(firstRoutePricing);
   });
 });
 

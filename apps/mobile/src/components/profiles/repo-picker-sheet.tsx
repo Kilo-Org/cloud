@@ -136,6 +136,7 @@ export function RepoPickerSheet({
     body = (
       <EmptyState
         placement="top"
+        compact
         icon={isSearching ? SearchX : GitBranch}
         title={
           isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')

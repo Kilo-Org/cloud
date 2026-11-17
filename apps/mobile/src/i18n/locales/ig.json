@@ -4589,6 +4589,7 @@
       "title": "Ihe mkpalite na webhook",
       "subtitle": "Mee ka ọsọ Cloud Agent na-akpaghị aka site na oku webhook ma ọ bụ nhazi oge.",
       "new": "Ihe mkpalite ọhụrụ",
+      "create": "Mepụta ihe mkpalite",
       "emptyTitle": "Enwebeghị ihe mkpalite",
       "emptyDescription": "Mepụta ihe mkpalite iji malite ọsọ Cloud Agent site na oku webhook ma ọ bụ na nhazi oge.",
       "loadFailedTitle": "Enweghị ike ibudata ihe mkpalite",

@@ -4589,6 +4589,7 @@
       "title": "Izibangeli nama-webhook",
       "subtitle": "Yenza kuzenzekele ukusebenza kwe-Cloud Agent kusuka ocingweni lwe-webhook noma ohlelweni lwesikhathi.",
       "new": "Isibangeli esisha",
+      "create": "Dala isibangeli",
       "emptyTitle": "Azikho izibangeli okwamanje",
       "emptyDescription": "Dala isibangeli ukuze uqale ukusebenza kwe-Cloud Agent kusuka ocingweni lwe-webhook noma ngohlelo lwesikhathi.",
       "loadFailedTitle": "Akukwazekanga ukulayisha izibangeli",

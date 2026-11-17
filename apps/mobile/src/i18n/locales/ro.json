@@ -4659,6 +4659,7 @@
       "title": "Declanșatoare și webhook-uri",
       "subtitle": "Automatizează rulările Cloud Agent dintr-un apel webhook sau conform unui program.",
       "new": "Declanșator nou",
+      "create": "Creează declanșator",
       "emptyTitle": "Nu există declanșatoare încă",
       "emptyDescription": "Creează un declanșator pentru a porni o rulare Cloud Agent dintr-un apel webhook sau conform unui program.",
       "loadFailedTitle": "Nu s-au putut încărca declanșatoarele",

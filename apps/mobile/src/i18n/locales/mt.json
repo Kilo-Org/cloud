@@ -4799,6 +4799,7 @@
       "title": "Skattaturi u webhooks",
       "subtitle": "Awtomatizza l-eżekuzzjonijiet tal-Cloud Agent minn sejħa webhook jew skeda.",
       "new": "Skattatur ġdid",
+      "create": "Oħloq skattatur",
       "emptyTitle": "Għadhom ma hemmx skattaturi",
       "emptyDescription": "Oħloq skattatur biex tibda eżekuzzjoni tal-Cloud Agent minn sejħa webhook jew fuq skeda.",
       "loadFailedTitle": "Ma setgħux jitgħabbew l-iskattaturi",

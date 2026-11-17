@@ -4589,6 +4589,7 @@
       "title": "Triggers en webhooks",
       "subtitle": "Automatiseer Cloud Agent-uitvoeringen via een webhookaanroep of een planning.",
       "new": "Nieuwe trigger",
+      "create": "Trigger aanmaken",
       "emptyTitle": "Nog geen triggers",
       "emptyDescription": "Maak een trigger om een Cloud Agent-uitvoering te starten via een webhookaanroep of volgens een planning.",
       "loadFailedTitle": "Kan triggers niet laden",

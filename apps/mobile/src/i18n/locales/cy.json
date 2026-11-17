@@ -4869,6 +4869,7 @@
       "title": "Sbardunau a bachynnau gwe",
       "subtitle": "Awtomeiddio rhediadau Cloud Agent o alwad bachyn gwe neu o atodlen.",
       "new": "Sbardun newydd",
+      "create": "Crëwch sbardun",
       "emptyTitle": "Dim sbardunau eto",
       "emptyDescription": "Crëwch sbardun i ddechrau rhediad Cloud Agent o alwad bachyn gwe neu ar atodlen.",
       "loadFailedTitle": "Methwyd llwytho sbardunau",

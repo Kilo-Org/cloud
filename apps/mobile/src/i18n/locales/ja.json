@@ -4589,6 +4589,7 @@
       "title": "トリガーとウェブフック",
       "subtitle": "ウェブフック呼び出しまたはスケジュールからCloud Agentの実行を自動化します。",
       "new": "新規トリガー",
+      "create": "トリガーを作成",
       "emptyTitle": "トリガーはまだありません",
       "emptyDescription": "ウェブフック呼び出しまたはスケジュールでCloud Agentの実行を開始するトリガーを作成します。",
       "loadFailedTitle": "トリガーを読み込めませんでした",

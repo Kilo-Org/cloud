@@ -4589,6 +4589,7 @@
       "title": "Kveikjur og vefkrókar",
       "subtitle": "Gera keyrslur Cloud Agent sjálfvirkar úr vefkrókarkalli eða á áætlun.",
       "new": "Ný kveikja",
+      "create": "Búðu til kveikju",
       "emptyTitle": "Engar kveikjur ennþá",
       "emptyDescription": "Búðu til kveikju til að hefja keyrslu Cloud Agent úr vefkrókarkalli eða á áætlun.",
       "loadFailedTitle": "Gat ekki hlaðið kveikjum",

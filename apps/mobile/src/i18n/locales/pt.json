@@ -4665,6 +4665,7 @@
       "title": "Acionadores e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de uma programação.",
       "new": "Novo acionador",
+      "create": "Criar acionador",
       "emptyTitle": "Ainda não há acionadores",
       "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
       "loadFailedTitle": "Não foi possível carregar os acionadores",

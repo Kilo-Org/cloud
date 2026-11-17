@@ -4589,6 +4589,7 @@
       "title": "Snellers en webhake",
       "subtitle": "Automatiseer Cloud Agent-lopies vanaf ’n webhaakoproep of ’n skedule.",
       "new": "Nuwe sneller",
+      "create": "Skep sneller",
       "emptyTitle": "Nog geen snellers nie",
       "emptyDescription": "Skep ’n sneller om ’n Cloud Agent-lopie vanaf ’n webhaakoproep of volgens ’n skedule te begin.",
       "loadFailedTitle": "Kon nie snellers laai nie",

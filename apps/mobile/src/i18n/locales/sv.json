@@ -4589,6 +4589,7 @@
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
       "new": "Ny utlösare",
+      "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
       "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",

@@ -4659,6 +4659,7 @@
       "title": "Disparadores y webhooks",
       "subtitle": "Automatiza ejecuciones de Cloud Agent desde una llamada de webhook o una programación.",
       "new": "Nuevo disparador",
+      "create": "Crear disparador",
       "emptyTitle": "Aún no hay disparadores",
       "emptyDescription": "Crea un disparador para iniciar una ejecución de Cloud Agent desde una llamada de webhook o de forma programada.",
       "loadFailedTitle": "No se pudieron cargar los disparadores",

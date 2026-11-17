@@ -4589,6 +4589,7 @@
       "title": "트리거 및 웹훅",
       "subtitle": "웹훅 호출 또는 일정으로 Cloud Agent 실행을 자동화하세요.",
       "new": "새 트리거",
+      "create": "트리거 만들기",
       "emptyTitle": "아직 트리거가 없습니다",
       "emptyDescription": "웹훅 호출 또는 일정에 따라 Cloud Agent 실행을 시작하려면 트리거를 만드세요.",
       "loadFailedTitle": "트리거를 불러오지 못했습니다",

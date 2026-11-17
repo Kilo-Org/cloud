@@ -4589,6 +4589,7 @@
       "title": "Deklanchè ak wèbhuk",
       "subtitle": "Otomatize egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa yon pwogramasyon.",
       "new": "Nouvo deklanchè",
+      "create": "Kreye deklanchè",
       "emptyTitle": "Pa gen deklanchè ankò",
       "emptyDescription": "Kreye yon deklanchè pou kòmanse yon egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa sou yon pwogramasyon.",
       "loadFailedTitle": "Nou pa t kapab chaje deklanchè yo",

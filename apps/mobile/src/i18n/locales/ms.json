@@ -4589,6 +4589,7 @@
       "title": "Pencetus & webhook",
       "subtitle": "Automatkan larian Cloud Agent daripada panggilan webhook atau jadual.",
       "new": "Pencetus baharu",
+      "create": "Cipta pencetus",
       "emptyTitle": "Belum ada pencetus",
       "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
       "loadFailedTitle": "Tidak dapat memuatkan pencetus",

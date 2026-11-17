@@ -4589,6 +4589,7 @@
       "title": "Tətikləyicilər və vebhuklar",
       "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",
       "new": "Yeni tətikləyici",
+      "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
       "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",

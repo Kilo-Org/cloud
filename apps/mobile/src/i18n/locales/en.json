@@ -4589,6 +4589,7 @@
       "title": "Triggers & webhooks",
       "subtitle": "Automate Cloud Agent runs from a webhook call or a schedule.",
       "new": "New trigger",
+      "create": "Create trigger",
       "emptyTitle": "No triggers yet",
       "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
       "loadFailedTitle": "Couldn't load triggers",

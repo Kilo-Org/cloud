@@ -4659,6 +4659,7 @@
       "title": "Trigeri un tīmekļa āķi",
       "subtitle": "Automatizējiet Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "new": "Jauns trigeris",
+      "create": "Izveidot trigeri",
       "emptyTitle": "Vēl nav trigeru",
       "emptyDescription": "Izveidojiet trigeri, lai sāktu Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "loadFailedTitle": "Neizdevās ielādēt trigerus",

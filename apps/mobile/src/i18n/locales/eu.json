@@ -4589,6 +4589,7 @@
       "title": "Abiarazleak eta webhookak",
       "subtitle": "Automatizatu Cloud Agent exekuzioak webhook dei batetik edo ordutegi baten arabera.",
       "new": "Abiarazle berria",
+      "create": "Sortu abiarazlea",
       "emptyTitle": "Oraindik ez dago abiarazlerik",
       "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
       "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",

@@ -4799,6 +4799,7 @@
       "title": "Truicir agus crúcaí gréasáin",
       "subtitle": "Uathoibrigh ritheanna Cloud Agent ó ghlao crúca gréasáin nó ó sceideal.",
       "new": "Truicear nua",
+      "create": "Cruthaigh truicear",
       "emptyTitle": "Níl truicir ar bith ann fós",
       "emptyDescription": "Cruthaigh truicear chun rith Cloud Agent a thosú ó ghlao crúca gréasáin nó ar sceideal.",
       "loadFailedTitle": "Níorbh fhéidir truicir a lódáil",

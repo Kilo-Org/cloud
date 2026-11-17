@@ -538,6 +538,23 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe(true);
       await toolTurn;
+      if (!server) throw new Error('Kilo v2 server is not started');
+      const staleReply: unknown = await createKilo2Api(server)
+        .request(`${kilo2SessionPath(sessionId)}/permission/${permission.id}/reply`, {
+          method: 'POST',
+          body: { decision: 'reject' },
+          signal,
+        })
+        .catch(error => error);
+      expect(staleReply).toBeInstanceOf(Error);
+      expect(staleReply).toMatchObject({ status: 404 });
+      expect(
+        await harness.answer({
+          directory,
+          signal,
+          reply: { action: 'permission', permissionId: permission.id, response: 'reject' },
+        })
+      ).toBe(false);
       expect(latestContextUpdate()).toBeDefined();
       expect(latestContextUpdate()).not.toContain('workspace_callback-marker');
       expect(

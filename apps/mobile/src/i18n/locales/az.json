@@ -1366,7 +1366,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
+    "sessionSignOutFailed": "Bu sessiyadan çıxış etmək mümkün olmadı. Yenidən cəhd edin.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Ödəniş tarixçəsi",
       "billingHistoryEmpty": "Hələ ödəniş tarixçəsi yoxdur.",
+      "billingHistoryError": "Ödəniş tarixçəsi yüklənə bilmədi",
       "cancel": "Abunəliyi ləğv et",
       "cancelDescription": "Kilo Pass ödəniş dövrünün sonunadək aktiv qalacaq və yenilənməyəcək.",
       "cancelScheduled": "{{date}} tarixində ləğv olunur",
       "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
       "cancelled": "Abunəlik ləğv edildi",
       "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
+      "creditHistoryError": "Kredit tarixçəsi yüklənə bilmədi",
       "resume": "Abunəliyi bərpa et",
       "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
       "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
-      "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
+      "accessDeniedDescription": "Təşkilat sahibindən və ya inzibatçısından sənə giriş icazəsi verməsini xahiş et."
     },
     "create": {
       "title": "Təşkilat yarat",
@@ -4681,5 +4685,175 @@
     "unavailableDescription": "Bu paylaşım linkinin müddəti bitib və ya o ləğv edilib.",
     "transcriptUnavailableTitle": "Bu transkripti yükləmək alınmadı",
     "transcriptUnavailableDescription": "Link hələ də işləyir. Bir az sonra yenidən cəhd edin."
+  },
+  "organizationGuardrails": {
+    "title": "Süni intellekt qoruyucu qaydaları",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "unavailable": "Süni intellekt qoruyucu qaydaları bu təşkilat üçün əlçatan deyil.",
+    "loadError": "Süni intellekt qoruyucu qaydaları yüklənmədi",
+    "statusSaving": "Yadda saxlanılır…",
+    "statusSaved": "Yadda saxlanıldı",
+    "statusFailed": "Yadda saxlamaq alınmadı.",
+    "inputTitle": "Giriş üçün qoruyucu qaydalar",
+    "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda bloklayan detektor sorğunu rədd edir.",
+    "outputTitle": "Çıxış üçün qoruyucu qaydalar",
+    "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
+    "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",
+    "detectorsHintOutput": "\"Blokla\" işarələnmiş cavabı uğursuz edir. \"Yalnız qeydə al\" cavabı ləngitmədən onu sadəcə qeydə alır.",
+    "choiceLog": "Yalnız qeydə al",
+    "applyTo": "Kimlərə tətbiq olunur",
+    "applyToAllMembers": "Bütün üzvlər",
+    "applyKiloDefault": "Kilo standartını tətbiq et",
+    "invalidSavedTitle": "Giriş detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedBody": "Giriş detektorları yenidən yadda saxlanılana qədər sorğular bloklanır. Aşağıdakı detektorlar Kilo standartı ilə başlayır.",
+    "invalidSavedOutputTitle": "Çıxış detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedOutputBody": "Çıxış detektorları yenidən yadda saxlanılana qədər cavablar verilmir. Aşağıda çıxış detektorlarını seçin.",
+    "blockingOutputNote": "Bloklayan çıxış detektoru Enkrypt cavabın hamısını yoxlayana qədər onu saxlayır. Gecikmənin qarşısını almaq üçün \"Yalnız qeydə al\" seçin.",
+    "inputDetectorRequired": "Ən azı bir giriş detektorunu aktivləşdirin.",
+    "outputDetectorRequired": "Ən azı bir çıxış detektorunu aktivləşdirin.",
+    "rulesTooMany": "Ən çoxu {{max}} qayda əlavə edin.",
+    "ruleIdRequired": "Qayda ID-sini daxil edin.",
+    "ruleIdInvalid": "Qayda ID-si yalnız hərflərdən, rəqəmlərdən, nöqtələrdən, defislərdən və alt xətlərdən ibarət ola bilər.",
+    "ruleTextRequired": "Qaydanın nəyi qadağan etdiyini və ya tələb etdiyini təsvir edin.",
+    "keywordTooLong": "Hər açar söz ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "topicTooLong": "Hər mövzu ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "keywordsTooMany": "Ən çoxu {{max}} açar söz əlavə edin.",
+    "topicsTooMany": "Ən çoxu {{max}} mövzu əlavə edin.",
+    "piiEntityRequired": "Aşkarlanacaq ən azı bir məlumat növü seçin.",
+    "keywordRequired": "Ən azı bir açar söz əlavə edin.",
+    "topicRequired": "Ən azı bir mövzu əlavə edin.",
+    "policyTextRequired": "Siyasət mətnini daxil edin.",
+    "ruleRequired": "Ən azı bir qayda əlavə edin.",
+    "ruleIdDuplicate": "Hər qaydanın öz qayda ID-si olmalıdır.",
+    "piiEntities": "Aşkarlanacaq məlumatlar",
+    "keywordsLabel": "Açar sözlər",
+    "keywordsHint": "Hər sətirdə bir açar söz.",
+    "topicsHint": "Hər sətirdə bir mövzu.",
+    "policyFormat": "Siyasət formatı",
+    "policyFormatRules": "Strukturlaşdırılmış qaydalar",
+    "policyFormatRulesDescription": "Hər tələb üçün kateqoriya və ciddilik dərəcəsi olan bir qayda. Tövsiyə olunur.",
+    "policyFormatText": "Siyasət mətni",
+    "policyFormatTextDescription": "Mövcud siyasəti sadə mətn kimi yapışdırın.",
+    "rulesEmpty": "Hələ qayda yoxdur. Hər qayda girişlərdə olmamalı və ya onların istəməməli olduğu bir şeyi təsvir edir.",
+    "addRule": "Qayda əlavə et",
+    "ruleNumber": "Qayda {{number}}",
+    "ruleRemove": "{{number}} nömrəli qaydanı sil",
+    "ruleIdLabel": "Qayda ID-si",
+    "ruleNameLabel": "Ad (istəyə bağlı)",
+    "ruleTextLabel": "Qayda",
+    "ruleRiskCategory": "Risk kateqoriyası",
+    "ruleApplicability": "Əhatə dairəsi",
+    "ruleFrameworks": "Çərçivələr",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt inyeksiyası",
+        "description": "Təlimatları ləğv etmək və ya modelin məhdudiyyətlərini aşmaq (jailbreak) cəhdlərini aşkarlayır."
+      },
+      "policyViolation": {
+        "label": "Siyasət pozuntusu",
+        "description": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan girişləri işarələyir.",
+        "descriptionOutput": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan cavabları işarələyir."
+      },
+      "pii": {
+        "label": "PII və məxfi məlumatlar",
+        "description": "Şəxsi məlumatları, giriş məlumatlarını, IP ünvanlarını və URL-ləri aşkarlayır."
+      },
+      "keywords": {
+        "label": "Qadağan olunmuş açar sözlər",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı açar sözü ehtiva edən cavabları aşkarlayır."
+      },
+      "topics": {
+        "label": "Mövzular",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı mövzuya aid cavabları işarələyir."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, təhqiramiz, təhdidedici və ya nifrət dolu dili aşkarlayır."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Cinsi və ya başqa səbəbdən iş mühiti üçün uyğun olmayan məzmunu aşkarlayır."
+      },
+      "bias": {
+        "label": "Qərəzlilik",
+        "description": "Qərəzli və ya ayrı-seçkilik edən dili aşkarlayır."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Şəxsi məlumatlar",
+        "description": "Adlar, e-poçt ünvanları, telefon nömrələri."
+      },
+      "secrets": {
+        "label": "Məxfi məlumatlar",
+        "description": "API açarları, tokenlər, parollar."
+      },
+      "ipAddress": {
+        "label": "IP ünvanları",
+        "description": "IPv4 və IPv6 ünvanları."
+      },
+      "url": {
+        "label": "URL-lər",
+        "description": "Veb ünvanlar."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Kibertəhlükəsizlik və fırıldaqçılıq",
+      "safetyHarm": "Təhlükəsizlik və zərər",
+      "privacyDataProtection": "Məxfilik və məlumatların qorunması",
+      "brandReputationTrust": "Brend və reputasiya",
+      "biasFairnessEthical": "Qərəzlilik və ədalətlilik",
+      "legalIpLiability": "Hüquqi və əqli mülkiyyət məsuliyyəti",
+      "productMisuse": "Məhsuldan sui-istifadə",
+      "performanceQuality": "Performans və keyfiyyət"
+    },
+    "applicability": {
+      "user": "İstifadəçi girişi",
+      "userAssistant": "İstifadəçi girişi və cavablar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Aİ Süni İntellekt Aktı",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise funksiyası",
+    "enterpriseOnly": "Bu funksiya yalnız Enterprise üçündür.",
+    "readOnly": "Bu ayarları yalnız təşkilat sahibləri və adminlər dəyişə bilər.",
+    "loadError": "Provayderlər və modellər yüklənmədi",
+    "tabModels": "Modellər",
+    "tabProviders": "Provayderlər",
+    "tabGateways": "Şlüzlər",
+    "modelsDescription": "Modeli bütün üzvlər üçün bloklamaq üçün onu söndürün. İcazə verilən provayderlərin modelləri standart olaraq aktivdir.",
+    "modelsDeniedOnly": "Yalnız qadağan olunanlar",
+    "modelsEmpty": "Bu axtarışa uyğun model yoxdur.",
+    "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
+    "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
+    "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "allowAllShown": "Göstərilənlərin hamısına icazə ver",
+    "denyAllShown": "Göstərilənlərin hamısını qadağan et",
+    "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",
+    "emptyProviderList": "Ən azı bir provayderə icazə verin. Boş siyahı bütün Kilo model yönləndirmələrini bloklayır.",
+    "gatewaysUnavailable": "Şlüz ayarları bu təşkilat üçün əlçatan deyil.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter sorğuları regiona bağlanmır.",
+    "inferenceRegion": "İnferens regionu",
+    "inferenceRegionDescription": "Vercel AI Gateway sorğularını bu regiona bağlayır. Orada əlçatan olmayan modelə sorğular uğursuz olur.",
+    "disableOpenrouterNote": "OpenRouter deaktiv edildikdə, sorğuları onun vasitəsilə yönləndirən BYOK açarları da bloklanır.",
+    "emptyModelList": "Ən azı bir modeli aktiv saxlayın. Bütün modelləri rədd etsəniz, üzvlərin istifadə edəcəyi heç nə qalmaz.",
+    "catalogUnavailable": "Tam model kataloqu yüklənmədi, buna görə yalnız yadda saxlanmış siyahılarınız göstərilir. Bütün modelləri yükləmək üçün yenidən cəhd edin.",
+    "region": {
+      "global": "Qlobal",
+      "us": "Amerika Birləşmiş Ştatları",
+      "eu": "Avropa İttifaqı",
+      "au": "Avstraliya",
+      "jp": "Yaponiya"
+    }
   }
 }

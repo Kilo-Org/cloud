@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "ການລະເມີດ SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "ການກວດສອບຄວາມປອດໄພມີການອັບເດດ"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "ເຊດຊັນ Kilo ຂອງທ່ານພ້ອມຄວບຄຸມຈາກໂທລະສັບຂອງທ່ານ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

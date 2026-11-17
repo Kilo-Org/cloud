@@ -1458,7 +1458,8 @@
       "noReviews": "Dim adolygiadau eto",
       "noReviewsDescription": "Bydd adolygiadau'n ymddangos yma ar ôl i'r Adolygydd cod adolygu cais tynnu.",
       "startManualReview": "Dechrau adolygiad â llaw",
-      "configureProvider": "Ffurfweddu darparwr"
+      "configureProvider": "Ffurfweddu darparwr",
+      "connectOwnerOnly": "Gofynnwch i berchennog sefydliad neu weinyddwr gysylltu darparwr."
     },
     "platformList": {
       "checking": "Yn gwirio…",
@@ -3193,6 +3194,7 @@
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
     "signOutSessionLabel": "Allgofnodi {{device}}, wedi mewngofnodi {{signedIn}}, gwelwyd ddiwethaf {{lastSeen}}",
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
+    "sessionSignOutFailed": "Methu ag allgofnodi'r sesiwn hon. Rhowch gynnig arall.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
     "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gwelwyd ddiwethaf {{lastSeen}}. Gall gadw mynediad at yr API am hyd at awr.",
@@ -3324,12 +3326,14 @@
     "manage": {
       "billingHistory": "Hanes bilio",
       "billingHistoryEmpty": "Dim hanes bilio eto.",
+      "billingHistoryError": "Methwyd â llwytho hanes bilio",
       "cancel": "Canslo tanysgrifiad",
       "cancelDescription": "Bydd eich Kilo Pass yn parhau'n weithredol tan ddiwedd y cyfnod bilio ac ni fydd yn adnewyddu.",
       "cancelScheduled": "Yn cael ei ganslo ar {{date}}",
       "cancelScheduledChange": "Canslo'r newid a drefnwyd",
       "cancelled": "Tanysgrifiad wedi'i ganslo",
       "creditHistoryEmpty": "Dim credydau Kilo Pass eto.",
+      "creditHistoryError": "Methwyd â llwytho hanes y credydau",
       "resume": "Ailddechrau tanysgrifiad",
       "resumeCancelledDescription": "Bydd eich Kilo Pass yn dechrau adnewyddu'n awtomatig eto.",
       "resumePausedDescription": "Bydd eich Kilo Pass yn ailddechrau nawr, cyn y dyddiad ailddechrau a drefnwyd.",
@@ -3566,7 +3570,7 @@
       "selectOrganization": "Dewis sefydliad",
       "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau.",
       "unavailableSessionsDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Ni ellir llwytho ei sesiynau.",
-      "accessDeniedDescription": "Nid oes gennych fynediad i'r sefydliad hwn."
+      "accessDeniedDescription": "Gofynnwch i berchennog neu weinyddwr sefydliad roi mynediad i chi."
     },
     "create": {
       "title": "Creu sefydliad",
@@ -4961,5 +4965,175 @@
     "unavailableDescription": "Mae'r ddolen rannu hon wedi dod i ben neu wedi'i dirymu.",
     "transcriptUnavailableTitle": "Methu llwytho'r trawsgrifiad hwn",
     "transcriptUnavailableDescription": "Mae'r ddolen yn dal i weithio. Rhowch gynnig arall arni mewn ychydig."
+  },
+  "organizationGuardrails": {
+    "title": "Mesurau diogelu AI",
+    "permissionDenied": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu rheoli Mesurau diogelu AI.",
+    "unavailable": "Nid yw Mesurau diogelu AI ar gael i'r sefydliad hwn.",
+    "loadError": "Methu llwytho Mesurau diogelu AI",
+    "statusSaving": "Wrthi'n cadw…",
+    "statusSaved": "Wedi cadw",
+    "statusFailed": "Methu cadw.",
+    "inputTitle": "Mesurau diogelu mewnbwn",
+    "inputDescription": "Mae'n sganio pob mewnbwn gydag Enkrypt AI, gan gynnwys canlyniadau offer. Mae synhwyrydd sy'n blocio yn gwrthod cais pan nad yw Enkrypt ar gael.",
+    "outputTitle": "Mesurau diogelu allbwn",
+    "outputDescription": "Mae'n sganio ymatebion gydag Enkrypt AI cyn i aelodau eu derbyn. Wedi diffodd oni bai eich bod yn ei droi ymlaen.",
+    "detectorsHint": "Mae Blocio yn gwrthod cais sydd wedi'i nodi. Mae Cofnodi yn unig yn ei gofnodi heb oedi'r cais.",
+    "detectorsHintOutput": "Mae Blocio yn gwneud i ymateb sydd wedi'i nodi fethu. Mae Cofnodi yn unig yn ei gofnodi heb oedi'r ymateb.",
+    "choiceLog": "Cofnodi yn unig",
+    "applyTo": "Cymhwyso i",
+    "applyToAllMembers": "Pob aelod",
+    "applyKiloDefault": "Cymhwyso Rhagosodiad Kilo",
+    "invalidSavedTitle": "Methu darllen y gosodiadau synwyryddion mewnbwn sydd wedi'u cadw",
+    "invalidSavedBody": "Mae ceisiadau'n cael eu blocio nes bod y synwyryddion mewnbwn yn cael eu cadw eto. Mae'r synwyryddion isod yn dechrau o Ragosodiad Kilo.",
+    "invalidSavedOutputTitle": "Methu darllen y gosodiadau synwyryddion allbwn sydd wedi'u cadw",
+    "invalidSavedOutputBody": "Mae ymatebion yn cael eu dal yn ôl nes bod y synwyryddion allbwn yn cael eu cadw eto. Dewiswch synwyryddion allbwn isod.",
+    "blockingOutputNote": "Mae synhwyrydd allbwn sy'n blocio yn dal ymateb nes bod Enkrypt wedi gwirio'r cyfan. Defnyddiwch Cofnodi yn unig i osgoi'r oedi.",
+    "inputDetectorRequired": "Trowch o leiaf un synhwyrydd mewnbwn ymlaen.",
+    "outputDetectorRequired": "Trowch o leiaf un synhwyrydd allbwn ymlaen.",
+    "rulesTooMany": "Ychwanegwch hyd at {{max}} o reolau.",
+    "ruleIdRequired": "Rhowch ID rheol.",
+    "ruleIdInvalid": "Dim ond llythrennau, rhifau, dotiau, cysylltnodau a thanlinellau y gall ID rheol eu cynnwys.",
+    "ruleTextRequired": "Disgrifiwch beth mae'r rheol yn ei wahardd neu'n ei fynnu.",
+    "keywordTooLong": "Gall pob allweddair fod hyd at {{max}} nod.",
+    "topicTooLong": "Gall pob pwnc fod hyd at {{max}} nod.",
+    "keywordsTooMany": "Ychwanegwch hyd at {{max}} o allweddeiriau.",
+    "topicsTooMany": "Ychwanegwch hyd at {{max}} o bynciau.",
+    "piiEntityRequired": "Dewiswch o leiaf un math o ddata i'w ganfod.",
+    "keywordRequired": "Ychwanegwch o leiaf un allweddair.",
+    "topicRequired": "Ychwanegwch o leiaf un pwnc.",
+    "policyTextRequired": "Nodwch y testun polisi.",
+    "ruleRequired": "Ychwanegwch o leiaf un rheol.",
+    "ruleIdDuplicate": "Rhaid i bob rheol gael ei ID rheol ei hun.",
+    "piiEntities": "Data i'w ganfod",
+    "keywordsLabel": "Allweddeiriau",
+    "keywordsHint": "Un allweddair i bob llinell.",
+    "topicsHint": "Un pwnc i bob llinell.",
+    "policyFormat": "Fformat y polisi",
+    "policyFormatRules": "Rheolau strwythuredig",
+    "policyFormatRulesDescription": "Un rheol i bob gofyniad, gyda chategori a difrifoldeb. Argymhellir.",
+    "policyFormatText": "Testun polisi",
+    "policyFormatTextDescription": "Gludwch bolisi sy'n bodoli eisoes fel testun plaen.",
+    "rulesEmpty": "Dim rheolau eto. Mae pob rheol yn disgrifio un peth na ddylai mewnbynnau ei gynnwys na gofyn amdano.",
+    "addRule": "Ychwanegu rheol",
+    "ruleNumber": "Rheol {{number}}",
+    "ruleRemove": "Tynnu rheol {{number}}",
+    "ruleIdLabel": "ID y rheol",
+    "ruleNameLabel": "Enw (dewisol)",
+    "ruleTextLabel": "Rheol",
+    "ruleRiskCategory": "Categori risg",
+    "ruleApplicability": "Cwmpas",
+    "ruleFrameworks": "Fframweithiau",
+    "detector": {
+      "promptInjection": {
+        "label": "Chwistrellu anogwyr",
+        "description": "Mae'n canfod ymdrechion i ddiystyru cyfarwyddiadau neu i jailbreakio'r model."
+      },
+      "policyViolation": {
+        "label": "Torri polisi",
+        "description": "Mae'n nodi mewnbynnau sy'n torri polisi eich sefydliad, wedi'i ysgrifennu fel testun neu reolau.",
+        "descriptionOutput": "Mae'n nodi ymatebion sy'n torri polisi eich sefydliad, wedi'i ysgrifennu fel testun neu reolau."
+      },
+      "pii": {
+        "label": "PII a chyfrinachau",
+        "description": "Mae'n canfod data personol, manylion mewngofnodi, cyfeiriadau IP ac URLau."
+      },
+      "keywords": {
+        "label": "Allweddeiriau gwaharddedig",
+        "descriptionOutput": "Mae'n canfod ymatebion sy'n cynnwys unrhyw allweddair rydych chi'n ei restru."
+      },
+      "topics": {
+        "label": "Pynciau",
+        "descriptionOutput": "Mae'n nodi ymatebion am unrhyw bwnc rydych chi'n ei restru."
+      },
+      "toxicity": {
+        "label": "Gwenwyndra",
+        "description": "Mae'n canfod iaith wenwynig, sarhaus, fygythiol neu atgas."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Mae'n canfod cynnwys rhywiol neu gynnwys arall sy'n anaddas i'r gweithle."
+      },
+      "bias": {
+        "label": "Rhagfarn",
+        "description": "Mae'n canfod iaith ragfarnllyd neu wahaniaethol."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Data personol",
+        "description": "Enwau, cyfeiriadau e-bost, rhifau ffôn."
+      },
+      "secrets": {
+        "label": "Cyfrinachau",
+        "description": "Allweddi API, tocynnau, cyfrineiriau."
+      },
+      "ipAddress": {
+        "label": "Cyfeiriadau IP",
+        "description": "Cyfeiriadau IPv4 ac IPv6."
+      },
+      "url": {
+        "label": "URLau",
+        "description": "Cyfeiriadau gwe."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Diogeledd a thwyll",
+      "safetyHarm": "Diogelwch a niwed",
+      "privacyDataProtection": "Preifatrwydd a diogelu data",
+      "brandReputationTrust": "Brand ac enw da",
+      "biasFairnessEthical": "Rhagfarn a thegwch",
+      "legalIpLiability": "Atebolrwydd cyfreithiol ac eiddo deallusol",
+      "productMisuse": "Camddefnyddio cynnyrch",
+      "performanceQuality": "Perfformiad ac ansawdd"
+    },
+    "applicability": {
+      "user": "Mewnbwn defnyddiwr",
+      "userAssistant": "Mewnbwn defnyddiwr ac ymatebion"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Deddf AI yr UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Nodwedd menter",
+    "enterpriseOnly": "Nodwedd ar gyfer mentrau yn unig yw hon.",
+    "readOnly": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid y gosodiadau hyn.",
+    "loadError": "Methu llwytho darparwyr a modelau",
+    "tabModels": "Modelau",
+    "tabProviders": "Darparwyr",
+    "tabGateways": "Pyrth",
+    "modelsDescription": "Diffoddwch fodel i'w flocio i bob aelod. Mae modelau gan ddarparwyr a ganiateir wedi'u troi ymlaen i ddechrau.",
+    "modelsDeniedOnly": "Wedi'u gwrthod yn unig",
+    "modelsEmpty": "Does dim modelau'n cyfateb i'r chwiliad hwn.",
+    "providersDescription": "Diffoddwch ddarparwr i atal Kilo rhag anfon ceisiadau ato ar gyfer y sefydliad hwn.",
+    "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
+    "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",
+    "allowAllShown": "Caniatáu pob un a ddangosir",
+    "denyAllShown": "Gwrthod pob un a ddangosir",
+    "gatewaysDescription": "Mae Kilo yn anfon ceisiadau model drwy Vercel AI Gateway neu OpenRouter. Bydd y ceisiadau hynny'n methu os yw'r porth wedi'i analluogi.",
+    "emptyProviderList": "Caniatewch o leiaf un darparwr. Mae rhestr wag yn rhwystro pob llwybr model Kilo.",
+    "gatewaysUnavailable": "Nid yw gosodiadau pyrth ar gael ar gyfer y sefydliad hwn.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Nid yw ceisiadau OpenRouter wedi'u pinio i ranbarth.",
+    "inferenceRegion": "Rhanbarth casgliadu",
+    "inferenceRegionDescription": "Mae'n pinio ceisiadau Vercel AI Gateway i'r rhanbarth hwn. Bydd model nad yw ar gael yno yn methu.",
+    "disableOpenrouterNote": "Mae analluogi OpenRouter hefyd yn blocio allweddi BYOK sy'n anfon ceisiadau drwyddo.",
+    "emptyModelList": "Gadewch o leiaf un model ymlaen. Os gwrthodwch bob model, ni fydd gan aelodau ddim i'w ddefnyddio.",
+    "catalogUnavailable": "Ni lwythodd y catalog modelau llawn, felly dim ond eich rhestrau sydd wedi'u cadw sy'n cael eu dangos. Rhowch gynnig arall arni i lwytho pob model.",
+    "region": {
+      "global": "Byd-eang",
+      "us": "Unol Daleithiau",
+      "eu": "Undeb Ewropeaidd",
+      "au": "Awstralia",
+      "jp": "Japan"
+    }
   }
 }

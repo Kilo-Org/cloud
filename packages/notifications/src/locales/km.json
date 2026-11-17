@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "ការរំលោភ SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "ការត្រួតពិនិត្យសុវត្ថិភាពមានការធ្វើបច្ចុប្បន្នភាព"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "វគ្គ Kilo របស់អ្នកបានត្រៀមរួចរាល់ដើម្បីគ្រប់គ្រងពីទូរសព្ទរបស់អ្នក"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
+      "connectOwnerOnly": "Sağlayıcıyı bağlaması için bir kuruluş sahibi veya yöneticiden istekte bulunun.",
       "couldNotLoad": "İncelemeler yüklenemedi.",
       "noReviews": "Henüz inceleme yok",
       "noReviewsDescription": "Kod inceleyici bir çekme isteğini inceledikten sonra sonuçlar burada görünür.",
@@ -2431,6 +2432,7 @@
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
     "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat, giriş: {{signedIn}}, son görülme: {{lastSeen}}",
     "sessionSignedOut": "Oturum kapatıldı.",
+    "sessionSignOutFailed": "Bu oturum kapatılamadı. Tekrar deneyin.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
     "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Son görülme: {{lastSeen}}. Cihazın API erişimi bir saat daha devam edebilir.",
@@ -2553,12 +2555,14 @@
     "manage": {
       "billingHistory": "Fatura geçmişi",
       "billingHistoryEmpty": "Henüz fatura geçmişi yok.",
+      "billingHistoryError": "Fatura geçmişi yüklenemedi",
       "cancel": "Aboneliği iptal et",
       "cancelDescription": "Kilo Pass'ınız fatura döneminin sonuna kadar etkin kalır ve yenilenmez.",
       "cancelScheduled": "{{date}} tarihinde iptal edilecek",
       "cancelScheduledChange": "Planlanan değişikliği iptal et",
       "cancelled": "Abonelik iptal edildi",
       "creditHistoryEmpty": "Henüz Kilo Pass kredisi yok.",
+      "creditHistoryError": "Kredi geçmişi yüklenemedi",
       "resume": "Aboneliği sürdür",
       "resumeCancelledDescription": "Kilo Pass'ınız yeniden otomatik olarak yenilenmeye başlar.",
       "resumePausedDescription": "Kilo Pass'ınız planlanan devam tarihini beklemeden şimdi devam eder.",
@@ -3330,7 +3334,7 @@
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
       "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
-      "accessDeniedDescription": "Bu kuruluşa erişimin yok."
+      "accessDeniedDescription": "Bir kuruluş sahibinden ya da yöneticiden sana erişim vermesini iste."
     },
     "create": {
       "title": "Kuruluş oluştur",
@@ -4681,5 +4685,175 @@
     "unavailableDescription": "Bu paylaşım bağlantısının süresi dolmuş veya bağlantı iptal edilmiş.",
     "transcriptUnavailableTitle": "Bu döküm yüklenemedi",
     "transcriptUnavailableDescription": "Bağlantı hâlâ çalışıyor. Birazdan tekrar deneyin."
+  },
+  "organizationGuardrails": {
+    "title": "Yapay Zeka Korkulukları",
+    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir.",
+    "unavailable": "Yapay Zeka Korkulukları bu kuruluş için kullanılamıyor.",
+    "loadError": "Yapay Zeka Korkulukları yüklenemedi",
+    "statusSaving": "Kaydediliyor…",
+    "statusSaved": "Kaydedildi",
+    "statusFailed": "Kaydedilemedi.",
+    "inputTitle": "Girdi korkulukları",
+    "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında engelleyici bir algılayıcı isteği reddeder.",
+    "outputTitle": "Çıktı korkulukları",
+    "outputDescription": "Yanıtları, üyeler almadan önce Enkrypt AI ile tarar. Siz açmadıkça kapalıdır.",
+    "detectorsHint": "Engelle, işaretlenen isteği reddeder. Yalnızca günlüğe kaydet seçeneği ise isteği geciktirmeden kaydeder.",
+    "detectorsHintOutput": "Engelle, işaretlenen yanıtı başarısız kılar. Yalnızca günlüğe kaydet seçeneği ise yanıtı geciktirmeden kaydeder.",
+    "choiceLog": "Yalnızca günlüğe kaydet",
+    "applyTo": "Şunlara uygula",
+    "applyToAllMembers": "Tüm üyeler",
+    "applyKiloDefault": "Kilo Varsayılanını Uygula",
+    "invalidSavedTitle": "Kaydedilen girdi algılayıcı ayarları okunamıyor",
+    "invalidSavedBody": "Girdi algılayıcıları yeniden kaydedilene kadar istekler engellenir. Aşağıdaki algılayıcılar Kilo Varsayılanından başlar.",
+    "invalidSavedOutputTitle": "Kaydedilen çıktı algılayıcı ayarları okunamıyor",
+    "invalidSavedOutputBody": "Yanıtlar, çıktı algılayıcıları yeniden kaydedilene kadar alıkonur. Aşağıdan çıktı algılayıcılarını seçin.",
+    "blockingOutputNote": "Engelleyici bir çıktı algılayıcısı, Enkrypt tamamını denetleyene kadar yanıtı bekletir. Gecikmeden kaçınmak için Yalnızca günlüğe kaydet seçeneğini kullanın.",
+    "inputDetectorRequired": "En az bir girdi algılayıcısını açın.",
+    "outputDetectorRequired": "En az bir çıktı algılayıcısını açın.",
+    "rulesTooMany": "En fazla {{max}} kural ekleyin.",
+    "ruleIdRequired": "Bir kural kimliği girin.",
+    "ruleIdInvalid": "Bir kural kimliği yalnızca harf, rakam, nokta, tire ve alt çizgi kullanabilir.",
+    "ruleTextRequired": "Kuralın neyi yasakladığını veya gerektirdiğini açıklayın.",
+    "keywordTooLong": "Her anahtar sözcük en fazla {{max}} karakter olabilir.",
+    "topicTooLong": "Her konu en fazla {{max}} karakter olabilir.",
+    "keywordsTooMany": "En fazla {{max}} anahtar sözcük ekleyin.",
+    "topicsTooMany": "En fazla {{max}} konu ekleyin.",
+    "piiEntityRequired": "Algılanacak en az bir veri türü seçin.",
+    "keywordRequired": "En az bir anahtar sözcük ekleyin.",
+    "topicRequired": "En az bir konu ekleyin.",
+    "policyTextRequired": "İlke metnini girin.",
+    "ruleRequired": "En az bir kural ekleyin.",
+    "ruleIdDuplicate": "Her kuralın kendi ID'si olmalıdır.",
+    "piiEntities": "Algılanacak veriler",
+    "keywordsLabel": "Anahtar sözcükler",
+    "keywordsHint": "Her satıra bir anahtar sözcük.",
+    "topicsHint": "Her satıra bir konu.",
+    "policyFormat": "İlke biçimi",
+    "policyFormatRules": "Yapılandırılmış kurallar",
+    "policyFormatRulesDescription": "Her gereksinim için bir kural; kategori ve önem derecesiyle birlikte. Önerilir.",
+    "policyFormatText": "İlke metni",
+    "policyFormatTextDescription": "Mevcut bir ilkeyi düz metin olarak yapıştırın.",
+    "rulesEmpty": "Henüz kural yok. Her kural, girdilerin içermemesi veya talep etmemesi gereken tek bir şeyi açıklar.",
+    "addRule": "Kural ekle",
+    "ruleNumber": "Kural {{number}}",
+    "ruleRemove": "{{number}} numaralı kuralı kaldır",
+    "ruleIdLabel": "Kural kimliği",
+    "ruleNameLabel": "Ad (isteğe bağlı)",
+    "ruleTextLabel": "Kural",
+    "ruleRiskCategory": "Risk kategorisi",
+    "ruleApplicability": "Kapsam",
+    "ruleFrameworks": "Çerçeveler",
+    "detector": {
+      "promptInjection": {
+        "label": "İstem enjeksiyonu",
+        "description": "Talimatları geçersiz kılma veya modelin kısıtlamalarını aşma girişimlerini algılar."
+      },
+      "policyViolation": {
+        "label": "İlke ihlali",
+        "description": "Metin veya kural olarak yazılmış kuruluş ilkenizi ihlal eden girdileri işaretler.",
+        "descriptionOutput": "Metin veya kural olarak yazılmış kuruluş ilkenizi ihlal eden yanıtları işaretler."
+      },
+      "pii": {
+        "label": "PII ve gizli bilgiler",
+        "description": "Kişisel verileri, kimlik bilgilerini, IP adreslerini ve URL'leri algılar."
+      },
+      "keywords": {
+        "label": "Yasaklı anahtar sözcükler",
+        "descriptionOutput": "Listelediğiniz anahtar sözcüklerden herhangi birini içeren yanıtları algılar."
+      },
+      "topics": {
+        "label": "Konular",
+        "descriptionOutput": "Listelediğiniz konulardan herhangi biri hakkındaki yanıtları işaretler."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, aşağılayıcı, tehdit edici veya nefret içeren dili algılar."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Cinsel veya başka açılardan iş ortamında uygun olmayan içerikleri algılar."
+      },
+      "bias": {
+        "label": "Önyargı",
+        "description": "Önyargılı veya ayrımcı dili algılar."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Kişisel veriler",
+        "description": "Adlar, e-posta adresleri, telefon numaraları."
+      },
+      "secrets": {
+        "label": "Gizli bilgiler",
+        "description": "API anahtarları, belirteçler, parolalar."
+      },
+      "ipAddress": {
+        "label": "IP adresleri",
+        "description": "IPv4 ve IPv6 adresleri."
+      },
+      "url": {
+        "label": "URL'ler",
+        "description": "Web adresleri."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Güvenlik ve dolandırıcılık",
+      "safetyHarm": "Emniyet ve zarar",
+      "privacyDataProtection": "Gizlilik ve veri koruma",
+      "brandReputationTrust": "Marka ve itibar",
+      "biasFairnessEthical": "Önyargı ve hakkaniyet",
+      "legalIpLiability": "Hukuki ve fikri mülkiyet sorumluluğu",
+      "productMisuse": "Ürünün kötüye kullanımı",
+      "performanceQuality": "Performans ve kalite"
+    },
+    "applicability": {
+      "user": "Kullanıcı girdisi",
+      "userAssistant": "Kullanıcı girdisi ve yanıtlar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM İlk 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "AB Yapay Zeka Yasası",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Kurumsal özellik",
+    "enterpriseOnly": "Bu yalnızca kurumsal bir özelliktir.",
+    "readOnly": "Bu ayarları yalnızca kuruluş sahipleri ve yöneticileri değiştirebilir.",
+    "loadError": "Sağlayıcılar ve modeller yüklenemedi",
+    "tabModels": "Modeller",
+    "tabProviders": "Sağlayıcılar",
+    "tabGateways": "Ağ geçitleri",
+    "modelsDescription": "Bir modeli her üye için engellemek üzere kapatın. İzin verilen sağlayıcılardan gelen modeller açık başlar.",
+    "modelsDeniedOnly": "Yalnızca engellenenler",
+    "modelsEmpty": "Bu aramayla eşleşen model yok.",
+    "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
+    "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
+    "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
+    "allowAllShown": "Gösterilenlerin tümüne izin ver",
+    "denyAllShown": "Gösterilenlerin tümünü reddet",
+    "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",
+    "emptyProviderList": "En az bir sağlayıcıya izin verin. Boş bir liste tüm Kilo model yönlendirmelerini engeller.",
+    "gatewaysUnavailable": "Ağ geçidi ayarları bu kuruluş için kullanılamıyor.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter istekleri bir bölgeye sabitlenmez.",
+    "inferenceRegion": "Çıkarım bölgesi",
+    "inferenceRegionDescription": "Vercel AI Gateway isteklerini bu bölgeye sabitler. Orada kullanılamayan bir model başarısız olur.",
+    "disableOpenrouterNote": "OpenRouter'ı devre dışı bırakmak, istekleri onun üzerinden yönlendiren BYOK anahtarlarını da engeller.",
+    "emptyModelList": "En az bir modeli açık bırakın. Tüm modelleri reddetmek, üyelere kullanacak hiçbir şey bırakmaz.",
+    "catalogUnavailable": "Tam model kataloğu yüklenemedi, bu yüzden yalnızca kayıtlı listeleriniz gösteriliyor. Tüm modelleri yüklemek için yeniden deneyin.",
+    "region": {
+      "global": "Küresel",
+      "us": "Amerika Birleşik Devletleri",
+      "eu": "Avrupa Birliği",
+      "au": "Avustralya",
+      "jp": "Japonya"
+    }
   }
 }

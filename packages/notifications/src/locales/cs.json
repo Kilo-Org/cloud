@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Porušení SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Kontrola zabezpečení má aktualizaci"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Vaše relace Kilo je připravena k ovládání z telefonu"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

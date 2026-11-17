@@ -3,9 +3,10 @@ import { createElement, type ReactElement, type ReactNode, type Ref } from 'reac
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
+import type * as ReviewerStatusModule from '@/lib/code-reviewer-status';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -40,8 +41,19 @@ const state = vi.hoisted(() => ({
   insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  githubError: false,
+  githubStaleError: false,
+  gitlabError: false,
   scope: 'personal',
-  organizations: [] as { organizationId: string; organizationName: string }[],
+  organizations: [] as {
+    organizationId: string;
+    organizationName: string;
+    role?: string;
+  }[],
+  permissionOverride: null as
+    | { status: 'loading' }
+    | { status: 'ready'; canEdit: boolean; canManage: boolean }
+    | null,
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -50,7 +62,10 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   bitbucket: {
-    data: { repositoryCache: { status: 'available', repositories: [] } } as unknown,
+    data: {
+      connected: false,
+      repositoryCache: { status: 'available', repositories: [] },
+    } as unknown,
     isLoading: false,
     isError: false,
     isFetching: false,
@@ -150,6 +165,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
   TAB_SCREEN_TRAILING_GAP: 16,
+  TabScreenScrollView: 'TabScreenScrollView',
   useTabBarBottomPadding: () => 0,
   useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
 }));
@@ -208,8 +224,14 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',
-  useGitHubStatus: () => ({ data: { connected: state.connected } }),
-  useGitLabStatus: () => ({ data: { connected: false } }),
+  useGitHubStatus: () => ({
+    data: state.githubError ? undefined : { connected: state.connected },
+    isError: state.githubError || state.githubStaleError,
+  }),
+  useGitLabStatus: () => ({
+    data: state.gitlabError ? undefined : { connected: false },
+    isError: state.gitlabError,
+  }),
   useReviewConfig: () => ({
     data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
   }),
@@ -230,6 +252,31 @@ vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.reviews }));
+// The screen reads the role from this module directly. The real hook is a thin
+// react-query wrapper, so the mock answers from the same membership rows and the
+// real classifier, and `permissionOverride` stands in for a read that has not
+// settled — which the shared `organizations` answer can never produce.
+vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
+  const { classifyPermission } = await vi.importActual<typeof ReviewerStatusModule>(
+    '@/lib/code-reviewer-status'
+  );
+  return {
+    useReviewerPermission: (scope: string) => {
+      if (state.permissionOverride) {
+        return state.permissionOverride;
+      }
+      return classifyPermission({
+        isPersonal: scope === 'personal',
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        hasData: true,
+        role: state.organizations.find(org => org.organizationId === scope)?.role,
+        refetch: () => undefined,
+      });
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
@@ -253,11 +300,18 @@ beforeEach(() => {
   state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.githubError = false;
+  state.githubStaleError = false;
+  state.gitlabError = false;
   state.scope = 'personal';
   state.organizations = [];
+  state.permissionOverride = null;
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
-  state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
+  state.bitbucket.data = {
+    connected: false,
+    repositoryCache: { status: 'available', repositories: [] },
+  };
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
@@ -783,6 +837,167 @@ describe('Recent review header', () => {
     expect(node.props.eyebrow).toBe('Recent reviews');
     expect(node.props.titleNumberOfLines).toBe(1);
     expect(node.props.reserveTitleSpace).toBe(false);
+    unmount();
+  });
+});
+
+// The empty list's Configure button opens the platform list, and each platform's
+// connect card there is per-role: GitHub's needs an organization-manage role,
+// GitLab's a billing-level edit role. A plain member would land on a screen with
+// no action of their own, so the scope-level screen replaces the button with a
+// role notice — while a connected scope keeps the manual-review destination for
+// every role.
+describe('empty reviews connect action', () => {
+  const SCOPE = 'org-1';
+  const ORG_NAME = 'Drain Labs';
+
+  function emptyState(renderer: RenderWithProvidersResult['renderer']) {
+    return renderer.root.find(node => String(node.type) === 'EmptyState');
+  }
+
+  /**
+   * The scope title paints from the same `organizations.list` read the role
+   * comes from, so reading the name means the role has settled too.
+   */
+  async function settled(renderer: RenderWithProvidersResult['renderer']) {
+    await waitFor(
+      () =>
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        ORG_NAME
+    );
+  }
+
+  function pressAction(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{ onPress: () => void }>;
+    action.props.onPress();
+  }
+
+  function actionLabel(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{
+      children: ReactElement<{ children: string }>;
+    }>;
+    return action.props.children.props.children;
+  }
+
+  it('replaces the button with a role notice for a plain member', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when only Bitbucket is connected', async () => {
+    // Bitbucket runs automatic reviews but offers no manual review, so a member
+    // cannot act here either; the notice would be false, because the scope is
+    // connected, and an owner would find it already set up.
+    state.bitbucket.data = {
+      connected: true,
+      repositoryCache: { status: 'available', repositories: [] },
+    };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when the provider read failed', async () => {
+    // A failed status read leaves the connection unknown, so the notice would
+    // claim the scope has nothing connected when the screen cannot know that.
+    state.githubError = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the role notice when a refetch failed over a cached disconnected answer', async () => {
+    // `isError` stays true for a failed background refetch, but the cached
+    // answer still says nothing is connected, so the notice is accurate.
+    state.githubStaleError = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('offers the platform list to an owner', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'owner' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}`);
+    unmount();
+  });
+
+  it('offers the platform list to a billing manager, who can connect GitLab', async () => {
+    state.organizations = [
+      { organizationId: SCOPE, organizationName: ORG_NAME, role: 'billing_manager' },
+    ];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    unmount();
+  });
+
+  it('keeps the loading body until the role settles, so no button flashes', async () => {
+    state.permissionOverride = { status: 'loading' };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
+    unmount();
+  });
+
+  it('keeps the manual-review action for a member once a provider is connected', async () => {
+    state.connected = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(actionLabel(renderer)).toBe(i18n.t('codeReviewer.reviewList.startManualReview'));
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}/manual-review`);
     unmount();
   });
 });

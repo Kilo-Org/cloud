@@ -69,16 +69,16 @@ export function SettingsSaveButton({
         })();
       }}
       // The Button's own base is `shrink-0`, so ScreenHeader's
-      // half-row clamp trims the trailing box while this label keeps its
-      // width: the catalog "Save changes" is 28 glyphs in French, and at
+      // fixed-width cluster never trims the trailing box while this label keeps
+      // its width: the catalog "Save changes" is 28 glyphs in French, and at
       // ~214 dp it consumed the row and left the screen title at ~0 width on
       // the narrowest 320 dp viewport. A variable-width header action must
-      // bound itself at its source, so this carries the same 140 dp cap as PR
-      // review's Submit review (see the trailing-cluster note in
-      // screen-header.tsx). 140 dp keeps the button and the 44 dp back control
-      // inside the row and leaves the flex-1 title room to draw; the label
-      // shrinks and wraps in place instead of clipping.
-      className="min-w-0 max-w-[140px] shrink"
+      // bound itself at its source, so this caps at 40 spacing steps (140 pt at
+      // the app's 14 pt rem), the same cap PR review's Submit review uses. The
+      // cap keeps the button and the 44 pt back control inside the row and
+      // leaves the flex-1 title room to draw; the label shrinks and wraps in
+      // place instead of clipping.
+      className="min-w-0 max-w-40 shrink"
     >
       {pending ? <ActivityIndicator size="small" color={spinnerColor} /> : null}
       <Text className="shrink text-center">{t('securityAgent.settingsSave.saveChanges')}</Text>

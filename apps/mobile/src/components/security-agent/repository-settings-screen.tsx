@@ -23,10 +23,13 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -44,26 +47,25 @@ type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 /** The repository rows the picker lists; derived from the hook so the row shape cannot drift. */
 type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>['data']>[number];
 
-// FlashList takes `contentContainerStyle`, not className, so the ScrollView's
-// `px-6 pt-4` content classes map to their pixel values. The tab-bar inset
-// rides on the content (the ScrollView used a frame `marginBottom`) so the
-// last row can still scroll clear of the bar.
+// FlashList takes `contentContainerStyle`, not className, so the body carries
+// only the tab-bar band and the safe-area side insets; the page gutter lives on
+// the rows and the header, whose row primitives draw their own `px-4`.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-// The gutter each row keeps inside the safe-area side insets: in landscape they
-// are what clear the sensor housing, and portrait insets are zero.
-const LIST_CONTENT_GUTTER = 24;
 
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.repositories')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
+      <ScreenHeader title={t('common.repositories')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <RowGroup>
+          <RowSkeleton />
+          <RowSkeleton />
+        </RowGroup>
+        <RowGroup>
+          <RowSkeleton subtitle />
+          <RowSkeleton subtitle />
+        </RowGroup>
       </View>
     </View>
   );
@@ -140,9 +142,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // not — starts at the same offset and a rotation re-derives it once.
   const listContentContainerStyle = useMemo(
     () => ({
-      paddingTop: 16,
-      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
-      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingTop: 12,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
       paddingBottom,
     }),
     [insets.left, insets.right, paddingBottom]
@@ -227,44 +229,44 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // mode — the loading / error / empty branches) rides on the list header so
   // the rendered order and paddings are unchanged from the ScrollView version.
   const listHeader: ReactNode = (
-    <>
+    <View className="gap-6 px-4 pt-3">
       {!canManage && (
-        <Text className="pb-4 text-center text-xs text-muted-foreground">
+        <Text className="text-center text-xs text-muted-foreground">
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
       <OrphanedFindingsCard scope={scope} canManage={canManage} />
       <RadioGroup label={t('common.repositories')}>
-        {(['all', 'selected'] as const).map(option => (
-          <ChoiceRow
-            key={option}
-            label={
-              option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
-            }
-            selected={mode === option}
-            disabled={!canManage}
-            className="border-b-[0.5px] border-hair-soft"
-            onPress={() => {
-              setMode(option);
-            }}
-          />
-        ))}
+        <RowGroup>
+          {(['all', 'selected'] as const).map(option => (
+            <ChoiceRow
+              key={option}
+              label={
+                option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
+              }
+              selected={mode === option}
+              disabled={!canManage}
+              onPress={() => {
+                setMode(option);
+              }}
+            />
+          ))}
+        </RowGroup>
       </RadioGroup>
 
       {showRepositorySection && (
-        <View className="mt-6">
-          {/* The empty state's own title already says "No repositories", so a
-              section label above it only repeats the screen title. */}
-          {repositoriesBody.status === 'empty' ? null : (
-            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              {t('common.repositories')}
-            </Text>
-          )}
+        // The empty state's own title already says "No repositories", so a
+        // section label above it only repeats the screen title.
+        <Section
+          label={
+            repositoriesBody.status === 'empty' ? undefined : t('common.repositories')
+          }
+        >
           {repositoriesBody.status === 'loading' && (
-            <View className="gap-3 pt-2">
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
-            </View>
+            <RowGroup>
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           )}
           {repositoriesFailed && (
             <QueryError
@@ -304,9 +306,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               }
             />
           ) : null}
-        </View>
+        </Section>
       )}
-    </>
+    </View>
   );
 
   const listFooter: ReactNode =
@@ -315,7 +317,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     !repositories.isError &&
     hasRepositories &&
     selectedIds.length === 0 ? (
-      <Text className="pt-2 text-xs text-destructive">
+      <Text className="px-4 pt-3 text-xs text-destructive">
         {t('securityAgent.repositories.selectAtLeastOne')}
       </Text>
     ) : null;
@@ -332,7 +334,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={

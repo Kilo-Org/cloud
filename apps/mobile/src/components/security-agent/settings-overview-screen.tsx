@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
+import { Bell, Clock, Cpu, FolderGit2, ShieldCheck, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -11,11 +11,14 @@ import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-o
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -234,41 +237,37 @@ export function SettingsOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.dashboard.settings')}
         // One size-11 (44dp) audit icon; declaring it keeps the one-line
         // title's readable minimum when the row is narrow.
         headerRightWidth={44}
         headerRight={auditAction}
       />
-      <TabScreenScrollView className="flex-1">
-        <View className="gap-6 px-6 py-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <RowGroup>
           {capability.canManage ? (
             <ToggleRow
+              icon={ShieldCheck}
               title={t('common.securityAgent')}
               value={data.isEnabled}
               disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
               onValueChange={handleToggle}
             />
           ) : (
-            <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-4">
-              {/* The gap between the title and the state comes from the row, not
-                  from a padding on the title's own side: a physical padding
-                  lands on the title's inline start under RTL, where the text
-                  then hangs past the box it was reserved for. */}
-              <View className="flex-1">
-                <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
-              </View>
-              <Text variant="muted" className="text-xs">
-                {data.isEnabled ? t('common.enabled') : t('common.disabled')}
-              </Text>
-            </View>
+            <KvRow
+              label={t('common.securityAgent')}
+              value={data.isEnabled ? t('common.enabled') : t('common.disabled')}
+              valueFace="text"
+              valueTone="muted"
+            />
           )}
+        </RowGroup>
 
-          {(!data.isEnabled || repositoriesLoading || recoveryError) && (
-            <View className="gap-3">
-              {renderRepositoryStatus()}
-              {showRepoCta ? (
+        {(!data.isEnabled || repositoriesLoading || recoveryError) && (
+          <View className="gap-3">
+            {renderRepositoryStatus()}
+            {showRepoCta ? (
+              <RowGroup leadingTile>
                 <ConfigureRow
                   icon={FolderGit2}
                   title={t('common.selectRepositories')}
@@ -286,73 +285,71 @@ export function SettingsOverviewScreen({
                     pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
                   }}
                 />
-              ) : null}
-            </View>
-          )}
+              </RowGroup>
+            ) : null}
+          </View>
+        )}
 
-          {data.isEnabled && (
-            <View>
-              <ConfigureRow
-                icon={FolderGit2}
-                title={t('common.repositories')}
-                subtitle={repoCountLabel}
-                onPress={() => {
-                  pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-                }}
-              />
-              <ConfigureRow
-                icon={Cpu}
-                title={t('securityAgent.analysisSettings.title')}
-                subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
-                  mode: analysisModeLabel,
-                })}
-                onPress={() => {
-                  pushOnce(getSecurityAgentPath(scope, 'settings/analysis'));
-                }}
-              />
-              <ConfigureRow
-                icon={Zap}
-                title={t('securityAgent.automation.title')}
-                subtitle={
-                  automationEnabledCount === 0
-                    ? t('securityAgent.settingsOverview.automationAllOff')
-                    : t('securityAgent.settingsOverview.automationCount', {
-                        count: automationEnabledCount,
-                        displayCount: formatNumber(automationEnabledCount, i18n.language),
-                      })
-                }
-                onPress={() => {
-                  pushOnce(getSecurityAgentPath(scope, 'settings/automation'));
-                }}
-              />
-              <ConfigureRow
-                icon={Bell}
-                title={t('common.notifications')}
-                subtitle={
-                  notificationsEnabledCount === 0
-                    ? t('common.off')
-                    : t('securityAgent.settingsOverview.notificationsCount', {
-                        count: notificationsEnabledCount,
-                        displayCount: formatNumber(notificationsEnabledCount, i18n.language),
-                      })
-                }
-                onPress={() => {
-                  pushOnce(getSecurityAgentPath(scope, 'settings/notifications'));
-                }}
-              />
-              <ConfigureRow
-                icon={Clock}
-                title={t('securityAgent.sla.title')}
-                subtitle={
-                  data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')
-                }
-                onPress={() => {
-                  pushOnce(getSecurityAgentPath(scope, 'settings/sla'));
-                }}
-              />
-            </View>
-          )}
-        </View>
+        {data.isEnabled && (
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={FolderGit2}
+              title={t('common.repositories')}
+              subtitle={repoCountLabel}
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+            />
+            <ConfigureRow
+              icon={Cpu}
+              title={t('securityAgent.analysisSettings.title')}
+              subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
+                mode: analysisModeLabel,
+              })}
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/analysis'));
+              }}
+            />
+            <ConfigureRow
+              icon={Zap}
+              title={t('securityAgent.automation.title')}
+              subtitle={
+                automationEnabledCount === 0
+                  ? t('securityAgent.settingsOverview.automationAllOff')
+                  : t('securityAgent.settingsOverview.automationCount', {
+                      count: automationEnabledCount,
+                      displayCount: formatNumber(automationEnabledCount, i18n.language),
+                    })
+              }
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/automation'));
+              }}
+            />
+            <ConfigureRow
+              icon={Bell}
+              title={t('common.notifications')}
+              subtitle={
+                notificationsEnabledCount === 0
+                  ? t('common.off')
+                  : t('securityAgent.settingsOverview.notificationsCount', {
+                      count: notificationsEnabledCount,
+                      displayCount: formatNumber(notificationsEnabledCount, i18n.language),
+                    })
+              }
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/notifications'));
+              }}
+            />
+            <ConfigureRow
+              icon={Clock}
+              title={t('securityAgent.sla.title')}
+              subtitle={data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')}
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/sla'));
+              }}
+            />
+          </RowGroup>
+        )}
       </TabScreenScrollView>
     </View>
   );

@@ -79,21 +79,27 @@ describe('bulk user credits router', () => {
     const recipient = await insertTestUser();
     const caller = await createCallerForUser(admin.id);
 
-    await expect(
-      caller.admin.bulkUserCredits.grantBulkCredits({
-        emails: [recipient.google_user_email],
-        amountUsd: 5,
-        expirationDate: '2026-13-01',
-      })
-    ).rejects.toThrow('Invalid date');
+    async function refusalMessage(expirationDate: string): Promise<string> {
+      let message = '';
+      await caller.admin.bulkUserCredits
+        .grantBulkCredits({
+          emails: [recipient.google_user_email],
+          amountUsd: 5,
+          expirationDate,
+        })
+        .catch((error: unknown) => {
+          message = error instanceof Error ? error.message : String(error);
+        });
+      return message;
+    }
 
-    await expect(
-      caller.admin.bulkUserCredits.grantBulkCredits({
-        emails: [recipient.google_user_email],
-        amountUsd: 5,
-        expirationDate: '2024-01-01',
-      })
-    ).rejects.toThrow('Expiration date must be in the future');
+    const invalidMessage = await refusalMessage('2026-13-01');
+    expect(invalidMessage).toContain('Invalid date');
+    expect(invalidMessage).not.toContain('must be in the future');
+
+    const pastMessage = await refusalMessage('2024-01-01');
+    expect(pastMessage).toContain('Expiration date must be in the future');
+    expect(pastMessage).not.toContain('Invalid date');
 
     const transactions = await db
       .select({ id: credit_transactions.id })

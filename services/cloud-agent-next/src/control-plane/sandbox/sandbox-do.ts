@@ -5575,15 +5575,43 @@ export class SandboxControlV2 extends DurableObject<Env> {
             }
           }
           // N2: create and launch share one bound (the create deadline).
+          const startedAt = Date.now();
+          const result = withTimeout(
+            this.provider.create(intent),
+            remainingMs(Math.min(createDeadline, billingAdmissionDeadlineAt ?? createDeadline)),
+            'Sandbox create timed out',
+            () => {
+              billingAdmissionTimedOut =
+                billingAdmissionDeadlineAt !== undefined &&
+                billingAdmissionDeadlineAt <= createDeadline;
+            }
+          );
+          if (intent.snapshot === undefined) return { result };
+          const log = (outcome: 'restored' | 'failed', reason?: string) =>
+            logControlDiagnostic('snapshot_restore_attempt_finished', {
+              sandboxId: this.sandboxId,
+              allocationId,
+              provider: pin.provider,
+              stage: 'provider_create',
+              snapshotKind: 'environment',
+              attempt: 1,
+              durationMs: Math.max(0, Date.now() - startedAt),
+              outcome,
+              reason,
+            });
           return {
-            result: withTimeout(
-              this.provider.create(intent),
-              remainingMs(Math.min(createDeadline, billingAdmissionDeadlineAt ?? createDeadline)),
-              'Sandbox create timed out',
-              () => {
-                billingAdmissionTimedOut =
-                  billingAdmissionDeadlineAt !== undefined &&
-                  billingAdmissionDeadlineAt <= createDeadline;
+            result: result.then(
+              created => {
+                if ('unresolved' in created) log('failed', 'provider_create_unresolved');
+                else log('restored');
+                return created;
+              },
+              (error: unknown) => {
+                log(
+                  'failed',
+                  error instanceof ProviderCreationError ? error.code : 'provider_create_failed'
+                );
+                throw error;
               }
             ),
           };
@@ -6253,9 +6281,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const source = input.selection?.source ?? 'image';
     for (let attempt = 1; ; attempt += 1) {
       const attemptStartedAt = Date.now();
+      let durationMs = 0;
+      const logAttempt = (
+        outcome: 'restored' | 'failed' | 'cancelled',
+        reason?: string,
+        willRetry = false
+      ) => {
+        if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') return;
+        logControlDiagnostic('snapshot_restore_attempt_finished', {
+          sandboxId: this.sandboxId,
+          allocationId: input.allocationId,
+          provider: this.currentProvider(),
+          stage: 'provider_launch',
+          snapshotKind: source,
+          attempt,
+          durationMs,
+          outcome,
+          reason,
+          willRetry,
+        });
+      };
       const recordFailure = (
-        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>,
+        willRetry = false
       ): SnapshotLaunchFailureDiagnostic => {
+        logAttempt('failed', failure.reason, willRetry);
         const diagnostic: SnapshotLaunchFailureDiagnostic = {
           ...failure,
           source,
@@ -6313,7 +6363,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           }
         );
       } catch (error) {
-        if (isContainersLaunchInterrupted(error)) throw error;
+        durationMs = Math.max(0, Date.now() - attemptStartedAt);
+        if (isContainersLaunchInterrupted(error)) {
+          logAttempt('cancelled', 'launch_interrupted');
+          throw error;
+        }
         // A create-time snapshot cannot be retried by launch. Retry creation
         // through the allocation lifecycle instead.
         if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;
@@ -6325,9 +6379,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         };
         result = { startSource: 'repository' };
       }
+      durationMs = Math.max(0, Date.now() - attemptStartedAt);
       const startedFromSnapshot = !result.snapshotFailed && result.startSource === 'repository';
       if (!requestedSnapshot) return { result, owned: false };
-      if (failure === undefined && startedFromSnapshot) return { result, owned: false };
+      if (failure === undefined && startedFromSnapshot) {
+        logAttempt('restored');
+        return { result, owned: false };
+      }
       const reason: SnapshotStartFailureReason =
         failure !== undefined
           ? 'transient'
@@ -6389,7 +6447,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         return { result, owned: true };
       }
-      recordFailure(failure);
+      recordFailure(failure, true);
       logControlDiagnostic('snapshot_launch_retry', {
         sandboxId: this.sandboxId,
         allocationId: input.allocationId,
@@ -7101,6 +7159,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // `stopping`), so only the current connection may move a route or forward.
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
+      case 'session.restore_attempt': {
+        if (!current) return;
+        const route = await readRoute(this.db, frame.sessionId);
+        if (route?.state !== 'preparing') return;
+        const { type: _type, ...timings } = frame;
+        logControlDiagnostic('snapshot_restore_attempt_finished', {
+          ...timings,
+          sandboxId: this.sandboxId,
+          allocationId: currentState.allocationId,
+          attemptId: route.attemptId,
+          provider: this.currentProvider(),
+          stage: 'wrapper_restore',
+          snapshotKind: 'session',
+        });
+        return;
+      }
       case 'session.progress':
         await onRouteProgress(
           ctx,

@@ -787,9 +787,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         await running('follow-up');
         await instance.onOutcome({ sessionId, status: 'completed', lastMessageId: 'follow-up' });
         await instance.alarm();
-        return withFields.mock.calls
-          .map(call => call[0] as Record<string, unknown>)
-          .filter(fields => fields.diagnosticEvent === 'session_message_committed');
+        return withFields.mock.calls.map(call => call[0] as Record<string, unknown>);
       } finally {
         withFields.mockRestore();
         info.mockRestore();
@@ -803,9 +801,27 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         captured.reports.find(report => report.run.messageId === messageId)?.run
       ).toMatchObject({ status: 'completed', container: connected });
       expect(committed).toContainEqual(
-        expect.objectContaining({ messageId, toState: 'completed', runtimeHarness: 'kilo2' })
+        expect.objectContaining({
+          diagnosticEvent: 'session_message_committed',
+          messageId,
+          toState: 'completed',
+          runtimeHarness: 'kilo2',
+        })
       );
     }
+    expect(
+      committed.filter(fields => fields.diagnosticEvent === 'session_startup_finished')
+    ).toEqual([
+      expect.objectContaining({
+        sessionId,
+        attemptId: peer.attemptId,
+        allocationId: connected.allocationId,
+        provider: connected.provider,
+        outcome: 'ready',
+        durationMs: expect.any(Number),
+        preparationMs: expect.any(Number),
+      }),
+    ]);
   });
 
   it('emits the session_message_committed diagnostic for accepted and terminal transitions', async () => {

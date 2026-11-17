@@ -3765,6 +3765,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const route = persistedRouteView(view, previous);
     await this.persistRoute(route);
+    if (
+      (route.state === 'ready' || route.state === 'failed') &&
+      previousAttemptId !== route.attemptId &&
+      readPreparationAttempt(this.eventQueries, route.attemptId) === null
+    ) {
+      const trigger = oldestOpenMessage(this.messages, 'queued');
+      if (trigger !== undefined) {
+        this.logStartupFinished(
+          route.attemptId,
+          route.state === 'ready'
+            ? { status: 'completed' }
+            : { status: 'failed', safeError: route.reason },
+          Date.now(),
+          trigger.createdAt
+        );
+      }
+    }
     if (route.state === 'preparing' || route.state === 'reconnecting') {
       await this.clearTransportRecovery();
     }
@@ -4303,12 +4320,53 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Close one route attempt's open row by persisted identity, never by a scan. */
   private finalizeAttempt(attemptId: string, outcome: PreparationOutcome): void {
     this.preparationRecorders.delete(attemptId);
-    for (const event of finalizePreparationAttempt(this.eventQueries, attemptId, {
+    const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+    const timestamp = Date.now();
+    const events = finalizePreparationAttempt(this.eventQueries, attemptId, {
       ...outcome,
-      timestamp: Date.now(),
-    })) {
-      this.broadcast(event);
+      timestamp,
+    });
+    if (events.length > 0 && attempt !== null) {
+      const trigger = this.messages.find(message => message.messageId === attempt.triggerMessageId);
+      this.logStartupFinished(attemptId, outcome, timestamp, trigger?.createdAt, attempt.startedAt);
     }
+    for (const event of events) this.broadcast(event);
+  }
+
+  private logStartupFinished(
+    attemptId: string,
+    outcome: PreparationOutcome,
+    timestamp: number,
+    admittedAt: number | undefined,
+    preparationStartedAt?: number
+  ): void {
+    const container =
+      this.route.state !== 'unknown' && this.route.attemptId === attemptId
+        ? this.route.container
+        : undefined;
+    const reason = outcome.status === 'failed' ? outcome.safeError : undefined;
+    logControlDiagnostic('session_startup_finished', {
+      sessionId: this.sessionId,
+      sandboxId: this.registration?.sandboxId,
+      allocationId: container?.allocationId,
+      attemptId,
+      provider: container?.provider ?? this.registration?.sandboxSelection?.provider,
+      startSource: container?.startSource,
+      outcome:
+        outcome.status === 'completed'
+          ? 'ready'
+          : reason === 'preparation_cancelled'
+            ? 'cancelled'
+            : reason === 'preparation_timeout'
+              ? 'timeout'
+              : 'failed',
+      reason,
+      durationMs: admittedAt === undefined ? undefined : Math.max(0, timestamp - admittedAt),
+      preparationMs:
+        preparationStartedAt === undefined
+          ? undefined
+          : Math.max(0, timestamp - preparationStartedAt),
+    });
   }
 
   /** The route attempt a notification must name (the route-view fence). */

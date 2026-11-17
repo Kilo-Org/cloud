@@ -2050,6 +2050,44 @@ async function rewriteUsageFixture(
   return { payload: envelope.message ?? envelope.response ?? envelope, objects };
 }
 
+describe('JSON bodies that are not objects', () => {
+  const rewriters = [
+    [
+      'chat completions',
+      'chat_completions',
+      (params: RewriteResponseParams) =>
+        rewriteModelResponse_ChatCompletions({ ...params, responseTransforms: null }),
+    ],
+    ['messages', 'messages', rewriteModelResponse_Messages],
+    ['responses', 'responses', rewriteModelResponse_Responses],
+  ] as const;
+
+  test.each(
+    rewriters.flatMap(([name, kind, rewrite]) =>
+      ['null', '[]', '"text"', '42', 'true'].map(text => [name, text, kind, rewrite] as const)
+    )
+  )('%s passes the JSON body %s through unchanged', async (_name, text, kind, rewrite) => {
+    const setBody = jest.fn();
+    const result = await rewrite({
+      response: new Response(text, {
+        status: 200,
+        statusText: 'Fine',
+        headers: { 'content-type': 'application/json' },
+      }),
+      usageContext: { ...freeUsageContext, api_kind: kind },
+      capture: { setGenerationId: jest.fn(), setBody, setReadError: jest.fn() },
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.statusText).toBe('Fine');
+    expect(result.headers.get('content-type')).toBe('application/json');
+    expect(await result.text()).toBe(text);
+    expect(setBody).toHaveBeenCalledWith(text);
+  });
+});
+
 describe('Vercel provider metadata rewriting', () => {
   const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
     '@kilocode/web-shared/lib/r2/create-client'

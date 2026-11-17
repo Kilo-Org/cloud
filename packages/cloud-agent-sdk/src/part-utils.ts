@@ -22,7 +22,7 @@ function isToolPart(part: Part): part is ToolPart {
  * reader validates for itself — `status`, `Array.isArray(attachments)`, and a
  * numeric `time.end`.
  */
-function toolStateOf(part: ToolPart): ToolState | null {
+export function toolStateOf(part: ToolPart): ToolState | null {
   const state: unknown = part.state;
   if (typeof state !== 'object' || state === null || Array.isArray(state)) {
     return null;
@@ -53,27 +53,27 @@ function isToolAttachment(attachment: unknown): attachment is ReadableToolAttach
 }
 
 /**
- * The stored form of one tool attachment: the bytes (`url`) and the source text
- * are dropped, the entry's other fields are kept.
+ * The stored form of one file part (top-level or a completed tool's
+ * attachment): the bytes (`url`) and the source text are blanked; every other
+ * field is kept, including the `synthetic` placeholder marker the storage
+ * merge reads to drop optimistic placeholders.
  *
- * The assertion restores the declared slot type: `ToolStateCompleted.attachments`
- * is `Array<FilePart>`, and the entry came from that list, while this seam
- * validates only the members the pipeline reads (`isToolAttachment`).
+ * A source without a readable `text` field (malformed wire data) gains an
+ * empty `text: { value: '' }` — one policy for top-level parts and
+ * attachments alike.
  */
-function stripToolAttachmentContent(attachment: ReadableToolAttachment): FilePart {
-  const stripped = { ...attachment, url: '' };
-  const source = stripped.source;
-  if (
-    typeof source === 'object' &&
-    source !== null &&
-    'text' in source &&
-    typeof source.text === 'object' &&
-    source.text !== null &&
-    'value' in source.text
-  ) {
-    stripped.source = { ...source, text: { ...source.text, value: '' } };
+function stripFilePartContent(part: FilePart): FilePart {
+  const stripped: FilePart = { ...part, url: '' };
+  if (part.source) {
+    stripped.source = {
+      ...part.source,
+      text: {
+        ...part.source.text,
+        value: '',
+      },
+    };
   }
-  return stripped as FilePart;
+  return stripped;
 }
 
 /**
@@ -91,28 +91,6 @@ export function toolPartAttachments(part: Part): readonly ReadableToolAttachment
   return state.attachments.filter(isToolAttachment);
 }
 
-function stripFilePartContent(part: FilePart): FilePart {
-  const stripped: FilePart = {
-    id: part.id,
-    sessionID: part.sessionID,
-    messageID: part.messageID,
-    type: 'file',
-    mime: part.mime,
-    ...(part.filename !== undefined ? { filename: part.filename } : {}),
-    url: '',
-  };
-  if (part.source) {
-    stripped.source = {
-      ...part.source,
-      text: {
-        ...part.source.text,
-        value: '',
-      },
-    };
-  }
-  return stripped;
-}
-
 export function stripPartContentIfFile(part: Part): Part {
   if (isFilePart(part)) {
     return stripFilePartContent(part);
@@ -122,7 +100,7 @@ export function stripPartContentIfFile(part: Part): Part {
     if (state !== null && state.status === 'completed' && Array.isArray(state.attachments)) {
       const strippedAttachments = state.attachments
         .filter(isToolAttachment)
-        .map(stripToolAttachmentContent);
+        .map(stripFilePartContent);
       return {
         ...part,
         state: {

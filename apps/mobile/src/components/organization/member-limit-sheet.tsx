@@ -43,7 +43,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   const router = useRouter();
   const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '', {
-    silenceUpdateMemberToast: true,
+    silenceMemberToast: true,
   });
   const currentLimit = member.dailyUsageLimitUsd;
   const hasCurrentLimit = currentLimit != null;

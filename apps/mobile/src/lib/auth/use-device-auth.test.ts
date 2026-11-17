@@ -42,6 +42,14 @@ vi.mock('@/lib/auth/pending-external-auth', () => ({
   clearPendingExternalAuth: vi.fn(),
 }));
 
+// The app-shell helper composes the SSO URL with the real base URL; only its
+// launch path reaches the native browser module this project cannot load.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
+// `app-shell-handoff` also imports the tRPC client, whose module loads the Expo
+// runtime; this suite starts sign-ins over `fetch` and never mints.
+vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
@@ -468,9 +476,11 @@ describe('useDeviceAuth hook', () => {
 
     expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledTimes(1);
     const url = new URL(vi.mocked(openAuthSessionAsync).mock.calls[0]?.[0] ?? '');
-    expect(url.searchParams.get('sso')).toBe('true');
+    expect(url.pathname).toBe('/app-shell/sign-in');
     expect(url.searchParams.get('email')).toBe('user@example.com');
-    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123&app=1');
+    // The approval page the server named is the callback, path and query kept.
+    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123');
+    expect(url.searchParams.has('sso')).toBe(false);
     expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
   });
 

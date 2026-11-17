@@ -20,7 +20,7 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join, relative as relativePath } from 'node:path';
+import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
@@ -42,6 +42,15 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * source trees whose calls and literals name their keys. The mobile app reads
  * its own tree; the push catalog is rendered on both sides of the wire, from
  * `packages/notifications/src` and from the workers under `services`.
+ *
+ * Each entry also carries the catalog's own policy. `baseKeyOf` names how a
+ * consumer appends its part to a key. `englishCopyRules` lists the checks the
+ * catalog's English copy must pass. `localeRegistry` names a hand-written
+ * module the push runtime reads its catalogs from. `calledKeyOf` reads the key
+ * one translate call names, `keyPrefixOf` the static head of a key built as a
+ * template literal (null when the catalog builds none), and
+ * `collectsDestructiveKeys` whether the scan gathers the keys object literals
+ * paint on destructive buttons.
  */
 function catalogsOf(root) {
   return [
@@ -49,11 +58,22 @@ function catalogsOf(root) {
       name: 'mobile',
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
+      baseKeyOf: pluralBaseKey,
+      englishCopyRules: [checkEnglishCopies, checkMobileEnglishIdentical],
+      calledKeyOf: mobileCalledKey,
+      keyPrefixOf: null,
+      collectsDestructiveKeys: true,
     },
     {
       name: 'notifications',
       dir: join(root, 'packages/notifications/src/locales'),
+      localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
+      baseKeyOf: pushBaseKey,
+      englishCopyRules: [checkPushEnglishCopy],
+      calledKeyOf: pushCalledKeyOf,
+      keyPrefixOf: pushKeyPrefix,
+      collectsDestructiveKeys: false,
     },
   ];
 }
@@ -133,14 +153,6 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
-  [
-    '{{displaycount}} critical',
-    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
-  ],
-  [
-    '{{displaycount}} high',
-    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
-  ],
 ]);
 
 /**
@@ -163,6 +175,7 @@ const WORDED_COUNTS = new Set([
   'securityAgent.automation.queued:two:ar',
   'securityAgent.settingsOverview.repositoriesCount:one:ar',
   'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.composer.charactersRemaining:one:mi',
   'agentChat.partRenderer.updatedFileCount:one:ar',
   'agentChat.partRenderer.updatedFileCount:two:ar',
   'agentChat.olderMessages.omitted:two:ar',
@@ -301,8 +314,11 @@ const NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS = {
  * and the deadline breakdown name the same bucket in their own wording (pt-BR
  * says "críticas" on the row and "críticos" in the breakdown), so those keys
  * carry the same English string on purpose and a catalog may translate the two
- * apart. Every other pair of keys holding one English string still has to
- * agree.
+ * apart.
+ *
+ * This record is the only skip for those keys. The duplicate-copy rule in
+ * `checkEnglishCopies` and the one-wording rule in `checkSharedWordings` both
+ * read it, so one entry exempts a phrase from each rule at once.
  */
 const PER_LINE_BUCKET_PHRASES = new Set([
   'securityAgent.dashboard.repoSummaryCritical',
@@ -787,9 +803,12 @@ function destructiveLabels(object) {
  * Three sets, read from every source root of one catalog:
  * - `called`: keys the catalog's own translate call names as a plain string.
  *   Each must exist.
- * - `referenced`: every string literal in the source. A key named in a lookup
- *   table and passed to t() through a variable is used, so the dead-key check
- *   reads this wider set and never asks anyone to delete a live key.
+ * - `referenced`: every string literal in the source, plus every literal
+ *   written under the static head of a key the source builds as a template
+ *   literal — `` `generic.body.${leaf}` `` reads `generic.body.`, so a leaf
+ *   literal beside it names the key `generic.body.<leaf>`. A key named in a
+ *   lookup table and passed to t() through a variable is used, so the dead-key
+ *   check reads this wider set and never asks anyone to delete a live key.
  * - `destructiveKeys`: keys an object literal paints on a destructive button
  *   while the dialog can also paint the generic Cancel label. See the rule that
  *   reads this set, `destructiveConfirmKeys` below. Only the mobile catalog
@@ -804,8 +823,9 @@ function scanSource(catalog, root) {
   const problems = [];
   const called = new Set();
   const referenced = new Set();
+  const keyPrefixes = new Set();
   const destructiveKeys = new Set();
-  const mobile = catalog.name === 'mobile';
+  const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
     // A fixture tree holds only the parts a test gives it; a root the tree does
     // not have has nothing to scan.
@@ -831,7 +851,7 @@ function scanSource(catalog, root) {
           return;
         }
         if (node.type === 'ObjectExpression') {
-          if (mobile) {
+          if (collectsDestructiveKeys) {
             for (const key of destructiveLabels(node)) {
               destructiveKeys.add(key);
             }
@@ -841,19 +861,25 @@ function scanSource(catalog, root) {
         if (node.type !== 'CallExpression') {
           return;
         }
-        if (mobile) {
-          const found = mobileCalledKey(node, file);
-          problems.push(...found.problems);
-          if (found.key !== null) {
-            called.add(found.key);
-          }
-          return;
+        const found = calledKeyOf(node, file);
+        problems.push(...found.problems);
+        if (found.key !== null) {
+          called.add(found.key);
         }
-        const key = pushCalledKey(node);
-        if (key !== null) {
-          called.add(key);
+        const prefix = keyPrefixOf === null ? null : keyPrefixOf(node);
+        if (prefix !== null) {
+          keyPrefixes.add(prefix);
         }
       });
+    }
+  }
+  // A key the source builds from the catalog has no literal of its own, so the
+  // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
+  // `generic.body.chatMessage`. The set is copied because the expansion grows
+  // it while it runs.
+  for (const prefix of keyPrefixes) {
+    for (const value of [...referenced]) {
+      referenced.add(`${prefix}${value}`);
     }
   }
   return { called, referenced, destructiveKeys, problems };
@@ -888,6 +914,17 @@ function mobileCalledKey(call, file) {
 }
 
 /**
+ * The push side of the uniform reader every catalog's scan calls: the key one
+ * `translatePush(locale, key, …)` call names, wrapped in the
+ * `{ key, problems }` shape `mobileCalledKey` writes. A push key is never a
+ * template literal — the prefix below serves that form — so this reader has no
+ * problem to report.
+ */
+function pushCalledKeyOf(call) {
+  return { key: pushCalledKey(call), problems: [] };
+}
+
+/**
  * The key one `translatePush(locale, key, …)` call names, or null when the call
  * is not one or its key is not a plain string.
  *
@@ -909,6 +946,30 @@ function pushCalledKey(call) {
   return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
     ? value.value
     : null;
+}
+
+/**
+ * The static head of a `translatePush(locale, key, …)` key built as a template
+ * literal, when that head names the dotted parent of the key:
+ * `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves builds
+ * its key this way, so the leaf literals beside it name every key under the
+ * head. Any other template literal — `` `${i18nKey}.title` ``, whose head is
+ * empty — names no parent and returns null.
+ */
+function pushKeyPrefix(call) {
+  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+    return null;
+  }
+  const key = call.arguments[1];
+  if (key === undefined) {
+    return null;
+  }
+  const value = unwrap(key);
+  if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
+    return null;
+  }
+  const head = value.quasis[0].value.cooked;
+  return typeof head === 'string' && head.endsWith('.') ? head : null;
 }
 
 /**
@@ -954,9 +1015,6 @@ function foldDestructiveLabel(value) {
  */
 function destructiveConfirmKeys(source, english) {
   const checks = new Map();
-  if (source === null) {
-    return checks;
-  }
   const englishCancel = foldDestructiveLabel(english.get('common.cancel') ?? '');
   for (const key of source.destructiveKeys) {
     const englishValue = english.get(key);
@@ -1167,13 +1225,15 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
  * that only sat in the folder used to render in English with no gate saying so;
  * a registry entry with no import would translate nothing.
  */
-function checkPushLocaleRegistry(root) {
+function checkPushLocaleRegistry({ root, catalog }) {
   const problems = [];
-  const catalogDir = join(root, 'packages/notifications/src/locales');
-  const localeModule = join(root, 'packages/notifications/src/i18n.ts');
+  const catalogDir = catalog.dir;
+  const localeModule = catalog.localeRegistry;
   const relativeModule = relativePath(root, localeModule);
+  const importPrefix =
+    './' + relativePath(dirname(localeModule), catalogDir).split(sep).join('/') + '/';
   if (!existsSync(localeModule)) {
-    problems.push(`notifications: no push locale registry at ${relativeModule}`);
+    problems.push(`${catalog.name}: no push locale registry at ${relativeModule}`);
     return problems;
   }
   const present = new Set(catalogTags(catalogDir));
@@ -1189,9 +1249,12 @@ function checkPushLocaleRegistry(root) {
   walk(entry.program, node => {
     if (node.type === 'ImportDeclaration') {
       const source = node.source.value;
-      const prefix = './locales/';
-      if (typeof source === 'string' && source.startsWith(prefix) && source.endsWith('.json')) {
-        const tag = source.slice(prefix.length, -'.json'.length);
+      if (
+        typeof source === 'string' &&
+        source.startsWith(importPrefix) &&
+        source.endsWith('.json')
+      ) {
+        const tag = source.slice(importPrefix.length, -'.json'.length);
         const binding = node.specifiers.find(
           specifier => specifier.type === 'ImportDefaultSpecifier'
         );
@@ -1250,16 +1313,16 @@ function checkPushLocaleRegistry(root) {
 
   for (const tag of [...present].sort()) {
     if (!imported.has(tag)) {
-      problems.push(`notifications: catalog "${tag}.json" has no import in ${relativeModule}`);
+      problems.push(`${catalog.name}: catalog "${tag}.json" has no import in ${relativeModule}`);
     }
     if (!registered.has(tag)) {
-      problems.push(`notifications: catalog "${tag}.json" has no push locale registry entry`);
+      problems.push(`${catalog.name}: catalog "${tag}.json" has no push locale registry entry`);
     }
   }
   for (const tag of [...imported.keys()].sort()) {
     if (!present.has(tag)) {
       problems.push(
-        `notifications: ${relativeModule} imports "./locales/${tag}.json" with no catalog file`
+        `${catalog.name}: ${relativeModule} imports "${importPrefix}${tag}.json" with no catalog file`
       );
     }
   }
@@ -1319,9 +1382,6 @@ function checkEnglishCopies({ catalogName, english }) {
   // drift apart, and only the duplicate key survives. Narrowing the exemption
   // has to compare stems, because a family's bare key carries its `_other` copy
   // by i18next convention and is not a second key for the same string.
-  if (catalogName !== 'mobile') {
-    return problems;
-  }
   const byCopy = new Map();
   for (const [key, value] of english) {
     if (pluralParts(key)) {
@@ -1332,8 +1392,14 @@ function checkEnglishCopies({ catalogName, english }) {
     }
     byCopy.get(value).push(key);
   }
+  // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
+  // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (keys.length < 2 || TWO_SENSE_COPY.has(wording(value))) {
+    if (
+      keys.length < 2 ||
+      TWO_SENSE_COPY.has(wording(value)) ||
+      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
+    ) {
       continue;
     }
     problems.push(
@@ -1374,7 +1440,6 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
 function checkEnglishCatalog({ catalogName, english, englishValues }) {
   const label = `${catalogName}/en`;
   return [
-    ...checkEnglishCopies({ catalogName, english }),
     ...checkEnglishValues({ catalogName, english, englishValues }),
     ...checkAgentEditorCopy(english, english, label),
     ...checkPullRequestTerm(english, label),
@@ -1791,12 +1856,7 @@ function checkCatalogLocales({
     // category suffix. The English `_one`/`_other` siblings of a family
     // English declares stay mandatory in the missing-key rule below, except
     // where the locale carries the flat base key instead.
-    const localeFamilies = new Set(
-      [...translated.keys()]
-        .map(pluralParts)
-        .filter(Boolean)
-        .map(parts => parts.base)
-    );
+    const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,
@@ -1840,7 +1900,7 @@ function checkCatalogLocales({
   return { problems, localeValues };
 }
 
-function checkMobileEnglishIdentical({ english, localeValues }) {
+function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
   const problems = [];
   // A mobile key whose value equals English in every non-English locale was
   // never translated. Allowlist the proper nouns and format-only strings that
@@ -1861,7 +1921,7 @@ function checkMobileEnglishIdentical({ english, localeValues }) {
       }
     }
     if (allEqual) {
-      problems.push(`mobile: "${key}" equals English in every locale`);
+      problems.push(`${catalogName}: "${key}" equals English in every locale`);
     }
   }
   return problems;
@@ -1892,6 +1952,33 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
+/**
+ * The policy fields a scan reads on one catalog descriptor. Every catalog
+ * needs a called-key reader; `keyPrefixOf` stays null when the catalog builds
+ * no key from a template head; the destructive collection is a real decision,
+ * because an entry that leaves the field out reads as one that chose not to
+ * collect. A misconfigured entry is reported as a named problem and the audit
+ * skips its scan entirely, instead of dying on the missing reader partway
+ * through the tree — the problems the run collected before the scan would
+ * never be printed.
+ */
+function checkScanPolicy(catalog) {
+  const missing = [];
+  if (typeof catalog.calledKeyOf !== 'function') {
+    missing.push('calledKeyOf');
+  }
+  if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
+    missing.push('keyPrefixOf');
+  }
+  if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
+    missing.push('collectsDestructiveKeys');
+  }
+  return missing.map(
+    field =>
+      `${catalog.name}: the catalog descriptor declares no ${field}; every entry of catalogsOf declares its scan policy`
+  );
+}
+
 /** Every key the source names exists, and every English key is used. */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
@@ -1909,6 +1996,41 @@ function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFami
 }
 
 /**
+ * The English strings each catalog may render more than one way, and the
+ * problem that stopped the audit from reading them. A file that is missing,
+ * does not parse, or does not map each tag to a list of strings reports the
+ * same one line: the callers below read every tag's entry as a set, so a value
+ * of another shape must not reach them, and a fixture tree still gets the rest
+ * of the findings.
+ */
+function readWordingExceptions(root) {
+  const problems = [];
+  try {
+    const parsed = JSON.parse(
+      readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
+    );
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      Object.values(parsed).every(
+        entries => Array.isArray(entries) && entries.every(entry => typeof entry === 'string')
+      )
+    ) {
+      return { wordingExceptions: parsed, problems };
+    }
+    problems.push(
+      'check-catalogs: cannot read tools/i18n/wording-exceptions.json: ' +
+        'expected an object that maps each tag to a list of English strings'
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`check-catalogs: cannot read tools/i18n/wording-exceptions.json: ${message}`);
+  }
+  return { wordingExceptions: {}, problems };
+}
+
+/**
  * Every problem the catalogs under `root` have, and how many languages were
  * checked. The repository root is the default, so the CLI below and a test that
  * points at a fixture tree run the same audit. The findings are returned, not
@@ -1922,15 +2044,33 @@ export function checkCatalogs(root = ROOT) {
    * where English reuses the noun. Everything else must read the same way
    * everywhere in one catalog.
    */
-  const WORDING_EXCEPTIONS = JSON.parse(
-    readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
-  );
+  const wordingExceptionsRead = readWordingExceptions(root);
+  problems.push(...wordingExceptionsRead.problems);
+  const { wordingExceptions } = wordingExceptionsRead;
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
 
-  problems.push(...checkPushLocaleRegistry(root));
+  const catalogs = catalogsOf(root);
+  const unscannable = new Set();
+  for (const catalog of catalogs) {
+    const policyProblems = checkScanPolicy(catalog);
+    problems.push(...policyProblems);
+    if (policyProblems.length > 0) {
+      // A descriptor without its policy cannot be scanned: scanSource would
+      // call the missing reader and die partway through the tree, so the
+      // named problems above would never be printed. Skipping the catalog
+      // keeps the diagnostic what the developer sees.
+      unscannable.add(catalog);
+    }
+  }
+  const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  for (const catalog of scannable) {
+    if (catalog.localeRegistry) {
+      problems.push(...checkPushLocaleRegistry({ root, catalog }));
+    }
+  }
 
-  for (const catalog of catalogsOf(root)) {
+  for (const catalog of scannable) {
     const catalogName = catalog.name;
     const present = new Set(catalogTags(catalog.dir));
 
@@ -1948,7 +2088,7 @@ export function checkCatalogs(root = ROOT) {
     problems.push(...source.problems);
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.
-    const baseKeyOf = catalogName === 'mobile' ? pluralBaseKey : pushBaseKey;
+    const baseKeyOf = catalog.baseKeyOf;
     const mustTranslateKeys = MUST_TRANSLATE_KEYS.get(catalogName) ?? new Set();
     const englishFamilies = pluralFamilyBases(english);
     // English copy that interpolates {{count}} but whose words inflect none or
@@ -1986,17 +2126,13 @@ export function checkCatalogs(root = ROOT) {
       mustTranslateKeys,
       destructiveChecks,
       sharedWordings,
-      wordingExceptions: WORDING_EXCEPTIONS,
+      wordingExceptions,
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;
 
-    if (catalogName === 'mobile') {
-      problems.push(...checkMobileEnglishIdentical({ english, localeValues }));
-    }
-
-    if (catalogName === 'notifications') {
-      problems.push(...checkPushEnglishCopy({ catalogName, english, localeValues }));
+    for (const rule of catalog.englishCopyRules) {
+      problems.push(...rule({ catalogName, english, localeValues }));
     }
 
     problems.push(

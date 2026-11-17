@@ -20,7 +20,7 @@ const PENDING_LIFETIME_SECONDS = 10 * 60;
 const pendingSchema = z.object({
   /** The Kilo user who started the connection; the callback must match it. */
   kiloUserId: z.string().min(1),
-  /** The connection the approval completes: personal, member, or shared services. */
+  /** The connection the approval completes: personal or organization. */
   owner: ClaudeBillingOwnerSchema,
   returnPath: z.string().startsWith('/'),
   state: z.string().min(1),

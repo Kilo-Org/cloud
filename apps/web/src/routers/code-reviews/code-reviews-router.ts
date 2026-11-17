@@ -71,6 +71,13 @@ import {
   retryFailedCodeReview,
   type CodeReviewRetryRefusalReason,
 } from '@/lib/code-reviews/retry-review';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+
+/**
+ * Retryable copy for a code review list that did not settle inside the mobile
+ * procedure budget.
+ */
+const CODE_REVIEWS_UNAVAILABLE_MESSAGE = 'Your code reviews took too long to load. Try again.';
 
 /**
  * The answer a person gets when the reviewer configuration refuses a retry.
@@ -200,22 +207,27 @@ export const codeReviewRouter = createTRPCRouter({
         const limit = fullInput.limit ?? DEFAULT_LIST_LIMIT;
         const offset = fullInput.offset ?? 0;
 
-        const [reviews, total] = await Promise.all([
-          listCodeReviews({
-            owner,
-            limit,
-            offset,
-            status: fullInput.status,
-            repoFullName: fullInput.repoFullName,
-            platform: fullInput.platform,
-          }),
-          countCodeReviews({
-            owner,
-            status: fullInput.status,
-            repoFullName: fullInput.repoFullName,
-            platform: fullInput.platform,
-          }),
-        ]);
+        const [reviews, total] = await withControlPlaneReadBudget({
+          clock: ctx,
+          message: CODE_REVIEWS_UNAVAILABLE_MESSAGE,
+          read: () =>
+            Promise.all([
+              listCodeReviews({
+                owner,
+                limit,
+                offset,
+                status: fullInput.status,
+                repoFullName: fullInput.repoFullName,
+                platform: fullInput.platform,
+              }),
+              countCodeReviews({
+                owner,
+                status: fullInput.status,
+                repoFullName: fullInput.repoFullName,
+                platform: fullInput.platform,
+              }),
+            ]),
+        });
 
         // Role-gated DTO: raw ledger/transaction identifiers are admin+ only.
         // Per-field decision:
@@ -247,6 +259,7 @@ export const codeReviewRouter = createTRPCRouter({
 
         return successResult(response);
       } catch (error) {
+        if (error instanceof TRPCError && error.code === 'SERVICE_UNAVAILABLE') throw error;
         return failureResult(
           error instanceof Error ? error.message : 'Failed to list code reviews'
         );
@@ -259,32 +272,39 @@ export const codeReviewRouter = createTRPCRouter({
   listForUser: baseProcedure
     .input(ListCodeReviewsForUserInputSchema)
     .query(async ({ input, ctx }) => {
+      const owner: Owner = {
+        type: 'user',
+        id: ctx.user.id,
+        userId: ctx.user.id,
+      };
+
+      const limit = input.limit ?? DEFAULT_LIST_LIMIT;
+      const offset = input.offset ?? 0;
+
       try {
-        const owner: Owner = {
-          type: 'user',
-          id: ctx.user.id,
-          userId: ctx.user.id,
-        };
-
-        const limit = input.limit ?? DEFAULT_LIST_LIMIT;
-        const offset = input.offset ?? 0;
-
-        const [reviews, total] = await Promise.all([
-          listCodeReviews({
-            owner,
-            limit,
-            offset,
-            status: input.status,
-            repoFullName: input.repoFullName,
-            platform: input.platform,
-          }),
-          countCodeReviews({
-            owner,
-            status: input.status,
-            repoFullName: input.repoFullName,
-            platform: input.platform,
-          }),
-        ]);
+        // Both reads are unbounded lists/counts over one owner, so a slow
+        // database would hold the whole procedure open until its budget fired.
+        const [reviews, total] = await withControlPlaneReadBudget({
+          clock: ctx,
+          message: CODE_REVIEWS_UNAVAILABLE_MESSAGE,
+          read: () =>
+            Promise.all([
+              listCodeReviews({
+                owner,
+                limit,
+                offset,
+                status: input.status,
+                repoFullName: input.repoFullName,
+                platform: input.platform,
+              }),
+              countCodeReviews({
+                owner,
+                status: input.status,
+                repoFullName: input.repoFullName,
+                platform: input.platform,
+              }),
+            ]),
+        });
 
         const response = {
           reviews,
@@ -294,6 +314,7 @@ export const codeReviewRouter = createTRPCRouter({
 
         return successResult(response);
       } catch (error) {
+        if (error instanceof TRPCError && error.code === 'SERVICE_UNAVAILABLE') throw error;
         return failureResult(
           error instanceof Error ? error.message : 'Failed to list code reviews'
         );

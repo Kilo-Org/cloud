@@ -77,6 +77,7 @@ import {
   type NativeEgressPolicy,
 } from './egress-policy.js';
 import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
+import { ContainersLaunchInterruptedError } from './launch-interrupted.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -272,6 +273,10 @@ function stopPath(
 
 export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly pendingStarts = new Set<{
+    allocationRef: string;
+    controller: AbortController;
+  }>();
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
   /** Snapshot calls still awaited in this isolate, by capture id. */
@@ -300,6 +305,22 @@ export class SandboxContainers extends DurableObject<Env> {
     return result;
   }
 
+  private async runLaunch<T>(
+    allocationRef: string,
+    task: (signal: AbortSignal) => Promise<T>
+  ): Promise<T> {
+    const pending = { allocationRef, controller: new AbortController() };
+    this.pendingStarts.add(pending);
+    try {
+      return await this.runExclusive(() => {
+        pending.controller.signal.throwIfAborted();
+        return task(pending.controller.signal);
+      });
+    } finally {
+      this.pendingStarts.delete(pending);
+    }
+  }
+
   async launchWrapper(input: ContainersLaunchInput): Promise<ContainersLaunchResult> {
     if (input.egressAudit !== undefined && typeof input.egressAudit !== 'boolean') {
       throw new Error('Invalid egress audit policy');
@@ -311,7 +332,7 @@ export class SandboxContainers extends DurableObject<Env> {
       ...input,
       egressAllowlist: nativeEgressAllowlistSchema.optional().parse(input.egressAllowlist),
     };
-    return this.runExclusive(async () => {
+    return this.runLaunch(input.allocationRef, async signal => {
       const ref = input.allocationRef;
       let stored = await this.readRecord();
       if (stored.allocationRef === ref && stored.state === 'stopping') {
@@ -330,7 +351,8 @@ export class SandboxContainers extends DurableObject<Env> {
           throw new Error('Container egress policy cannot change within an allocation');
         }
       }
-      return this.launchEntry(stored, ref, input);
+      signal.throwIfAborted();
+      return this.launchEntry(stored, ref, input, signal);
     });
   }
 
@@ -361,7 +383,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async launchEntry(
     stored: ContainersRecord,
     ref: string,
-    input: ContainersLaunchInput
+    input: ContainersLaunchInput,
+    signal: AbortSignal
   ): Promise<ContainersLaunchResult> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
@@ -380,7 +403,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (stored.state === 'launching' && sameRef) {
       if (phase === 'not_started') {
         const record = await this.installLaunchInstance(stored, input.instance);
-        return this.resumePreExecLaunch(record, ref, input);
+        return this.resumePreExecLaunch(record, ref, input, signal);
       }
       if (phase === 'exec_pending' || phase === 'missing') {
         return this.adoptUncertainWrapper(stored, ref, input, phase === 'missing');
@@ -388,7 +411,7 @@ export class SandboxContainers extends DurableObject<Env> {
       throw new Error('Container wrapper attempt phase is unknown');
     }
     if (stored.state === 'idle' && phase === 'missing') {
-      return this.freshLaunch(stored, ref, input);
+      return this.freshLaunch(stored, ref, input, signal);
     }
     throw new Error('Container wrapper attempt phase conflicts with the allocation state');
   }
@@ -396,7 +419,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async freshLaunch(
     stored: ContainersRecord,
     ref: string,
-    input: ContainersLaunchInput
+    input: ContainersLaunchInput,
+    signal: AbortSignal
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
@@ -427,7 +451,7 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.installOutboundProxy(container, input);
     }
     const start = await this.resolveStart(input, 'supervisor', true);
-    return this.issueNativeMainProcess(record, ref, start, input, input.deadlineAt);
+    return this.issueNativeMainProcess(record, ref, start, signal, input, input.deadlineAt);
   }
 
   /**
@@ -438,7 +462,7 @@ export class SandboxContainers extends DurableObject<Env> {
    * start may still be in flight is confirmed by its main-process identity.
    */
   async launchBuilder(input: ContainersBuilderLaunchInput): Promise<ContainersLaunchResult> {
-    return this.runExclusive(async () => {
+    return this.runLaunch(input.allocationRef, async signal => {
       const ref = input.allocationRef;
       let stored = await this.readRecord();
       if (stored.allocationRef === ref && stored.state === 'stopping') {
@@ -488,6 +512,7 @@ export class SandboxContainers extends DurableObject<Env> {
         record,
         ref,
         start,
+        signal,
         undefined,
         input.deadlineAt
       );
@@ -530,11 +555,13 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     start: ResolvedStart,
+    signal: AbortSignal,
     policy:
       | Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit' | 'snapshotDiagnostic'>
       | undefined,
     deadlineAt: number | undefined
   ): Promise<ContainersLaunchResult> {
+    signal.throwIfAborted();
     const container = this.requiredContainer();
     // Ownership is retained before start: an ambiguous start that takes effect
     // must not release the allocation. Never leave `not_started` across the start.
@@ -557,6 +584,7 @@ export class SandboxContainers extends DurableObject<Env> {
       };
     }
     await this.writeRecord(launching);
+    signal.throwIfAborted();
     if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
@@ -565,11 +593,25 @@ export class SandboxContainers extends DurableObject<Env> {
       async () => {
         const issuedAt = Date.now();
         await this.startContainerAndActivateBilling(container, record, start.options);
-        await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
+        // Only the read-only readiness probe is cancellable. Physical start,
+        // billing and destroy keep their order in the provider queue.
+        const cancelled = Promise.withResolvers<never>();
+        const interrupt = () => cancelled.reject(signal.reason);
+        signal.addEventListener('abort', interrupt, { once: true });
+        try {
+          signal.throwIfAborted();
+          await Promise.race([
+            this.awaitMainProcess(container, start, issuedAt, deadlineAt, signal),
+            cancelled.promise,
+          ]);
+        } finally {
+          signal.removeEventListener('abort', interrupt);
+        }
         await this.activateBillingIfRunning(container, record);
       },
       policy?.snapshotDiagnostic
     );
+    signal.throwIfAborted();
     if (failure !== null) return { started: false, startSource: start.source, ...failure };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
@@ -647,6 +689,7 @@ export class SandboxContainers extends DurableObject<Env> {
       await attempt();
       return null;
     } catch (error) {
+      if (error instanceof ContainersLaunchInterruptedError) throw error;
       if (start.source === 'repository' && start.snapshotId !== null) {
         const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
@@ -821,6 +864,11 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   async stop(allocationRef: string): Promise<'terminal' | 'retryable'> {
+    for (const pending of this.pendingStarts) {
+      if (pending.allocationRef === allocationRef) {
+        pending.controller.abort(new ContainersLaunchInterruptedError());
+      }
+    }
     return this.runExclusive(async () => {
       const ref = allocationRef;
       const record = await this.readRecord();
@@ -898,7 +946,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async resumePreExecLaunch(
     record: ContainersRecord,
     ref: string,
-    input: ContainersLaunchInput
+    input: ContainersLaunchInput,
+    signal: AbortSignal
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     const interception =
@@ -912,7 +961,7 @@ export class SandboxContainers extends DurableObject<Env> {
         'supervisor',
         record.startSource === 'repository'
       );
-      return this.issueNativeMainProcess(record, ref, start, input, input.deadlineAt);
+      return this.issueNativeMainProcess(record, ref, start, signal, input, input.deadlineAt);
     }
     if (
       (await this.settleRunningMainProcess(record, ref, 'supervisor', input.command)) === 'issued'
@@ -1263,7 +1312,8 @@ export class SandboxContainers extends DurableObject<Env> {
     container: Container,
     start: ResolvedStart,
     issuedAt: number,
-    launchDeadlineAt?: number
+    launchDeadlineAt: number | undefined,
+    signal: AbortSignal
   ): Promise<void> {
     const readinessDeadline =
       start.source === 'repository'
@@ -1283,6 +1333,7 @@ export class SandboxContainers extends DurableObject<Env> {
       })
     );
     for (;;) {
+      signal.throwIfAborted();
       const result = await Promise.race([
         this.observeMainProcess(container, start.command, deadlineAt).then(observation => ({
           type: 'observed' as const,
@@ -1290,6 +1341,7 @@ export class SandboxContainers extends DurableObject<Env> {
         })),
         stopped,
       ]);
+      signal.throwIfAborted();
       const observation = result.observation;
       checks += 1;
       if (result.type === 'stopped') {

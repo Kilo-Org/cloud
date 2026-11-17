@@ -33,6 +33,8 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/organizations/.*/overview',
   '/organizations/.*/integrations',
   '/organizations/.*/usage-details',
+  '/organizations/new',
+  '/organizations/create',
   '/organizations/[^/]+',
   '/pr-review/gitlab/.*',
   '/pr-review/bitbucket/.*',

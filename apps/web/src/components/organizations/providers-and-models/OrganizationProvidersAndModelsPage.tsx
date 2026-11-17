@@ -295,6 +295,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         byokOnly: provider.byokOnly,
+        vercelInferenceRegions: model.endpoint.vercel_inference_regions ?? [],
         ...getOfferingPricing(
           customPricingConfig,
           getSnapshotModelVariantId(model),
@@ -571,6 +572,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         </Tabs>
 
         <ModelDetailsDialog
+          organizationId={organizationId}
+          showGatewayAvailability={showGatewaysTab}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

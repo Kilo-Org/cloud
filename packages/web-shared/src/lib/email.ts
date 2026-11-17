@@ -109,6 +109,45 @@ export function renderNonAutolinkedText(str: string): RawHtml {
 // these templates into its functions with outputFileTracingIncludes.
 const EMAIL_TEMPLATES_DIR = path.join(process.cwd(), '..', '..', 'packages', 'web-shared', 'src');
 
+// Transactional emails carry a light-mode design system with inline colors, so
+// clients that transform colors for dark mode would end up with unreadable
+// text. Declaring both schemes here plus a matching dark palette lets clients
+// that honor prefers-color-scheme render our own dark theme instead.
+const EMAIL_DARK_MODE_STYLES = `<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  @media (prefers-color-scheme: dark) {
+    .kc-page { background-color: #121212 !important; }
+    .kc-strong { color: #f2f2f2 !important; }
+    .kc-text { color: #e0e0e0 !important; }
+    .kc-muted { color: #b3b3b3 !important; }
+    .kc-faint { color: #7a7a7a !important; }
+    .kc-box { background-color: #1e1e1e !important; border-color: #333333 !important; }
+    .kc-divider { border-top-color: #333333 !important; }
+    .kc-btn { background-color: #f2f2f2 !important; color: #121212 !important; }
+  }
+</style>
+`;
+
+function injectDarkModeStyles(html: string, name: string): string {
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${EMAIL_DARK_MODE_STYLES}</head>`);
+  }
+  // Some templates are body-only or bare fragments; head content is allowed
+  // before the first body node and browsers hoist it into the head.
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(
+      /<html[^>]*>/i,
+      match => `${match}\n  <head>${EMAIL_DARK_MODE_STYLES}</head>`
+    );
+  }
+  if (html.trim().length === 0) {
+    throw new Error(`Email template '${name}' is empty`);
+  }
+  return `${EMAIL_DARK_MODE_STYLES}${html}`;
+}
+
 // Report an unreadable template before any caller can swallow the error; the
 // low-balance alert, for one, only logs send failures from after().
 function readTemplate(name: string, directory: 'emails' | 'marketing-emails'): string {
@@ -129,7 +168,10 @@ export function renderTemplate(
   vars: TemplateVars,
   directory: 'emails' | 'marketing-emails' = 'emails'
 ): string {
-  const html = readTemplate(name, directory);
+  let html = readTemplate(name, directory);
+  if (directory === 'emails') {
+    html = injectDarkModeStyles(html, name);
+  }
   const templateVars: TemplateVars = { ...vars, support_email: SUPPORT_EMAIL };
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     if (!(key in templateVars)) {
@@ -143,7 +185,7 @@ export function renderTemplate(
 export function buildCreditsSection(monthlyCreditsUsd: number): RawHtml {
   if (monthlyCreditsUsd <= 0) return new RawHtml('');
   return new RawHtml(
-    `<br />• <strong style="color: #1a1a1a">$${monthlyCreditsUsd} USD in Kilo credits</strong>, which reset every 30 days`
+    `<br />• <strong class="kc-strong" style="color: #1a1a1a">$${monthlyCreditsUsd} USD in Kilo credits</strong>, which reset every 30 days`
   );
 }
 
@@ -336,7 +378,7 @@ export async function sendNewSignInMethodEmail(
         ? `${displayName} (${linkedIdentity.email})`
         : linkedIdentity.email,
       connected_accounts_link: new RawHtml(
-        `<a href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
+        `<a class="kc-strong" href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
           connectedAccountsUrl
         )}</a>`
       ),
@@ -748,7 +790,7 @@ export function buildCreditsTopUpReceiptSection(receiptUrl: string | null | unde
   if (!receiptUrl) return new RawHtml('');
   const escaped = escapeHtml(receiptUrl);
   return new RawHtml(
-    `<a href="${escaped}" style="color: #1a1a1a; text-decoration: underline">View your Stripe receipt</a>.`
+    `<a class="kc-strong" href="${escaped}" style="color: #1a1a1a; text-decoration: underline">View your Stripe receipt</a>.`
   );
 }
 
@@ -760,7 +802,7 @@ const TOP_UP_INFO_ROW_STYLE =
   "margin: 0 0 8px; font-size: 13px; line-height: 20px; color: #555; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 export function buildCreditsTopUpInfoRow(label: string, value: string): string {
-  return `<p style="${TOP_UP_INFO_ROW_STYLE}"><strong style="color: #1a1a1a">${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`;
+  return `<p class="kc-muted" style="${TOP_UP_INFO_ROW_STYLE}"><strong class="kc-strong" style="color: #1a1a1a">${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`;
 }
 
 // Optional fee + total-paid rows. Fee-free callers get empty HTML so the
@@ -933,14 +975,14 @@ function buildRecommendationsDigestSection(
       const href = `${baseUrl}${escapeHtml(rec.actionUrl)}`;
       return `
         <tr>
-          <td style="padding: 14px 0; border-top: 1px solid #ebebea">
-            <p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${escapeHtml(
+          <td class="kc-divider" style="padding: 14px 0; border-top: 1px solid #ebebea">
+            <p class="kc-strong" style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${escapeHtml(
               rec.title
             )}</p>
-            <p style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${escapeHtml(
+            <p class="kc-muted" style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${escapeHtml(
               rec.description
             )}</p>
-            <a href="${href}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${escapeHtml(
+            <a class="kc-strong" href="${href}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${escapeHtml(
               rec.actionLabel
             )}</a>
           </td>

@@ -1,11 +1,17 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it, vi } from 'vitest';
 import { act } from '@/test/renderer';
-import { DRAFT_DEBOUNCE_MS } from '@/lib/persist/drafts';
+import { DRAFT_DEBOUNCE_MS, DRAFT_MAX_BYTES } from '@/lib/persist/drafts';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  defaultCommitMessage,
+  defaultCommitTitle,
+} from '@/lib/pr-review/merge/merge-commit-defaults';
 import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
 import {
   baseProps,
+  chipChecked,
+  chooseChip,
   deferred,
   draftKey,
   edit,
@@ -33,7 +39,58 @@ describe('PrMergeSheet durable drafts', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS);
     });
-    expect(storedDraft()).toEqual({ title: 'Draft title', message: 'Draft message' });
+    expect(storedDraft()).toEqual({
+      title: 'Draft title',
+      message: 'Draft message',
+    });
+  });
+
+  it('stores only the method when a chip tap is the only edit', async () => {
+    const renderer = await mount({ initialMethod: 'merge' });
+    await chooseChip(renderer, 'Squash and merge');
+    await unmount(renderer);
+    // The default title and message were never the person's text, so the record
+    // holds no text at all.
+    expect(storedDraft()).toEqual({ method: 'squash' });
+
+    const restored = await mount({
+      initialMethod: 'merge',
+      title: 'Renamed feature',
+      bodyMarkdown: 'New body',
+    });
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+    expect(input(restored, 'Commit title').props.defaultValue).toBe(
+      defaultCommitTitle('Renamed feature', 1)
+    );
+    expect(input(restored, 'Commit message').props.defaultValue).toBe(
+      defaultCommitMessage('New body')
+    );
+  });
+
+  it('keeps a method-only tap when the derived message is over the draft cap', async () => {
+    const body = 'x'.repeat(DRAFT_MAX_BYTES + 1);
+    const renderer = await mount({ initialMethod: 'merge', bodyMarkdown: body });
+    await chooseChip(renderer, 'Squash and merge');
+    await unmount(renderer);
+    // The message is no longer written, so the byte cap cannot drop the method.
+    expect(storedDraft()).toEqual({ method: 'squash' });
+
+    const restored = await mount({ initialMethod: 'merge', bodyMarkdown: body });
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+  });
+
+  it('keeps the authored title of a record whose method this build cannot restore', async () => {
+    seedDraft('u1', draftKey, { title: 'Stored title', method: 'octopus' });
+    const renderer = await mount({ initialMethod: 'merge' });
+    // The record loads instead of being read as a shape mismatch, so its text
+    // survives; the unknown method falls back to the default chip.
+    expect(input(renderer, 'Commit title').props.defaultValue).toBe('Stored title');
+    expect(chipChecked(renderer, 'Create a merge commit')).toBe(true);
+    expect(chipChecked(renderer, 'Squash and merge')).toBe(false);
+
+    await edit(renderer, 'Commit message', 'Fresh message');
+    await unmount(renderer);
+    expect(storedDraft()).toEqual({ title: 'Stored title', message: 'Fresh message' });
   });
 
   it('flushes a pending edit on passive back and restores it after remount', async () => {
@@ -49,12 +106,65 @@ describe('PrMergeSheet durable drafts', () => {
     });
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
     await unmount(renderer);
-    expect(storedDraft()).toEqual({ title: 'Keep my title', message: 'Keep my message' });
+    expect(storedDraft()).toEqual({
+      title: 'Keep my title',
+      message: 'Keep my message',
+    });
 
     const restored = await mount();
     expect(input(restored, 'Commit title').props.defaultValue).toBe('Keep my title');
     expect(input(restored, 'Commit message').props.defaultValue).toBe('Keep my message');
     expect(input(restored, 'Commit title').props.value).toBeUndefined();
+  });
+
+  it('restores the chosen merge method with the draft after passive back', async () => {
+    // The default here is the merge commit, so a restored Squash chip proves the
+    // method came from the draft rather than from the initial prop.
+    const renderer = await mount({ initialMethod: 'merge' });
+    expect(chipChecked(renderer, 'Create a merge commit')).toBe(true);
+    await chooseChip(renderer, 'Squash and merge');
+    expect(chipChecked(renderer, 'Squash and merge')).toBe(true);
+    const header = hosts(renderer, 'PrFormSheetHeader')[0];
+    if (!header) {
+      throw new Error('Sheet header missing');
+    }
+    await act(() => {
+      (header.props.onBack as () => void)();
+    });
+    await unmount(renderer);
+    expect(storedDraft()?.method).toBe('squash');
+
+    const restored = await mount({ initialMethod: 'merge' });
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+    expect(chipChecked(restored, 'Create a merge commit')).toBe(false);
+  });
+
+  it('submits the merge method restored from the draft after a remount', async () => {
+    seedDraft('u1', draftKey, { title: 'T', message: 'M', method: 'squash' });
+    const renderer = await mount({ initialMethod: 'merge' });
+    expect(chipChecked(renderer, 'Squash and merge')).toBe(true);
+    await submit(renderer);
+    expect(state.merge.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'squash' })
+    );
+  });
+
+  it('falls back to the default when the stored merge method is not allowed', async () => {
+    seedDraft('u1', draftKey, { title: 'T', message: 'M', method: 'rebase' });
+    const renderer = await mount({
+      initialMethod: 'rebase',
+      repo: { ...baseProps.repo, allowRebaseMerge: false },
+    });
+    expect(
+      hosts(renderer, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Rebase and merge'
+      )
+    ).toBe(false);
+    expect(chipChecked(renderer, 'Create a merge commit')).toBe(true);
+    await submit(renderer);
+    expect(state.merge.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'merge' })
+    );
   });
 
   it('flushes the latest edit when the app backgrounds', async () => {
@@ -69,8 +179,13 @@ describe('PrMergeSheet durable drafts', () => {
   });
 
   it('explicit Cancel clears both stored and pending edits, even after unmount', async () => {
-    seedDraft('u1', draftKey, { title: 'Stored title', message: 'Stored message' });
+    seedDraft('u1', draftKey, {
+      title: 'Stored title',
+      message: 'Stored message',
+      method: 'rebase',
+    });
     const renderer = await mount();
+    expect(chipChecked(renderer, 'Rebase and merge')).toBe(true);
     await edit(renderer, 'Commit message', 'Pending replacement');
     await press(renderer, 'Cancel');
     await unmount(renderer);
@@ -79,6 +194,9 @@ describe('PrMergeSheet durable drafts', () => {
     const restored = await mount();
     expect(input(restored, 'Commit message').props.defaultValue).toBe('');
     expect(input(restored, 'Commit title').props.defaultValue).not.toBe('Stored title');
+    // The discarded draft's method is gone too: the default is selected again.
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+    expect(chipChecked(restored, 'Rebase and merge')).toBe(false);
   });
 
   it.each(['merge', 'enable-auto-merge'] as const)(
@@ -93,7 +211,10 @@ describe('PrMergeSheet durable drafts', () => {
       expect(baseProps.onDismiss).not.toHaveBeenCalled();
       expect(baseProps.onRefetch).not.toHaveBeenCalled();
       await unmount(renderer);
-      expect(storedDraft()).toEqual({ title: 'Retained title', message: 'Retained message' });
+      expect(storedDraft()).toEqual({
+        title: 'Retained title',
+        message: 'Retained message',
+      });
       const restored = await mount({ mode });
       expect(input(restored, 'Commit title').props.defaultValue).toBe('Retained title');
       expect(input(restored, 'Commit message').props.defaultValue).toBe('Retained message');
@@ -142,7 +263,10 @@ describe('PrMergeSheet durable drafts', () => {
     await edit(renderer, 'Commit message', 'Current edit');
     await unmount(renderer);
     expect(storedDraft('u1')).toBeNull();
-    expect(storedDraft('u2')).toEqual({ title: 'Current account', message: 'Current edit' });
+    expect(storedDraft('u2')).toEqual({
+      title: 'Current account',
+      message: 'Current edit',
+    });
   });
 
   it('hides a previously settled account form while the next identity loads', async () => {

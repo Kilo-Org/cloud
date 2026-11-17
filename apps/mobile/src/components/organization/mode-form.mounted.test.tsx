@@ -68,7 +68,11 @@ vi.mock('@/components/organization/mode-tools-fields', () => ({
   ModeToolsFields: 'ModeToolsFields',
 }));
 
-const TEXT = 'Text';
+/* `node.type` widens to `ElementType` across a tree that holds both component
+ * and host nodes, so a literal comparison reads as an impossible one; the
+ * unknown annotation widens the comparison instead of fighting the check. */
+const TEXT: unknown = 'Text';
+const PRESSABLE: unknown = 'Pressable';
 /** `useFormFieldScroll` keeps this much above the field it reveals; it is not exported. */
 const FIELD_TOP_MARGIN = 12;
 const NAME_OFFSET = 40;
@@ -164,7 +168,7 @@ function layoutField(root: ReactTestInstance, label: string, y: number): void {
 
 function pressSave(root: ReactTestInstance): void {
   const [button, ...extra] = root.findAll(
-    node => node.type === 'Pressable' && (node.props as WidgetProps).role === 'button'
+    node => node.type === PRESSABLE && (node.props as WidgetProps).role === 'button'
   );
   if (button === undefined || extra.length > 0) {
     throw new Error(`expected one action button, received ${extra.length + 1}`);

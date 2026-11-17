@@ -162,7 +162,7 @@ function rowLabels(group: TestRenderer.ReactTestInstance): (string | undefined)[
   const children: unknown[] = Array.isArray(group.props.children)
     ? group.props.children
     : [group.props.children];
-  return children.map(rowLabel);
+  return children.map(child => rowLabel(child));
 }
 
 describe('FindingDetailsPanel advisory link routing', () => {

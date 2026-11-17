@@ -14,8 +14,14 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false, getConstants: () => ({ isRTL: false }) },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/icons', () => ({ X: 'X' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/lib/a11y/tap-target', () => ({
+  DENSE_ROW_FRAME_CLASS: 'dense-row',
+  ICON_TARGET_BOX_CLASS: 'icon-box',
+  ROW_TARGET_CLASS: 'row-target',
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<() => void>() }) }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -163,21 +169,23 @@ describe('BriefingCard layout ownership', () => {
   }
 
   function summaryRowClasses(classes: string[]): string[] {
-    return classes.filter(
-      name => name.includes('flex-row items-center gap-2') && name.includes('px-4 py-3')
-    );
+    return classes.filter(name => name.startsWith('flex-row items-center gap-2'));
   }
 
   it('fills the layer it is drawn in and lets the summary row hold its height', () => {
-    const classes = classNames(renderCard(true));
+    const renderer = renderCard(true);
+    const classes = classNames(renderer);
     expect(classes[0]).toContain('grow');
-    expect(classes.filter(name => name.includes('h-px'))).toEqual(['h-px bg-border']);
-    expect(summaryRowClasses(classes)).toEqual([expect.stringContaining('flex-1')]);
+    expect(summaryRowClasses(classes)).toContain('flex-row items-center gap-2 flex-1');
+    // The embedded card borrows the frame's surface instead of painting one.
+    expect(renderer.root.findAllByType('Card' as ElementType)).toHaveLength(0);
   });
 
   it('keeps its intrinsic height outside the frame', () => {
-    const classes = classNames(renderCard(false));
+    const renderer = renderCard(false);
+    const classes = classNames(renderer);
     expect(classes[0]).not.toContain('grow');
-    expect(summaryRowClasses(classes)).toEqual([expect.not.stringContaining('flex-1')]);
+    expect(summaryRowClasses(classes)).not.toContain('flex-row items-center gap-2 flex-1');
+    expect(renderer.root.findAllByType('Card' as ElementType)).toHaveLength(1);
   });
 });

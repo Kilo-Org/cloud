@@ -4,14 +4,17 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type SessionChangesDraft,
   type SessionChangesReviewBlock,
 } from '@/lib/session-changes-review';
+import { cn } from '@/lib/utils';
 
 function CommentRow({
   path,
@@ -28,11 +31,11 @@ function CommentRow({
 }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-1 border-b border-hair-soft py-3">
-      <Text variant="muted" className="text-xs" numberOfLines={2}>
+    <View className="gap-1 border-b-[0.5px] border-hair-soft py-3">
+      <Text variant="caption" numberOfLines={2}>
         {`${isolateLtrBidiText(path)}:${line}`}
       </Text>
-      <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={2}>
+      <Text variant="mono" className="text-muted-foreground" numberOfLines={2}>
         {isolateLtrBidiText(quote)}
       </Text>
       <View className="flex-row items-center gap-2">
@@ -41,11 +44,13 @@ function CommentRow({
           onPress={onRemove}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.sessionChanges.removeComment')}
-          className="min-h-[32px] min-w-[32px] items-center justify-center active:opacity-70"
+          className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
           hitSlop={6}
           testID="session-changes-review-remove-comment"
         >
-          <Text className="text-xs text-destructive">{t('common.remove')}</Text>
+          <Text variant="caption" className="text-destructive">
+            {t('common.remove')}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -79,39 +84,28 @@ export function SessionChangesReviewSheet({
   const sendDisabled = block !== undefined || sending || draft.comments.length === 0;
   return (
     <Sheet visible={visible} onClose={onClose} dismissGestures={false}>
+      <SheetHeader
+        title={t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
+        onDone={onClose}
+        doneLabel={t('common.close')}
+      />
       <View className="px-4 pb-6">
-        <View className="flex-row items-center justify-between gap-3 pb-2">
-          <Text className="text-base font-semibold text-foreground">
-            {t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
-          </Text>
-          <Pressable
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.close')}
-            className="min-h-[44px] min-w-[44px] items-center justify-center active:opacity-70"
-            hitSlop={6}
-          >
-            <Text variant="muted" className="text-sm">
-              {t('common.close')}
-            </Text>
-          </Pressable>
-        </View>
-        <Text variant="muted" className="pb-1 text-xs">
+        <Text variant="caption" className="pb-1">
           {t('agentChat.sessionChanges.reviewHint')}
         </Text>
         {staleCommentIds.size === 0 ? null : (
-          <Text className="text-xs text-warn" testID="session-changes-review-stale">
+          <Text variant="caption" className="text-warn" testID="session-changes-review-stale">
             {t('agentChat.sessionChanges.staleFile')}
           </Text>
         )}
         {block === undefined ? null : (
-          <Text className="text-xs text-warn" testID="session-changes-review-block">
+          <Text variant="caption" className="text-warn" testID="session-changes-review-block">
             {block.kind === 'read-only'
               ? t('agentChat.sessionChanges.readOnlyReason')
               : t('agentChat.sessionChanges.noAgentModelReason')}
           </Text>
         )}
-        <ScrollView className="max-h-[320px]" testID="session-changes-review-comments">
+        <ScrollView className="max-h-96" testID="session-changes-review-comments">
           {draft.comments.map(comment => (
             <CommentRow
               key={comment.id}
@@ -126,7 +120,9 @@ export function SessionChangesReviewSheet({
           ))}
         </ScrollView>
         {error === undefined ? null : (
-          <Text className="pt-2 text-xs text-destructive">{error}</Text>
+          <Text variant="caption" className="pt-2 text-destructive">
+            {error}
+          </Text>
         )}
         <View className="flex-row justify-between gap-2 pt-4">
           <Button

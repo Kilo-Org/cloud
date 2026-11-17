@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Newspaper } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -108,7 +109,7 @@ export function BriefingListScreen() {
       </Button>
     );
   } else if (query.isFetchingNextPage) {
-    footer = <Skeleton className="mx-4 h-20 rounded-2xl" />;
+    footer = <Skeleton className="mx-4 h-20 rounded-xl" />;
   }
   return (
     <View className="flex-1 bg-background">
@@ -130,7 +131,7 @@ export function BriefingListScreen() {
           )
         }
       />
-      <View className="gap-3 px-4 pb-3">
+      <View className="gap-3 px-4 pt-3 pb-3">
         <BriefingFilterControls
           history={history}
           onSelectHistory={setHistory}
@@ -141,20 +142,20 @@ export function BriefingListScreen() {
         {/* The empty state carries the hint when it prints one, so the same
             sentence is not shown twice on one screen. */}
         {emptyDescription === undefined ? (
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="caption">
             {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
           </Text>
         ) : null}
         {offline || (query.isError && reports.length > 0) ? (
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="caption">
             {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
           </Text>
         ) : null}
       </View>
       {loading && (
-        <View className="gap-4 px-4">
-          <Skeleton className="h-48 rounded-2xl" />
-          <Skeleton className="h-48 rounded-2xl" />
+        <View className="gap-3 px-4">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
         </View>
       )}
       {failure && (
@@ -206,22 +207,27 @@ export function BriefingListScreen() {
           }}
           renderItem={({ item }) => (
             <Pressable
-              className="mx-4 mb-3 overflow-hidden rounded-2xl border border-border bg-card active:opacity-70"
+              className="px-4 pb-3 active:opacity-70"
               accessibilityRole="button"
               onPress={() => {
                 router.push(`${BRIEFING_PATH}/${item.id}` as Href);
               }}
             >
-              <View className="gap-1 px-4 pt-3">
-                <Text>
-                  {item.context.organizationId === null ? t('common.personal') : item.context.name}
-                </Text>
-                <BriefingPeriodLabel report={item} />
-                {item.dismissedAt || dismissals.data?.some(entry => entry.reportId === item.id) ? (
-                  <Text className="text-xs text-muted-foreground">{t('common.dismissed')}</Text>
-                ) : null}
-              </View>
-              <BriefingScorecard report={item} />
+              <Card>
+                <View className="gap-1">
+                  <Text>
+                    {item.context.organizationId === null
+                      ? t('common.personal')
+                      : item.context.name}
+                  </Text>
+                  <BriefingPeriodLabel report={item} />
+                  {item.dismissedAt ||
+                  dismissals.data?.some(entry => entry.reportId === item.id) ? (
+                    <Text variant="caption">{t('common.dismissed')}</Text>
+                  ) : null}
+                </View>
+                <BriefingScorecard report={item} />
+              </Card>
             </Pressable>
           )}
           ListFooterComponent={footer}

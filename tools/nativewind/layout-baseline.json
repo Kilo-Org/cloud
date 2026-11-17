@@ -50,29 +50,6 @@
   "apps/mobile/src/components/add-credits-row.tsx": {
     "L8": 1
   },
-  "apps/mobile/src/components/agent-briefing/briefing-card.tsx": {
-    "L4": 1,
-    "L7": 1,
-    "L8": 1
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-context-settings.tsx": {
-    "L4": 1
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-detail-screen.tsx": {
-    "L4": 2
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-list-screen.tsx": {
-    "L4": 1
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-notification-toggle.tsx": {
-    "L4": 2
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-session-list.tsx": {
-    "L4": 1
-  },
-  "apps/mobile/src/components/agent-briefing/briefing-summary.tsx": {
-    "L4": 1
-  },
   "apps/mobile/src/components/agents/markdown-html-details.tsx": {
     "L7": 1
   },
@@ -358,12 +335,6 @@
     "L1": 1,
     "L4": 1,
     "L8": 2
-  },
-  "apps/mobile/src/components/native-remote/native-remote-question.tsx": {
-    "L8": 1
-  },
-  "apps/mobile/src/components/native-remote/native-remote-transcript.tsx": {
-    "L8": 1
   },
   "apps/mobile/src/components/notification-history-row.tsx": {
     "L4": 1
@@ -802,19 +773,6 @@
     "L3": 2,
     "L4": 1
   },
-  "apps/mobile/src/components/session-changes/session-changes-comment-dialog.tsx": {
-    "L8": 1
-  },
-  "apps/mobile/src/components/session-changes/session-changes-file-list.tsx": {
-    "L7": 1,
-    "L8": 1
-  },
-  "apps/mobile/src/components/session-changes/session-changes-review-sheet.tsx": {
-    "L8": 5
-  },
-  "apps/mobile/src/components/session-changes/session-changes-screen.tsx": {
-    "L6": 1
-  },
   "apps/mobile/src/components/share/share-destination-list.tsx": {
     "L1": 1,
     "L8": 1
@@ -868,14 +826,6 @@
     "L4": 1
   },
   "apps/mobile/src/components/tool-summary-translation-settings-screen.tsx": {
-    "L4": 1
-  },
-  "apps/mobile/src/components/tour/tour-screen.tsx": {
-    "L2": 1,
-    "L4": 2,
-    "L6": 1
-  },
-  "apps/mobile/src/components/tour/tour-step-header.tsx": {
     "L4": 1
   },
   "apps/mobile/src/components/trusted-hosts-screen.tsx": {

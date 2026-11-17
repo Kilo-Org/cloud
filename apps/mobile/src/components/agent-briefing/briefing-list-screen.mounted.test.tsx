@@ -43,6 +43,7 @@ vi.mock('@/components/screen-header', () => ({
     createElement('ScreenHeader', null, headerRight),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

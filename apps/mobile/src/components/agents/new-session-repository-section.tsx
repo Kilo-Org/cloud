@@ -164,7 +164,7 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
-        const offer = connectCardOffer(platform, organizationId, role);
+        const offer = connectCardOffer(platform, role);
         // The compact row after a selection keeps the same gate as the expanded
         // card: a member who cannot complete the connect gets the note alone.
         return selectedRepository === null ? (
@@ -222,7 +222,7 @@ export function NewSessionRepositorySection({
 
   function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
-    const offer = connectCardOffer(platform, organizationId, role);
+    const offer = connectCardOffer(platform, role);
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"

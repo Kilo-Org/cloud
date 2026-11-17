@@ -55,15 +55,13 @@ export type ConnectCardOffer = {
 };
 
 /**
- * The connect action and restriction note for one provider in this session's
- * scope.
+ * The connect action and restriction note for one provider.
  *
  * Bitbucket connects for an organization, never for a personal account, and
  * every one of its connect mutations takes organization billing authority, so
- * the card offers the action only where the server would accept it: an
- * organization session whose role may manage billing. A personal session keeps
- * the organizations-only note and offers no action, because the sheet behind it
- * can only explain that no organization is selected.
+ * the card offers the action only where the server would accept it. The
+ * Bitbucket group itself exists only in an organization session
+ * (`resolveRepositoryGroups`), so this decides among organization members.
  *
  * `role` is `undefined` until the membership list answers. That state keeps the
  * action: the card never blocks on a verdict it does not have, and a member who
@@ -73,17 +71,10 @@ export type ConnectCardOffer = {
  */
 export function connectCardOffer(
   platform: RepositoryPlatform,
-  organizationId: string | undefined,
   role: string | undefined
 ): ConnectCardOffer {
   if (platform !== 'bitbucket') {
     return { offersAction: true, noteKey: undefined };
-  }
-  if (organizationId === undefined) {
-    return {
-      offersAction: false,
-      noteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
-    };
   }
   if (role !== undefined && !canManageOrganizationBilling(role)) {
     // The member cannot connect it, so the note names the roles that can and the

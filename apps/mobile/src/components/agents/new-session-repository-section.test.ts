@@ -295,24 +295,6 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
 
-  it.each(['member', 'owner'])('offers no action in a personal session whatever the %s role', role => {
-    // A personal session has no organization to connect for, so the sheet
-    // behind the card could only report that no scope is selected.
-    orgState.role = role;
-    const renderer = mountSection({
-      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
-    });
-
-    expect(renderedText(renderer)).toContain(
-      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
-    );
-    expect(renderedText(renderer)).not.toContain(
-      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
-    );
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
-    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
-  });
-
   it('states the restriction in the compact row of a member who already selected', () => {
     orgState.role = 'member';
     const renderer = mountSection({

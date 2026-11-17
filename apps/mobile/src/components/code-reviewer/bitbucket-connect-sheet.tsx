@@ -53,14 +53,27 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // A workspace connected through Bitbucket OAuth has no token integration to
   // name, so the sheet is about the connection itself rather than about a form.
   const managesExisting = repair?.kind === 'manage-connection';
-  let title = t('prReview.connect.reconnectTitleBitbucket');
+  // Until the two reads settle the sheet cannot know which repair it will
+  // offer, and a failed read leaves the answer unknown, not "not connected":
+  // the title names the platform in both cases instead of promising a form the
+  // sheet may not render.
+  const readsSettled =
+    !isResolving &&
+    !readiness.isPending &&
+    !status.isPending &&
+    !(readiness.isError && readiness.data == null) &&
+    !(status.isError && status.data == null);
+  let title = t('agentChat.repoPicker.platformBitbucket');
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-  if (managesExisting) {
-    title = t('agentChat.repoPicker.platformBitbucket');
-    deniedDescription = t('integrations.managedByOwner');
-  } else if (integrationId === null) {
-    title = t('common.connectBitbucket');
-    deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+  if (readsSettled) {
+    if (managesExisting) {
+      deniedDescription = t('integrations.managedByOwner');
+    } else if (integrationId === null) {
+      title = t('common.connectBitbucket');
+      deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+    } else {
+      title = t('prReview.connect.reconnectTitleBitbucket');
+    }
   }
 
   // The sheet's own header is the shared one: the title stays pinned above the
@@ -86,7 +99,8 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           className="flex-1 bg-background"
           contentContainerClassName={SCREEN_BODY_CLASS}
         >
-          <Skeleton className="mx-auto h-5 w-40 rounded" />
+          {/* The header already paints the title, so the body reserves the
+              form's own blocks: the description, then the field and its action. */}
           <View className="gap-2">
             <Skeleton className="h-3.5 w-full rounded" />
             <Skeleton className="h-3.5 w-4/5 rounded" />

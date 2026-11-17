@@ -15,12 +15,9 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Brain } from '@/components/ui/icons';
 import { RowChevron } from '@/components/ui/row-chevron';
-import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -134,17 +131,14 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             ? 'codeReviewer.reviewMemory.loading'
             : 'codeReviewer.reviewMemory.loadingProposals'
         )}
-        className={SCREEN_BODY_CLASS}
+        className="flex-1"
       >
-        <Card>
-          <Skeleton className="h-4 w-40 max-w-full rounded bg-muted-soft" />
-          <Skeleton className="h-3 w-56 max-w-full rounded bg-muted-soft" />
-        </Card>
-        <RowGroup leadingTile>
-          {Array.from({ length: 3 }, (_, index) => (
-            <RowSkeleton key={index} tile subtitle />
-          ))}
-        </RowGroup>
+        {/* The proposals list is the body's own content: flat full-bleed rows,
+            so the placeholder holds that shape (the row frame draws the page
+            gutter) instead of a card the loaded state never paints. */}
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
       </View>
     );
   } else if (summaryError) {

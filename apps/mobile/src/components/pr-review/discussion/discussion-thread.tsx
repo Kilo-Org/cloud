@@ -315,7 +315,10 @@ function ThreadHeader({
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (
-          <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
+          // A resolved mark sits on the thread's card, so it takes a tint of
+          // its own instead of the card's secondary fill (which the card now
+          // paints) — the tile pair is the palette's tinted-surface token.
+          <View className="flex-row items-center gap-1 rounded-full bg-good-tile-bg px-2 py-0.5">
             <CheckCheck size={10} color={colors.good} />
             <Text className="text-xs font-medium text-good">
               {t('prReview.discussion.resolved')}

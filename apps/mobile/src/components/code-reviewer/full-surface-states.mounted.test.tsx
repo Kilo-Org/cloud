@@ -593,9 +593,9 @@ describe('Recent review bodies', () => {
         paddingLeft: left,
         paddingRight: right,
       });
-      const rows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
-      expect(rows.length).toBeGreaterThan(0);
-      for (const row of rows) {
+      const reviewRows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
+      expect(reviewRows.length).toBeGreaterThan(0);
+      for (const row of reviewRows) {
         const pressable = row.find(node => Object.is(node.type, 'Pressable'));
         const classes = String(pressable.props.className ?? '').split(' ');
         expect(classes).toContain('px-4');
@@ -745,7 +745,7 @@ describe('Recent review bodies', () => {
     );
     expect(placeholders).toHaveLength(1);
     const [placeholder] = placeholders;
-    expect(placeholder?.props.subtitle).toBe(true);
+    expect(placeholder?.props.lines).toBe(3);
     footerRender.unmount();
   });
 
@@ -1012,7 +1012,7 @@ describe('empty reviews connect action', () => {
     // of two-line rows, so swapping in the real data never changes the height.
     const loadingRows = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
     expect(loadingRows.length).toBeGreaterThan(0);
-    expect(loadingRows.every(row => row.props.subtitle === true)).toBe(true);
+    expect(loadingRows.every(row => row.props.lines === 3)).toBe(true);
     unmount();
 
     state.permissionOverride = null;

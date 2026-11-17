@@ -1,8 +1,5 @@
 {
   "apps/mobile/src/components/home/adaptive-home-card-frame.tsx": {
     "L1": 2
-  },
-  "apps/mobile/src/components/pr-review/diff/pr-diff-file-rows.tsx": {
-    "L7": 1
   }
 }

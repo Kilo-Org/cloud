@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -118,15 +120,18 @@ function DeleteBranchToggle({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between gap-3 border-t-[0.5px] border-hair-soft px-4 py-3">
-      <Text className="flex-1 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
-      <Switch
-        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
+    // The body already carries the page gutter, so the row is a grouped row
+    // like every other switch row: the group draws its own surface and the
+    // primitive owns the switch's haptic and 48pt target.
+    <RowGroup>
+      <PreferenceRow
+        title={t('prReview.merge.deleteBranch')}
         value={value}
         disabled={isDisabled}
         onValueChange={onChange}
+        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
       />
-    </View>
+    </RowGroup>
   );
 }
 
@@ -170,14 +175,14 @@ export function MergeSheetFormSkeleton(props: {
           <Skeleton className="h-24" />
         </View>
         {props.showDeleteBranchToggle ? (
-          <View className="px-4 py-3">
-            <Skeleton className="h-12" />
-          </View>
+          <RowGroup>
+            <RowSkeleton trailing="switch" />
+          </RowGroup>
         ) : null}
       </View>
       <PrFormSheetFooter>
-        <Skeleton className="h-12" />
-        <Skeleton className="mt-2 h-12" />
+        <Skeleton className="h-11" />
+        <Skeleton className="mt-2 h-11" />
       </PrFormSheetFooter>
     </>
   );

@@ -38,7 +38,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
@@ -283,6 +283,7 @@ export function PrDiffFileNavigator({
           <Button
             variant="outline"
             size="sm"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               void query.refetch();
             }}
@@ -426,6 +427,7 @@ export function PrDiffFileNavigator({
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => void retryAction()}
               accessibilityLabel={retryLabel}
             >

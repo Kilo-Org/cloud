@@ -250,6 +250,20 @@ vi.mock('@/lib/hooks/use-reviewer-models', () => ({
 vi.mock('@/components/code-reviewer/repository-model-overrides', () => ({
   RepositoryModelOverrides: 'RepositoryModelOverrides',
 }));
+// The screen's busy states draw the shared ActivityIndicator, whose
+// reduced-motion read loads `expo-battery` and the Expo runtime with it; Node
+// has no `__DEV__` for that module.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+// Row skeletons draw the shared row frame, whose trailing primitives fire a
+// selection tick. `expo-haptics` loads the Expo runtime too, so the tick is a
+// no-op here.
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
+}));
 
 const REPOSITORIES = [
   { id: 7000001, fullName: 'acme/acme-repo-1', private: false },

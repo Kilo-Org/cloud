@@ -202,19 +202,22 @@ describe('recents identity across providers', () => {
     expect(empty.props?.compact).toBe(true);
   });
 
-  it('the recents load renders one row-shaped card while pending', () => {
-    // getRecentPrs is still in flight on the first call: the body is a card
-    // with a recent row's own shape, never a blank or a bare spinner that
-    // would read as a clipped fragment and jump the section on arrival.
+  it('the recents load renders one flat row while pending', () => {
+    // getRecentPrs is still in flight on the first call: the body is a flat
+    // recent row's own shape, never a blank or a bare spinner that would read
+    // as a clipped fragment and jump the section on arrival.
     store.set('pr-review-recents', JSON.stringify([{ ...SAME_TRIPLE, title: 'X' }]));
     const tree = render();
     expect(findAll(tree, PrReviewRecentsPending)).toHaveLength(1);
-    // The loaded rows wait for the read: no row is drawn beside the card.
+    // The loaded rows wait for the read: no row is drawn beside the placeholder.
     expect(findAll(tree, 'View').filter(p => p.props?.testID === 'recent-row')).toHaveLength(0);
 
     // eslint-disable-next-line new-cap -- called as a plain function, like the screen harness
-    const card = PrReviewRecentsPending();
-    const frame = find(card, 'Card', () => true);
+    const pending = PrReviewRecentsPending();
+    // The placeholder is the loaded row's own frame — no card surface — so the
+    // section keeps its gutter and the row replaces it in place.
+    expect(findAll(pending, 'Card')).toHaveLength(0);
+    const frame = find(pending, 'View', p => p.accessibilityRole === 'progressbar');
     expect(propsOf(frame).accessibilityLabel).toBe('Loading…');
     expect(findAll(frame, 'Skeleton')).toHaveLength(4);
   });

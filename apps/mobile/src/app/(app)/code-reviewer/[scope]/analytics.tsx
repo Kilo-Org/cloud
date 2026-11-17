@@ -76,21 +76,21 @@ function AnalyticsSkeleton() {
         <View className="flex-row gap-3">
           <Card className="flex-1">
             <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
-            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
           <Card className="flex-1">
             <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
-            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
         </View>
         <View className="flex-row gap-3">
           <Card className="flex-1">
             <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
-            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
           <Card className="flex-1">
             <Skeleton className="h-3 w-20 max-w-full rounded bg-muted-soft" />
-            <Skeleton className="h-6 w-16 max-w-full rounded bg-muted-soft" />
+            <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
         </View>
       </View>

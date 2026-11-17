@@ -14,6 +14,12 @@ import '@/i18n';
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectAccessibilityLabels, collectText } from './review-memory-screen.test-helpers';
 
+// The migrated proposal rows draw through `RowSkeleton`, whose switch/row
+// primitive reaches the haptics module; the module import loads the expo
+// runtime, which needs `__DEV__` in this harness. The haptic itself is the
+// primitive's own contract, tested beside it.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
+
 vi.mock('@/components/code-reviewer/review-memory-analyze-section', () => ({
   ReviewMemoryAnalyzeSection: 'ReviewMemoryAnalyzeSection',
 }));

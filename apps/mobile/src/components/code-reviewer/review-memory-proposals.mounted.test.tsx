@@ -41,6 +41,11 @@ const h = vi.hoisted(() => {
   };
 });
 
+// The migrated proposal rows draw through `RowSkeleton`, whose row primitive
+// reaches the haptics module; that import loads the expo runtime, which needs
+// `__DEV__` in this harness. The haptic is the primitive's own contract.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
+
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',

@@ -14,10 +14,12 @@ import {
   glanceableNeedsInputKind,
   GLANCEABLE_NEEDS_INPUT_STATUSES,
   GLANCEABLE_STATUS_KINDS,
+  GLANCEABLE_TITLE_LIMIT,
   glanceableStatusKind,
   isStartableGlanceableWork,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
+  type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
   compareSessionInstant,
@@ -25,8 +27,7 @@ import {
 import { timestampMs, timestampToIso } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
-export const HOME_WIDGET_TITLE_LIMIT = 120;
-const titleSchema = z.string().max(HOME_WIDGET_TITLE_LIMIT);
+const titleSchema = z.string().max(GLANCEABLE_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
@@ -153,13 +154,13 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
 
 /**
  * The one display-title cut every glanceable surface draws: the text as one
- * line of what it draws, trimmed, then capped at `HOME_WIDGET_TITLE_LIMIT` on a
+ * line of what it draws, trimmed, then capped at `GLANCEABLE_TITLE_LIMIT` on a
  * character boundary. A surface adds only its own empty or placeholder rule on
  * top, so the cap cannot drift between the Home widget and the session card.
  */
 export function glanceableTitle(value: string | null | undefined): string {
   const title = sessionDisplayLine(value ?? '').trim();
-  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
+  return sessionLiveCut(title, GLANCEABLE_TITLE_LIMIT);
 }
 
 /**
@@ -183,35 +184,37 @@ export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
 ): HomeWidgetDetails {
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
-  const waiting = sessions
-    .filter(row => glanceableStatusKind(row.status) === 'needsInput')
-    .sort(
-      (a, b) =>
-        Number(b.approvalKey != null) - Number(a.approvalKey != null) || byStatusUpdatedAt(a, b)
-    );
+  // One status predicate owns both membership and the kind, so a needs-input
+  // row and the label drawn for it cannot disagree.
+  const waiting: { row: HomeWidgetSessionRow; kind: GlanceableNeedsInputKind }[] = [];
+  for (const row of sessions) {
+    const kind = glanceableNeedsInputKind(row.status);
+    if (kind !== null) waiting.push({ row, kind });
+  }
+  waiting.sort(
+    (a, b) =>
+      Number(b.row.approvalKey != null) - Number(a.row.approvalKey != null) ||
+      byStatusUpdatedAt(a.row, b.row)
+  );
   const scheduled = sessions
     .filter(row => glanceableStatusKind(row.status) === 'scheduled')
     .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
   const primaryKind = primaryKindOf(countGlanceableSessions(sessions));
   const primary =
     primaryKind === 'needsInput'
-      ? waiting[0]
+      ? waiting[0]?.row
       : primaryKind === 'scheduled'
         ? scheduled[0]
         : sessions
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
   return {
-    approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
+    approvalKey: waiting.find(entry => entry.row.approvalKey != null)?.row.approvalKey ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
-    waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
-      // The status fold above admits only needs-input statuses; a status that
-      // is not one of them has no kind here and the row is dropped rather
-      // than mislabelled.
-      const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
-    }),
+    waitingAgents: waiting
+      .slice(0, HOME_WIDGET_DETAIL_LIMIT)
+      .map(entry => ({ title: glanceableTitle(entry.row.title), kind: entry.kind })),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
       title: glanceableTitle(row.title),
       scheduledAt: timestampToIso(row.scheduledAt),

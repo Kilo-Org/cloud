@@ -40,6 +40,14 @@ export const GLANCEABLE_TERMINAL_MS = 8000;
  * update well inside the window, and an idle card is already gone by then.
  */
 export const GLANCEABLE_STALE_MS = 1_800_000;
+/**
+ * The one display-title cut every glanceable surface shares: a title is trimmed
+ * to a single line of what it draws, then capped at this many characters.
+ * `glanceableTitle` owns the cut; the Home widget's stored details and the
+ * session-card content schema bound their titles with this same value, so the
+ * cap cannot drift between the surfaces.
+ */
+export const GLANCEABLE_TITLE_LIMIT = 120;
 
 export const GLANCEABLE_SNAPSHOT_STATUSES = [
   'waiting',

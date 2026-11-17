@@ -144,9 +144,10 @@ export function EnvironmentBuildDetail({
         onDone={onClose}
         doneDisabled={isSubmitting}
         topInset="never"
+        underHandle
         surfaceClassName="bg-card"
       />
-      <View className="gap-3 px-4 pb-4">
+      <View className="gap-3 px-4 pb-4 pt-2">
         {status === undefined ? (
           <BuildStatusPending failed={buildStatusFailed} onRetry={onRetryBuildStatus} />
         ) : (

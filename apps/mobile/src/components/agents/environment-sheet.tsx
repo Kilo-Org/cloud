@@ -170,6 +170,7 @@ function EnvironmentList({
         title={t('agentChat.newSession.environment')}
         onDone={onClose}
         topInset="never"
+        underHandle
         surfaceClassName="bg-card"
       />
       <Text className="px-4 py-2 text-sm text-muted-foreground" numberOfLines={1}>

@@ -20,6 +20,7 @@ export function SheetHeader({
   disabled = false,
   doneDisabled = false,
   topInset = 'always',
+  underHandle = false,
   surfaceClassName = 'bg-background',
 }: {
   title: string;
@@ -47,6 +48,15 @@ export function SheetHeader({
    */
   doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
+  /**
+   * The header is the first content of a `Sheet` that paints its native drag
+   * handle above the React content (`showHandle`, the default). The host
+   * already spends the handle's own padding on the gap above the title
+   * (Material3's is 22dp), so the header drops the `pt-4` it would add on top
+   * of that padding and gives the same room below the title instead. The title
+   * then sits under the handle no farther than it sits above its divider.
+   */
+  underHandle?: boolean;
   /**
    * The surface the sheet paints behind the header. A sheet that sits on the
    * raised dark surface passes `bg-card` so its top edge separates from the
@@ -81,7 +91,18 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       collapsable={false}
-      className={cn('border-b border-border px-4 pb-3 pt-4', surfaceClassName)}
+      className={cn(
+        'border-b border-border px-4',
+        // The centred 48dp action row leaves ~10dp of leading above the title's
+        // line box and the same below it; `pb-3` puts the divider ~21dp under
+        // the title. A native handle already sits ~22dp above the content
+        // (Material3), so with `pt-4` the gap over the title was 48dp — twice
+        // the gap below it. Under the handle the header drops `pt-4` and pays
+        // the title the same room below: measured 33.9dp above and 35.9dp
+        // below on the emulator.
+        underHandle ? 'pb-7 pt-0' : 'pb-3 pt-4',
+        surfaceClassName
+      )}
     >
       <View style={safeAreaStyle}>
         <View className="min-h-[48px] flex-row items-center gap-x-3">

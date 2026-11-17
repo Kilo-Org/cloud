@@ -209,6 +209,12 @@ describe('EnvironmentSheet', () => {
     // The sheet sizes to its content and never reaches the window top, so the
     // header reserves no status-bar clearance. It also paints the card surface
     // the sheet itself paints, so the header and the list read as one surface.
-    expect(listHeader?.props).toMatchObject({ topInset: 'never', surfaceClassName: 'bg-card' });
+    // It sits under the sheet's own drag handle, so it leaves the handle's gap
+    // to supply the space above the title.
+    expect(listHeader?.props).toMatchObject({
+      topInset: 'never',
+      underHandle: true,
+      surfaceClassName: 'bg-card',
+    });
   });
 });

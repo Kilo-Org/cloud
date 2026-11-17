@@ -229,6 +229,35 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it('mirrors the native handle padding below the title when the sheet owns one', async () => {
+    const renderer = await mount({
+      title: 'Environment',
+      onDone: () => undefined,
+      underHandle: true,
+    });
+
+    // The sheet paints the drag handle above this header, and Material3's
+    // handle already reserves 22dp of padding under the bar. Stacking `pt-4`
+    // on that made the gap above the title twice the gap to its divider.
+    const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
+    expect(classes).toContain('pt-0');
+    expect(classes).toContain('pb-7');
+    expect(classes).not.toContain('pt-4');
+    expect(classes).not.toContain('pb-3');
+
+    renderer.unmount();
+  });
+
+  it('keeps its own top padding when no native handle sits above the header', async () => {
+    const renderer = await mount({ title: 'Environment', onDone: () => undefined });
+
+    const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
+    expect(classes).toContain('pt-4');
+    expect(classes).toContain('pb-3');
+
+    renderer.unmount();
+  });
+
   it.each([
     { title: 'Language', doneLabel: 'Done', cancelLabel: 'Cancel' },
     { title: 'اللغة', doneLabel: 'تم', cancelLabel: 'إلغاء' },

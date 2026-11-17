@@ -9,6 +9,19 @@ function trpcFailure(message: string): unknown {
   return { data: { code: 'INTERNAL_SERVER_ERROR', message } };
 }
 
+/**
+ * What the web client actually observes: a tRPC v11 `TRPCClientError` carries
+ * the server message on `message`, and `data` holds only
+ * `{ code, httpStatus, path?, stack? }` (`getErrorShape` in `@trpc/server`).
+ */
+function trpcClientError(message: string): unknown {
+  const error = new Error(message);
+  error.name = 'TRPCClientError';
+  return Object.assign(error, {
+    data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+  });
+}
+
 describe('usageQueryOutcome', () => {
   it('treats a failed initial load as an error, not as empty', () => {
     expect(usageQueryOutcome({ isLoading: true, isError: true, hasData: false })).toBe('error');
@@ -60,6 +73,18 @@ describe('resolveUsageDashboardState', () => {
         tableRowCount: undefined,
         queries: ['success', 'error'],
         tableError: trpcFailure(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE),
+      })
+    ).toBe('unavailable');
+  });
+
+  it('matches a real client error, whose message sits on error.message, not error.data', () => {
+    expect(
+      resolveUsageDashboardState({
+        ...emptyToday,
+        summary: undefined,
+        tableRowCount: undefined,
+        queries: ['error', 'success'],
+        summaryError: trpcClientError(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE),
       })
     ).toBe('unavailable');
   });

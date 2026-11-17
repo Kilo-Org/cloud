@@ -56,9 +56,14 @@ export function resolveUsageDashboardState(args: {
  */
 function readTrpcErrorMessage(error: unknown): string | undefined {
   if (error && typeof error === 'object') {
-    const shaped = error as { data?: { message?: unknown } };
-    const message = shaped.data?.message;
-    if (typeof message === 'string') return message;
+    // The tRPC wire's error envelope keeps the message at the top level, and
+    // the web client surfaces it as `TRPCClientError.message`; `data` carries
+    // only `{ code, httpStatus, … }`. `data.message` stays first so a shaped
+    // error keeps working, with the client error's own message as fallback —
+    // the same order mobile's `readTrpcErrorField` uses.
+    const shaped = error as { data?: { message?: unknown }; message?: unknown };
+    if (typeof shaped.data?.message === 'string') return shaped.data.message;
+    if (typeof shaped.message === 'string') return shaped.message;
   }
   return undefined;
 }

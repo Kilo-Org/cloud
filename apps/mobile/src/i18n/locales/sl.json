@@ -3576,7 +3576,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavitve organizacije na spletu",
-      "integrations": "Integracije na spletu",
       "usageDetails": "Podrobnosti porabe",
       "providersAndModels": "Ponudniki in modeli",
       "groups": "Skupine",
@@ -3585,9 +3584,19 @@
       "ssoAndDomain": "SSO in domena",
       "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
-      "requestLogs": "Dnevniki zahtev",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Razdeli sredstva"
+      "requestLogs": "Dnevniki zahtev"
+    },
+    "requestLogs": {
+      "hint": "Zahteve iz ure pred koncem časovnega okna, od najnovejše naprej.",
+      "older": "Prejšnja ura",
+      "newer": "Naslednja ura",
+      "truncated": "V tej uri je več zahtev, kot jih prikazuje seznam.",
+      "emptyTitle": "Ni zahtev",
+      "emptyDescription": "V tej uri ni zahtev prek prehoda.",
+      "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "tokens": "{{input}} vhod · {{output}} izhod",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
@@ -4824,5 +4833,175 @@
     "unavailableDescription": "Ta povezava za deljenje je potekla ali je bila preklicana.",
     "transcriptUnavailableTitle": "Prepisa ni bilo mogoče naložiti",
     "transcriptUnavailableDescription": "Povezava še vedno deluje. Poskusite znova čez trenutek."
+  },
+  "organizationGuardrails": {
+    "title": "AI varovala",
+    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala.",
+    "unavailable": "AI varovala niso na voljo za to organizacijo.",
+    "loadError": "AI varoval ni bilo mogoče naložiti",
+    "statusSaving": "Shranjevanje…",
+    "statusSaved": "Shranjeno",
+    "statusFailed": "Shranjevanje ni uspelo.",
+    "inputTitle": "Vhodna varovala",
+    "inputDescription": "Pregleda vsak vhod z Enkrypt AI, vključno z rezultati orodij. Blokirni detektor zavrne zahtevo, ko Enkrypt ni na voljo.",
+    "outputTitle": "Izhodna varovala",
+    "outputDescription": "Pregleda odgovore z Enkrypt AI, preden jih prejmejo člani. Izklopljeno, razen če jih vklopite.",
+    "detectorsHint": "Blokiranje zavrne označeno zahtevo. Samo beleženje jo zabeleži, ne da bi zahtevo zakasnilo.",
+    "detectorsHintOutput": "Blokiranje zavrne označeni odgovor. Samo beleženje ga zabeleži, ne da bi odgovor zakasnilo.",
+    "choiceLog": "Samo beleženje",
+    "applyTo": "Uporabi za",
+    "applyToAllMembers": "Vsi člani",
+    "applyKiloDefault": "Uporabi privzeto nastavitev Kilo",
+    "invalidSavedTitle": "Shranjenih nastavitev vhodnih detektorjev ni mogoče prebrati",
+    "invalidSavedBody": "Zahteve so blokirane, dokler vhodni detektorji niso znova shranjeni. Spodnji detektorji se začnejo s privzeto nastavitvijo Kilo.",
+    "invalidSavedOutputTitle": "Shranjenih nastavitev izhodnih detektorjev ni mogoče prebrati",
+    "invalidSavedOutputBody": "Odgovori so zadržani, dokler izhodni detektorji niso znova shranjeni. Spodaj izberite izhodne detektorje.",
+    "blockingOutputNote": "Blokirni izhodni detektor zadrži odgovor, dokler ga Enkrypt ne preveri v celoti. Za izogibanje zakasnitvi uporabite Samo beleženje.",
+    "inputDetectorRequired": "Vklopite vsaj en vhodni detektor.",
+    "outputDetectorRequired": "Vklopite vsaj en izhodni detektor.",
+    "rulesTooMany": "Dodajte do {{max}} pravil.",
+    "ruleIdRequired": "Vnesite oznako pravila.",
+    "ruleIdInvalid": "Oznaka pravila lahko vsebuje samo črke, številke, pike, pomišljaje in podčrtaje.",
+    "ruleTextRequired": "Opišite, kaj pravilo prepoveduje ali zahteva.",
+    "keywordTooLong": "Vsaka ključna beseda ima lahko največ {{max}} znakov.",
+    "topicTooLong": "Vsaka tema ima lahko največ {{max}} znakov.",
+    "keywordsTooMany": "Dodajte do {{max}} ključnih besed.",
+    "topicsTooMany": "Dodajte do {{max}} tem.",
+    "piiEntityRequired": "Izberite vsaj eno vrsto podatkov za zaznavanje.",
+    "keywordRequired": "Dodajte vsaj eno ključno besedo.",
+    "topicRequired": "Dodajte vsaj eno temo.",
+    "policyTextRequired": "Vnesite besedilo pravilnika.",
+    "ruleRequired": "Dodajte vsaj eno pravilo.",
+    "ruleIdDuplicate": "Vsako pravilo mora imeti svoj ID pravila.",
+    "piiEntities": "Podatki za zaznavanje",
+    "keywordsLabel": "Ključne besede",
+    "keywordsHint": "Ena ključna beseda na vrstico.",
+    "topicsHint": "Ena tema na vrstico.",
+    "policyFormat": "Oblika pravilnika",
+    "policyFormatRules": "Strukturirana pravila",
+    "policyFormatRulesDescription": "Eno pravilo na zahtevo, s kategorijo in resnostjo. Priporočeno.",
+    "policyFormatText": "Besedilo pravilnika",
+    "policyFormatTextDescription": "Prilepite obstoječi pravilnik kot navadno besedilo.",
+    "rulesEmpty": "Pravil še ni. Vsako pravilo opisuje eno stvar, ki jo vhodi ne smejo vsebovati ali zahtevati.",
+    "addRule": "Dodaj pravilo",
+    "ruleNumber": "Pravilo {{number}}",
+    "ruleRemove": "Odstrani pravilo {{number}}",
+    "ruleIdLabel": "Oznaka pravila",
+    "ruleNameLabel": "Ime (neobvezno)",
+    "ruleTextLabel": "Pravilo",
+    "ruleRiskCategory": "Kategorija tveganja",
+    "ruleApplicability": "Obseg",
+    "ruleFrameworks": "Okviri",
+    "detector": {
+      "promptInjection": {
+        "label": "Vbrizgavanje pozivov",
+        "description": "Zazna poskuse prepisovanja navodil ali izogibanja omejitvam modela."
+      },
+      "policyViolation": {
+        "label": "Kršitev pravilnika",
+        "description": "Označi vhode, ki kršijo pravilnik vaše organizacije, zapisan kot besedilo ali pravila.",
+        "descriptionOutput": "Označi odgovore, ki kršijo pravilnik vaše organizacije, zapisan kot besedilo ali pravila."
+      },
+      "pii": {
+        "label": "PII in skrivnosti",
+        "description": "Zazna osebne podatke, poverilnice, naslove IP in URL-je."
+      },
+      "keywords": {
+        "label": "Prepovedane ključne besede",
+        "descriptionOutput": "Zazna odgovore, ki vsebujejo katero koli ključno besedo, ki jo navedete."
+      },
+      "topics": {
+        "label": "Teme",
+        "descriptionOutput": "Označi odgovore o kateri koli temi, ki jo navedete."
+      },
+      "toxicity": {
+        "label": "Toksičnost",
+        "description": "Zazna toksičen, žaljiv, grozeč ali sovražen jezik."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Zazna spolne ali druge vsebine, neprimerne za delovno okolje."
+      },
+      "bias": {
+        "label": "Pristranskost",
+        "description": "Zazna pristranski ali diskriminatoren jezik."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osebni podatki",
+        "description": "Imena, e-poštni naslovi, telefonske številke."
+      },
+      "secrets": {
+        "label": "Skrivnosti",
+        "description": "Ključi API, žetoni, gesla."
+      },
+      "ipAddress": {
+        "label": "Naslovi IP",
+        "description": "Naslovi IPv4 in IPv6."
+      },
+      "url": {
+        "label": "URL-ji",
+        "description": "Spletni naslovi."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Varnost in goljufije",
+      "safetyHarm": "Varnost in škoda",
+      "privacyDataProtection": "Zasebnost in varstvo podatkov",
+      "brandReputationTrust": "Blagovna znamka in ugled",
+      "biasFairnessEthical": "Pristranskost in pravičnost",
+      "legalIpLiability": "Pravna odgovornost in odgovornost glede intelektualne lastnine",
+      "productMisuse": "Zloraba izdelka",
+      "performanceQuality": "Delovanje in kakovost"
+    },
+    "applicability": {
+      "user": "Uporabniški vnos",
+      "userAssistant": "Uporabniški vnos in odgovori"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 najpomembnejših tveganj (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o umetni inteligenci",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkcija za podjetja",
+    "enterpriseOnly": "To je funkcija samo za podjetja.",
+    "readOnly": "Samo lastniki in skrbniki organizacije lahko spremenijo te nastavitve.",
+    "loadError": "Ponudnikov in modelov ni bilo mogoče naložiti",
+    "tabModels": "Modeli",
+    "tabProviders": "Ponudniki",
+    "tabGateways": "Prehodi",
+    "modelsDescription": "Izklopite model, da ga blokirate za vse člane. Modeli dovoljenih ponudnikov so privzeto vklopljeni.",
+    "modelsDeniedOnly": "Samo zavrnjeni",
+    "modelsEmpty": "Noben model ne ustreza temu iskanju.",
+    "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
+    "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
+    "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",
+    "allowAllShown": "Dovoli vse prikazane",
+    "denyAllShown": "Zavrni vse prikazane",
+    "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",
+    "emptyProviderList": "Dovolite vsaj enega ponudnika. Prazen seznam blokira vse poti modelov Kilo.",
+    "gatewaysUnavailable": "Nastavitve prehodov za to organizacijo niso na voljo.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Zahteve OpenRouter niso vezane na regijo.",
+    "inferenceRegion": "Regija sklepanja",
+    "inferenceRegionDescription": "Veže zahteve Vercel AI Gateway na to regijo. Model, ki tam ni na voljo, ne uspe.",
+    "disableOpenrouterNote": "Onemogočanje storitve OpenRouter blokira tudi ključe BYOK, ki usmerjajo zahteve prek nje.",
+    "emptyModelList": "Pustite vklopljen vsaj en model. Če zavrnete vse modele, člani ne bodo imeli ničesar za uporabo.",
+    "catalogUnavailable": "Celoten katalog modelov se ni naložil, zato so prikazani le vaši shranjeni seznami. Poskusite znova, da naložite vse modele.",
+    "region": {
+      "global": "Globalno",
+      "us": "Združene države",
+      "eu": "Evropska unija",
+      "au": "Avstralija",
+      "jp": "Japonska"
+    }
   }
 }

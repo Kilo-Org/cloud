@@ -3542,7 +3542,6 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
-      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
@@ -3551,9 +3550,19 @@
       "ssoAndDomain": "SSO and domain",
       "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
-      "requestLogs": "Request logs",
-      "subOrganizations": "Sub-organizations",
-      "distributeFunds": "Distribute funds"
+      "requestLogs": "Request logs"
+    },
+    "requestLogs": {
+      "hint": "Requests from the hour before the window ends, newest first.",
+      "older": "Older hour",
+      "newer": "Newer hour",
+      "truncated": "This hour has more requests than the list shows.",
+      "emptyTitle": "No requests",
+      "emptyDescription": "This hour has no gateway requests.",
+      "loadError": "Couldn't load request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "tokens": "{{input}} in · {{output}} out",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -4684,5 +4693,175 @@
     "unavailableDescription": "This share link has expired or been revoked.",
     "transcriptUnavailableTitle": "Couldn't load this transcript",
     "transcriptUnavailableDescription": "The link still works. Try again in a moment."
+  },
+  "organizationGuardrails": {
+    "title": "AI Guardrails",
+    "permissionDenied": "Only organization owners and admins can manage AI Guardrails.",
+    "unavailable": "AI Guardrails is not available for this organization.",
+    "loadError": "AI Guardrails couldn't load",
+    "statusSaving": "Saving…",
+    "statusSaved": "Saved",
+    "statusFailed": "Couldn't save.",
+    "inputTitle": "Input guardrails",
+    "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable.",
+    "outputTitle": "Output guardrails",
+    "outputDescription": "Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails.",
+    "detectorsHint": "Block stops a flagged request. Log only records detections without delaying the request.",
+    "detectorsHintOutput": "Block replaces a flagged response with an error. Log only records detections without delaying the response.",
+    "choiceLog": "Log only",
+    "applyTo": "Apply to",
+    "applyToAllMembers": "All members",
+    "applyKiloDefault": "Apply Kilo Default",
+    "invalidSavedTitle": "Saved input detector settings can't be read",
+    "invalidSavedBody": "Requests are blocked until the input detectors are saved again. Review the detectors below, which start from Kilo Default.",
+    "invalidSavedOutputTitle": "Saved output detector settings can't be read",
+    "invalidSavedOutputBody": "Responses are withheld until the output detectors are saved again. Choose output detectors below.",
+    "blockingOutputNote": "With a blocking output detector, members see nothing until the model has finished the whole response and Enkrypt has checked it. Use Log only to monitor without the delay.",
+    "inputDetectorRequired": "Turn on at least one input detector.",
+    "outputDetectorRequired": "Turn on at least one output detector.",
+    "rulesTooMany": "Add up to {{max}} rules.",
+    "ruleIdRequired": "Enter a rule ID.",
+    "ruleIdInvalid": "A rule ID can only contain letters, numbers, dots, dashes, and underscores.",
+    "ruleTextRequired": "Describe what the rule forbids or requires.",
+    "keywordTooLong": "Each keyword can be up to {{max}} characters.",
+    "keywordsTooMany": "Add up to {{max}} keywords.",
+    "topicTooLong": "Each topic can be up to {{max}} characters.",
+    "topicsTooMany": "Add up to {{max}} topics.",
+    "piiEntityRequired": "Select at least one type of data to detect.",
+    "keywordRequired": "Add at least one keyword.",
+    "topicRequired": "Add at least one topic.",
+    "policyTextRequired": "Enter the policy text.",
+    "ruleRequired": "Add at least one rule.",
+    "ruleIdDuplicate": "Each rule needs its own rule ID.",
+    "piiEntities": "Data to detect",
+    "keywordsLabel": "Keywords",
+    "keywordsHint": "One keyword per line.",
+    "topicsHint": "One topic per line.",
+    "policyFormat": "Policy format",
+    "policyFormatRules": "Structured rules",
+    "policyFormatRulesDescription": "One rule per requirement, with a category and severity. Recommended.",
+    "policyFormatText": "Policy text",
+    "policyFormatTextDescription": "Paste an existing policy as plain text.",
+    "rulesEmpty": "No rules yet. Each rule describes one thing members' inputs must not contain or ask for.",
+    "addRule": "Add rule",
+    "ruleNumber": "Rule {{number}}",
+    "ruleRemove": "Remove rule {{number}}",
+    "ruleIdLabel": "Rule ID",
+    "ruleNameLabel": "Name (optional)",
+    "ruleTextLabel": "Rule",
+    "ruleRiskCategory": "Risk category",
+    "ruleApplicability": "Scope",
+    "ruleFrameworks": "Frameworks",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt injection",
+        "description": "Detects attempts to override instructions or jailbreak the model."
+      },
+      "policyViolation": {
+        "label": "Policy violation",
+        "description": "Flags inputs that break your organization policy, written as text or rules.",
+        "descriptionOutput": "Flags responses that break your organization policy, written as text or rules."
+      },
+      "pii": {
+        "label": "PII and secrets",
+        "description": "Detects personal data, credentials, IP addresses, and URLs."
+      },
+      "keywords": {
+        "label": "Banned keywords",
+        "descriptionOutput": "Detects responses that contain any keyword you list."
+      },
+      "topics": {
+        "label": "Topics",
+        "descriptionOutput": "Flags responses about any topic you list."
+      },
+      "toxicity": {
+        "label": "Toxicity",
+        "description": "Detects toxic, insulting, threatening, or hateful language."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detects sexual or otherwise not-safe-for-work content."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Detects biased or discriminatory language."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personal data",
+        "description": "Names, email addresses, phone numbers."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "description": "API keys, tokens, passwords."
+      },
+      "ipAddress": {
+        "label": "IP addresses",
+        "description": "IPv4 and IPv6 addresses."
+      },
+      "url": {
+        "label": "URLs",
+        "description": "Web addresses."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Security and fraud",
+      "safetyHarm": "Safety and harm",
+      "privacyDataProtection": "Privacy and data protection",
+      "brandReputationTrust": "Brand and reputation",
+      "biasFairnessEthical": "Bias and fairness",
+      "legalIpLiability": "Legal and IP liability",
+      "productMisuse": "Product misuse",
+      "performanceQuality": "Performance and quality"
+    },
+    "applicability": {
+      "user": "User input",
+      "userAssistant": "User input and responses"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise feature",
+    "enterpriseOnly": "This is an enterprise only feature.",
+    "readOnly": "Only organization owners and admins can change these settings.",
+    "loadError": "Providers and models couldn't load",
+    "tabModels": "Models",
+    "tabProviders": "Providers",
+    "tabGateways": "Gateways",
+    "modelsDescription": "Turn a model off to block it for every member. Models from allowed providers are on by default.",
+    "modelsDeniedOnly": "Denied only",
+    "modelsEmpty": "No models match this search.",
+    "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
+    "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
+    "providersEmpty": "No providers match this search.",
+    "allowAllShown": "Allow all shown",
+    "denyAllShown": "Deny all shown",
+    "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",
+    "emptyModelList": "Leave at least one model on. Denying every model leaves members with nothing to use.",
+    "catalogUnavailable": "The full model catalog didn't load, so only your saved lists are shown. Retry to load every model.",
+    "gatewaysDescription": "Kilo routes model requests through the Vercel AI Gateway or OpenRouter. Requests that end up on a disabled gateway fail with an error.",
+    "gatewaysUnavailable": "Gateway settings aren't available for this organization.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter requests are not pinned to a region.",
+    "inferenceRegion": "Inference region",
+    "inferenceRegionDescription": "Pins requests routed through the Vercel AI Gateway to this region. Requests for a model that is not available in the region fail with an error.",
+    "disableOpenrouterNote": "Disabling OpenRouter also blocks BYOK keys that route requests through it.",
+    "region": {
+      "global": "Global",
+      "us": "United States",
+      "eu": "European Union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

@@ -37,7 +37,7 @@ import {
   rejectDisallowedUpstreamUrls,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { resolveUsageEndpointRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+import { resolveEmbeddingOrDecisionRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -142,8 +142,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
     apiKey: 'test-platform-openrouter-key',
   },
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider', () => ({
-  resolveUsageEndpointRoute: jest.fn(),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes', () => ({
+  resolveEmbeddingOrDecisionRoute: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
@@ -399,7 +399,7 @@ describe('handleSystemOneRequest', () => {
       );
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest
-      .mocked(resolveUsageEndpointRoute)
+      .mocked(resolveEmbeddingOrDecisionRoute)
       .mockResolvedValue({ provider: OPENROUTER, userByok: null });
     jest
       .mocked(mapModelIdToVercel)
@@ -1951,7 +1951,7 @@ describe('handleSystemOneRequest', () => {
 
       expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
 
-      expect(resolveUsageEndpointRoute).toHaveBeenCalledWith({
+      expect(resolveEmbeddingOrDecisionRoute).toHaveBeenCalledWith({
         requestedModel: TYPESAFE_MODEL,
         modelType: 'evaluation',
         user,
@@ -1963,7 +1963,7 @@ describe('handleSystemOneRequest', () => {
 
     it("sends the request through the owner's OpenRouter key without a balance check", async () => {
       jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0 });
-      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
         provider: userOpenRouterProvider,
         userByok: [userOpenRouterKey],
       });
@@ -1990,7 +1990,7 @@ describe('handleSystemOneRequest', () => {
     });
 
     it("records the upstream inference cost of the owner's OpenRouter key as the market cost", async () => {
-      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
         provider: userOpenRouterProvider,
         userByok: [userOpenRouterKey],
       });
@@ -2017,7 +2017,7 @@ describe('handleSystemOneRequest', () => {
 
     it("passes the owner's provider key through Kilo's Vercel account, exempt from the region", async () => {
       setEnterpriseRegion('eu');
-      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
         provider: kiloVercelProvider,
         userByok: [userAnthropicKey],
       });
@@ -2054,14 +2054,14 @@ describe('handleSystemOneRequest', () => {
     it("runs on Kilo's Vercel account in the organization's region when OpenRouter is refused", async () => {
       setEnterpriseRegion('eu');
       jest
-        .mocked(resolveUsageEndpointRoute)
+        .mocked(resolveEmbeddingOrDecisionRoute)
         .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
       mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
 
       const response = await handleSystemOneRequest(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(resolveUsageEndpointRoute).toHaveBeenCalledWith(
+      expect(resolveEmbeddingOrDecisionRoute).toHaveBeenCalledWith(
         expect.objectContaining({ openRouterDisabled: true })
       );
       const upstream = upstreamRequest(VERCEL_TYPESAFE_URL);
@@ -2086,7 +2086,7 @@ describe('handleSystemOneRequest', () => {
     it("omits the region from Kilo's Vercel route without one", async () => {
       setEnterpriseRegion();
       jest
-        .mocked(resolveUsageEndpointRoute)
+        .mocked(resolveEmbeddingOrDecisionRoute)
         .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
       mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
 
@@ -2104,7 +2104,7 @@ describe('handleSystemOneRequest', () => {
         decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
       });
       jest
-        .mocked(resolveUsageEndpointRoute)
+        .mocked(resolveEmbeddingOrDecisionRoute)
         .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
       mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
 
@@ -2120,7 +2120,7 @@ describe('handleSystemOneRequest', () => {
 
     it('normalizes a Vercel response to the OpenRouter-compatible shape and bills its cost', async () => {
       jest
-        .mocked(resolveUsageEndpointRoute)
+        .mocked(resolveEmbeddingOrDecisionRoute)
         .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
       mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
 
@@ -2154,7 +2154,7 @@ describe('handleSystemOneRequest', () => {
     it('reconciles a Vercel response without a usable cost through the Vercel generation', async () => {
       mockMeteredClock();
       jest
-        .mocked(resolveUsageEndpointRoute)
+        .mocked(resolveEmbeddingOrDecisionRoute)
         .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
       const { cost: _cost, ...gateway } = vercelUpstreamBody.provider_metadata.gateway;
       mockedFetch.mockImplementation(async () =>
@@ -2183,7 +2183,7 @@ describe('handleSystemOneRequest', () => {
     });
 
     it("passes the owner's upstream balance error through instead of reporting Kilo's balance", async () => {
-      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
         provider: userOpenRouterProvider,
         userByok: [userOpenRouterKey],
       });

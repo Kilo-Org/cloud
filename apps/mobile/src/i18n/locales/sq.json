@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Cilësimet e organizatës në ueb",
-      "integrations": "Integrimet në ueb",
       "usageDetails": "Detajet e përdorimit",
       "providersAndModels": "Ofruesit dhe modelet",
       "groups": "Grupet",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO dhe domeni",
       "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
-      "requestLogs": "Regjistrat e kërkesave",
-      "subOrganizations": "Nënorganizatat",
-      "distributeFunds": "Shpërndaj fondet"
+      "requestLogs": "Regjistrat e kërkesave"
+    },
+    "requestLogs": {
+      "hint": "Kërkesat e orës para fundit të dritares, më të rejat në krye.",
+      "older": "Ora e mëparshme",
+      "newer": "Ora pasardhëse",
+      "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
+      "emptyTitle": "Nuk ka kërkesa",
+      "emptyDescription": "Në këtë orë nuk ka kërkesa në gateway.",
+      "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "tokens": "{{input}} hyrëse · {{output}} dalëse",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -4684,5 +4693,175 @@
     "unavailableDescription": "Kjo lidhje ndarjeje ka skaduar ose është revokuar.",
     "transcriptUnavailableTitle": "Ky transkript nuk u ngarkua",
     "transcriptUnavailableDescription": "Lidhja funksionon ende. Provo përsëri pas pak."
+  },
+  "organizationGuardrails": {
+    "title": "Mbrojtëset e IA-së",
+    "permissionDenied": "Vetëm pronarët dhe administratorët e organizatës mund të menaxhojnë Mbrojtëset e IA-së.",
+    "unavailable": "Mbrojtëset e IA-së nuk janë të disponueshme për këtë organizatë.",
+    "loadError": "Mbrojtëset e IA-së nuk u ngarkuan dot",
+    "statusSaving": "Po ruhet…",
+    "statusSaved": "U ruajt",
+    "statusFailed": "Nuk u ruajt dot.",
+    "inputTitle": "Mbrojtëset e hyrjes",
+    "inputDescription": "Skanon çdo hyrje me Enkrypt AI, duke përfshirë rezultatet e mjeteve. Një detektor bllokues e refuzon një kërkesë kur Enkrypt nuk është i disponueshëm.",
+    "outputTitle": "Mbrojtëset e daljes",
+    "outputDescription": "Skanon përgjigjet me Enkrypt AI përpara se anëtarët t'i marrin ato. Është e fikur nëse nuk e aktivizoni.",
+    "detectorsHint": "Bllokimi e refuzon një kërkesë të sinjalizuar. Vetëm regjistrimi e shënon atë pa e vonuar kërkesën.",
+    "detectorsHintOutput": "Bllokimi e dështon një përgjigje të sinjalizuar. Vetëm regjistrimi e shënon atë pa e vonuar përgjigjen.",
+    "choiceLog": "Vetëm regjistro",
+    "applyTo": "Zbato për",
+    "applyToAllMembers": "Të gjithë anëtarët",
+    "applyKiloDefault": "Zbato parazgjedhjen Kilo",
+    "invalidSavedTitle": "Cilësimet e ruajtura të detektorëve të hyrjes nuk mund të lexohen",
+    "invalidSavedBody": "Kërkesat bllokohen derisa detektorët e hyrjes të ruhen përsëri. Detektorët më poshtë nisin nga parazgjedhja Kilo.",
+    "invalidSavedOutputTitle": "Cilësimet e ruajtura të detektorëve të daljes nuk mund të lexohen",
+    "invalidSavedOutputBody": "Përgjigjet mbahen derisa detektorët e daljes të ruhen përsëri. Zgjidhni detektorët e daljes më poshtë.",
+    "blockingOutputNote": "Një detektor bllokues i daljes e mban përgjigjen derisa Enkrypt të ketë kontrolluar të gjithë përmbajtjen e saj. Përdorni Vetëm regjistro për të shmangur vonesën.",
+    "inputDetectorRequired": "Aktivizoni të paktën një detektor të hyrjes.",
+    "outputDetectorRequired": "Aktivizoni të paktën një detektor të daljes.",
+    "rulesTooMany": "Shtoni deri në {{max}} rregulla.",
+    "ruleIdRequired": "Jepni një ID rregulli.",
+    "ruleIdInvalid": "Një ID rregulli mund të përdorë vetëm shkronja, numra, pika, viza dhe nënviza.",
+    "ruleTextRequired": "Përshkruani çfarë ndalon ose kërkon rregulli.",
+    "keywordTooLong": "Çdo fjalë kyçe mund të jetë deri në {{max}} karaktere.",
+    "topicTooLong": "Çdo temë mund të jetë deri në {{max}} karaktere.",
+    "keywordsTooMany": "Shtoni deri në {{max}} fjalë kyçe.",
+    "topicsTooMany": "Shtoni deri në {{max}} tema.",
+    "piiEntityRequired": "Zgjidhni të paktën një lloj të dhënash për t'u zbuluar.",
+    "keywordRequired": "Shtoni të paktën një fjalë kyçe.",
+    "topicRequired": "Shtoni të paktën një temë.",
+    "policyTextRequired": "Jepni tekstin e politikës.",
+    "ruleRequired": "Shtoni të paktën një rregull.",
+    "ruleIdDuplicate": "Çdo rregull ka nevojë për ID-në e vet të rregullit.",
+    "piiEntities": "Të dhëna për t'u zbuluar",
+    "keywordsLabel": "Fjalë kyçe",
+    "keywordsHint": "Një fjalë kyçe për rresht.",
+    "topicsHint": "Një temë për rresht.",
+    "policyFormat": "Formati i politikës",
+    "policyFormatRules": "Rregulla të strukturuara",
+    "policyFormatRulesDescription": "Një rregull për kërkesë, me kategori dhe ashpërsi. Rekomandohet.",
+    "policyFormatText": "Tekst i politikës",
+    "policyFormatTextDescription": "Ngjitni një politikë ekzistuese si tekst i thjeshtë.",
+    "rulesEmpty": "Nuk ka ende rregulla. Çdo rregull përshkruan një gjë që hyrjet nuk duhet të përmbajnë ose të kërkojnë.",
+    "addRule": "Shto rregull",
+    "ruleNumber": "Rregulli {{number}}",
+    "ruleRemove": "Hiq rregullin {{number}}",
+    "ruleIdLabel": "ID e rregullit",
+    "ruleNameLabel": "Emri (opsional)",
+    "ruleTextLabel": "Rregulli",
+    "ruleRiskCategory": "Kategoria e rrezikut",
+    "ruleApplicability": "Shtrirja",
+    "ruleFrameworks": "Kornizat",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeksion prompti",
+        "description": "Zbulon përpjekjet për të anashkaluar udhëzimet ose kufizimet e modelit."
+      },
+      "policyViolation": {
+        "label": "Shkelje e politikës",
+        "description": "Shënon hyrjet që shkelin politikën e organizatës tuaj, e cila është shkruar si tekst ose rregulla.",
+        "descriptionOutput": "Shënon përgjigjet që shkelin politikën e organizatës tuaj, e cila është shkruar si tekst ose rregulla."
+      },
+      "pii": {
+        "label": "PII dhe sekrete",
+        "description": "Zbulon të dhëna personale, kredenciale, adresa IP dhe URL."
+      },
+      "keywords": {
+        "label": "Fjalë kyçe të ndaluara",
+        "descriptionOutput": "Zbulon përgjigjet që përmbajnë çdo fjalë kyçe që listoni."
+      },
+      "topics": {
+        "label": "Tema",
+        "descriptionOutput": "Shënon përgjigjet për çdo temë që listoni."
+      },
+      "toxicity": {
+        "label": "Toksiciteti",
+        "description": "Zbulon gjuhë toksike, fyese, kërcënuese ose urrejtëse."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Zbulon përmbajtje seksuale ose ndryshe të papërshtatshme për punë."
+      },
+      "bias": {
+        "label": "Paragjykim",
+        "description": "Zbulon gjuhë të paragjykuar ose diskriminuese."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Të dhëna personale",
+        "description": "Emra, adresa të postës elektronike, numra telefoni."
+      },
+      "secrets": {
+        "label": "Sekrete",
+        "description": "Çelësa API, tokena, fjalëkalime."
+      },
+      "ipAddress": {
+        "label": "Adresa IP",
+        "description": "Adresa IPv4 dhe IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adresa uebi."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Siguria dhe mashtrimi",
+      "safetyHarm": "Siguria dhe dëmtimi",
+      "privacyDataProtection": "Privatësia dhe mbrojtja e të dhënave",
+      "brandReputationTrust": "Marka dhe reputacioni",
+      "biasFairnessEthical": "Paragjykimi dhe drejtësia",
+      "legalIpLiability": "Përgjegjësia ligjore dhe e pronësisë intelektuale",
+      "productMisuse": "Keqpërdorimi i produktit",
+      "performanceQuality": "Performanca dhe cilësia"
+    },
+    "applicability": {
+      "user": "Hyrja e përdoruesit",
+      "userAssistant": "Hyrja e përdoruesit dhe përgjigjet"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akti i BE-së për IA",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Veçori e ndërmarrjes",
+    "enterpriseOnly": "Kjo është një veçori vetëm për ndërmarrjet.",
+    "readOnly": "Vetëm pronarët dhe administratorët e organizatës mund t'i ndryshojnë këto cilësime.",
+    "loadError": "Ofruesit dhe modelet nuk u ngarkuan dot",
+    "tabModels": "Modelet",
+    "tabProviders": "Ofruesit",
+    "tabGateways": "Portat",
+    "modelsDescription": "Fikni një model për ta bllokuar për çdo anëtar. Modelet nga ofruesit e lejuar nisin të aktivizuara.",
+    "modelsDeniedOnly": "Vetëm të ndaluarat",
+    "modelsEmpty": "Nuk ka modele që përputhen me këtë kërkim.",
+    "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
+    "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
+    "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",
+    "allowAllShown": "Lejo çdo gjë të shfaqur",
+    "denyAllShown": "Ndal çdo gjë të shfaqur",
+    "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",
+    "emptyProviderList": "Lejoni të paktën një ofrues. Një listë bosh bllokon çdo rrugëzim të modeleve të Kilo.",
+    "gatewaysUnavailable": "Cilësimet e portave nuk janë të disponueshme për këtë organizatë.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Kërkesat e OpenRouter nuk fiksohen në një rajon.",
+    "inferenceRegion": "Rajoni i inferencës",
+    "inferenceRegionDescription": "Fikson kërkesat e Vercel AI Gateway në këtë rajon. Një model që nuk është i disponueshëm atje dështon.",
+    "disableOpenrouterNote": "Çaktivizimi i OpenRouter bllokon gjithashtu çelësat BYOK që i rrugëzojnë kërkesat përmes tij.",
+    "emptyModelList": "Lini të aktivizuar të paktën një model. Nëse refuzoni çdo model, anëtarët nuk do të kenë asgjë për të përdorur.",
+    "catalogUnavailable": "Katalogu i plotë i modeleve nuk u ngarkua, prandaj shfaqen vetëm listat tuaja të ruajtura. Provoni përsëri për të ngarkuar të gjitha modelet.",
+    "region": {
+      "global": "Botëror",
+      "us": "Shtetet e Bashkuara",
+      "eu": "Bashkimi Europian",
+      "au": "Australi",
+      "jp": "Japoni"
+    }
   }
 }

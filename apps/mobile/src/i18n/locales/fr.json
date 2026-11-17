@@ -3524,7 +3524,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramètres de l'organisation sur le web",
-      "integrations": "Intégrations sur le web",
       "usageDetails": "Détails d'utilisation",
       "providersAndModels": "Fournisseurs et modèles",
       "groups": "Groupes",
@@ -3533,9 +3532,19 @@
       "ssoAndDomain": "SSO et domaine",
       "dataCollection": "Collecte de données",
       "auditLogs": "Journaux d'audit",
-      "requestLogs": "Journaux des requêtes",
-      "subOrganizations": "Sous-organisations",
-      "distributeFunds": "Répartir les fonds"
+      "requestLogs": "Journaux des requêtes"
+    },
+    "requestLogs": {
+      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
+      "older": "Heure précédente",
+      "newer": "Heure suivante",
+      "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
+      "emptyTitle": "Aucune requête",
+      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
+      "loadError": "Impossible de charger les journaux des requêtes.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
+      "tokens": "{{input}} en entrée · {{output}} en sortie",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
@@ -4754,5 +4763,175 @@
     "unavailableDescription": "Ce lien de partage a expiré ou a été révoqué.",
     "transcriptUnavailableTitle": "Impossible de charger cette transcription",
     "transcriptUnavailableDescription": "Le lien fonctionne toujours. Réessayez dans un instant."
+  },
+  "organizationGuardrails": {
+    "title": "Garde-fous IA",
+    "permissionDenied": "Seuls les propriétaires et administrateurs de l'organisation peuvent gérer les garde-fous IA.",
+    "unavailable": "Les garde-fous IA ne sont pas disponibles pour cette organisation.",
+    "loadError": "Impossible de charger les garde-fous IA",
+    "statusSaving": "Enregistrement…",
+    "statusSaved": "Enregistré",
+    "statusFailed": "Impossible d'enregistrer.",
+    "inputTitle": "Garde-fous d'entrée",
+    "inputDescription": "Analyse chaque entrée avec Enkrypt AI, y compris les résultats d'outils. Un détecteur bloquant rejette une requête lorsque Enkrypt est indisponible.",
+    "outputTitle": "Garde-fous de sortie",
+    "outputDescription": "Analyse les réponses avec Enkrypt AI avant qu'elles ne parviennent aux membres. Désactivé tant que vous ne l'activez pas.",
+    "detectorsHint": "Bloquer rejette une requête signalée. Journaliser uniquement l'enregistre sans retarder la requête.",
+    "detectorsHintOutput": "Bloquer fait échouer une réponse signalée. Journaliser uniquement l'enregistre sans retarder la réponse.",
+    "choiceLog": "Journaliser uniquement",
+    "applyTo": "Appliquer à",
+    "applyToAllMembers": "Tous les membres",
+    "applyKiloDefault": "Appliquer la configuration par défaut de Kilo",
+    "invalidSavedTitle": "Impossible de lire les paramètres enregistrés des détecteurs d'entrée",
+    "invalidSavedBody": "Les requêtes sont bloquées jusqu'à ce que les détecteurs d'entrée soient de nouveau enregistrés. Les détecteurs ci-dessous reprennent la configuration par défaut de Kilo.",
+    "invalidSavedOutputTitle": "Impossible de lire les paramètres enregistrés des détecteurs de sortie",
+    "invalidSavedOutputBody": "Les réponses sont retenues jusqu'à ce que les détecteurs de sortie soient de nouveau enregistrés. Choisissez les détecteurs de sortie ci-dessous.",
+    "blockingOutputNote": "Un détecteur de sortie bloquant retient une réponse jusqu'à ce qu'Enkrypt l'ait entièrement vérifiée. Utilisez Journaliser uniquement pour éviter ce délai.",
+    "inputDetectorRequired": "Activez au moins un détecteur d'entrée.",
+    "outputDetectorRequired": "Activez au moins un détecteur de sortie.",
+    "rulesTooMany": "Ajoutez jusqu'à {{max}} règles.",
+    "ruleIdRequired": "Saisissez un ID de règle.",
+    "ruleIdInvalid": "Un ID de règle ne peut contenir que des lettres, des chiffres, des points, des tirets et des traits de soulignement.",
+    "ruleTextRequired": "Décrivez ce que la règle interdit ou exige.",
+    "keywordTooLong": "Chaque mot-clé peut contenir jusqu'à {{max}} caractères.",
+    "topicTooLong": "Chaque sujet peut contenir jusqu'à {{max}} caractères.",
+    "keywordsTooMany": "Ajoutez jusqu'à {{max}} mots-clés.",
+    "topicsTooMany": "Ajoutez jusqu'à {{max}} sujets.",
+    "piiEntityRequired": "Sélectionnez au moins un type de données à détecter.",
+    "keywordRequired": "Ajoutez au moins un mot-clé.",
+    "topicRequired": "Ajoutez au moins un sujet.",
+    "policyTextRequired": "Saisissez le texte de la politique.",
+    "ruleRequired": "Ajoutez au moins une règle.",
+    "ruleIdDuplicate": "Chaque règle doit avoir son propre ID de règle.",
+    "piiEntities": "Données à détecter",
+    "keywordsLabel": "Mots-clés",
+    "keywordsHint": "Un mot-clé par ligne.",
+    "topicsHint": "Un sujet par ligne.",
+    "policyFormat": "Format de la politique",
+    "policyFormatRules": "Règles structurées",
+    "policyFormatRulesDescription": "Une règle par exigence, avec une catégorie et une gravité. Recommandé.",
+    "policyFormatText": "Texte de la politique",
+    "policyFormatTextDescription": "Collez une politique existante en texte brut.",
+    "rulesEmpty": "Aucune règle pour l'instant. Chaque règle décrit un élément que les entrées ne doivent pas contenir ni demander.",
+    "addRule": "Ajouter une règle",
+    "ruleNumber": "Règle {{number}}",
+    "ruleRemove": "Supprimer la règle {{number}}",
+    "ruleIdLabel": "ID de la règle",
+    "ruleNameLabel": "Nom (facultatif)",
+    "ruleTextLabel": "Règle",
+    "ruleRiskCategory": "Catégorie de risque",
+    "ruleApplicability": "Portée",
+    "ruleFrameworks": "Référentiels",
+    "detector": {
+      "promptInjection": {
+        "label": "Injection de prompt",
+        "description": "Détecte les tentatives de contournement des instructions ou de jailbreak du modèle."
+      },
+      "policyViolation": {
+        "label": "Violation de politique",
+        "description": "Signale les entrées qui enfreignent la politique de votre organisation, rédigée sous forme de texte ou de règles.",
+        "descriptionOutput": "Signale les réponses qui enfreignent la politique de votre organisation, rédigée sous forme de texte ou de règles."
+      },
+      "pii": {
+        "label": "Données personnelles et secrets",
+        "description": "Détecte les données personnelles, les identifiants, les adresses IP et les URL."
+      },
+      "keywords": {
+        "label": "Mots-clés interdits",
+        "descriptionOutput": "Détecte les réponses contenant l'un des mots-clés de votre liste."
+      },
+      "topics": {
+        "label": "Sujets",
+        "descriptionOutput": "Signale les réponses portant sur l'un des sujets de votre liste."
+      },
+      "toxicity": {
+        "label": "Toxicité",
+        "description": "Détecte les propos toxiques, insultants, menaçants ou haineux."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Détecte les contenus à caractère sexuel ou inappropriés dans un cadre professionnel."
+      },
+      "bias": {
+        "label": "Biais",
+        "description": "Détecte les propos biaisés ou discriminatoires."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Données personnelles",
+        "description": "Noms, adresses e-mail, numéros de téléphone."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "description": "Clés API, jetons, mots de passe."
+      },
+      "ipAddress": {
+        "label": "Adresses IP",
+        "description": "Adresses IPv4 et IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adresses web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sécurité et fraude",
+      "safetyHarm": "Sûreté et préjudices",
+      "privacyDataProtection": "Confidentialité et protection des données",
+      "brandReputationTrust": "Marque et réputation",
+      "biasFairnessEthical": "Biais et équité",
+      "legalIpLiability": "Responsabilité juridique et propriété intellectuelle",
+      "productMisuse": "Usage abusif du produit",
+      "performanceQuality": "Performances et qualité"
+    },
+    "applicability": {
+      "user": "Entrées utilisateur",
+      "userAssistant": "Entrées utilisateur et réponses"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "AI Act (UE)",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Fonctionnalité Enterprise",
+    "enterpriseOnly": "Cette fonctionnalité est réservée à l'offre Enterprise.",
+    "readOnly": "Seuls les propriétaires et administrateurs de l'organisation peuvent modifier ces paramètres.",
+    "loadError": "Impossible de charger les fournisseurs et modèles",
+    "tabModels": "Modèles",
+    "tabProviders": "Fournisseurs",
+    "tabGateways": "Passerelles",
+    "modelsDescription": "Désactivez un modèle pour le bloquer pour tous les membres. Les modèles des fournisseurs autorisés sont activés par défaut.",
+    "modelsDeniedOnly": "Refusés uniquement",
+    "modelsEmpty": "Aucun modèle ne correspond à cette recherche.",
+    "providersDescription": "Désactivez un fournisseur pour que Kilo cesse de lui acheminer les requêtes de cette organisation.",
+    "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
+    "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",
+    "allowAllShown": "Autoriser tous ceux affichés",
+    "denyAllShown": "Refuser tous ceux affichés",
+    "gatewaysDescription": "Kilo achemine les requêtes de modèles via Vercel AI Gateway ou OpenRouter. Une passerelle désactivée fait échouer ces requêtes.",
+    "emptyProviderList": "Autorisez au moins un fournisseur. Une liste vide bloque tout acheminement vers les modèles Kilo.",
+    "gatewaysUnavailable": "Les paramètres de passerelle ne sont pas disponibles pour cette organisation.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Les requêtes OpenRouter ne sont pas rattachées à une région.",
+    "inferenceRegion": "Région d'inférence",
+    "inferenceRegionDescription": "Rattache les requêtes Vercel AI Gateway à cette région. Un modèle qui n'y est pas disponible échoue.",
+    "disableOpenrouterNote": "Désactiver OpenRouter bloque aussi les clés BYOK qui acheminent les requêtes par son intermédiaire.",
+    "emptyModelList": "Laissez au moins un modèle activé. Si vous refusez tous les modèles, les membres n'auront plus rien à utiliser.",
+    "catalogUnavailable": "Le catalogue complet des modèles n'a pas pu être chargé ; seules vos listes enregistrées sont affichées. Réessayez pour charger tous les modèles.",
+    "region": {
+      "global": "Mondial",
+      "us": "États-Unis",
+      "eu": "Union européenne",
+      "au": "Australie",
+      "jp": "Japon"
+    }
   }
 }

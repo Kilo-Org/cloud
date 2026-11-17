@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Ngā tautuhinga rōpū i te ipurangi",
-      "integrations": "Ngā Tūhononga i te ipurangi",
       "usageDetails": "Ngā taipitopito whakamahinga",
       "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
       "groups": "Ngā kāhui",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO me te rohe",
       "dataCollection": "Kohinga raraunga",
       "auditLogs": "Ngā pūkete arotake",
-      "requestLogs": "Ngā pūkete tono",
-      "subOrganizations": "Ngā rōpū iti",
-      "distributeFunds": "Tohaina ngā pūtea"
+      "requestLogs": "Ngā pūkete tono"
+    },
+    "requestLogs": {
+      "hint": "Ngā tono o te haora i mua i te mutunga o te awhe, ko ngā mea hou rawa ki mua.",
+      "older": "Haora o mua",
+      "newer": "Haora o muri",
+      "truncated": "He maha ake ngā tono o tēnei haora i ērā e whakaaturia ana i te rārangi.",
+      "emptyTitle": "Kāore he tono",
+      "emptyDescription": "Kāore he tono tomokanga i tēnei haora.",
+      "loadError": "Kāore i taea te uta i ngā pūkete tono.",
+      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū anake e pānui ōna pūkete tono.",
+      "tokens": "{{input}} ki roto · {{output}} ki waho",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
@@ -4684,5 +4693,175 @@
     "unavailableDescription": "Kua pau, kua whakakorehia rānei tēnei hono tohatoha.",
     "transcriptUnavailableTitle": "Kāore i taea te uta i tēnei tuhinga",
     "transcriptUnavailableDescription": "Kei te mahi tonu te hono. Ngana anō ā kō ake nei."
+  },
+  "organizationGuardrails": {
+    "title": "Ara Tiaki Atamai",
+    "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai.",
+    "unavailable": "Kāore ngā Ara Tiaki Atamai e wātea ana mō tēnei whakahaere.",
+    "loadError": "Kāore i taea te uta i ngā Ara Tiaki Atamai",
+    "statusSaving": "E tiaki ana…",
+    "statusSaved": "Kua tiakina",
+    "statusFailed": "Kāore i taea te tiaki.",
+    "inputTitle": "Ngā ara tiaki whakaurunga",
+    "inputDescription": "Ka tirotiro i ia whakaurunga mā Enkrypt AI, tae atu ki ngā hua o ngā taputapu. Ka whakakāhoretia e tētahi kaitirotiro ārai tētahi tono ina kāore a Enkrypt e wātea ana.",
+    "outputTitle": "Ngā ara tiaki putanga",
+    "outputDescription": "Ka tirotiro i ngā whakautu mā Enkrypt AI i mua i te whiwhi a ngā mema i aua whakautu. Kua whakaweto ki te kore koe e whakakā.",
+    "detectorsHint": "Ka whakakāhore te Ārai i tētahi tono kua tohua. Ka tuhia noa e te kōwhiringa Tuhi noa, kāore e whakaroa i te tono.",
+    "detectorsHintOutput": "Ka whakakore te Ārai i tētahi whakautu kua tohua. Ka tuhia noa e te kōwhiringa Tuhi noa, kāore e whakaroa i te whakautu.",
+    "choiceLog": "Tuhi noa",
+    "applyTo": "Whakamahia ki",
+    "applyToAllMembers": "Ngā mema katoa",
+    "applyKiloDefault": "Whakamahia te Taunoa Kilo",
+    "invalidSavedTitle": "Kāore e taea te pānui i ngā tautuhinga kaitirotiro whakaurunga kua tiakina",
+    "invalidSavedBody": "Ka āraia ngā tono kia tiakina anō rā ngā kaitirotiro whakaurunga. Ka tīmata ngā kaitirotiro i raro nei mai i te Taunoa Kilo.",
+    "invalidSavedOutputTitle": "Kāore e taea te pānui i ngā tautuhinga kaitirotiro putanga kua tiakina",
+    "invalidSavedOutputBody": "Ka pupuritia ngā whakautu kia tiakina anō rā ngā kaitirotiro putanga. Kōwhiria ngā kaitirotiro putanga i raro nei.",
+    "blockingOutputNote": "Ka pupuri tētahi kaitirotiro putanga ārai i tētahi whakautu kia oti rā i a Enkrypt te tirotiro katoa. Whakamahia te Tuhi noa kia kore ai e whakaroa.",
+    "inputDetectorRequired": "Whakakāhia kia kotahi te kaitirotiro whakaurunga, neke atu rānei.",
+    "outputDetectorRequired": "Whakakāhia kia kotahi te kaitirotiro putanga, neke atu rānei.",
+    "rulesTooMany": "Tāpirihia ngā ture kia tae atu ki te {{max}}.",
+    "ruleIdRequired": "Whakauruhia he tohu ture.",
+    "ruleIdInvalid": "Ka taea e te tohu ture te whakamahi i ngā pū, ngā tau, ngā ira, ngā tohu haehae, me ngā tohu whakararo anake.",
+    "ruleTextRequired": "Whakamāramatia ngā mea e aukatia ana, e hiahiatia ana rānei e te ture.",
+    "keywordTooLong": "Ka taea e ia kupu matua te roa kia tae atu ki te {{max}} pū.",
+    "topicTooLong": "Ka taea e ia kaupapa te roa kia tae atu ki te {{max}} pū.",
+    "keywordsTooMany": "Tāpirihia ngā kupu matua kia tae atu ki te {{max}}.",
+    "topicsTooMany": "Tāpirihia ngā kaupapa kia tae atu ki te {{max}}.",
+    "piiEntityRequired": "Kōwhiria kia kotahi te iti rawa o ngā momo raraunga hei rapu.",
+    "keywordRequired": "Tāpirihia kia kotahi te iti rawa o ngā kupu matua.",
+    "topicRequired": "Tāpirihia kia kotahi te iti rawa o ngā kaupapa.",
+    "policyTextRequired": "Whakauruhia te kuputuhi kaupapa here.",
+    "ruleRequired": "Tāpirihia kia kotahi te iti rawa o ngā ture.",
+    "ruleIdDuplicate": "Me whai tōna ake ID ture ia ture.",
+    "piiEntities": "Raraunga hei rapu",
+    "keywordsLabel": "Ngā kupu matua",
+    "keywordsHint": "Kotahi te kupu matua i ia rārangi.",
+    "topicsHint": "Kotahi te kaupapa i ia rārangi.",
+    "policyFormat": "Hōputu kaupapa here",
+    "policyFormatRules": "Ngā ture kua whakaritea",
+    "policyFormatRulesDescription": "Kotahi te ture mō ia whakaritenga, me tētahi kāwai me tētahi taumaha. E tūtohungia ana.",
+    "policyFormatText": "Kuputuhi kaupapa here",
+    "policyFormatTextDescription": "Whakapirihia tētahi kaupapa here o nāianei hei kuputuhi noa.",
+    "rulesEmpty": "Kāore anō he ture. Ka whakamārama ia ture i tētahi mea kāore e tika kia whai, kia pātai rānei ngā whakaurunga.",
+    "addRule": "Tāpiri ture",
+    "ruleNumber": "Ture {{number}}",
+    "ruleRemove": "Tango ture {{number}}",
+    "ruleIdLabel": "Tohu ture",
+    "ruleNameLabel": "Ingoa (kōwhiringa)",
+    "ruleTextLabel": "Ture",
+    "ruleRiskCategory": "Kāwai mōrearea",
+    "ruleApplicability": "Awhe",
+    "ruleFrameworks": "Ngā anga",
+    "detector": {
+      "promptInjection": {
+        "label": "Werohanga whakahau",
+        "description": "Ka kite i ngā ngana ki te whakakore i ngā tohutohu, ki te mawhiti rānei i te tauira."
+      },
+      "policyViolation": {
+        "label": "Takahi kaupapa here",
+        "description": "Ka tohu i ngā whakaurunga e takahi ana i te kaupapa here o tō whakahaere, ahakoa kua tuhia hei kuputuhi, hei ture rānei.",
+        "descriptionOutput": "Ka tohu i ngā whakautu e takahi ana i te kaupapa here o tō whakahaere, ahakoa kua tuhia hei kuputuhi, hei ture rānei."
+      },
+      "pii": {
+        "label": "PII me ngā mea huna",
+        "description": "Ka kite i ngā raraunga whaiaro, ngā tohu whakamana, ngā wāhitau IP, me ngā URL."
+      },
+      "keywords": {
+        "label": "Ngā kupu matua kua aukatia",
+        "descriptionOutput": "Ka kite i ngā whakautu e whai ana i tētahi kupu matua kua tāuritia e koe."
+      },
+      "topics": {
+        "label": "Ngā kaupapa",
+        "descriptionOutput": "Ka tohu i ngā whakautu mō tētahi kaupapa kua tāuritia e koe."
+      },
+      "toxicity": {
+        "label": "Tūkino",
+        "description": "Ka kite i ngā reo tūkino, whakaiti, whakamataku, kino rānei."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Ka kite i ngā ihirangi whakahiakā, i ngā ihirangi kāore e tika mō te wāhi mahi rānei."
+      },
+      "bias": {
+        "label": "Whakatoihara",
+        "description": "Ka kite i ngā reo whakatoihara, whakahāwea rānei."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Raraunga whaiaro",
+        "description": "Ngā ingoa, ngā wāhitau īmēra, ngā nama waea."
+      },
+      "secrets": {
+        "label": "Ngā mea huna",
+        "description": "Ngā kī API, ngā tohu, ngā kupuhipa."
+      },
+      "ipAddress": {
+        "label": "Ngā wāhitau IP",
+        "description": "Ngā wāhitau IPv4 me IPv6."
+      },
+      "url": {
+        "label": "Ngā URL",
+        "description": "Ngā wāhitau tukutuku."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Haumarutanga me te tinihanga",
+      "safetyHarm": "Haumaru me te whara",
+      "privacyDataProtection": "Tūmataitinga me te tiaki raraunga",
+      "brandReputationTrust": "Waitohu me te mana",
+      "biasFairnessEthical": "Whakatoihara me te tika",
+      "legalIpLiability": "Ture me te taunahatanga IP",
+      "productMisuse": "Whakamahinga hē o te hua",
+      "performanceQuality": "Mahinga me te kounga"
+    },
+    "applicability": {
+      "user": "Whakaurunga kaiwhakamahi",
+      "userAssistant": "Whakaurunga kaiwhakamahi me ngā whakautu"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Āhuatanga umanga nui",
+    "enterpriseOnly": "He āhuatanga mō te umanga nui anake tēnei.",
+    "readOnly": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te huri i ēnei tautuhinga.",
+    "loadError": "Kāore i taea te uta i ngā kaiwhakarato me ngā tauira",
+    "tabModels": "Ngā tauira",
+    "tabProviders": "Ngā kaiwhakarato",
+    "tabGateways": "Ngā kuwaha",
+    "modelsDescription": "Whakawetohia tētahi tauira hei ārai i taua tauira mō ia mema. Ka kā tonu ngā tauira mai i ngā kaiwhakarato kua whakaaetia.",
+    "modelsDeniedOnly": "Kua whakakāhore anake",
+    "modelsEmpty": "Kāore he tauira e hāngai ana ki tēnei rapunga.",
+    "providersDescription": "Whakawetohia tētahi kaiwhakarato kia kore ai a Kilo e arataki tono ki a ia mō tēnei whakahaere.",
+    "providersNeedCatalog": "Ka noho pānui-anake ngā pana kaiwhakarato kia uta katoa rā anō te rārangi tauira. Pēhia te Whakamātau anō i runga ake nei kia taea ai te whakatika.",
+    "providersEmpty": "Kāore he kaiwhakarato e hāngai ana ki tēnei rapunga.",
+    "allowAllShown": "Whakaaetia ngā mea katoa e whakaatuhia ana",
+    "denyAllShown": "Whakakāhoretia ngā mea katoa e whakaatuhia ana",
+    "gatewaysDescription": "Ka tuku a Kilo i ngā tono tauira mā Vercel AI Gateway, mā OpenRouter rānei. Ka rahua ērā tono i tētahi kuwaha kua whakawetohia.",
+    "emptyProviderList": "Whakaaetia kia kotahi te kaiwhakarato i te iti rawa. Ki te kau te rārangi, ka aukatia ngā ara tauira katoa a Kilo.",
+    "gatewaysUnavailable": "Kāore e wātea ana ngā tautuhinga kuwaha mō tēnei whakahaere.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Kāore ngā tono OpenRouter e herea ana ki tētahi rohe.",
+    "inferenceRegion": "Rohe whakatau",
+    "inferenceRegionDescription": "Ka herea ngā tono Vercel AI Gateway ki tēnei rohe. Ka rahua tētahi tauira kāore e wātea ana ki reira.",
+    "disableOpenrouterNote": "Mā te whakaweto i a OpenRouter e ārai hoki i ngā kī BYOK e tuku tono ana mā roto i a ia.",
+    "emptyModelList": "Waiho kia kotahi te tauira kia kā i te iti rawa. Ki te whakakāhoretia ngā tauira katoa, kāore he mea hei whakamahi mā ngā mema.",
+    "catalogUnavailable": "Kāore i utaina te putumōhio tauira katoa, nō reira ko ō rārangi kua tiakina anake e whakaaturia ana. Whakamātau anō kia utaina ngā tauira katoa.",
+    "region": {
+      "global": "Ao whānui",
+      "us": "Te Hononga o Amerika",
+      "eu": "Te Kotahitanga o Ūropi",
+      "au": "Ahitereiria",
+      "jp": "Hapani"
+    }
   }
 }

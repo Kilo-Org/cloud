@@ -26,7 +26,7 @@ import {
   validateEmbeddingDimensions,
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getNonChatGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   handleUsageEndpointRequest,
@@ -138,7 +138,7 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
       input.requestedModelLowerCased
     );
     upstreamBody.providerOptions = {
-      gateway: await getUsageEndpointGatewayOptions({
+      gateway: await getNonChatGatewayOptions({
         vercelModelId: body.model,
         userByok,
         provider: {

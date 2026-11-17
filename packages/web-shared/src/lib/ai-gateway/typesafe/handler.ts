@@ -22,9 +22,9 @@ import {
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getRouteInferenceRegion } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
-import { resolveUsageEndpointRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+import { resolveEmbeddingOrDecisionRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getNonChatGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   logMicrodollarUsageAndReportToBouncer,
@@ -211,7 +211,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     : undefined;
   // System One is served by OpenRouter, and by the Vercel AI Gateway when the owner's key or the
   // organization's gateway settings route it there. Models only Vercel serves are not supported.
-  const route = await resolveUsageEndpointRoute({
+  const route = await resolveEmbeddingOrDecisionRoute({
     requestedModel: resolvedModel,
     modelType: 'evaluation',
     user,
@@ -484,7 +484,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           state: parsed.data.state,
           questions: parsed.data.questions,
           providerOptions: {
-            gateway: await getUsageEndpointGatewayOptions({
+            gateway: await getNonChatGatewayOptions({
               vercelModelId,
               userByok,
               provider: providerPolicy,

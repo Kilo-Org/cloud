@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { Search } from '@/components/ui/icons';
 
+import { GroupMemberPicker } from '@/components/organization/group-member-picker';
 import {
   isOrgGroupFormDirty,
   ORG_GROUP_DESCRIPTION_MAX_LENGTH,
   ORG_GROUP_NAME_MAX_LENGTH,
   orgGroupNameError,
+  selectOrgGroupMemberPickerState,
   sortOrgGroupMemberIds,
   toggleOrgGroupMember,
   toggleOrgGroupMembers,
@@ -17,12 +19,10 @@ import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { ChoiceRow } from '@/components/ui/choice-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
-import { Text } from '@/components/ui/text';
 import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
 import {
   type ActiveOrgMember,
@@ -32,7 +32,6 @@ import {
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups' as const;
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
@@ -122,7 +121,14 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const selectedVisibleCount = visibleMemberIds.filter(id => memberIds.includes(id)).length;
   const allVisibleSelected =
     visibleMembers.length > 0 && selectedVisibleCount === visibleMembers.length;
-
+  const memberPicker = selectOrgGroupMemberPickerState(
+    {
+      isPending: orgWithMembers.isPending,
+      isError: orgWithMembers.isError,
+      hasData: orgWithMembers.data !== undefined,
+    },
+    visibleMembers.length
+  );
   const save = () => {
     const name = nameRef.current.trim();
     const description = descriptionRef.current.trim();
@@ -238,49 +244,26 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
                 }}
               />
             </View>
-            {visibleMembers.length === 0 ? (
-              <Text variant="muted" className="text-sm">
-                {t('organization.groups.membersEmpty')}
-              </Text>
-            ) : (
-              <View className="overflow-hidden rounded-lg bg-secondary">
-                <ChoiceRow
-                  label={t('organization.groups.selectAllVisible')}
-                  selected={allVisibleSelected}
-                  multi
-                  disabled={busy}
-                  onPress={() => {
-                    const toggled = toggleOrgGroupMembers(
-                      memberIds,
-                      visibleMemberIds,
-                      !allVisibleSelected
-                    );
-                    setMemberIds(toggled);
-                    syncDirty(toggled);
-                  }}
-                  className={cn('border-b-[0.5px] border-hair-soft')}
-                />
-                {visibleMembers.map((member, index) => (
-                  <ChoiceRow
-                    key={member.id}
-                    label={member.name}
-                    description={member.email}
-                    selected={memberIds.includes(member.id)}
-                    multi
-                    disabled={busy}
-                    onPress={() => {
-                      const selected = !memberIds.includes(member.id);
-                      const toggled = toggleOrgGroupMember(memberIds, member.id, selected);
-                      setMemberIds(toggled);
-                      syncDirty(toggled);
-                    }}
-                    className={cn(
-                      index < visibleMembers.length - 1 && 'border-b-[0.5px] border-hair-soft'
-                    )}
-                  />
-                ))}
-              </View>
-            )}
+            <GroupMemberPicker
+              picker={memberPicker}
+              error={orgWithMembers.error}
+              isRetrying={orgWithMembers.isFetching}
+              onRetry={() => void orgWithMembers.refetch()}
+              visibleMembers={visibleMembers}
+              memberIds={memberIds}
+              allVisibleSelected={allVisibleSelected}
+              busy={busy}
+              onToggleAll={selected => {
+                const toggled = toggleOrgGroupMembers(memberIds, visibleMemberIds, selected);
+                setMemberIds(toggled);
+                syncDirty(toggled);
+              }}
+              onToggleMember={(memberId, selected) => {
+                const toggled = toggleOrgGroupMember(memberIds, memberId, selected);
+                setMemberIds(toggled);
+                syncDirty(toggled);
+              }}
+            />
           </View>
         )}
 

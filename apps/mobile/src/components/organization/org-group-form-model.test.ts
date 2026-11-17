@@ -4,6 +4,7 @@ import {
   isOrgGroupFormDirty,
   ORG_GROUP_NAME_MAX_LENGTH,
   orgGroupNameError,
+  selectOrgGroupMemberPickerState,
   toggleOrgGroupMember,
   toggleOrgGroupMembers,
 } from '@/components/organization/org-group-form-model';
@@ -43,6 +44,33 @@ describe('toggleOrgGroupMembers', () => {
 
   it('returns the same selection when everyone visible is already selected', () => {
     expect(toggleOrgGroupMembers(['a', 'b'], ['a', 'b'], true)).toEqual(['a', 'b']);
+  });
+});
+
+describe('selectOrgGroupMemberPickerState', () => {
+  const loaded = { isPending: false, isError: false, hasData: true };
+
+  it('reports a pending fetch as loading, never as an empty search', () => {
+    expect(
+      selectOrgGroupMemberPickerState({ isPending: true, isError: false, hasData: false }, 0)
+    ).toEqual({ kind: 'loading' });
+  });
+
+  it('reports a failed fetch with no data as an error', () => {
+    expect(
+      selectOrgGroupMemberPickerState({ isPending: false, isError: true, hasData: false }, 0)
+    ).toEqual({ kind: 'error' });
+  });
+
+  it('keeps the loaded members when a later fetch fails', () => {
+    expect(selectOrgGroupMemberPickerState({ ...loaded, isError: true }, 2)).toEqual({
+      kind: 'list',
+    });
+  });
+
+  it('separates an empty search result from the query states', () => {
+    expect(selectOrgGroupMemberPickerState(loaded, 0)).toEqual({ kind: 'empty' });
+    expect(selectOrgGroupMemberPickerState(loaded, 1)).toEqual({ kind: 'list' });
   });
 });
 

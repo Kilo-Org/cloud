@@ -59,6 +59,30 @@ export function sortOrgGroupMemberIds(memberIds: readonly string[]): readonly st
   return [...memberIds].sort();
 }
 
+/**
+ * What the member picker shows. The list query's phases are exclusive: a pending
+ * fetch has nothing to filter yet and a failed one has nothing to offer, so
+ * neither may read as "no active member matches your search".
+ */
+export type OrgGroupMemberPickerState =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'empty' }
+  | { kind: 'list' };
+
+export function selectOrgGroupMemberPickerState(
+  query: Readonly<{ isPending: boolean; isError: boolean; hasData: boolean }>,
+  visibleMemberCount: number
+): OrgGroupMemberPickerState {
+  if (query.isPending) {
+    return { kind: 'loading' };
+  }
+  if (query.isError && !query.hasData) {
+    return { kind: 'error' };
+  }
+  return visibleMemberCount === 0 ? { kind: 'empty' } : { kind: 'list' };
+}
+
 /** Whether a group form holds a change against the group it opened with. */
 export function isOrgGroupFormDirty(
   values: Readonly<{ name: string; description: string; memberIds: readonly string[] }>,

@@ -10,14 +10,14 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@/lib/app-shell/session', () => ({
   requireAppShellUser: jest.fn(),
 }));
-// The root router builds service clients at import time; this suite only needs a
-// router that answers one query.
-jest.mock('@/routers/root-router', () => {
+// The shell router builds service clients at import time; this suite only needs
+// a router that answers one query.
+jest.mock('@/routers/app-shell-procedures-router', () => {
   const { createTRPCRouter, baseProcedure } = jest.requireActual<typeof TrpcInitModule>(
     '@kilocode/web-shared/lib/trpc/init'
   );
   return {
-    rootRouter: createTRPCRouter({
+    appShellProceduresRouter: createTRPCRouter({
       user: createTRPCRouter({
         getMe: baseProcedure.query(({ ctx }) => ({ id: ctx.user.id })),
       }),

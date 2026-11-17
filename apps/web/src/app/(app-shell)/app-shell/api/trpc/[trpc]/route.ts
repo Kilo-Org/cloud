@@ -2,16 +2,16 @@ import { TRPCError } from '@trpc/server';
 import { fetchRequestHandler, type FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { rootRouter } from '@/routers/root-router';
+import { appShellProceduresRouter } from '@/routers/app-shell-procedures-router';
 import { requireAppShellUser } from '@/lib/app-shell/session';
 
 export const maxDuration = 800;
 
 /**
  * The shell's own tRPC entry point. It resolves the caller from the shell
- * cookie (the only cookie scoped to `/app-shell`) and refuses a cross-origin
- * caller, so a shell page can read and write the same procedures the full web
- * page does without widening the credential beyond the shell.
+ * cookie (the only cookie scoped to `/app-shell`), refuses a cross-origin
+ * caller, and mounts only the procedures shell pages call, so a shell session
+ * cannot reach the rest of the web API. See `appShellProceduresRouter`.
  */
 async function createAppShellTRPCContext({
   req,
@@ -37,7 +37,7 @@ const handler = (req: Request) =>
   fetchRequestHandler({
     endpoint: '/app-shell/api/trpc',
     req,
-    router: rootRouter,
+    router: appShellProceduresRouter,
     createContext: createAppShellTRPCContext,
     allowMethodOverride: true,
   });

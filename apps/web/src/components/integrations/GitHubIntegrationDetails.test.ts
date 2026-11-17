@@ -321,6 +321,18 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.description).toContain('different account');
   });
 
+  it('non-retryable start refusal: Back, no retry, names who can start the install', () => {
+    const view = buildAppReturnOutcomeView({ error: 'installation_start_refused' });
+    expect(view.kind).toBe('blocked');
+    expect(view.cta).toBe('Back');
+    expect(view.title).toBe('Cannot complete installation');
+    expect(view.description).toBe(
+      'Only an organization owner or admin can start this GitHub installation. Ask one to connect it.'
+    );
+    expect(view.description).not.toContain('Try again');
+    expect(view.href).toBe('/cloud/sessions?error=installation_start_refused');
+  });
+
   it('success takes precedence over error, and pending over error (callback ordering)', () => {
     expect(buildAppReturnOutcomeView({ success: true, error: 'installation_failed' }).kind).toBe(
       'installed'

@@ -28,7 +28,7 @@ import {
   ORGANIZATION_ROLES,
   canManageOrganization,
   type OrganizationRole,
-} from '../../../packages/app-shared/src/organizations/roles';
+} from '@kilocode/app-shared/organizations';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';

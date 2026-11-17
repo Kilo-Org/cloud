@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Iibsashada kiredit",
       "receipt": "Rasiid",
-      "receiptA11y": "Fur rasiidka {{description}}",
+      "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo."
     },
     "title": "Iibso lacag adeeg",

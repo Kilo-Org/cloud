@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",
       "receipt": "రసీదు",
-      "receiptA11y": "{{description}} కోసం రసీదును తెరవండి",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} కోసం రసీదును తెరవండి",
       "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు."
     },
     "title": "క్రెడిట్‌లు కొనండి",

@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
-      "receiptA11y": "{{description}} ची पावती उघडा",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही."
     },
     "title": "क्रेडिट्स खरेदी करा",

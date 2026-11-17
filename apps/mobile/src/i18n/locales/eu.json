@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
-      "receiptA11y": "Ireki honen ordainagiria: {{description}}",
+      "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
     },
     "title": "Erosi kredituak",

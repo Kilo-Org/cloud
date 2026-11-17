@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Покупка на кредити",
       "receipt": "Разписка",
-      "receiptA11y": "Отваряне на разписката за {{description}}",
+      "receiptA11y": "Отваряне на разписката за {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Няма налична разписка за тази покупка."
     },
     "title": "Купи кредити",

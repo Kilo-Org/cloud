@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
-      "receiptA11y": "Öppna kvittot för {{description}}",
+      "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
       "receiptUnavailable": "Det finns inget kvitto för det här köpet."
     },
     "title": "Köp krediter",

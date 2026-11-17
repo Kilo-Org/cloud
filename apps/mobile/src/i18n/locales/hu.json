@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
-      "receiptA11y": "Nyugta megnyitása: {{description}}",
+      "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
     },
     "title": "Kreditek vásárlása",

@@ -4381,7 +4381,7 @@
       },
       "purchaseFallback": "Kupnja kredita",
       "receipt": "Račun",
-      "receiptA11y": "Otvori račun za {{description}}",
+      "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun za ovu kupnju nije dostupan."
     },
     "title": "Kupi kredite",

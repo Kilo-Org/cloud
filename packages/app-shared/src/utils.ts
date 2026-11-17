@@ -91,12 +91,9 @@ export function fromMicrodollars(microdollars: number): number {
 }
 
 export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // One owner of the en-US USD presentation: Intl derives USD's 2 minor-unit
+  // digits by default, so cents in, dollars out, same string.
+  return formatCents(amount * 100);
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {

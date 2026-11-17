@@ -623,7 +623,7 @@
     },
     "connectionExpired": "Kua pau te wā o te hononga GitHub.",
     "merge": {
-      "merge": "Whakakotahitanga",
+      "merge": "Whakakotahitia",
       "mergeTitle": "Whakakotahitanga",
       "mergeNow": "Whakakotahitia ināianei",
       "mergePullRequest": "Whakakotahi tono kume",
@@ -679,7 +679,7 @@
         "requiredReviewsDetail": "Kei te ngaro ngā whakaaetanga a ngā kaiarotake e hiahiatia ana, kei te tāria rānei.",
         "failingChecksTitle": "Kei te rahua ngā arowhai e hiahiatia ana",
         "unstableTitle": "Kei te rahua ētahi arowhai",
-        "unstableDetail": "Kei te rahua ētahi arowhai kāore e herea ana. E kore ēnei e ārai i te whakakotahitanga.",
+        "unstableDetail": "Kei te rahua ētahi arowhai kāore e hiahiatia ana. E kore ēnei e ārai i te whakakotahitanga.",
         "draftTitle": "Tono kume hukihuki",
         "draftDetail": "Tohua te tono kume kua rite mō te arotake i mua i te whakakotahitanga.",
         "behindTitle": "Kua tawhito te peka",
@@ -3020,7 +3020,7 @@
     "serverTitle": "Kāore i taea te uta",
     "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō.",
     "timeoutTitle": "Kua roa rawa te tūmau",
-    "timeoutDescription": "Kua taka te wā o te tono i tehe mai i tōna otinga. Whakamātau anō."
+    "timeoutDescription": "Kua pau te wā o te tono i mua i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
     "openMenu": "Whakatuwheratia te tahua",
@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Hoko whiwhinga",
       "receipt": "Rihīti",
-      "receiptA11y": "Huakina te rihīti mō {{description}}",
+      "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kāore he rihīti mō tēnei hoko."
     },
     "title": "Hoko whiwhinga",

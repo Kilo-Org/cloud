@@ -4381,7 +4381,7 @@
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
-      "receiptA11y": "Atvērt kvīti: {{description}}",
+      "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama."
     },
     "title": "Pirkt kredītus",

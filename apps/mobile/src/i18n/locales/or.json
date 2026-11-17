@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "କ୍ରେଡିଟ୍ କ୍ରୟ",
       "receipt": "ରସିଦ",
-      "receiptA11y": "{{description}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
       "receiptUnavailable": "ଏହି କ୍ରୟ ପାଇଁ କୌଣସି ରସିଦ ଉପଲବ୍ଧ ନାହିଁ।"
     },
     "title": "କ୍ରେଡିଟ୍ କିଣନ୍ତୁ",

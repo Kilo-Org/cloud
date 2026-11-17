@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "积分购买",
       "receipt": "收据",
-      "receiptA11y": "打开 {{description}} 的收据",
+      "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。"
     },
     "title": "购买额度",

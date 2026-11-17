@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
-      "receiptA11y": "{{description}} chekini ochish",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas."
     },
     "title": "Kredit sotib olish",

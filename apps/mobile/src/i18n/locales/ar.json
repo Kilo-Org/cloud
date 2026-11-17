@@ -4579,7 +4579,7 @@
       },
       "purchaseFallback": "شراء رصيد",
       "receipt": "الإيصال",
-      "receiptA11y": "فتح إيصال {{description}}",
+      "receiptA11y": "فتح إيصال {{description}}، {{amount}}، من {{date}}",
       "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه."
     },
     "title": "شراء الرصيد",

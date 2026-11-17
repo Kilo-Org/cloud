@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
-      "receiptA11y": "Buɗe rasitin {{description}}",
+      "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya."
     },
     "title": "Sayi kuɗin amfani",

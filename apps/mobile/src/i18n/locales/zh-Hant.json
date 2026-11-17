@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",
-      "receiptA11y": "開啟「{{description}}」的收據",
+      "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。"
     },
     "title": "購買點數",

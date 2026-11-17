@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
-      "receiptA11y": "Buka tanda terima untuk {{description}}",
+      "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
     },
     "title": "Beli kredit",

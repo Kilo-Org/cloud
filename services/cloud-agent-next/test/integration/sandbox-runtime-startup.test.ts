@@ -519,6 +519,55 @@ describe('downloaded startup in the allocation owner', () => {
         });
       }
     );
+    it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
+      'starts v2 from origin %s for an all-session organization',
+      async billingOrigin => {
+        const h = await setup(
+          KILO2_SANDBOX,
+          {},
+          {
+            ...kilo2Env,
+            RUNTIME_KILO2_ALL_SESSION_ORG_IDS: TARGET_ORG,
+          }
+        );
+        await prepare(h, { ...isolatedTarget, billingOrigin });
+        expect(harnessOf(h, 0)).toBe('kilo2');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo2');
+        });
+      }
+    );
+    it('starts v2 on the code-review native class for an all-session organization', async () => {
+      const h = await setup(
+        KILO2_SANDBOX,
+        {},
+        {
+          ...kilo2Env,
+          RUNTIME_KILO2_ALL_SESSION_ORG_IDS: TARGET_ORG,
+        }
+      );
+      await prepare(h, {
+        ...isolatedTarget,
+        sandboxKind: 'code-review',
+        billingOrigin: 'code-review',
+      });
+      expect(harnessOf(h, 0)).toBe('kilo2');
+    });
+    it('keeps a non-web origin on v1 outside the all-session scope', async () => {
+      const h = await setup(
+        KILO2_SANDBOX,
+        {},
+        {
+          ...kilo2Env,
+          RUNTIME_KILO2_ALL_SESSION_ORG_IDS: OTHER_ORG,
+        }
+      );
+      await prepare(h, { ...isolatedTarget, billingOrigin: 'code-review' });
+      expect(harnessOf(h, 0)).toBe('kilo');
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        expect(await state.storage.get('runtime_harness')).toBe('kilo');
+      });
+    });
     it('keeps an existing v1 sandbox on v1 after enabling all web accounts', async () => {
       const h = await setup(
         UNLISTED_KILO2_SANDBOX,

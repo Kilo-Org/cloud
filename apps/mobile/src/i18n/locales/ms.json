@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
-      "receiptA11y": "Buka resit untuk {{description}}",
+      "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
     },
     "title": "Beli kredit",

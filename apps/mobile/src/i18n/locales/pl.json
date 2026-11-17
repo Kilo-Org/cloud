@@ -4447,7 +4447,7 @@
       },
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
-      "receiptA11y": "Otwórz potwierdzenie dla: {{description}}",
+      "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne."
     },
     "title": "Kup kredyty",

@@ -4447,7 +4447,7 @@
       },
       "purchaseFallback": "Nakup kreditov",
       "receipt": "Potrdilo",
-      "receiptA11y": "Odpri potrdilo za {{description}}",
+      "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo."
     },
     "title": "Kupi kredite",

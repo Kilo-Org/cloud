@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "การซื้อเครดิต",
       "receipt": "ใบเสร็จ",
-      "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}}",
+      "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}} จำนวน {{amount}} วันที่ {{date}}",
       "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้"
     },
     "title": "ซื้อเครดิต",

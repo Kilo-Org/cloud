@@ -84,25 +84,18 @@ truth for which function regions actually run those deployments.
 
 ## Advanced gateway policies
 
-An enterprise organization's Advanced policies (`disable_openrouter`, `data_region`;
-see `providers/organization-gateway-settings.ts`) apply only to requests Kilo pays for.
-A set inference region admits only Kilo's Vercel AI Gateway route, pinned to the region,
-and also disables OpenRouter. User BYOK routes (provider keys through Vercel, OpenRouter
-and Vercel AI Gateway keys, direct BYOK) and linked ChatGPT or Claude billing
-connections are exempt and never get a region. FIM and edit
-completions go straight to their providers and are exempt. A disabled OpenRouter also
-lifts Kilo's Vercel opt-out list for that request, as a user's own Vercel AI Gateway key
-always does.
+`disable_openrouter` and `data_region` (`providers/organization-gateway-settings.ts`)
+apply only to enterprise organizations in the `gateway_settings` feature, and only to
+Kilo-paid routes. A region pins Kilo's Vercel route, refuses other routes, and implies
+OpenRouter off. BYOK, ChatGPT and Claude billing routes, FIM and edit are exempt.
+OpenRouter off also lifts the Vercel opt-out list.
 
-Deliberate limitations, kept until end users ask otherwise:
+Deliberate limitations until users ask:
 
-- The policies do not change the model lists any model endpoint returns. A listed model
-  may fail under them; do not filter catalogs by them.
-- Embeddings and System One route to Vercel (Kilo's account, provider keys, or a user's
-  Vercel AI Gateway key) only for OpenRouter catalog ids that `mapModelIdToVercel` maps to
-  a Vercel model of the right type. Models only Vercel serves are not supported there.
-- Transcriptions run only on OpenRouter, so a disabled OpenRouter or a region leaves them
-  working only through a user's OpenRouter key.
+- Model endpoint lists are not filtered by these policies.
+- Embeddings and System One use Vercel only when `mapModelIdToVercel` maps the id to a
+  Vercel model of that type; Vercel-only models are unsupported.
+- Transcriptions are OpenRouter-only.
 
 ## Autocomplete routes
 

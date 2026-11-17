@@ -45,9 +45,28 @@ const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 // events turns them into one frame per body render.
 const record = vi.hoisted(() => ({ events: [] as Event[] }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Brain: 'Brain',
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  Cpu: 'Cpu',
+  FolderGit2: 'FolderGit2',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Search: 'Search',
+  ShieldCheck: 'ShieldCheck',
+  Trash2: 'Trash2',
+  Wrench: 'Wrench',
+  Zap: 'Zap',
+}));
 vi.mock('react-native', () => ({
   View: ({ children }: { children?: ReactNode }): ReactNode => children ?? null,
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
   Pressable: (props: {
     children?: ReactNode;
     accessibilityRole?: string;
@@ -120,7 +139,6 @@ vi.mock('@/components/ui/configure-row', () => ({
     return null;
   },
 }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain', Search: 'Search', Wrench: 'Wrench' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
   radioItemA11y: ({

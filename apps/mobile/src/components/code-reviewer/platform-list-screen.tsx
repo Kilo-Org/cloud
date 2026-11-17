@@ -153,7 +153,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             {t('codeReviewer.platformList.platforms')}
           </Text>
           <View>
-            {platforms.map((platform, index) => {
+            {platforms.map(platform => {
               const status = statusFor(platform);
               return (
                 <ConfigureRow
@@ -161,7 +161,6 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   icon={PLATFORM_ICONS[platform]}
                   title={PLATFORM_CAPABILITIES[platform].label}
                   subtitle={connectionSubtitle(status)}
-                  last={index === platforms.length - 1}
                   onPress={() => {
                     pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
@@ -186,7 +185,6 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             <ConfigureRow
               icon={CirclePlus}
               title={t('codeReviewer.manualReview.title')}
-              last={isPersonal}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
@@ -197,7 +195,6 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               <ConfigureRow
                 icon={LineChart}
                 title={t('codeReviewer.analytics.title')}
-                last
                 onPress={() => {
                   pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
                 }}

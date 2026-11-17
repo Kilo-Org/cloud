@@ -129,6 +129,15 @@ afterEach(() => {
 });
 
 describe('KvRow mounted layout', () => {
+  it('takes the contract row anatomy without a divider of its own', () => {
+    const root = renderRow({ value: '1.2.3' });
+    const row = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(row?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
+  });
+
   // Android's `selectable` routes the value through ReactTextView, which drops
   // the `maxLines` clamp on attach, so a clamped selectable value wrapped past
   // the one-line row height and painted a clipped second line (SPOT-DEFECT:

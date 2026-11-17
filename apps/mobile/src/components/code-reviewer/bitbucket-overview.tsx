@@ -232,13 +232,12 @@ export function BitbucketOverview({
               </View>
 
               <View>
-                {rows.map((row, index) => (
+                {rows.map(row => (
                   <ConfigureRow
                     key={row.field}
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
-                    last={index === rows.length - 1}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}

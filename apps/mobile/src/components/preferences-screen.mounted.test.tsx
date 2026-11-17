@@ -70,37 +70,31 @@ describe('PreferencesScreen hub', () => {
     const renderer = await mountPreferences();
 
     expect(hubRows(renderer)).toHaveLength(7);
-    expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
+    expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal' });
     expect(row(renderer, 'Voice input').props).toMatchObject({
       icon: 'Mic',
-      last: true,
       subtitle:
         "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
     });
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',
-      last: true,
       subtitle:
         'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
     });
     expect(row(renderer, 'Account').props).toMatchObject({
       icon: 'Globe',
-      last: true,
       subtitle: 'Language, trusted hosts, and device sessions',
     });
     expect(row(renderer, 'Notifications').props).toMatchObject({
       icon: 'Bell',
       subtitle: 'Push preferences',
-      last: true,
     });
     expect(row(renderer, i18n.t('notifications.history.title')).props).toMatchObject({
       icon: 'History',
       subtitle: 'Notifications this account received',
-      last: true,
     });
     expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
       icon: 'Wallet',
-      last: true,
     });
   });
 

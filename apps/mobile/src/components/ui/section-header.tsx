@@ -8,12 +8,13 @@ import {
   SECTION_HEADER_ROW_PADDING_CLASS,
   textActionTargetClass,
 } from '@/lib/a11y/tap-target';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 /**
- * The box a Home section label sits at the bottom of. It is as tall as the
- * compact action box, so every Home section header has one height and keeps
- * one gap to the block above it.
+ * The box a section label sits at the bottom of. It is as tall as the compact
+ * action box, so every section header has one height and keeps one gap to the
+ * block above it.
  */
 const LABEL_AIR_CLASS = 'min-h-[28px]';
 
@@ -45,10 +46,15 @@ type SectionHeaderProps = {
    * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
    * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
    * slop. A row with an action and a row without one then have the same height,
-   * so every Home section keeps the same gap to the block above it
-   * (home-header-section-gap). Home passes this for its sections.
+   * so every section keeps the same gap to the block above it.
    */
   reserveLabelAir?: boolean;
+  /**
+   * Draws the page gutter. A section label inside a padded body keeps none of
+   * its own; a full-bleed list (its rows reach the screen edge) passes this so
+   * the label lines up with the rows it names.
+   */
+  inset?: boolean;
 };
 
 export function SectionHeader({
@@ -58,6 +64,7 @@ export function SectionHeader({
   actionHidden = false,
   notice,
   reserveLabelAir = false,
+  inset = false,
 }: Readonly<SectionHeaderProps>) {
   const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
   // With a notice the label keeps its own width, so the notice takes all the
@@ -73,16 +80,17 @@ export function SectionHeader({
     // one 11 px line, so a centred row holds the label 17 dp above the rows and
     // cards it names — twice the gap a header without an action has — and the
     // same label-to-content relation then reads as two different spacings
-    // (home section-label gap). The box still sets the row's height, so the air
+    // (section-label gap). The box still sets the row's height, so the air
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
     //
     // With `reserveLabelAir` the label and the action share one compact box
     // height, and the row's padding holds the action's hit slop inside the row,
-    // so every Home section header has one height (home-header-section-gap).
+    // so every full-bleed section header has one height.
     <View
       className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2 px-4',
+        'flex-row flex-wrap items-end justify-end gap-2',
+        inset && SCREEN_GUTTER_CLASS,
         reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
       )}
     >

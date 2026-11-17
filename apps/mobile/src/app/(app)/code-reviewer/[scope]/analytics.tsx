@@ -219,7 +219,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               {t('common.repositories')}
             </Text>
             <View>
-              {repositories.map((repository, index) => (
+              {repositories.map(repository => (
                 <ConfigureRow
                   key={repository.repository}
                   icon={GitPullRequest}
@@ -232,7 +232,6 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
                         repository.suggestionFindings
                     ),
                   })}
-                  last={index === repositories.length - 1}
                 />
               ))}
             </View>

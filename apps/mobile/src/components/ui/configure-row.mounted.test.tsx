@@ -130,6 +130,12 @@ describe('ConfigureRow mounted layout', () => {
     expect(classes).not.toContain('gap-2');
   });
 
+  it('takes the contract row anatomy', () => {
+    const classes = rowClasses(renderRow());
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
+  });
+
   it('still stacks at the large-font-scale threshold', () => {
     windowDims.fontScale = 1.8;
     expect(rowClasses(renderRow())).not.toContain('flex-row');

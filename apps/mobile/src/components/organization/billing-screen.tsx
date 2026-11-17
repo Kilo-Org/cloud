@@ -196,14 +196,12 @@ export function OrganizationBillingScreen() {
           value={subscriptionState.label}
           valueFace="text"
           valueTone={subscriptionState.tone}
-          last={scheduledSeatChange == null}
         />
         {scheduledSeatChange == null ? null : (
           <KvRow
             label={t('kiloPass.manage.scheduledChange')}
             value={scheduledSeatChange}
             valueFace="text"
-            last
           />
         )}
       </BillingCard>
@@ -242,7 +240,6 @@ export function OrganizationBillingScreen() {
           label={t('organization.billing.autoTopUpThreshold')}
           value={autoTopUpReadout.threshold}
           valueFace="numeric"
-          last
         />
       </BillingCard>
     );
@@ -288,7 +285,6 @@ export function OrganizationBillingScreen() {
               label={t('organization.billing.seatsInUse')}
               value={seatCountValue}
               valueFace="numeric"
-              last
             />
           </BillingCard>
         </View>
@@ -309,7 +305,6 @@ export function OrganizationBillingScreen() {
                   value={kiloPassRowState.subtitle}
                   valueFace="text"
                   valueTone={kiloPassRowState.attention ? 'warn' : 'default'}
-                  last
                   trailing={
                     kiloPassRowState.action === 'retry' ? (
                       <Button

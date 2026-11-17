@@ -10,7 +10,7 @@ import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { RowsRefreshControl } from './rows-refresh-control';
-import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { LiveSessionListEmptyState } from './live-session-list-empty-state';
@@ -294,9 +294,11 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
-  FAB_MARGIN: 16,
-  FAB_SIZE: 48,
 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 16, FAB_SIZE: 48 };
+});
 vi.mock('@/components/agents/session-status-filter-bar', () => ({
   SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
@@ -333,7 +335,7 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
     state.sessionId = id;
   },
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/text', async importOriginal => {
@@ -1254,7 +1256,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 20,
+      right: 14,
       width: 48,
       height: 48,
     });
@@ -1265,7 +1267,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 79,
+      right: 73,
       width: 48,
       height: 48,
     });

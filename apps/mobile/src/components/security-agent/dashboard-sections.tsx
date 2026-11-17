@@ -253,7 +253,6 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         valueTone="muted"
         valueFace="numeric"
         dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
-        last
       />
     </SectionCard>
   );
@@ -298,7 +297,7 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
-      {rows.map((row, index) => (
+      {rows.map(row => (
         <Pressable
           key={row.label}
           onPress={() => {
@@ -317,7 +316,6 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
             valueTone="muted"
             valueFace="numeric"
             dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
-            last={index === rows.length - 1}
           />
         </Pressable>
       ))}

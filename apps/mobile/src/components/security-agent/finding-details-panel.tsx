@@ -283,15 +283,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           )}
           valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection={finding.patched_version ? 'ltr' : undefined}
-          last={advisoryRows.length === 0 && !finding.manifest_path}
           selectable
         />
-        {advisoryRows.map((row, index) => (
+        {advisoryRows.map(row => (
           <KvRow
             key={row.label}
             label={row.label}
             value={row.value}
-            last={index === advisoryRows.length - 1 && !finding.manifest_path}
             valueDirection="ltr"
             selectable
           />
@@ -300,7 +298,6 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           <KvRow
             label={t('securityAgent.findingDetails.manifest')}
             value={finding.manifest_path}
-            last
             valueDirection="ltr"
             selectable
           />
@@ -308,14 +305,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       </View>
 
       <View className="rounded-lg bg-secondary px-3">
-        {dateRows.map((row, index) => (
+        {dateRows.map(row => (
           <KvRow
             key={row.key}
             label={row.label}
             value={row.value}
             valueFace="text"
             valueTone={row.tone}
-            last={index === dateRows.length - 1}
           />
         ))}
       </View>
@@ -330,7 +326,6 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           label={t('securityAgent.findingDetails.sourceId')}
           value={finding.source_id}
           valueDirection="ltr"
-          last
           selectable
         />
       </CollapsibleSection>

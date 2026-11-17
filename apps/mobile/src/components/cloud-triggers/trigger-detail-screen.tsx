@@ -60,7 +60,6 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
       <KvRow
         label={t('common.model')}
         value={detail.model ?? t('common.unknown')}
-        last
         valueFace="text"
       />
     </View>

@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { GitMerge, GitPullRequest, ShieldCheck } from '@/components/ui/icons';
 import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-agent-navigation';
@@ -21,7 +21,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
 
   return (
     <View>
-      <SectionHeader label={t('home.explore')} reserveLabelAir />
+      <SectionHeader label={t('home.explore')} reserveLabelAir inset />
       <View className="mx-4 gap-2">
         {contextReady && (
           <>
@@ -53,7 +53,6 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
           subtitle={t('common.prReviewSubtitle')}
           hue="gold"
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push(getPrReviewEntryPath());
           }}

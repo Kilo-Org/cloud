@@ -45,7 +45,6 @@ export function PreferencesScreen() {
           icon={SlidersHorizontal}
           title={t('preferences.general')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/general' as Href);
           }}
@@ -55,7 +54,6 @@ export function PreferencesScreen() {
           title={t('preferences.voiceInput')}
           subtitle={t('preferences.gatewayTranscriptionSubtitle')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
           }}
@@ -65,7 +63,6 @@ export function PreferencesScreen() {
           title={t('preferences.toolSummaryTranslation')}
           subtitle={t('preferences.toolSummaryTranslationSubtitle')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
           }}
@@ -93,7 +90,6 @@ export function PreferencesScreen() {
           title={t('preferences.account')}
           subtitle={t('preferences.accountSubtitle')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/account' as Href);
           }}
@@ -103,7 +99,6 @@ export function PreferencesScreen() {
           title={t('common.notifications')}
           subtitle={t('preferences.notificationsSubtitle')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/notifications' as Href);
           }}
@@ -113,7 +108,6 @@ export function PreferencesScreen() {
           title={t('notifications.history.title')}
           subtitle={t('notifications.history.subtitle')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
           }}
@@ -122,7 +116,6 @@ export function PreferencesScreen() {
           icon={Wallet}
           title={t('notifications.channel.spend')}
           className="rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
           }}

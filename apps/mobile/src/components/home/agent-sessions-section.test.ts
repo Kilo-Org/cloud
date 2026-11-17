@@ -93,7 +93,7 @@ vi.mock('@/components/agent-briefing/briefing-card', () => ({
 }));
 // A host element that still renders the header notice. The factory is hoisted
 // above the static imports, so it loads React itself.
-vi.mock('@/components/home/section-header', async () => {
+vi.mock('@/components/ui/section-header', async () => {
   const { createElement: create } = await import('react');
   return {
     SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),

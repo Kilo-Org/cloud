@@ -144,7 +144,6 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
       icon: 'Cpu',
       subtitle: 'Auto Small',
       disabled: true,
-      last: true,
     });
   });
 

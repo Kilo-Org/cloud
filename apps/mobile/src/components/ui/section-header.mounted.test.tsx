@@ -334,6 +334,20 @@ describe('SectionHeader mounted layout', () => {
     expect(String(row.props.className).split(' ')).toContain('items-end');
   });
 
+  it('draws the page gutter only for a full-bleed list', () => {
+    const rowClasses = (inset: boolean) => {
+      const root = mount(createElement(SectionHeader, { label: 'Explore', inset }));
+      const row = root.find(node => Object.is(node.type, 'View'));
+      const classes = String(row.props.className).split(' ');
+      act(() => renderer?.unmount());
+      renderer = undefined;
+      return classes;
+    };
+
+    expect(rowClasses(false)).not.toContain('px-4');
+    expect(rowClasses(true)).toContain('px-4');
+  });
+
   it('gives a notice all the free space and keeps the action at the outer edge', () => {
     // Field defect (iPhone 17 Pro): a growing label took half the free space
     // and cut "Connection lost" to "Connection l…" beside empty space.

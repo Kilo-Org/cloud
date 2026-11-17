@@ -23,7 +23,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 
 /**
@@ -74,6 +74,7 @@ export function AgentSessionsSection({
         actionLabel={showBriefing ? t('agentBriefing.history') : t('home.seeAll')}
         actionHidden={!showBriefing && content === 'empty'}
         reserveLabelAir
+        inset
         onActionPress={() => {
           if (showBriefing) {
             router.push('/(app)/agent-briefing' as Href);

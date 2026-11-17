@@ -70,7 +70,7 @@ export function ChoiceRow({
     <Pressable
       className={cn(
         ROW_TARGET_CLASS,
-        'flex-row items-center justify-between py-3 active:opacity-70',
+        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
         className
       )}
       disabled={disabled}
@@ -90,7 +90,7 @@ export function ChoiceRow({
       }
     >
       {children ?? (
-        <View className="flex-1 pe-3">
+        <View className="flex-1">
           <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
             {label}
           </Text>

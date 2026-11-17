@@ -370,7 +370,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 : undefined
             }
             valueFace="text"
-            last
           />
         </Animated.View>
 
@@ -394,7 +393,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <ConfigureRow
             icon={Plug}
             title={t('integrations.title')}
-            last={!showMoney && inAppSettingsRows.length === 0}
             onPress={() => {
               router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
             }}
@@ -464,7 +462,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               <ConfigureRow
                 icon={Wallet}
                 title={t('notifications.channel.spend')}
-                last={inAppSettingsRows.length === 0}
                 onPress={() => {
                   router.push(
                     `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
@@ -475,12 +472,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           )}
           {/* The destinations this app reads and writes itself. They close the
               card — see `visibleInAppSettingsRows`. */}
-          {inAppSettingsRows.map((row, index) => (
+          {inAppSettingsRows.map(row => (
             <ConfigureRow
               key={row.area}
               icon={row.icon}
               title={row.title}
-              last={index === inAppSettingsRows.length - 1}
               onPress={() => {
                 router.push(row.href);
               }}
@@ -499,12 +495,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {t('organization.settingsOnWeb.title')}
             </Text>
             <View className="rounded-lg bg-secondary px-3">
-              {settingsRows.map((row, index) => (
+              {settingsRows.map(row => (
                 <ConfigureRow
                   key={row.area}
                   icon={row.icon}
                   title={row.title}
-                  last={index === settingsRows.length - 1}
                   onPress={() => {
                     if (row.target.kind === 'app-shell') {
                       void openAppShellHandoff(row.target.target, { label: row.title });

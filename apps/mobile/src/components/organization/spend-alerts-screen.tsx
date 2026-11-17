@@ -449,7 +449,6 @@ function SpendAlertsForm({
           // sentence and keeps the paragraph's.
           valueDirection={hasSpend ? 'ltr' : undefined}
           selectable={hasSpend}
-          last
         />
       </View>
 

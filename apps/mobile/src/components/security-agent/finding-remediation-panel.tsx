@@ -450,7 +450,6 @@ export function FindingRemediationPanel({
                   <KvRow
                     label={t('common.branch')}
                     value={attempt.branchName}
-                    last
                     valueDirection="ltr"
                     selectable
                   />

@@ -150,12 +150,11 @@ function KiloPassDetailBody({
         </View>
         {detail.rows.length > 0 ? (
           <View className="rounded-lg bg-secondary px-3">
-            {detail.rows.map((row, index) => (
+            {detail.rows.map(row => (
               <KvRow
                 key={row.id}
                 label={row.label}
                 value={row.value}
-                last={index === detail.rows.length - 1}
                 valueFace={row.id === 'renewal' ? 'text' : 'numeric'}
                 valueDirection={row.id === 'renewal' ? undefined : 'ltr'}
               />

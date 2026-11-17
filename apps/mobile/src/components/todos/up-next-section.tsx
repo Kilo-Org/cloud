@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';

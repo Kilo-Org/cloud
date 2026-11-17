@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -96,21 +97,22 @@ export function ToolSummaryTranslationSettingsScreen() {
         contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <PreferenceRow
-          icon={WandSparkles}
-          title={t('preferences.translateSummaries')}
-          subtitle={t('preferences.toolSummaryTranslationSubtitle')}
-          value={enabled}
-          disabled={!hasLoaded}
-          onValueChange={setEnabled}
-          resolveValue={getRequestedEnabled}
-        />
+        <RowGroup>
+          <PreferenceRow
+            icon={WandSparkles}
+            title={t('preferences.translateSummaries')}
+            subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+            value={enabled}
+            disabled={!hasLoaded}
+            onValueChange={setEnabled}
+            resolveValue={getRequestedEnabled}
+          />
+        </RowGroup>
         <ConfigureRow
           icon={Cpu}
           title={t('common.model')}
           subtitle={modelSubtitle}
           className="rounded-lg bg-secondary px-3"
-          last
           disabled={modelRowDisabled}
           onPress={() => {
             openModelPicker(pushOnce, {

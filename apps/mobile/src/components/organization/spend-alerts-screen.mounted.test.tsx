@@ -401,11 +401,7 @@ describe('SpendAlertsScreen scope line', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.props.label).toBe(i18n.t('preferences.account'));
     expect(rows[0]?.props.value).toBe('Ada');
-    // The owner row is not the group's last, so the divider separates it from
-    // the spend row that closes the group.
-    expect(rows[0]?.props.last).toBeFalsy();
     expect(rows[1]?.props.label).toBe(i18n.t('spendAlerts.spend24h'));
-    expect(rows[1]?.props.last).toBe(true);
   });
 
   it('names an organization scope with the organization name', async () => {

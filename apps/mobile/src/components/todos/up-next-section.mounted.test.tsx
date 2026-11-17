@@ -42,7 +42,7 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/todos/use-start-todo', () => ({
   useStartTodo: () => ({ review: vi.fn(), startNow: vi.fn(), isStarting: () => false }),
 }));

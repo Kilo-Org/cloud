@@ -7,7 +7,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';

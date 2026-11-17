@@ -213,7 +213,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
           ) : null}
           {rows.length > 0 ? (
             <View className="rounded-lg bg-secondary px-3">
-              {rows.map((row, index) => (
+              {rows.map(row => (
                 <IntegrationProviderRow
                   key={row.provider}
                   row={row}
@@ -234,7 +234,6 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   }}
                   onRetryConnection={() => void bitbucket.refetch()}
                   retryingConnection={bitbucket.isFetching}
-                  last={index === rows.length - 1}
                 />
               ))}
             </View>

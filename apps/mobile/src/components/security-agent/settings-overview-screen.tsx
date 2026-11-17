@@ -346,7 +346,6 @@ export function SettingsOverviewScreen({
                 subtitle={
                   data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')
                 }
-                last
                 onPress={() => {
                   pushOnce(getSecurityAgentPath(scope, 'settings/sla'));
                 }}

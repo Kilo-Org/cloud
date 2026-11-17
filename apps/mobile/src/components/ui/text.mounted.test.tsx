@@ -225,10 +225,9 @@ describe('Text eyebrow letterspacing', () => {
 // other, and a non-heading variant announces neither.
 describe('Text heading accessibility', () => {
   it.each([
-    ['h1', '1'],
     ['h2', '2'],
     ['h3', '3'],
-    ['h4', '4'],
+    ['heading', '2'],
   ] as const)('announces %s as a heading with level %s', (variant, level) => {
     const node = hostText(mountTextTree(createElement(Text, { variant }, 'Section')));
 

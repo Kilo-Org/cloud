@@ -51,7 +51,6 @@ type IntegrationProviderRowProps = Readonly<{
   /** Runs the read that names a connected row's connection again. */
   onRetryConnection: () => void;
   retryingConnection: boolean;
-  last?: boolean;
 }>;
 
 /**
@@ -71,7 +70,6 @@ export function IntegrationProviderRow({
   onManageOnWeb,
   onRetryConnection,
   retryingConnection,
-  last,
 }: IntegrationProviderRowProps) {
   const { t } = useTranslation();
   const label = t(providerLabelKey(row.provider));
@@ -179,7 +177,6 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action}
-      last={last}
     />
   );
   if (!rowStartsConnect) {

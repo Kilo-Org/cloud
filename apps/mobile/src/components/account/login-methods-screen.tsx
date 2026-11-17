@@ -248,7 +248,6 @@ export function LoginMethodsScreen() {
           title={t('profile.signInMethods.linkAnother')}
           subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
           className="mt-3 rounded-lg bg-secondary px-3"
-          last
           onPress={() => {
             void openAppShellHandoff(
               { page: 'connected-accounts' },

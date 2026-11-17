@@ -62,6 +62,14 @@ afterEach(() => {
 });
 
 describe('ChoiceRow accessible name', () => {
+  it('takes the contract row anatomy', () => {
+    const classes = String(
+      rowControl(renderRow({ label: 'Balanced', selected: false })).props.className
+    ).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+  });
+
   it('names a row after its label alone when it has no caption', () => {
     const control = rowControl(renderRow({ label: 'Balanced', selected: false }));
 

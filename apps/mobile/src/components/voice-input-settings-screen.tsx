@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -97,15 +98,17 @@ export function VoiceInputSettingsScreen() {
         // dismiss.
         keyboardShouldPersistTaps="handled"
       >
-        <PreferenceRow
-          icon={Mic}
-          title={t('preferences.gatewayTranscription')}
-          subtitle={t('preferences.gatewayTranscriptionSubtitle')}
-          value={gatewayTranscriptionEnabled}
-          disabled={!gatewayTranscriptionLoaded}
-          onValueChange={setGatewayTranscriptionEnabled}
-          resolveValue={getRequestedGatewayTranscriptionEnabled}
-        />
+        <RowGroup>
+          <PreferenceRow
+            icon={Mic}
+            title={t('preferences.gatewayTranscription')}
+            subtitle={t('preferences.gatewayTranscriptionSubtitle')}
+            value={gatewayTranscriptionEnabled}
+            disabled={!gatewayTranscriptionLoaded}
+            onValueChange={setGatewayTranscriptionEnabled}
+            resolveValue={getRequestedGatewayTranscriptionEnabled}
+          />
+        </RowGroup>
         <ConfigureRow
           icon={Cpu}
           title={t('preferences.transcriptionModel')}
@@ -121,7 +124,6 @@ export function VoiceInputSettingsScreen() {
           title={t('common.language')}
           subtitle={languageSubtitle}
           className="rounded-lg bg-secondary px-3"
-          last
           disabled={!languageLoaded}
           onPress={() => {
             pushOnce('/(app)/voice-language-picker' as Href);

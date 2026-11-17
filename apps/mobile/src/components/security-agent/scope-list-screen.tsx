@@ -64,7 +64,7 @@ export function ScopeListScreen() {
     if (orgsBody.status === 'loading') {
       return <Skeleton className="mt-3 h-[54px] w-full rounded-lg" />;
     }
-    return orgs?.map((org, index) => (
+    return orgs?.map(org => (
       <ConfigureRow
         key={org.organizationId}
         icon={Building2}
@@ -72,7 +72,6 @@ export function ScopeListScreen() {
         onPress={() => {
           openScope(org.organizationId);
         }}
-        last={index === orgs.length - 1}
       />
     ));
   };
@@ -88,7 +87,6 @@ export function ScopeListScreen() {
           onPress={() => {
             openScope(PERSONAL_SECURITY_SCOPE);
           }}
-          last={orgsBody.status === 'empty'}
         />
         {renderOrgSection()}
       </TabScreenScrollView>

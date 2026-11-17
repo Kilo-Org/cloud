@@ -46,8 +46,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
-export const FAB_SIZE = 56;
-export const FAB_MARGIN = 16;
 const REFRESH_STATUS_BAND_HEIGHT = 20;
 
 type AgentSessionListContentProps = {

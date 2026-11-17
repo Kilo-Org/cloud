@@ -201,7 +201,7 @@ export function ProfilesListScreen({
             {sections.map(section => (
               <View key={section.key} className="gap-3">
                 {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
-                {section.profiles.map((profile, index) => {
+                {section.profiles.map(profile => {
                   const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(
                     ' · '
                   );
@@ -227,7 +227,6 @@ export function ProfilesListScreen({
                       subtitle={subtitle || undefined}
                       accessibilityLabel={accessibilityLabel}
                       className="rounded-lg bg-secondary px-3"
-                      last={index === section.profiles.length - 1}
                       trailing={
                         isDefault ? (
                           <Star size={16} color={colors.primary} fill={colors.primary} />
@@ -259,7 +258,6 @@ export function ProfilesListScreen({
               // the row's own name carries the full destination instead.
               accessibilityLabel={t('profiles.repoBindings.title')}
               className="rounded-lg bg-secondary px-3"
-              last
               onPress={openRepoBindings}
             />
           </View>

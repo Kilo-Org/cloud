@@ -166,7 +166,6 @@ export function AccountSettingsScreen() {
           subtitle={t('profile.signOutWeb.rowSubtitle')}
           tone="danger"
           className={rowClassName}
-          last
           accessibilityLabel={t('profile.signOutWeb.title')}
           onPress={() => {
             confirm({

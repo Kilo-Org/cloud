@@ -263,7 +263,6 @@ export function FindingAnalysisPanel({
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(triage.suggestedAction)}
               valueFace="text"
-              last
             />
           </View>
           {triage.needsSandboxReasoning ? (
@@ -303,7 +302,6 @@ export function FindingAnalysisPanel({
               label={t('securityAgent.analysis.analyzed')}
               value={analyzedLabel}
               valueFace="text"
-              last
               selectable
             />
           </View>

@@ -29,7 +29,7 @@ import { useLiveSessionQuery } from '@/components/agents/use-live-session-query'
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import {
   useAgentsBottomBands,
   useSessionListInsets,

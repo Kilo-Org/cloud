@@ -96,6 +96,15 @@ function contrast(a: string, b: string): number {
 }
 
 describe('PreferenceRow', () => {
+  it('takes the contract row anatomy without owning a card', () => {
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const outer = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(outer?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('rounded-') || name.startsWith('bg-'))).toBe(false);
+  });
+
   it('moves the switch when the title is pressed, so a tap on the label is a tap on the control', () => {
     const seen: boolean[] = [];
     const root = renderRow({

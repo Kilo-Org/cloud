@@ -316,7 +316,6 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               icon={Wrench}
               title={t('securityAgent.analysisSettings.remediationModel')}
               subtitle={modelName(remediationModelSlug)}
-              last
               disabled={!canManage}
               onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
             />

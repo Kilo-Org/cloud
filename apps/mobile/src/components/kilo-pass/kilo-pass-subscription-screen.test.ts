@@ -284,7 +284,6 @@ describe('KiloPassSubscriptionScreen', () => {
       ["This month's usage", '$12.50 / $58.80'],
       ['Available free bonus', '$9.80'],
     ]);
-    expect(rows.at(-1)?.props.last).toBe(true);
 
     // No button exists on the details surface: managing, cancelling, and
     // buying a pass are web-only.

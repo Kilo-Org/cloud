@@ -35,8 +35,6 @@ type KvRowProps = {
    * for a column of counts: a count column compares left to right.
    */
   valueFace?: 'mono' | 'text' | 'numeric';
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
   className?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
@@ -94,7 +92,6 @@ export function KvRow({
   valueStatus,
   dotTone,
   valueFace = 'mono',
-  last,
   className,
   selectable,
   valueClassName,
@@ -138,8 +135,7 @@ export function KvRow({
   return (
     <View
       className={cn(
-        'flex-row items-center justify-between gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft',
+        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3',
         className
       )}
     >

@@ -38,6 +38,7 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
@@ -284,21 +285,23 @@ export function ProfileOverviewScreen({
               disabled={!canManage}
             />
 
-            <PreferenceRow
-              icon={Star}
-              title={t('profiles.defaultSectionTitle')}
-              subtitle={t(defaultDescriptionKey(isOrgOwned))}
-              value={profile.isDefault}
-              disabled={!canManage || defaultPending}
-              busy={defaultPending}
-              onValueChange={next => {
-                if (next) {
-                  setAsDefault.mutate({ profileId });
-                } else {
-                  clearDefault.mutate({ profileId });
-                }
-              }}
-            />
+            <RowGroup>
+              <PreferenceRow
+                icon={Star}
+                title={t('profiles.defaultSectionTitle')}
+                subtitle={t(defaultDescriptionKey(isOrgOwned))}
+                value={profile.isDefault}
+                disabled={!canManage || defaultPending}
+                busy={defaultPending}
+                onValueChange={next => {
+                  if (next) {
+                    setAsDefault.mutate({ profileId });
+                  } else {
+                    clearDefault.mutate({ profileId });
+                  }
+                }}
+              />
+            </RowGroup>
 
             <ProfileRepoPinsSection
               profileId={profileId}
@@ -311,13 +314,12 @@ export function ProfileOverviewScreen({
                 {t('profiles.settingsSectionTitle')}
               </Text>
               <View>
-                {overviewSectionRows(profile).map((row, index, rows) => (
+                {overviewSectionRows(profile).map(row => (
                   <ConfigureRow
                     key={row.key}
                     icon={SECTION_ICONS[row.key]}
                     title={t(row.titleKey)}
                     subtitle={String(row.count)}
-                    last={index === rows.length - 1 && !canManage}
                     onPress={() => {
                       router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
@@ -328,7 +330,6 @@ export function ProfileOverviewScreen({
                     icon={Download}
                     title={t('profiles.importConfigTitle')}
                     subtitle={t('profiles.importConfigRowSubtitle')}
-                    last
                     onPress={() => {
                       setImportOpen(true);
                     }}

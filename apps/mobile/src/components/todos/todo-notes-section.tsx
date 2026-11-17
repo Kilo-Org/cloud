@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useTodoItemMutations } from '@/lib/hooks/use-todos';

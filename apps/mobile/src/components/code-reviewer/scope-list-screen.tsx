@@ -51,12 +51,11 @@ export function ScopeListScreen() {
           onPress={() => {
             openScope(PERSONAL_SCOPE);
           }}
-          last={!isLoading && (orgs?.length ?? 0) === 0}
         />
         {isLoading ? (
           <Skeleton className="mt-3 h-[54px] w-full rounded-lg" />
         ) : (
-          orgs?.map((org, index) => (
+          orgs?.map(org => (
             <ConfigureRow
               key={org.organizationId}
               icon={Building2}
@@ -65,7 +64,6 @@ export function ScopeListScreen() {
               onPress={() => {
                 openScope(org.organizationId);
               }}
-              last={index === orgs.length - 1}
             />
           ))
         )}

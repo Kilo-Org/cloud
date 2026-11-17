@@ -107,6 +107,12 @@ type ScreenHeaderProps = {
   title?: string;
   titleContent?: React.ReactNode;
   /**
+   * A badge or control on the title's own line, after the title and centred
+   * with it (the Chat tab's BETA pill). The title keeps its own typography, so
+   * an accessory never has to restate it through `titleContent`.
+   */
+  titleAccessory?: React.ReactNode;
+  /**
    * Line cap for the title, at most {@link MAX_TITLE_LINES}. The default is
    * one line: a header title that does not fit ellipsizes at its tail instead
    * of wrapping. Android breaks CJK strings between any two characters, so a
@@ -158,7 +164,7 @@ type ScreenHeaderProps = {
   eyebrow?: string;
   reserveEyebrow?: boolean;
   centerTitle?: boolean;
-  /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
+  /** Use the large 30pt root-title style (tab roots). Default `text-lg` (15.75pt). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
   /**
@@ -242,13 +248,13 @@ type ScreenHeaderProps = {
 
 /**
  * Height of the reserved title box for `reserveTitleSpace`, one title line
- * height per line the title can paint: the default 18px title's Tailwind line
- * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
- * static because NativeWind extracts them at build time. The reserve tracks the
- * line cap so a title that grows a line (loading -> loaded, rename) cannot move
- * the body below the header — and a one-line cap reserves one line, not the
- * two-line default it replaced, or the header keeps a blank line it can never
- * fill.
+ * height per line the title can paint: the default `text-lg` title's Tailwind
+ * line height is `1.75rem` (24.5pt), the large 30pt variant's is 36px. Class
+ * names must be static because NativeWind extracts them at build time. The
+ * reserve tracks the line cap so a title that grows a line (loading -> loaded,
+ * rename) cannot move the body below the header — and a one-line cap reserves
+ * one line, not the two-line default it replaced, or the header keeps a blank
+ * line it can never fill.
  *
  * The box is the measure the header's reserved band keeps its height by (see
  * `reservedTitleBand`): an empty box at the title's own position, so a title
@@ -304,6 +310,7 @@ function useCanGoBack(): boolean {
 export function ScreenHeader({
   title,
   titleContent,
+  titleAccessory,
   titleNumberOfLines = 1,
   subtitle,
   reserveSubtitle = false,
@@ -421,16 +428,7 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleText = titleContent ? (
-      <View
-        accessible
-        accessibilityRole="header"
-        accessibilityLabel={title}
-        className={cn('shrink-0', centerTitle && 'items-center')}
-      >
-        {titleContent}
-      </View>
-    ) : (
+    const titleLabel = (
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
@@ -440,6 +438,28 @@ export function ScreenHeader({
         {title}
       </Text>
     );
+    let titleText: React.ReactNode;
+    if (titleContent) {
+      titleText = (
+        <View
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={title}
+          className={cn('shrink-0', centerTitle && 'items-center')}
+        >
+          {titleContent}
+        </View>
+      );
+    } else if (titleAccessory == null) {
+      titleText = titleLabel;
+    } else {
+      titleText = (
+        <View className={cn('flex-row items-center gap-2', centerTitle && 'justify-center')}>
+          {titleLabel}
+          <View className="shrink-0 justify-center">{titleAccessory}</View>
+        </View>
+      );
+    }
     // The visible title paints at its own height: the reserved line lives in
     // the band beside the heading (see `reservedTitleBand`), never around the
     // text, so the eyebrow keeps its tight pair with the title's first line.

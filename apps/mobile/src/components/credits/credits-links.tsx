@@ -35,7 +35,6 @@ export function PersonalCreditsLinks() {
         subtitle={t('profile.invoicesSubtitle')}
         hue="moss"
         className="rounded-lg bg-secondary px-3"
-        last
         onPress={() => {
           router.push('/(app)/(tabs)/(3_profile)/invoices' as Href);
         }}

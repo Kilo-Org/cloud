@@ -1,10 +1,10 @@
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { type LucideIcon } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconTile } from '@/components/ui/icon-tile';
 import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
 import {
   NEUTRAL_TINT,
@@ -14,7 +14,6 @@ import {
   toneColor,
   type ToneKey,
 } from '@/lib/agent-color';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +40,7 @@ type ConfigureRowProps = {
    * Node rendered in the subtitle's place while the value that fills it loads.
    * The row's subtitle is one line of `text-xs`, so a placeholder of that
    * height keeps the row's settled size: the rows below never move, and the
-   * card does not print loading copy. The caller builds it, because the width
+   * group does not print loading copy. The caller builds it, because the width
    * that stands in for the settled text is the caller's.
    */
   subtitlePlaceholder?: ReactNode;
@@ -57,6 +56,13 @@ type ConfigureRowProps = {
    * never derived from the title. A semantic tone outranks it.
    */
   hue?: RowHue;
+  /**
+   * `navigation` is a destination row and ends in a chevron; `action` runs a
+   * command in place, so it keeps the foreground title and no chevron.
+   */
+  variant?: 'navigation' | 'action';
+  /** The action destroys something: a danger tile and a destructive title. */
+  destructive?: boolean;
   onPress?: () => void;
   disabled?: boolean;
   /**
@@ -69,12 +75,10 @@ type ConfigureRowProps = {
    */
   accessibilityLabel?: string;
   trailing?: ReactNode;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
   className?: string;
 };
 
-/** Neutral (or `tone`-tinted) icon tile + title + subtitle + trailing chevron row. */
+/** Tile + title + subtitle + trailing mark row. */
 export function ConfigureRow({
   icon: Icon,
   title,
@@ -83,14 +87,14 @@ export function ConfigureRow({
   subtitlePlaceholder,
   tone,
   hue,
+  variant = 'navigation',
+  destructive = false,
   onPress,
   disabled,
   accessibilityLabel,
   trailing,
-  last,
   className,
 }: Readonly<ConfigureRowProps>) {
-  const colors = useThemeColors();
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   // A narrow window squeezes the flexible text block between the fixed icon
@@ -105,21 +109,21 @@ export function ConfigureRow({
   // / Trusted hosts / Device sessions) three different accents, and a title
   // never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
-  if (tone) {
+  if (destructive) {
+    tint = toneColor('danger');
+  } else if (tone) {
     tint = toneColor(tone);
   } else if (hue) {
     tint = rowTint(hue);
   }
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
-  const showChevron = Boolean(onPress) && !disabled;
-  const trailingNode =
-    trailing ??
-    (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
+  const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
+  const trailingNode = trailing ?? (showChevron ? <RowChevron /> : null);
 
   // A disabled row dims by token, once, and never by row opacity: halving the
   // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
-  // card and 1.95:1 on the light one, so the last line of an unavailable row
+  // group and 1.95:1 on the light one, so the last line of an unavailable row
   // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
   // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
@@ -140,14 +144,15 @@ export function ConfigureRow({
     );
   }
 
+  let titleTone = 'text-foreground';
+  if (disabled) {
+    titleTone = 'text-muted-foreground';
+  } else if (destructive) {
+    titleTone = 'text-destructive';
+  }
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
-      <Text
-        className={cn(
-          'text-sm font-medium',
-          disabled ? 'text-muted-foreground' : 'text-foreground'
-        )}
-      >
+      <Text className={cn('text-sm font-medium', titleTone)} numberOfLines={1} ellipsizeMode="tail">
         {title}
       </Text>
       {subtitleNode}
@@ -157,8 +162,8 @@ export function ConfigureRow({
   const inner = (
     <View
       className={cn(
-        stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft',
+        'min-h-[48px] px-4 py-3',
+        stack ? 'gap-2' : 'flex-row items-center gap-3',
         className
       )}
     >

@@ -1026,7 +1026,7 @@ const runInjectedWebMcpExecute = async (
     modelContext?: {
       getTools?: () => Promise<unknown[]>;
       // oxlint-disable-next-line anti-slop/no-unknown-returns -- injected function; the third-party tool result shape is arbitrary and cannot be parsed without importing a schema.
-      executeTool?: (tool: unknown, argumentsText: string) => Promise<unknown>;
+      executeTool?: (tool: unknown, args: unknown) => Promise<unknown>;
     };
   };
   const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
@@ -1115,10 +1115,13 @@ const runInjectedWebMcpExecute = async (
     // accepted a JSON string and re-parsed it; Chromium 158 rejects a string
     // with `parameter 2 is not of type 'object'`. Parse inline: only the
     // function source reaches the MAIN world, so a module-scope helper would
-    // be undefined there. Pass the raw string through when it is not JSON.
-    let args;
+    // be undefined there. JSON.parse can yield a non-object (null, array,
+    // number), so fall back to an object wrapper instead of the raw value;
+    // a non-JSON string body is passed through verbatim.
+    let args: unknown;
     try {
-      args = JSON.parse(argumentsText);
+      const parsed: unknown = JSON.parse(argumentsText);
+      args = isPlainObject(parsed) ? parsed : { value: parsed };
     } catch {
       args = argumentsText;
     }

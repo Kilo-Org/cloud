@@ -297,7 +297,9 @@ export function createSecureStorePreference<T>(options: {
         // reset already explains why the value is gone.
         if (epoch === clearEpoch) {
           toast.error(
-            i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined)
+            toastLng
+              ? i18n.t('common.couldNotSaveSetting', { lng: toastLng })
+              : i18n.t('common.couldNotSaveSetting')
           );
         }
         return false;

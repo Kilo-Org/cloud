@@ -29,6 +29,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
   logExceptInTest: jest.fn(),
 }));
 // `upstreamRequest` schedules its timeout-listener cleanup through `next/server`'s
@@ -121,8 +122,8 @@ function routingInput(
   };
 }
 
-async function buildProviderForTest() {
-  const result = await checkOpenAiChatGptByok(routingInput());
+async function buildProviderForTest(requestedModel = REQUESTED_MODEL) {
+  const result = await checkOpenAiChatGptByok(routingInput({ requestedModel }));
   if (result?.kind !== 'provider') {
     throw new Error('expected an openai-chatgpt provider');
   }
@@ -660,7 +661,7 @@ describe('checkOpenAiChatGptByok', () => {
     expect('reasoning' in body).toBe(false);
   });
 
-  it('preserves replayed effort updates and request-level reasoning', async () => {
+  it('promotes a replayed effort update without changing conversation items', async () => {
     const provider = await buildProviderForTest();
     const history = [
       { type: 'message', role: 'user', content: 'Inspect the code.' },
@@ -685,17 +686,16 @@ describe('checkOpenAiChatGptByok', () => {
       ],
       reasoning: { effort: 'medium', summary: 'auto' },
     } as GatewayResponsesRequest;
-    const originalInput = structuredClone(body.input);
 
     await transformResponsesRequest(provider, body);
 
-    expect(body.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
-    expect(body.input).toEqual(originalInput);
+    expect(body.reasoning).toEqual({ effort: 'high', summary: 'auto' });
+    expect(body.input).toEqual([...history, followUp]);
     expect(body.input?.[0]).toBe(history[0]);
   });
 
   it.each(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const)(
-    'preserves effort updates with %s when reasoning was absent',
+    'uses the latest effort update %s when reasoning was absent',
     async effort => {
       const provider = await buildProviderForTest();
       const body = {
@@ -707,12 +707,14 @@ describe('checkOpenAiChatGptByok', () => {
           { role: 'user', content: 'Next turn.' },
         ],
       } as GatewayResponsesRequest;
-      const originalInput = structuredClone(body.input);
 
       await transformResponsesRequest(provider, body);
 
-      expect(body.reasoning).toBeUndefined();
-      expect(body.input).toEqual(originalInput);
+      expect(body.reasoning).toEqual({ effort });
+      expect(body.input).toEqual([
+        { role: 'user', content: 'First turn.' },
+        { role: 'user', content: 'Next turn.' },
+      ]);
     }
   );
 
@@ -743,7 +745,7 @@ describe('checkOpenAiChatGptByok', () => {
     expect(body.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
   });
 
-  it('preserves all interleaved configuration updates', async () => {
+  it('preserves untranslatable updates interleaved with recognized effort updates', async () => {
     const provider = await buildProviderForTest();
     const reset = { type: 'configuration_update', reasoning: { effort: null } };
     const unknown = { type: 'configuration_update', text: { format: { type: 'text' } } };
@@ -759,12 +761,11 @@ describe('checkOpenAiChatGptByok', () => {
       ],
       reasoning: { effort: 'medium', summary: 'auto' },
     } as GatewayResponsesRequest;
-    const originalInput = structuredClone(body.input);
 
     await transformResponsesRequest(provider, body);
 
-    expect(body.input).toEqual(originalInput);
-    expect(body.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    expect(body.input).toEqual([reset, message, unknown]);
+    expect(body.reasoning).toEqual({ effort: 'low', summary: 'auto' });
   });
 
   it('does not rewrite an input history without effort updates', async () => {
@@ -909,7 +910,9 @@ describe('checkOpenAiChatGptByok', () => {
 
 describe('delegated request normalization', () => {
   async function normalize(fields: Record<string, unknown>) {
-    const provider = await buildProviderForTest();
+    const provider = await buildProviderForTest(
+      typeof fields.model === 'string' ? fields.model : REQUESTED_MODEL
+    );
     const body = { model: REQUESTED_MODEL, input: 'hello', ...fields } as GatewayResponsesRequest;
     await transformResponsesRequest(provider, body);
     return body;
@@ -964,10 +967,34 @@ describe('delegated request normalization', () => {
     }
   );
 
-  it('maps ultra effort to max and preserves other reasoning fields', async () => {
-    const body = await normalize({ reasoning: { effort: 'ultra', summary: 'auto' } });
+  it('maps ultra effort to the documented gpt-6.1-sol maximum and preserves other reasoning fields', async () => {
+    const body = await normalize({
+      model: 'openai/gpt-6.1-sol',
+      reasoning: { effort: 'ultra', summary: 'auto' },
+    });
 
     expect(body.reasoning).toEqual({ effort: 'max', summary: 'auto' });
+  });
+
+  it.each(['openai/gpt-5-nano', 'openai/future-model'])(
+    'does not invent an ultra replacement for %s',
+    async model => {
+      const body = await normalize({ model, reasoning: { effort: 'ultra', summary: 'auto' } });
+
+      expect(body.reasoning).toEqual({ summary: 'auto' });
+    }
+  );
+
+  it('normalizes a promoted ultra update before sending it upstream', async () => {
+    const message = { role: 'user', content: 'Continue.' };
+    const body = await normalize({
+      model: 'openai/gpt-6.1-sol',
+      input: [{ type: 'configuration_update', reasoning: { effort: 'ultra' } }, message],
+      reasoning: { effort: 'medium', summary: 'auto' },
+    });
+
+    expect(body.reasoning).toEqual({ effort: 'max', summary: 'auto' });
+    expect(body.input).toEqual([message]);
   });
 
   it.each(['unknown', '', null, 42, {}, false])('drops unknown effort %p only', async effort => {
@@ -1064,23 +1091,57 @@ describe('delegated request normalization', () => {
     expect((await normalize({ input })).input).toEqual(original);
   });
 
-  const namespace = (name: string, toolName = 'read') => ({
+  const namespace = (name: string, toolName = 'read', toolType = 'function') => ({
     type: 'namespace',
     name,
-    tools: [{ type: 'function', name: toolName, parameters: {}, strict: false }],
+    tools: [{ type: toolType, name: toolName, parameters: {}, strict: false }],
   });
 
-  it.each(['function_call', 'custom_tool_call'])(
-    'adds the only matching namespace for %s',
-    async type => {
-      const body = await normalize({
-        input: [{ type, name: 'read', call_id: 'short' }],
-        tools: [namespace('files'), namespace('other', 'write')],
-      });
+  it.each([
+    ['function_call', 'function'],
+    ['custom_tool_call', 'custom'],
+  ])('adds the only matching namespace for %s', async (type, toolType) => {
+    const body = await normalize({
+      input: [{ type, name: 'read', call_id: 'short' }],
+      tools: [namespace('files', 'read', toolType), namespace('other', 'write', toolType)],
+    });
 
-      expect(body.input).toEqual([{ type, name: 'read', call_id: 'short', namespace: 'files' }]);
-    }
-  );
+    expect(body.input).toEqual([{ type, name: 'read', call_id: 'short', namespace: 'files' }]);
+  });
+
+  it.each([
+    ['function_call', 'custom'],
+    ['custom_tool_call', 'function'],
+  ])('does not match %s to a nested %s tool', async (type, toolType) => {
+    const input = [{ type, name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+
+    expect(
+      (await normalize({ input, tools: [namespace('files', 'read', toolType)] })).input
+    ).toEqual(original);
+  });
+
+  it.each([
+    ['function_call', 'function'],
+    ['custom_tool_call', 'custom'],
+  ])('does not namespace %s when a same-named top-level tool exists', async (type, toolType) => {
+    const input = [{ type, name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files', 'read', toolType), { type: toolType, name: 'read' }];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('ignores namespaces containing only a different tool type', async () => {
+    const body = await normalize({
+      input: [{ type: 'function_call', name: 'read', call_id: 'short' }],
+      tools: [namespace('files'), namespace('custom', 'read', 'custom')],
+    });
+
+    expect(body.input).toEqual([
+      { type: 'function_call', name: 'read', call_id: 'short', namespace: 'files' },
+    ]);
+  });
 
   it.each([
     undefined,
@@ -1110,6 +1171,7 @@ describe('delegated request normalization', () => {
 
   it('is deterministic and leaves a normalized body unchanged on its second pass', async () => {
     const fields = {
+      model: 'openai/gpt-6.1-sol',
       stream_options: { include_usage: true, include_obfuscation: false },
       reasoning: { effort: 'ultra', summary: 'auto' },
       input: [
@@ -1125,7 +1187,7 @@ describe('delegated request normalization', () => {
     expect(JSON.stringify(await normalize(structuredClone(fields)))).toBe(firstPass);
     jest.mocked(logExceptInTest).mockClear();
 
-    await transformResponsesRequest(await buildProviderForTest(), body);
+    await transformResponsesRequest(await buildProviderForTest('openai/gpt-6.1-sol'), body);
 
     expect(JSON.stringify(body)).toBe(firstPass);
     expect(logExceptInTest).not.toHaveBeenCalled();
@@ -1133,6 +1195,7 @@ describe('delegated request normalization', () => {
 
   it('logs one structured line with model and normalization names only', async () => {
     await normalize({
+      model: 'openai/gpt-6.1-sol',
       input: [
         { type: 'reasoning', encrypted_content: 'private encrypted content' },
         {
@@ -1156,7 +1219,7 @@ describe('delegated request normalization', () => {
     expect(logExceptInTest).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'openai_chatgpt_request_normalized',
-        model: 'gpt-5-nano',
+        model: 'gpt-6.1-sol',
         normalizations: [
           'model_prefix_removed',
           'store_disabled',

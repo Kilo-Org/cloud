@@ -892,7 +892,7 @@ export async function captureProxyError(params: {
       try {
         const responseText = await clonedReponse.text();
         extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
-        const parsed = parseJson(responseText);
+        const parsed = parseJson(responseText.slice(0, 16 * 1024));
         if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
           const { param, code } = parsed.value.error;
           if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);

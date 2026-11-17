@@ -2237,6 +2237,19 @@ describe('captureProxyError', () => {
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
   });
 
+  it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
+    const response = Response.json(
+      { padding: 'x'.repeat(16 * 1024), error: { param: 'input', code: 'unknown_parameter' } },
+      { status: 400 }
+    );
+    const data = await captureResponsesError({}, response);
+
+    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data).not.toHaveProperty('upstreamErrorParam');
+    expect(data).not.toHaveProperty('upstreamErrorCode');
+    expect(await response.json()).toMatchObject({ error: { param: 'input' } });
+  });
+
   it.each(['not JSON', 'null', '[]', '{"error":null}', '{"error":{"param":null,"code":{}}}'])(
     'does not extract malformed error fields from %s',
     async body => {

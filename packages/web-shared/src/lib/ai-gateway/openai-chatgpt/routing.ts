@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -62,15 +64,11 @@ const MIN_MAX_OUTPUT_TOKENS = 16;
  */
 const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
 
-const SUPPORTED_REASONING_EFFORTS = new Set([
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-]);
+const reasoningEffortUpdateSchema = z.strictObject({
+  type: z.literal('configuration_update'),
+  id: z.string().optional(),
+  reasoning: z.strictObject({ effort: ReasoningEffortSchema.or(z.literal('ultra')) }),
+});
 
 const TOOL_CALL_TYPES = new Set([
   'function_call',
@@ -295,12 +293,45 @@ export async function tagOpenAiChatGptByokModels<
   );
 }
 
-function normalizeInputItems(body: GatewayResponsesRequest, normalizations: Set<string>): void {
+function normalizeReasoningEffort(
+  effort: unknown,
+  model: string,
+  normalizations: Set<string>
+): ReasoningEffort | undefined {
+  // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+  if (effort === 'ultra' && model === 'gpt-6.1-sol') {
+    normalizations.add('reasoning_effort_ultra_to_max');
+    return 'max';
+  }
+  const parsed = ReasoningEffortSchema.safeParse(effort);
+  if (parsed.success) return parsed.data;
+  normalizations.add('reasoning_effort_removed');
+  return undefined;
+}
+
+function normalizeInputItems(
+  body: GatewayResponsesRequest,
+  upstreamModel: string,
+  normalizations: Set<string>
+): void {
   const input: unknown = body.input;
   if (!Array.isArray(input)) return;
 
+  // Subscription sharing rejects inline updates; promoting effort can break prompt-cache reuse.
+  const normalizedInput = input.filter(item => {
+    const update = reasoningEffortUpdateSchema.safeParse(item);
+    if (!update.success) return true;
+    body.reasoning = {
+      ...body.reasoning,
+      effort: normalizeReasoningEffort(update.data.reasoning.effort, upstreamModel, normalizations),
+    };
+    normalizations.add('reasoning_effort_update_promoted');
+    return false;
+  });
+  body.input = normalizedInput;
+
   const callIds = new Map<string, string>();
-  for (const item of input) {
+  for (const item of normalizedInput) {
     if (!isRecord(item)) continue;
 
     if (item.type === 'reasoning' && 'encrypted_content' in item && !('summary' in item)) {
@@ -330,12 +361,23 @@ function normalizeInputItems(body: GatewayResponsesRequest, normalizations: Set<
       typeof item.name === 'string' &&
       Array.isArray(body.tools)
     ) {
+      const toolType = item.type === 'function_call' ? 'function' : 'custom';
+      if (
+        body.tools.some(
+          tool => isRecord(tool) && tool.type !== 'namespace' && tool.name === item.name
+        )
+      ) {
+        continue;
+      }
       const namespaces = body.tools.flatMap(tool =>
         isRecord(tool) &&
         tool.type === 'namespace' &&
         typeof tool.name === 'string' &&
         Array.isArray(tool.tools) &&
-        tool.tools.some(nestedTool => isRecord(nestedTool) && nestedTool.name === item.name)
+        tool.tools.some(
+          nestedTool =>
+            isRecord(nestedTool) && nestedTool.type === toolType && nestedTool.name === item.name
+        )
           ? [tool.name]
           : []
       );
@@ -438,7 +480,7 @@ export function buildOpenAiChatGptProvider(
         if (Object.keys(streamOptions).length === 0) delete body.stream_options;
       }
 
-      normalizeInputItems(body, normalizations);
+      normalizeInputItems(body, upstreamModel, normalizations);
       const reasoning: unknown = body.reasoning;
       if (isRecord(reasoning)) {
         for (const field of UNSUPPORTED_REASONING_FIELDS) {
@@ -447,16 +489,10 @@ export function buildOpenAiChatGptProvider(
             normalizations.add(`reasoning_${field}_removed`);
           }
         }
-        if (reasoning.effort === 'ultra') {
-          reasoning.effort = 'max';
-          normalizations.add('reasoning_effort_ultra_to_max');
-        } else if (
-          'effort' in reasoning &&
-          (typeof reasoning.effort !== 'string' ||
-            !SUPPORTED_REASONING_EFFORTS.has(reasoning.effort))
-        ) {
-          delete reasoning.effort;
-          normalizations.add('reasoning_effort_removed');
+        if ('effort' in reasoning) {
+          const effort = normalizeReasoningEffort(reasoning.effort, upstreamModel, normalizations);
+          if (effort === undefined) delete reasoning.effort;
+          else reasoning.effort = effort;
         }
       }
       // OpenAI requires this traceability metadata on every delegated Responses

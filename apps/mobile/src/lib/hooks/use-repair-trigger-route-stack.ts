@@ -7,15 +7,14 @@ import {
 } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
-import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
 import {
   isFocusedProfileScreen,
   profileScreenPath,
   profileStackRepair,
-  TRIGGERS_LIST_ROUTE_NAME,
+  TRIGGER_ROUTE_NAMES,
   withRebuiltParents,
 } from '@/lib/profile-route-stack';
-import { triggerListPath } from '@/lib/cloud-triggers/trigger-routes';
+import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
@@ -39,9 +38,12 @@ type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
  */
 export function useRepairTriggerRouteStack({
   self,
+  organizationId,
 }: Readonly<{
   /** The href that re-opens this screen above the list. */
   self: Href;
+  /** The organization the caller is scoped to; absent is the caller's own triggers. */
+  organizationId?: string;
 }>): void {
   const router = useRouter();
   const navigation = useNavigation<StackNavigation>();
@@ -99,7 +101,7 @@ export function useRepairTriggerRouteStack({
           pathname: pathnameRef.current,
           screenPath,
           currentRouteName: current.name,
-          profileRouteNames: getProfileRouteNames('profileTab'),
+          profileRouteNames: TRIGGER_ROUTE_NAMES,
           currentParams: current.params,
         })
       ) {
@@ -122,7 +124,10 @@ export function useRepairTriggerRouteStack({
       unsubscribeRetire = navigation.addListener('state', () => {
         retireOriginal(retiredKey, selfName);
       });
-      router.push(withRebuiltParents(triggerListPath()));
+      // The rebuilt list keeps the caller's scope: `org` is what scopes the
+      // list, the detail and every write, so a personal rebuild would show the
+      // caller's own triggers under an organization link.
+      router.push(withRebuiltParents(triggersListHref(organizationId)));
       router.push(withRebuiltParents(self));
     };
 
@@ -133,5 +138,5 @@ export function useRepairTriggerRouteStack({
       unsubscribeDecide();
       unsubscribeRetire?.();
     };
-  }, [navigation, router, screenPath, self]);
+  }, [navigation, organizationId, router, screenPath, self]);
 }

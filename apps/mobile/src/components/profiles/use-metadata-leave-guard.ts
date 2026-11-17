@@ -57,15 +57,18 @@ export function useMetadataLeaveGuard({
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   const leavingRef = useRef(false);
   // A derived dirty screen reports its flag during render, the way React state
-  // derivations work: the value the removal handler reads is the one this
-  // screen rendered with, and a screen that is leaving stops recomputing — the
-  // draft the create just saved still differs from a fresh form, and the
-  // recompute would re-arm the guard in the render after the clear, turning the
-  // route's removal into a prompt about a save that already landed.
+  // derivations work: the comparison keys on the state value, so a discarded
+  // render pass leaves no stranded flag, and the state update still runs when
+  // this render commits. A screen that is leaving stops recomputing — the draft
+  // the create just saved still differs from a fresh form, and the recompute
+  // would re-arm the guard in the render after the clear, turning the route's
+  // removal into a prompt about a save that already landed. The latch spans the
+  // rest of the mount on purpose: every leave this guard answers removes the
+  // screen (the save's replace retires it, a discard pops it), so the latch
+  // dies with the screen and never suppresses a prompt a later edit needed.
   if (isDirty !== undefined && !leavingRef.current) {
     const next = isDirty();
-    if (next !== dirtyRef.current) {
-      dirtyRef.current = next;
+    if (next !== dirty) {
       setDirty(next);
     }
   }
@@ -107,6 +110,13 @@ export function useMetadataLeaveGuard({
       leave();
     }, 0);
   }, []);
+
+  // The removal handler reads the ref, so it must trail the committed state
+  // rather than the render pass: an effect writes it after React accepts the
+  // render, and a discarded pass writes nothing.
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
 
   usePreventRemove(enabled && dirty && !leaveAllowed, ({ data, repeat }) => {
     const leave = () => {

@@ -16,6 +16,7 @@ export default function TriggerDetailRoute() {
   // profile tree.
   useRepairTriggerRouteStack({
     self: triggerDetailHref(triggerId, organizationId),
+    organizationId,
   });
   return <TriggerDetailScreen triggerId={triggerId} organizationId={organizationId} />;
 }

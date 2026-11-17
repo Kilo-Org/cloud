@@ -12,6 +12,7 @@ export default function NewTriggerRoute() {
   // Back returns to the list instead of leaving the profile tree.
   useRepairTriggerRouteStack({
     self: triggerCreateHref(organizationId),
+    organizationId,
   });
   return <TriggerCreateScreen organizationId={organizationId} />;
 }

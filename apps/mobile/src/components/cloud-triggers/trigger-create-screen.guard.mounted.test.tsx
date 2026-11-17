@@ -16,6 +16,7 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import { deviceTimeZone } from '@/lib/intl-cache';
 
 import { TriggerCreateScreen } from './trigger-create-screen';
 
@@ -151,7 +152,7 @@ describe('TriggerCreateScreen leave guard', () => {
         name: 'probe-draft',
         activation: 'webhook',
         cron: '',
-        timezone: 'UTC',
+        timezone: deviceTimeZone(),
         repository: '',
         agent: 'code',
         model: '',
@@ -200,7 +201,7 @@ describe('TriggerCreateScreen leave guard', () => {
         name: 'probe-draft',
         activation: 'webhook',
         cron: '',
-        timezone: 'UTC',
+        timezone: deviceTimeZone(),
         repository: '',
         agent: 'code',
         model: '',
@@ -237,14 +238,13 @@ describe('TriggerCreateScreen leave guard', () => {
 
     const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
       onDraftChange: (next: Record<string, unknown>) => void;
-      onSubmit: () => void;
     };
     act(() => {
       formProps.onDraftChange({
         name: 'trigger-new',
         activation: 'webhook',
         cron: '',
-        timezone: 'UTC',
+        timezone: deviceTimeZone(),
         repository: 'owner/repo',
         agent: 'code',
         model: 'kilo-auto/efficient',
@@ -264,8 +264,13 @@ describe('TriggerCreateScreen leave guard', () => {
     });
     expect(h.guard.enabled).toBe(true);
 
+    // The draft change re-rendered the form; its submit handler closes over
+    // the new draft.
+    const submitProps = renderer.root.findByProps({ mode: 'create' }).props as {
+      onSubmit: () => void;
+    };
     await act(async () => {
-      formProps.onSubmit();
+      submitProps.onSubmit();
       await Promise.resolve();
     });
 

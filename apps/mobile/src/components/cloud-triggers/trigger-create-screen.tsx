@@ -38,11 +38,10 @@ type TriggerCreateScreenProps = Readonly<{
   organizationId?: string;
 }>;
 
-/** Whether a draft differs from the one a fresh create screen starts on. */
-function isDraftDirty(draft: TriggerDraft): boolean {
-  const fresh = createTriggerDraft(draft.timezone);
-  for (const key of Object.keys(fresh) as (keyof TriggerDraft)[]) {
-    if (draft[key] !== fresh[key]) {
+/** Whether a draft differs from the one the screen started on. */
+function isDraftDirty(draft: TriggerDraft, initialDraft: TriggerDraft): boolean {
+  for (const key of Object.keys(initialDraft) as (keyof TriggerDraft)[]) {
+    if (draft[key] !== initialDraft[key]) {
       return true;
     }
   }
@@ -54,12 +53,20 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
   const trpc = useTRPC();
   const stackSafeReplace = useStackSafeReplace();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
+  // The draft this screen started on, captured once: every field including the
+  // time zone can be edited back to a different value, so the dirty test
+  // compares against what the reader began with, not against a fresh draft
+  // rebuilt around the current value.
+  const [initialDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
+  const [draft, setDraft] = useState<TriggerDraft>(() => initialDraft);
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const create = useMutation(trpc.webhookTriggers.create.mutationOptions());
   const problems = triggerDraftProblems(draft, { mode: 'create', authConfigured: false });
   const submitting = feedback.status === 'pending';
-  const guard = useMetadataLeaveGuard({ enabled: true, isDirty: () => isDraftDirty(draft) });
+  const guard = useMetadataLeaveGuard({
+    enabled: true,
+    isDirty: () => isDraftDirty(draft, initialDraft),
+  });
 
   const submit = async () => {
     const attempt = begin();

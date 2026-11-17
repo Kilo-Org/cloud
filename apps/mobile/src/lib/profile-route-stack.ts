@@ -190,6 +190,17 @@ export type ProfileStackParents = {
  */
 export const TRIGGERS_LIST_ROUTE_NAME = 'triggers/index';
 
+/**
+ * The route names the trigger screens register under in the Profile tab's
+ * Stack, the names the layout declares and the repair's focus check compares
+ * against (`use-repair-trigger-route-stack.ts`).
+ */
+export const TRIGGER_ROUTE_NAMES: readonly string[] = [
+  TRIGGERS_LIST_ROUTE_NAME,
+  'triggers/new',
+  'triggers/[trigger-id]',
+];
+
 /** The profile screens below the list: they only need the list beneath them. */
 export const LIST_CHILD_PARENTS: ProfileStackParents = { list: true, overview: false };
 

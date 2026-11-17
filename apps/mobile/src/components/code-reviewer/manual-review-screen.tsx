@@ -7,7 +7,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, View } from 'react-native';
 
 import {
   MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
@@ -411,7 +411,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
 
           <Section label={t('codeReviewer.manualReview.instructions')}>
-            <TextInput
+            <Input
               // The route caps this at the same constant (its zod schema), and
               // the native input clips a longer value (a paste) at `maxLength`
               // before the change reaches JS, so the form cannot produce the
@@ -425,7 +425,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               accessibilityLabel={formFieldA11y({
                 label: t('codeReviewer.manualReview.instructions'),
               })}
-              className="h-24 rounded-md border border-border bg-card p-3 text-sm text-foreground"
+              className="h-24 rounded-md border border-input bg-background p-3 text-sm text-foreground focus:border-ring"
               multiline
               textAlignVertical="top"
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}

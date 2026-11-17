@@ -109,7 +109,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               required
               multiline
               textAlignVertical="top"
-              className="min-h-48 font-mono"
+              className="min-h-32 font-mono"
               autoCapitalize="none"
               autoCorrect={false}
               disabled={busy}
@@ -128,7 +128,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               <Text className="font-medium">
                 {t('codeReviewer.overview.proposedReviewMdGuidance')}
               </Text>
-              <Text selectable className="font-mono text-sm leading-[20px]">
+              <Text selectable className="font-mono text-sm">
                 {record.proposed_markdown}
               </Text>
             </View>

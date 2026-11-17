@@ -281,12 +281,7 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
           {reviewMessage ? (
-            <View
-              className={cn(
-                'rounded-xl p-4',
-                cancellationLabel ? 'bg-secondary' : 'bg-danger-tile-bg'
-              )}
-            >
+            <Card>
               <Text
                 variant={cancellationLabel ? 'muted' : undefined}
                 className={cn('text-xs', !cancellationLabel && 'text-destructive')}
@@ -294,7 +289,7 @@ export function ReviewDetailScreen({
               >
                 {reviewMessage}
               </Text>
-            </View>
+            </Card>
           ) : null}
         </View>
 

@@ -70,7 +70,7 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
-      englishCopyRules: [checkPushEnglishCopy],
+      englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
       collectsDestructiveKeys: false,

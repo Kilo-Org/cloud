@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Mmebi SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Nlele nchekwa nwere mmelite"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Nnọkọ Kilo gị dị njikere ịchịkwa site na ekwentị gị"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -214,6 +214,11 @@ describe('the quiet moment of a Working card', () => {
       post.indexOf('.notify(')
     );
     const schedule = body(NOTIFICATIONS, 'private fun scheduleQuiet(');
+    expect(
+      schedule.indexOf('alarmManager.cancel(operation)'),
+      'scheduleQuiet must cancel before it arms'
+    ).toBeGreaterThan(-1);
+    expect(schedule.indexOf('alarmWhileIdle('), 'scheduleQuiet must arm').toBeGreaterThan(-1);
     expect(schedule.indexOf('alarmManager.cancel(operation)')).toBeLessThan(
       schedule.indexOf('alarmWhileIdle(')
     );

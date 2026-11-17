@@ -15,8 +15,8 @@ type RoleRefusalNoticeProps = {
 
 /**
  * The one info callout that stands in an action's place when the server's answer
- * is that this reader's role may not act. Both surfaces that receive that answer
- * — the connect screen and the repository picker — word and draw it identically.
+ * is that this reader may not act. The setup screen renders it in the button's
+ * place; the connect screen hands its sentence in as `readOnlyNotice`.
  *
  * It fills the action's own slot: full width, the same padding as the
  * description above it, so an answer that arrives after mount changes what the
@@ -25,8 +25,8 @@ type RoleRefusalNoticeProps = {
  * action's gap it read as a footnote, the faintest text on the screen, leaving
  * the state looking unfinished.
  *
- * It arrives without a press — on the repository picker it replaces the action
- * the reader just used — so it is announced through the shared status channel
+ * It arrives without a press — it takes the place of the action the reader
+ * would have had — so it is announced through the shared status channel
  * instead of appearing silently: the polite live region carries it on Android,
  * one imperative announcement carries it elsewhere, never both.
  */

@@ -1070,6 +1070,10 @@ export async function getGitHubReviewComment(
   id: number;
   body: string;
   userLogin: string | null;
+  /** GitHub account type of the comment author: 'User' | 'Bot' | 'Organization'. */
+  userType: string | null;
+  /** Numeric GitHub user id of the comment author; survives an App rename. */
+  userId: number | null;
   inReplyToId: number | null;
 } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -1085,6 +1089,8 @@ export async function getGitHubReviewComment(
       id: data.id,
       body: data.body,
       userLogin: data.user?.login ?? null,
+      userType: data.user?.type ?? null,
+      userId: data.user?.id ?? null,
       inReplyToId: data.in_reply_to_id ?? null,
     };
   } catch (error) {

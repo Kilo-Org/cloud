@@ -1366,7 +1366,8 @@
       "noReviews": "Ammaaf sakatta'iinsi hin jiru",
       "noReviewsDescription": "Sakatta'aan koodii gaaffii makuu irratti erga hojjeteen booda sakatta'awwan asitti mul'atu.",
       "startManualReview": "Sakatta'a harkaa jalqabi",
-      "configureProvider": "Waltajjii qindeessi"
+      "configureProvider": "Waltajjii qindeessi",
+      "connectOwnerOnly": "Waltajjii walqabsiisuuf abbaa dhaabbataa ykn bulchaa gaafadhu."
     },
     "platformList": {
       "checking": "Mirkaneessaa jira…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Meeshaa kana herrega keessaa baasi",
     "signOutSessionLabel": "{{device}} herrega keessaa baasi, yeroo seene {{signedIn}}, dhumarratti kan mul'ate {{lastSeen}}",
     "sessionSignedOut": "Turtiin herrega keessaa baafameera.",
+    "sessionSignOutFailed": "Turtii kana herrega keessaa baasuu hin dandeenye. Irra deebi'ii yaali.",
     "signOutThisDeviceTitle": "Meeshaa kana herrega keessaa baastaa?",
     "signOutThisSessionTitle": "Turtii kana herrega keessaa baastaa?",
     "signOutThisSessionMessage": "{{device}} herrega keessaa baafama. Dhumarratti kan mul'ate {{lastSeen}}. Hanga sa'aatii tokkootti API fayyadamuu itti fufuu danda'a.",
@@ -4692,5 +4694,175 @@
     "unavailableDescription": "Yeroon liinkii qooddannaa kanaa darbeera ykn haqameera.",
     "transcriptUnavailableTitle": "Galmee kana fe'uun hin danda'amne",
     "transcriptUnavailableDescription": "Liinkiin ammallee ni hojjeta. Yeroo muraasa booda irra deebi'ii yaali."
+  },
+  "organizationGuardrails": {
+    "title": "Daangoolee Eegumsaa AI",
+    "permissionDenied": "Abbootii fi bulchitoonni dhaabbataa qofti Daangoolee Eegumsaa AI bulchuu danda'u.",
+    "unavailable": "Daangooleen Eegumsaa AI dhaabbata kanaaf hin jiraatan.",
+    "loadError": "Daangoolee Eegumsaa AI fe'uu hin dandeenye",
+    "statusSaving": "Galmeessa jira…",
+    "statusSaved": "Galmeeffame",
+    "statusFailed": "Galmeessuu hin dandeenye.",
+    "inputTitle": "Daangoolee seensaa",
+    "inputDescription": "Seensa hunda Enkrypt AI waliin sakatta'a, bu'aa meeshaa dabalatee. Qorataan dhorku yeroo Enkrypt hin jiraanne gaaffii ni dida.",
+    "outputTitle": "Daangoolee ba'aa",
+    "outputDescription": "Deebiiwwan Enkrypt AI waliin osoo miseensonni hin fudhanne dura sakatta'a. Yoo ati hin banne, cufaa ta'a.",
+    "detectorsHint": "Dhorkuun gaaffii mallatteeffame ni dida. Galmeessuun qofa osoo gaaffii hin turre itti galmeessa.",
+    "detectorsHintOutput": "Dhorkuun deebii mallatteeffame ni kasaasa. Galmeessuun qofa osoo deebii hin turre itti galmeessa.",
+    "choiceLog": "Galmeessuu qofa",
+    "applyTo": "Itti fayyadami",
+    "applyToAllMembers": "Miseensota hunda",
+    "applyKiloDefault": "Durtii Kilo fayyadami",
+    "invalidSavedTitle": "Qindaa'inni qorataa seensaa galmeeffame dubbisamuu hin danda'u",
+    "invalidSavedBody": "Gaaffiin ni dhorkama hanga qorattoonni seensaa irra deebi'anii galmeeffamanitti. Qorattoonni armaan gadii Durtii Kilo irraa eegalu.",
+    "invalidSavedOutputTitle": "Qindaa'inni qorataa ba'aa galmeeffame dubbisamuu hin danda'u",
+    "invalidSavedOutputBody": "Deebiiwwan ni qabama hanga qorattoonni ba'aa irra deebi'anii galmeeffamanitti. Qorattoota ba'aa armaan gadii filadhu.",
+    "blockingOutputNote": "Qorataan ba'aa dhorku deebii hanga Enkrypt guutummaa isaa qoradetti ni qaba. Turuu dhiisuuf Galmeessuu qofa fayyadami.",
+    "inputDetectorRequired": "Qorataa seensaa yoo xiqqaate tokko bani.",
+    "outputDetectorRequired": "Qorataa ba'aa yoo xiqqaate tokko bani.",
+    "rulesTooMany": "Hanga {{max}} seera dabalchuu dandeessa.",
+    "ruleIdRequired": "ID seeraa galchi.",
+    "ruleIdInvalid": "ID seeraa qubee, lakkoofsa, tuqaa, xarii, fi xarii gadi fayyadamuu qofa danda'a.",
+    "ruleTextRequired": "Seerichi maal dhorku yookaan maal barbaadu ibsi.",
+    "keywordTooLong": "Jechi furtuu tokkoon tokkoon hanga {{max}} qubee qabaachuu danda'a.",
+    "topicTooLong": "Mata-duree tokkoon tokkoon hanga {{max}} qubee qabaachuu danda'a.",
+    "keywordsTooMany": "Hanga {{max}} jechoota furtuu dabalchuu dandeessa.",
+    "topicsTooMany": "Hanga {{max}} mata-dureewwan dabalchuu dandeessa.",
+    "piiEntityRequired": "Gosa daataa qoratamuu qabu tokko yoo xiqqaate filadhu.",
+    "keywordRequired": "Jecha furtuu tokko yoo xiqqaate dabali.",
+    "topicRequired": "Mata-duree tokko yoo xiqqaate dabali.",
+    "policyTextRequired": "Barruu imaammataa galchi.",
+    "ruleRequired": "Seera tokko yoo xiqqaate dabali.",
+    "ruleIdDuplicate": "Seerri tokkoon tokkoon ID seeraa ofii isaa qabaachuu qaba.",
+    "piiEntities": "Daataa qoratamuu qabu",
+    "keywordsLabel": "Jechoota furtuu",
+    "keywordsHint": "Jecha furtuu tokko sarara tokkoon.",
+    "topicsHint": "Mata-duree tokko sarara tokkoon.",
+    "policyFormat": "Bitaa imaammataa",
+    "policyFormatRules": "Seerota caasaa qaban",
+    "policyFormatRulesDescription": "Seera tokko barbaachisummaa tokkoof, ramaddii fi cimina waliin. Ni gorfama.",
+    "policyFormatText": "Barruu imaammataa",
+    "policyFormatTextDescription": "Imaammata jiru barruu salphaatti maxxansi.",
+    "rulesEmpty": "Amma ammaatti seerri hin jiru. Seerri tokkoon tokkoon waan seensi qabaachuu hin qabne yookaan gaafachuu hin qabne tokko ibsa.",
+    "addRule": "Seera dabali",
+    "ruleNumber": "Seera {{number}}",
+    "ruleRemove": "Seera {{number}} haqi",
+    "ruleIdLabel": "ID seeraa",
+    "ruleNameLabel": "Maqaa (dirqamaa miti)",
+    "ruleTextLabel": "Seera",
+    "ruleRiskCategory": "Ramaddii balaa",
+    "ruleApplicability": "Daangaa",
+    "ruleFrameworks": "Caasawwan",
+    "detector": {
+      "promptInjection": {
+        "label": "Injekkshinii ajajaa",
+        "description": "Yaaliin ajaja jijjiiruu yookaan moodela cufaa keessaa ba'uu qorata."
+      },
+      "policyViolation": {
+        "label": "Cabsa imaammataa",
+        "description": "Seensota imaammata dhaabbata kee cabsan mallatteessa, barruu yookaan seerotaan barreeffaman.",
+        "descriptionOutput": "Deebiiwwan imaammata dhaabbata kee cabsan mallatteessa, barruu yookaan seerotaan barreeffaman."
+      },
+      "pii": {
+        "label": "PII fi iccitii",
+        "description": "Daataa dhuunfaa, ragaa seensaa, teessoo IP, fi URL qorata."
+      },
+      "keywords": {
+        "label": "Jechoota furtuu dhorkaman",
+        "descriptionOutput": "Deebiiwwan jecha furtuu ati tarreessite kamiyyuu of keessaa qaban qorata."
+      },
+      "topics": {
+        "label": "Mata-dureewwan",
+        "descriptionOutput": "Deebiiwwan mata-duree ati tarreessite kamiyyuu ilaalchisee mallatteessa."
+      },
+      "toxicity": {
+        "label": "Sumaawummaa",
+        "description": "Afaan sumaawaa, tuffisaa, naasisaa, yookaan jibbisaa qorata."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Qabiyyee saalaa yookaan karaa biraatiin hojii keessatti nageenya qabeessa hin taane qorata."
+      },
+      "bias": {
+        "label": "Loogii",
+        "description": "Afaan loogii yookaan adda baasaa qorata."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Daataa dhuunfaa",
+        "description": "Maqoota, teessoo imeelii, lakkoofsa bilbilaa."
+      },
+      "secrets": {
+        "label": "Iccitii",
+        "description": "Furtuu API, tokeenii, jecha darbii."
+      },
+      "ipAddress": {
+        "label": "Teessoo IP",
+        "description": "Teessoo IPv4 fi IPv6."
+      },
+      "url": {
+        "label": "Teessoowwan URL",
+        "description": "Teessoo weebii."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Eegumsa fi gowwoomsa",
+      "safetyHarm": "Nageenya fi miidhaa",
+      "privacyDataProtection": "Dhuunfaa fi eegumsa daataa",
+      "brandReputationTrust": "Mallattoo fi maqaa gaarii",
+      "biasFairnessEthical": "Loogii fi walqixxummaa",
+      "legalIpLiability": "Itti gaafatamummaa seeraa fi IP",
+      "productMisuse": "Itti fayyadama dogoggoraa oomishaa",
+      "performanceQuality": "Raawwii fi qulqullina"
+    },
+    "applicability": {
+      "user": "Seensa fayyadamaa",
+      "userAssistant": "Seensa fayyadamaa fi deebiiwwan"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Kudhan Olii (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Seera AI EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Amala dhaabbata guddaa",
+    "enterpriseOnly": "Kun amala dhaabbata guddaaf qofa.",
+    "readOnly": "Abbootii fi bulchitoonni dhaabbataa qofti qindaa'ina kana jijjiiruu danda'u.",
+    "loadError": "Dhiyeessitoonni fi moodeloonni fe'uu hin dandeenye",
+    "tabModels": "Moodeloota",
+    "tabProviders": "Dhiyeessitoota",
+    "tabGateways": "Kallattiiwwan",
+    "modelsDescription": "Moodela dhaabi miseensa hundaaf dhorkuuf. Moodeloonni dhiyeessitoota hayyamaman irraa dhufan banamaniin eegalu.",
+    "modelsDeniedOnly": "Kan dhorkaman qofa",
+    "modelsEmpty": "Moodelaan barbaacha kanaaf hin jiru.",
+    "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
+    "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
+    "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",
+    "allowAllShown": "Kan mul'atan hunda hayyami",
+    "denyAllShown": "Kan mul'atan hunda dhorki",
+    "gatewaysDescription": "Kilo gaaffiiwwan moodelaa Vercel AI Gateway yookaan OpenRouter keessa geessa. Kallattiin cufame gaaffiiwwan sana ni kasaasa.",
+    "emptyProviderList": "Yoo xiqqaate dhiyeessaa tokko hayyami. Tarreen duwwaan karaa moodelaa Kilo hunda ni cufa.",
+    "gatewaysUnavailable": "Qindaa'inni kallattiiwwanii dhaabbata kanaaf hin argamu.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Gaaffiiwwan OpenRouter naannoo tokkoon hin hidhamne.",
+    "inferenceRegion": "Naannoo raawwii",
+    "inferenceRegionDescription": "Gaaffiiwwan Vercel AI Gateway naannoo kanaatti ni hidha. Moodelaan achitti hin jiraanne ni kasaasa.",
+    "disableOpenrouterNote": "OpenRouter cufuun furtuulee BYOK gaaffiiwwan isa keessa geessanis ni dhorka.",
+    "emptyModelList": "Yoo xiqqaate moodela tokko banaa dhiisi. Moodela hunda yoo dide, miseensonni waan itti fayyadaman hin qaban.",
+    "catalogUnavailable": "Kaataalogiin moodelaa guutuun hin fe'amne, kanaaf tarreewwan kee olkaa'aman qofatu mul'ata. Moodela hunda fe'uuf irra deebi'ii yaali.",
+    "region": {
+      "global": "Addunyaa",
+      "us": "Istaatawwan Ameerikaa",
+      "eu": "Gamtaa Awurooppaa",
+      "au": "Awustraaliyaa",
+      "jp": "Jaappaan"
+    }
   }
 }

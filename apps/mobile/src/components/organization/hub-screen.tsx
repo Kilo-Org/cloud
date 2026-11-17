@@ -244,28 +244,30 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         },
       };
 
-  // The in-app destinations the hub opens itself, and the only card rows that
-  // need no payload: their gate reads the role and the plan, which the
-  // organization row decides before this screen renders.
-  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan }, organizationId);
+  // The in-app destinations the hub opens itself. The audit log's gate reads
+  // only the role and the plan, which the organization row decides before this
+  // screen renders; the guardrails row also needs the organization's Kilo
+  // Encrypt setting, so it arrives with the membership payload — the same
+  // commit that paints the web group below it, so nothing already on screen
+  // moves when it lands.
+  const inAppSettingsRows = visibleInAppSettingsRows(
+    {
+      role,
+      plan: org.plan,
+      guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt,
+    },
+    organizationId
+  );
 
   // The organization dashboard's own settings on the web, one row per area.
-  // The group waits for the membership payload because that payload carries the
-  // Kilo Encrypt setting the guardrails row's gate reads: painting the row on
-  // the cached list entry's absence and removing it a request later would move
-  // every row under it. It is the last group on the screen, so its arrival
-  // pushes nothing above it.
+  // The group waits for the membership payload because the guardrails row in
+  // the card above arrives with it: painting the group on the cached list
+  // entry's absence and moving it a request later would shift every row in it.
+  // It is the last group on the screen, so its arrival pushes nothing above it.
   const settingsRows =
     orgWithMembers.data == null && !membershipUnavailable
       ? null
-      : visibleOrgSettingsRows(
-          {
-            role,
-            plan: org.plan,
-            guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt === true,
-          },
-          organizationId
-        );
+      : visibleOrgSettingsRows({ plan: org.plan }, organizationId);
 
   return (
     <View className="flex-1 bg-background">
@@ -472,8 +474,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             </>
           )}
           {/* The destinations this app reads and writes itself. They close the
-              card, and they are painted before any web row because their gates
-              need no payload — see `visibleInAppSettingsRows`. */}
+              card — see `visibleInAppSettingsRows`. */}
           {inAppSettingsRows.map((row, index) => (
             <ConfigureRow
               key={row.area}

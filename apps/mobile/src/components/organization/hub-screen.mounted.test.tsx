@@ -1031,9 +1031,9 @@ describe('Organization hub settings-on-the-web group', () => {
     unmount();
   });
 
-  it('keeps the heading for a role that still has a web page', async () => {
-    // Model Access is the remaining web destination, and it needs the
-    // enterprise plan, so the group exists exactly where that row does.
+  it('keeps the heading on enterprise, where the SSO card is the destination', async () => {
+    // SSO and domain is the enterprise dashboard card the shell hosts, so the
+    // group exists exactly where that card does.
     boundary.plan = 'enterprise';
     const { renderer, unmount } = await renderHub();
 
@@ -1043,8 +1043,8 @@ describe('Organization hub settings-on-the-web group', () => {
 
   it('paints the heading for a member on teams, whose card the app shell owns', async () => {
     // A teams dashboard shows data collection where enterprise shows providers
-    // and models, and the app shell owns that card, so the row survives the
-    // member's role gate and the group names it.
+    // and models, and the app shell owns that card, so the plan gate keeps the
+    // row and the group names it.
     boundary.role = 'member';
 
     const { renderer, unmount } = await renderHub();

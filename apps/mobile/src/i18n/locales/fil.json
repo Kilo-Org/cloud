@@ -1366,7 +1366,8 @@
       "noReviews": "Wala pang pagsusuri",
       "noReviewsDescription": "Lalabas dito ang mga pagsusuri kapag nagsuri na ng pull request ang Code Reviewer.",
       "startManualReview": "Magsimula ng manu-manong pagsusuri",
-      "configureProvider": "Isaayos ang provider"
+      "configureProvider": "Isaayos ang provider",
+      "connectOwnerOnly": "Hilingin sa isang may-ari ng organisasyon o admin na ikonekta ang isang provider."
     },
     "platformList": {
       "checking": "Sinusuri…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "I-sign out ang device na ito",
     "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}, huling nakita: {{lastSeen}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
+    "sessionSignOutFailed": "Hindi ma-sign out ang sesyong ito. Subukan muli.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Huling nakita: {{lastSeen}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",
@@ -4692,5 +4694,175 @@
     "unavailableDescription": "Nag-expire na o binawi na ang share link na ito.",
     "transcriptUnavailableTitle": "Hindi ma-load ang transcript na ito",
     "transcriptUnavailableDescription": "Gumagana pa rin ang link. Subukang muli maya-maya."
+  },
+  "organizationGuardrails": {
+    "title": "Mga AI Guardrail",
+    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail.",
+    "unavailable": "Hindi available ang Mga AI Guardrail para sa organisasyong ito.",
+    "loadError": "Hindi ma-load ang Mga AI Guardrail",
+    "statusSaving": "Sine-save…",
+    "statusSaved": "Na-save",
+    "statusFailed": "Hindi ma-save.",
+    "inputTitle": "Mga input guardrail",
+    "inputDescription": "Ini-scan ang bawat input gamit ang Enkrypt AI, kasama ang mga resulta ng tool. Tinatanggihan ng blocking detector ang request kapag hindi available ang Enkrypt.",
+    "outputTitle": "Mga output guardrail",
+    "outputDescription": "Ini-scan ang mga sagot gamit ang Enkrypt AI bago ito matanggap ng mga miyembro. Naka-off maliban kung i-on mo.",
+    "detectorsHint": "Tinatanggihan ng Harangin ang na-flag na request. Itinatala lang ito ng Log lang nang hindi naaantala ang request.",
+    "detectorsHintOutput": "Pinapalya ng Harangin ang na-flag na sagot. Itinatala lang ito ng Log lang nang hindi naaantala ang sagot.",
+    "choiceLog": "Log lang",
+    "applyTo": "Ilapat sa",
+    "applyToAllMembers": "Lahat ng miyembro",
+    "applyKiloDefault": "Ilapat ang Kilo Default",
+    "invalidSavedTitle": "Hindi mabasa ang na-save na setting ng input detector",
+    "invalidSavedBody": "Haharangin ang mga request hanggang ma-save muli ang mga input detector. Nagsisimula sa Kilo Default ang mga detector sa ibaba.",
+    "invalidSavedOutputTitle": "Hindi mabasa ang na-save na setting ng output detector",
+    "invalidSavedOutputBody": "Pipigilan ang mga sagot hanggang ma-save muli ang mga output detector. Pumili ng mga output detector sa ibaba.",
+    "blockingOutputNote": "Pinipigil ng blocking output detector ang sagot hanggang masuri ito nang buo ng Enkrypt. Gamitin ang Log lang para maiwasan ang pagkaantala.",
+    "inputDetectorRequired": "Mag-on ng kahit isang input detector.",
+    "outputDetectorRequired": "Mag-on ng kahit isang output detector.",
+    "rulesTooMany": "Magdagdag ng hanggang {{max}} na panuntunan.",
+    "ruleIdRequired": "Maglagay ng rule ID.",
+    "ruleIdInvalid": "Mga titik, numero, tuldok, gitling, at underscore lang ang puwede sa rule ID.",
+    "ruleTextRequired": "Ilarawan kung ano ang ipinagbabawal o hinihingi ng panuntunan.",
+    "keywordTooLong": "Hanggang {{max}} na character ang bawat keyword.",
+    "topicTooLong": "Hanggang {{max}} na character ang bawat paksa.",
+    "keywordsTooMany": "Magdagdag ng hanggang {{max}} na keyword.",
+    "topicsTooMany": "Magdagdag ng hanggang {{max}} na paksa.",
+    "piiEntityRequired": "Pumili ng kahit isang uri ng datos na ide-detect.",
+    "keywordRequired": "Magdagdag ng kahit isang keyword.",
+    "topicRequired": "Magdagdag ng kahit isang paksa.",
+    "policyTextRequired": "Ilagay ang teksto ng patakaran.",
+    "ruleRequired": "Magdagdag ng kahit isang panuntunan.",
+    "ruleIdDuplicate": "Kailangan ng bawat panuntunan ng sarili nitong rule ID.",
+    "piiEntities": "Datos na ide-detect",
+    "keywordsLabel": "Mga keyword",
+    "keywordsHint": "Isang keyword bawat linya.",
+    "topicsHint": "Isang paksa bawat linya.",
+    "policyFormat": "Format ng patakaran",
+    "policyFormatRules": "Mga structured na panuntunan",
+    "policyFormatRulesDescription": "Isang panuntunan bawat requirement, may kategorya at kalubhaan. Inirerekomenda.",
+    "policyFormatText": "Teksto ng patakaran",
+    "policyFormatTextDescription": "I-paste ang kasalukuyang patakaran bilang plain text.",
+    "rulesEmpty": "Wala pang panuntunan. Inilalarawan ng bawat panuntunan ang isang bagay na hindi dapat laman o hingin ng mga input.",
+    "addRule": "Magdagdag ng panuntunan",
+    "ruleNumber": "Panuntunan {{number}}",
+    "ruleRemove": "Alisin ang panuntunan {{number}}",
+    "ruleIdLabel": "Rule ID",
+    "ruleNameLabel": "Pangalan (opsyonal)",
+    "ruleTextLabel": "Panuntunan",
+    "ruleRiskCategory": "Kategorya ng panganib",
+    "ruleApplicability": "Saklaw",
+    "ruleFrameworks": "Mga framework",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt injection",
+        "description": "Nade-detect ang mga pagtatangkang i-override ang mga tagubilin o i-jailbreak ang modelo."
+      },
+      "policyViolation": {
+        "label": "Paglabag sa patakaran",
+        "description": "Fina-flag ang mga input na lumalabag sa patakaran ng iyong organisasyon, nakasulat man bilang teksto o mga panuntunan.",
+        "descriptionOutput": "Fina-flag ang mga sagot na lumalabag sa patakaran ng iyong organisasyon, nakasulat man bilang teksto o mga panuntunan."
+      },
+      "pii": {
+        "label": "PII at mga secret",
+        "description": "Nade-detect ang personal na datos, mga credential, IP address, at URL."
+      },
+      "keywords": {
+        "label": "Mga ipinagbabawal na keyword",
+        "descriptionOutput": "Nade-detect ang mga sagot na naglalaman ng alinmang keyword na inilista mo."
+      },
+      "topics": {
+        "label": "Mga paksa",
+        "descriptionOutput": "Fina-flag ang mga sagot tungkol sa alinmang paksang inilista mo."
+      },
+      "toxicity": {
+        "label": "Toxicity",
+        "description": "Nade-detect ang toxic, mapang-insulto, nagbabanta, o mapoot na pananalita."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Nade-detect ang sekswal o iba pang content na hindi angkop sa trabaho."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Nade-detect ang may kinikilingan o mapandiskriminang pananalita."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personal na datos",
+        "description": "Mga pangalan, email address, numero ng telepono."
+      },
+      "secrets": {
+        "label": "Mga secret",
+        "description": "Mga API key, token, password."
+      },
+      "ipAddress": {
+        "label": "Mga IP address",
+        "description": "Mga IPv4 at IPv6 address."
+      },
+      "url": {
+        "label": "Mga URL",
+        "description": "Mga web address."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Seguridad at panloloko",
+      "safetyHarm": "Kaligtasan at pinsala",
+      "privacyDataProtection": "Privacy at proteksyon ng datos",
+      "brandReputationTrust": "Brand at reputasyon",
+      "biasFairnessEthical": "Bias at pagiging patas",
+      "legalIpLiability": "Legal at IP na pananagutan",
+      "productMisuse": "Maling paggamit ng produkto",
+      "performanceQuality": "Performance at kalidad"
+    },
+    "applicability": {
+      "user": "Input ng user",
+      "userAssistant": "Input ng user at mga sagot"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Feature ng Enterprise",
+    "enterpriseOnly": "Para sa enterprise lang ang feature na ito.",
+    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "loadError": "Hindi ma-load ang mga provider at modelo",
+    "tabModels": "Mga modelo",
+    "tabProviders": "Mga provider",
+    "tabGateways": "Mga gateway",
+    "modelsDescription": "I-off ang isang modelo para harangin ito para sa bawat miyembro. Naka-on sa simula ang mga modelo mula sa mga pinapayagang provider.",
+    "modelsDeniedOnly": "Mga tinanggihan lang",
+    "modelsEmpty": "Walang modelong tumutugma sa paghahanap na ito.",
+    "providersDescription": "I-off ang isang provider para itigil ng Kilo ang pag-route dito para sa organisasyong ito.",
+    "providersNeedCatalog": "Read-only ang mga switch ng provider hangga't hindi pa nalo-load ang buong catalog ng model. I-tap ang Subukan muli sa itaas para ma-edit ang mga ito.",
+    "providersEmpty": "Walang provider na tumutugma sa paghahanap na ito.",
+    "allowAllShown": "Payagan lahat ng nakikita",
+    "denyAllShown": "Tanggihan lahat ng nakikita",
+    "gatewaysDescription": "Ina-route ng Kilo ang mga request sa modelo sa pamamagitan ng Vercel AI Gateway o OpenRouter. Papalya ang mga request na iyon kapag naka-disable ang gateway.",
+    "emptyProviderList": "Mag-allow ng kahit isang provider. Kapag walang laman ang listahan, maba-block ang lahat ng route ng modelo ng Kilo.",
+    "gatewaysUnavailable": "Hindi available ang mga setting ng gateway para sa organisasyong ito.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Hindi naka-pin sa isang rehiyon ang mga request sa OpenRouter.",
+    "inferenceRegion": "Rehiyon ng inference",
+    "inferenceRegionDescription": "Pini-pin ang mga request sa Vercel AI Gateway sa rehiyong ito. Papalya ang modelong hindi available doon.",
+    "disableOpenrouterNote": "Kapag na-disable ang OpenRouter, haharangin din ang mga BYOK key na nagra-route ng mga request dito.",
+    "emptyModelList": "Mag-iwan ng kahit isang modelong naka-on. Kapag dinine-deny ang lahat ng modelo, wala nang magagamit ang mga miyembro.",
+    "catalogUnavailable": "Hindi na-load ang buong catalog ng modelo, kaya ang mga naka-save mong listahan lang ang ipinapakita. Subukang muli para i-load ang lahat ng modelo.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "European Union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

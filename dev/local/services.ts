@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
 import { resolveE2eInternalSecret } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
+import { caBundlePath } from '../mock-snowflake/tls-env';
 import { readEnvFile } from './env-sync/parse';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
@@ -311,11 +312,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'dev/local/scripts',
   },
   // Dev-only Snowflake stand-in for the usage screens (dev/mock-snowflake/
-  // README.md). Its entry wires the SNOWFLAKE_* block and the mock's
-  // self-signed CA into .env.local before the web app starts — scripts/dev.sh
-  // exports NODE_EXTRA_CA_CERTS from that file before next dev — so the web
-  // app depends on it. A real SNOWFLAKE_ACCOUNT_HOST in .env.local is never
-  // replaced; run without it with `pnpm dev:start app --without=mock-snowflake`.
+  // README.md). Core is always on, so every `dev:start` gains it; its entry
+  // keeps the SNOWFLAKE_* block and the CA bundle that the managed section of
+  // .env.local names current, and `serviceCommand` exports that bundle to
+  // `next dev` when this service is selected. A real SNOWFLAKE_ACCOUNT_HOST in
+  // .env.local is never replaced; run without the mock with
+  // `pnpm dev:start app --without=mock-snowflake`.
   'mock-snowflake': {
     group: 'core',
     dependsOn: [],
@@ -1095,13 +1097,6 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     result.add(name);
     for (const dep of svc.dependsOn) {
-      // The Snowflake mock exists for the web app's usage screens; other
-      // dependents (e.g. a workers-only start that names nextjs for its
-      // internal endpoints) never call a warehouse, so drop it there. A real
-      // SNOWFLAKE_ACCOUNT_HOST keeps its wiring either way.
-      if (dep === 'mock-snowflake' && name !== 'nextjs' && !targets.includes('nextjs')) {
-        continue;
-      }
       if (!result.has(dep)) {
         stack.push(dep);
       }
@@ -1232,12 +1227,20 @@ export function getService(name: string): ServiceDef {
  * tunnels optionally publish the fake-LLM tunnel; that only makes sense when
  * the fake Worker is in the same selection, and including the port
  * unconditionally would make a standalone tunnels start depend on a running
- * fake Worker.
+ * fake Worker. The web app is handed the Snowflake mock's CA bundle the same
+ * way: `scripts/dev.sh` keeps an exported `NODE_EXTRA_CA_CERTS` ahead of the
+ * first line in `.env.local`, so exporting it here is what makes the mock's
+ * certificate trusted whatever the file already says.
  */
 export function serviceCommand(serviceName: string, serviceNames: readonly string[]): string[] {
   const command = getService(serviceName).command;
   if (serviceName === 'cloud-agent-public-tunnels' && serviceNames.includes('fake-llm-worker')) {
     return [...command, String(resolveFakeLlmWorkerPort())];
+  }
+  if (serviceName === 'nextjs' && serviceNames.includes('mock-snowflake')) {
+    // `env` opens the web app's command, so the variable joins that prefix.
+    const [env, ...prefixAndArgs] = command;
+    return [env, `NODE_EXTRA_CA_CERTS=${caBundlePath()}`, ...prefixAndArgs];
   }
   return command;
 }

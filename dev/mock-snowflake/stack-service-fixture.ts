@@ -8,10 +8,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-type WireResult = { appended: boolean; keptRealWarehouse?: boolean };
+import type { WireResult } from './stack-service';
 
 export type WireEnvLocalFixture = {
+  /** Directory the copied sources treat as the repository root. */
+  root: string;
   envLocalPath: string;
+  caBundlePath: string;
   wire(): Promise<WireResult>;
   restore(): void;
 };
@@ -21,9 +24,16 @@ export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalF
   const moduleDir = path.join(root, 'dev', 'mock-snowflake');
   const sourceDir = import.meta.dirname;
   const envLocalPath = path.join(root, '.env.local');
+  const caBundlePath = path.join(moduleDir, 'fixtures', 'tls', 'ca-bundle.pem');
 
   fs.mkdirSync(moduleDir, { recursive: true });
-  for (const name of ['stack-service.ts', 'tls-env.ts', 'server.ts', 'warehouse.ts']) {
+  for (const name of [
+    'stack-service.ts',
+    'env-file.ts',
+    'tls-env.ts',
+    'server.ts',
+    'warehouse.ts',
+  ]) {
     fs.copyFileSync(path.join(sourceDir, name), path.join(moduleDir, name));
   }
   fs.mkdirSync(path.join(moduleDir, 'fixtures', 'tls'), { recursive: true });
@@ -36,7 +46,9 @@ export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalF
   if (envLocal !== undefined) fs.writeFileSync(envLocalPath, envLocal);
 
   return {
+    root,
     envLocalPath,
+    caBundlePath,
     async wire(): Promise<WireResult> {
       // The fixture copy of stack-service.ts computes the same `../..` layout
       // as the real one, so running the real logic here is the point of the

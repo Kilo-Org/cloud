@@ -243,6 +243,28 @@ test('starts the Snowflake mock before the web app on the offset port', () => {
   assert.ok(appTargets.indexOf('mock-snowflake') < appTargets.indexOf('nextjs'));
 });
 
+test('exports the mock CA bundle to the web app only when the mock is selected', () => {
+  const withMock = serviceCommand('nextjs', ['mock-snowflake', 'nextjs']);
+  const trusted = withMock.find(arg => arg.startsWith('NODE_EXTRA_CA_CERTS='));
+  assert.ok(trusted);
+  const bundle = trusted.slice('NODE_EXTRA_CA_CERTS='.length);
+  assert.equal(path.isAbsolute(bundle), true);
+  assert.equal(
+    bundle.endsWith(path.join('dev', 'mock-snowflake', 'fixtures', 'tls', 'ca-bundle.pem')),
+    true
+  );
+  // The variable joins the `env` prefix the web app command already has.
+  assert.deepEqual(withMock.slice(0, 2), ['env', trusted]);
+  assert.ok(withMock.includes('pnpm'));
+
+  const withoutMock = serviceCommand('nextjs', ['nextjs']);
+  assert.equal(
+    withoutMock.some(arg => arg.startsWith('NODE_EXTRA_CA_CERTS=')),
+    false
+  );
+  assert.deepEqual(withoutMock, getService('nextjs').command);
+});
+
 test('starts the BYOK KMS service on its own port before the web app', () => {
   const kms = getService('local-kms');
   const service = getService('byok-kms');

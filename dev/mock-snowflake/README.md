@@ -11,25 +11,37 @@ only way to see a populated usage screen locally.
 
 ## The local stack starts it for you
 
-`pnpm dev:start` now starts the mock as the `mock-snowflake` service (core
-group, before the web app) and its entry — `stack-service.ts` — wires the
-`SNOWFLAKE_*` block and a `NODE_EXTRA_CA_CERTS` line pointing at the mock's
-self-signed certificate into the repo-root `.env.local` automatically. The web
-dev script exports that CA before `next dev` starts, which is what makes the
-certificate trusted; Next.js loads `.env.local` into its own process after Node
-has already read the variable, so a line that only reached Next would leave the
-certificate untrusted.
+`pnpm dev:start` starts the mock as the `mock-snowflake` service (core group,
+always on, before the web app) and its entry — `stack-service.ts` — keeps one
+managed section of the repo-root `.env.local` current. The section, delimited by
+`# wired by dev/mock-snowflake/stack-service.ts` and
+`# end of dev/mock-snowflake wiring`, holds the `SNOWFLAKE_*` block and one
+`NODE_EXTRA_CA_CERTS` line.
 
-Two guarantees about `.env.local`:
+Three guarantees about the file:
 
-- **An existing real warehouse is never replaced.** If `.env.local` already has
-  a `SNOWFLAKE_ACCOUNT_HOST` line that the mock did not write, the stack entry
-  leaves the file alone and the web app keeps talking to your real warehouse.
-- **Wiring is idempotent.** A second start (or a `dev:restart mock-snowflake`)
-  adds nothing. The mock's own fixture block
-  (`dev/mock-snowflake/fixtures/snowflake-env.txt`) is rewritten whenever the
-  port differs, so it always names the port the server listens on — a worktree
-  port offset shifts the service to `4792 + offset`.
+- **An existing real warehouse is never replaced.** A `SNOWFLAKE_ACCOUNT_HOST`
+  entry outside the managed section means the stack entry leaves the file
+  byte-identical and the web app keeps talking to your real warehouse. The
+  guard reads parsed entries, so `export KEY=value`, `KEY = value`,
+  `KEY = "value"  # prod` and a plain `KEY=value` all count.
+- **The section is kept current.** A port change — a different worktree offset,
+  or a lease that moved this worktree to a free offset — rewrites that one
+  section in place: it names the port the mock actually listens on
+  (`4792 + offset`), stays the only section, and a start that finds it identical
+  writes nothing.
+- **Your own CA keeps working.** The section names
+  `dev/mock-snowflake/fixtures/tls/ca-bundle.pem`, which holds the mock's
+  self-signed certificate followed by the contents of every CA file that
+  `NODE_EXTRA_CA_CERTS` already named in `.env.local` (outside the section) or in
+  the shell. Trust no longer depends on which line comes first, and the web app
+  still trusts a developer's other local certificates.
+
+`dev/local/services.ts` adds the bundle to the web app's command as
+`NODE_EXTRA_CA_CERTS` whenever the mock is in the selection. That export is what
+makes the certificate trusted: Node reads `NODE_EXTRA_CA_CERTS` at startup,
+before Next.js loads `.env*` into its own process, and `scripts/dev.sh` keeps an
+exported value ahead of the first line it would otherwise read from the file.
 
 ## Turning it off
 
@@ -66,7 +78,13 @@ pnpm dev:start app
 
 Both lines are dev-only and `.env.local` is gitignored. The generated
 certificate is a CA that signs only itself and names this one host, so the web
-app trusts the mock and nothing else. Do not use
+app trusts the mock and nothing else. Naming `cert.pem` directly is right when
+the mock is the only extra CA you trust; if you also trust another local CA, the
+stack's `fixtures/tls/ca-bundle.pem` holds the mock's certificate plus the CAs
+you already named, and that is the file it wires. If you later let the stack wire
+the mock, delete the block you appended by hand first: the stack never replaces a
+`SNOWFLAKE_ACCOUNT_HOST` it did not write, so it would leave that block alone and
+keep its own section out of the file. Do not use
 `NODE_TLS_REJECT_UNAUTHORIZED=0` instead: it turns certificate verification off
 for every host the Next.js process talks to.
 

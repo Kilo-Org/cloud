@@ -6,7 +6,9 @@ name: SBOM
 # The SBOM is uploaded as a retained workflow artifact (never committed).
 #
 # Container-image SBOMs are handled separately in deploy-kiloclaw.yml, where
-# they are attested against the image digest in GHCR.
+# they are attested against the image digest in GHCR. Dependabot alerts read
+# pnpm-lock.yaml directly; dependency-submission.yml submits what the KiloClaw
+# image installs outside it.
 
 on:
   push:

@@ -261,11 +261,10 @@ function formField(renderer: TestRenderer.ReactTestRenderer): Record<string, unk
 }
 
 function saveButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
-  const [save] = renderer.root.findAll(node => String(node.type) === 'Button');
-  if (!save) {
-    throw new Error('the limit form rendered no save button');
-  }
-  return propsOf(save);
+  // Save moved into the shared header, so the control's unavailable state is
+  // the header's own `doneDisabled`.
+  const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+  return { disabled: propsOf(header).doneDisabled };
 }
 
 const rangeMessage = i18n.t('organization.memberLimit.rangeError', {

@@ -1,6 +1,5 @@
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -15,9 +14,9 @@ import {
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { PreferenceRow } from '@/components/ui/preference-row';
@@ -37,18 +36,21 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { usePopOnce } from '@/lib/navigation/pop-once';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
   settings: OrgWithMembers['settings'];
+  onClose: () => void;
 }>;
 
 /** The field's and the save button's own 44pt box under the loading fill. */
 const SAVE_BAR_CLASS = 'w-full rounded-md bg-muted-soft';
 
-function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
-  const router = useRouter();
+function LowBalanceAlertForm({ organizationId, settings, onClose }: LowBalanceAlertFormProps) {
   const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const { email: myEmail } = useCurrentUserId();
 
@@ -115,7 +117,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       {
         onSuccess: () => {
           notificationHaptic(Haptics.NotificationFeedbackType.Success);
-          router.back();
+          // The user may have closed the sheet while the save was in flight;
+          // popping again would take the screen underneath with it.
+          onClose();
         },
       }
     );
@@ -123,86 +127,98 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   return (
     <>
-      <RowGroup>
-        <PreferenceRow
-          title={t('organization.lowBalanceAlert.enableA11y')}
-          value={enabled}
-          disabled={false}
-          onValueChange={value => {
-            setEnabled(value);
-            setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
-            revalidate(value, thresholdRef.current, emailsRef.current);
-            clearSaveError();
-          }}
-        />
-      </RowGroup>
-
-      {enabled && (
-        <>
-          <FormField
-            label={t('organization.lowBalanceAlert.thresholdLabel')}
-            required
-            placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
-            keyboardType="decimal-pad"
-            defaultValue={thresholdRef.current || undefined}
-            validate={thresholdError}
-            error={draftThresholdError ?? undefined}
-            onChangeText={value => {
-              thresholdRef.current = value;
-              setDraftThresholdError(fieldThresholdError(value));
-              revalidate(enabled, value, emailsRef.current);
+      <SheetHeader
+        title={t('organization.lowBalanceAlert.title')}
+        onDone={onSave}
+        onCancel={onClose}
+        doneLabel={t('common.save')}
+        doneDisabled={!canSave}
+        doneBusy={mutations.updateMinimumBalanceAlert.isPending}
+        topInset={headerTopInset}
+      />
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
+        <RowGroup>
+          <PreferenceRow
+            title={t('organization.lowBalanceAlert.enableA11y')}
+            value={enabled}
+            disabled={false}
+            onValueChange={value => {
+              setEnabled(value);
+              setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
+              revalidate(value, thresholdRef.current, emailsRef.current);
               clearSaveError();
             }}
           />
+        </RowGroup>
 
-          <View className="gap-1.5">
+        {enabled && (
+          <>
             <FormField
-              label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
+              label={t('organization.lowBalanceAlert.thresholdLabel')}
               required
-              placeholder={t('organization.inviteMember.emailPlaceholder')}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              defaultValue={emailsRef.current || undefined}
-              validate={emailsError}
+              placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
+              keyboardType="decimal-pad"
+              defaultValue={thresholdRef.current || undefined}
+              validate={thresholdError}
+              error={draftThresholdError ?? undefined}
               onChangeText={value => {
-                emailsRef.current = value;
-                revalidate(enabled, thresholdRef.current, value);
+                thresholdRef.current = value;
+                setDraftThresholdError(fieldThresholdError(value));
+                revalidate(enabled, value, emailsRef.current);
                 clearSaveError();
               }}
             />
-            <Text variant="caption">{t('organization.lowBalanceAlert.separateEmailsHint')}</Text>
-            <AccessibleStatus
-              message={saveError?.field === 'emails' ? saveError.message : null}
-              className="text-sm"
-            />
-          </View>
-        </>
-      )}
 
-      {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
-          P2), so AccessibleStatus is the single announcement owner here: one
-          announcement per platform, visuals preserved (tone error). A rejected
-          save names itself in localized copy — the server's schema message is
-          a JSON array, never a sentence a person should read. */}
-      <AccessibleStatus
-        message={saveError?.field === 'form' ? saveError.message : null}
-        className="text-sm"
-      />
+            <View className="gap-1.5">
+              <FormField
+                label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
+                required
+                placeholder={t('organization.inviteMember.emailPlaceholder')}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                defaultValue={emailsRef.current || undefined}
+                validate={emailsError}
+                onChangeText={value => {
+                  emailsRef.current = value;
+                  revalidate(enabled, thresholdRef.current, value);
+                  clearSaveError();
+                }}
+              />
+              <Text variant="caption">
+                {t('organization.lowBalanceAlert.separateEmailsHint')}
+              </Text>
+              <AccessibleStatus
+                message={saveError?.field === 'emails' ? saveError.message : null}
+                className="text-sm"
+              />
+            </View>
+          </>
+        )}
 
-      <Button
-        disabled={!canSave}
-        loading={mutations.updateMinimumBalanceAlert.isPending}
-        onPress={onSave}
-      >
-        <Text>{t('common.save')}</Text>
-      </Button>
+        {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
+            P2), so AccessibleStatus is the single announcement owner here: one
+            announcement per platform, visuals preserved (tone error). A rejected
+            save names itself in localized copy — the server's schema message is
+            a JSON array, never a sentence a person should read. */}
+        <AccessibleStatus
+          message={saveError?.field === 'form' ? saveError.message : null}
+          className="text-sm"
+        />
+      </SheetScrollView>
     </>
   );
 }
 
 export function LowBalanceAlertSheet() {
   const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
+  const closeSheet = usePopOnce();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
@@ -213,23 +229,30 @@ export function LowBalanceAlertSheet() {
   // forever) falling through to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <SheetScrollView
-        className="flex-1 bg-background"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-      >
-        <RowGroup>
-          <RowSkeleton trailing="switch" />
-        </RowGroup>
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-28 rounded" />
-          <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-32 rounded" />
-          <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
-        </View>
-        <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
-      </SheetScrollView>
+      <>
+        <SheetHeader
+          title={t('organization.lowBalanceAlert.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
+        <SheetScrollView
+          className="flex-1 bg-background"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+        >
+          <RowGroup>
+            <RowSkeleton trailing="switch" />
+          </RowGroup>
+          <View className="gap-1.5">
+            <Skeleton className="h-3.5 w-28 rounded" />
+            <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
+          </View>
+          <View className="gap-1.5">
+            <Skeleton className="h-3.5 w-32 rounded" />
+            <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, SAVE_BAR_CLASS)} />
+          </View>
+        </SheetScrollView>
+      </>
     );
   }
   if (organizationId == null || org == null) {
@@ -242,11 +265,14 @@ export function LowBalanceAlertSheet() {
   if (orgWithMembers.isError && !orgWithMembers.data) {
     return (
       <>
-        <View collapsable={false} className="bg-background px-4 pt-3">
-          <Text variant="large" className="text-center">
-            {t('organization.lowBalanceAlert.title')}
-          </Text>
-        </View>
+        {/* Nothing to commit until the read answers, so the header only closes;
+            the retry lives in the error block below. */}
+        <SheetHeader
+          title={t('organization.lowBalanceAlert.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
         <QueryError
           className="bg-background"
           onRetry={() => void orgWithMembers.refetch()}
@@ -256,23 +282,14 @@ export function LowBalanceAlertSheet() {
     );
   }
 
+  if (!orgWithMembers.data) {
+    return null;
+  }
   return (
-    <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName={SCREEN_BODY_CLASS}
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text variant="large" className="text-center">
-        {t('organization.lowBalanceAlert.title')}
-      </Text>
-
-      {orgWithMembers.data && (
-        <LowBalanceAlertForm
-          organizationId={organizationId}
-          settings={orgWithMembers.data.settings}
-        />
-      )}
-    </SheetScrollView>
+    <LowBalanceAlertForm
+      organizationId={organizationId}
+      settings={orgWithMembers.data.settings}
+      onClose={closeSheet}
+    />
   );
 }

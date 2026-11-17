@@ -574,39 +574,46 @@ describe('CenteredState first-frame paint', () => {
     expect(held.contentNode()).toBeUndefined();
     expect(held.scroll().contentContainerStyle).toBeUndefined();
 
-    // The probe reports with the device's insets. The surface's resolved
-    // insets land with the frame, so the first painted placement is the final
-    // one: no 0-inset band style paints in between.
+    // The probe reports with the device's insets. The scroller's own frame
+    // reaches the window bottom, so the reported bottom inset moves the band:
+    // the first painted placement must carry it, or the state would move again
+    // once the content height landed (the defect this test pins).
     native.surface.source = 'native';
-    native.surface.frame = { top: 0, bottom: 914 };
-    native.surface.bounds = { top: 0, bottom: 914 };
+    native.surface.frame = { top: 0, bottom: 900 };
+    native.surface.bounds = { top: 0, bottom: 900 };
     native.surface.safeAreaBottom = 24;
     native.surface.topInset = 52;
     native.surface.bottomInset = 24;
     held.rerender();
-    held.settle();
+    held.settle(80, 900 - 80);
     expectPainted(held);
-    // First paint: the band style built from the reported insets. The content
-    // height lands a frame later and centers at the same point (the docstring's
-    // equality), so no later frame moves it.
+    // First paint: the band style built from the reported insets. The band
+    // bottom sits one bottom inset above the window bottom while the scroller
+    // runs to the window bottom itself, so the scroller's bottom padding
+    // carries that inset; a placement built from zero insets would paint a
+    // smaller padding and move when it corrected.
     expect(held.scroll().contentContainerStyle).toEqual({
       flexGrow: 1,
-      minHeight: 340,
+      minHeight: 900 - 80,
       justifyContent: 'center',
       paddingTop: 16,
-      paddingBottom: 16,
+      paddingBottom: 24 + 16,
     });
-    // The measured layout keeps the same content-box paddings once the height
-    // is known.
+    // The measured layout centers the content in the same band: band top is
+    // the scroller's top (the top inset sits above it) and band bottom is the
+    // window bottom minus the bottom inset, so a content box of 188 centers
+    // 12 higher than the zero-inset placement would place it. Asserting the
+    // inset-carrying value is what proves the first paint is the final one.
     act(() => {
-      held.contentNode()?.props.onLayout?.(contentLayout as LayoutChangeEvent);
+      held.contentNode()?.props.onLayout?.({
+        nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+      } as LayoutChangeEvent);
     });
-    expect(held.scroll().contentContainerStyle).toEqual({
-      flexGrow: 1,
-      minHeight: 340,
-      paddingTop: 16,
-      paddingBottom: 16,
-    });
+    const placed = held.scroll().contentContainerStyle as {
+      paddingTop: number;
+    };
+    // Band: top 80, bottom 900 - 24 = 876; (796 - 188) / 2 = 304 below the top.
+    expect(placed.paddingTop).toBeCloseTo(304, 5);
     held.unmount();
   });
 });

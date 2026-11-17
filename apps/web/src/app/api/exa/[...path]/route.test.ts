@@ -592,6 +592,12 @@ describe('POST /api/exa/[...path]', () => {
       );
       expect(mockedFetch).toHaveBeenCalledTimes(1);
       expect(consoleError.mock.calls[0][1]).toMatchObject({ stage: 'cost_above_max' });
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        expect.any(ExaCostAbovePerCallMaximumError),
+        expect.objectContaining({
+          tags: expect.objectContaining({ usage_failure_stage: 'cost_above_max' }),
+        })
+      );
     });
 
     it('passes featureId from header and type from body to recordExaUsage', async () => {

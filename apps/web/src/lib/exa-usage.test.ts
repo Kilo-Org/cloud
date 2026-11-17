@@ -41,7 +41,9 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 // sentryLogger is console-silent in automated tests; capture its calls for the rejection assertions.
+// Keep every other export real, so a success-path log cannot fail with a missing-function error.
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
